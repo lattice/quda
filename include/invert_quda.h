@@ -6,6 +6,7 @@
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 #include <vector>
+#include <memory>
 
 namespace quda {
 
@@ -138,22 +139,22 @@ namespace quda {
     int num_offset;
 
     /** Offsets for multi-shift solver */
-    double offset[QUDA_MAX_MULTI_SHIFT];
+    double offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Solver tolerance for each offset */
-    double tol_offset[QUDA_MAX_MULTI_SHIFT];
+    double tol_offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Solver tolerance for each shift when refinement is applied using the heavy-quark residual */
-    double tol_hq_offset[QUDA_MAX_MULTI_SHIFT];
+    double tol_hq_offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Actual L2 residual norm achieved in solver for each offset */
-    double true_res_offset[QUDA_MAX_MULTI_SHIFT];
+    double true_res_offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Iterated L2 residual norm achieved in multi shift solver for each offset */
-    double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
+    double iter_res_offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
-    double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT];
+    double true_res_hq_offset[QUDA_MAX_ARRAY_SIZE];
 
 
     /** Number of steps in s-step algorithms */
@@ -418,14 +419,13 @@ namespace quda {
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
     std::vector<ColorSpinorField*> p;
-    bool init;
+   bool init;
 
   public:
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
-
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
-    void solve(ColorSpinorField& out, ColorSpinorField& in);
+    
   };
 
 
@@ -919,7 +919,61 @@ namespace quda {
     void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in);
   };
 
+  class BlockSolver  {
 
+  protected:
+    SolverParam &param;
+    TimeProfile &profile;
+
+  public:
+    BlockSolver(SolverParam &param, TimeProfile &profile) :
+    param(param), profile(profile) { ; }
+    virtual ~BlockSolver() { ; }
+
+    virtual void operator()(ColorSpinorField& out, ColorSpinorField& in) = 0;
+    bool convergence(const double &r2, const double &hq2, const double &r2_tol,
+         const double &hq_tol) const;
+    static double stopping(const double &tol, const double &b2, QudaResidualType residual_type);
+        /**
+       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
+     */
+    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
+
+    /**
+  Prints out the summary of the solver convergence (requires a
+  versbosity of QUDA_SUMMARIZE).  Assumes
+  SolverParam.true_res and SolverParam.true_res_hq has
+  been set
+    */
+    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
+  };
+
+  class BlockCG : public BlockSolver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    // pointers to fields to avoid multiple creation overhead
+    std::shared_ptr<ColorSpinorField> yp, rp, App, tmpp;
+    std::vector<ColorSpinorField*> p;
+    std::shared_ptr<ColorSpinorField> x_sloppy_savedp, pp, qp, tmp_matsloppyp;
+    std::shared_ptr<ColorSpinorField> p_oldp; // only for BLOCKSOLVER_PRECISE_Q
+    bool init;
+
+    template <int n>
+    void solve_n(ColorSpinorField& out, ColorSpinorField& in);
+    int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+
+    
+
+  public:
+    BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~BlockCG();
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+
+    
+  };
 
   /**
      This computes the optimum guess for the system Ax=b in the L2

@@ -1641,6 +1641,7 @@ double clover_coeff = 0.1;
 bool compute_clover = false;
 double tol = 1e-7;
 double tol_hq = 0.;
+double rdelta = 0.1;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
@@ -1755,6 +1756,7 @@ void usage(char** argv )
   printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
+  printf("    --rdelta  <rdelta>                        # reliable update delta\n");
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
   printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
@@ -2375,6 +2377,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     tol_hq= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--rdelta") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    rdelta= atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;

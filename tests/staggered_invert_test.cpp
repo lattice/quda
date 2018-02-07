@@ -51,6 +51,7 @@ cpuGaugeField *cpuLong = NULL;
 
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
+extern double rdelta; // reliable delta
 extern int test_type;
 extern int xdim;
 extern int ydim;
@@ -128,7 +129,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->tol_restart = 1e-3; //now theoretical background for this parameter... 
   inv_param->maxiter = niter;
-  inv_param->reliable_delta = 1e-1;
+  inv_param->reliable_delta = rdelta;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param->pipeline = pipeline;
@@ -174,7 +175,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   inv_param->dslash_type = dslash_type;
 
-  inv_param->sp_pad = X1*X2*X3/2;
+  inv_param->sp_pad = 0;// X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   inv_param->input_location = QUDA_CPU_FIELD_LOCATION;

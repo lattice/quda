@@ -183,6 +183,7 @@ namespace quda {
 #endif // USE_TEXTURE_OBJECTS
 
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      constexpr int register_block_size = 1;
       
       switch(DS_type){
         case 0:

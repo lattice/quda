@@ -137,6 +137,7 @@ set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
+set(QUDA_BLOCKSOLVER_NVTX OFF CACHE BOOL "add nvtx markup to block solver calls for the visual profiler")
 
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
@@ -147,6 +148,8 @@ set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
+
+set(QUDA_SWIZZLE OFF CACHE BOOL "use swizzle optimization for Dslash")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -160,16 +163,18 @@ mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
+mark_as_advanced(QUDA_BLOCKSOLVER_NVTX)
+
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
+mark_as_advanced(QUDA_SWIZZLE)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
 set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
-
 
 #######################################################################
 # everything below here is processing the setup
@@ -344,6 +349,10 @@ if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
 
+if(QUDA_SWIZZLE)
+  add_definitions(-DSWIZZLE)
+endif()
+
 if (QUDA_MULTIGRID)
   add_definitions(-DCUBLAS_LIB)
   add_definitions(-DGPU_MULTIGRID)
@@ -352,10 +361,12 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
+# MAX_MULTI_BLAS_N
+  add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})
 endif()
 
 if(QUDA_ALTRELIABLE)
-  add_definitions(-DALTRELIABE)
+  add_definitions(-DALTRELIABLE)
 endif()
 
 if(QUDA_USE_EIGEN)
@@ -438,6 +449,11 @@ if(QUDA_INTERFACE_NVTX)
   add_definitions(-DINTERFACE_NVTX)
   set(QUDA_NVTX ON)
 endif(QUDA_INTERFACE_NVTX)
+
+if(QUDA_BLOCKSOLVER_NVTX)
+  add_definitions(-DBLOCKSOLVER_NVTX)
+  set(QUDA_NVTX ON)
+endif(QUDA_BLOCKSOLVER_NVTX)
 
 if(QUDA_NVTX)
   FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64/)

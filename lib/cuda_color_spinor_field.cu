@@ -58,7 +58,8 @@ namespace quda {
          (param.create == QUDA_REFERENCE_FIELD_CREATE && (param.is_composite || param.is_component))) {
       reset(param);
     } else {
-      errorQuda("Undefined behaviour"); // else silent bug possible?
+      // errorQuda("Undefined behaviour"); // else silent bug possible?
+      reset(param);
     }
 
     // This must be set before create is called
@@ -233,6 +234,7 @@ namespace quda {
          param.siteSubset = QUDA_PARITY_SITE_SUBSET;
          param.nDim = nDim;
          memcpy(param.x, x, nDim*sizeof(int));
+         param.x[4] = 1;
          param.create = QUDA_REFERENCE_FIELD_CREATE;
          param.v = v;
          param.norm = norm;
@@ -272,7 +274,7 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if (!composite_descr.is_composite || composite_descr.is_component)
+    // if (!composite_descr.is_composite || composite_descr.is_component)
       createTexObject();
 #endif
   }
@@ -497,6 +499,7 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
     if (!composite_descr.is_composite || composite_descr.is_component) {
+    // if (!composite_descr.is_composite || composite_descr.is_component)
       destroyTexObject();
       destroyGhostTexObject();
     }
@@ -536,7 +539,7 @@ namespace quda {
   }
 
   void cudaColorSpinorField::zeroPad() {
-    size_t pad_bytes = (stride - volume) * precision * fieldOrder;
+    size_t pad_bytes = 0;//(stride - volume) * precision * fieldOrder;
     int Npad = nColor * nSpin * 2 / fieldOrder;
 
     if (composite_descr.is_composite && !composite_descr.is_component){//we consider the whole eigenvector set:
@@ -713,7 +716,7 @@ namespace quda {
 
       void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
 
-      cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream);
+      cudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], cudaMemcpyDeviceToHost, *stream);
 
     } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) { // do multiple cudaMemcpys
 
@@ -735,7 +738,7 @@ namespace quda {
     
       size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
       size_t dpitch = x4*len;
-      size_t spitch = stride*Nvec*precision;
+      size_t spitch = composite_descr.is_composite ? composite_descr.stride*Nvec*precision : stride*Nvec*precision;
 
       // QUDA Memcpy NPad's worth. 
       //  -- Dest will point to the right beginning PAD. 
@@ -743,7 +746,7 @@ namespace quda {
       //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
       for (int s=0; s<x4; s++) { // loop over multiple 4-d volumes (if they exist)
 	void *dst = (char*)ghost_spinor + s*len;
-	void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	void *src = composite_descr.is_composite ? (char*)v + (offset + s*composite_descr.volumeCB*Npad)*Nvec*precision : (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
 	cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
 	if (precision == QUDA_HALF_PRECISION) {
@@ -810,17 +813,11 @@ namespace quda {
 					 const int dim, const QudaDirection dir, 
 					 const int dagger, cudaStream_t* stream) 
   {
-    int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
-
-    int len = nFace*ghostFace[dim]*Nint*precision;
     const void *src = ghost_spinor;
-  
     int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
     void *ghost_dst = (char*)ghost_recv_buffer_d[bufferIndex] + precision*ghost_offset;
 
-    if (precision == QUDA_HALF_PRECISION) len += nFace*ghostFace[dim]*sizeof(float);
-
-    cudaMemcpyAsync(ghost_dst, src, len, cudaMemcpyHostToDevice, *stream);
+    cudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], cudaMemcpyHostToDevice, *stream);
   }
 
 
@@ -1074,11 +1071,11 @@ namespace quda {
 
 	size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
 	size_t dpitch = x4*len;
-	size_t spitch = stride*Nvec*precision;
+        size_t spitch = composite_descr.is_composite ? composite_descr.stride*Nvec*precision : stride*Nvec*precision;
 
 	for (int s=0; s<x4; s++) {
 	  void *dst = (char*)ghost_dst + s*len;
-	  void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	  void *src = composite_descr.is_composite ? (char*)v + (offset + s*composite_descr.volumeCB*Npad)*Nvec*precision : (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
 	  // start the copy
 	  cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 

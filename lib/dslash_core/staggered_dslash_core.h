@@ -2,224 +2,90 @@
 #undef SHARED_FLOATS_PER_THREAD 
 #define SHARED_FLOATS_PER_THREAD 6
 
-//#define kernel_type param.kernel_type
-
 // input spinor
 #if (DD_PREC==0)
+
+#define gaugeFloat double
+#define gaugeFloat2 double2
 #define spinorFloat double
 #define spinorFloat2 double2
-/*
-   double2 I0, I1, I2;
-   */
-
-#define i00_re I0.x
-#define i00_im I0.y
-#define i01_re I1.x
-#define i01_im I1.y
-#define i02_re I2.x
-#define i02_im I2.y
-
-#define t00_re T0.x
-#define t00_im T0.y
-#define t01_re T1.x
-#define t01_im T1.y
-#define t02_re T2.x
-#define t02_im T2.y
-
 #define time_boundary t_boundary
 
 #else
 
+#define gaugeFloat float
+#define gaugeFloat2 float2
 #define spinorFloat float
 #define spinorFloat2 float2
-//float2 I0, I1, I2;
-
-#define i00_re I0.x
-#define i00_im I0.y
-#define i01_re I1.x
-#define i01_im I1.y
-#define i02_re I2.x
-#define i02_im I2.y
-
-#define t00_re T0.x
-#define t00_im T0.y
-#define t01_re T1.x
-#define t01_im T1.y
-#define t02_re T2.x
-#define t02_im T2.y
-
 #define time_boundary t_boundary_f
 
 #endif
 
-// gauge link
-#if (DD_PREC==0)
+// gauge links
+#define fat00_re FAT[0].x
+#define fat00_im FAT[0].y
+#define fat01_re FAT[1].x
+#define fat01_im FAT[1].y
+#define fat02_re FAT[2].x
+#define fat02_im FAT[2].y
+#define fat10_re FAT[3].x
+#define fat10_im FAT[3].y
+#define fat11_re FAT[4].x
+#define fat11_im FAT[4].y
+#define fat12_re FAT[5].x
+#define fat12_im FAT[5].y
+#define fat20_re FAT[6].x
+#define fat20_im FAT[6].y
+#define fat21_re FAT[7].x
+#define fat21_im FAT[7].y
+#define fat22_re FAT[8].x
+#define fat22_im FAT[8].y
 
-#define fat00_re FAT0.x
-#define fat00_im FAT0.y
-#define fat01_re FAT1.x
-#define fat01_im FAT1.y
-#define fat02_re FAT2.x
-#define fat02_im FAT2.y
-#define fat10_re FAT3.x
-#define fat10_im FAT3.y
-#define fat11_re FAT4.x
-#define fat11_im FAT4.y
-#define fat12_re FAT5.x
-#define fat12_im FAT5.y
-#define fat20_re FAT6.x
-#define fat20_im FAT6.y
-#define fat21_re FAT7.x
-#define fat21_im FAT7.y
-#define fat22_re FAT8.x
-#define fat22_im FAT8.y
+#define long00_re LONG[0].x
+#define long00_im LONG[0].y
+#define long01_re LONG[1].x
+#define long01_im LONG[1].y
+#define long02_re LONG[2].x
+#define long02_im LONG[2].y
+#define long10_re LONG[3].x
+#define long10_im LONG[3].y
+#define long11_re LONG[4].x
+#define long11_im LONG[4].y
+#define long12_re LONG[5].x
+#define long12_im LONG[5].y
+#define long20_re LONG[6].x
+#define long20_im LONG[6].y
+#define long21_re LONG[7].x
+#define long21_im LONG[7].y
+#define long22_re LONG[8].x
+#define long22_im LONG[8].y
 
-#define long00_re LONG0.x
-#define long00_im LONG0.y
-#define long01_re LONG1.x
-#define long01_im LONG1.y
-#define long02_re LONG2.x
-#define long02_im LONG2.y
-#define long10_re LONG3.x
-#define long10_im LONG3.y
-#define long11_re LONG4.x
-#define long11_im LONG4.y
-#define long12_re LONG5.x
-#define long12_im LONG5.y
-#define long20_re LONG6.x
-#define long20_im LONG6.y
-#define long21_re LONG7.x
-#define long21_im LONG7.y
-#define long22_re LONG8.x
-#define long22_im LONG8.y
+#define MAT_MUL_V(VOUT, M, V)			\
+  complex<spinorFloat> VOUT[3];			\
+  for (int i=0; i<3; i++) {			\
+    VOUT[i] = M[i*3+0]*V[0];			\
+    for (int j=1; j<3; j++) {			\
+      VOUT[i] += M[i*3+j]*V[j];			\
+    }						\
+  }
 
+#define ADJ_MAT_MUL_V(VOUT, M, V)		\
+  complex<spinorFloat> VOUT[3];			\
+  for (int i=0; i<3; i++) {			\
+    VOUT[i] = conj(M[0*3+i])*V[0];		\
+    for (int j=1; j<3; j++) {			\
+      VOUT[i] += conj(M[j*3+i])*V[j];		\
+    }						\
+  }
+
+#include "read_gauge.h"
+#include "io_spinor.h"
+
+
+#if (DD_IMPROVED==1)
+#define NFACE 3
 #else
-
-#if (DD_FAT_RECON == 18) //18 (no) reconstruct
-#define fat00_re FAT0.x
-#define fat00_im FAT0.y
-#define fat01_re FAT1.x
-#define fat01_im FAT1.y
-#define fat02_re FAT2.x
-#define fat02_im FAT2.y
-#define fat10_re FAT3.x
-#define fat10_im FAT3.y
-#define fat11_re FAT4.x
-#define fat11_im FAT4.y
-#define fat12_re FAT5.x
-#define fat12_im FAT5.y
-#define fat20_re FAT6.x
-#define fat20_im FAT6.y
-#define fat21_re FAT7.x
-#define fat21_im FAT7.y
-#define fat22_re FAT8.x
-#define fat22_im FAT8.y
-#else
-#define fat00_re FAT0.x
-#define fat00_im FAT0.y
-#define fat01_re FAT0.z
-#define fat01_im FAT0.w
-#define fat02_re FAT1.x
-#define fat02_im FAT1.y
-#define fat10_re FAT1.z
-#define fat10_im FAT1.w
-#define fat11_re FAT2.x
-#define fat11_im FAT2.y
-#define fat12_re FAT2.z
-#define fat12_im FAT2.w
-#define fat20_re FAT3.x
-#define fat20_im FAT3.y
-#define fat21_re FAT3.z
-#define fat21_im FAT3.w
-#define fat22_re FAT4.x
-#define fat22_im FAT4.y
-#endif // DD_FAT_RECON
-
-#if (DD_LONG_RECON == 18) //18 (no) reconstruct
-#define long00_re LONG0.x
-#define long00_im LONG0.y
-#define long01_re LONG1.x
-#define long01_im LONG1.y
-#define long02_re LONG2.x
-#define long02_im LONG2.y
-#define long10_re LONG3.x
-#define long10_im LONG3.y
-#define long11_re LONG4.x
-#define long11_im LONG4.y
-#define long12_re LONG5.x
-#define long12_im LONG5.y
-#define long20_re LONG6.x
-#define long20_im LONG6.y
-#define long21_re LONG7.x
-#define long21_im LONG7.y
-#define long22_re LONG8.x
-#define long22_im LONG8.y
-#else
-#define long00_re LONG0.x
-#define long00_im LONG0.y
-#define long01_re LONG0.z
-#define long01_im LONG0.w
-#define long02_re LONG1.x
-#define long02_im LONG1.y
-#define long10_re LONG1.z
-#define long10_im LONG1.w
-#define long11_re LONG2.x
-#define long11_im LONG2.y
-#define long12_re LONG2.z
-#define long12_im LONG2.w
-#define long20_re LONG3.x
-#define long20_im LONG3.y
-#define long21_re LONG3.z
-#define long21_im LONG3.w
-#define long22_re LONG4.x
-#define long22_im LONG4.y
-#endif
-
-#endif
-
-// conjugated gauge link
-#define fatT00_re (+fat00_re)
-#define fatT00_im (-fat00_im)
-#define fatT01_re (+fat10_re)
-#define fatT01_im (-fat10_im)
-#define fatT02_re (+fat20_re)
-#define fatT02_im (-fat20_im)
-#define fatT10_re (+fat01_re)
-#define fatT10_im (-fat01_im)
-#define fatT11_re (+fat11_re)
-#define fatT11_im (-fat11_im)
-#define fatT12_re (+fat21_re)
-#define fatT12_im (-fat21_im)
-#define fatT20_re (+fat02_re)
-#define fatT20_im (-fat02_im)
-#define fatT21_re (+fat12_re)
-#define fatT21_im (-fat12_im)
-#define fatT22_re (+fat22_re)
-#define fatT22_im (-fat22_im)
-
-#define longT00_re (+long00_re)
-#define longT00_im (-long00_im)
-#define longT01_re (+long10_re)
-#define longT01_im (-long10_im)
-#define longT02_re (+long20_re)
-#define longT02_im (-long20_im)
-#define longT10_re (+long01_re)
-#define longT10_im (-long01_im)
-#define longT11_re (+long11_re)
-#define longT11_im (-long11_im)
-#define longT12_re (+long21_re)
-#define longT12_im (-long21_im)
-#define longT20_re (+long02_re)
-#define longT20_im (-long02_im)
-#define longT21_re (+long12_re)
-#define longT21_im (-long12_im)
-#define longT22_re (+long22_re)
-#define longT22_im (-long22_im)
-
-#if ((CUDA_VERSION >= 4010) && (__COMPUTE_CAPABILITY__ >= 200)) // NVVM compiler
-#define VOLATILE
-#else // Open64 compiler
-#define VOLATILE volatile
+#define NFACE 1
 #endif
 
 #ifdef PARALLEL_DIR
@@ -233,138 +99,54 @@ extern __shared__ spinorFloat s_data[];
 #define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi+
 #endif
 
-VOLATILE spinorFloat *s = s_data + 
+spinorFloat *s = s_data + 
   SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*((threadIdx.x+blockDim.x*threadIdx.y)/SHARED_STRIDE)
   + ((threadIdx.x+blockDim.x*threadIdx.y) % SHARED_STRIDE);
 
 #endif // PARALLEL_DIR
 
-// output spinor
-spinorFloat o00_re;
-spinorFloat o00_im;
-spinorFloat o01_re;
-spinorFloat o01_im;
-spinorFloat o02_re;
-spinorFloat o02_im;
-
-#include "read_gauge.h"
-#include "io_spinor.h"
-
-#define MAT_MUL_V(VOUT, M, V)                   \
-    spinorFloat VOUT##0_re = M##00_re * V##00_re; \
-  VOUT##0_re -= M##00_im * V##00_im;            \
-  VOUT##0_re += M##01_re * V##01_re;            \
-  VOUT##0_re -= M##01_im * V##01_im;            \
-  VOUT##0_re += M##02_re * V##02_re;            \
-  VOUT##0_re -= M##02_im * V##02_im;            \
-  spinorFloat VOUT##0_im = M##00_re * V##00_im; \
-  VOUT##0_im += M##00_im * V##00_re;            \
-  VOUT##0_im += M##01_re * V##01_im;            \
-  VOUT##0_im += M##01_im * V##01_re;            \
-  VOUT##0_im += M##02_re * V##02_im;            \
-  VOUT##0_im += M##02_im * V##02_re;            \
-  spinorFloat VOUT##1_re = M##10_re * V##00_re; \
-  VOUT##1_re -= M##10_im * V##00_im;            \
-  VOUT##1_re += M##11_re * V##01_re;            \
-  VOUT##1_re -= M##11_im * V##01_im;            \
-  VOUT##1_re += M##12_re * V##02_re;            \
-  VOUT##1_re -= M##12_im * V##02_im;            \
-  spinorFloat VOUT##1_im = M##10_re * V##00_im; \
-  VOUT##1_im += M##10_im * V##00_re;            \
-  VOUT##1_im += M##11_re * V##01_im;            \
-  VOUT##1_im += M##11_im * V##01_re;            \
-  VOUT##1_im += M##12_re * V##02_im;            \
-  VOUT##1_im += M##12_im * V##02_re;            \
-  spinorFloat VOUT##2_re = M##20_re * V##00_re; \
-  VOUT##2_re -= M##20_im * V##00_im;            \
-  VOUT##2_re += M##21_re * V##01_re;            \
-  VOUT##2_re -= M##21_im * V##01_im;            \
-  VOUT##2_re += M##22_re * V##02_re;            \
-  VOUT##2_re -= M##22_im * V##02_im;            \
-  spinorFloat VOUT##2_im = M##20_re * V##00_im; \
-  VOUT##2_im += M##20_im * V##00_re;            \
-  VOUT##2_im += M##21_re * V##01_im;            \
-  VOUT##2_im += M##21_im * V##01_re;            \
-  VOUT##2_im += M##22_re * V##02_im;            \
-  VOUT##2_im += M##22_im * V##02_re;
-
-#define ADJ_MAT_MUL_V(VOUT, M, V)               \
-    spinorFloat VOUT##0_re = M##00_re * V##00_re; \
-  VOUT##0_re += M##00_im * V##00_im;            \
-  VOUT##0_re += M##10_re * V##01_re;            \
-  VOUT##0_re += M##10_im * V##01_im;            \
-  VOUT##0_re += M##20_re * V##02_re;            \
-  VOUT##0_re += M##20_im * V##02_im;            \
-  spinorFloat VOUT##0_im = M##00_re * V##00_im; \
-  VOUT##0_im -= M##00_im * V##00_re;            \
-  VOUT##0_im += M##10_re * V##01_im;            \
-  VOUT##0_im -= M##10_im * V##01_re;            \
-  VOUT##0_im += M##20_re * V##02_im;            \
-  VOUT##0_im -= M##20_im * V##02_re;            \
-  spinorFloat VOUT##1_re = M##01_re * V##00_re; \
-  VOUT##1_re += M##01_im * V##00_im;            \
-  VOUT##1_re += M##11_re * V##01_re;            \
-  VOUT##1_re += M##11_im * V##01_im;            \
-  VOUT##1_re += M##21_re * V##02_re;            \
-  VOUT##1_re += M##21_im * V##02_im;            \
-  spinorFloat VOUT##1_im = M##01_re * V##00_im; \
-  VOUT##1_im -= M##01_im * V##00_re;            \
-  VOUT##1_im += M##11_re * V##01_im;            \
-  VOUT##1_im -= M##11_im * V##01_re;            \
-  VOUT##1_im += M##21_re * V##02_im;            \
-  VOUT##1_im -= M##21_im * V##02_re;            \
-  spinorFloat VOUT##2_re = M##02_re * V##00_re; \
-  VOUT##2_re += M##02_im * V##00_im;            \
-  VOUT##2_re += M##12_re * V##01_re;            \
-  VOUT##2_re += M##12_im * V##01_im;            \
-  VOUT##2_re += M##22_re * V##02_re;            \
-  VOUT##2_re += M##22_im * V##02_im;            \
-  spinorFloat VOUT##2_im = M##02_re * V##00_im; \
-  VOUT##2_im -= M##02_im * V##00_re;            \
-  VOUT##2_im += M##12_re * V##01_im;            \
-  VOUT##2_im -= M##12_im * V##01_re;            \
-  VOUT##2_im += M##22_re * V##02_im;            \
-  VOUT##2_im -= M##22_im * V##02_re;
-
-
+complex<gaugeFloat> FAT[9];
 #if (DD_IMPROVED==1)
-#define NFACE 3
-#else
-#define NFACE 1
+complex<gaugeFloat> LONG[9];
 #endif
 
-  const auto *X = param.X;
-  const auto *Xh = param.Xh;
-  const int& fat_stride = param.gauge_stride;
+// output spinor
+complex<spinorFloat> O[reg_block_size][3];
+complex<spinorFloat> tmp[3];
+
+const auto *X = param.X;
+const auto *Xh = param.Xh;
+const int& fat_stride = param.gauge_stride;
 #if (DD_IMPROVED == 1)
-  const int& long_stride = param.long_gauge_stride;
+const int& long_stride = param.long_gauge_stride;
 #endif
 #if (DD_PREC == 2) // half precision
-  const float& fat_link_max = param.fat_link_max;
+const float& fat_link_max = param.fat_link_max;
 #endif
 
 #if ((DD_LONG_RECON==9 || DD_LONG_RECON==13) && DD_IMPROVED==1)
-#if (DD_PREC==0) // double precision
-  double PHASE = 0.;
-#else
-  float PHASE = 0.f;
-#endif
+gaugeFloat PHASE = static_cast<gaugeFloat>(0.0);
 #endif
 
-  int sid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
-  if (sid >= param.threads) return;
+int idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
+if (idx >= param.threads) return;
 
-  int src_idx = blockIdx.y*blockDim.y + threadIdx.y;
-  if (src_idx >= param.Ls) return;
+int src_idx = reg_block_size*(blockIdx.y*blockDim.y + threadIdx.y);
+if (src_idx >= param.Ls) return;
+
+//multisrc modification:
+int block_src_offset = (param.is_composite) ? 3 : 1;
+int Volh             = (param.is_composite) ? param.composite_Vh : Vh;
+
+if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
   const int X1X0 = X[1]*X[0];
   const int X2X1X0 = X[2]*X1X0;
-#ifdef MULTI_GPU
 #if (DD_IMPROVED == 1)
   const int X3X1X0 = X[3]*X1X0;
 #endif
   const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
-#endif
+
 
   int za,zb; 
   int x0h;
@@ -374,44 +156,37 @@ spinorFloat o02_im;
 
   if (kernel_type == INTERIOR_KERNEL) {
     //data order: X4 X3 X2 X1h
-    za = sid/Xh[0];
-    x0h = sid - za*Xh[0];
+    za = idx/Xh[0];
+    x0h = idx - za*Xh[0];
     zb = za / X[1];
     y[1] = za - zb*X[1];
     y[3] = zb / X[2];
     y[2] = zb - y[3]*X[2];
     x0odd = (y[1] + y[2] + y[3] + param.parity) & 1;
     y[0] = 2*x0h + x0odd;
-    full_idx = 2*sid + x0odd;
-  } else {
-    coordsFromFaceIndexStaggered<kernel_type,NFACE,2>(y, sid, param);
+    full_idx = 2*idx + x0odd;
+  } else { // !INTERIOR_KERNEL
+    coordsFromFaceIndexStaggered<kernel_type,NFACE,2>(y, idx, param);
     full_idx = ((y[3]*X[2] +y[2])*X[1] +y[1])*X[0]+y[0];
-    sid = full_idx>>1;
+    idx = full_idx>>1;
   }
 
+  for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+    for (int i=0; i<3; i++) O[reg_src][i] = static_cast<spinorFloat>(0.0);
+  }
 
-#if (DD_PREC == 0) // double precision
-  o00_re = o00_im = 0.0;
-  o01_re = o01_im = 0.0;
-  o02_re = o02_im = 0.0;
-#else 
-  o00_re = o00_im = 0.f;
-  o01_re = o01_im = 0.f;
-  o02_re = o02_im = 0.f;
-#endif
 #if(DD_FAT_RECON == 13 || DD_FAT_RECON == 9)
-int fat_sign = 1;
+  int fat_sign = 1;
 #endif
 #if((DD_LONG_RECON == 13 || DD_LONG_RECON == 9) && DD_IMPROVED==1)
-int long_sign = 1;
+  int long_sign = 1;
 #endif
 
 #ifdef PARALLEL_DIR
 if (threadId.z & 1)
 #endif // PARALLEL_DIR
-{
+  {
   //direction: +X
-
 
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
   int fat_sign = (y[3]%2 == 1) ? -1 : 1;
@@ -420,7 +195,7 @@ if (threadId.z & 1)
   int long_sign = (y[3]%2 == 1) ? -1 : 1;
 #endif
 
-  int ga_idx = sid;
+  int ga_idx = idx;
 
 #ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] < (X[0]-1)) )|| (kernel_type == EXTERIOR_KERNEL_X && y[0] >= (X[0]-1) ))
@@ -428,41 +203,26 @@ if (threadId.z & 1)
   {
     int sp_idx_1st_nbr = ((y[0]==(X[0]-1)) ? full_idx-(X[0]-1) : full_idx+1) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
+    RECONSTRUCT_FAT_GAUGE_MATRIX(0, fat, sp_idx_1st_nbr, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-    int norm_idx1 = nbr_idx1;
-#endif	   
-#ifdef MULTI_GPU
-    if ( (kernel_type == EXTERIOR_KERNEL_X)){
-      int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;	
-      nbr_idx1 = param.ghostOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0]+ space_con;
-      stride1 = NFACE*ghostFace[0]*param.Ls;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if ( (kernel_type == EXTERIOR_KERNEL_X)){
+	int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;
+	nbr_idx1 = param.ghostOffset[0][1] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0] + space_con;
 #if (DD_PREC == 2) //half precision
-      norm_idx1 = param.ghostNormOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0]+ space_con;
+	norm_idx1 = param.ghostNormOffset[0][1] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0] + space_con;
 #endif
-      READ_1ST_NBR_SPINOR(GHOSTSPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(0, fat, sp_idx_1st_nbr, fat_sign);
-      MAT_MUL_V(A, fat, i);    
-      o00_re += A0_re;
-      o00_im += A0_im;
-      o01_re += A1_re;
-      o01_im += A1_im;
-      o02_re += A2_re;
-      o02_im += A2_im;
-    }else 
-#endif
-    {
-      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(0, fat, sp_idx_1st_nbr, fat_sign);
-      MAT_MUL_V(A, fat, i);    
-      o00_re += A0_re;
-      o00_im += A0_im;
-      o01_re += A1_re;
-      o01_im += A1_im;
-      o02_re += A2_re;
-      o02_im += A2_im;
-    }
+	READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[0]*param.Ls);
+      } else {
+	READ_1ST_NBR_SPINOR(tmp, SPINORTEX, nbr_idx1, param.sp_stride);
+      }
+      MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += A[i];
+    } // register block
   }
 
 #if (DD_IMPROVED==1)
@@ -473,34 +233,26 @@ if (threadId.z & 1)
     int sp_idx_3rd_nbr = ((y[0] >= (X[0]-3)) ? full_idx-(X[0]-3) : full_idx+3) >> 1;
     READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx, long_stride);        
     READ_LONG_PHASE(LONGPHASE0TEX, 0, ga_idx, long_stride);
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
-    int stride3 = param.sp_stride;    
-#if (DD_PREC == 2) //half precision
-    int norm_idx3 = nbr_idx3;
-#endif	 
-    spinorFloat2 T0, T1, T2;
-#ifdef MULTI_GPU
-    if ( (kernel_type == EXTERIOR_KERNEL_X)){
-      int space_con = ((y[3]*X[2]+y[2])*X[1] + y[1])/2;		
-      nbr_idx3 = param.ghostOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0]+ space_con;
-      stride3 = NFACE*ghostFace[0]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx3 = param.ghostNormOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0]+ space_con;
-#endif	
-      READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
-    } else
-#endif
-    {
-      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
-    }
     RECONSTRUCT_LONG_GAUGE_MATRIX(0, long, ga_idx, long_sign);
-    MAT_MUL_V(B, long, t);        
-    o00_re += B0_re;
-    o00_im += B0_im;
-    o01_re += B1_re;
-    o01_im += B1_im;
-    o02_re += B2_re;
-    o02_im += B2_im;  
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if ( (kernel_type == EXTERIOR_KERNEL_X)){
+	int space_con = ((y[3]*X[2]+y[2])*X[1] + y[1])/2;
+	nbr_idx3 = param.ghostOffset[0][1] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0] + space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx3 = param.ghostNormOffset[0][1] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0] + space_con;
+#endif
+	READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[0]*param.Ls);
+      } else {
+	READ_3RD_NBR_SPINOR(tmp, SPINORTEX, nbr_idx3, param.sp_stride);
+      }
+      MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += B[i];
+    } // register block
   }
 
 #endif
@@ -521,53 +273,37 @@ if (!(threadIdx.z & 1))
 #endif
   int dir =1;
 
-#ifdef MULTI_GPU
   int space_con = ((y[3]*X[2] + y[2])*X[1] + y[1]) >>1;
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] >= 1)) || (kernel_type == EXTERIOR_KERNEL_X && y[0] < 1))
 #endif
   {
     int sp_idx_1st_nbr = ((y[0]==0) ? full_idx+(X[0]-1) : full_idx-1) >> 1;
-    int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
-    if ((y[0] -1) < 0){
-      fat_idx = half_volume + space_con;
-    }
+    int fat_idx = (y[0]-1 < 0) ? (half_volume + space_con ) : sp_idx_1st_nbr;
+#else
+    int fat_idx = sp_idx_1st_nbr;
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
+    RECONSTRUCT_FAT_GAUGE_MATRIX(1, fat, sp_idx_1st_nbr, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-    int norm_idx1 = nbr_idx1;
-#endif	 
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_X){
-      nbr_idx1 = param.ghostOffset[0][0] +  src_idx*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0]+ space_con;
-      stride1 = NFACE*ghostFace[0]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx1 = param.ghostNormOffset[0][0] + src_idx*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0]+ space_con;
-#endif	
-      READ_1ST_NBR_SPINOR(GHOSTSPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(1, fat, sp_idx_1st_nbr, fat_sign);
-      ADJ_MAT_MUL_V(A, fat, i);       
-      o00_re -= A0_re;
-      o00_im -= A0_im;
-      o01_re -= A1_re;
-      o01_im -= A1_im;
-      o02_re -= A2_re;
-      o02_im -= A2_im;
-    }else
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
-    {
-      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(1, fat, sp_idx_1st_nbr, fat_sign);
-      ADJ_MAT_MUL_V(A, fat, i);       
-      o00_re -= A0_re;
-      o00_im -= A0_im;
-      o01_re -= A1_re;
-      o01_im -= A1_im;
-      o02_re -= A2_re;
-      o02_im -= A2_im;
-    }
+      if (kernel_type == EXTERIOR_KERNEL_X){
+	nbr_idx1 = param.ghostOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0] + space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx1 = param.ghostNormOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0] + space_con;
+#endif
+	READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[0]*param.Ls);
+      } else {
+	READ_1ST_NBR_SPINOR(tmp, SPINORTEX, nbr_idx1, param.sp_stride);
+      }
+      ADJ_MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= A[i];
+    } // register block
   }
 
 #if (DD_IMPROVED==1)
@@ -577,47 +313,37 @@ if (!(threadIdx.z & 1))
 #endif
   {
     int sp_idx_3rd_nbr = ((y[0]<3) ? full_idx+(X[0]-3): full_idx-3)>>1; 
-    int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
-    if ((y[0] -3) < 0){
-      long_idx =half_volume + y[0]*(X[3]*X[2]*(X[1]>>1)) + space_con;
-    }    
+    int long_idx = (y[0]-3 < 0) ? (half_volume + y[0]*(X[3]*X[2]*(X[1]>>1)) + space_con) : sp_idx_3rd_nbr;
+#else
+    int long_idx = sp_idx_3rd_nbr;
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 		
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 		
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
-    int stride3 = param.sp_stride;
-#if (DD_PREC == 2) //half precision
-    int norm_idx3 = nbr_idx3;
-#endif	     
-    spinorFloat2 T0, T1, T2;
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_X){
-      nbr_idx3 = param.ghostOffset[0][0] + src_idx*NFACE*ghostFace[0] + y[0]*ghostFace[0]+ space_con;
-      stride3 = NFACE*ghostFace[0]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx3 = param.ghostNormOffset[0][0] + src_idx*NFACE*ghostFace[0] + y[0]*ghostFace[0]+ space_con;
-#endif
-      READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);  
-    } else
-#endif
-    {
-      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);  
-    }
     RECONSTRUCT_LONG_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, long_sign);
-    ADJ_MAT_MUL_V(B, long, t);    
-    o00_re -= B0_re;
-    o00_im -= B0_im;
-    o01_re -= B1_re;
-    o01_im -= B1_im;
-    o02_re -= B2_re;
-    o02_im -= B2_im;  
-  }
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
+      if (kernel_type == EXTERIOR_KERNEL_X){
+	nbr_idx3 = param.ghostOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + y[0]*ghostFace[0] + space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx3 = param.ghostNormOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + y[0]*ghostFace[0] + space_con;
+#endif
+	READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[0]*param.Ls);
+      } else {
+	READ_3RD_NBR_SPINOR(tmp, SPINORTEX, nbr_idx3, param.sp_stride);
+      }
+      ADJ_MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= B[i];
+    } // register block
+  }
+
+#endif // DD_IMPROVED
 
 }
-
-
 
 #ifdef PARALLEL_DIR
 if (threadIdx.z & 1) 
@@ -631,48 +357,33 @@ if (threadIdx.z & 1)
   int long_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
 #endif
 
-  int ga_idx = sid;
+  int ga_idx = idx;
 
-#ifdef MULTI_GPU
   int space_con = ((y[3]*X[2]+y[2])*X[0]+y[0])/2;
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] < (X[1]-1)))|| (kernel_type == EXTERIOR_KERNEL_Y && y[1] >= (X[1]-1)))
 #endif
   {
     int sp_idx_1st_nbr = ((y[1]==(X[1]-1)) ? full_idx-(X1X0-X[0]) : full_idx+X[0]) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
+    RECONSTRUCT_FAT_GAUGE_MATRIX(2, fat, sp_idx_1st_nbr, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-    int norm_idx1 = nbr_idx1;
-#endif	 
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_Y){	    
-      nbr_idx1 = param.ghostOffset[1][1] +  src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1]+ space_con;
-      stride1 = NFACE*ghostFace[1]*param.Ls;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if (kernel_type == EXTERIOR_KERNEL_Y) {
+	nbr_idx1 = param.ghostOffset[1][1] +  (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1] + space_con;
 #if (DD_PREC == 2) //half precision
-      norm_idx1 = param.ghostNormOffset[1][1] + src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1]+ space_con;
-#endif		    
-      READ_1ST_NBR_SPINOR(GHOSTSPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(2, fat, sp_idx_1st_nbr, fat_sign);
-      MAT_MUL_V(A, fat, i);
-      o00_re += A0_re;
-      o00_im += A0_im;
-      o01_re += A1_re;
-      o01_im += A1_im;
-      o02_re += A2_re;
-      o02_im += A2_im;
-    }else
-#endif 
-    {
-      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(2, fat, sp_idx_1st_nbr, fat_sign);
-      MAT_MUL_V(A, fat, i);
-      o00_re += A0_re;
-      o00_im += A0_im;
-      o01_re += A1_re;
-      o01_im += A1_im;
-      o02_re += A2_re;
-      o02_im += A2_im;
+	norm_idx1 = param.ghostNormOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1] + space_con;
+#endif
+	READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[1]*param.Ls);
+      } else {
+	READ_1ST_NBR_SPINOR(tmp, SPINORTEX, nbr_idx1, param.sp_stride);
+      }
+      MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += A[i];
     }
   }
 
@@ -685,37 +396,28 @@ if (threadIdx.z & 1)
     int sp_idx_3rd_nbr = ((y[1] >= (X[1]-3) ) ? full_idx-(X[1]-3)*X[0] : full_idx+3*X[0]) >> 1;    
     READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx, long_stride);
     READ_LONG_PHASE(LONGPHASE0TEX, 2, ga_idx, long_stride);
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
-    int stride3 = param.sp_stride;
-#if (DD_PREC == 2) //half precision
-    int norm_idx3 = nbr_idx3;
-#endif	 
-    spinorFloat2 T0, T1, T2;
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_Y){
-      nbr_idx3 = param.ghostOffset[1][1] + src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1]+ space_con;
-      stride3 = NFACE*ghostFace[1]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx3 = param.ghostNormOffset[1][1] + src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1]+ space_con;
-#endif		    
-      READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
-    } else
-#endif    
-    {
-      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
-    }
     RECONSTRUCT_LONG_GAUGE_MATRIX(2, long, ga_idx, long_sign);
-    MAT_MUL_V(B, long, t);            
-    o00_re += B0_re;
-    o00_im += B0_im;
-    o01_re += B1_re;
-    o01_im += B1_im;
-    o02_re += B2_re;
-    o02_im += B2_im;  
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if (kernel_type == EXTERIOR_KERNEL_Y){
+	nbr_idx3 = param.ghostOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1]+ space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx3 = param.ghostNormOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1]+ space_con;
+#endif
+	READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[1]*param.Ls);
+      } else {
+	READ_3RD_NBR_SPINOR(tmp, SPINORTEX, nbr_idx3, param.sp_stride);
+      }
+      MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += B[i];
+    } // register block
   }
 #endif
 }
-
 
 #ifdef PARALLEL_DIR
 if (!(threadIdx.z & 1)) 
@@ -731,53 +433,37 @@ if (!(threadIdx.z & 1))
 #endif
 
   int dir=3;
+  int space_con = (y[3]*X[2]*X[0] + y[2]*X[0] + y[0]) >>1;
 #ifdef MULTI_GPU
-  int space_con = (y[3]*X[2]*X[0] + y[2]*X[0] + y[0]) >>1;    
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] >= 1)) || (kernel_type == EXTERIOR_KERNEL_Y && y[1] < 1))
 #endif
   {
     int sp_idx_1st_nbr = ((y[1]==0)    ? full_idx+(X1X0-X[0]) : full_idx-X[0]) >> 1;
-    int fat_idx=sp_idx_1st_nbr;
 #ifdef MULTI_GPU
-    if ((y[1] -1) < 0){
-      fat_idx = half_volume + space_con;
-    }    
+    int fat_idx = (y[1]-1 < 0) ? (half_volume + space_con) : sp_idx_1st_nbr;
+#else
+    int fat_idx = sp_idx_1st_nbr;
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
+    RECONSTRUCT_FAT_GAUGE_MATRIX(3, fat, sp_idx_1st_nbr, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-    int norm_idx1 = nbr_idx1;
-#endif	 
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_Y){
-      nbr_idx1 = param.ghostOffset[1][0] + src_idx*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1]+ space_con;
-      stride1 = NFACE*ghostFace[1]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx1 = param.ghostNormOffset[1][0] + src_idx*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1]+ space_con;
-#endif	
-      READ_1ST_NBR_SPINOR(GHOSTSPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(3, fat, sp_idx_1st_nbr, fat_sign);
-      ADJ_MAT_MUL_V(A, fat, i);
-      o00_re -= A0_re;
-      o00_im -= A0_im;
-      o01_re -= A1_re;
-      o01_im -= A1_im;
-      o02_re -= A2_re;
-      o02_im -= A2_im;
-    }else
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
-    {
-      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(3, fat, sp_idx_1st_nbr, fat_sign);
-      ADJ_MAT_MUL_V(A, fat, i);
-      o00_re -= A0_re;
-      o00_im -= A0_im;
-      o01_re -= A1_re;
-      o01_im -= A1_im;
-      o02_re -= A2_re;
-      o02_im -= A2_im;
-    }
+      if (kernel_type == EXTERIOR_KERNEL_Y) {
+	nbr_idx1 = param.ghostOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1] + space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx1 = param.ghostNormOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1] + space_con;
+#endif
+	READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[1]*param.Ls);
+      } else {
+	READ_1ST_NBR_SPINOR(tmp, SPINORTEX, nbr_idx1, param.sp_stride);
+      }
+      ADJ_MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= A[i];
+    } // register block
   }
 
 #if (DD_IMPROVED==1)
@@ -787,41 +473,32 @@ if (!(threadIdx.z & 1))
 #endif
   {
     int sp_idx_3rd_nbr = ((y[1] < 3) ? full_idx + (X[1]-3)*X[0]: full_idx -3*X[0] )>> 1; 
-    int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
-    if ((y[1]-3) < 0){
-      long_idx = half_volume+ y[1]*(X[3]*X[2]*X[0] >> 1) + space_con;
-    }    
+    int long_idx = (y[1]-3 < 0) ? (half_volume + y[1]*(X[3]*X[2]*X[0] >> 1) + space_con) : sp_idx_3rd_nbr;
+#else
+    int long_idx = sp_idx_3rd_nbr;
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
-    int stride3 = param.sp_stride;
-#if (DD_PREC == 2) //half precision
-    int norm_idx3 = nbr_idx3;
-#endif	 
-    spinorFloat2 T0, T1, T2;
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_Y){
-      nbr_idx3 = param.ghostOffset[1][0] + src_idx*NFACE*ghostFace[1] + y[1]*ghostFace[1]+ space_con;
-      stride3 = NFACE*ghostFace[1]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx3 = param.ghostNormOffset[1][0] + src_idx*NFACE*ghostFace[1] + y[1]*ghostFace[1]+ space_con;
-#endif
-      READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
-    } else
-#endif
-    {
-      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
-    }
     RECONSTRUCT_LONG_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,long_sign);
-    ADJ_MAT_MUL_V(B, long, t);    
-    o00_re -= B0_re;
-    o00_im -= B0_im;
-    o01_re -= B1_re;
-    o01_im -= B1_im;
-    o02_re -= B2_re;
-    o02_im -= B2_im;  
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if (kernel_type == EXTERIOR_KERNEL_Y){
+	nbr_idx3 = param.ghostOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + y[1]*ghostFace[1] + space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx3 = param.ghostNormOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + y[1]*ghostFace[1] + space_con;
+#endif
+	READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[1]*param.Ls);
+      } else {
+	READ_3RD_NBR_SPINOR(tmp, SPINORTEX, nbr_idx3, param.sp_stride);
+      }
+      ADJ_MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= B[i];
+    } // register block
   }    
 #endif
 }
@@ -839,49 +516,34 @@ if (threadIdx.z&1)
   int long_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
 #endif
 
-  int ga_idx = sid;
+  int ga_idx = idx;
 
-#ifdef MULTI_GPU
   int space_con = ((y[3]*X[1]+y[1])*X[0]+y[0])/2;
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || y[2] < (X[2]-1)))|| (kernel_type == EXTERIOR_KERNEL_Z && y[2] >= (X[2]-1)))
 #endif
   {
     int sp_idx_1st_nbr = ((y[2]==(X[2]-1)) ? full_idx-(X[2]-1)*X1X0 : full_idx+X1X0) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
+    RECONSTRUCT_FAT_GAUGE_MATRIX(4, fat, sp_idx_1st_nbr, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-    int norm_idx1 = nbr_idx1;
-#endif	 
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_Z){	
-      nbr_idx1 = param.ghostOffset[2][1]  + src_idx*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2]+ space_con;
-      stride1 = NFACE*ghostFace[2]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx1 = param.ghostNormOffset[2][1] + src_idx*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2]+ space_con;
-#endif		
-      READ_1ST_NBR_SPINOR(GHOSTSPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(4, fat, sp_idx_1st_nbr, fat_sign);
-      MAT_MUL_V(A, fat, i);	 
-      o00_re += A0_re;
-      o00_im += A0_im;
-      o01_re += A1_re;
-      o01_im += A1_im;
-      o02_re += A2_re;
-      o02_im += A2_im;
-    }else
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
-    {
-      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(4, fat, sp_idx_1st_nbr, fat_sign);
-      MAT_MUL_V(A, fat, i);	 
-      o00_re += A0_re;
-      o00_im += A0_im;
-      o01_re += A1_re;
-      o01_im += A1_im;
-      o02_re += A2_re;
-      o02_im += A2_im;
-    }
+      if (kernel_type == EXTERIOR_KERNEL_Z) {
+	nbr_idx1 = param.ghostOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2] + space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx1 = param.ghostNormOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2] + space_con;
+#endif
+	READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[2]*param.Ls);
+      } else {
+	READ_1ST_NBR_SPINOR(tmp, SPINORTEX, nbr_idx1, param.sp_stride);
+      }
+      MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += A[i];
+    } // register block
   }
 
 #if (DD_IMPROVED==1)
@@ -893,33 +555,25 @@ if (threadIdx.z&1)
     int sp_idx_3rd_nbr = ((y[2]>= (X[2]-3))? full_idx -(X[2]-3)*X1X0: full_idx + 3*X1X0)>> 1;    
     READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx, long_stride);
     READ_LONG_PHASE(LONGPHASE0TEX, 4, ga_idx, long_stride);
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
-    int stride3 = param.sp_stride;
-#if (DD_PREC == 2) //half precision
-    int norm_idx3 = nbr_idx3;
-#endif	 
-    spinorFloat2 T0, T1, T2;
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_Z){
-      nbr_idx3 = param.ghostOffset[2][1] + src_idx*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2]+ space_con;
-      stride3 = NFACE*ghostFace[2]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx3 = param.ghostNormOffset[2][1] + src_idx*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2]+ space_con;
-#endif
-      READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
-    } else
-#endif
-    {
-      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
-    }
     RECONSTRUCT_LONG_GAUGE_MATRIX(4, long, ga_idx, long_sign);
-    MAT_MUL_V(B, long, t);        
-    o00_re += B0_re;
-    o00_im += B0_im;
-    o01_re += B1_re;
-    o01_im += B1_im;
-    o02_re += B2_re;
-    o02_im += B2_im;      
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if (kernel_type == EXTERIOR_KERNEL_Z){
+	nbr_idx3 = param.ghostOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2]+ space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx3 = param.ghostNormOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2]+ space_con;
+#endif
+	READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[2]*param.Ls);
+      } else {
+	READ_3RD_NBR_SPINOR(tmp, SPINORTEX, nbr_idx3, param.sp_stride);
+      }
+      MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += B[i];
+    } // register block
   }
 #endif
 
@@ -941,53 +595,37 @@ if (!(threadIdx.z & 1))
 
   int dir = 5;
 
-#ifdef MULTI_GPU
   int space_con = ((y[3]*X[1] + y[1])*X[0] + y[0]) >>1;    
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || y[2] >= 1)) || (kernel_type == EXTERIOR_KERNEL_Z && y[2] < 1))
 #endif
   {
     int sp_idx_1st_nbr = ((y[2]==0)    ? full_idx+(X[2]-1)*X1X0 : full_idx-X1X0) >> 1;
-    int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
-    if ((y[2] -1) < 0){
-      fat_idx = half_volume + space_con;
-    }    
+    int fat_idx = (y[2]-1 < 0) ? (half_volume + space_con) : sp_idx_1st_nbr;
+#else
+    int fat_idx = sp_idx_1st_nbr;
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
+    RECONSTRUCT_FAT_GAUGE_MATRIX(5, fat, sp_idx_1st_nbr, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-    int norm_idx1 = nbr_idx1;
-#endif	 
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_Z){
-      nbr_idx1 = param.ghostOffset[2][0] + src_idx*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2]+ space_con;
-      stride1 = NFACE*ghostFace[2]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx1 = param.ghostNormOffset[2][0] + src_idx*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2]+ space_con;
-#endif			    
-      READ_1ST_NBR_SPINOR(GHOSTSPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(5, fat, sp_idx_1st_nbr, fat_sign);
-      ADJ_MAT_MUL_V(A, fat, i);
-      o00_re -= A0_re;
-      o00_im -= A0_im;
-      o01_re -= A1_re;
-      o01_im -= A1_im;
-      o02_re -= A2_re;
-      o02_im -= A2_im;
-    } else
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
-    {
-      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(5, fat, sp_idx_1st_nbr, fat_sign);
-      ADJ_MAT_MUL_V(A, fat, i);
-      o00_re -= A0_re;
-      o00_im -= A0_im;
-      o01_re -= A1_re;
-      o01_im -= A1_im;
-      o02_re -= A2_re;
-      o02_im -= A2_im;
-    }
+      if (kernel_type == EXTERIOR_KERNEL_Z){
+	nbr_idx1 = param.ghostOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2]+ space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx1 = param.ghostNormOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2]+ space_con;
+#endif
+	READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[2]*param.Ls);
+      } else {
+	READ_1ST_NBR_SPINOR(tmp, SPINORTEX, nbr_idx1, param.sp_stride);
+      }
+      ADJ_MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= A[i];
+    } // register block
   }
 
 #if (DD_IMPROVED==1)
@@ -997,41 +635,32 @@ if (!(threadIdx.z & 1))
 #endif
   {
     int sp_idx_3rd_nbr = ((y[2] <3) ? full_idx + (X[2]-3)*X1X0: full_idx - 3*X1X0)>>1;
-    int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
-    if ((y[2] -3) < 0){
-      long_idx = half_volume + y[2]*(X3X1X0 >> 1) + space_con;
-    }    
+    int long_idx = (y[2]-3 < 0) ? (half_volume + y[2]*(X3X1X0 >> 1) + space_con) : sp_idx_3rd_nbr;
+#else
+    int long_idx = sp_idx_3rd_nbr;
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);         
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);         
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
-    int stride3 = param.sp_stride;    
-#if (DD_PREC == 2) //half precision
-    int norm_idx3 = nbr_idx3;
-#endif	 
-    spinorFloat2 T0, T1, T2;
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_Z){
-      nbr_idx3 = param.ghostOffset[2][0] + src_idx*NFACE*ghostFace[2] + y[2]*ghostFace[2]+ space_con;
-      stride3 = NFACE*ghostFace[2]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx3 = param.ghostNormOffset[2][0] + src_idx*NFACE*ghostFace[2] + y[2]*ghostFace[2]+ space_con;
-#endif			    
-      READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
-    } else
-#endif
-    {
-      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
-    }
     RECONSTRUCT_LONG_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,long_sign);
-    ADJ_MAT_MUL_V(B, long, t);    	    
-    o00_re -= B0_re;
-    o00_im -= B0_im;
-    o01_re -= B1_re;
-    o01_im -= B1_im;
-    o02_re -= B2_re;
-    o02_im -= B2_im;    
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if (kernel_type == EXTERIOR_KERNEL_Z){
+	nbr_idx3 = param.ghostOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + y[2]*ghostFace[2]+ space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx3 = param.ghostNormOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + y[2]*ghostFace[2]+ space_con;
+#endif
+	READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[2]*param.Ls);
+      } else {
+	READ_3RD_NBR_SPINOR(tmp, SPINORTEX, nbr_idx3, param.sp_stride);
+      }
+      ADJ_MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= B[i];
+    } // register block
   }
 #endif
 }
@@ -1049,49 +678,34 @@ if (threadIdx.z & 1)
   int long_sign = (y[3] >= (X4-3)) ? time_boundary : 1;
 #endif
 
-  int ga_idx = sid;
+  int ga_idx = idx;
 
-#ifdef MULTI_GPU
   int space_con = (y[2]*X1X0+y[1]*X[0]+y[0])/2;
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || y[3] < (X[3]-1)))|| (kernel_type == EXTERIOR_KERNEL_T && y[3] >= (X[3]-1)))
 #endif
   {    
     int sp_idx_1st_nbr = ((y[3]==(X[3]-1)) ? full_idx-(X[3]-1)*X2X1X0 : full_idx+X2X1X0) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 6, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
+    RECONSTRUCT_FAT_GAUGE_MATRIX(6, fat, sp_idx_1st_nbr, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-    int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_T){      
-      nbr_idx1 = param.ghostOffset[3][1] + src_idx*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3]+ space_con;
-      stride1 = NFACE*ghostFace[3]*param.Ls;
+      if (kernel_type == EXTERIOR_KERNEL_T){
+	nbr_idx1 = param.ghostOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3]+ space_con;
 #if (DD_PREC == 2) //half precision
-      norm_idx1 = param.ghostNormOffset[3][1] + src_idx*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3]+ space_con;
+	norm_idx1 = param.ghostNormOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3]+ space_con;
 #endif
-      READ_1ST_NBR_SPINOR( GHOSTSPINORTEX, nbr_idx1, stride1);    
-      RECONSTRUCT_FAT_GAUGE_MATRIX(6, fat, sp_idx_1st_nbr, fat_sign);
-      MAT_MUL_V(A, fat, i);
-      o00_re += A0_re;
-      o00_im += A0_im;
-      o01_re += A1_re;
-      o01_im += A1_im;
-      o02_re += A2_re;
-      o02_im += A2_im;
-    }else
-#endif
-    {
-      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);    
-      RECONSTRUCT_FAT_GAUGE_MATRIX(6, fat, sp_idx_1st_nbr, fat_sign);
-      MAT_MUL_V(A, fat, i);
-      o00_re += A0_re;
-      o00_im += A0_im;
-      o01_re += A1_re;
-      o01_im += A1_im;
-      o02_re += A2_re;
-      o02_im += A2_im;
-    }
+	READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[3]*param.Ls);
+      } else {
+	READ_1ST_NBR_SPINOR(tmp, SPINORTEX, nbr_idx1, param.sp_stride);
+      }
+      MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += A[i];
+    } // register block
   }
 
 
@@ -1104,36 +718,29 @@ if (threadIdx.z & 1)
     int sp_idx_3rd_nbr = ((y[3]>=(X[3]-3))? full_idx -(X[3]-3)*X2X1X0 : full_idx + 3*X2X1X0)>> 1;     
     READ_LONG_MATRIX(LONGLINK0TEX, 6, ga_idx, long_stride);    
     READ_LONG_PHASE(LONGPHASE0TEX, 6, ga_idx, long_stride);    
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
-    int stride3 = param.sp_stride;    
-#if (DD_PREC == 2) //half precision
-    int norm_idx3 = nbr_idx3;
-#endif
-    spinorFloat2 T0, T1, T2;
-#ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_T){
-      nbr_idx3 = param.ghostOffset[3][1] + src_idx*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3]+ space_con;
-      stride3 = NFACE*ghostFace[3]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx3 = param.ghostNormOffset[3][1] + src_idx*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3]+ space_con;
-#endif
-      READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3); 
-    } else
-#endif
-    {
-      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3); 
-    }
     RECONSTRUCT_LONG_GAUGE_MATRIX(6, long, ga_idx, long_sign);
-    MAT_MUL_V(B, long, t);    
-    o00_re += B0_re;
-    o00_im += B0_im;
-    o01_re += B1_re;
-    o01_im += B1_im;
-    o02_re += B2_re;
-    o02_im += B2_im;      
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if (kernel_type == EXTERIOR_KERNEL_T) {
+	nbr_idx3 = param.ghostOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3]+ space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx3 = param.ghostNormOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3]+ space_con;
+#endif
+	READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[3]*param.Ls);
+      } else {
+	READ_3RD_NBR_SPINOR(tmp, SPINORTEX, nbr_idx3, param.sp_stride);
+      }
+      MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += B[i];
+    } // register block
   }
 #endif
 }
+
 
 #ifdef PARALLEL_DIR
 if (!(threadIdx.z & 1)) 
@@ -1149,53 +756,37 @@ if (!(threadIdx.z & 1))
 
   int dir = 7;
 
-#ifdef MULTI_GPU
   int space_con = (y[2]*X1X0+y[1]*X[0]+y[0])/2;
+#ifdef MULTI_GPU
   if ((kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || y[3] >= 1)) || (kernel_type == EXTERIOR_KERNEL_T && y[3] < 1))
 #endif
   {
-    int sp_idx_1st_nbr = ((y[3]==0)    ? full_idx+(X[3]-1)*X2X1X0 : full_idx-X2X1X0) >> 1;
-    int fat_idx = sp_idx_1st_nbr;    
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
-#if (DD_PREC == 2) //half precision
-    int norm_idx1 = nbr_idx1;
-#endif
+    int sp_idx_1st_nbr = ((y[3]==0) ? full_idx+(X[3]-1)*X2X1X0 : full_idx-X2X1X0) >> 1;
 #ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_T){
-      if ( (y[3] - 1) < 0){
-        fat_idx = half_volume + space_con;
-      }
-
-      nbr_idx1 = param.ghostOffset[3][0] + src_idx*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3]+ space_con;
-      stride1 = NFACE*ghostFace[3]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx1 = param.ghostNormOffset[3][0] + src_idx*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3]+ space_con;
-#endif		    
-      READ_1ST_NBR_SPINOR(GHOSTSPINORTEX, nbr_idx1, stride1);
-      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(7, fat, sp_idx_1st_nbr, fat_sign);
-      ADJ_MAT_MUL_V(A, fat, i);
-      o00_re -= A0_re;
-      o00_im -= A0_im;
-      o01_re -= A1_re;
-      o01_im -= A1_im;
-      o02_re -= A2_re;
-      o02_im -= A2_im;
-    } else
+    int fat_idx = (kernel_type == EXTERIOR_KERNEL_T && y[3] - 1 < 0) ? half_volume + space_con : sp_idx_1st_nbr;
+#else
+    int fat_idx = sp_idx_1st_nbr;
 #endif
-    {
-      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
-      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-      RECONSTRUCT_FAT_GAUGE_MATRIX(7, fat, sp_idx_1st_nbr, fat_sign);
-      ADJ_MAT_MUL_V(A, fat, i);
-      o00_re -= A0_re;
-      o00_im -= A0_im;
-      o01_re -= A1_re;
-      o01_im -= A1_im;
-      o02_re -= A2_re;
-      o02_im -= A2_im;
-    }
+    READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(7, fat, sp_idx_1st_nbr, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if (kernel_type == EXTERIOR_KERNEL_T){
+	nbr_idx1 = param.ghostOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3]+ space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx1 = param.ghostNormOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3]+ space_con;
+#endif
+	READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[3]*param.Ls)
+      } else {
+	READ_1ST_NBR_SPINOR(tmp, SPINORTEX, nbr_idx1, param.sp_stride);
+      }
+      ADJ_MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= A[i];
+    } // register block
   }
 
 #if (DD_IMPROVED==1)
@@ -1205,82 +796,67 @@ if (!(threadIdx.z & 1))
 #endif
   {
     int sp_idx_3rd_nbr = ((y[3]<3) ? full_idx + (X[3]-3)*X2X1X0: full_idx - 3*X2X1X0) >> 1;
-    int long_idx = sp_idx_3rd_nbr;
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
-    int stride3 = param.sp_stride;
-#if (DD_PREC == 2) //half precision
-    int norm_idx3 = nbr_idx3;
-#endif	    
-    spinorFloat2 T0, T1, T2;
 #ifdef MULTI_GPU
-    if (kernel_type == EXTERIOR_KERNEL_T){
-      if ( (y[3] - 3) < 0){
-        long_idx = half_volume + y[3]*ghostFace[3]+ space_con;
-      }	
-      nbr_idx3 = param.ghostOffset[3][0] + src_idx*NFACE*ghostFace[3] + y[3]*ghostFace[3]+ space_con;
-      stride3 = NFACE*ghostFace[3]*param.Ls;
-#if (DD_PREC == 2) //half precision
-      norm_idx3 = param.ghostNormOffset[3][0] + src_idx*NFACE*ghostFace[3] + y[3]*ghostFace[3]+ space_con;
-#endif		    
-      READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);       
-    } else
-#endif	  
-    {  
-      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);       
-    }
+    int long_idx = (kernel_type == EXTERIOR_KERNEL_T && y[3] - 3 < 0) ? half_volume + y[3]*ghostFace[3]+ space_con : sp_idx_3rd_nbr;
+#else
+    int long_idx = sp_idx_3rd_nbr;
+#endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);
-
-
     RECONSTRUCT_LONG_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, long_sign);
-    ADJ_MAT_MUL_V(B, long, t);    
-    o00_re -= B0_re;
-    o00_im -= B0_im;
-    o01_re -= B1_re;
-    o01_im -= B1_im;
-    o02_re -= B2_re;
-    o02_im -= B2_im;
- 
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      if (kernel_type == EXTERIOR_KERNEL_T) {
+	nbr_idx3 = param.ghostOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + y[3]*ghostFace[3]+ space_con;
+#if (DD_PREC == 2) //half precision
+	norm_idx3 = param.ghostNormOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + y[3]*ghostFace[3]+ space_con;
+#endif
+	READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[3]*param.Ls);
+      } else {
+	READ_3RD_NBR_SPINOR(tmp, SPINORTEX, nbr_idx3, param.sp_stride);
+      }
+      ADJ_MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= B[i];
+    } // register block
+
 #ifdef PARALLEL_DIR
     // send the backward gathers to shared memory
-    s[0*SHARED_STRIDE] = o00_re;
-    s[1*SHARED_STRIDE] = o00_im;
-    s[2*SHARED_STRIDE] = o01_re;
-    s[3*SHARED_STRIDE] = o01_im;
-    s[4*SHARED_STRIDE] = o02_re;
-    s[5*SHARED_STRIDE] = o02_im;
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      for (int i=0; i<3; i++) {
+	s[(2*i+0)*SHARED_STRIDE] = O[reg_src][i].x;
+	s[(2*i+1)*SHARED_STRIDE] = O[reg_src][i].y;
+      }
+    }
 #endif // PARALLEL_DIR
 
- }        
+  }
 #endif
 }
+
 
 #ifdef PARALLEL_DIR
 __syncthreads();
 
 // add the forward gathers to the backward gathers and save
 if (threadIdx.z & 1) {
-  o00_re += s[0*SHARED_STRIDE];
-  o00_im += s[1*SHARED_STRIDE];
-  o01_re += s[2*SHARED_STRIDE];
-  o01_im += s[3*SHARED_STRIDE];
-  o02_re += s[4*SHARED_STRIDE];
-  o02_im += s[5*SHARED_STRIDE];
+  for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+    for (int i=0; i<3; i++) {
+      O[reg_src][i].x += s[(2*i+0)*SHARED_STRIDE];
+      O[reg_src][i].y += s[(2*i+1)*SHARED_STRIDE];
+    }
+  }
 #else
-  {
+ {
 #endif // PARALLEL_DIR
 
-
 #if (DD_DAG == 1)
-{
-  o00_re = - o00_re;
-  o00_im = - o00_im;
-  o01_re = - o01_re;
-  o01_im = - o01_im;
-  o02_re = - o02_re;
-  o02_im = - o02_im;
-}
-
+  for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+    for (int i=0; i<3; i++) O[reg_src][i] = -O[reg_src][i];
+  }
 #endif
 
 #ifdef DSLASH_AXPY
@@ -1293,72 +869,640 @@ spinorFloat a = param.a_f;
 
 #ifdef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
-  READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
-  o00_re = -o00_re + a*accum0.x;
-  o00_im = -o00_im + a*accum0.y;
-  o01_re = -o01_re + a*accum1.x;
-  o01_im = -o01_im + a*accum1.y;
-  o02_re = -o02_re + a*accum2.x;
-  o02_im = -o02_im + a*accum2.y;
-}else{
-  o00_re = -o00_re;
-  o00_im = -o00_im;
-  o01_re = -o01_re;
-  o01_im = -o01_im;
-  o02_re = -o02_re;
-  o02_im = -o02_im;
+  for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+    int norm_idx1 = idx + (src_idx+reg_src)*Volh;
+#endif
+    READ_ACCUM(tmp,ACCUMTEX,idx + (src_idx+reg_src)*block_src_offset*Volh);
+    for (int i=0; i<3; i++) O[reg_src][i] = -O[reg_src][i] + a*tmp[i];
+  }
+} else {
+  for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+    for (int i=0; i<3; i++) O[reg_src][i] = -O[reg_src][i];
+  }
 }
 #else
-READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
-o00_re = -o00_re + a*accum0.x;
-o00_im = -o00_im + a*accum0.y;
-o01_re = -o01_re + a*accum1.x;
-o01_im = -o01_im + a*accum1.y;
-o02_re = -o02_re + a*accum2.x;
-o02_im = -o02_im + a*accum2.y;
+ for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+    int norm_idx1 = idx + (src_idx+reg_src)*Volh;
+#endif
+   READ_ACCUM(tmp,ACCUMTEX, idx+(src_idx+reg_src)*block_src_offset*Volh);
+   for (int i=0; i<3; i++) O[reg_src][i] = -O[reg_src][i] + a*tmp[i];
+ }
 #endif //MULTI_GPU
 #endif // DSLASH_AXPY
 
 #ifdef MULTI_GPU
-//if (kernel_type == EXTERIOR_KERNEL_T){
-if (kernel_type != INTERIOR_KERNEL){
-  READ_AND_SUM_SPINOR(INTERTEX, sid + src_idx*Vh);
-}
+ if (kernel_type != INTERIOR_KERNEL) {
+   for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+    int norm_idx1 = idx + (src_idx+reg_src)*Volh;
+#endif
+     READ_AND_SUM_SPINOR(O[reg_src], INTERTEX, idx + (src_idx+reg_src)*block_src_offset*Volh);
+   }
+ }
 #endif
 
-
 // write spinor field back to device memory
-WRITE_SPINOR(param.out, sid + src_idx*Vh, param.sp_stride);
+  for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+    int norm_idx1 = idx + (src_idx+reg_src)*Volh;
+#endif
+    WRITE_SPINOR(param.out, O[reg_src], idx + (src_idx+reg_src)*block_src_offset*Volh, param.sp_stride);
   }
+
+}
+
+} 
+#ifdef MULTI_GPU
+else { // else fused exterior
+  
+  const int X1X0 = X[1]*X[0];
+  const int X2X1X0 = X[2]*X1X0;
+#if (DD_IMPROVED == 1)
+  const int X3X1X0 = X[3]*X1X0;
+#endif
+
+  int y[4] = {};
+
+  int full_idx=0;
+  bool active = false;
+  int dim = dimFromFaceIndex (idx, param);
+    
+  if(dim == 0){
+    coordsFromFaceIndexStaggered<EXTERIOR_KERNEL_X,NFACE,2>(y, idx, param);
+  }else if(dim == 1){
+    coordsFromFaceIndexStaggered<EXTERIOR_KERNEL_Y,NFACE,2>(y, idx, param);
+  }else if(dim == 2){
+    coordsFromFaceIndexStaggered<EXTERIOR_KERNEL_Z,NFACE,2>(y, idx, param);
+  }else if(dim == 3){
+    coordsFromFaceIndexStaggered<EXTERIOR_KERNEL_T,NFACE,2>(y, idx, param);
+  }
+
+  const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
+  full_idx = ((y[3]*X[2] +y[2])*X[1] +y[1])*X[0]+y[0];
+  int half_idx = full_idx>>1;
+
+
+  for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+    for (int i=0; i<3; i++) O[reg_src][i] = static_cast<spinorFloat>(0.0);
+  }
+
+#if(DD_FAT_RECON == 13 || DD_FAT_RECON == 9)
+  int fat_sign = 1;
+#endif
+#if((DD_LONG_RECON == 13 || DD_LONG_RECON == 9) && DD_IMPROVED==1)
+  int long_sign = 1;
+#endif
+
+{
+  //direction: +X
+
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = (y[3]%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = (y[3]%2 == 1) ? -1 : 1;
+#endif
+
+  int ga_idx = half_idx;
+
+  if ( isActive(dim,0,NFACE,y,param.commDim,X) && y[0] >= (X[0]-1) )
+  {
+    int sp_idx_1st_nbr = ((y[0]==(X[0]-1)) ? full_idx-(X[0]-1) : full_idx+1) >> 1;
+    READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx, fat_stride);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(0, fat, ga_idx, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;
+      nbr_idx1 = param.ghostOffset[0][1] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx1 = param.ghostNormOffset[0][1] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0] + space_con;
+#endif
+      READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[0]*param.Ls);
+      MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += A[i];
+    } // register block
+  }
+
+#if (DD_IMPROVED==1)
+  if (isActive(dim,0,NFACE,y,param.commDim,X) && y[0] >= (X[0]-3))
+  {
+    int sp_idx_3rd_nbr = ((y[0] >= (X[0]-3)) ? full_idx-(X[0]-3) : full_idx+3) >> 1;
+    READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx, long_stride);        
+    READ_LONG_PHASE(LONGPHASE0TEX, 0, ga_idx, long_stride);
+    RECONSTRUCT_LONG_GAUGE_MATRIX(0, long, ga_idx, long_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      int space_con = ((y[3]*X[2]+y[2])*X[1] + y[1])/2;
+      nbr_idx3 = param.ghostOffset[0][1] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx3 = param.ghostNormOffset[0][1] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0] + space_con;
+#endif
+      READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[0]*param.Ls);
+      MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += B[i];
+    } // register block
+  }
+
+#endif
+
+} // direction: +X
+
+
+{
+  // direction: -X
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = (y[3]%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = (y[3]%2 == 1) ? -1 : 1;
+#endif
+  int dir =1;
+
+  int space_con = ((y[3]*X[2] + y[2])*X[1] + y[1]) >>1;
+  if (isActive(dim,0,NFACE,y,param.commDim,X) && y[0] < 1)
+  {
+    int sp_idx_1st_nbr = ((y[0]==0) ? full_idx+(X[0]-1) : full_idx-1) >> 1;
+    int fat_idx = half_volume + space_con;
+    READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(1, fat, ga_idx, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx1 = param.ghostOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx1 = param.ghostNormOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0] + space_con;
+#endif
+      READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[0]*param.Ls);
+      ADJ_MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= A[i];
+    } // register source
+  }
+
+#if (DD_IMPROVED==1)
+
+  if (isActive(dim,0,NFACE,y,param.commDim,X) && y[0] < 3)
+  {
+    int sp_idx_3rd_nbr = ((y[0]<3) ? full_idx+(X[0]-3): full_idx-3)>>1; 
+    int long_idx = (y[0]-3 < 0) ? (half_volume + y[0]*(X[3]*X[2]*(X[1]>>1)) + space_con) : sp_idx_3rd_nbr;
+    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 		
+    READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 		
+    RECONSTRUCT_LONG_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, long_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx3 = param.ghostOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + y[0]*ghostFace[0] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx3 = param.ghostNormOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + y[0]*ghostFace[0] + space_con;
+#endif
+      READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[0]*param.Ls);
+      ADJ_MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= B[i];
+    } // register source
+  }
+#endif
+
+}
+
+{
+  //direction: +Y
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#endif
+
+  int ga_idx = half_idx;
+
+  int space_con = ((y[3]*X[2]+y[2])*X[0]+y[0])/2;
+  if (isActive(dim,1,NFACE,y,param.commDim,X) && y[1] >= (X[1]-1))
+  {
+    int sp_idx_1st_nbr = ((y[1]==(X[1]-1)) ? full_idx-(X1X0-X[0]) : full_idx+X[0]) >> 1;
+    READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx, fat_stride);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(2, fat, ga_idx, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx1 = param.ghostOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx1 = param.ghostNormOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1] + space_con;
+#endif
+      READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[1]*param.Ls);
+      MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += A[i];
+    } // register source
+  }
+
+#if (DD_IMPROVED==1)
+
+  if (isActive(dim,1,NFACE,y,param.commDim,X) && y[1] >= (X[1]-3))    
+  {
+    int sp_idx_3rd_nbr = ((y[1] >= (X[1]-3) ) ? full_idx-(X[1]-3)*X[0] : full_idx+3*X[0]) >> 1;    
+    READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx, long_stride);
+    READ_LONG_PHASE(LONGPHASE0TEX, 2, ga_idx, long_stride);
+    RECONSTRUCT_LONG_GAUGE_MATRIX(2, long, ga_idx, long_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx3 = param.ghostOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx3 = param.ghostNormOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1] + space_con;
+#endif
+      READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[1]*param.Ls);
+      MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += B[i];
+    }
+  }
+#endif
+}
+
+
+{
+  //direction: -Y
+
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#endif
+
+  int dir=3;
+  int space_con = (y[3]*X[2]*X[0] + y[2]*X[0] + y[0]) >>1;    
+  if (isActive(dim,1,NFACE,y,param.commDim,X) && y[1] < 1)
+  {
+    int sp_idx_1st_nbr = ((y[1]==0)    ? full_idx+(X1X0-X[0]) : full_idx-X[0]) >> 1;
+    int fat_idx = half_volume + space_con;
+    READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(3, fat, ga_idx, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx1 = param.ghostOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx1 = param.ghostNormOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1] + space_con;
+#endif
+      READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[1]*param.Ls);
+      ADJ_MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= A[i];
+    } // register source
+  }
+
+#if (DD_IMPROVED==1)
+
+  if (isActive(dim,1,NFACE,y,param.commDim,X) && y[1] < 3)
+  {
+    int sp_idx_3rd_nbr = ((y[1] < 3) ? full_idx + (X[1]-3)*X[0]: full_idx -3*X[0] )>> 1; 
+    int long_idx = (y[1]-3 < 0) ? (half_volume+ y[1]*(X[3]*X[2]*X[0] >> 1) + space_con) : sp_idx_3rd_nbr;
+    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 
+    READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 
+    RECONSTRUCT_LONG_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,long_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx3 = param.ghostOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + y[1]*ghostFace[1] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx3 = param.ghostNormOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + y[1]*ghostFace[1] + space_con;
+#endif
+      READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[1]*param.Ls);
+      ADJ_MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= B[i];
+    } // register source
+  }    
+#endif
+
+}
+
+
+{
+  //direction: +Z
+
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#endif
+
+  int ga_idx = half_idx;
+
+  int space_con = ((y[3]*X[1]+y[1])*X[0]+y[0])/2;
+  if (isActive(dim,2,NFACE,y,param.commDim,X) && y[2] >= (X[2]-1))
+  {
+    int sp_idx_1st_nbr = ((y[2]==(X[2]-1)) ? full_idx-(X[2]-1)*X1X0 : full_idx+X1X0) >> 1;
+    READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx, fat_stride);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(4, fat, ga_idx, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx1 = param.ghostOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx1 = param.ghostNormOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2] + space_con;
+#endif
+      READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[2]*param.Ls);
+      MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += A[i];
+    } // register source
+  }
+
+#if (DD_IMPROVED==1)
+
+  if (isActive(dim,2,NFACE,y,param.commDim,X)  && y[2] >= (X[2]-3))
+  {
+    int sp_idx_3rd_nbr = ((y[2]>= (X[2]-3))? full_idx -(X[2]-3)*X1X0: full_idx + 3*X1X0)>> 1;    
+    READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx, long_stride);
+    READ_LONG_PHASE(LONGPHASE0TEX, 4, ga_idx, long_stride);
+    RECONSTRUCT_LONG_GAUGE_MATRIX(4, long, ga_idx, long_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx3 = param.ghostOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx3 = param.ghostNormOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2] + space_con;
+#endif
+      READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[2]*param.Ls);
+      MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += B[i];
+    } // register source
+  }
+#endif
+
+}
+
+
+{
+  //direction: -Z
+
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#endif
+
+  int dir = 5;
+
+  int space_con = ((y[3]*X[1] + y[1])*X[0] + y[0]) >>1;    
+  if (isActive(dim,2,NFACE,y,param.commDim,X) && y[2] < 1)
+  {
+    int sp_idx_1st_nbr = ((y[2]==0)    ? full_idx+(X[2]-1)*X1X0 : full_idx-X1X0) >> 1;
+    int fat_idx = half_volume + space_con;
+    READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(5, fat, ga_idx, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx1 = param.ghostOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx1 = param.ghostNormOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2] + space_con;
+#endif
+      READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[2]*param.Ls);
+      ADJ_MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= A[i];
+    } // register source
+  }
+
+#if (DD_IMPROVED==1)
+
+  if (isActive(dim,2,NFACE,y,param.commDim,X) && y[2] < 3)
+  {
+    int sp_idx_3rd_nbr = ((y[2] <3) ? full_idx + (X[2]-3)*X1X0: full_idx - 3*X1X0)>>1;
+    int long_idx = (y[2]-3 < 0) ? (half_volume + y[2]*(X3X1X0 >> 1) + space_con) : sp_idx_3rd_nbr;
+    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);         
+    READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);         
+    RECONSTRUCT_LONG_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,long_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx3 = param.ghostOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + y[2]*ghostFace[2] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx3 = param.ghostNormOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + y[2]*ghostFace[2] + space_con;
+#endif
+      READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[2]*param.Ls);
+      ADJ_MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= B[i];
+    } // register source
+  }
+#endif
+
+}
+
+
+{
+  //direction: +T
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = (y[3] >= (X4-1)) ? time_boundary : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = (y[3] >= (X4-3)) ? time_boundary : 1;
+#endif
+
+  int ga_idx = half_idx;
+
+  int space_con = (y[2]*X1X0+y[1]*X[0]+y[0])/2;
+  if ((y[3] >= (X[3]-1)) && isActive(dim,3,NFACE,y,param.commDim,X))
+  {    
+    int sp_idx_1st_nbr = ((y[3]==(X[3]-1)) ? full_idx-(X[3]-1)*X2X1X0 : full_idx+X2X1X0) >> 1;
+    READ_FAT_MATRIX(FATLINK0TEX, 6, ga_idx, fat_stride);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(6, fat, ga_idx, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx1 = param.ghostOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx1 = param.ghostNormOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3] + space_con;
+#endif
+      READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[3]*param.Ls);
+      MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += A[i];
+    } // register source
+  }
+
+
+#if (DD_IMPROVED==1)
+
+  if ((isActive(dim,3,NFACE,y,param.commDim,X) &&  y[3] >= (X[3]-3)))
+  {
+    int sp_idx_3rd_nbr = ((y[3]>=(X[3]-3))? full_idx -(X[3]-3)*X2X1X0 : full_idx + 3*X2X1X0)>> 1;     
+    READ_LONG_MATRIX(LONGLINK0TEX, 6, ga_idx, long_stride);    
+    READ_LONG_PHASE(LONGPHASE0TEX, 6, ga_idx, long_stride);    
+    RECONSTRUCT_LONG_GAUGE_MATRIX(6, long, ga_idx, long_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx3 = param.ghostOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx3 = param.ghostNormOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3] + space_con;
+#endif
+      READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[3]*param.Ls);
+      MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] += B[i];
+    } // register source
+  }
+#endif
+}
+
+
+{
+  //direction: -T
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ( ((y[3]+(X[3]-1))%X[3])>= (X[3]-1) ) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ( ((y[3]+(X[3]-3))%X[3])>= (X[3]-3) ) ? -1 : 1;
+#endif
+
+  int dir = 7;
+
+  int space_con = (y[2]*X1X0+y[1]*X[0]+y[0])/2;
+  if ((y[3] < 1) && isActive(dim,3,NFACE,y,param.commDim,X))
+  {
+    int sp_idx_1st_nbr = ((y[3]==0)    ? full_idx+(X[3]-1)*X2X1X0 : full_idx-X2X1X0) >> 1;
+    int fat_idx = half_volume + space_con;
+    READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(7, fat, ga_idx, fat_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx1 = param.ghostOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx1 = param.ghostNormOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3] + space_con;
+#endif
+      READ_1ST_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx1, NFACE*ghostFace[3]*param.Ls);
+      ADJ_MAT_MUL_V(A, FAT, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= A[i];
+    } // register source
+  }
+
+#if (DD_IMPROVED==1)
+
+  if ((y[3]<3) && isActive(dim,3,NFACE,y,param.commDim,X))
+  {
+    int sp_idx_3rd_nbr = ((y[3]<3) ? full_idx + (X[3]-3)*X2X1X0: full_idx - 3*X2X1X0) >> 1;
+    int long_idx = half_volume + y[3]*ghostFace[3] + space_con;
+    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);
+    READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);
+    RECONSTRUCT_LONG_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, long_sign);
+
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+      int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
+#if (DD_PREC == 2) //half precision
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
+#endif
+      active = true;
+      nbr_idx3 = param.ghostOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + y[3]*ghostFace[3] + space_con;
+#if (DD_PREC == 2) //half precision
+      norm_idx3 = param.ghostNormOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + y[3]*ghostFace[3] + space_con;
+#endif
+      READ_3RD_NBR_SPINOR(tmp, GHOSTSPINORTEX, nbr_idx3, NFACE*ghostFace[3]*param.Ls);
+      ADJ_MAT_MUL_V(B, LONG, tmp);
+      for (int i=0; i<3; i++) O[reg_src][i] -= B[i];
+    } // register source
+  }        
+#endif
+
+}
+
+
+#if (DD_DAG == 1)
+ {
+   for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+     for (int i=0; i<3; i++) O[reg_src][i] = -O[reg_src][i];
+   }
+ }
+#endif
+
+#ifdef DSLASH_AXPY
+ for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+   for (int i=0; i<3; i++) O[reg_src][i] = -O[reg_src][i];
+ }
+#endif // DSLASH_AXPY
+
+  if (active){
+    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = half_idx+(src_idx+reg_src)*Volh;
+#endif
+      READ_AND_SUM_SPINOR(O[reg_src], INTERTEX, half_idx+(src_idx+reg_src)*block_src_offset*Volh);
+      WRITE_SPINOR(param.out, O[reg_src], half_idx+(src_idx+reg_src)*block_src_offset*Volh, param.sp_stride);
+    }
+  }
+
+ }
+#endif // MULTI_GPU
 
 // undefine to prevent warning when precision is changed
 #undef time_boundary
 
+#undef gaugeFloat
+#undef gaugeFloat2
 #undef spinorFloat
 #undef spinorFloat2
 #undef SHARED_STRIDE
-
-#undef g00_re
-#undef g00_im
-#undef g01_re
-#undef g01_im
-#undef g02_re
-#undef g02_im
-#undef g10_re
-#undef g10_im
-#undef g11_re
-#undef g11_im
-#undef g12_re
-#undef g12_im
-#undef g20_re
-#undef g20_im
-#undef g21_re
-#undef g21_im
-#undef g22_re
-#undef g22_im
-
-#undef fat_re
-#undef fat_im
 
 #undef fat00_re
 #undef fat00_im
@@ -1401,30 +1545,7 @@ WRITE_SPINOR(param.out, sid + src_idx*Vh, param.sp_stride);
 #undef long_re
 #undef long_im
 
-#undef i00_re
-#undef i00_im
-#undef i01_re
-#undef i01_im
-#undef i02_re
-#undef i02_im
-
-#undef t00_re
-#undef t00_im
-#undef t01_re
-#undef t01_im
-#undef t02_re
-#undef t02_im
-
 #undef SHARED_FLOATS_PER_THREAD
 #undef kernel_type
 
-#undef o00_re
-#undef o00_im
-#undef o01_re
-#undef o01_im
-#undef o02_re
-#undef o02_im
-
 #undef NFACE
-
-#undef VOLATILE
