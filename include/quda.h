@@ -313,13 +313,16 @@ extern "C" {
     int use_resident_solution;
 
     /** Whether to use the solution vector to augment the chronological basis */
-    int make_resident_chrono;
+    int chrono_make_resident;
+
+    /** Whether the solution should replace the last entry in the chronology */
+    int chrono_replace_last;
 
     /** Whether to use the resident chronological basis */
-    int use_resident_chrono;
+    int chrono_use_resident;
 
     /** The maximum length of the chronological history to store */
-    int max_chrono_dim;
+    int chrono_max_dim;
 
     /** The index to indeicate which chrono history we are augmenting */
     int chrono_index;

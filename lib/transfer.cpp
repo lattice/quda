@@ -58,7 +58,7 @@ namespace quda {
     char block_str[128];
     sprintf(block_str, "%d", geo_bs[0]);
     for (int d=1; d<ndim; d++) sprintf(block_str, "%s x %d", block_str, geo_bs[d]);
-    printfQuda("Transfer: using block size %s\n", block_str);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: using block size %s\n", block_str);
 
     // create the storage for the final block orthogonal elements
     ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
@@ -77,17 +77,15 @@ namespace quda {
       param.x[0] *= 2;
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: creating V field with location %d\n", param.location);
-
     // for cpu transfer this is the V field, for gpu it's just a temporary until we port the block orthogonalization
     V_h = ColorSpinorField::Create(param);
 
     param.location = QUDA_CUDA_FIELD_LOCATION;
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//ok for staggered
 
-    param.precision = null_precision;
+    param.setPrecision(null_precision);
     V_d = enable_gpu ? ColorSpinorField::Create(param) : nullptr;
-    param.precision = V_h->Precision();
+    param.setPrecision(V_h->Precision());
 
     // used for cpu<->gpu transfers
     param = ColorSpinorParam(*B[0]);
@@ -135,39 +133,37 @@ namespace quda {
 
     if (enable_gpu && gpu_setup) {
 
-      ColorSpinorField *V_tmp = V_d;
-      if (V_d && V_d->Precision() != V_h->Precision()) {
-	ColorSpinorParam param(*V_d);
-	param.precision = V_h->Precision();
-	V_tmp = ColorSpinorField::Create(param);
+      std::vector<ColorSpinorField*> B_d;
+      for (int i=0; i<Nvec; i++) {
+	ColorSpinorParam param(*B[i]);
+	param.location = QUDA_CUDA_FIELD_LOCATION;
+	param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+	B_d.push_back(ColorSpinorField::Create(param));
+	*B_d[i] = *B[i];
       }
 
-      printfQuda("Transfer: filling V field with null-space components\n");
-      fillV(*V_tmp);  // copy the null space vectors into V
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: filling V field with null-space components\n");
 
       // orthogonalize the blocks
-      printfQuda("Transfer: block orthogonalizing\n");
-      BlockOrthogonalize(*V_tmp, Nvec, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
+      BlockOrthogonalize(*V_d, B_d, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
 
-      *V_h = *V_tmp;
-      if (V_d != V_tmp) {
-      	*V_d = *V_tmp;
-      	delete V_tmp;
-      }
-      printfQuda("Transferred prolongator back to CPU\n");
+      for (int i=0; i<Nvec; i++) delete B_d[i];
+
+      *V_h = *V_d;
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator back to CPU\n");
 
     } else {
 
-      printfQuda("Transfer: filling V field with null-space components\n");
-      fillV(*V_h); // copy the null space vectors into V
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: filling V field with null-space components\n");
 
       // orthogonalize the blocks
-      printfQuda("Transfer: block orthogonalizing\n");
-      BlockOrthogonalize(*V_h, Nvec, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
+      BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs);
 
       if (enable_gpu) {
       	*V_d = *V_h;
-      	printfQuda("Transferred prolongator to GPU\n");
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
       }
     }
   }
@@ -212,7 +208,7 @@ namespace quda {
       param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
       param.x[0] /= 2;
       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      param.precision = V_d->Precision();
+      param.setPrecision(V_d->Precision());
 
       delete V_d;
       V_d = ColorSpinorField::Create(param);
@@ -224,7 +220,7 @@ namespace quda {
       ColorSpinorParam param(*V_h);
       param.location = QUDA_CUDA_FIELD_LOCATION;
       param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      param.precision = V_d->Precision();
+      param.setPrecision(V_d->Precision());
 
       delete V_d;
       V_d = ColorSpinorField::Create(param);
@@ -234,24 +230,6 @@ namespace quda {
       errorQuda("Undefined site_subset %d", site_subset_);
     }
 
-  }
-
-  void Transfer::fillV(ColorSpinorField &V) { 
-    if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
-      ColorSpinorParam param(*B[0]);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      ColorSpinorField *Bgpu = ColorSpinorField::Create(param);
-
-      for (int i=0; i<Nvec; i++) {
-	*Bgpu = *B[i];
-	FillV(V, *Bgpu, i, Nvec);
-      }
-
-      delete Bgpu;
-    } else {
-      for (int i=0; i<Nvec; i++) FillV(V, *B[i], i, Nvec);
-    }
   }
 
   struct Int2 {

@@ -109,9 +109,30 @@ namespace quda {
        @param precision The precision to use 
      */
     void setPrecision(QudaPrecision precision) {
+      // is the current status in native field order?
+      bool native = false;
+      if (precision == QUDA_DOUBLE_PRECISION) {
+	if (order  == QUDA_FLOAT2_GAUGE_ORDER) native = true;
+      } else if (precision == QUDA_SINGLE_PRECISION ||
+		 precision == QUDA_HALF_PRECISION) {
+	if (reconstruct == QUDA_RECONSTRUCT_NO) {
+	  if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
+	} else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
+	  if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
+	} else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
+	  if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
+	} else if (reconstruct == QUDA_RECONSTRUCT_10) {
+	  if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
+	}
+      }
+
       this->precision = precision;
-      order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ? 
-	QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER; 
+      this->ghost_precision = precision;
+
+      if (native) {
+	order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ?
+	  QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+      }
     }
 
   };
@@ -185,8 +206,10 @@ namespace quda {
        @param[in] R Radius of the ghost zone
        @param[in] no_comms_fill If true we create a full halo
        regardless of partitioning
+       @param[in] bidir Is this a bi-directional exchange - if not
+       then we alias the fowards and backwards offsetss
     */
-    void createGhostZone(const int *R, bool no_comms_fill) const;
+    void createGhostZone(const int *R, bool no_comms_fill, bool bidir=true) const;
 
   public:
     GaugeField(const GaugeFieldParam &param);
@@ -335,19 +358,24 @@ namespace quda {
 
     /**
        @brief Create the communication handlers and buffers
-       @param R The thickness of the extended region in each dimension
-       @param no_comms_fill Do local exchange to fill out the extended
+       @param[in] R The thickness of the extended region in each dimension
+       @param[in] no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
+       @param[in] bidir Whether to allocate communication buffers to
+       allow for simultaneous bi-directional exchange.  If false, then
+       the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(const int *R, bool no_comms_fill);
+    void createComms(const int *R, bool no_comms_fill, bool bidir=true);
 
     /**
        @brief Allocate the ghost buffers
-       @param R The thickness of the extended region in each dimension
-       @param no_comms_fill Do local exchange to fill out the extended
+       @param[in] R The thickness of the extended region in each dimension
+       @param[in] no_comms_fill Do local exchange to fill out the extended
+       @param[in] bidir Is this a bi-directional exchange - if not
+       then we alias the fowards and backwards offsetss
        region in non-partitioned dimensions
     */
-    void allocateGhostBuffer(const int *R, bool no_comms_fill) const;
+    void allocateGhostBuffer(const int *R, bool no_comms_fill, bool bidir=true) const;
 
     /**
        @brief Start the receive communicators

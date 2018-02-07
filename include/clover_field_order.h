@@ -222,16 +222,18 @@ namespace quda {
       }
 
       __host__ double device_absmax() const {
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
 	// just use offset_cb, since factor of two from parity is equivalent to complexity
-	return thrust::transform_reduce(thrust::retag<my_tag>(ptr), thrust::retag<my_tag>(ptr+offset_cb),
+	return thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb,
 					abs_<Float>(), 0.0, thrust::maximum<Float>());
       }
 
       __host__ double device_absmin() const {
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
 	// just use offset_cb, since factor of two from parity is equivalent to complexity
-	return thrust::transform_reduce(thrust::retag<my_tag>(ptr), thrust::retag<my_tag>(ptr+offset_cb),
+	return thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb,
 					abs_<Float>(), 0.0, thrust::minimum<Float>());
       }
     };

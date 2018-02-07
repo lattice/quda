@@ -746,7 +746,7 @@ static void setColorSpinorParams(const int dim[4],
   for(int dir=0; dir<4; ++dir) param->x[dir] = dim[dir];
   param->x[0] /= 2;
 
-  param->precision = precision;
+  param->setPrecision(precision);
   param->pad = 0;
   param->siteSubset = QUDA_PARITY_SITE_SUBSET;
   param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -1768,17 +1768,17 @@ void qudaCloverMultishiftInvert(int external_precision,
     // default is chronological CG
     if (!quda_solver || strcmp(quda_solver,"CHRONO_CG_SOLVER")==0) {
       // use CG with chronological forecasting
-      invertParam.use_resident_chrono = 1;
-      invertParam.make_resident_chrono = 1;
-      invertParam.max_chrono_dim = 10;
+      invertParam.chrono_use_resident = 1;
+      invertParam.chrono_make_resident = 1;
+      invertParam.chrono_max_dim = 10;
     } else if (strcmp(quda_solver,"BICGSTAB_SOLVER")==0){
       // use two-step BiCGStab
       invertParam.inv_type = QUDA_BICGSTAB_INVERTER;
       invertParam.solve_type = QUDA_DIRECT_PC_SOLVE;
     } else if (strcmp(quda_solver,"CG_SOLVER")==0){
       // regular CG
-      invertParam.use_resident_chrono = 0;
-      invertParam.make_resident_chrono = 0;
+      invertParam.chrono_use_resident = 0;
+      invertParam.chrono_make_resident = 0;
     }
 
     invertQuda(solutionArray[0], source, &invertParam);

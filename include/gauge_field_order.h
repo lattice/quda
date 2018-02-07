@@ -538,9 +538,11 @@ namespace quda {
       }
 
       __host__ double device_norm2() const {
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	return thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*volumeCB*geometry*nColor*nColor),
-					thrust::retag<my_tag>(ptr+2*volumeCB*geometry*nColor*nColor),
+	return thrust::transform_reduce(thrust::cuda::par(alloc),
+					ptr+0*volumeCB*geometry*nColor*nColor,
+					ptr+2*volumeCB*geometry*nColor*nColor,
 					square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
       }
 
@@ -725,72 +727,86 @@ namespace quda {
       }
 
       __host__ double device_norm2() const {
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
-
-	double even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb),
-					       thrust::retag<my_tag>(ptr+0*offset_cb+geometry*stride*nColor*nColor),
+	double even = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+0*offset_cb, ptr+0*offset_cb+geometry*stride*nColor*nColor,
 					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-	double odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb),
-					       thrust::retag<my_tag>(ptr+1*offset_cb+geometry*stride*nColor*nColor),
+	double odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+1*offset_cb, ptr+1*offset_cb+geometry*stride*nColor*nColor,
 					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	return even + odd;
       }
 
       __host__ double device_norm2(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
-
-	double even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor),
-					       thrust::retag<my_tag>(ptr+0*offset_cb+(dim+1)*stride*nColor*nColor),
+	double even = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
+					       ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
 					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-	double odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor),
-					       thrust::retag<my_tag>(ptr+1*offset_cb+(dim+1)*stride*nColor*nColor),
+	double odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
+					       ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
 					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	return even + odd;
       }
 
       __host__ Float device_absmax() const {
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	Float even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+0*stride*nColor*nColor),
-					      thrust::retag<my_tag>(ptr+0*offset_cb+geometry*stride*nColor*nColor),
+	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
+					      ptr+0*offset_cb+0*stride*nColor*nColor,
+					      ptr+0*offset_cb+geometry*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
-	Float odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+0*stride*nColor*nColor),
-					      thrust::retag<my_tag>(ptr+1*offset_cb+geometry*stride*nColor*nColor),
+	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+					      ptr+1*offset_cb+0*stride*nColor*nColor,
+					      ptr+1*offset_cb+geometry*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
 	return std::max(even,odd);
       }
 
       __host__ Float device_absmax(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	Float even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor),
-					      thrust::retag<my_tag>(ptr+0*offset_cb+(dim+1)*stride*nColor*nColor),
+	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
+					      ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
+					      ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
-	Float odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor),
-					      thrust::retag<my_tag>(ptr+1*offset_cb+(dim+1)*stride*nColor*nColor),
+	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+					      ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
+					      ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
 	return std::max(even,odd);
       }
 
       __host__ Float device_absmin() const {
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	Float even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+0*stride*nColor*nColor),
-					      thrust::retag<my_tag>(ptr+0*offset_cb+geometry*stride*nColor*nColor),
+	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
+					      ptr+0*offset_cb+0*stride*nColor*nColor,
+					      ptr+0*offset_cb+geometry*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
-	Float odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+0*stride*nColor*nColor),
-					      thrust::retag<my_tag>(ptr+1*offset_cb+geometry*stride*nColor*nColor),
+	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+					      ptr+1*offset_cb+0*stride*nColor*nColor,
+					      ptr+1*offset_cb+geometry*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
 	return std::min(even,odd);
       }
 
       __host__ Float device_absmin(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	Float even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor),
-					      thrust::retag<my_tag>(ptr+0*offset_cb+(dim+1)*stride*nColor*nColor),
+	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
+					      ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
+					      ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
-	Float odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor),
-					      thrust::retag<my_tag>(ptr+1*offset_cb+(dim+1)*stride*nColor*nColor),
+	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+					      ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
+					      ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
 	return std::min(even,odd);
       }

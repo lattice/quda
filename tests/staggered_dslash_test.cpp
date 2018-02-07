@@ -147,7 +147,7 @@ void init()
   }
   csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
-  csParam.precision = inv_param.cpu_prec;
+  csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
   if (test_type < 2) {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
@@ -242,7 +242,7 @@ void init()
 
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     csParam.pad = inv_param.sp_pad;
-    csParam.precision = inv_param.cuda_prec;
+    csParam.setPrecision(inv_param.cuda_prec);
     if (test_type < 2){
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /=2;

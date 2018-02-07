@@ -317,41 +317,6 @@ template<typename OutputType, typename InputType, int tex_id>
     return __fdividef(MAX_SHORT, c[0]);
   }
 
-  // Specializations for chars.
-
-  template <int M>
-  __device__ inline float store_norm(float *norm, char x[M], int i) {
-    float c[M];
-#pragma unroll
-    for (int j=0; j<M; j++) c[j] = max_fabs(x[j]);
-#pragma unroll
-    for (int j=1; j<M; j++) c[0] = fmaxf(c[j],c[0]);
-    norm[i] = c[0];
-    return __fdividef(MAX_CHAR, c[0]);
-  }
-
-  template <int M>
-  __device__ inline float store_norm(float *norm, char2 x[M], int i) {
-    float c[M];
-#pragma unroll
-    for (int j=0; j<M; j++) c[j] = max_fabs(x[j]);
-#pragma unroll
-    for (int j=1; j<M; j++) c[0] = fmaxf(c[j],c[0]);
-    norm[i] = c[0];
-    return __fdividef(MAX_CHAR, c[0]);
-  }
-
-  template <int M>
-  __device__ inline float store_norm(float *norm, char4 x[M], int i) {
-    float c[M];
-#pragma unroll
-    for (int j=0; j<M; j++) c[j] = max_fabs(x[j]);
-#pragma unroll
-    for (int j=1; j<M; j++) c[0] = fmaxf(c[j],c[0]);
-    norm[i] = c[0];
-    return __fdividef(MAX_CHAR, c[0]);
-  }
-
   /**
      @param RegType Register type used in kernel
      @param InterType Intermediate format - RegType precision with StoreType ordering

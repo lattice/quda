@@ -97,7 +97,7 @@ fermion_force_init()
 #endif
 
   gParam.pad = 0;
-  gParam.precision = gaugeParam.cuda_prec;
+  gParam.setPrecision(gaugeParam.cuda_prec);
   gParam.reconstruct = link_recon;
   gParam.order = (gaugeParam.cuda_prec == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_GAUGE_ORDER 
     : (link_recon == QUDA_RECONSTRUCT_12) ? QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
@@ -106,7 +106,7 @@ fermion_force_init()
   gParam.order = QUDA_MILC_GAUGE_ORDER;
 
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
-  gParam.precision = gaugeParam.cpu_prec;
+  gParam.setPrecision(gaugeParam.cpu_prec);
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   cpuMom = new cpuGaugeField(gParam);
   refMom = new cpuGaugeField(gParam);
@@ -117,7 +117,7 @@ fermion_force_init()
   memcpy(refMom->Gauge_p(), cpuMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize*gaugeParam.cpu_prec);
     
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam.precision = gaugeParam.cuda_prec;
+  gParam.setPrecision(gaugeParam.cuda_prec);
   cudaMom = new cudaGaugeField(gParam);
     
   ColorSpinorParam hwParam;
@@ -125,7 +125,7 @@ fermion_force_init()
   hwParam.nSpin = 2;
   hwParam.nDim = 4;
   for (int d=0; d<4; d++) hwParam.x[d] = gaugeParam.X[d];
-  hwParam.precision = cpu_hw_prec;
+  hwParam.setPrecision(cpu_hw_prec);
   hwParam.pad = 0;
   hwParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   hwParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -134,7 +134,7 @@ fermion_force_init()
 
   cpuHw = new cpuColorSpinorField(hwParam);
 
-  hwParam.precision = hw_prec;
+  hwParam.setPrecision(hw_prec);
   hwParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   cudaHw = new cudaColorSpinorField(hwParam);
 

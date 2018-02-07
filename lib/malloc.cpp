@@ -14,6 +14,7 @@ namespace quda {
 
   enum AllocType {
     DEVICE,
+    DEVICE_PINNED,
     HOST,
     PINNED,
     MAPPED,
@@ -74,7 +75,7 @@ namespace quda {
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Host  ", "Pinned", "Mapped"};
+    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped"};
     std::map<void *, MemAlloc>::iterator entry;
 
     for (entry = alloc[type].begin(); entry != alloc[type].end(); entry++) {
@@ -92,7 +93,7 @@ namespace quda {
     if (total_bytes[type] > max_total_bytes[type]) {
       max_total_bytes[type] = total_bytes[type];
     }
-    if (type != DEVICE) {
+    if (type != DEVICE && type != DEVICE_PINNED) {
       total_host_bytes += a.base_size;
       if (total_host_bytes > max_total_host_bytes) {
 	max_total_host_bytes = total_host_bytes;
@@ -112,7 +113,7 @@ namespace quda {
   {
     size_t size = alloc[type][ptr].base_size;
     total_bytes[type] -= size;
-    if (type != DEVICE) {
+    if (type != DEVICE && type != DEVICE_PINNED) {
       total_host_bytes -= size;
     }
     if (type == PINNED || type == MAPPED) {
@@ -185,6 +186,8 @@ namespace quda {
    */
   void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
+    if (!comm_peer2peer_present()) return device_malloc_(func, file, line, size);
+
     MemAlloc a(func, file, line);
     void *ptr;
 
@@ -195,7 +198,7 @@ namespace quda {
       printfQuda("ERROR: Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
-    track_malloc(DEVICE, a, ptr);
+    track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
     cudaMemset(ptr, 0xff, size);
 #endif
@@ -307,11 +310,16 @@ namespace quda {
    */
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr)
   {
+    if (!comm_peer2peer_present()) {
+      device_free_(func, file, line, ptr);
+      return;
+    }
+
     if (!ptr) {
       printfQuda("ERROR: Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
     }
-    if (!alloc[DEVICE].count(ptr)) {
+    if (!alloc[DEVICE_PINNED].count(ptr)) {
       printfQuda("ERROR: Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
     }
@@ -320,7 +328,7 @@ namespace quda {
       printfQuda("ERROR: Failed to free device memory (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
     }
-    track_free(DEVICE, ptr);
+    track_free(DEVICE_PINNED, ptr);
   }
 
 
@@ -363,6 +371,7 @@ namespace quda {
   void printPeakMemUsage()
   {
     printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1<<20));
+    printfQuda("Pinned device memory used = %.1f MB\n", max_total_bytes[DEVICE_PINNED] / (double)(1<<20));
     printfQuda("Page-locked host memory used = %.1f MB\n", max_total_pinned_bytes / (double)(1<<20));
     printfQuda("Total host memory used >= %.1f MB\n", max_total_host_bytes / (double)(1<<20));
   }
@@ -370,11 +379,12 @@ namespace quda {
 
   void assertAllMemFree()
   {
-    if (!alloc[DEVICE].empty() || !alloc[HOST].empty() || !alloc[PINNED].empty() || !alloc[MAPPED].empty()) {
+    if (!alloc[DEVICE].empty() || !alloc[DEVICE_PINNED].empty() || !alloc[HOST].empty() || !alloc[PINNED].empty() || !alloc[MAPPED].empty()) {
       warningQuda("The following internal memory allocations were not freed.");
       printfQuda("\n");
       print_alloc_header();
       print_alloc(DEVICE);
+      print_alloc(DEVICE_PINNED);
       print_alloc(HOST);
       print_alloc(PINNED);
       print_alloc(MAPPED);

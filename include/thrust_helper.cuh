@@ -5,39 +5,30 @@
 #undef device_malloc
 #undef device_free
 
-#include <thrust/device_ptr.h>
+#include <thrust/system/cuda/vector.h>
+#include <thrust/system/cuda/execution_policy.h>
 #include <thrust/transform_reduce.h>
-#include <thrust/iterator/detail/retag.h>
+#include <thrust/device_ptr.h>
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
 
 #define device_malloc(size) quda::device_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
 #define device_free(ptr) quda::device_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
-// create a tag derived from system::cuda::tag for distinguishing
-// our overloads of get_temporary_buffer and return_temporary_buffer
-struct my_tag : thrust::system::cuda::tag {};
-
-// overload get_temporary_buffer on my_tag
-// its job is to forward allocation requests to g_allocator
-template<typename T>
-thrust::pair<T*, std::ptrdiff_t> get_temporary_buffer(my_tag, std::ptrdiff_t n)
+/**
+   Allocator helper class which allows us to redirect thrust temporary
+   alocations to use QUDA's pool memory
+ */
+class thrust_allocator
 {
-  // ask the allocator for sizeof(T) * n bytes
-  T* result = reinterpret_cast<T*>(pool_device_malloc(sizeof(T) * n));
+public:
+  // just allocate bytes
+  typedef char value_type;
 
-  // return the pointer and the number of elements allocated
-  return thrust::make_pair(result,n);
-}
+  thrust_allocator() {}
+  ~thrust_allocator() { }
 
+  char *allocate(std::ptrdiff_t num_bytes) { return reinterpret_cast<char*>(pool_device_malloc(num_bytes)); }
+  void deallocate(char *ptr, size_t n) { pool_device_free(ptr); }
 
-// overload return_temporary_buffer on my_tag
-// its job is to forward deallocations to g_allocator
-// an overloaded return_temporary_buffer should always accompany
-// an overloaded get_temporary_buffer
-template<typename Pointer>
-void return_temporary_buffer(my_tag, Pointer p)
-{
-  // return the pointer to the allocator
-  pool_device_free(thrust::raw_pointer_cast(p));
-}
+};

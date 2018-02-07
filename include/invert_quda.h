@@ -817,6 +817,7 @@ namespace quda {
     const DiracMatrix &mat;
     bool orthogonal; //! Whether to construct an orthogonal basis or not
     bool apply_mat; //! Whether to compute q = Ap or assume it is provided
+    bool hermitian; //! whether A is hermitian ot not
     TimeProfile &profile;
 
   public:
@@ -826,7 +827,7 @@ namespace quda {
        @param apply_mat Whether to apply the operator in place or assume q already contains this
        @profile Timing profile to use
     */
-    MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, TimeProfile &profile);
+    MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile);
     virtual ~MinResExt();
 
     /**

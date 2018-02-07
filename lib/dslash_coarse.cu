@@ -25,7 +25,7 @@ namespace quda {
 
   template <typename Float, typename yFloat, int coarseSpin, int coarseColor, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
   struct DslashCoarseArg {
-    typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder> F;
+    typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder,Float,yFloat> F;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> G;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,yFloat> GY;
 
@@ -464,11 +464,7 @@ namespace quda {
     const int nParity;
     const int nSrc;
 
-#ifdef EIGHT_WAY_WARP_SPLIT
     const int max_color_col_stride = 8;
-#else
-    const int max_color_col_stride = 4;
-#endif
     mutable int color_col_stride;
     mutable int dim_threads;
     char *saveOut;
@@ -694,11 +690,9 @@ namespace quda {
 	  case 4:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
-#ifdef EIGHT_WAY_WARP_SPLIT
 	  case 8:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
-#endif // EIGHT_WAY_WARP_SPLIT
 #endif // DOT_PRODUCT_SPLIT
 	  default:
 	    errorQuda("Color column stride %d not valid", tp.aux.x);
@@ -716,11 +710,9 @@ namespace quda {
 	  case 4:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
-#ifdef EIGHT_WAY_WARP_SPLIT
 	  case 8:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
-#endif // EIGHT_WAY_WARP_SPLIT
 #endif // DOT_PRODUCT_SPLIT
 	  default:
 	    errorQuda("Color column stride %d not valid", tp.aux.x);
@@ -738,11 +730,9 @@ namespace quda {
 	  case 4:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
-#ifdef EIGHT_WAY_WARP_SPLIT
 	  case 8:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
-#endif // EIGHT_WAY_WARP_SPLIT
 #endif // DOT_PRODUCT_SPLIT
 	  default:
 	    errorQuda("Color column stride %d not valid", tp.aux.x);
@@ -975,7 +965,7 @@ namespace quda {
 
       if (dslash && comm_partitioned() && comms) {
 	const int nFace = 1;
-	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv);
+	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, Y.Precision());
       }
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
@@ -1057,6 +1047,7 @@ namespace quda {
       i32toa(prec_str,dslash.Y.Precision());
       strcat(aux,prec_str);
       strcat(aux,comm_dim_partitioned_string());
+      strcat(aux,comm_dim_topology_string());
 
       int comm_sum = 4;
       if (dslash.commDim) for (int i=0; i<4; i++) comm_sum -= (1-dslash.commDim[i]);

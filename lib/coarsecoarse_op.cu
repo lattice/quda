@@ -16,6 +16,8 @@ typedef int storeType;
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
+
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateYcoarse(GaugeField &Y, GaugeField &X,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
@@ -161,7 +163,7 @@ namespace quda {
     checkPrecision(X, Y, clover, cloverInv);
     checkPrecision(g, uv, T.Vectors(X.Location()));
 
-    printfQuda("Computing Y field......\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
@@ -183,8 +185,10 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
-    printfQuda("....done computing Y field\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
   }
+
+#endif // GPU_MULTIGRID
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
@@ -192,6 +196,7 @@ namespace quda {
 		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
 		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
+#ifdef GPU_MULTIGRID
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(X, Y, gauge, clover, cloverInv);
 
@@ -203,13 +208,16 @@ namespace quda {
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
     UVparam.nSpin *= 2; // so nSpin == 4
-    UVparam.precision = T.Vectors(location).Precision();
+    UVparam.setPrecision(T.Vectors(location).Precision());
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 
     calculateYcoarse(Y, X, *uv, T, gauge, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
 
     delete uv;
+#else
+    errorQuda("Multigrid has not been built");
+#endif // GPU_MULTIGRID
   }
   
 } //namespace quda
