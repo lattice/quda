@@ -4,6 +4,7 @@
 #include <index_helper.cuh>
 #include <stencil.h>
 #include <color_spinor.h>
+#include <worker.h>
 
 /**
    This is a basic gauged Laplace operator

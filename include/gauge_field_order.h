@@ -23,6 +23,7 @@
 #include <type_traits>
 #include <atomic.cuh>
 #include <thrust_helper.cuh>
+#include <gauge_field.h>
 
 namespace quda {
 
