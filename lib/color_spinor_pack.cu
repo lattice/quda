@@ -46,7 +46,7 @@ namespace quda {
 
     Field field;
     int_fastdiv X[QUDA_MAX_DIM];
-    const int volumeCB;
+    const int_fastdiv volumeCB;
     const int nDim;
     const int nFace;
     const int parity;
@@ -54,6 +54,7 @@ namespace quda {
     const int dagger;
     const QudaDWFPCType pc_type;
     int commDim[4]; // whether a given dimension is partitioned or not
+    int_fastdiv nParity2dim_threads;
 
     PackGhostArg(Field field, const ColorSpinorField &a, int parity, int nFace, int dagger)
       : field(field),
@@ -192,19 +193,19 @@ namespace quda {
   template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim_threads, typename Arg>
   __global__ void GenericPackGhostKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    if (x_cb >= arg.volumeCB) return;
+    int spin_color_block = blockDim.y*blockIdx.y + threadIdx.y;
+    int parity_dim_dir = blockDim.z*blockIdx.z + threadIdx.z;
 
-    const int parity_dim_dir = blockDim.z*blockIdx.z + threadIdx.z;
-    if (parity_dim_dir >= arg.nParity*2*dim_threads) return;
+    // ensure all threads are always active so it safe to synchronize
+    x_cb %= arg.volumeCB;
+    spin_color_block %= (Ns/Ms)*(Nc/Mc);
+    parity_dim_dir %= arg.nParity2dim_threads;
 
     const int dim_dir = parity_dim_dir % (2*dim_threads);
     const int dim0 = dim_dir / 2;
     const int dir = dim_dir % 2;
     const int parity = (arg.nParity == 2) ? (parity_dim_dir / (2*dim_threads) ) : arg.parity;
-
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
-    const int spin_color_block = blockDim.y*blockIdx.y + threadIdx.y;
-    if (spin_color_block >= (Ns/Ms)*(Nc/Mc)) return; // ensure only valid threads
     const int spin_block = (spin_color_block / (Nc / Mc)) * Ms;
     const int color_block = (spin_color_block % (Nc / Mc)) * Mc;
 
@@ -268,6 +269,7 @@ namespace quda {
 	else GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,4,Arg>(arg);
       } else {
 	const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	arg.nParity2dim_threads = arg.nParity*2*tp.aux.x;
 	switch(tp.aux.x) {
 	case 1:
 	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,1,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
