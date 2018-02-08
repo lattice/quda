@@ -22,8 +22,7 @@
 #include <fast_intdiv.h>
 #include <type_traits>
 #include <atomic.cuh>
-#include <thrust/device_ptr.h>
-#include <thrust/transform_reduce.h>
+#include <thrust_helper.cuh>
 
 namespace quda {
 
@@ -322,15 +321,19 @@ namespace quda {
 
       __host__ double device_norm2(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust_allocator alloc;
 	thrust::device_ptr<complex<Float> > ptr(u);
-	double even = thrust::transform_reduce(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
+	double even = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
 					       ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
 					       square<double,Float>(), 0.0, thrust::plus<double>());
-	double odd  = thrust::transform_reduce(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
+	double odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
 					       ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
 					       square<double,Float>(), 0.0, thrust::plus<double>());
 	return even + odd;
       }
+
     };
 
     template<typename Float, int nColor, bool native_ghost>
