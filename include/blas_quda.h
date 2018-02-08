@@ -94,6 +94,23 @@ namespace quda {
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
+    /**
+       @brief Compute the block "axpy" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       y = x * a + y
+
+       The dimensions of a can be rectangular, e.g., the width of x
+       and y need not be same, though the maximum width for both is
+       16.
+
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void axpy(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+
     /**
        @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes

@@ -121,13 +121,13 @@ namespace quda {
 
   void PreconCG::ComputeBeta(double *beta, int begin, int size)
   {
-    std::vector<cudaColorSpinorField*> _Ap(size);
-    std::vector<cudaColorSpinorField*> _wp(size);
+    std::vector<ColorSpinorField*> _Ap(size);
+    std::vector<ColorSpinorField*> _wp(size);
 
     for (int  l = 0; l < size; l++)
     {
-      _Ap[l]  = static_cast<cudaColorSpinorField*>(Ap[begin+l]);
-      _wp[l]  = static_cast<cudaColorSpinorField*>(wp);
+      _Ap.push_back(Ap[begin+l]);
+      _wp.push_back(wp);
       beta[l] = 0.0;
     }
 
