@@ -133,10 +133,19 @@ namespace quda {
 
     const auto &rhs = arg.field;
 
-    {
-      if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace){
-	Float max = block_float ? compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block) : 1.0;
+    if (arg.commDim[dim]) {
+      Float max = 1.0;
+      if (block_float) {
+	if ( (dir == 0 && x[dim] < arg.nFace) || (dir == 1 && x[dim] >= arg.X[dim] - arg.nFace) ) {
+	  max = compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block);
+	} else {
+#if __CUDA_ARCH__ >= 700
+	  __syncthreads();
+#endif
+	}
+      }
 
+      if (dir == 0 && x[dim] < arg.nFace) {
 	for (int spin_local=0; spin_local<Ms; spin_local++) {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
@@ -146,9 +155,7 @@ namespace quda {
 	}
       }
       
-      if (dir == 1 && arg.commDim[dim] && x[dim] >= arg.X[dim] - arg.nFace){
-	Float max = block_float ? compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block) : 1.0;
-
+      if (dir == 1 && x[dim] >= arg.X[dim] - arg.nFace) {
 	for (int spin_local=0; spin_local<Ms; spin_local++) {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
@@ -158,6 +165,7 @@ namespace quda {
 	}
       }
     }
+
   }
 
   template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, typename Arg>
