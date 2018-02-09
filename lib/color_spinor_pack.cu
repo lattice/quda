@@ -82,11 +82,13 @@ namespace quda {
      Compute the max element over the spin-color components of a given site.
    */
   template <typename Float, int Ns, int Ms, int Nc, int Mc, typename Arg>
-  __device__ __host__ inline Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block) {
+     __device__ __host__ inline Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block, bool active) {
 
-    Float thread_max = 0.0;
-    Float site_max = 0.0;
+      Float thread_max = 0.0;
+      Float site_max = active ? 0.0 : 1.0;
 #ifdef __CUDA_ARCH__
+
+
     // workout how big a shared-memory allocation we need
     // just statically compute the largest size needed to avoid templating on block size
     constexpr int max_block_size = 1024; // all supported GPUs have 1024 as their max block size
@@ -94,34 +96,37 @@ namespace quda {
     constexpr int color_spin_threads = Nc <= MAX_BLOCK_FLOAT_NC ? (Ns/Ms) * (Nc/Mc) : 1;
     // this is the largest size of blockDim.x (rounded up to multiples of bank_width)
     constexpr int thread_width_x = ( (max_block_size / color_spin_threads + bank_width-1) / bank_width) * bank_width;
-    const auto &rhs = arg.field;
-#pragma unroll
-    for (int spin_local=0; spin_local<Ms; spin_local++) {
-      int s = spin_block + spin_local;
-#pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) {
-	int c = color_block + color_local;
-	complex<Float> z = rhs(spinor_parity, x_cb, s, c);
-	thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
-	thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
-      }
-    }
-
     __shared__ Float v[ (Ns/Ms) * (Nc/Mc) * thread_width_x];
-    v[ ( (spin_block/Ms) * (Nc/Mc) + (color_block/Mc)) * blockDim.x + threadIdx.x ] = thread_max;
-    __syncthreads();
+    const auto &rhs = arg.field;
+    if (active){
+#pragma unroll
+      for (int spin_local=0; spin_local<Ms; spin_local++) {
+        int s = spin_block + spin_local;
+#pragma unroll
+        for (int color_local=0; color_local<Mc; color_local++) {
+         int c = color_block + color_local;
+         complex<Float> z = rhs(spinor_parity, x_cb, s, c);
+         thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
+         thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
+       }
+     }
+     v[ ( (spin_block/Ms) * (Nc/Mc) + (color_block/Mc)) * blockDim.x + threadIdx.x ] = thread_max;
+   }
 
+   __syncthreads();
+   
+   if (active){
 #pragma unroll
     for (int sc=0; sc<(Ns/Ms) * (Nc/Mc); sc++) {
       site_max = site_max > v[sc*blockDim.x + threadIdx.x] ? site_max : v[sc*blockDim.x + threadIdx.x];
     }
-
+  }
 #else
-    errorQuda("Not supported on CPU");
+  errorQuda("Not supported on CPU");
 #endif
 
-    return site_max;
-  }
+  return site_max;
+}
 
 
   template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim, int dir, typename Arg>
@@ -132,10 +137,24 @@ namespace quda {
     else getCoords(x, x_cb, arg.X, parity);
 
     const auto &rhs = arg.field;
+    bool active = false;
 
     {
-      if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace){
-	Float max = block_float ? compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block) : 1.0;
+      Float max = 1.0;
+      if (block_float) {
+        if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace || dir == 1 && arg.commDim[dim] && x[dim] >= arg.X[dim] - arg.nFace) {
+          active=true;
+        }
+        max = compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block, active);
+         
+//         else {
+// #if __CUDA_ARCH__ >=    700
+//       __syncthreads();
+// #endif
+        
+      }      
+if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace){
+	
 
 	for (int spin_local=0; spin_local<Ms; spin_local++) {
 	  int s = spin_block + spin_local;
@@ -147,7 +166,6 @@ namespace quda {
       }
       
       if (dir == 1 && arg.commDim[dim] && x[dim] >= arg.X[dim] - arg.nFace){
-	Float max = block_float ? compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block) : 1.0;
 
 	for (int spin_local=0; spin_local<Ms; spin_local++) {
 	  int s = spin_block + spin_local;
