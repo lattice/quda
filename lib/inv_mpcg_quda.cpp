@@ -129,8 +129,8 @@ namespace quda {
     const int nsteps = (dim-1)/2;
 
     {
-      std::vector<cudaColorSpinorField*> vp1; vp1.reserve((nsteps+1)*nsteps);
-      std::vector<cudaColorSpinorField*> vp2; vp2.reserve((nsteps+1)*nsteps);
+      std::vector<ColorSpinorField*> vp1; vp1.reserve((nsteps+1)*nsteps);
+      std::vector<ColorSpinorField*> vp2; vp2.reserve((nsteps+1)*nsteps);
       double g[(nsteps+1)*nsteps];
     
       for(int i=0; i<nsteps; ++i){
@@ -152,8 +152,8 @@ namespace quda {
     const int num = dim-nsteps;
     const int offset = nsteps;
     double d[2*nsteps+1];
-    std::vector<cudaColorSpinorField*> vp1; vp1.reserve(2*nsteps+1);
-    std::vector<cudaColorSpinorField*> vp2; vp2.reserve(2*nsteps+1);
+    std::vector<ColorSpinorField*> vp1; vp1.reserve(2*nsteps+1);
+    std::vector<ColorSpinorField*> vp2; vp2.reserve(2*nsteps+1);
     for(int i=0; i<=nsteps; ++i){
       vp1.push_back(&v[0+offset]);
       vp2.push_back(&v[i+offset]);
