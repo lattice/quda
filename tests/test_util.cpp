@@ -2806,7 +2806,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     gcrNkrylov = atoi(argv[i+1]);
-    if (gcrNkrylov < 1 || gcrNkrylov > 1e6){
+    if ( (gcrNkrylov < 1 || gcrNkrylov > 1e6) and (inv_type != QUDA_PCG_INVERTER) ){
       printf("ERROR: invalid number of gcrkrylov iterations (%d)\n", gcrNkrylov);
       usage(argv);
     }
