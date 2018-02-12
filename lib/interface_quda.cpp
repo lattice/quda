@@ -36,6 +36,10 @@
 #include <numa_affinity.h>
 #endif
 
+#ifdef QUDA_NVML
+#include <nvml.h>
+#endif
+
 #include <cuda.h>
 
 #ifdef MULTI_GPU
@@ -387,6 +391,26 @@ void initQudaDevice(int dev) {
     printfQuda("QUDA %s\n",quda_version.c_str());
 #endif
   }
+
+  int driver_version;
+  cudaDriverGetVersion(&driver_version);
+  printfQuda("CUDA Driver version = %d\n", driver_version);
+
+  int runtime_version;
+  cudaRuntimeGetVersion(&runtime_version);
+  printfQuda("CUDA Runtime version = %d\n", runtime_version);
+
+#ifdef QUDA_NVML
+  nvmlReturn_t result = nvmlInit();
+  if (NVML_SUCCESS != result) errorQuda("NVML Init failed with error %d", result);
+  const int length = 80;
+  char graphics_version[length];
+  result = nvmlSystemGetDriverVersion(graphics_version, length);
+  if (NVML_SUCCESS != result) errorQuda("nvmlSystemGetDriverVersion failed with error %d", result);
+  printfQuda("Graphic driver version = %s\n", graphics_version);
+  result = nvmlShutdown();
+  if (NVML_SUCCESS != result) errorQuda("NVML Shutdown failed with error %d", result);
+#endif
 
 #if defined(MULTI_GPU) && (CUDA_VERSION == 4000)
   //check if CUDA_NIC_INTEROP is set to 1 in the enviroment

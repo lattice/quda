@@ -129,8 +129,12 @@ if(QUDA_ARPACK)
   target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${PARPACK_OR_ARPACK})
 endif()
 
+if(QUDA_NVML)
+  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${NVML_LIBRARY})
+endif()
+
 if(QUDA_NUMA_NVML)
-target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${NVML_LIBRARY})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${NVML_LIBRARY})
 endif()
 
 
