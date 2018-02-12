@@ -2369,8 +2369,6 @@ void* newMultigridQuda(QudaMultigridParam *mg_param) {
   multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  saveProfile(__func__);
-  flushProfile();
   saveTuneCache();
 
   popVerbosity();
