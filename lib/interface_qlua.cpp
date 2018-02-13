@@ -165,7 +165,7 @@ init_QudaGaugeParam_generic(QudaGaugeParam& gp, const qudaLattice *qS, const int
 
 //-- load the gauge field
 static GaugeField*
-new_cudaGaugeField(QudaGaugeParam& gp, double *hbuf_u[])
+new_cudaGaugeField(QudaGaugeParam& gp, QUDA_REAL *hbuf_u[])
 {
 
   GaugeFieldParam gf_param(hbuf_u, gp);
@@ -547,6 +547,8 @@ momentumProjectionPropagator_Quda(
   if (check_quda_comms(qS))
     return 1;
 
+  if(typeid(QUDA_REAL) != typeid(double)) errorQuda("momentumProjectionPropagator_Quda: Precision not supported\n");
+  
   //-- This is needed to avoid segfaults, propagator must hold the full 3d-volume
   if( comm_size() != comm_dim(3) )
     errorQuda("momentumProjectionPropagator_Quda: This function supports only T-direction partitioning!\n");
@@ -759,31 +761,6 @@ momentumProjectionPropagator_Quda(
   memcpy(corrOut_proj, corrOut_local, sizeof(complex<QUDA_REAL>)*Nmoms*Ndata*Lt);
 
   
-  //-- Perform reduction over all processes
-  /* Create a separate communicator
-   * All processes with the same comm_coord(3) belong to COMM_TIME communicator.
-   * When performing the reduction over the COMM_TIME communicator, the global sum
-   * will be performed across all processes with the same time-coordinate,
-   * and the result will be placed at the "root" of each of the "time" groups.
-   * This means that the global result will exist only at the "time" processes, where each will
-   * hold the sum for its corresponing time slices.
-   * In the case where only the time-direction is partitioned,
-   * MPI_Reduce is essentially a memcpy.
-  */
-  /*
-  int time_rank, time_size;
-  MPI_Comm COMM_TIME;
-  MPI_Comm_split(MPI_COMM_WORLD, comm_coord(3), comm_rank(), &COMM_TIME);
-  MPI_Comm_rank(COMM_TIME,&time_rank);
-  MPI_Comm_size(COMM_TIME,&time_size);
-
-  MPI_Reduce(corrOut_local, corrOut_proj, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX, MPI_SUM, 0, COMM_TIME);  
-
-  MPI_Gather(corrOut_proj  , Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
-	     corrOut_global, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
-	     0, COMM_TIME);
-  */
-  
   //-- Not the fastest way to do it, but for testing is fair enough...
   // Works only when Nmoms = totV3 AND only the time direction is partitioned (such that V3 = totV3),
   // so that all entries of the output propagator get (non-zero) entries
@@ -982,10 +959,22 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
    * corrOut_dev=(Nmoms,Ndata*Lt) is the output matrix in column-major format
    */
   double t3 = MPI_Wtime();
-  stat = cublasZgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*Lt, V3,
-		     &al, phaseMatrix_dev, V3,
-		     corrInp_dev , V3, &be,
-		     corrOut_dev, Nmoms);
+  if(typeid(QUDA_REAL) == typeid(double)){
+    printfQuda("%s: Performing momentum projection in double precision.\n", func_name);
+    stat = cublasZgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*Lt, V3,
+		       &al, phaseMatrix_dev, V3,
+		       corrInp_dev , V3, &be,
+		       corrOut_dev, Nmoms);
+  }
+  else if(typeid(QUDA_REAL) == typeid(float)){
+    printfQuda("%s: Performing momentum projection in single precision.\n", func_name);
+    stat = cublasCgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*Lt, V3,
+		       &al, phaseMatrix_dev, V3,
+		       corrInp_dev , V3, &be,
+		       corrOut_dev, Nmoms);
+  }
+  else errorQuda("%s: Precision not supported!\n");
+  
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("%s: Momentum projection failed!\n", func_name);
   double t4 = MPI_Wtime();
@@ -1036,13 +1025,19 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   MPI_Comm_size(COMM_TIME,&time_size);
 
   
-  MPI_Reduce(corrOut_host, corrOut_glob, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX, MPI_SUM, 0, COMM_SPACE);  
+  MPI_Datatype dataTypeMPI;
+  if     ( typeid(QUDA_REAL) == typeid(float) ) dataTypeMPI = MPI_COMPLEX;
+  else if( typeid(QUDA_REAL) == typeid(double)) dataTypeMPI = MPI_DOUBLE_COMPLEX;
 
-  MPI_Gather(corrOut_glob, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
-	     corrOut_proj, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
+  
+  MPI_Reduce(corrOut_host, corrOut_glob, Nmoms*Ndata*Lt, dataTypeMPI, MPI_SUM, 0, COMM_SPACE);  
+
+  
+  MPI_Gather(corrOut_glob, Nmoms*Ndata*Lt, dataTypeMPI,
+	     corrOut_proj, Nmoms*Ndata*Lt, dataTypeMPI,
 	     0, COMM_TIME);
   
-  MPI_Bcast(corrOut_proj, Nmoms*Ndata*totT, MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
+  MPI_Bcast(corrOut_proj, Nmoms*Ndata*totT, dataTypeMPI, 0, MPI_COMM_WORLD);
   
   /*
    * Now a transpose of the corrOut_proj is required such that it follows the Qlua-C
