@@ -93,6 +93,7 @@ namespace quda {
     dim3 gridDim((param.V3 + blockDim.x -1)/blockDim.x, 1, 1); // spawn threads only for the spatial volume
 
     phaseMatrix_kernel<<<gridDim,blockDim>>>(phaseMatrix_dev, momMatrix_dev, arg_dev);
+    cudaDeviceSynchronize();
     checkCudaError();
     
     cudaFree(momMatrix_dev);

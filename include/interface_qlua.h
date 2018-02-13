@@ -98,6 +98,12 @@ typedef struct {
 } wuppertalParam;
 
 typedef struct {
+  QUDA_REAL alpha;
+  int Nstep;
+  QUDA_REAL tol;
+} APESmearParam;
+
+typedef struct {
   int nVec;
   qudaAPI_ContractId cntrID;
 } contractParam;
@@ -122,6 +128,7 @@ typedef struct {
 typedef struct {
   QudaVerbosity verbosity;
   wuppertalParam wParam;
+  APESmearParam apeParam;
   contractParam cParam;
   momProjParam mpParam;
 } qudaAPI_Param;

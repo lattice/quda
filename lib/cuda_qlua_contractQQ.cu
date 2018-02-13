@@ -238,6 +238,9 @@ namespace quda {
     
     ContractQQ contract(arg, arg_dev, *propIn1[0]);
     contract.apply(0);
+
+    cudaDeviceSynchronize();
+    checkCudaError();
   }
 
   

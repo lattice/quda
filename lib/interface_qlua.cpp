@@ -428,6 +428,8 @@ doQQ_contract_Quda(
     
     if((cudaProp_in1[ivec] == NULL) || (cudaProp_in2[ivec] == NULL) || (cudaProp_out[ivec] == NULL))
       errorQuda("doQQ_contract_Quda: Cannot allocate propagators. Exiting.\n");
+
+    cudaDeviceSynchronize();
     checkCudaError();
   }
   double t6 = MPI_Wtime();
@@ -437,7 +439,6 @@ doQQ_contract_Quda(
   int parity = 0;
   double t1 = MPI_Wtime();
   cudaContractQQ(cudaProp_out, cudaProp_in1, cudaProp_in2, parity, nColor, nSpin, paramAPI.cParam);
-  checkCudaError();
   double t2 = MPI_Wtime();
   printfQuda("TIMING - doQQ_contract_Quda: Contractions in %.6f sec.\n", t2-t1);
   
@@ -445,6 +446,7 @@ doQQ_contract_Quda(
   double t7 = MPI_Wtime();
   for(int ivec=0;ivec<nVec;ivec++){
     save_cudaColorSpinorField(&(hprop_out[ivec * fld_lgh]), gp, ip, nColor, nSpin, *cudaProp_out[ivec]);
+    cudaDeviceSynchronize();
     checkCudaError();
   }
   double t8 = MPI_Wtime();
@@ -488,6 +490,7 @@ Qlua_invertQuda(
   printfQuda("Csw     = %lf\n", paramAPI.wParam.alpha[1]);
   printfQuda("tol     = %e\n",  paramAPI.wParam.alpha[2]);
   printfQuda("Maxiter = %d\n",  int(paramAPI.wParam.alpha[3]));
+  printfQuda("Will perform APE Smearing with parameters (N,alpha) = (%d,%f)\n", paramAPI.apeParam.Nstep, paramAPI.apeParam.alpha);
 
   //-- Initialize the quda-gauge parameters
   QudaGaugeParam gp;
@@ -513,6 +516,12 @@ Qlua_invertQuda(
   double x6 = MPI_Wtime();
   printfQuda("TIMING - Qlua_invertQuda: invertQuda in %.6f sec.\n", x6-x5);
 
+  double x7 = MPI_Wtime();
+  performAPEnStep(paramAPI.apeParam.Nstep, paramAPI.apeParam.alpha);
+  double x8 = MPI_Wtime();
+  printfQuda("TIMING - Qlua_invertQuda: APE Smearing in %.6f sec.\n", x8-x7);
+  
+  
   freeCloverQuda();
   freeGaugeQuda();
 
@@ -1111,6 +1120,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   setVerbosity(paramAPI.verbosity);
 
   //-- Load the propagators into cuda-CSFs
+
   int nVec = 12;
   LONG_T fieldLgh = paramAPI.mpParam.locvol * Nc * Ns * 2;
   
@@ -1118,12 +1128,14 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   ColorSpinorField *cudaProp2[nVec];
   ColorSpinorField *cudaProp3[nVec];
   
+  double t1 = MPI_Wtime();
   for(int ivec=0;ivec<nVec;ivec++){
     cudaProp1[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop1[ivec * fieldLgh]) );
     cudaProp2[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop2[ivec * fieldLgh]) );
     if( (cudaProp1[ivec] == NULL) || (cudaProp2[ivec] == NULL) )
       errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
-    
+
+    cudaDeviceSynchronize();
     checkCudaError();
   }
 
@@ -1135,20 +1147,27 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
       if(cudaProp3[ivec] == NULL)
 	errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
 
+      cudaDeviceSynchronize();    
       checkCudaError();
     }//-ivec
   }
-  printfQuda("%s: Cuda Color-Spinor fields loaded.\n", func_name);
+  double t2 = MPI_Wtime();
+  printfQuda("TIMING - %s: Cuda Color-Spinor fields loaded in %f sec.\n", func_name, t2-t1);
 
   
   //-- Load the gauge field, if applicable
   GaugeField *cuda_gf = NULL;
   if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) ){
+    double t3 = MPI_Wtime();
     for(int mu=0;mu<qS->rank;mu++)
       if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
     
     cuda_gf = new_cudaGaugeField(gp, h_gauge);
-    printfQuda("%s: Cuda Gauge Field loaded.\n", func_name);
+
+    cudaDeviceSynchronize();    
+    checkCudaError();
+    double t4 = MPI_Wtime();
+    printfQuda("TIMING - %s: Cuda Gauge Field loaded in %f sec.\n", func_name, t4-t3);
   }
   /* --------------------------------------------------------------------------------------- */
 
@@ -1171,12 +1190,12 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   checkCudaErrorNoSync();
   cudaMemset(corrQuda_dev, 0, corrSize);
 
-  double t1 = MPI_Wtime();
+  double t5 = MPI_Wtime();
   QuarkContract_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3, cuda_gf,
 		    (complex<QUDA_REAL>*)S2, (complex<QUDA_REAL>*)S1,
 		    paramAPI.mpParam);
-  double t2 = MPI_Wtime();
-  printfQuda("%s: GPU Contractions completed in %f sec.\n", func_name, t2-t1);
+  double t6 = MPI_Wtime();
+  printfQuda("TIMING - %s: Function \'QuarkContract_GPU\' completed in %f sec.\n", func_name, t6-t5);
   /* --------------------------------------------------------------------------------------- */
 
   
@@ -1188,25 +1207,25 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   
   
   //-- Call momentum-projection function  
+  double t7 = MPI_Wtime();  
   int mpStat = momentumProjectCorr_Quda(momproj_buf, corrQuda_dev, utilArg, qS, momlist, paramAPI);
   if(mpStat != 0) return 1;
+  double t8 = MPI_Wtime();
+  printfQuda("TIMING - %s: Function \'momentumProjectCorr_Quda\' completed in %f sec.\n", func_name, t8-t7);
 
   
   //-- cleanup & return
   for(int ivec=0;ivec<nVec;ivec++){
     delete cudaProp1[ivec];
     delete cudaProp2[ivec];
-  }
-  
+  }  
   if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS){
     for(int ivec=0;ivec<nVec;ivec++)
       delete cudaProp3[ivec];
   }
-
   if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) )
-    delete cuda_gf;
+    delete cuda_gf;  
 
-  
   cudaFree(corrQuda_dev);
   
   saveTuneCache();

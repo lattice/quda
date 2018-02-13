@@ -111,6 +111,7 @@ namespace quda {
     dim3 gridDim((utilArg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
     
     QluaSiteOrderCheck_kernel<<<gridDim,blockDim>>>(utilArg_dev);
+    cudaDeviceSynchronize();
     checkCudaError();
     cudaMemcpyFromSymbol(&crdChkVal, d_crdChkVal, sizeof(crdChkVal), 0, cudaMemcpyDeviceToHost);
     checkCudaErrorNoSync();
@@ -160,6 +161,7 @@ namespace quda {
     dim3 gridDim((utilArg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
     convertSiteOrder_QudaQDP_to_momProj_kernel<<<gridDim,blockDim>>>(corrInp_dev, corrQuda_dev, utilArg_dev);
+    cudaDeviceSynchronize();
     checkCudaError();
     
     cudaFree(utilArg_dev);
@@ -224,6 +226,7 @@ namespace quda {
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
     prepareDeviceProp_kernel<<<gridDim,blockDim>>>(devProp, arg_dev);
+    cudaDeviceSynchronize();
     checkCudaError();
 
     cudaFree(arg_dev);
@@ -245,6 +248,7 @@ namespace quda {
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
     prepareDeviceProp_kernel<<<gridDim,blockDim>>>(devProp, arg_dev);
+    cudaDeviceSynchronize();
     checkCudaError();
 
     cudaFree(arg_dev);
@@ -267,6 +271,7 @@ namespace quda {
     LONG_T locvol = mpParam.locvol;
     
     //-- Transform the propagators
+    double t1 = MPI_Wtime();
     size_t propSizeCplx = sizeof(complex<QC_REAL>) * locvol * QUDA_Nc*QUDA_Nc * QUDA_Ns*QUDA_Ns;
     
     complex<QC_REAL> *prop1_dev = NULL;
@@ -294,11 +299,12 @@ namespace quda {
 	prepareDeviceProp(prop3_dev, cudaProp3, mpParam.cntrType);
       }
     }
-    
-    printfQuda("%s: Propagators transformed\n", func_name);
+    double t2 = MPI_Wtime();    
+    printfQuda("TIMING - %s: Device Propagators prepared in %f sec.\n", func_name, t2-t1);
     //-------------------------------------------------------------
     
     //-- allocate local volume on device
+    double t3 = MPI_Wtime();    
     LONG_T *locvol_dev;
     cudaMalloc((void**)&locvol_dev, sizeof(LONG_T));
     checkCudaErrorNoSync();
@@ -316,51 +322,52 @@ namespace quda {
       cudaMemcpy(S2_dev, S2, SmatSize, cudaMemcpyHostToDevice);
       cudaMemcpy(S1_dev, S1, SmatSize, cudaMemcpyHostToDevice);
     }
-
+    double t4 = MPI_Wtime();    
+    printfQuda("TIMING - %s: Device variables allocated in %f sec.\n", func_name, t4-t3);
+    
     
     //-- Call the kernel wrapper to perform contractions
+    double t5 = MPI_Wtime();    
+
     dim3 blockDim(THREADS_PER_BLOCK, 1, 1);
     dim3 gridDim((locvol + blockDim.x - 1)/blockDim.x, 1, 1);
-
     
     switch(mpParam.cntrType){
     case what_baryon_sigma_UUS: {
       baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev,
 								   prop1_dev, prop2_dev, prop3_dev,
 								   S2_dev, S1_dev);
-      checkCudaError();
     } break;
     case what_qbarq_g_F_B: {
       qbarq_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
-      checkCudaError();
     } break;
     case what_qbarq_g_F_aB: {
       qbarq_g_P_aP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
-      checkCudaError();
     } break;
     case what_qbarq_g_F_hB: {
       qbarq_g_P_hP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
-      checkCudaError();
     } break;
     case what_meson_F_B: {
       meson_F_B_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
-      checkCudaError();
     } break;
     case what_meson_F_aB: {
       meson_F_aB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
-      checkCudaError();
     } break;
     case what_meson_F_hB: {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
-      checkCudaError();
     } break;
     case what_qpdf_g_F_B:
     case what_tmd_g_F_B:
-    default: errorQuda("%s: cntrType = %d not supported!\n", func_name, (int)mpParam.cntrType);
+    default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[mpParam.cntrType]);
     }//-- switch
+    cudaDeviceSynchronize();
+    checkCudaError();
+    double t6 = MPI_Wtime();    
+    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[mpParam.cntrType], t6-t5);
 
     
     //-- Clean-up
+    double t7 = MPI_Wtime();    
     cudaFree(prop1_dev);
     cudaFree(prop2_dev);
     cudaFree(locvol_dev);
@@ -369,6 +376,8 @@ namespace quda {
       cudaFree(S2_dev);
       cudaFree(S1_dev);
     }
+    double t8 = MPI_Wtime();    
+    printfQuda("TIMING - %s: Clean-up finished in %f sec.\n", func_name, t8-t7);
 
   }//-- function
   
