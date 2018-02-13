@@ -179,93 +179,8 @@ INFUNC_ DEVFUNC_ int qc_gamma_sim_parity(int m, int n){
 
 #define gamma_left_coeff(m,n) (complex<QC_REAL>{gamma_left_coeff_Re(m,n,0),gamma_left_coeff_Re(m,n,1)})
 
+
 namespace quda { 
-  
-#if 0
-  INFUNC_ DEVFUNC_ void QC(gvec_adj)(QC_CPLX *a_gvec);
-  INFUNC_ DEVFUNC_ void QC(gvec_transp)(QC_CPLX *a_gvec);
-  INFUNC_ DEVFUNC_ void QC(gvec_conj)(QC_CPLX *a_gvec);
-  INFUNC_ DEVFUNC_ void QC(gvec_uni_transf)(QC_CPLX *a_gvec, int ng);
-  INFUNC_ DEVFUNC_ void QC(gvec_sim_transf)(QC_CPLX *a_gvec, int ng);
-  INFUNC_ DEVFUNC_ void QC(agx_pby_gind_D)(
-					   QC_CPLX a, int ng, const QC_CPLX *x_loc, int x_stride,
-					   QC_CPLX b, QC_CPLX *y_loc, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(agTx_pby_gind_D)(
-					    QC_CPLX a, int ng, const QC_CPLX *x_loc, int x_stride,
-					    QC_CPLX b, QC_CPLX *y_loc, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(agx_pby_gind_P)(
-					   QC_CPLX a, int ng, const QC_CPLX *x_loc, int x_stride,
-					   QC_CPLX b, QC_CPLX *y_loc, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(agTx_pby_gind_P)(
-					    QC_CPLX a, int ng, const QC_CPLX *x_loc, int x_stride, 
-					    QC_CPLX b, QC_CPLX *y_loc, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(axg_pby_gind_P)(
-					   QC_CPLX a, int ng, const QC_CPLX *x_loc, int x_stride,
-					   QC_CPLX b, QC_CPLX *y_loc, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(axgT_pby_gind_P)(
-					    QC_CPLX a, int ng, const QC_CPLX *x_loc, int x_stride,
-					    QC_CPLX b, QC_CPLX *y_loc, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(cplx_vec_zero)(QC_CPLX *y, int y_stride, int len);
-  INFUNC_ DEVFUNC_ void QC(cplx_vec_copy)(QC_CPLX *y, int y_stride, 
-					  const QC_CPLX *x, int x_stride, int len);
-  INFUNC_ DEVFUNC_ void QC(cplx_vec_scal)(
-					  QC_CPLX *x, int x_stride, QC_CPLX a, int len);
-  INFUNC_ DEVFUNC_ void QC(cplx_vec_scal_copy)(QC_CPLX *y, int y_stride, 
-					       QC_CPLX a, const QC_CPLX *x, int x_stride, int len);
-  INFUNC_ DEVFUNC_ void QC(cplx_vec_conj)(QC_CPLX *y, int y_stride, int len);
-  INFUNC_ DEVFUNC_ void QC(quarkContract12)(QC_CPLX *c, int c_stride, 
-					    const QC_CPLX *a, int a_stride, const QC_CPLX *b, int b_stride);
-  INFUNC_ DEVFUNC_ void QC(quarkContract13)(QC_CPLX *c, int c_stride, 
-					    const QC_CPLX *a, int a_stride, const QC_CPLX *b, int b_stride);
-  INFUNC_ DEVFUNC_ void QC(quarkContract14)(QC_CPLX *c, int c_stride, 
-					    const QC_CPLX *a, int a_stride, const QC_CPLX *b, int b_stride);
-  INFUNC_ DEVFUNC_ void QC(quarkContract23)(QC_CPLX *c, int c_stride, 
-					    const QC_CPLX *a, int a_stride, const QC_CPLX *b, int b_stride);
-  INFUNC_ DEVFUNC_ void QC(quarkContract24)(QC_CPLX *c, int c_stride, 
-					    const QC_CPLX *a, int a_stride, const QC_CPLX *b, int b_stride);
-  INFUNC_ DEVFUNC_ void QC(quarkContract34)(QC_CPLX *c, int c_stride, 
-					    const QC_CPLX *a, int a_stride, const QC_CPLX *b, int b_stride);
-  
-  INFUNC_ DEVFUNC_ void QC(P_eq_spintrace_P)(
-					     QC_CPLX *r, int r_stride, const QC_CPLX *x, int x_stride);
-  INFUNC_ DEVFUNC_ void QC(spintranspose_P)(
-					    QC_CPLX *r, int r_stride);
-  INFUNC_ DEVFUNC_ void QC(P_eq_spintranspose_P)(
-						 QC_CPLX *r, int r_stride, QC_CPLX *x, int x_stride);
-  INFUNC_ DEVFUNC_ void QC(ax_py_P)(
-				    QC_CPLX a, const QC_CPLX *x, int x_stride, QC_CPLX *y, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(axTs_py_P)(
-				      QC_CPLX a, const QC_CPLX *x, int x_stride, QC_CPLX *y, int y_stride);
-  INFUNC_ DEVFUNC_ QC_CPLX QC(trace_P_dot_P)(
-					     const QC_CPLX *x, int x_stride,
-					     const QC_CPLX *y, int y_stride);
-  INFUNC_ DEVFUNC_ QC_CPLX QC(trace_P_dot_cP)(
-					      const QC_CPLX *x, int x_stride,
-					      const QC_CPLX *y, int y_stride);
-  INFUNC_ DEVFUNC_ QC_CPLX QC(trace_cP_dot_P)(
-					      const QC_CPLX *x, int x_stride,
-					      const QC_CPLX *y, int y_stride);
-  INFUNC_ DEVFUNC_ QC_CPLX QC(trace_cP_dot_cP)(
-					       const QC_CPLX *x, int x_stride,
-					       const QC_CPLX *y, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(G_peqa_colortrace_P_dot_P)(
-						      QC_CPLX *gres, int gres_stride, QC_CPLX a,
-						      const QC_CPLX *x, int x_stride,
-						      const QC_CPLX *y, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(G_peqa_colortrace_P_dot_cP)(
-						       QC_CPLX *gres, int gres_stride, QC_CPLX a,
-						       const QC_CPLX *x, int x_stride,
-						       const QC_CPLX *y, int y_stride);
-  INFUNC_ DEVFUNC_ void QC(G_peqa_colortrace_cP_dot_P)(
-						       QC_CPLX *gres, QC_CPLX a, int gres_stride,
-						       const QC_CPLX *x, int x_stride,
-						       const QC_CPLX *y, int y_stride);
-  INFUNC_ DEVFUNC_ QC_CPLX QC(trace_gamma_dot_G)(
-						 int ng, const QC_CPLX *g1, int g1_stride);
-  INFUNC_ DEVFUNC_ void QC(gvec_eq_trace_gamma_dot_G)(
-						      QC_CPLX *gres, int gres_stride, 
-						      const QC_CPLX *g1, int g1_stride);
-#endif
 
   DEVFUNC_ void QC(contract_tr_g_P_P)(
 				      QC_CPLX *gres, int gres_stride,
@@ -295,62 +210,54 @@ namespace quda {
 					     QC_CPLX *r, int r_stride,
 					     const QC_CPLX *Fu, int Fu_stride, 
 					     const QC_CPLX *Fd, int Fd_stride,
-					     const QC_CPLX *S2_gvec, const QC_CPLX *S1_gvec, 
 					     const QC_CPLX *T_gvec);
   DEVFUNC_ void QC(baryon_sigma_seqsource_d)(
 					     QC_CPLX *r, int r_stride,
 					     const QC_CPLX *Fu1, int Fu1_stride,
 					     const QC_CPLX *Fu2, int Fu2_stride,
-					     const QC_CPLX *S2_gvec, const QC_CPLX *S1_gvec, 
 					     const QC_CPLX *T_gvec);
   DEVFUNC_ void QC(baryon_sigma_twopt_asymsrc_gvec)(
 						    QC_CPLX *r, int r_stride,
 						    const QC_CPLX *Fu1, int Fu1_stride,
 						    const QC_CPLX *Fu2, int Fu2_stride,
-						    const QC_CPLX *Fd,  int Fd_stride,
-						    const QC_CPLX *S2_gvec, const QC_CPLX *S1_gvec);
-
+						    const QC_CPLX *Fd,  int Fd_stride);
+  
   /* ----------------------------------------------------------------------------------------------- */
   /* ----------------------------------------------------------------------------------------------- */
   //-- Forward declarations for contraction wrappers
 
+  void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
+  void copylocvolToSymbol(LONG_T locvol);
+
+  
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev,
-							 LONG_T *locvol_dev,
                                                          complex<QC_REAL> *prop1_dev,
 							 complex<QC_REAL> *prop2_dev,
-							 complex<QC_REAL> *prop3_dev,
-                                                         complex<QC_REAL> *S2_dev,
-							 complex<QC_REAL> *S1_dev);
+							 complex<QC_REAL> *prop3_dev);
 
-__global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					LONG_T *locvol_dev,
-					complex<QC_REAL> *prop1_dev,
-					complex<QC_REAL> *prop2_dev);
-
- __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					  LONG_T *locvol_dev,
+  __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
 					  complex<QC_REAL> *prop1_dev,
 					  complex<QC_REAL> *prop2_dev);
+  
+  __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					   complex<QC_REAL> *prop1_dev,
+					   complex<QC_REAL> *prop2_dev);
 
- __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					  LONG_T *locvol_dev,
-					  complex<QC_REAL> *prop1_dev,
-					  complex<QC_REAL> *prop2_dev);
+  __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					   complex<QC_REAL> *prop1_dev,
+					   complex<QC_REAL> *prop2_dev);
 
- __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev,
-				       LONG_T *locvol_dev,
-				       complex<QC_REAL> *prop1_dev,
-				       complex<QC_REAL> *prop2_dev);
-
- __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					LONG_T *locvol_dev,
+  __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev,
 					complex<QC_REAL> *prop1_dev,
 					complex<QC_REAL> *prop2_dev);
 
- __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					LONG_T *locvol_dev,
-					complex<QC_REAL> *prop1_dev,
-					complex<QC_REAL> *prop2_dev);
+  __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					 complex<QC_REAL> *prop1_dev,
+					 complex<QC_REAL> *prop2_dev);
+
+  __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					 complex<QC_REAL> *prop1_dev,
+					 complex<QC_REAL> *prop2_dev);
  
 } //- namespace quda
 

@@ -303,58 +303,36 @@ namespace quda {
     printfQuda("TIMING - %s: Device Propagators prepared in %f sec.\n", func_name, t2-t1);
     //-------------------------------------------------------------
     
-    //-- allocate local volume on device
-    double t3 = MPI_Wtime();    
-    LONG_T *locvol_dev;
-    cudaMalloc((void**)&locvol_dev, sizeof(LONG_T));
-    checkCudaErrorNoSync();
-    cudaMemcpy(locvol_dev, &locvol, sizeof(LONG_T), cudaMemcpyHostToDevice);
-
-    //-- allocate S-matrices on device
-    size_t SmatSize = sizeof(complex<QC_REAL>)*QUDA_LEN_G;
-    complex<QC_REAL> *S2_dev;
-    complex<QC_REAL> *S1_dev;
-
-    if(mpParam.cntrType == what_baryon_sigma_UUS){
-      cudaMalloc((void**)&S2_dev, SmatSize);
-      cudaMalloc((void**)&S1_dev, SmatSize);
-      checkCudaErrorNoSync();
-      cudaMemcpy(S2_dev, S2, SmatSize, cudaMemcpyHostToDevice);
-      cudaMemcpy(S1_dev, S1, SmatSize, cudaMemcpyHostToDevice);
-    }
-    double t4 = MPI_Wtime();    
-    printfQuda("TIMING - %s: Device variables allocated in %f sec.\n", func_name, t4-t3);
-    
     
     //-- Call the kernel wrapper to perform contractions
-    double t5 = MPI_Wtime();    
+    copylocvolToSymbol(locvol); //- Copy the local volume to constant memory
 
     dim3 blockDim(THREADS_PER_BLOCK, 1, 1);
     dim3 gridDim((locvol + blockDim.x - 1)/blockDim.x, 1, 1);
-    
+
+    double t5 = MPI_Wtime();    
     switch(mpParam.cntrType){
     case what_baryon_sigma_UUS: {
-      baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev,
-								   prop1_dev, prop2_dev, prop3_dev,
-								   S2_dev, S1_dev);
+      copySmatricesToSymbol(S2, S1);
+      baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev, prop3_dev);
     } break;
     case what_qbarq_g_F_B: {
-      qbarq_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      qbarq_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
     } break;
     case what_qbarq_g_F_aB: {
-      qbarq_g_P_aP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      qbarq_g_P_aP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
     } break;
     case what_qbarq_g_F_hB: {
-      qbarq_g_P_hP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      qbarq_g_P_hP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
     } break;
     case what_meson_F_B: {
-      meson_F_B_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      meson_F_B_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
     } break;
     case what_meson_F_aB: {
-      meson_F_aB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      meson_F_aB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
     } break;
     case what_meson_F_hB: {
-      meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
     } break;
     case what_qpdf_g_F_B:
     case what_tmd_g_F_B:
@@ -370,12 +348,7 @@ namespace quda {
     double t7 = MPI_Wtime();    
     cudaFree(prop1_dev);
     cudaFree(prop2_dev);
-    cudaFree(locvol_dev);
-    if(mpParam.cntrType == what_baryon_sigma_UUS){
-      cudaFree(prop3_dev);
-      cudaFree(S2_dev);
-      cudaFree(S1_dev);
-    }
+    if(mpParam.cntrType == what_baryon_sigma_UUS) cudaFree(prop3_dev);
     double t8 = MPI_Wtime();    
     printfQuda("TIMING - %s: Clean-up finished in %f sec.\n", func_name, t8-t7);
 

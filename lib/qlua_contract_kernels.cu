@@ -1,6 +1,12 @@
 #include <qlua_contract_kernels.cuh>
 
 namespace quda {
+
+  //- C.K. Constant variable declarations
+  __constant__ QC_CPLX cS1_gvec[QC_LEN_G];
+  __constant__ QC_CPLX cS2_gvec[QC_LEN_G];
+  __constant__ LONG_T c_locvol;
+
   
   /* elementary actions on gamma matrices */
   /* a <- a^\dag */
@@ -608,7 +614,6 @@ namespace quda {
 				 QC_CPLX *r, int r_stride,
 				 const QC_CPLX *Fu, int Fu_stride, 
 				 const QC_CPLX *Fd, int Fd_stride,
-				 const QC_CPLX *S2_gvec, const QC_CPLX *S1_gvec, 
 				 const QC_CPLX *T_gvec)
   {
     //  Fu, Fd      u and d quark propagators (can be the same ptr)
@@ -636,12 +641,12 @@ namespace quda {
     QC(cplx_vec_zero)(ut,1, QC_LEN_P);
     QC(axg_pby_gvec_P)(1., T_gvec, Fu,Fu_stride, 0., ut,1);
     // S1bar <- g4 . S1^dag . g4^T
-    QC(cplx_vec_copy)(S1bar_gvec,1, S1_gvec,1, QC_LEN_G);
+    QC(cplx_vec_copy)(S1bar_gvec,1, cS1_gvec,1, QC_LEN_G);
     QC(gvec_adj)(S1bar_gvec);
     QC(gvec_sim_transf)(S1bar_gvec, 8);
     // s2ds1b <- S2 . Fd . S1bar
     QC(cplx_vec_zero)(tmpP1,1, QC_LEN_P);
-    QC(agx_pby_gvec_P)(1., S2_gvec,    Fd,Fd_stride, 0., tmpP1,1);
+    QC(agx_pby_gvec_P)(1., cS2_gvec,    Fd,Fd_stride, 0., tmpP1,1);
     QC(cplx_vec_zero)(s2ds1b,1, QC_LEN_P);
     QC(axg_pby_gvec_P)(1., S1bar_gvec, tmpP1,1,      0., s2ds1b,1);
     
@@ -670,7 +675,6 @@ namespace quda {
 				 QC_CPLX *r, int r_stride,
 				 const QC_CPLX *Fu1, int Fu1_stride,
 				 const QC_CPLX *Fu2, int Fu2_stride,
-				 const QC_CPLX *S2_gvec, const QC_CPLX *S1_gvec, 
 				 const QC_CPLX *T_gvec)
   {
     //  Fu1, Fu2    are u quark propagators (can be the same ptr)
@@ -697,7 +701,7 @@ namespace quda {
     QC(cplx_vec_zero)(u1t,1, QC_LEN_P);
     QC(axg_pby_gvec_P)(1., T_gvec, Fu1,Fu1_stride, 0., u1t,1);
     // S1bar <- g4 . S1^dag . g4^T
-    QC(cplx_vec_copy)(S1bar_gvec,1, S1_gvec,1, QC_LEN_G);
+    QC(cplx_vec_copy)(S1bar_gvec,1, cS1_gvec,1, QC_LEN_G);
     QC(gvec_adj)(S1bar_gvec);
     QC(gvec_sim_transf)(S1bar_gvec, 8);
 
@@ -710,7 +714,7 @@ namespace quda {
     QC(cplx_vec_zero)(tmp2,1, QC_LEN_P);
     QC(agx_pby_gvec_P)(1., S1bar_gvec,   tmp1,1, 0., tmp2,1);
     QC(cplx_vec_zero)(r,r_stride, QC_LEN_P);
-    QC(axg_pby_gvec_P)(1., S2_gvec,      tmp2,1, 0., r,r_stride);
+    QC(axg_pby_gvec_P)(1., cS2_gvec,      tmp2,1, 0., r,r_stride);
   }
 
 
@@ -719,8 +723,7 @@ namespace quda {
 					QC_CPLX *r, int r_stride,
 					const QC_CPLX *Fu1, int Fu1_stride,
 					const QC_CPLX *Fu2, int Fu2_stride,
-					const QC_CPLX *Fd,  int Fd_stride,      /* or Fs */
-					const QC_CPLX *S2_gvec, const QC_CPLX *S1_gvec)
+					const QC_CPLX *Fd,  int Fd_stride)
   {
     //  general nucleon propagator with "asymmetric" u-quarks at the source
     //  (asymmetry is fictional, needed to lift degeneracy to have a right
@@ -745,13 +748,13 @@ namespace quda {
       tmpG[QC_LEN_G];         /* can reuse S1bar_gvec */
     
     // S1bar <- g4 . S1^dag . g4^T
-    QC(cplx_vec_copy)(S1bar_gvec,1, S1_gvec,1, QC_LEN_G);
+    QC(cplx_vec_copy)(S1bar_gvec,1, cS1_gvec,1, QC_LEN_G);
     QC(gvec_adj)(S1bar_gvec);
     QC(gvec_sim_transf)(S1bar_gvec, 8);
 
     // tmp1 <- qC24(u2, s2*d*s1b)
     QC(cplx_vec_zero)(tmpP1,1, QC_LEN_P);
-    QC(agx_pby_gvec_P)(1., S2_gvec, Fd,Fd_stride, 0., tmpP1,1);
+    QC(agx_pby_gvec_P)(1., cS2_gvec, Fd,Fd_stride, 0., tmpP1,1);
     QC(cplx_vec_zero)(tmpP2,1, QC_LEN_P);
     QC(axg_pby_gvec_P)(1., S1bar_gvec, tmpP1,1,   0., tmpP2,1);
     QC(quarkContract24)(tmpP1,1, Fu2,Fu2_stride, tmpP2,1);
@@ -769,37 +772,37 @@ namespace quda {
   //--------------------------------------------------------------------------------------  
   //-- Kernel wrappers  
 
+  void copylocvolToSymbol(LONG_T locvol){
+    cudaMemcpyToSymbol(c_locvol, &locvol, sizeof(LONG_T));
+  }
+
+  void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1){
+    cudaMemcpyToSymbol(cS2_gvec, S2, sizeof(complex<QC_REAL>)*QC_LEN_G);
+    cudaMemcpyToSymbol(cS1_gvec, S1, sizeof(complex<QC_REAL>)*QC_LEN_G);
+  }
+
+  
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev,
-							 LONG_T *locvol_dev,
                                                          complex<QC_REAL> *prop1_dev,
 							 complex<QC_REAL> *prop2_dev,
-							 complex<QC_REAL> *prop3_dev,
-                                                         complex<QC_REAL> *S2_dev,
-							 complex<QC_REAL> *S1_dev){
-
+							 complex<QC_REAL> *prop3_dev){
     int tid = threadIdx.x + blockIdx.x*blockDim.x;
-
-    LONG_T lV = locvol_dev[0];
-
+    LONG_T lV = c_locvol;
     if(tid >= lV) return;
 
     qc_quda_baryon_sigma_twopt_asymsrc_gvec(Corr_dev  + tid, (int)lV,
                                             prop1_dev + tid, (int)lV,
                                             prop2_dev + tid, (int)lV,
-                                            prop3_dev + tid, (int)lV,
-                                            S2_dev, S1_dev);
+                                            prop3_dev + tid, (int)lV);
   }
   //------------------------------------------------------------------------------------------
 
   __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					  LONG_T *locvol_dev,
 					  complex<QC_REAL> *prop1_dev,
 					  complex<QC_REAL> *prop2_dev){
 
     int tid = threadIdx.x + blockIdx.x*blockDim.x;
-    
-    LONG_T lV = locvol_dev[0];
-    
+    LONG_T lV = c_locvol;
     if(tid >= lV) return;
 
     qc_quda_contract_tr_g_P_P(Corr_dev  + tid, (int)lV,
@@ -809,14 +812,11 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
   __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					   LONG_T *locvol_dev,
 					   complex<QC_REAL> *prop1_dev,
 					   complex<QC_REAL> *prop2_dev){
 
     int tid = threadIdx.x + blockIdx.x*blockDim.x;
-    
-    LONG_T lV = locvol_dev[0];
-    
+    LONG_T lV = c_locvol;
     if(tid >= lV) return;
 
     qc_quda_contract_tr_g_P_aP(Corr_dev  + tid, (int)lV,
@@ -826,14 +826,11 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
     __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					     LONG_T *locvol_dev,
 					     complex<QC_REAL> *prop1_dev,
 					     complex<QC_REAL> *prop2_dev){
 
     int tid = threadIdx.x + blockIdx.x*blockDim.x;
-    
-    LONG_T lV = locvol_dev[0];
-    
+    LONG_T lV = c_locvol;
     if(tid >= lV) return;
 
     qc_quda_contract_tr_g_P_hP(Corr_dev  + tid, (int)lV,
@@ -843,14 +840,11 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
   __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					LONG_T *locvol_dev,
 					complex<QC_REAL> *prop1_dev,
 					complex<QC_REAL> *prop2_dev){
 
     int tid = threadIdx.x + blockIdx.x*blockDim.x;
-    
-    LONG_T lV = locvol_dev[0];
-    
+    LONG_T lV = c_locvol;
     if(tid >= lV) return;
 
     qc_quda_contract_tr_g_P_mgbar_P(Corr_dev  + tid, (int)lV,
@@ -860,14 +854,11 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
   __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					 LONG_T *locvol_dev,
 					 complex<QC_REAL> *prop1_dev,
 					 complex<QC_REAL> *prop2_dev){
     
     int tid = threadIdx.x + blockIdx.x*blockDim.x;
-    
-    LONG_T lV = locvol_dev[0];
-    
+    LONG_T lV = c_locvol;
     if(tid >= lV) return;
 
     qc_quda_contract_tr_g_P_mgbar_aP(Corr_dev  + tid, (int)lV,
@@ -877,14 +868,11 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
   __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					 LONG_T *locvol_dev,
 					 complex<QC_REAL> *prop1_dev,
 					 complex<QC_REAL> *prop2_dev){
 
     int tid = threadIdx.x + blockIdx.x*blockDim.x;
-    
-    LONG_T lV = locvol_dev[0];
-    
+    LONG_T lV = c_locvol;
     if(tid >= lV) return;
 
     qc_quda_contract_tr_g_P_mgbar_hP(Corr_dev  + tid, (int)lV,
