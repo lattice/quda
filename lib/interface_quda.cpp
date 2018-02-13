@@ -82,6 +82,8 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 #include <momentum.h>
 
 
+#include <cuda_profiler_api.h>
+
 using namespace quda;
 
 static int R[4] = {0, 0, 0, 0};
@@ -251,10 +253,59 @@ static TimeProfile profileEnd("endQuda");
 static TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
 static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
 
-
-
 //!< Profiler for toal time spend between init and end
 static TimeProfile profileInit2End("initQuda-endQuda",false);
+
+static bool enable_profiler = false;
+
+static void profilerStart(const char *f) {
+
+  static std::vector<int> target_list;
+  static bool enable = false;
+  static bool init = false;
+  if (!init) {
+    char *profile_target_env = getenv("QUDA_ENABLE_TARGET_PROFILE"); // selectively enable profiling for a given solve
+
+    if ( profile_target_env ) {
+      std::stringstream target_stream(profile_target_env);
+
+      int target;
+      while(target_stream >> target) {
+	target_list.push_back(target);
+	if (target_stream.peek() == ',') target_stream.ignore();
+      }
+
+      if (target_list.size() > 0) {
+	std::sort(target_list.begin(), target_list.end());
+	target_list.erase( unique( target_list.begin(), target_list.end() ), target_list.end() );
+	warningQuda("Targeted profiling enabled for %lu functions\n", target_list.size());
+	enable = true;
+      }
+    }
+
+    init = true;
+  }
+
+  static int target_count = 0;
+  static unsigned int i = 0;
+  if (enable) {
+    if (i < target_list.size() && target_count++ == target_list[i]) {
+      enable_profiler = true;
+      printfQuda("Starting profiling for %s\n", f);
+      cudaProfilerStart();
+      i++; // advance to next target
+    }
+  }
+}
+
+static void profilerStop(const char *f) {
+  if (enable_profiler) {
+    printfQuda("Stopping profiling for %s\n", f);
+    cudaProfilerStop();
+    enable_profiler = false;
+  }
+}
+
 
 namespace quda {
   void printLaunchTimer();
@@ -2363,6 +2414,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 }
 
 void* newMultigridQuda(QudaMultigridParam *mg_param) {
+  profilerStart(__func__);
+
   pushVerbosity(mg_param->invert_param->verbosity);
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
@@ -2372,6 +2425,8 @@ void* newMultigridQuda(QudaMultigridParam *mg_param) {
   saveTuneCache();
 
   popVerbosity();
+
+  profilerStop(__func__);
   return static_cast<void*>(mg);
 }
 
@@ -2379,7 +2434,9 @@ void destroyMultigridQuda(void *mg) {
   delete static_cast<multigrid_solver*>(mg);
 }
 
-void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
+void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
+{
+  profilerStart(__func__);
 
   pushVerbosity(mg_param->invert_param->verbosity);
 
@@ -2455,6 +2512,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
   popVerbosity();
+
+  profilerStop(__func__);
 }
 
 deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
@@ -2545,6 +2604,8 @@ void destroyDeflationQuda(void *df) {
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+  profilerStart(__func__);
+
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
@@ -2911,6 +2972,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   saveTuneCache();
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  profilerStop(__func__);
 }
 
 
@@ -3273,6 +3336,7 @@ for(int i=0; i < param->num_src; i++) {
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
+  profilerStart(__func__);
 
   profileMulti.TPSTART(QUDA_PROFILE_TOTAL);
   profileMulti.TPSTART(QUDA_PROFILE_INIT);
@@ -3611,6 +3675,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   saveTuneCache();
 
   profileMulti.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  profilerStop(__func__);
 }
 
 void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param) {
