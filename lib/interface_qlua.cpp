@@ -969,11 +969,11 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   else if(typeid(QUDA_REAL) == typeid(float)){
     printfQuda("%s: Performing momentum projection in single precision.\n", func_name);
     stat = cublasCgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*Lt, V3,
-		       &al, phaseMatrix_dev, V3,
-		       corrInp_dev , V3, &be,
-		       corrOut_dev, Nmoms);
+		       (cuComplex*)&al, (cuComplex*)phaseMatrix_dev, V3,
+		       (cuComplex*)corrInp_dev , V3, (cuComplex*)&be,
+		       (cuComplex*)corrOut_dev, Nmoms);
   }
-  else errorQuda("%s: Precision not supported!\n");
+  else errorQuda("%s: Precision not supported!\n", func_name);
   
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("%s: Momentum projection failed!\n", func_name);
