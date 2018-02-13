@@ -253,7 +253,7 @@ namespace quda {
 
     cudaFree(arg_dev);
   }
-//------------------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------------------
 
   
   //-Top-level function in GPU contractions
@@ -263,10 +263,12 @@ namespace quda {
 			 ColorSpinorField **cudaProp3,
 			 GaugeField *U,
 			 complex<QC_REAL> *S2, complex<QC_REAL> *S1,
-			 momProjParam mpParam){
+			 momProjParam mpParam){    
 
     char *func_name;
     asprintf(&func_name,"QuarkContract_GPU");
+    
+    if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("QUDA_REAL and QC_REAL type mismatch!\n");
 
     LONG_T locvol = mpParam.locvol;
     
@@ -345,12 +347,9 @@ namespace quda {
 
     
     //-- Clean-up
-    double t7 = MPI_Wtime();    
     cudaFree(prop1_dev);
     cudaFree(prop2_dev);
     if(mpParam.cntrType == what_baryon_sigma_UUS) cudaFree(prop3_dev);
-    double t8 = MPI_Wtime();    
-    printfQuda("TIMING - %s: Clean-up finished in %f sec.\n", func_name, t8-t7);
 
   }//-- function
   
