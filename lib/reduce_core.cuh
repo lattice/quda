@@ -87,13 +87,36 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
   if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
+  if (getFastReduce() && !commAsyncReduction()) {
+    // initialize the reduction values in 32-bit increments to INT_MIN
+    constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
+    for (int i=0; i<tp.grid.y*words; i++) {
+      reinterpret_cast<int32_t*>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
+    }
+  }
+
   LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,FloatN,M);
 
   if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
-    if(deviceProp.canMapHostMemory) {
-      cudaEventRecord(reduceEnd, stream);
-      while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
+    if (deviceProp.canMapHostMemory) {
+      if (getFastReduce()) {
+	constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
+	volatile int32_t *check = reinterpret_cast<int32_t*>(h_reduce);
+	int count = 0;
+	for (int i=0; i<tp.grid.y*words; i++) {
+	  // spin-wait until all values have been updated
+	  while (check[i] == std::numeric_limits<int32_t>::min()) {
+	    if (count++ % 10000 == 0) { // check error every 10000 iterations
+	      // if there is an error in the kernel then we need to exit the spin-wait
+	      if (cudaSuccess != cudaPeekAtLastError()) break;
+	    }
+	  }
+	}
+      } else {
+	cudaEventRecord(reduceEnd, stream);
+	while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
+      }
     } else
 #endif
       { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
