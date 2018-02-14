@@ -1264,26 +1264,17 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
     
     
     const int sp_stride_pad = ghostFace[3];
-    //const int t_proj_scale = TPROJSCALE;
+    const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
     READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
-#ifdef TWIST_INV_DSLASH
-    a0_re = i00_re;  a0_im = i00_im;
-    a1_re = i01_re;  a1_im = i01_im;
-    a2_re = i02_re;  a2_im = i02_im;
-    b0_re = i10_re;  b0_im = i10_im;
-    b1_re = i11_re;  b1_im = i11_im;
-    b2_re = i12_re;  b2_im = i12_im;
-#else  
-    a0_re = 2*i00_re;  a0_im = 2*i00_im;
-    a1_re = 2*i01_re;  a1_im = 2*i01_im;
-    a2_re = 2*i02_re;  a2_im = 2*i02_im;
-    b0_re = 2*i10_re;  b0_im = 2*i10_im;
-    b1_re = 2*i11_re;  b1_im = 2*i11_im;
-    b2_re = 2*i12_re;  b2_im = 2*i12_im;
-#endif 
+    a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+    a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+    a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+    b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+    b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+    b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
     
     // identity gauge matrix
     spinorFloat A0_re = a0_re; spinorFloat A0_im = a0_im;
@@ -1318,26 +1309,17 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
     
     
     const int sp_stride_pad = ghostFace[3];
-    //const int t_proj_scale = TPROJSCALE;
+    const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
     READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
-#ifdef TWIST_INV_DSLASH
-    a0_re = i00_re;  a0_im = i00_im;
-    a1_re = i01_re;  a1_im = i01_im;
-    a2_re = i02_re;  a2_im = i02_im;
-    b0_re = i10_re;  b0_im = i10_im;
-    b1_re = i11_re;  b1_im = i11_im;
-    b2_re = i12_re;  b2_im = i12_im;
-#else  
-    a0_re = 2*i00_re;  a0_im = 2*i00_im;
-    a1_re = 2*i01_re;  a1_im = 2*i01_im;
-    a2_re = 2*i02_re;  a2_im = 2*i02_im;
-    b0_re = 2*i10_re;  b0_im = 2*i10_im;
-    b1_re = 2*i11_re;  b1_im = 2*i11_im;
-    b2_re = 2*i12_re;  b2_im = 2*i12_im;
-#endif 
+    a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+    a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+    a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+    b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+    b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+    b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
     
     // read gauge matrix from device memory
     READ_GAUGE_MATRIX(G, GAUGE0TEX, 6, ga_idx, ga_stride);
@@ -1480,26 +1462,17 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
     
     
     const int sp_stride_pad = ghostFace[3];
-    //const int t_proj_scale = TPROJSCALE;
+    const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
     READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
-#ifdef TWIST_INV_DSLASH
-    a0_re = i00_re;  a0_im = i00_im;
-    a1_re = i01_re;  a1_im = i01_im;
-    a2_re = i02_re;  a2_im = i02_im;
-    b0_re = i10_re;  b0_im = i10_im;
-    b1_re = i11_re;  b1_im = i11_im;
-    b2_re = i12_re;  b2_im = i12_im;
-#else  
-    a0_re = 2*i00_re;  a0_im = 2*i00_im;
-    a1_re = 2*i01_re;  a1_im = 2*i01_im;
-    a2_re = 2*i02_re;  a2_im = 2*i02_im;
-    b0_re = 2*i10_re;  b0_im = 2*i10_im;
-    b1_re = 2*i11_re;  b1_im = 2*i11_im;
-    b2_re = 2*i12_re;  b2_im = 2*i12_im;
-#endif 
+    a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+    a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+    a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+    b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+    b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+    b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
     
     // identity gauge matrix
     spinorFloat A0_re = a0_re; spinorFloat A0_im = a0_im;
@@ -1534,26 +1507,17 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
     
     
     const int sp_stride_pad = ghostFace[3];
-    //const int t_proj_scale = TPROJSCALE;
+    const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
     READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
-#ifdef TWIST_INV_DSLASH
-    a0_re = i00_re;  a0_im = i00_im;
-    a1_re = i01_re;  a1_im = i01_im;
-    a2_re = i02_re;  a2_im = i02_im;
-    b0_re = i10_re;  b0_im = i10_im;
-    b1_re = i11_re;  b1_im = i11_im;
-    b2_re = i12_re;  b2_im = i12_im;
-#else  
-    a0_re = 2*i00_re;  a0_im = 2*i00_im;
-    a1_re = 2*i01_re;  a1_im = 2*i01_im;
-    a2_re = 2*i02_re;  a2_im = 2*i02_im;
-    b0_re = 2*i10_re;  b0_im = 2*i10_im;
-    b1_re = 2*i11_re;  b1_im = 2*i11_im;
-    b2_re = 2*i12_re;  b2_im = 2*i12_im;
-#endif 
+    a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+    a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+    a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+    b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+    b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+    b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
     
     // read gauge matrix from device memory
     READ_GAUGE_MATRIX(G, GAUGE1TEX, 7, ga_idx, ga_stride);
