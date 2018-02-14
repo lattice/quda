@@ -188,17 +188,11 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	double t1 = MPI_Wtime();
         wuppertalStepCPU<Float,Ns,Nc>(arg);
-	double t2 = MPI_Wtime();
-	printfQuda("TIMING - wuppertalStep: CPU function done in %.6f sec\n", t2-t1);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-	double t1 = MPI_Wtime();
         wuppertalStepGPU<Float,Ns,Nc> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	double t2 = MPI_Wtime();
-	printfQuda("TIMING - wuppertalStep: GPU kernel done in %.6f sec\n", t2-t1);
       }
     }
 
@@ -291,10 +285,7 @@ namespace quda {
     checkLocation(out, in, U);
 
     const int nFace = 1;
-    double t1 = MPI_Wtime();
     in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy
-    double t2 = MPI_Wtime();
-    printfQuda("TIMING - wuppertalStep: in.exchangeGhost() done in %.6f sec.\n", t2-t1);
 
     if (out.Precision() == QUDA_SINGLE_PRECISION){
       wuppertalStep<float>(out, in, parity, U, aW, bW);
