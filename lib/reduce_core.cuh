@@ -90,7 +90,7 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
   if (getFastReduce() && !commAsyncReduction()) {
     // initialize the reduction values in 32-bit increments to INT_MIN
     constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
-    for (int i=0; i<tp.grid.y*words; i++) {
+    for (unsigned int i=0; i<tp.grid.y*words; i++) {
       reinterpret_cast<int32_t*>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
     }
   }
@@ -104,7 +104,7 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
 	constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
 	volatile int32_t *check = reinterpret_cast<int32_t*>(h_reduce);
 	int count = 0;
-	for (int i=0; i<tp.grid.y*words; i++) {
+	for (unsigned int i=0; i<tp.grid.y*words; i++) {
 	  // spin-wait until all values have been updated
 	  while (check[i] == std::numeric_limits<int32_t>::min()) {
 	    if (count++ % 10000 == 0) { // check error every 10000 iterations
