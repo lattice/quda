@@ -493,7 +493,6 @@ Qlua_invertQuda(
   printfQuda("Csw     = %lf\n", paramAPI.wParam.alpha[1]);
   printfQuda("tol     = %e\n",  paramAPI.wParam.alpha[2]);
   printfQuda("Maxiter = %d\n",  int(paramAPI.wParam.alpha[3]));
-  printfQuda("Will perform APE Smearing with parameters (N,alpha) = (%d,%f)\n", paramAPI.apeParam.Nstep, paramAPI.apeParam.alpha);
 
   //-- Initialize the quda-gauge parameters
   QudaGaugeParam gp;
@@ -518,11 +517,6 @@ Qlua_invertQuda(
   invertQuda(hv_out, hv_in, &ip);
   double x6 = MPI_Wtime();
   printfQuda("TIMING - Qlua_invertQuda: invertQuda in %.6f sec.\n", x6-x5);
-
-  double x7 = MPI_Wtime();
-  performAPEnStep(paramAPI.apeParam.Nstep, paramAPI.apeParam.alpha);
-  double x8 = MPI_Wtime();
-  printfQuda("TIMING - Qlua_invertQuda: APE Smearing in %.6f sec.\n", x8-x7);
   
   
   freeCloverQuda();
