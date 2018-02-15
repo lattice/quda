@@ -100,7 +100,7 @@ namespace quda {
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z);
 
-    void pipePCGRRFletcherReevesMergedOp(double4 *buffer, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+    void pipePCGRRPolakRibiereMergedOp(double4 *buffer, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
                                 ColorSpinorField &r, ColorSpinorField &s,  
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z);

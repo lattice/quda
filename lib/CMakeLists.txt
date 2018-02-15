@@ -9,7 +9,7 @@ set (QUDA_OBJS
   gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp inv_pipe2pcg_quda.cpp
   inv_pipepcg_quda.cpp inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  inv_eks_pcg_quda.cpp
+  eks_utils.cu inv_eks_pcg_quda.cpp
   inv_cg3_quda.cpp inv_cg3ne_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
   color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 

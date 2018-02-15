@@ -913,10 +913,10 @@ A.S. edit: extended to 16 for CA solvers
     }
 
     template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
-    struct pipePCGRRFletcherReevesMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
+    struct pipePCGRRPolakRibiereMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
       Float2 a;
       Float2 b;
-      pipePCGRRFletcherReevesMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      pipePCGRRPolakRibiereMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
       __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
 	 typedef typename ScalarType<ReduceType>::type scalar;
 
@@ -935,13 +935,13 @@ A.S. edit: extended to 16 for CA solvers
          norm2_<scalar> (sum[2].z, w);
          norm2_<scalar> (sum[2].w, m);
 
-         x = x + a.x*p;
          u = u - a.x*q;
+         w = w - a.x*z;
 
          dot_<scalar> (sum[0].w, r, u);
 
+         x = x + a.x*p;
          r = r - a.x*s;
-         w = w - a.x*z;
 
          dot_<scalar> (sum[0].x, r, u);
          dot_<scalar> (sum[0].y, w, u);
@@ -957,15 +957,14 @@ A.S. edit: extended to 16 for CA solvers
       static int flops() { return (16+6); } //! flops per real element
     };
 
-
-    void pipePCGRRFletcherReevesMergedOp(double4 *buffer, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+    void pipePCGRRPolakRibiereMergedOp(double4 *buffer, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
                                 ColorSpinorField &r, ColorSpinorField &s,  
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
       if (x.Precision() != p.Precision()) {
          errorQuda("\nMixed blas is not implemented.\n");
       } 
-      reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRFletcherReevesMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+      reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRPolakRibiereMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
 	  (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
       return;
     }

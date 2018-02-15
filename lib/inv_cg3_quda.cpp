@@ -13,9 +13,43 @@
 
 namespace quda {
 
-  CG3::CG3(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false)
+
+  // set the required parameters for the inner solver
+  static void fillInnerCG3SolverParam(SolverParam &inner, const SolverParam &outer)
   {
+    inner.tol = outer.tol_precondition;
+    inner.maxiter = outer.maxiter_precondition;
+    inner.delta = 1e-20; // no reliable updates within the inner solver
+    inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
+    inner.precision_sloppy = outer.precision_precondition;
+
+    inner.iter = 0;
+    inner.gflops = 0;
+    inner.secs = 0;
+
+    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
+    inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
+
+    if(outer.inv_type == QUDA_CG3_INVERTER && outer.precision_sloppy != outer.precision_precondition)
+      inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+    else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
+  }
+
+
+  CG3::CG3(DiracMatrix &mat, DiracMatrix &matSloppy,  DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param), init(false) {
+
+    fillInnerCG3SolverParam(Kparam, param);
+
+    if(param.inv_type_precondition == QUDA_CG_INVERTER){
+      K = new CG(matPrecon, matPrecon, Kparam, profile);
+    }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
+      K = new MR(matPrecon, matPrecon, Kparam, profile);
+    }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
+      K = new SD(matPrecon, Kparam, profile);
+    }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
+      errorQuda("Unknown inner solver %d", param.inv_type_precondition);
+    }
   }
 
   CG3::~CG3() {
@@ -32,6 +66,8 @@ namespace quda {
         delete rS_oldp;
       }
       if(!mat.isStaggered()) delete tmp2Sp;
+
+      if(K) delete K;
 
       init = false;
     }
@@ -57,6 +93,8 @@ namespace quda {
       param.true_res_hq = 0.0;
       return;
     }
+
+    if((param.precision_sloppy != param.precision_precondition) and K) errorQuda("Sloppy precision and precondition precision do not match\n");
 
     const bool mixed_precision = (param.precision != param.precision_sloppy);
     ColorSpinorParam csParam(x);
@@ -87,6 +125,12 @@ namespace quda {
 
       init = true;
     }
+
+    ColorSpinorField *zp;
+    csParam.setPrecision(param.precision_sloppy);
+    zp = ColorSpinorField::Create(csParam); 
+
+    ColorSpinorField &z = *zp;
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
@@ -170,34 +214,45 @@ namespace quda {
     double delta  = param.delta;
     bool restart = false;
 
+
     int k = 0;
     double rho = 1.0, gamma = 1.0;
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
-      matSloppy(ArS, rS, tmpS, tmp2S);
+      if(K) {
+        blas::zero(z);
+        (*K)(z, rS);
+      } else {
+        z = rS;
+      }
+
+      matSloppy(ArS, z, tmpS, tmp2S);
+
       double gamma_old = gamma;
-      double rAr = blas::reDotProduct(rS,ArS);
-      gamma = r2/rAr;
+      double rAr = blas::reDotProduct(z,ArS);
+      gamma = blas::reDotProduct(z,rS) / rAr;
+      r2 = blas::norm2(z);
       
       // CG3 step
       if(k==0 || restart) { // First iteration
-        if(pipeline) {
+        if(pipeline and !K) {
           r2 = blas::quadrupleCG3InitNorm(gamma, xS, rS, xS_old, rS_old, ArS);
         } else {
           blas::copy(xS_old, xS);
           blas::copy(rS_old, rS);
 
-          blas::axpy(gamma, rS, xS);  // x += gamma*r
+          blas::axpy(gamma, z, xS);  // x += gamma*r
           r2 = blas::axpyNorm(-gamma, ArS, rS); // r -= gamma*w
         }
-        restart = false;
+        if (restart) {printfQuda("Do restart \n"); restart = false;}
       } else {
         rho = rho/(rho-(gamma/gamma_old)*(r2/r2_old));
         r2_old = r2;
 
-        if(pipeline) {
+        if(pipeline and !K) {
           r2 = blas::quadrupleCG3UpdateNorm(gamma, rho, xS, rS, xS_old, rS_old, ArS);
         } else {
+#if 0
           blas::copy(tmpS, xS);
           blas::copy(tmp2S, rS);
 
@@ -209,6 +264,20 @@ namespace quda {
 
           blas::copy(xS_old, tmpS);
           blas::copy(rS_old, tmp2S);
+#else
+          //z = a*x + b*y + c*z
+          tmpS  = xS;
+          tmp2S = rS;
+
+          blas::axpbypcz(rho, xS, (+gamma*rho), z, (1.-rho), xS_old);
+          xS = xS_old;
+          xS_old = tmpS;
+          //
+          blas::axpbypcz(rho, rS, (-gamma*rho), ArS, (1.-rho), rS_old);
+          rS = rS_old;
+          rS_old = tmp2S;
+          r2 = blas::norm2(rS);
+#endif
         }
       }
 
@@ -298,7 +367,8 @@ namespace quda {
             }
           }
         }
-      } else {
+      } else { //solo precision
+
         if (convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
           mat(r, x, tmp, tmp2S);
           r2 = blas::xmyNorm(b, r);
@@ -321,7 +391,7 @@ namespace quda {
               break;
           }
         }
-      }
+      }//mixed precision
 
       PrintStats("CG3", k, r2, b2, heavy_quark_res);
     }
@@ -355,6 +425,8 @@ namespace quda {
     blas::flops = 0;
     mat.flops();
     matSloppy.flops();
+
+    delete zp;
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 

@@ -116,7 +116,7 @@ namespace quda {
       break;
     case QUDA_CG3_INVERTER:
       report("CG3");
-      solver = new CG3(mat, matSloppy, param, profile);
+      solver = new CG3(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CG3NE_INVERTER:
       report("CG3NE");

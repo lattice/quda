@@ -435,12 +435,22 @@ namespace quda {
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
+
+    Solver *K;
+    SolverParam Kparam; // parameters for preconditioner solve
+
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp, *tmp2Sp;
     bool init;
 
   public:
-    CG3(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    CG3(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    /**
+        @param K Preconditioner
+    */
+    CG3(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+
     virtual ~CG3();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -945,18 +955,25 @@ namespace quda {
     // pointers to fields to avoid multiple creation overhead
     std::shared_ptr<ColorSpinorField> yp, rp, App, tmpp;
     std::vector<ColorSpinorField*> p;
-    std::shared_ptr<ColorSpinorField> x_sloppy_savedp, pp, qp, tmp_matsloppyp;
-    std::shared_ptr<ColorSpinorField> p_oldp; 
+
+    /** Decomposed source */
+    std::shared_ptr<ColorSpinorFieldSet> B;
+
+    /** The lattice grid blocking, correlated with nsrc */
+    std::array<int, 5>    latt_bs;
+    std::shared_ptr<int> *index_map;//might be useful for the next RHS
+
     bool init;
 
     template <int n>
     void solve_n(ColorSpinorField& out, ColorSpinorField& in);
-    int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
 
   public:
     EKS_PCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
     virtual ~EKS_PCG();
+
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void CreateSourceBlock(ColorSpinorField& b); 
     
   };
 
