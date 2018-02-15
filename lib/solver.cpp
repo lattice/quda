@@ -195,18 +195,18 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       if (param.compute_true_res) {
 	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, heavy-quark residual = %e\n",
-		     name, k, sqrt(r2/b2), param.true_res, param.true_res_hq);
+	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, heavy-quark residual = %e, GFLOPS: %lf, time: %lf secs\n",
+		     name, k, sqrt(r2/b2), param.true_res, param.true_res_hq, param.gflops/param.secs, param.secs);
 	} else {
-	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e\n",
-		     name, k, sqrt(r2/b2), param.true_res);
+	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, GFLOPS: %lf, time: %lf secs\n",
+		     name, k, sqrt(r2/b2), param.true_res, param.gflops/param.secs, param.secs);
 	}
       } else {
 	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, heavy-quark residual = %e\n",
-		     name, k, sqrt(r2/b2), param.true_res_hq);
+	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, heavy-quark residual = %e, GFLOPS: %lf, time: %lf secs\n",
+		     name, k, sqrt(r2/b2), param.true_res_hq, param.gflops/param.secs, param.secs);
 	} else {
-	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e\n", name, k, sqrt(r2/b2));
+	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, GFLOPS: %lf, time: %lf secs\n", name, k, sqrt(r2/b2), param.gflops/param.secs, param.secs);
 	}
       }
     }
