@@ -79,7 +79,7 @@ void initFields(QudaPrecision prec)
 
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  param.precision = QUDA_DOUBLE_PRECISION;
+  param.setPrecision(QUDA_DOUBLE_PRECISION);
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
   param.create = QUDA_ZERO_FIELD_CREATE;
@@ -95,7 +95,7 @@ void initFields(QudaPrecision prec)
 
   if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;
-  param.precision = prec;
+  param.setPrecision(prec);
   param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
 
   xD = new cudaColorSpinorField(param);
@@ -118,7 +118,7 @@ void initFields(QudaPrecision prec)
   gParam.link_type = QUDA_COARSE_LINKS;
   gParam.t_boundary = QUDA_PERIODIC_T;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.precision = param.precision;
+  gParam.setPrecision(param.Precision());
   gParam.nDim = 4;
   gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -141,13 +141,13 @@ void initFields(QudaPrecision prec)
 	(gParam.x[0]*gParam.x[2]*gParam.x[3])/2,
 	(gParam.x[0]*gParam.x[1]*gParam.x[3])/2 } );
   gParam.pad = gParam.nFace * pad * 2;
-  gParam.precision = prec_sloppy;
+  gParam.setPrecision(prec_sloppy);
   Y_d = new cudaGaugeField(gParam);
   Yhat_d = new cudaGaugeField(gParam);
   Y_d->copy(*Y_h);
   Yhat_d->copy(*Yhat_h);
 
-  gParam.precision = param.precision;
+  gParam.setPrecision(param.Precision());
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 0;

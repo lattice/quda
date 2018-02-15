@@ -435,7 +435,7 @@ namespace quda {
     spinor_param.nSpin = 4;
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
-    spinor_param.precision = a.Precision();
+    spinor_param.setPrecision(a.Precision());
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;

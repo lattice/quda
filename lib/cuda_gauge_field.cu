@@ -204,7 +204,8 @@ namespace quda {
     const int dir = 1; // sending forwards only
     const int R[] = {nFace, nFace, nFace, nFace};
     const bool no_comms_fill = true; // dslash kernels presently require this
-    createComms(R, true); // always need to allocate space for non-partitioned dimension for copyGenericGauge
+    const bool bidir = false; // communication is only ever done in one direction at once
+    createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
 
     // loop over backwards and forwards links
     const QudaLinkDirection directions[] = {QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS};
@@ -217,7 +218,7 @@ namespace quda {
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
 	// receive from backwards is first half of each ghost_recv_buffer
-	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
+	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; if (bidir) offset += ghost_face_bytes[d];
 	// send forwards is second half of each ghost_send_buffer
 	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
       }
@@ -288,7 +289,8 @@ namespace quda {
     const int dir = 0; // sending backwards only
     const int R[] = {nFace, nFace, nFace, nFace};
     const bool no_comms_fill = false; // injection never does no_comms_fill
-    createComms(R, true); // always need to allocate space for non-partitioned dimension for copyGenericGauge
+    const bool bidir = false; // communication is only ever done in one direction at once
+    createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
 
     // loop over backwards and forwards links (forwards links never sent but leave here just in case)
     const QudaLinkDirection directions[] = {QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS};
@@ -301,7 +303,7 @@ namespace quda {
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
 	// send backwards is first half of each ghost_send_buffer
-	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
+	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; if (bidir) offset += ghost_face_bytes[d];
 	// receive from forwards is the second half of each ghost_recv_buffer
 	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
       }
@@ -358,21 +360,22 @@ namespace quda {
     cudaDeviceSynchronize();
   }
 
-  void cudaGaugeField::allocateGhostBuffer(const int *R, bool no_comms_fill) const
+  void cudaGaugeField::allocateGhostBuffer(const int *R, bool no_comms_fill, bool bidir) const
   {
-    createGhostZone(R, no_comms_fill);
+    createGhostZone(R, no_comms_fill, bidir);
     LatticeField::allocateGhostBuffer(ghost_bytes);
   }
 
-  void cudaGaugeField::createComms(const int *R, bool no_comms_fill)
+  void cudaGaugeField::createComms(const int *R, bool no_comms_fill, bool bidir)
   {
-    allocateGhostBuffer(R, no_comms_fill); // allocate the ghost buffer if not yet allocated
+    allocateGhostBuffer(R, no_comms_fill, bidir); // allocate the ghost buffer if not yet allocated
 
     // ascertain if this instance needs it comms buffers to be updated
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
-      (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]); // pinned buffers
+      (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]) || // pinned buffers
+      ghost_bytes != ghost_bytes_old; // ghost buffer has been resized (e.g., bidir to unidir)
 
-    if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill);
+    if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill, bidir);
 
     if (ghost_field_reset) destroyIPCComms();
     createIPCComms();

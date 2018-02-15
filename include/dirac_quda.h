@@ -771,21 +771,46 @@ namespace quda {
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
 
-    cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
-    cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
-    cpuGaugeField *Xinv_h; /** CPU copy of the inverse coarse clover term */
-    cpuGaugeField *Yhat_h; /** CPU copy of the preconditioned coarse link field */
+    mutable cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
+    mutable cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
+    mutable cpuGaugeField *Xinv_h; /** CPU copy of the inverse coarse clover term */
+    mutable cpuGaugeField *Yhat_h; /** CPU copy of the preconditioned coarse link field */
 
-    cudaGaugeField *Y_d; /** GPU copy of the coarse link field */
-    cudaGaugeField *X_d; /** GPU copy of the coarse clover term */
-    cudaGaugeField *Xinv_d; /** GPU copy of inverse coarse clover term */
-    cudaGaugeField *Yhat_d; /** GPU copy of the preconditioned coarse link field */
+    mutable cudaGaugeField *Y_d; /** GPU copy of the coarse link field */
+    mutable cudaGaugeField *X_d; /** GPU copy of the coarse clover term */
+    mutable cudaGaugeField *Xinv_d; /** GPU copy of inverse coarse clover term */
+    mutable cudaGaugeField *Yhat_d; /** GPU copy of the preconditioned coarse link field */
 
-    void initializeCoarse();  /** Initialize the coarse gauge field */
+    /**
+       @brief Initialize the coarse gauge fields.  Location is
+       determined by gpu_setup variable.
+    */
+    void initializeCoarse();
 
-    const bool enable_gpu; /** Whether to enable this operator for the GPU */
+    /**
+       @brief Create the CPU or GPU coarse gauge fields on demand
+       (requires that the fields have been created in the other memory
+       space)
+    */
+    void initializeLazy(QudaFieldLocation location) const;
+
+    mutable bool enable_gpu; /** Whether the GPU links have been constructed */
+    mutable bool enable_cpu; /** Whether the CPU links have been constructed */
     const bool gpu_setup; /** Where to do the coarse-operator construction*/
-    bool init; /** Whether this instance did the allocation or not */
+    mutable bool init_gpu; /** Whether this instance did the GPU allocation or not */
+    mutable bool init_cpu; /** Whether this instance did the CPU allocation or not */
+
+    /**
+       @brief Allocate the Y and X fields
+       @param[in] gpu Whether to allocate on gpu (true) or cpu (false)
+     */
+    void createY(bool gpu = true) const;
+
+    /**
+       @brief Allocate the Yhat and Xinv fields
+       @param[in] gpu Whether to allocate on gpu (true) or cpu (false)
+     */
+    void createYhat(bool gpu = true) const;
 
   public:
     double Mu() const { return mu; }
@@ -793,9 +818,9 @@ namespace quda {
 
     /**
        @param[in] param Parameters defining this operator
-       @param[in] enable_gpu Whether to enable this operator for the GPU
+       @param[in] gpu_setup Whether to do the setup on GPU or CPU
      */
-    DiracCoarse(const DiracParam &param, bool enable_gpu=true, bool gpu_setup=true);
+    DiracCoarse(const DiracParam &param, bool gpu_setup=true);
 
     /**
        @param[in] param Parameters defining this operator
@@ -900,8 +925,18 @@ namespace quda {
   class DiracCoarsePC : public DiracCoarse {
 
   public:
-    DiracCoarsePC(const DiracParam &param, bool enable_gpu=true, bool gpu_setup=true);
+    /**
+       @param[in] param Parameters defining this operator
+       @param[in] gpu_setup Whether to do the setup on GPU or CPU
+     */
+    DiracCoarsePC(const DiracParam &param, bool gpu_setup=true);
+
+    /**
+       @param[in] dirac Another operator instance to clone from (shallow copy)
+       @param[in] param Parameters defining this operator
+     */
     DiracCoarsePC(const DiracCoarse &dirac, const DiracParam &param);
+
     virtual ~DiracCoarsePC();
 
     void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;

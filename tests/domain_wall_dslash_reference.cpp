@@ -517,7 +517,7 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
     csParam.nDim = 5; //for DW dslash
     for (int d=0; d<4; d++) csParam.x[d] = Z[d];
     csParam.x[4] = Ls;//5th dimention
-    csParam.precision = precision;
+    csParam.setPrecision(precision);
     csParam.pad = 0;
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     csParam.x[0] /= 2;
@@ -579,7 +579,7 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
     csParam.nDim = 5; //for DW dslash
     for (int d=0; d<4; d++) csParam.x[d] = Z[d];
     csParam.x[4] = Ls;//5th dimention
-    csParam.precision = precision;
+    csParam.setPrecision(precision);
     csParam.pad = 0;
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     csParam.x[0] /= 2;

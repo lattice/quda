@@ -8,6 +8,7 @@
 
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
+#include "qdp_config.h"
 #endif
 
 namespace quda {
@@ -159,6 +160,7 @@ namespace quda {
    */
   void *device_malloc_(const char *func, const char *file, int line, size_t size)
   {
+ #ifndef QDP_USE_CUDA_MANAGED_MEMORY
     MemAlloc a(func, file, line);
     void *ptr;
 
@@ -174,6 +176,10 @@ namespace quda {
     cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
+#else
+    // when QDO uses managed memory we can bypass the QDP memory manager
+    return device_pinned_malloc_(func, file, line, size);
+#endif
   }
 
 
@@ -186,6 +192,8 @@ namespace quda {
    */
   void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
+    if (!comm_peer2peer_present()) return device_malloc_(func, file, line, size);
+
     MemAlloc a(func, file, line);
     void *ptr;
 
@@ -284,6 +292,7 @@ namespace quda {
    */
   void device_free_(const char *func, const char *file, int line, void *ptr)
   {
+#ifndef QDP_USE_CUDA_MANAGED_MEMORY
     if (!ptr) {
       printfQuda("ERROR: Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
@@ -298,6 +307,9 @@ namespace quda {
       errorQuda("Aborting");
     }
     track_free(DEVICE, ptr);
+#else
+    device_pinned_free_(func, file, line, ptr);
+#endif
   }
 
 
@@ -308,6 +320,11 @@ namespace quda {
    */
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr)
   {
+    if (!comm_peer2peer_present()) {
+      device_free_(func, file, line, ptr);
+      return;
+    }
+
     if (!ptr) {
       printfQuda("ERROR: Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");

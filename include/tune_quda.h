@@ -1,16 +1,15 @@
 #ifndef _TUNE_QUDA_H
 #define _TUNE_QUDA_H
 
-#include <quda_internal.h>
-#include <dirac_quda.h>
-
 #include <string>
 #include <iostream>
 #include <iomanip>
 #include <cstring>
 #include <cfloat>
 #include <stdarg.h>
+
 #include <tune_key.h>
+#include <quda_internal.h>
 
 namespace quda {
 

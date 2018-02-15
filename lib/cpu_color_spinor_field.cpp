@@ -309,7 +309,7 @@ namespace quda {
   }
 
   void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *dummy1,
-					  const MemoryLocation *dummy2, bool dummy3, bool dummy4) const
+					  const MemoryLocation *dummy2, bool dummy3, bool dummy4, QudaPrecision dummy5) const
   {
     // allocate ghost buffer if not yet allocated
     allocateGhostBuffer(nFace);

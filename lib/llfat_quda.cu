@@ -531,7 +531,7 @@ namespace quda {
 #ifdef GPU_FATLINK
     GaugeFieldParam gParam(u);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.setPrecision(gParam.precision);
+    gParam.setPrecision(gParam.Precision());
     gParam.create = QUDA_NULL_FIELD_CREATE;
     cudaGaugeField staple(gParam);
     cudaGaugeField staple1(gParam);

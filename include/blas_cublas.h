@@ -1,10 +1,19 @@
 #include <quda_internal.h>
-#include <cublas_v2.h>
 
 #pragma once
 
 namespace quda {
   namespace cublas {
+
+    /**
+       @brief Create the CUBLAS context
+    */
+    void init();
+
+    /**
+       @brief Destroy the CUBLAS context
+    */
+    void destroy();
 
     /**
        Batch inversion the matrix field using an LU decomposition method.
