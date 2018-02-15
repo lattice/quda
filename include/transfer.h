@@ -11,7 +11,6 @@
  */
 
 #include <color_spinor_field.h>
-#include <dirac_quda.h>
 #include <vector>
 
 namespace quda {

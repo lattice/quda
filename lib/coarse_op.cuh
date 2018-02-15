@@ -1560,8 +1560,9 @@ namespace quda {
 #ifdef DYNAMIC_CLOVER
 	  arg.max_d = static_cast<Float*>(pool_device_malloc(2 * arg.fineVolumeCB));
 	  ComputeCloverInvMaxGPU<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+	  thrust_allocator alloc;
 	  thrust::device_ptr<Float> ptr(arg.max_d);
-	  arg.max_h = thrust::reduce(thrust::retag<my_tag>(ptr), thrust::retag<my_tag>(ptr+2*arg.fineVolumeCB), static_cast<Float>(0.0), thrust::maximum<Float>());
+	  arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr+2*arg.fineVolumeCB, static_cast<Float>(0.0), thrust::maximum<Float>());
 	  pool_device_free(arg.max_d);
 #else
 	  errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
@@ -1898,8 +1899,8 @@ namespace quda {
     // do exchange of null-space vectors
     const int nFace = 1;
     v.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
-    arg.V.resetGhost(v.Ghost());  // point the accessor to the correct ghost buffer
-    if (&v == &av) arg.AV.resetGhost(av.Ghost());
+    arg.V.resetGhost(v, v.Ghost());  // point the accessor to the correct ghost buffer
+    if (&v == &av) arg.AV.resetGhost(av, av.Ghost());
     LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("V2 = %e\n", arg.V.norm2());
@@ -2007,7 +2008,7 @@ namespace quda {
     if ( (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
 	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
       av.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
-      arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
+      arg.AV.resetGhost(av, av.Ghost());  // make sure we point to the correct pointer in the accessor
       LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
     }
 

@@ -15,7 +15,7 @@ template<typename T, typename... Ts>
     return std::unique_ptr<T>(new T(std::forward<Ts>(params)...));
   }
 
-  ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) {
+  ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) : LatticeFieldParam()  {
     field.fill(*this);
   }
 
@@ -27,7 +27,7 @@ template<typename T, typename... Ts>
       components(0)
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor,
-	   param.precision, param.pad, param.siteSubset, param.siteOrder,
+	   param.Precision(), param.pad, param.siteSubset, param.siteOrder,
 	   param.fieldOrder, param.gammaBasis, param.PCtype);
   }
 
@@ -38,7 +38,7 @@ template<typename T, typename... Ts>
      composite_descr(field.composite_descr), components(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor,
-	   field.precision, field.pad, field.siteSubset, field.siteOrder,
+	   field.Precision(), field.pad, field.siteSubset, field.siteOrder,
 	   field.fieldOrder, field.gammaBasis, field.PCtype);
   }
 
@@ -75,7 +75,7 @@ template<typename T, typename... Ts>
       if (i==0) {
 	ghostOffset[i][0] = 0;
       } else {
-        if (precision == QUDA_HALF_PRECISION) {
+        if (ghost_precision == QUDA_HALF_PRECISION) {
           ghostOffset[i][0] = (ghostNormOffset[i-1][1] + num_norm_faces*ghostFace[i-1]/2)*sizeof(float)/sizeof(short);
           // Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
           ghostOffset[i][0] = 4*((ghostOffset[i][0] + 3)/4);
@@ -84,7 +84,7 @@ template<typename T, typename... Ts>
         }
       }
 
-      if (precision == QUDA_HALF_PRECISION) {
+      if (ghost_precision == QUDA_HALF_PRECISION) {
         ghostNormOffset[i][0] = (ghostOffset[i][0] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*sizeof(short)/sizeof(float);
         ghostOffset[i][1] = (ghostNormOffset[i][0] + num_norm_faces*ghostFace[i]/2)*sizeof(float)/sizeof(short);
 	// Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
@@ -95,8 +95,8 @@ template<typename T, typename... Ts>
       }
 
       int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
-      ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*precision;
-      if (precision == QUDA_HALF_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
+      ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*ghost_precision;
+      if (ghost_precision == QUDA_HALF_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
 
     } // dim
 
@@ -104,15 +104,15 @@ template<typename T, typename... Ts>
     ghostVolume *= num_faces;
 
     size_t ghost_length = ghostVolume*nColor*nSpin*2;
-    size_t ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
+    size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
       printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
       printfQuda("ghost length = %lu, ghost norm length = %lu\n", ghost_length, ghost_norm_length);
     }
 
-    ghost_bytes = (size_t)ghost_length*precision;
-    if (precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
+    ghost_bytes = (size_t)ghost_length*ghost_precision;
+    if (ghost_precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
   } // createGhostZone
@@ -273,7 +273,8 @@ template<typename T, typename... Ts>
 
     if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
 
-    if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
+    if (param.Precision() != QUDA_INVALID_PRECISION) precision = param.Precision();
+    if (param.GhostPrecision() != QUDA_INVALID_PRECISION) ghost_precision = param.GhostPrecision();
     if (param.nDim != 0) nDim = param.nDim;
 
     composite_descr.is_composite     = param.is_composite;
@@ -364,7 +365,8 @@ template<typename T, typename... Ts>
     param.nSpin = nSpin;
     param.nVec = nVec;
     param.twistFlavor = twistFlavor;
-    param.precision = precision;
+    param.fieldOrder = fieldOrder;
+    param.setPrecision(precision, ghost_precision);
     param.nDim = nDim;
 
     param.is_composite  = composite_descr.is_composite;
@@ -376,7 +378,6 @@ template<typename T, typename... Ts>
     param.pad = pad;
     param.siteSubset = siteSubset;
     param.siteOrder = siteOrder;
-    param.fieldOrder = fieldOrder;
     param.gammaBasis = gammaBasis;
     param.PCtype = PCtype;
     param.create = QUDA_INVALID_FIELD_CREATE;
@@ -394,7 +395,7 @@ template<typename T, typename... Ts>
     const int Ninternal = 2*nColor*nSpin;
     size_t total_bytes = 0;
     for (int i=0; i<nDimComms; i++) {
-      bytes[i] = siteSubset*nFace*surfaceCB[i]*Ninternal*precision;
+      bytes[i] = siteSubset*nFace*surfaceCB[i]*Ninternal*ghost_precision;
       if (comm_dim_partitioned(i)) total_bytes += 2*bytes[i]; // 2 for fwd/bwd
     }
 
@@ -804,7 +805,7 @@ template<typename T, typename... Ts>
 
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) {
-      fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.precision!= QUDA_DOUBLE_PRECISION) ?
+      fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.Precision()!= QUDA_DOUBLE_PRECISION) ?
 	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
     }
 
@@ -828,6 +829,7 @@ template<typename T, typename... Ts>
     for (int d=0; d<a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
     out << "volume = " << a.volume << std::endl;
     out << "precision = " << a.precision << std::endl;
+    out << "ghost_precision = " << a.ghost_precision << std::endl;
     out << "pad = " << a.pad << std::endl;
     out << "stride = " << a.stride << std::endl;
     out << "real_length = " << a.real_length << std::endl;

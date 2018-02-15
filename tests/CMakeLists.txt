@@ -14,6 +14,11 @@ MACRO (QUDA_CHECKBUILDTEST mytarget qudabuildtests)
 ENDMACRO()
 #define tests
 
+# if we build with QDP JIT the tests cannot run anyway
+if(QUDA_INTERFACE_QDPJIT)
+  set(QUDA_BUILD_ALL_TESTS OFF)
+endif()
+
 if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_DOMAIN_WALL)
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )

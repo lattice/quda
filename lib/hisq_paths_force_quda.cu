@@ -1,10 +1,11 @@
+#include <utility>
+#include <typeinfo>
 #include <quda_internal.h>
 #include <lattice_field.h>
 #include <read_gauge.h>
 #include <gauge_field.h>
 #include <ks_improved_force.h>
 #include <hisq_force_macros.h>
-#include <utility>
 #include <quda_matrix.h>
 #include <force_common.h>
 #include <tune_quda.h>

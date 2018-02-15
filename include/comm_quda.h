@@ -161,6 +161,14 @@ extern "C" {
   void comm_peer2peer_init(const char *hostname_recv_buf);
 
   /**
+     @brief Returns true if any peer-to-peer capability is present on
+     this system (regardless of whether it has been disabled or not.  We
+     use this, for example, to determine if we need to allocate pinned
+     device memory or not.
+  */
+  bool comm_peer2peer_present();
+
+  /**
      Query if peer-to-peer communication is enabled globally
      @return Whether peer-to-peer is enabled globally
   */
