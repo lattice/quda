@@ -60,16 +60,17 @@ namespace quda {
       if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
         if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) {
 
-          RNG* randstates = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
-          randstates->Init();
+          if (param.B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+            rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
+            rng->Init();
+          }
 
           // Initializing to random vectors
           for(int i=0; i<(int)param.B.size(); i++) {
             if (param.B[i]->Location() == QUDA_CPU_FIELD_LOCATION) param.B[i]->Source(QUDA_RANDOM_SOURCE);
-            else spinorNoise(*param.B[i], *randstates, QUDA_NOISE_UNIFORM);
+            else spinorNoise(*param.B[i], *rng, QUDA_NOISE_UNIFORM);
           }
 
-          randstates->Release();
         }
         if ( param.mg_global.num_setup_iter[param.level] > 0 ) generateNullVectors(param.B);
       } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
@@ -353,6 +354,9 @@ namespace quda {
 
   MG::~MG() {
     if (param.level < param.Nlevel-1) {
+      if (rng) rng->Release();
+      delete rng;
+
       if (param.level == param.Nlevel-1 || param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
 	if (coarse_solver) delete coarse_solver;
 	if (param_coarse_solver) delete param_coarse_solver;
