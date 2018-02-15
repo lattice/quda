@@ -487,7 +487,7 @@ def gen(dir, pack_only=False):
     #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
     #load_half += "#endif\n"
 
-    if dir >= 6: load_half += "//const int t_proj_scale = TPROJSCALE;\n"
+    if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     #if dir >= 6: load_half += "const int t_proj_scale = 2;//set this manually\n"
     load_half += "\n"
     load_half += "// read half spinor from device memory\n"
@@ -575,23 +575,10 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 
 
     copy_half = ""
-    if dir < 6:
-        for h in range(0, 2):
-            for c in range(0, 3):
-                copy_half += h1_re(h,c)+" = "+in_re(h,c)+";  "
-                copy_half += h1_im(h,c)+" = "+in_im(h,c)+";\n"
-    else:
-        copy_half += "#ifdef TWIST_INV_DSLASH\n"
-        for h in range(0, 2):
-            for c in range(0, 3):
-                copy_half += h1_re(h,c)+" = "+in_re(h,c)+";  "
-                copy_half += h1_im(h,c)+" = "+in_im(h,c)+";\n"
-        copy_half += "#else  \n"
-        for h in range(0, 2):
-            for c in range(0, 3):
-                copy_half += h1_re(h,c)+" = "+"2*"+in_re(h,c)+";  "
-                copy_half += h1_im(h,c)+" = "+"2*"+in_im(h,c)+";\n"
-        copy_half += "#endif \n"
+    for h in range(0, 2):
+        for c in range(0, 3):
+            copy_half += h1_re(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_re(h,c)+";  "
+            copy_half += h1_im(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_im(h,c)+";\n"
     copy_half += "\n"
 
     prep_half = ""

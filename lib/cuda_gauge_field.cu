@@ -156,11 +156,11 @@ namespace quda {
   }
 
   void cudaGaugeField::destroyTexObject() {
-    if( isNative() && geometry != QUDA_COARSE_GEOMETRY ){
+    if ( isNative() && geometry != QUDA_COARSE_GEOMETRY ) {
       cudaDestroyTextureObject(tex);
       cudaDestroyTextureObject(evenTex);
       cudaDestroyTextureObject(oddTex);
-      if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13){
+      if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
         cudaDestroyTextureObject(phaseTex);
         cudaDestroyTextureObject(evenPhaseTex);
         cudaDestroyTextureObject(oddPhaseTex);
