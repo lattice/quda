@@ -185,6 +185,8 @@ new_cudaGaugeField(QudaGaugeParam& gp, QUDA_REAL *hbuf_u[])
   if(NULL != hbuf_u){
     cuda_gf->copy(*cpu_gf); // C.K. This does ghost exchange as well
   }
+
+  delete cpu_gf;
   
   return cuda_gf;
 }
@@ -203,12 +205,13 @@ new_cudaColorSpinorField(QudaGaugeParam& gp, QudaInvertParam& ip,
     cudaParam.create = QUDA_COPY_FIELD_CREATE;
     ColorSpinorField *cpu_x = ColorSpinorField::Create(cpuParam);
     cuda_x = new cudaColorSpinorField(*cpu_x, cudaParam);
+    delete cpu_x;
   }
   else{
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
     cuda_x = new cudaColorSpinorField(cudaParam);
   }
-    
+
   return cuda_x;
 }
 
@@ -366,9 +369,9 @@ laplacianQuda(
   
   //-- cleanup & return
   printfQuda("laplacianQuda: Finalizing...\n");
-  delete_not_null(cuda_gf);
-  delete_not_null(cuda_v_in);
-  delete_not_null(cuda_v_out);
+  delete cuda_gf;
+  delete cuda_v_in;
+  delete cuda_v_out;
 
   saveTuneCache();
 
@@ -455,9 +458,9 @@ doQQ_contract_Quda(
   //-- cleanup & return
   printfQuda("doQQ_contract_Quda: Finalizing...\n");
   for(int ivec=0;ivec<nVec;ivec++){
-    delete_not_null(cudaProp_in1[ivec]);
-    delete_not_null(cudaProp_in2[ivec]);
-    delete_not_null(cudaProp_out[ivec]);
+    delete cudaProp_in1[ivec];
+    delete cudaProp_in2[ivec];
+    delete cudaProp_out[ivec];
   }
   
   saveTuneCache();
@@ -784,6 +787,7 @@ momentumProjectionPropagator_Quda(
   //-- cleanup & return  
   free(momMatrix);
   free(corrOut_local);
+  free(corrOut_global);
   free(corrIn_proj);
   free(corrOut_proj);
   if(!GPU_phaseMatrix) free(phaseMatrix_host);
