@@ -69,11 +69,12 @@ endif()
 # QUDA_OBJS all c, cpp, fortran sources
 
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
-if(GITVERSION)
-  find_file(QUDA_GITDIR NAMES .git PATHS ${CMAKE_SOURCE_DIR} NO_DEFAULT_PATH)
-  set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${QUDA_GITDIR}/logs/HEAD)
-endif()
-mark_as_advanced(QUDA_GITDIR)
+# commented out: broken if QUDA is a Git submodule syritsyn 2018/02/16
+#if(GITVERSION)
+#  find_file(QUDA_GITDIR NAMES .git PATHS ${CMAKE_SOURCE_DIR} NO_DEFAULT_PATH)
+#  set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${QUDA_GITDIR}/logs/HEAD)
+#endif()
+#mark_as_advanced(QUDA_GITDIR)
 
 
 # include_directories
