@@ -173,7 +173,7 @@ namespace quda {
 
       // resize the on-GPU null-space components to single-parity if we're doing a
       // single-parity solve (memory saving technique).
-      if (0) {
+      {
         QudaSiteSubset site_subset = param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
         QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
         QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;

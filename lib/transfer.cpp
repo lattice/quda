@@ -200,6 +200,8 @@ namespace quda {
     if (site_subset == site_subset_) return;
     site_subset = site_subset_;
 
+    return; // FIXME apply memory optimization
+
     // this function only does something non-trivial if the operator is on the GPU
     if (!enable_gpu) return;
 
