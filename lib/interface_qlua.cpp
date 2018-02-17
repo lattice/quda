@@ -1075,6 +1075,7 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   saveTuneCache();
 
   printfQuda("%s: Returning...\n", func_name);
+  free(func_name);
   
   return status;
 }
@@ -1224,6 +1225,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   saveTuneCache();
 
   printfQuda("%s: Returning...\n", func_name);
+  free(func_name);
   
   return status;
 }

@@ -350,7 +350,8 @@ namespace quda {
     cudaFree(prop1_dev);
     cudaFree(prop2_dev);
     if(mpParam.cntrType == what_baryon_sigma_UUS) cudaFree(prop3_dev);
-
+    free(func_name);
+    
   }//-- function
   
 } //-namespace quda
