@@ -772,11 +772,11 @@ void unbindTwistedCloverTex(const FullClover clover)  //We don't really need thi
 
   // Half precision
   static inline __device__ float short2float(short a) {
-    return (float)a/MAX_SHORT;
+    return (float)a/fixedMaxValue<short>::value;
   }
 
   static inline __device__ short float2short(float c, float a) {
-    return (short)(a*c*MAX_SHORT);
+    return (short)(a*c*fixedMaxValue<short>::value);
   }
 
   static inline __device__ short4 float42short4(float c, float4 a) {
@@ -793,11 +793,11 @@ void unbindTwistedCloverTex(const FullClover clover)  //We don't really need thi
 
   // Quarter precision
   static inline __device__ float char2float(char a) {
-    return (float)a/MAX_CHAR;
+    return (float)a/fixedMaxValue<char>::value;
   }
 
   static inline __device__ char float2char(float c, float a) {
-    return (char)(a*c*MAX_CHAR);
+    return (char)(a*c*fixedMaxValue<char>::value);
   }
 
   static inline __device__ char4 float42char4(float c, float4 a) {

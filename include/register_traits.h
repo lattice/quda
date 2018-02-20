@@ -167,14 +167,12 @@ namespace quda {
   }
 
   // specializations for char-float conversion
-#define MAX_CHAR_INV 3.92156862745e-3
-  static inline __host__ __device__ float c2f(const char &a) { return static_cast<float>(a) * MAX_CHAR_INV; }
-  static inline __host__ __device__ double c2d(const char &a) { return static_cast<double>(a) * MAX_CHAR_INV; }
+  static inline __host__ __device__ float c2f(const char &a) { return static_cast<float>(a) * fixedInvMaxValue<char>::value; }
+  static inline __host__ __device__ double c2d(const char &a) { return static_cast<double>(a) * fixedInvMaxValue<char>::value; }
 
   // specializations for short-float conversion
-#define MAX_SHORT_INV 3.051850948e-5
-  static inline __host__ __device__ float s2f(const short &a) { return static_cast<float>(a) * MAX_SHORT_INV; }
-  static inline __host__ __device__ double s2d(const short &a) { return static_cast<double>(a) * MAX_SHORT_INV; }
+  static inline __host__ __device__ float s2f(const short &a) { return static_cast<float>(a) * fixedInvMaxValue<short>::value; }
+  static inline __host__ __device__ double s2d(const short &a) { return static_cast<double>(a) * fixedInvMaxValue<short>::value; }
 
   // Fast float to integer round
   __device__ __host__ inline int f2i(float f) {
@@ -195,14 +193,14 @@ namespace quda {
   }
 
   template<> __host__ __device__ inline void copy(float &a, const short &b) { a = s2f(b); }
-  template<> __host__ __device__ inline void copy(short &a, const float &b) { a = f2i(b*MAX_SHORT); }
+  template<> __host__ __device__ inline void copy(short &a, const float &b) { a = f2i(b*fixedMaxValue<short>::value); }
 
   template<> __host__ __device__ inline void copy(float2 &a, const short2 &b) {
     a.x = s2f(b.x); a.y = s2f(b.y);
   }
 
   template<> __host__ __device__ inline void copy(short2 &a, const float2 &b) {
-    a.x = f2i(b.x*MAX_SHORT); a.y = f2i(b.y*MAX_SHORT);
+    a.x = f2i(b.x*fixedMaxValue<short>::value); a.y = f2i(b.y*fixedMaxValue<short>::value);
   }
 
   template<> __host__ __device__ inline void copy(float4 &a, const short4 &b) {
@@ -210,18 +208,18 @@ namespace quda {
   }
 
   template<> __host__ __device__ inline void copy(short4 &a, const float4 &b) {
-    a.x = f2i(b.x*MAX_SHORT); a.y = f2i(b.y*MAX_SHORT); a.z = f2i(b.z*MAX_SHORT); a.w = f2i(b.w*MAX_SHORT);
+    a.x = f2i(b.x*fixedMaxValue<short>::value); a.y = f2i(b.y*fixedMaxValue<short>::value); a.z = f2i(b.z*fixedMaxValue<short>::value); a.w = f2i(b.w*fixedMaxValue<short>::value);
   }
 
   template<> __host__ __device__ inline void copy(float &a, const char &b) { a = c2f(b); }
-  template<> __host__ __device__ inline void copy(char &a, const float &b) { a = f2i(b*MAX_CHAR); }
+  template<> __host__ __device__ inline void copy(char &a, const float &b) { a = f2i(b*fixedMaxValue<char>::value); }
 
   template<> __host__ __device__ inline void copy(float2 &a, const char2 &b) {
     a.x = c2f(b.x); a.y = c2f(b.y);
   }
 
   template<> __host__ __device__ inline void copy(char2 &a, const float2 &b) {
-    a.x = f2i(b.x*MAX_CHAR); a.y = f2i(b.y*MAX_CHAR);
+    a.x = f2i(b.x*fixedMaxValue<char>::value); a.y = f2i(b.y*fixedMaxValue<char>::value);
   }
 
   template<> __host__ __device__ inline void copy(float4 &a, const char4 &b) {
@@ -229,7 +227,7 @@ namespace quda {
   }
 
   template<> __host__ __device__ inline void copy(char4 &a, const float4 &b) {
-    a.x = f2i(b.x*MAX_CHAR); a.y = f2i(b.y*MAX_CHAR); a.z = f2i(b.z*MAX_CHAR); a.w = f2i(b.w*MAX_CHAR);
+    a.x = f2i(b.x*fixedMaxValue<char>::value); a.y = f2i(b.y*fixedMaxValue<char>::value); a.z = f2i(b.z*fixedMaxValue<char>::value); a.w = f2i(b.w*fixedMaxValue<char>::value);
   }
 
   

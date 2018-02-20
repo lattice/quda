@@ -8,31 +8,41 @@
  * arbitrary field and register ordering.
  */
 
-#include <quda_internal.h> // for MAX_SHORT, MAX_CHAR
+#include <quda_internal.h> // for maximum short, char traits. 
 
 template <typename type> inline int vecLength() { return 0; }
 
+template<> inline int vecLength<char>() { return 1; }
 template<> inline int vecLength<short>() { return 1; }
 template<> inline int vecLength<float>() { return 1; }
 template<> inline int vecLength<double>() { return 1; }
 
+template<> inline int vecLength<char2>() { return 2; }
 template<> inline int vecLength<short2>() { return 2; }
 template<> inline int vecLength<float2>() { return 2; }
 template<> inline int vecLength<double2>() { return 2; }
 
+template<> inline int vecLength<char4>() { return 4; }
 template<> inline int vecLength<short4>() { return 4; }
 template<> inline int vecLength<float4>() { return 4; }
 template<> inline int vecLength<double4>() { return 4; }
 
-// MAX_SHORT 32767
-#define MAX_SHORT_INV 3.051850948e-5
-static inline __device__ float s2f(const short &a) { return static_cast<float>(a) * MAX_SHORT_INV; }
-static inline __device__ double s2d(const short &a) { return static_cast<double>(a) * MAX_SHORT_INV; }
+static inline __device__ float s2f(const short &a) { return static_cast<float>(a) * fixedInvMaxValue<short>::value; }
+static inline __device__ double s2d(const short &a) { return static_cast<double>(a) * fixedInvMaxValue<short>::value; }
+static inline __device__ float c2f(const char &a) { return static_cast<float>(a) * fixedInvMaxValue<char>::value; }
+static inline __device__ double c2d(const char &a) { return static_cast<double>(a) * fixedInvMaxValue<char>::value; }
+
 
 template <typename FloatN>
 __device__ inline void copyFloatN(FloatN &a, const FloatN &b) { a = b; }
 
-// This is emulating the texture normalized return
+// This is emulating the texture normalized return: char
+__device__ inline void copyFloatN(float2 &a, const char2 &b) { a = make_float2(c2f(b.x), c2f(b.y)); }
+__device__ inline void copyFloatN(float4 &a, const char4 &b) { a = make_float4(c2f(b.x), c2f(b.y), c2f(b.z), c2f(b.w)); }
+__device__ inline void copyFloatN(double2 &a, const char2 &b) { a = make_double2(c2d(b.x), c2d(b.y)); }
+__device__ inline void copyFloatN(double4 &a, const char4 &b) { a = make_double4(c2d(b.x), c2d(b.y), c2d(b.z), c2d(b.w)); }
+
+// This is emulating the texture normalized return: short
 __device__ inline void copyFloatN(float2 &a, const short2 &b) { a = make_float2(s2f(b.x), s2f(b.y)); }
 __device__ inline void copyFloatN(float4 &a, const short4 &b) { a = make_float4(s2f(b.x), s2f(b.y), s2f(b.z), s2f(b.w)); }
 __device__ inline void copyFloatN(double2 &a, const short2 &b) { a = make_double2(s2d(b.x), s2d(b.y)); }

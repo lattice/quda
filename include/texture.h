@@ -279,7 +279,7 @@ template<typename OutputType, typename InputType, int tex_id>
      RegType must match that of the InterType, and the ordering of the
      InterType must match that of the StoreType.  The only exception is
      when fixed precision is used, in which case, RegType can be a double
-     and InterType can be single (with StoreType short).
+     and InterType can be single (with StoreType short or char).
      
      @param RegType Register type used in kernel
      @param InterType Intermediate format - RegType precision with StoreType ordering
@@ -292,7 +292,7 @@ template<typename OutputType, typename InputType, int tex_id>
     const size_t inter_size = sizeof(((InterType*)0)->x);
     const size_t store_size = sizeof(((StoreType*)0)->x);
 
-    if (reg_size != inter_size  && store_size != 2 && inter_size != 4)
+    if (reg_size != inter_size  && store_size != 2 && store_size != 1 && inter_size != 4)
       errorQuda("Precision of register (%lu) and intermediate (%lu) types must match\n",
 		(unsigned long)reg_size, (unsigned long)inter_size);
   
@@ -306,7 +306,7 @@ template<typename OutputType, typename InputType, int tex_id>
 
   }
 
-  template <int M, typename FloatN>
+  template <int M, typename FloatN, typename FixedType>
   __device__ inline float store_norm(float *norm, FloatN x[M], int i) {
     float c[M];
 #pragma unroll
@@ -314,7 +314,7 @@ template<typename OutputType, typename InputType, int tex_id>
 #pragma unroll
     for (int j=1; j<M; j++) c[0] = fmaxf(c[j],c[0]);
     norm[i] = c[0];
-    return __fdividef(MAX_SHORT, c[0]);
+    return __fdividef(fixedMaxValue<FixedType>::value, c[0]);
   }
 
   /**
@@ -591,20 +591,20 @@ template <typename RegType, typename StoreType, int N, int write, int tex_id=-1>
     ~Spinor() { }
 
     // default store used for simple fields
-  __device__ inline void save(RegType x[], int i, const int parity = 0) {
+    __device__ inline void save(RegType x[], int i, const int parity = 0) {
       if (write) {
-	constexpr int M = (N * vec_length<RegType>::value ) / vec_length<InterType>::value;
-	InterType y[M];
-	convert<InterType, RegType>(y, x, M);
-	
-	if ( isFixed<StoreType>::value ) {
-          float C = store_norm<M, InterType>(ST::norm, y, ST::cb_norm_offset*parity + i);
+        constexpr int M = (N * vec_length<RegType>::value ) / vec_length<InterType>::value;
+        InterType y[M];
+        convert<InterType, RegType>(y, x, M);
+
+        if ( isFixed<StoreType>::value ) {
+          float C = store_norm<M, InterType, StoreType>(ST::norm, y, ST::cb_norm_offset*parity + i);
 #pragma unroll
           for (int j=0; j<M; j++) copyFloatN(SPINOR[ST::cb_offset*parity + i + j*ST::stride], C*y[j]);
-	} else {
+        } else {
 #pragma unroll
           for (int j=0; j<M; j++) copyFloatN(SPINOR[ST::cb_offset*parity + i + j*ST::stride], y[j]);
-	}
+        }
       }
     }
 

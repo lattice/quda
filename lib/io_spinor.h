@@ -393,7 +393,7 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   param.outNorm[sid] = c0;							\
-  float scale = __fdividef(MAX_SHORT, c0);				\
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale;	\
   o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale;	\
@@ -433,7 +433,7 @@
   c0 = fmaxf(c0, c1);             \
   c0 = fmaxf(c0, c2);             \
   param.outNorm[sid] = c0;              \
-  float scale = __fdividef(MAX_CHAR, c0);        \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);        \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale; \
   o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale; \
   o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale; \
@@ -497,7 +497,7 @@
   c0 = fmaxf(c0, c1);					\
   c0 = fmaxf(c0, c2);					\
   param.outNorm[sid] = c0;					\
-  float scale = __fdividef(MAX_SHORT, c0);			    \
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);			    \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale;	\
   o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale;	\
@@ -537,7 +537,7 @@
   c0 = fmaxf(c0, c1);         \
   c0 = fmaxf(c0, c2);         \
   param.outNorm[sid] = c0;          \
-  float scale = __fdividef(MAX_CHAR, c0);          \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);          \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale; \
   o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale; \
   o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale; \
@@ -581,7 +581,7 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   outNorm[sid] = c0;							\
-  float scale = __fdividef(MAX_SHORT, c0);				\
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   a0_re *= scale; a0_im *= scale; a1_re *= scale; a1_im *= scale;	\
   a2_re *= scale; a2_im *= scale; b0_re *= scale; b0_im *= scale;	\
   b1_re *= scale; b1_im *= scale; b2_re *= scale; b2_im *= scale;	\
@@ -602,7 +602,7 @@
   c0 = fmaxf(c0, c1);             \
   c0 = fmaxf(c0, c2);             \
   outNorm[sid] = c0;              \
-  float scale = __fdividef(MAX_CHAR, c0);        \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);        \
   a0_re *= scale; a0_im *= scale; a1_re *= scale; a1_im *= scale; \
   a2_re *= scale; a2_im *= scale; b0_re *= scale; b0_im *= scale; \
   b1_re *= scale; b1_im *= scale; b2_re *= scale; b2_im *= scale; \
@@ -682,7 +682,7 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   param.outNorm[sid] = c0;							\
-  float scale = __fdividef(MAX_SHORT, c0);				\
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   o1_00_re *= scale; o1_00_im *= scale; o1_01_re *= scale; o1_01_im *= scale;	\
   o1_02_re *= scale; o1_02_im *= scale; o1_10_re *= scale; o1_10_im *= scale;	\
   o1_11_re *= scale; o1_11_im *= scale; o1_12_re *= scale; o1_12_im *= scale;	\
@@ -719,7 +719,7 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   param.outNorm[sid+param.fl_stride] = c0;							\
-  scale = __fdividef(MAX_SHORT, c0);				\
+  scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   o2_00_re *= scale; o2_00_im *= scale; o2_01_re *= scale; o2_01_im *= scale;	\
   o2_02_re *= scale; o2_02_im *= scale; o2_10_re *= scale; o2_10_im *= scale;	\
   o2_11_re *= scale; o2_11_im *= scale; o2_12_re *= scale; o2_12_im *= scale;	\
@@ -759,7 +759,7 @@
   c0 = fmaxf(c0, c1);             \
   c0 = fmaxf(c0, c2);             \
   param.outNorm[sid] = c0;              \
-  float scale = __fdividef(MAX_CHAR, c0);        \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);        \
   o1_00_re *= scale; o1_00_im *= scale; o1_01_re *= scale; o1_01_im *= scale; \
   o1_02_re *= scale; o1_02_im *= scale; o1_10_re *= scale; o1_10_im *= scale; \
   o1_11_re *= scale; o1_11_im *= scale; o1_12_re *= scale; o1_12_im *= scale; \
@@ -796,7 +796,7 @@
   c0 = fmaxf(c0, c1);             \
   c0 = fmaxf(c0, c2);             \
   param.outNorm[sid+param.fl_stride] = c0;              \
-  scale = __fdividef(MAX_CHAR, c0);        \
+  scale = __fdividef(fixedMaxValue<char>::value, c0);        \
   o2_00_re *= scale; o2_00_im *= scale; o2_01_re *= scale; o2_01_im *= scale; \
   o2_02_re *= scale; o2_02_im *= scale; o2_10_re *= scale; o2_10_im *= scale; \
   o2_11_re *= scale; o2_11_im *= scale; o2_12_re *= scale; o2_12_im *= scale; \
@@ -972,7 +972,7 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   out ## Norm[sid] = c0;						\
-  float scale = __fdividef(MAX_SHORT, c0);				\
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale;					\
   ((short2*)out)[sid+0*mystride] = make_short2(f2i(o00_re), f2i(o00_im)); \
@@ -986,7 +986,7 @@
   c0 = fmaxf(c0, c1);             \
   c0 = fmaxf(c0, c2);             \
   out ## Norm[sid] = c0;            \
-  float scale = __fdividef(MAX_CHAR, c0);        \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);        \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale; \
   o02_re *= scale; o02_im *= scale;         \
   ((char2*)out)[sid+0*mystride] = make_char2(f2i(o00_re), f2i(o00_im)); \
@@ -1011,7 +1011,7 @@
   c0 = fmaxf(c0, c1);					\
   c0 = fmaxf(c0, c2);					\
   out ## Norm[sid] = c0;				\
-  float scale = __fdividef(MAX_SHORT, c0);			    \
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);			    \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale;					\
   store_streaming_short2(&g_out[0*mystride+sid], f2i(o00_re), f2i(o00_im)); \
@@ -1025,7 +1025,7 @@
   c0 = fmaxf(c0, c1);         \
   c0 = fmaxf(c0, c2);         \
   out ## Norm[sid] = c0;        \
-  float scale = __fdividef(MAX_CHAR, c0);          \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);          \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale; \
   o02_re *= scale; o02_im *= scale;         \
   store_streaming_char2(&g_out[0*mystride+sid], f2i(o00_re), f2i(o00_im)); \

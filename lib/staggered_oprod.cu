@@ -6,6 +6,7 @@
 #include <quda_internal.h>
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
