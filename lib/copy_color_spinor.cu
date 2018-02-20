@@ -41,6 +41,8 @@ namespace quda {
 			      QudaFieldLocation location, void *Dst, void *Src, 
 			      void *dstNorm, void *srcNorm) {
 
+    printfQuda("Entered copyGenericColorSpinor\n");
+
     if (dst.SiteSubset() != src.SiteSubset())
       errorQuda("Destination %d and source %d site subsets not equal", dst.SiteSubset(), src.SiteSubset());
 
@@ -80,7 +82,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
           copyGenericColorSpinorHH(dst, src, location, (short*)Dst, (short*)Src, (float*)dstNorm, (float*)srcNorm);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorHH(dst, src, location, (short*)Dst, (char*)Src, (float*)dstNorm, (float*)srcNorm);
+          copyGenericColorSpinorHQ(dst, src, location, (short*)Dst, (char*)Src, (float*)dstNorm, (float*)srcNorm);
         } else {
           errorQuda("Unsupported Precision %d", src.Precision());
         }
@@ -92,7 +94,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
           copyGenericColorSpinorQH(dst, src, location, (char*)Dst, (short*)Src, (float*)dstNorm, (float*)srcNorm);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorQH(dst, src, location, (char*)Dst, (char*)Src, (float*)dstNorm, (float*)srcNorm);
+          copyGenericColorSpinorQQ(dst, src, location, (char*)Dst, (char*)Src, (float*)dstNorm, (float*)srcNorm);
         } else {
           errorQuda("Unsupported Precision %d", src.Precision());
         }

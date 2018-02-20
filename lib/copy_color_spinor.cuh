@@ -412,6 +412,8 @@ namespace quda {
 			      QudaFieldLocation location, dstFloat *Dst, srcFloat *Src, 
 			      float *dstNorm=0, float *srcNorm=0) {
 
+    printf("Entered CopyGenericColorSpinor<Nc,dstFloat,srcFloat> with Nc %d\n", Nc);
+
     if (dst.Nspin() != src.Nspin())
       errorQuda("source and destination spins must match");
 
