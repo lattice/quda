@@ -60,7 +60,6 @@ namespace quda {
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
     int Nc_c = transfer->nvec();     // Coarse Color
     int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs(); // Coarse Spin
-
     GaugeFieldParam gParam;
     memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
     gParam.nColor = Nc_c*Ns_c;
@@ -69,7 +68,7 @@ namespace quda {
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.setPrecision(transfer->Vectors(QUDA_CPU_FIELD_LOCATION).Precision()); // always use "CPU" precision for Y/X fields
+    gParam.setPrecision( transfer->NullPrecision(QUDA_CPU_FIELD_LOCATION) ); // minimum of single precision
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -108,8 +107,8 @@ namespace quda {
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
-    // use null-space precision for preconditioned links
-    gParam.setPrecision(transfer->Vectors(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION).Precision());
+    // use null-space precision for preconditioned links on gpu
+    gParam.setPrecision( transfer->NullPrecision(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION) );
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;

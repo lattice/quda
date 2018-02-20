@@ -837,17 +837,22 @@ namespace quda {
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			int nFace, int dagger, MemoryLocation *destination=nullptr);
 
-  /*Generate a gaussian distributed spinor
-   * @param src The spinorfield
-   * @param seed Seed
-   * */
-  void spinorGauss(ColorSpinorField &src, int seed);
+  /**
+     @brief Generate a random noise spinor.  This variant allows the user to manage the RNG state.
+     @param src The colorspinorfield
+     @param randstates Random state
+     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+  */
+  void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type);
 
-  /*Generate a gaussian distributed spinor
-   * @param src The spinorfield
-   * @param randstates Random state
-   * */
-  void spinorGauss(ColorSpinorField &src, RNG& randstates);
+  /**
+     @brief Generate a random noise spinor.  This variant just
+     requires a seed and will create and destroy the random number state.
+     @param src The colorspinorfield
+     @param seed Seed
+     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+  */
+  void spinorNoise(ColorSpinorField &src, int seed, QudaNoiseType type);
 
 } // namespace quda
 

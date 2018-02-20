@@ -46,7 +46,7 @@ namespace quda {
 
     Field field;
     int_fastdiv X[QUDA_MAX_DIM];
-    const int volumeCB;
+    const int_fastdiv volumeCB;
     const int nDim;
     const int nFace;
     const int parity;
@@ -54,6 +54,7 @@ namespace quda {
     const int dagger;
     const QudaDWFPCType pc_type;
     int commDim[4]; // whether a given dimension is partitioned or not
+    int_fastdiv nParity2dim_threads;
 
     PackGhostArg(Field field, const ColorSpinorField &a, int parity, int nFace, int dagger)
       : field(field),
@@ -81,10 +82,11 @@ namespace quda {
      Compute the max element over the spin-color components of a given site.
    */
   template <typename Float, int Ns, int Ms, int Nc, int Mc, typename Arg>
-  __device__ __host__ inline Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block) {
+  __device__ __host__ inline Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block, bool active) {
 
     Float thread_max = 0.0;
-    Float site_max = 0.0;
+    Float site_max = active ? 0.0 : 1.0;
+
 #ifdef __CUDA_ARCH__
     // workout how big a shared-memory allocation we need
     // just statically compute the largest size needed to avoid templating on block size
@@ -93,28 +95,31 @@ namespace quda {
     constexpr int color_spin_threads = Nc <= MAX_BLOCK_FLOAT_NC ? (Ns/Ms) * (Nc/Mc) : 1;
     // this is the largest size of blockDim.x (rounded up to multiples of bank_width)
     constexpr int thread_width_x = ( (max_block_size / color_spin_threads + bank_width-1) / bank_width) * bank_width;
+    __shared__ Float v[ (Ns/Ms) * (Nc/Mc) * thread_width_x];
     const auto &rhs = arg.field;
+    if (active) {
 #pragma unroll
-    for (int spin_local=0; spin_local<Ms; spin_local++) {
-      int s = spin_block + spin_local;
+      for (int spin_local=0; spin_local<Ms; spin_local++) {
+	int s = spin_block + spin_local;
 #pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) {
-	int c = color_block + color_local;
-	complex<Float> z = rhs(spinor_parity, x_cb, s, c);
-	thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
-	thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
+	for (int color_local=0; color_local<Mc; color_local++) {
+	  int c = color_block + color_local;
+	  complex<Float> z = rhs(spinor_parity, x_cb, s, c);
+	  thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
+	  thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
+	}
+      }
+      v[ ( (spin_block/Ms) * (Nc/Mc) + (color_block/Mc)) * blockDim.x + threadIdx.x ] = thread_max;
+    }
+
+    __syncthreads();
+   
+    if (active) {
+#pragma unroll
+      for (int sc=0; sc<(Ns/Ms) * (Nc/Mc); sc++) {
+	site_max = site_max > v[sc*blockDim.x + threadIdx.x] ? site_max : v[sc*blockDim.x + threadIdx.x];
       }
     }
-
-    __shared__ Float v[ (Ns/Ms) * (Nc/Mc) * thread_width_x];
-    v[ ( (spin_block/Ms) * (Nc/Mc) + (color_block/Mc)) * blockDim.x + threadIdx.x ] = thread_max;
-    __syncthreads();
-
-#pragma unroll
-    for (int sc=0; sc<(Ns/Ms) * (Nc/Mc); sc++) {
-      site_max = site_max > v[sc*blockDim.x + threadIdx.x] ? site_max : v[sc*blockDim.x + threadIdx.x];
-    }
-
 #else
     errorQuda("Not supported on CPU");
 #endif
@@ -133,9 +138,13 @@ namespace quda {
     const auto &rhs = arg.field;
 
     {
-      if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace){
-	Float max = block_float ? compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block) : 1.0;
+      Float max = 1.0;
+      if (block_float) {
+        bool active = ( arg.commDim[dim] && ( (dir == 0 && x[dim] < arg.nFace) || (dir == 1 && x[dim] >= arg.X[dim] - arg.nFace) ) );
+        max = compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block, active);
+      }      
 
+      if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace) {
 	for (int spin_local=0; spin_local<Ms; spin_local++) {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
@@ -144,10 +153,8 @@ namespace quda {
 	  }
 	}
       }
-      
-      if (dir == 1 && arg.commDim[dim] && x[dim] >= arg.X[dim] - arg.nFace){
-	Float max = block_float ? compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block) : 1.0;
 
+      if (dir == 1 && arg.commDim[dim] && x[dim] >= arg.X[dim] - arg.nFace) {
 	for (int spin_local=0; spin_local<Ms; spin_local++) {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
@@ -192,19 +199,19 @@ namespace quda {
   template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim_threads, typename Arg>
   __global__ void GenericPackGhostKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    if (x_cb >= arg.volumeCB) return;
+    int spin_color_block = blockDim.y*blockIdx.y + threadIdx.y;
+    int parity_dim_dir = blockDim.z*blockIdx.z + threadIdx.z;
 
-    const int parity_dim_dir = blockDim.z*blockIdx.z + threadIdx.z;
-    if (parity_dim_dir >= arg.nParity*2*dim_threads) return;
+    // ensure all threads are always active so it safe to synchronize
+    x_cb %= arg.volumeCB;
+    spin_color_block %= (Ns/Ms)*(Nc/Mc);
+    parity_dim_dir %= arg.nParity2dim_threads;
 
     const int dim_dir = parity_dim_dir % (2*dim_threads);
     const int dim0 = dim_dir / 2;
     const int dir = dim_dir % 2;
     const int parity = (arg.nParity == 2) ? (parity_dim_dir / (2*dim_threads) ) : arg.parity;
-
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
-    const int spin_color_block = blockDim.y*blockIdx.y + threadIdx.y;
-    if (spin_color_block >= (Ns/Ms)*(Nc/Mc)) return; // ensure only valid threads
     const int spin_block = (spin_color_block / (Nc / Mc)) * Ms;
     const int color_block = (spin_color_block % (Nc / Mc)) * Mc;
 
@@ -268,6 +275,7 @@ namespace quda {
 	else GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,4,Arg>(arg);
       } else {
 	const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	arg.nParity2dim_threads = arg.nParity*2*tp.aux.x;
 	switch(tp.aux.x) {
 	case 1:
 	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,1,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);

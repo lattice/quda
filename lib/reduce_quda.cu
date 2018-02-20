@@ -64,6 +64,7 @@ static QudaSumFloat *d_reduce=0;
 static QudaSumFloat *h_reduce=0;
 static QudaSumFloat *hd_reduce=0;
 static cudaEvent_t reduceEnd;
+static bool fast_reduce_enabled = false;
 
 namespace quda {
   namespace blas {
@@ -74,6 +75,7 @@ namespace quda {
     void* getMappedHostReduceBuffer() { return hd_reduce; }
     void* getHostReduceBuffer() { return h_reduce; }
     cudaEvent_t* getReduceEvent() { return &reduceEnd; }
+    bool getFastReduce() { return fast_reduce_enabled; }
 
     void initReduce()
     {
@@ -127,6 +129,13 @@ namespace quda {
       }
 
       cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
+
+      // enable fast reductions with CPU spin waiting as opposed to using CUDA events
+      char *fast_reduce_env = getenv("QUDA_ENABLE_FAST_REDUCE");
+      if (fast_reduce_env && strcmp(fast_reduce_env,"1") == 0) {
+        warningQuda("Experimental fast reductions enabled");
+        fast_reduce_enabled = true;
+      }
 
       checkCudaError();
     }
