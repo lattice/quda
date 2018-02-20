@@ -255,10 +255,10 @@ namespace quda {
       if (param.precision_sloppy != param.precision) {
 	csParam.setPrecision(param.precision_sloppy);
 	x_sloppy = ColorSpinorField::Create(csParam);
-	r_sloppy = ColorSpinorField::Create(csParam);
+	r_sloppy = K ? ColorSpinorField::Create(csParam) : nullptr;
       } else {
 	x_sloppy = &x;
-	r_sloppy = rp;
+	r_sloppy = K ? rp : nullptr;
       }
 
       init = true;
@@ -267,7 +267,7 @@ namespace quda {
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &xSloppy = *x_sloppy;
-    ColorSpinorField &rSloppy = *r_sloppy;
+    ColorSpinorField &rSloppy = K ? *r_sloppy : *p[0];
     ColorSpinorField &tmp = *tmpp;
 
     double b2 = blas::norm2(b);  // norm sq of source
@@ -341,15 +341,14 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       if (K) {
-
 	pushVerbosity(param.verbosity_precondition);
 	(*K)(*p[k], rSloppy);
 	popVerbosity();
 
 	// relaxation p = omega*p + (1-omega)*r
 	//if (param.omega!=1.0) blas::axpby((1.0-param.omega), rPre, param.omega, pPre);
-      } else { // no preconditioner
-	*p[k] = rSloppy;
+      } else {
+        // no preconditioner
       }
 
       matSloppy(*Ap[k], *p[k], tmp);
@@ -360,7 +359,7 @@ namespace quda {
 
       orthoDir(beta, Ap, k, pipeline);
 
-      double3 Apr = blas::cDotProductNormA(*Ap[k], rSloppy);
+      double3 Apr = blas::cDotProductNormA(*Ap[k], K ? rSloppy : *p[k]);
 
       if (getVerbosity()>= QUDA_DEBUG_VERBOSE) {
 	printfQuda("GCR debug iter=%d: Apr=(%e,%e,%e)\n", total_iter, Apr.x, Apr.y, Apr.z);
@@ -375,7 +374,7 @@ namespace quda {
       alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-      r2 = blas::cabxpyAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], rSloppy); 
+      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[(k+1)%nKrylov]);
 
       k++;
       total_iter++;
