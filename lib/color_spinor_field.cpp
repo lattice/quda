@@ -67,7 +67,7 @@ namespace quda {
       if (i==0) {
 	ghostOffset[i][0] = 0;
       } else {
-        if (ghost_precision == QUDA_HALF_PRECISION) {
+        if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
           ghostOffset[i][0] = (ghostNormOffset[i-1][1] + num_norm_faces*ghostFace[i-1]/2)*sizeof(float)/sizeof(short);
           // Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
           ghostOffset[i][0] = 4*((ghostOffset[i][0] + 3)/4);
@@ -76,7 +76,7 @@ namespace quda {
         }
       }
 
-      if (ghost_precision == QUDA_HALF_PRECISION) {
+      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
         ghostNormOffset[i][0] = (ghostOffset[i][0] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*sizeof(short)/sizeof(float);
         ghostOffset[i][1] = (ghostNormOffset[i][0] + num_norm_faces*ghostFace[i]/2)*sizeof(float)/sizeof(short);
 	// Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
@@ -88,7 +88,7 @@ namespace quda {
 
       int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
       ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*ghost_precision;
-      if (ghost_precision == QUDA_HALF_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
+      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
 
     } // dim
 
@@ -96,7 +96,7 @@ namespace quda {
     ghostVolume *= num_faces;
 
     size_t ghost_length = ghostVolume*nColor*nSpin*2;
-    size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
+    size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ? ghostNormVolume : 0;
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
       printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
@@ -104,7 +104,7 @@ namespace quda {
     }
 
     ghost_bytes = (size_t)ghost_length*ghost_precision;
-    if (ghost_precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
+    if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
   } // createGhostZone

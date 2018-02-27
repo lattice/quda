@@ -99,11 +99,19 @@ namespace quda {
    */
   template< typename T > struct fixedMaxValue{ static constexpr float value = 0.0f; };
   template<> struct fixedMaxValue<short>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<char>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
 
   template< typename T > struct fixedInvMaxValue{ static constexpr double value = 3.402823e+38; };
   template<> struct fixedInvMaxValue<short>{ static constexpr double value = 3.051850948e-5; };
-  template<> struct fixedInvMaxValue<char>{ static constexpr double value = 3.92156862745e-3; };
+  template<> struct fixedInvMaxValue<short2>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<short4>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<char>{ static constexpr double value = 7.87401574e-3; };
+  template<> struct fixedInvMaxValue<char2>{ static constexpr double value = 7.87401574e-3; };
+  template<> struct fixedInvMaxValue<char4>{ static constexpr double value = 7.87401574e-3; };
 
   /**
    * Use this for recording a fine-grained profile of a QUDA

@@ -400,6 +400,7 @@ namespace quda {
 #endif
   }
 
+  // A char4 is the same size as a short2
   template <>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const char4 &value) {
 #if defined(__CUDA_ARCH__)
@@ -407,10 +408,19 @@ namespace quda {
     store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, reinterpret_cast<const short2*>(&value)->x, reinterpret_cast<const short2*>(&value)->y);
 #else
     reinterpret_cast<char4*>(ptr)[idx] = value;
+    //reinterpret_cast<short2*>(ptr)[idx] = *reinterpret_cast<const short2*>(&value);
 #endif
   }
 
-  // No specification for a char2 b/c it's the same size as a short, which had no specification.
+  template <>
+    __device__ __host__ inline void vector_store(void *ptr, int idx, const char2 &value) {
+#if defined(__CUDA_ARCH__)
+    vector_store(ptr, idx, *reinterpret_cast<const short*>(&value));
+    //store_streaming_char2(reinterpret_cast<char2*>(ptr)+idx, reinterpret_cast<const char2*>(&value)->x, reinterpret_cast<const char2*>(&value)->y);
+#else
+    reinterpret_cast<char2*>(ptr)[idx] = value;
+#endif
+  }
 
   template<bool large_alloc> struct AllocType { };
   template<> struct AllocType<true> { typedef size_t type; };

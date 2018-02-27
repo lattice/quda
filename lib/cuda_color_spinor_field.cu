@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include <color_spinor_field.h>
+#include <color_spinor_field_order.h> // Evan hack
 #include <blas_quda.h>
 #include <dslash_quda.h>
 
@@ -617,7 +618,7 @@ namespace quda {
 
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
-
+    printfQuda("Running cudaColorSpinorField::saveSpinorField.\n");
     if (reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes+norm_bytes);
       qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
@@ -628,7 +629,8 @@ namespace quda {
     } else if (typeid(dest) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION);
     } else {
-      void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr;
+      printfQuda("Copying from GPU to CPU, maybe changing precision, reorder on GPU if needed.\n");
+      void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr, *vNorm=nullptr;
       if (!zeroCopy) {
 	buffer = pool_device_malloc(dest.Bytes()+dest.NormBytes());
 	dst = buffer;
@@ -638,7 +640,8 @@ namespace quda {
 	cudaHostGetDevicePointer(&dst, buffer, 0);
 	dstNorm = static_cast<char*>(dst)+dest.Bytes();
       }
-      copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, 0);
+      vNorm = static_cast<char*>(v)+this->Bytes();
+      copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, vNorm);
 
       if (!zeroCopy) {
 	qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
@@ -1589,7 +1592,121 @@ namespace quda {
     *this = tmp;
   }
 
+  template<typename Float,int Ns, int Nc>
+  void genericCudaPrintVector(const cudaColorSpinorField& field, unsigned int i)
+  {
+    typedef typename colorspinor_mapper<Float,Ns,Nc>::type ColorSpinor;
+    ColorSpinor csmap(field);
+    typedef typename mapper<Float>::type TrueFloat;
+    TrueFloat* data_gpu=0;
+    cudaMalloc((void**)&data_gpu, 2*Ns*Nc*sizeof(TrueFloat));
+    csmap.load(data_gpu,i);
+    TrueFloat* data_cpu = new TrueFloat[2*Ns*Nc];
+    cudaMemcpy(data_cpu, data_gpu, 2*Ns*Nc*sizeof(TrueFloat), cudaMemcpyDeviceToHost);
+    cudaFree(data_gpu);
+    for (int i = 0; i < 2*Ns*Nc; i++)
+      printfQuda("%f ", data_cpu[i]);
+    printfQuda("\n");
+    delete[] data_cpu;
+  }
+
+  template <typename StoreType, QudaFieldOrder FieldOrder>
+  void printFloatVector(const cudaColorSpinorField& field, unsigned int i)
+  {
+    constexpr int Ns = 4;
+    constexpr int Nc = 3;
+
+    typedef colorspinor::AccessorCB<StoreType,Ns,Nc,1,FieldOrder> AccessorType;
+
+    AccessorType A(field);
+
+    // Register type
+    typedef typename scalar<typename mapper<StoreType>::type>::type Float;
+
+    // Allocate a real+imag component for the storage type.
+    StoreType indiv_num[2];
+
+    // Allocate space for the full site.
+    Float* data_cpu = new Float[2*Ns*Nc];
+
+    // Grab the pointer to the field.
+    complex<StoreType>* field_ptr = (complex<StoreType>*)field.V();
+
+    // Grab the pointer to the norm field. Might be ignored as appropriate.
+    float* norm_ptr = (float*)field.Norm();
+    float scale = 1.0;
+
+    for (int s = 0; s < Ns; s++)
+    {
+      for (int c = 0; c < Nc; c++)
+      {
+        if (isFixed<StoreType>::value)
+        {
+          cudaMemcpy(&scale, &norm_ptr[i], sizeof(float), cudaMemcpyDeviceToHost);
+          scale *= fixedInvMaxValue<StoreType>::value;
+        }
+        cudaMemcpy(indiv_num, &field_ptr[A.index(i%2,i/2,s,c,0)], 2*sizeof(StoreType), cudaMemcpyDeviceToHost);
+        data_cpu[2*(c+Nc*s)] = scale*static_cast<Float>(indiv_num[0]);
+        data_cpu[2*(c+Nc*s)+1] = scale*static_cast<Float>(indiv_num[1]);
+      }
+    }
+    // print
+    for (int s = 0; s < Ns; s++) {
+      printfQuda("x = %u, s = %d, { ", i, s);
+      for (int c = 0; c < Nc; c++) {
+        printfQuda("(%f,%f)", data_cpu[(s*Nc+c)*2], data_cpu[(s*Nc+c)*2+1]);
+        printfQuda("%s", c == Nc-1 ? " " : " , ");
+      }
+      printfQuda("}\n");
+    }
+    //for (int j = 0; j < 2*Ns*Nc; j++)
+    //  printfQuda("%f\n", data_cpu[j]);
+    
+    delete[] data_cpu;
+
+  }
+
+  template <typename StoreType>
+  void printFloatVector(const cudaColorSpinorField &field, unsigned int i)
+  {
+    switch (field.FieldOrder())
+    {
+      case QUDA_FLOAT_FIELD_ORDER:
+        printFloatVector<StoreType,QUDA_FLOAT_FIELD_ORDER>(field,i);
+        break;
+      case QUDA_FLOAT2_FIELD_ORDER:
+        printFloatVector<StoreType,QUDA_FLOAT2_FIELD_ORDER>(field,i);
+        break;
+      case QUDA_FLOAT4_FIELD_ORDER:
+        printFloatVector<StoreType,QUDA_FLOAT4_FIELD_ORDER>(field,i);
+        break;
+      case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER:
+        printFloatVector<StoreType,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(field,i);
+        break;
+      case QUDA_SPACE_COLOR_SPIN_FIELD_ORDER:
+        printFloatVector<StoreType,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER>(field,i);
+        break;
+    }
+  }
+
   void cudaColorSpinorField::PrintVector(unsigned int i) {
+    switch (this->precision)
+    {
+      case QUDA_QUARTER_PRECISION:
+        printFloatVector<char>(*this,i);
+        break;
+      case QUDA_HALF_PRECISION:
+        printFloatVector<short>(*this,i);
+        break;
+      case QUDA_SINGLE_PRECISION:
+        printFloatVector<float>(*this,i);
+        break;
+      case QUDA_DOUBLE_PRECISION:
+        printFloatVector<double>(*this, i);
+        break;
+    }
+
+    /*
     ColorSpinorParam param(*this);
     param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.location = QUDA_CPU_FIELD_LOCATION;
@@ -1597,7 +1714,7 @@ namespace quda {
 
     cpuColorSpinorField tmp(param);
     tmp = *this;
-    tmp.PrintVector(i);
+    tmp.PrintVector(i);*/
   }
 
 

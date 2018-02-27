@@ -80,6 +80,57 @@ bool skip_kernel(int precision, int kernel) {
   return false;
 }
 
+void printFieldInfo(ColorSpinorField& field, const char* name)
+{
+  printf("\nField %s lives on the ");
+  switch (field.Location())
+  {
+    case QUDA_CUDA_FIELD_LOCATION:
+      printf("GPU");
+      break;
+    case QUDA_CPU_FIELD_LOCATION:
+      printf("CPU");
+      break;
+  }
+  printf(", is ");
+  switch (field.Precision())
+  {
+    case QUDA_QUARTER_PRECISION:
+      printf("quarter");
+      break;
+    case QUDA_HALF_PRECISION:
+      printf("half");
+      break;
+    case QUDA_SINGLE_PRECISION:
+      printf("single");
+      break;
+    case QUDA_DOUBLE_PRECISION:
+      printf("double");
+      break;
+  }
+  printf(" precision. Its layout is ");
+  switch (field.FieldOrder())
+  {
+    case QUDA_FLOAT_FIELD_ORDER:
+      printf("QUDA_FLOAT_FIELD_ORDER");
+      break;
+    case QUDA_FLOAT2_FIELD_ORDER:
+      printf("QUDA_FLOAT2_FIELD_ORDER");
+      break;
+    case QUDA_FLOAT4_FIELD_ORDER:
+      printf("QUDA_FLOAT4_FIELD_ORDER");
+      break;
+    case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER:
+      printf("QUDA_SPACE_SPIN_COLOR_FIELD_ORDER");
+      break;
+    case QUDA_SPACE_COLOR_SPIN_FIELD_ORDER:
+      printf("QUDA_SPACE_COLOR_SPIN_FIELD_ORDER");
+      break;
+  }
+  printf(", which is %snative.\n", field.isNative() ? "" : "not ");
+}
+
+
 void initFields(int prec)
 {
   // precisions used for the source field in the copyCuda() benchmark
@@ -127,7 +178,7 @@ void initFields(int prec)
   // Now set the parameters for the cuda fields
   //param.pad = xdim*ydim*zdim/2;
 
-  if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  //if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;
 
   switch(prec) {
@@ -224,7 +275,6 @@ void freeFields()
 
 
 double benchmark(int kernel, const int niter) {
-
   cudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventCreate(&end);
@@ -262,6 +312,7 @@ double benchmark(int kernel, const int niter) {
 
 #define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)
 
+
 double test(int kernel) {
 
   double error = 0;
@@ -269,14 +320,13 @@ double test(int kernel) {
   switch (kernel) {
 
   case 0:
+    //printFieldInfo(*hD, "hD");
+    //hD->PrintVector(0);
     *hD = *hH;
     blas::copy(*yD, *hD);
     blas::copy(*yH, *hH);
     error = ERROR(y);
-    for (int x=0; x<yD->Volume(); x++) yH->PrintVector(x);
-    blas::copy(*yH, *yD);
-    for (int x=0; x<yD->Volume(); x++) yH->PrintVector(x);
-    break;
+    break;    
 
   case 1:
     *mD = *mH;

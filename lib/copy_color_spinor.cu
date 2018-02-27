@@ -41,8 +41,6 @@ namespace quda {
 			      QudaFieldLocation location, void *Dst, void *Src, 
 			      void *dstNorm, void *srcNorm) {
 
-    printfQuda("Entered copyGenericColorSpinor\n");
-
     if (dst.SiteSubset() != src.SiteSubset())
       errorQuda("Destination %d and source %d site subsets not equal", dst.SiteSubset(), src.SiteSubset());
 
@@ -52,7 +50,7 @@ namespace quda {
     if (dst.Ncolor() == 3) {
       if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorDD(dst, src, location, Dst, Src);
+          copyGenericColorSpinorDD(dst, src, location, (double*)Dst, (double*)Src);
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
           copyGenericColorSpinorDS(dst, src, location, (double*)Dst, (float*)Src);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {

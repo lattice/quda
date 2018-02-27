@@ -280,7 +280,6 @@ namespace quda {
     void genericCopyColorSpinor(InOrder &inOrder, ColorSpinorField &out, 
 				const ColorSpinorField &in, QudaFieldLocation location,
 				FloatOut *Out, float *outNorm) {
-
     const bool override = true;
     if (out.isNative()) {
       typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
@@ -331,7 +330,6 @@ namespace quda {
     void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, 
 				QudaFieldLocation location, FloatOut *Out, FloatIn *In, 
 				float *outNorm, float *inNorm) {
-
     const bool override = true;
     if (in.isNative()) {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
@@ -411,8 +409,6 @@ namespace quda {
   void CopyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
 			      QudaFieldLocation location, dstFloat *Dst, srcFloat *Src, 
 			      float *dstNorm=0, float *srcNorm=0) {
-
-    printf("Entered CopyGenericColorSpinor<Nc,dstFloat,srcFloat> with Nc %d\n", Nc);
 
     if (dst.Nspin() != src.Nspin())
       errorQuda("source and destination spins must match");
