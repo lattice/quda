@@ -288,7 +288,7 @@ static void profilerStart(const char *f) {
 
 
     char* donotprofile_env = getenv("QUDA_DO_NOT_PROFILE"); // disable profiling of QUDA parts
-    if (!strcmp(donotprofile_env, "0") == 0)  {
+    if (donotprofile_env && (!strcmp(donotprofile_env, "0") == 0))  {
       do_not_profile_quda=true;
       printfQuda("Disabling profiling in QUDA\n");
     }
