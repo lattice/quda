@@ -1298,32 +1298,21 @@ namespace quda {
 
 
     template <typename real>
-    struct OneLinkTermArg {
+    struct OneLinkTermArg : BaseForceArg {
 
       typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
       F force;
       const F oprod;
-      int threads;
-      int X[4]; // regular grid dims
-      int E[4]; // extended grid dims
-      int border[4];
       const real coeff;
 
-      OneLinkTermArg(GaugeField &force, const GaugeField &oprod, real coeff)
-        : force(force), oprod(oprod), threads(1), coeff(coeff)
+      OneLinkTermArg(GaugeField &force, const GaugeField &oprod, const GaugeField &link, real coeff)
+        : BaseForceArg(link, 0), force(force), oprod(oprod), coeff(coeff)
       {
         if (!force.isNative()) errorQuda("Unsupported gauge order %d", force.Order());
         if (!oprod.isNative()) errorQuda("Unsupported gauge order %d", oprod.Order());\
-        for (int d=0; d<4; d++) {
-          E[d] = oprod.X()[d]; // link field is extended
-#ifdef MULTI_GPU
-          border[d] = 2;//P3.R()[d]; // FIXME need to make sure that R is set so we can extract X
-#else
-          border[d] = 0;
-#endif
-          X[d] = E[d] - 2*border[d];
-          threads *= X[d];
-        }
+        if (!link.isNative()) errorQuda("Unsupported gauge order %d", link.Order());\
+        threads = 1;
+        for (int d=0; d<4; d++) threads *= X[d];
         threads /= 2;
       }
 
@@ -1437,7 +1426,7 @@ namespace quda {
         SevenSt = act_path_coeff.seven;
         Lepage  = act_path_coeff.lepage; mLepage  = -Lepage;
 
-        OneLinkTermArg<Real> arg(newOprod, oprod, OneLink);
+        OneLinkTermArg<Real> arg(newOprod, oprod, link, OneLink);
         OneLinkForce<Real, OneLinkTermArg<Real> > oneLink(arg, newOprod, FORCE_ONE_LINK);
         oneLink.apply(0);
         checkCudaError();
