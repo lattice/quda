@@ -610,7 +610,7 @@ namespace quda {
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do reorder on the CPU
 	void *buffer = pool_pinned_malloc(bytes);
 
-	if (src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	  // copy field and ghost zone into buffer
 	  copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, static_cast<const cpuGaugeField&>(src).gauge);
 	} else {
@@ -654,7 +654,7 @@ namespace quda {
 	    for (int d=0; d<geometry; d++)
 	      qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyHostToDevice);
 
-	  if (src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	  if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
 	    if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
 	  } else {
