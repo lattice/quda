@@ -381,6 +381,17 @@ namespace quda {
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     /**
+       @brief This does routine will populate the border / halo region
+       of a gauge field that has been created using copyExtendedGauge.
+       Overloaded variant that will start and stop a comms profile.
+       @param R The thickness of the extended region in each dimension
+       @param profile TimeProfile intance which will record the time taken
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimensions
+    */
+    void exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill=false);
+
+    /**
      * Generic gauge field copy
      * @param[in] src Source from which we are copying
      */
@@ -469,6 +480,17 @@ namespace quda {
        region in non-partitioned dimenions
     */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
+
+    /**
+       @brief This does routine will populate the border / halo region of a
+       gauge field that has been created using copyExtendedGauge.
+       Overloaded variant that will start and stop a comms profile.
+       @param R The thickness of the extended region in each dimension
+       @param profile TimeProfile intance which will record the time taken
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimenions
+    */
+    void exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill=false);
 
     /**
      * Generic gauge field copy

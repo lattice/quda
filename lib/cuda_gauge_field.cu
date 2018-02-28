@@ -530,6 +530,12 @@ namespace quda {
     cudaDeviceSynchronize();
   }
 
+  void cudaGaugeField::exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill) {
+    profile.TPSTART(QUDA_PROFILE_COMMS);
+    exchangeExtendedGhost(R, no_comms_fill);
+    profile.TPSTOP(QUDA_PROFILE_COMMS);
+  }
+
   void cudaGaugeField::setGauge(void *gauge_)
   {
     if(create != QUDA_REFERENCE_FIELD_CREATE) {
