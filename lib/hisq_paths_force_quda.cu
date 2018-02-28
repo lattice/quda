@@ -45,35 +45,35 @@ namespace quda {
     __device__ __host__ constexpr inline int Sign(int parity) { return parity ? -1 : 1; }
     __device__ __host__ constexpr inline int posDir(int dir) { return (dir >= 4) ? 7-dir : dir; }
 
-    template <int dir>
-    inline __device__ __host__ void updateCoords(int x[], int shift, const int X[4], const int partitioned[]){
+    template <int dir, typename Arg>
+    inline __device__ __host__ void updateCoords(int x[], int shift, const Arg &arg) {
 #ifdef MULTI_GPU
       if (shift == 1) {
-        x[dir] = (partitioned[dir] || (x[dir] != X[dir]+1)) ? x[dir]+1 : 2;
+        x[dir] = (arg.commDim[dir] || (x[dir] != arg.X[dir]+1)) ? x[dir]+1 : 2;
       } else if (shift == -1) {
-        x[dir] = (partitioned[dir] || (x[dir] != 2)) ? x[dir]-1 : X[dir]+1;
+        x[dir] = (arg.commDim[dir] || (x[dir] != 2)) ? x[dir]-1 : arg.X[dir]+1;
       }
 #else
-      x[dir] = (x[dir]+shift + X[dir])%X[dir];
+      x[dir] = (x[dir] + shift + arg.X[dir]) % arg.X[dir];
 #endif
     }
 
-    inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned[]) {
+    template <typename Arg>
+    inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const Arg &arg) {
       switch (dir) {
         case 0:
-	  updateCoords<0>(x, shift, X, partitioned);
+	  updateCoords<0>(x, shift, arg);
 	  break;
         case 1:
-	  updateCoords<1>(x, shift, X, partitioned);
-	  break;
+	  updateCoords<1>(x, shift, arg);
+          break;
         case 2:
-	  updateCoords<2>(x, shift, X, partitioned);
+	  updateCoords<2>(x, shift, arg);
 	  break;
         case 3:
-	  updateCoords<3>(x, shift, X, partitioned);
+	  updateCoords<3>(x, shift, arg);
 	  break;
       }
-
       return;
     }
 
@@ -339,7 +339,7 @@ namespace quda {
 
       int y[4] = {x[0], x[1], x[2], x[3]};
       int mysig = posDir(arg.sig);
-      updateCoords(y, mysig, (sig_positive ? 1 : -1), arg.X, arg.commDim);
+      updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
       int point_b = linkIndex(y,arg.E);
       int ab_link_nbr_idx = (sig_positive) ? e_cb : point_b;
 
@@ -354,9 +354,9 @@ namespace quda {
        *
        */
       if (mu_positive) { //positive mu
-        updateCoords(y, arg.mu, -1, arg.X, arg.commDim);
+        updateCoords(y, arg.mu, -1, arg);
         int point_d = linkIndex(y,arg.E);
-        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg.X, arg.commDim);
+        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
         int point_c = linkIndex(y,arg.E);
 
         Link Uab = arg.link(posDir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
@@ -385,9 +385,9 @@ namespace quda {
       } else { //negative mu
 
         int mu = opp_dir(arg.mu);
-        updateCoords(y, mu, 1, arg.X, arg.commDim);
+        updateCoords(y, mu, 1, arg);
         int point_d = linkIndex(y,arg.E);
-        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg.X, arg.commDim);
+        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
         int point_c = linkIndex(y,arg.E);
 
         Link Uab = arg.link(posDir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
@@ -569,17 +569,17 @@ namespace quda {
       int y[4] = {x[0], x[1], x[2], x[3]};
 
       int mymu = posDir(arg.mu);
-      updateCoords(y, mymu, (mu_positive ? -1 : 1), arg.X, arg.commDim);
+      updateCoords(y, mymu, (mu_positive ? -1 : 1), arg);
 
       int point_d = linkIndex(y, arg.E);
       int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
 
       int mysig = posDir(arg.sig);
-      updateCoords(y, mysig, (sig_positive ? 1 : -1), arg.X, arg.commDim);
+      updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
       int point_c = linkIndex(y, arg.E);
 
       for (int d=0; d<4; d++) y[d] = x[d];
-      updateCoords(y, mysig, (sig_positive ? 1 : -1), arg.X, arg.commDim);
+      updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
       int point_b = linkIndex(y, arg.E);
 
       int bc_link_nbr_idx = mu_positive ? point_c : point_b;
@@ -748,7 +748,7 @@ namespace quda {
       int y[4] = {x[0], x[1], x[2], x[3]};
 
       int mymu = posDir(arg.mu);
-      updateCoords(y, mymu, (mu_positive ? -1 : 1), arg.X, arg.commDim);
+      updateCoords(y, mymu, (mu_positive ? -1 : 1), arg);
       int point_d = linkIndex(y,arg.E);
 
       Link Oy = arg.p3(0, e_cb, parity);
@@ -807,7 +807,7 @@ namespace quda {
       int mymu = posDir(arg.mu);
       int y[4] = {x[0], x[1], x[2], x[3]};
 
-      updateCoords(y, mymu, (mu_positive ? -1 : 1), arg.X, arg.commDim);
+      updateCoords(y, mymu, (mu_positive ? -1 : 1), arg);
       int point_d = linkIndex(y,arg.E);
       real mycoeff = CoeffSign(sig_positive,parity)*arg.coeff;
 
@@ -1612,6 +1612,7 @@ namespace quda {
           act_path_coeff.five   = path_coeff_array[3];
           act_path_coeff.seven  = path_coeff_array[4];
           act_path_coeff.lepage = path_coeff_array[5];
+
           do_hisq_staples_force_cuda<double,double2,double2>( act_path_coeff,
               param,
               oprod,
