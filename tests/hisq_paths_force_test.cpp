@@ -187,8 +187,6 @@ static void hisq_force_init()
 
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
 
-  for (int d=0; d<4; d++) qudaGaugeParam_ex.X[d] = qudaGaugeParam.X[d] + 2*R[d];
-
   gParam = GaugeFieldParam(0, qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
@@ -197,11 +195,11 @@ static void hisq_force_init()
   cpuGauge = new cpuGaugeField(gParam);
 
   gParam_ex = GaugeFieldParam(0, qudaGaugeParam_ex);
-  for (int d=0; d<4; d++) gParam_ex.r[d] = R[d];
   gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.order = gauge_order;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = R[d]; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region for CPU
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 
   if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
@@ -209,6 +207,7 @@ static void hisq_force_init()
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
+
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
@@ -216,6 +215,7 @@ static void hisq_force_init()
   gParam_ex.reconstruct = link_recon;
   gParam_ex.pad = 0;
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region
   cudaGauge_ex = new cudaGaugeField(gParam_ex);
   qudaGaugeParam.site_ga_pad = gParam_ex.pad;
   //record gauge pad size  
@@ -224,9 +224,13 @@ static void hisq_force_init()
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.create = QUDA_ZERO_FIELD_CREATE;
   gParam_ex.order = gauge_order;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = R[d]; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region for CPU
   cpuForce_ex = new cpuGaugeField(gParam_ex); 
+
+
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region
   cudaForce_ex = new cudaGaugeField(gParam_ex); 
 
   // create the momentum matrix
@@ -261,15 +265,18 @@ static void hisq_force_init()
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.order = gauge_order;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = R[d]; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region for CPU
   cpuOprod_ex = new cpuGaugeField(gParam_ex);
   cpuLongLinkOprod_ex = new cpuGaugeField(gParam_ex);
 
   copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
+
   copyExtendedGauge(*cpuLongLinkOprod_ex, *cpuLongLinkOprod, QUDA_CPU_FIELD_LOCATION);
 
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region
   cudaOprod_ex = new cudaGaugeField(gParam_ex);
-  gParam_ex.order = gauge_order;
+
 }
 
 static void hisq_force_end()
@@ -320,10 +327,12 @@ static int hisq_force_test(void)
   }
 
   cpuGauge_ex->exchangeExtendedGhost(R,true);
-  cudaGauge_ex->loadCPUField(*cpuGauge_ex);
+  cudaGauge_ex->loadCPUField(*cpuGauge);
+  cudaGauge_ex->exchangeExtendedGhost(cudaGauge_ex->R());
 
   cpuOprod_ex->exchangeExtendedGhost(R,true);
-  cudaOprod_ex->loadCPUField(*cpuOprod_ex);
+  cudaOprod_ex->loadCPUField(*cpuOprod);
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
 
   cpuLongLinkOprod_ex->exchangeExtendedGhost(R,true);
 
@@ -334,7 +343,6 @@ static int hisq_force_test(void)
     hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
     hisqCompleteForceCPU(qudaGaugeParam, *cpuForce_ex, *cpuGauge_ex, refMom);
   }
-
   gettimeofday(&ht1, NULL);
 
   struct timeval t0, t1, t2, t3;
@@ -347,8 +355,10 @@ static int hisq_force_test(void)
 
   delete cudaOprod_ex; //doing this to lower the peak memory usage
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region
   cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
-  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod_ex);
+  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod);
+  cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
   fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);  
   cudaDeviceSynchronize(); 
 

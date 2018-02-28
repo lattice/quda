@@ -47,15 +47,7 @@ namespace quda {
 
     template <int dir, typename Arg>
     inline __device__ __host__ void updateCoords(int x[], int shift, const Arg &arg) {
-#ifdef MULTI_GPU
-      if (shift == 1) {
-        x[dir] = (arg.commDim[dir] || (x[dir] != arg.X[dir]+1)) ? x[dir]+1 : 2;
-      } else if (shift == -1) {
-        x[dir] = (arg.commDim[dir] || (x[dir] != 2)) ? x[dir]-1 : arg.X[dir]+1;
-      }
-#else
-      x[dir] = (x[dir] + shift + arg.X[dir]) % arg.X[dir];
-#endif
+      x[dir] = (x[dir] + shift + arg.E[dir]) % arg.E[dir];
     }
 
     template <typename Arg>
@@ -96,7 +88,6 @@ namespace quda {
       int E[4]; // extended grid dims
 
       int commDim[4];
-
       int border[4];
       int base_idx[4];
       int oddness_change;
@@ -104,15 +95,15 @@ namespace quda {
       int mu;
       int sig;
 
-      BaseForceArg(const GaugeField &meta, int base_offset) : threads(1),
+      BaseForceArg(const GaugeField &meta, int overlap) : threads(1),
         commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) }
       {
         for (int d=0; d<4; d++) {
-          E[d] = meta.X()[d]; // link field is extended
+          E[d] = meta.X()[d];
           border[d] = meta.R()[d];
           X[d] = E[d] - 2*border[d];
-          D[d] = comm_dim_partitioned(d) ? X[d]+(base_offset+1)*border[d] : X[d];
-          base_idx[d] = comm_dim_partitioned(d) ? base_offset : border[d];
+          D[d] = comm_dim_partitioned(d) ? X[d]+overlap*2 : X[d];
+          base_idx[d] = comm_dim_partitioned(d) ? border[d]-overlap : 0;
           threads *= D[d];
         }
         threads /= 2;
@@ -135,7 +126,6 @@ namespace quda {
       CompleteForceArg(GaugeField &force, const GaugeField &link, const GaugeField &oprod)
         : BaseForceArg(link, 0), force(force), link(link), oprod(oprod), coeff(0.0)
       {
-        threads = force.VolumeCB();
         if (!force.isNative()) errorQuda("Unsupported gauge order %d", force.Order());
         if (!link.isNative())  errorQuda("Unsupported gauge order %d", link.Order());
         if (!oprod.isNative()) errorQuda("Unsupported gauge order %d", oprod.Order());
@@ -187,9 +177,6 @@ namespace quda {
         if (!force.isNative()) errorQuda("Unsupported gauge order %d", force.Order());
         if (!link.isNative())  errorQuda("Unsupported gauge order %d", link.Order());
         if (!oprod.isNative()) errorQuda("Unsupported gauge order %d", oprod.Order());
-        threads = 1;
-        for (int d=0; d<4; d++) threads *= X[d];
-        threads /= 2;
       }
 
     };
@@ -274,8 +261,8 @@ namespace quda {
       const real accumu_coeff;
 
       HisqForceArg(GaugeField &force, GaugeField &shortP, const GaugeField &link, const GaugeField &oprod,
-                   const GaugeField &qPrev, real coeff, real accumu_coeff, int base_offset)
-        : BaseForceArg(link, base_offset), force(force), shortP(shortP), link(link), oprod(oprod), qPrev(qPrev),
+                   const GaugeField &qPrev, real coeff, real accumu_coeff, int overlap)
+        : BaseForceArg(link, overlap), force(force), shortP(shortP), link(link), oprod(oprod), qPrev(qPrev),
           coeff(coeff), accumu_coeff(accumu_coeff)
       {
         if (link.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct type %d", link.Reconstruct());
@@ -438,8 +425,8 @@ namespace quda {
 
       MiddleLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
                     const GaugeField &oProd, const GaugeField &qPrev, const GaugeField &link,
-                    real coeff, int base_offset, HisqForceType type)
-        : BaseForceArg(link, base_offset), newOprod(newOprod), pMu(pMu), p3(P3), qMu(qMu),
+                    real coeff, int overlap, HisqForceType type)
+        : BaseForceArg(link, overlap), newOprod(newOprod), pMu(pMu), p3(P3), qMu(qMu),
           oProd(oProd), qPrev(qPrev), link(link), coeff(coeff), p_mu(true), q_mu(true), q_prev(true)
       {
         if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK");
@@ -454,8 +441,8 @@ namespace quda {
 
       MiddleLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
                     const GaugeField &oProd, const GaugeField &link,
-                    real coeff, int base_offset, HisqForceType type)
-        : BaseForceArg(link, base_offset), newOprod(newOprod), pMu(pMu), p3(P3), qMu(qMu),
+                    real coeff, int overlap, HisqForceType type)
+        : BaseForceArg(link, overlap), newOprod(newOprod), pMu(pMu), p3(P3), qMu(qMu),
           oProd(oProd), qPrev(qMu), link(link), coeff(coeff), p_mu(true), q_mu(true), q_prev(false)
       {
         if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK");
@@ -469,8 +456,8 @@ namespace quda {
 
       MiddleLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &oProd,
                     const GaugeField &qPrev, const GaugeField &link,
-                    real coeff, int base_offset, HisqForceType type)
-        : BaseForceArg(link, base_offset), newOprod(newOprod), pMu(P3), p3(P3), qMu(qPrev),
+                    real coeff, int overlap, HisqForceType type)
+        : BaseForceArg(link, overlap), newOprod(newOprod), pMu(P3), p3(P3), qMu(qPrev),
           oProd(oProd), qPrev(qPrev), link(link), coeff(coeff), p_mu(false), q_mu(false), q_prev(true)
       {
         if (type != FORCE_LEPAGE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK");
@@ -643,8 +630,8 @@ namespace quda {
       const real accumu_coeff;
 
       SideLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &P3,
-                  const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int base_offset)
-        : BaseForceArg(link, base_offset), newOprod(newOprod), shortP(shortP), p3(P3), qProd(qProd), link(link),
+                  const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int overlap)
+        : BaseForceArg(link, overlap), newOprod(newOprod), shortP(shortP), p3(P3), qProd(qProd), link(link),
           coeff(coeff), accumu_coeff(accumu_coeff)
       {
         if (!newOprod.isNative()) errorQuda("Unsupported gauge order %d", newOprod.Order());
@@ -665,8 +652,8 @@ namespace quda {
       const real coeff;
 
       SideLinkShortArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &link,
-                       real coeff, int base_offset)
-        : BaseForceArg(link, base_offset), newOprod(newOprod), p3(P3), coeff(coeff)
+                       real coeff, int overlap)
+        : BaseForceArg(link, overlap), newOprod(newOprod), p3(P3), coeff(coeff)
       {
         if (!newOprod.isNative()) errorQuda("Unsupported gauge order %d", newOprod.Order());
         if (!P3.isNative()) errorQuda("Unsupported gauge order %d", P3.Order());
@@ -1311,9 +1298,6 @@ namespace quda {
         if (!force.isNative()) errorQuda("Unsupported gauge order %d", force.Order());
         if (!oprod.isNative()) errorQuda("Unsupported gauge order %d", oprod.Order());\
         if (!link.isNative()) errorQuda("Unsupported gauge order %d", link.Order());\
-        threads = 1;
-        for (int d=0; d<4; d++) threads *= X[d];
-        threads /= 2;
       }
 
     };
@@ -1439,12 +1423,12 @@ namespace quda {
             //3-link
             //Kernel A: middle link
 
-            MiddleLinkArg<Real> middleLinkArg( newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 1, FORCE_MIDDLE_LINK);
+            MiddleLinkArg<Real> middleLinkArg( newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
             MiddleLinkForce<Real, MiddleLinkArg<Real> > middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK);
             middleLink.apply(0);
             checkCudaError();
 
-            for(int nu=0; nu < 8; nu++){
+            for (int nu=0; nu < 8; nu++) {
               if (nu == sig || nu == opp_dir(sig)
                   || nu == mu || nu == opp_dir(mu)){
                 continue;
@@ -1452,12 +1436,12 @@ namespace quda {
               //5-link: middle link
               //Kernel B
               MiddleLinkArg<Real> middleLinkArg( newOprod, Pnumu, P5, Qnumu,
-                                                 Pmu, Qmu, link, FiveSt, 0, FORCE_MIDDLE_LINK);
+                                                 Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
               MiddleLinkForce<Real, MiddleLinkArg<Real> > middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK);
               middleLink.apply(0);
               checkCudaError();
 
-              for(int rho = 0; rho < 8; rho++){
+              for (int rho = 0; rho < 8; rho++) {
                 if (rho == sig || rho == opp_dir(sig)
                     || rho == mu || rho == opp_dir(mu)
                     || rho == nu || rho == opp_dir(nu)){
@@ -1465,18 +1449,19 @@ namespace quda {
                 }
 
                 //7-link: middle link and side link
-                if(FiveSt != 0)coeff = SevenSt/FiveSt; else coeff = 0;
+                if (FiveSt != 0) coeff = SevenSt/FiveSt; else coeff = 0;
 
-                HisqForceArg<Real> arg(newOprod, P5, link, Pnumu, Qnumu, SevenSt, coeff, 0);
+                HisqForceArg<Real> arg(newOprod, P5, link, Pnumu, Qnumu, SevenSt, coeff, 1);
                 AllForce<Real, HisqForceArg<Real> > all(arg, link, sig, rho, FORCE_ALL_LINK);
                 all.apply(0);
                 checkCudaError();
+
               }//rho
 
               //5-link: side link
-              if(ThreeSt != 0)coeff = FiveSt/ThreeSt; else coeff = 0;
+              if (ThreeSt != 0)coeff = FiveSt/ThreeSt; else coeff = 0;
 
-              SideLinkArg<Real> arg(newOprod, P3, P5, Qmu, link, mFiveSt, coeff, 0);
+              SideLinkArg<Real> arg(newOprod, P3, P5, Qmu, link, mFiveSt, coeff, 1);
               SideLinkForce<Real, SideLinkArg<Real> > side(arg, link, sig, nu, FORCE_SIDE_LINK);
               side.apply(0);
               checkCudaError();
@@ -1486,14 +1471,14 @@ namespace quda {
             //lepage
             if(Lepage != 0.){
               MiddleLinkArg<Real> middleLinkArg( newOprod, P5,
-                                                 Pmu, Qmu, link, Lepage, 1, FORCE_LEPAGE_MIDDLE_LINK);
+                                                 Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
               MiddleLinkForce<Real, MiddleLinkArg<Real> > middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK);
               middleLink.apply(0);
               checkCudaError();
 
               if(ThreeSt != 0)coeff = Lepage/ThreeSt ; else coeff = 0;
 
-              SideLinkArg<Real> arg(newOprod, P3, P5, Qmu, link, mLepage, coeff, 1);
+              SideLinkArg<Real> arg(newOprod, P3, P5, Qmu, link, mLepage, coeff, 2);
               SideLinkForce<Real, SideLinkArg<Real> > side(arg, link, sig, mu, FORCE_SIDE_LINK);
               side.apply(0);
               checkCudaError();
@@ -1501,7 +1486,7 @@ namespace quda {
             } // Lepage != 0.0
 
             //3-link side link
-            SideLinkShortArg<Real> arg(newOprod, P3, link, ThreeSt, 0);
+            SideLinkShortArg<Real> arg(newOprod, P3, link, ThreeSt, 1);
             SideLinkShortForce<Real, SideLinkShortArg<Real> > side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT);
             side.apply(0);
             checkCudaError();

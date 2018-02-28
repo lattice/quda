@@ -30,7 +30,6 @@ BUILD_NDEG_TWISTED_MASS_DIRAC = @BUILD_NDEG_TWISTED_MASS_DIRAC@	# build non-dege
 BUILD_FATLINK = @BUILD_FATLINK@					# build code for computing asqtad fat links?
 BUILD_HISQLINK = @BUILD_HISQLINK@				# build code for computing hisq fat links?
 BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@				# build code for (1-loop Symanzik) gauge force?
-BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@			# build code for asqtad fermion force?
 BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
 BUILD_GAUGE_TOOLS = @BUILD_GAUGE_TOOLS@				# build auxilary gauge-field tools?
 BUILD_GAUGE_ALG = @BUILD_GAUGE_ALG@				# build gauge-fixing and pure-gauge algorithms?
@@ -271,11 +270,6 @@ endif
 ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
   NVCCOPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
   COPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
-endif
-
-ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
-  NVCCOPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
-  COPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
 endif
 
 ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
