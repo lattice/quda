@@ -610,7 +610,7 @@ namespace { // anonymous
       UnitarizeForce<Float,UnitarizeForceArg<Gauge,Gauge> > unitarizeForce(arg, meta);
       unitarizeForce.apply(0);
       cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
-      if(flops) *flops = unitarizeForce.flops(); 
+      if (flops) *flops += unitarizeForce.flops();
       checkCudaError();
     }
 
