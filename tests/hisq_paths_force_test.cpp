@@ -197,7 +197,8 @@ static void hisq_force_init()
   cpuGauge = new cpuGaugeField(gParam);
 
   gParam_ex = GaugeFieldParam(0, qudaGaugeParam_ex);
-  gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  for (int d=0; d<4; d++) gParam_ex.r[d] = R[d];
+  gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.order = gauge_order;
@@ -213,7 +214,6 @@ static void hisq_force_init()
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam_ex.precision = prec;
   gParam_ex.reconstruct = link_recon;
-  //gParam_ex.pad = E1*E2*E3/2;
   gParam_ex.pad = 0;
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaGauge_ex = new cudaGaugeField(gParam_ex);

@@ -89,8 +89,39 @@ namespace quda {
         Real lepage;
       };
 
+    struct BaseForceArg {
+      int threads;
+      int X[4]; // regular grid dims
+      int D[4]; // working set grid dims
+      int E[4]; // extended grid dims
+
+      int commDim[4];
+
+      int border[4];
+      int base_idx[4];
+      int oddness_change;
+
+      int mu;
+      int sig;
+
+      BaseForceArg(const GaugeField &meta, int base_offset) : threads(1),
+        commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) }
+      {
+        for (int d=0; d<4; d++) {
+          E[d] = meta.X()[d]; // link field is extended
+          border[d] = meta.R()[d];
+          X[d] = E[d] - 2*border[d];
+          D[d] = comm_dim_partitioned(d) ? X[d]+(base_offset+1)*border[d] : X[d];
+          base_idx[d] = comm_dim_partitioned(d) ? base_offset : border[d];
+          threads *= D[d];
+        }
+        threads /= 2;
+        oddness_change = (base_idx[0] + base_idx[1] + base_idx[2] + base_idx[3])&1;
+      }
+    };
+
     template <typename real, QudaReconstructType reconstruct>
-    struct CompleteForceArg {
+    struct CompleteForceArg : public BaseForceArg {
 
       typedef typename gauge::FloatNOrder<real,18,2,11> M;
       typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
@@ -99,26 +130,15 @@ namespace quda {
       M force;
       const F oprod;
       const G link;
-
-      const int threads;
-      int X[4];
-      int E[4];
-      int border[4];
-
       const real coeff;
 
       CompleteForceArg(GaugeField &force, const GaugeField &link, const GaugeField &oprod)
-        : force(force), link(link), oprod(oprod), threads(force.VolumeCB()), coeff(0.0)
+        : BaseForceArg(link, 0), force(force), link(link), oprod(oprod), coeff(0.0)
       {
+        threads = force.VolumeCB();
         if (!force.isNative()) errorQuda("Unsupported gauge order %d", force.Order());
         if (!link.isNative())  errorQuda("Unsupported gauge order %d", link.Order());
         if (!oprod.isNative()) errorQuda("Unsupported gauge order %d", oprod.Order());
-
-        for (int d=0; d<4; d++) {
-          X[d] = force.X()[d]; // force field is reguar field
-          E[d] = link.X()[d]; // link field is extended
-          border[d] = (E[d] - X[d]) / 2;
-        }
       }
 
     };
@@ -151,7 +171,7 @@ namespace quda {
     }
 
     template <typename real, QudaReconstructType reconstruct>
-    struct LongLinkArg {
+    struct LongLinkArg : public BaseForceArg {
 
       typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
       typedef typename gauge_mapper<real,reconstruct>::type G;
@@ -159,31 +179,16 @@ namespace quda {
       F force;
       const F oprod;
       const G link;
-
-      int threads;
-      int X[4];
-      int E[4];
-      int border[4];
-
       const real coeff;
 
       LongLinkArg(GaugeField &force, const GaugeField &link, const GaugeField &oprod, real coeff)
-        : force(force), link(link), oprod(oprod), threads(1), coeff(coeff)
+        : BaseForceArg(link,0), force(force), link(link), oprod(oprod), coeff(coeff)
       {
         if (!force.isNative()) errorQuda("Unsupported gauge order %d", force.Order());
         if (!link.isNative())  errorQuda("Unsupported gauge order %d", link.Order());
         if (!oprod.isNative()) errorQuda("Unsupported gauge order %d", oprod.Order());
-
-        for (int d=0; d<4; d++) {
-          E[d] = link.X()[d]; // link field is extended
-#ifdef MULTI_GPU
-          border[d] = 2;//link.R()[d];
-#else
-          border[d] = 0;
-#endif
-          X[d] = E[d] - 2*border[d];
-          threads *= X[d];
-        }
+        threads = 1;
+        for (int d=0; d<4; d++) threads *= X[d];
         threads /= 2;
       }
 
@@ -252,41 +257,6 @@ namespace quda {
       } // loop over sig
 
     }
-
-    struct BaseForceArg {
-      int threads;
-      int X[4]; // regular grid dims
-      int D[4]; // working set grid dims
-      int E[4]; // extended grid dims
-
-      int commDim[4];
-
-      int border[4];
-      int base_idx[4];
-      int oddness_change;
-
-      int mu;
-      int sig;
-
-      BaseForceArg(const GaugeField &meta, int base_offset) : threads(1),
-        commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) }
-      {
-        for (int d=0; d<4; d++) {
-          E[d] = meta.X()[d]; // link field is extended
-#ifdef MULTI_GPU
-          border[d] = 2;//meta.R()[d]; FIXME
-#else
-          border[d] = 0;
-#endif
-          X[d] = E[d] - 2*border[d];
-          D[d] = comm_dim_partitioned(d) ? X[d]+(base_offset+1)*border[d] : X[d];
-          base_idx[d] = comm_dim_partitioned(d) ? base_offset : border[d];
-          threads *= D[d];
-        }
-        threads /= 2;
-        oddness_change = (base_idx[0] + base_idx[1] + base_idx[2] + base_idx[3])&1;
-      }
-    };
 
     template <typename real, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
     struct HisqForceArg : public BaseForceArg {
@@ -1625,16 +1595,10 @@ namespace quda {
                               cudaGaugeField* newOprod,
                               long long* flops)
       {
-#ifdef MULTI_GPU
-        int X[4] = {param.X[0]+4, param.X[1]+4, param.X[2]+4, param.X[3]+4};
-#else
-        int X[4] = {param.X[0], param.X[1], param.X[2], param.X[3]};
-#endif
-
         // create color matrix fields with zero padding
-        GaugeFieldParam gauge_param(X, param.cuda_prec, QUDA_RECONSTRUCT_NO, 0, QUDA_SCALAR_GEOMETRY);
+        GaugeFieldParam gauge_param(link.X(), param.cuda_prec, QUDA_RECONSTRUCT_NO, 0, QUDA_SCALAR_GEOMETRY);
 
-        gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+        gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
         gauge_param.siteSubset = QUDA_FULL_SITE_SUBSET;
         gauge_param.order = QUDA_FLOAT2_GAUGE_ORDER;
         cudaGaugeField Pmu(gauge_param);
@@ -1650,8 +1614,8 @@ namespace quda {
         cudaEventCreate(&end);
 
         cudaEventRecord(start);
-        if (param.cuda_prec == QUDA_DOUBLE_PRECISION){
 
+        if (param.cuda_prec == QUDA_DOUBLE_PRECISION) {
           PathCoefficients<double> act_path_coeff;
           act_path_coeff.one    = path_coeff_array[0];
           act_path_coeff.naik   = path_coeff_array[1];
@@ -1670,9 +1634,7 @@ namespace quda {
               Qmu,
               Qnumu,
               *newOprod);
-
-
-        }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
+        } else if (param.cuda_prec == QUDA_SINGLE_PRECISION) {
           PathCoefficients<float> act_path_coeff;
           act_path_coeff.one    = path_coeff_array[0];
           act_path_coeff.naik   = path_coeff_array[1];
@@ -1692,7 +1654,7 @@ namespace quda {
               Qmu,
               Qnumu,
               *newOprod);
-        }else{
+        } else {
           errorQuda("Unsupported precision");
         }
 
@@ -1701,7 +1663,7 @@ namespace quda {
         float runtime;
         cudaEventElapsedTime(&runtime, start, end);
 
-	if (flops){
+	if (flops) {
 	  int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
 	  // Middle Link, side link, short side link, AllLink, OneLink
 	  *flops += (long long)volume*(134784 + 24192 + 103680 + 864 + 397440 + 72 + (path_coeff_array[5] != 0 ? 28944 : 0));
