@@ -3976,12 +3976,12 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
 
 
 void computeAsqtadForceQuda(void* const milc_momentum,
-    long long *flops,
-    const double act_path_coeff[6],
-    const void* const one_link_src[4],
-    const void* const naik_src[4],
-    const void* const link,
-    const QudaGaugeParam* gParam)
+                            long long *flops,
+                            const double act_path_coeff[6],
+                            const void* const one_link_src[4],
+                            const void* const naik_src[4],
+                            const void* const link,
+                            const QudaGaugeParam* gParam)
 {
 
 #ifdef GPU_HISQ_FORCE
@@ -3990,100 +3990,73 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   profileAsqtadForce.TPSTART(QUDA_PROFILE_TOTAL);
   profileAsqtadForce.TPSTART(QUDA_PROFILE_INIT);
 
-  cudaGaugeField *cudaGauge = NULL;
-  cpuGaugeField *cpuGauge = NULL;
-  cudaGaugeField *cudaInForce = NULL;
-  cpuGaugeField *cpuOneLinkInForce = NULL;
-  cpuGaugeField *cpuNaikInForce = NULL;
-  cudaGaugeField *cudaOutForce = NULL;
-  cudaGaugeField *cudaMom = NULL;
-  cpuGaugeField *cpuMom = NULL;
-
-  cudaGaugeField *cudaGauge_ex = NULL;
-  cudaGaugeField *cudaInForce_ex = NULL;
-  cudaGaugeField *cudaOutForce_ex = NULL;
-
   // create host fields
   GaugeFieldParam param((void*)link, *gParam, QUDA_GENERAL_LINKS);
   param.anisotropy = 1.0;
   param.siteSubset = QUDA_FULL_SITE_SUBSET;
   param.t_boundary = QUDA_PERIODIC_T;
   param.nFace = 1;
-  cpuGauge = new cpuGaugeField(param);
+  cpuGaugeField *cpuGauge = new cpuGaugeField(param);
 
   param.order = QUDA_QDP_GAUGE_ORDER;
   param.gauge = (void*)one_link_src;
-  cpuOneLinkInForce = new cpuGaugeField(param);
+  cpuGaugeField *cpuOneLinkInForce = new cpuGaugeField(param);
 
   param.gauge = (void*)naik_src;
-  cpuNaikInForce = new cpuGaugeField(param);
+  cpuGaugeField *cpuNaikInForce = new cpuGaugeField(param);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   param.link_type = QUDA_ASQTAD_MOM_LINKS;
   param.reconstruct = QUDA_RECONSTRUCT_10;
   param.gauge = milc_momentum;
-  cpuMom = new cpuGaugeField(param);
+  cpuGaugeField *cpuMom = new cpuGaugeField(param);
 
   // create device fields
   param.create = QUDA_NULL_FIELD_CREATE;
-  param.link_type = QUDA_GENERAL_LINKS;
-  param.reconstruct = QUDA_RECONSTRUCT_NO;
   param.order =  QUDA_FLOAT2_GAUGE_ORDER;
-
-  cudaGauge    = new cudaGaugeField(param);
-  cudaInForce  = new cudaGaugeField(param);
-  cudaOutForce = new cudaGaugeField(param);
-
   param.link_type = QUDA_ASQTAD_MOM_LINKS;
   param.reconstruct = QUDA_RECONSTRUCT_10;
-  cudaMom = new cudaGaugeField(param);
+  cudaGaugeField *cudaMom = new cudaGaugeField(param);
 
   param.link_type = QUDA_GENERAL_LINKS;
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.reconstruct = QUDA_RECONSTRUCT_NO;
 
+  // gauge and force fields are extended
   int R[4] = { 2*comm_dim_partitioned(0), 2*comm_dim_partitioned(1), 2*comm_dim_partitioned(2), 2*comm_dim_partitioned(3) };
   for (int dir=0; dir<4; ++dir) {
     param.x[dir] += 2*R[dir];
     param.r[dir] = R[dir];
   }
 
-  cudaGauge_ex    = new cudaGaugeField(param);
-  cudaInForce_ex  = new cudaGaugeField(param);
-  cudaOutForce_ex = new cudaGaugeField(param);
+  cudaGaugeField *cudaGauge    = new cudaGaugeField(param);
+  cudaGaugeField *cudaInForce  = new cudaGaugeField(param);
+  cudaGaugeField *cudaOutForce = new cudaGaugeField(param);
   profileAsqtadForce.TPSTOP(QUDA_PROFILE_INIT);
 
   profileAsqtadForce.TPSTART(QUDA_PROFILE_H2D);
   cudaGauge->loadCPUField(*cpuGauge);
-  profileAsqtadForce.TPSTOP(QUDA_PROFILE_H2D);
-  cudaMemset((void**)(cudaInForce_ex->Gauge_p()), 0, cudaInForce_ex->Bytes());
-  copyExtendedGauge(*cudaGauge_ex, *cudaGauge, QUDA_CUDA_FIELD_LOCATION);
-  cudaGauge_ex->exchangeExtendedGhost(R,profileAsqtadForce,true);
-
-  profileAsqtadForce.TPSTART(QUDA_PROFILE_H2D);
   cudaInForce->loadCPUField(*cpuOneLinkInForce);
   profileAsqtadForce.TPSTOP(QUDA_PROFILE_H2D);
-  cudaMemset((void**)(cudaInForce_ex->Gauge_p()), 0, cudaInForce_ex->Bytes());
-  copyExtendedGauge(*cudaInForce_ex, *cudaInForce, QUDA_CUDA_FIELD_LOCATION);
-  cudaInForce_ex->exchangeExtendedGhost(R,profileAsqtadForce,true);
 
-  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  cudaInForce->exchangeExtendedGhost(R,profileAsqtadForce,true);
+  cudaGauge->exchangeExtendedGhost(R,profileAsqtadForce,true);
+
   profileAsqtadForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  cudaMemset((void**)(cudaOutForce_ex->Gauge_p()), 0, cudaOutForce_ex->Bytes());
-  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex, &partialFlops);
+  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce, &partialFlops);
   *flops += partialFlops;
   profileAsqtadForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileAsqtadForce.TPSTART(QUDA_PROFILE_H2D);
   cudaInForce->loadCPUField(*cpuNaikInForce);
   profileAsqtadForce.TPSTOP(QUDA_PROFILE_H2D);
-  copyExtendedGauge(*cudaInForce_ex, *cudaInForce, QUDA_CUDA_FIELD_LOCATION);
-  cudaInForce_ex->exchangeExtendedGhost(R,profileAsqtadForce,true);
+  cudaInForce->exchangeExtendedGhost(R,profileAsqtadForce,true);
 
   profileAsqtadForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex, &partialFlops);
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce, &partialFlops);
   *flops += partialFlops;
-  completeKSForce(*cudaMom, *cudaOutForce_ex, *cudaGauge_ex, QUDA_CUDA_FIELD_LOCATION, &partialFlops);
+  completeKSForce(*cudaMom, *cudaOutForce, *cudaGauge, QUDA_CUDA_FIELD_LOCATION, &partialFlops);
   *flops += partialFlops;
   profileAsqtadForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -4092,13 +4065,10 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   profileAsqtadForce.TPSTOP(QUDA_PROFILE_D2H);
 
   profileAsqtadForce.TPSTART(QUDA_PROFILE_FREE);
+  delete cudaMom;
   delete cudaInForce;
   delete cudaOutForce;
   delete cudaGauge;
-  delete cudaMom;
-  delete cudaInForce_ex;
-  delete cudaOutForce_ex;
-  delete cudaGauge_ex;
   delete cpuGauge;
   delete cpuOneLinkInForce;
   delete cpuNaikInForce;
@@ -4115,17 +4085,17 @@ void computeAsqtadForceQuda(void* const milc_momentum,
 }
 
 
- void computeHISQForceQuda(void* const milc_momentum,
-    long long *flops,
-    const double level2_coeff[6],
-    const double fat7_coeff[6],
-    const void* const staple_src[4],
-    const void* const one_link_src[4],
-    const void* const naik_src[4],
-    const void* const w_link,
-    const void* const v_link,
-    const void* const u_link,
-    const QudaGaugeParam* gParam)
+void computeHISQForceQuda(void* const milc_momentum,
+                          long long *flops,
+                          const double level2_coeff[6],
+                          const double fat7_coeff[6],
+                          const void* const staple_src[4],
+                          const void* const one_link_src[4],
+                          const void* const naik_src[4],
+                          const void* const w_link,
+                          const void* const v_link,
+                          const void* const u_link,
+                          const QudaGaugeParam* gParam)
 {
 #ifdef GPU_HISQ_FORCE
   if (gParam->gauge_order != QUDA_MILC_GAUGE_ORDER) errorQuda("Unsupported input field order %d", gParam->gauge_order);
@@ -4158,11 +4128,8 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   param.reconstruct = QUDA_RECONSTRUCT_10;
   cudaGaugeField* cudaMom = new cudaGaugeField(param);
 
-  param.order = QUDA_FLOAT2_GAUGE_ORDER;
   param.link_type = QUDA_GENERAL_LINKS;
   param.reconstruct = QUDA_RECONSTRUCT_NO;
-  cudaGaugeField* cudaGauge = new cudaGaugeField(param);
-
   param.order = QUDA_QDP_GAUGE_ORDER;
   param.create = QUDA_REFERENCE_FIELD_CREATE;
   param.gauge = (void*)staple_src;
@@ -4176,9 +4143,7 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   param.ghostExchange =  QUDA_GHOST_EXCHANGE_NO;
   param.link_type = QUDA_GENERAL_LINKS;
   param.precision = gParam->cpu_prec;
-
   param.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaGaugeField* cudaInForce  = new cudaGaugeField(param);
 
   int R[4] = { 2*comm_dim_partitioned(0), 2*comm_dim_partitioned(1), 2*comm_dim_partitioned(2), 2*comm_dim_partitioned(3) };
   for (int dir=0; dir<4; ++dir) {
@@ -4188,12 +4153,9 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   param.reconstruct = QUDA_RECONSTRUCT_NO;
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
-  cudaGaugeField* cudaGaugeEx = new cudaGaugeField(param);
-  cudaGaugeField* cudaInForceEx = new cudaGaugeField(param);
-  cudaGaugeField* cudaOutForceEx = new cudaGaugeField(param);
-  cudaGaugeField* gaugePtr = cudaGaugeEx;
-  cudaGaugeField* inForcePtr = cudaInForceEx;
-  cudaGaugeField* outForcePtr = cudaOutForceEx;
+  cudaGaugeField* cudaGauge = new cudaGaugeField(param);
+  cudaGaugeField* cudaInForce = new cudaGaugeField(param);
+  cudaGaugeField* cudaOutForce = new cudaGaugeField(param);
 
   {
     // default settings for the unitarization
@@ -4205,77 +4167,61 @@ void computeAsqtadForceQuda(void* const milc_momentum,
     const double svd_rel_err = 1e-8;
     const double svd_abs_err = 1e-8;
 
-    setUnitarizeForceConstants(unitarize_eps,
-        hisq_force_filter,
-        max_det_error,
-        allow_svd,
-        svd_only,
-        svd_rel_err,
-        svd_abs_err);
+    setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
   }
   profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
 
   profileHISQForce.TPSTART(QUDA_PROFILE_H2D);
   cudaGauge->loadCPUField(cpuWLink);
-  profileHISQForce.TPSTOP(QUDA_PROFILE_H2D);
-  copyExtendedGauge(*cudaGaugeEx, *cudaGauge, QUDA_CUDA_FIELD_LOCATION);
-  cudaGaugeEx->exchangeExtendedGhost(R,profileHISQForce,true);
-
-  profileHISQForce.TPSTART(QUDA_PROFILE_H2D);
   cudaInForce->loadCPUField(*cpuStapleForce);
+  cudaOutForce->loadCPUField(*cpuOneLinkForce);
   profileHISQForce.TPSTOP(QUDA_PROFILE_H2D);
-  copyExtendedGauge(*cudaInForceEx, *cudaInForce, QUDA_CUDA_FIELD_LOCATION);
-  cudaInForceEx->exchangeExtendedGhost(R,profileHISQForce,true);
-  profileHISQForce.TPSTART(QUDA_PROFILE_H2D);
-  cudaInForce->loadCPUField(*cpuOneLinkForce);
-  profileHISQForce.TPSTOP(QUDA_PROFILE_H2D);
-  copyExtendedGauge(*cudaOutForceEx, *cudaInForce, QUDA_CUDA_FIELD_LOCATION);
-  cudaOutForceEx->exchangeExtendedGhost(R,profileHISQForce,true);
+
+  cudaInForce->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaGauge->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForceCuda(act_path_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr, flops);
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce, flops);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Load naik outer product
   profileHISQForce.TPSTART(QUDA_PROFILE_H2D);
   cudaInForce->loadCPUField(*cpuNaikForce);
   profileHISQForce.TPSTOP(QUDA_PROFILE_H2D);
-  copyExtendedGauge(*cudaInForceEx, *cudaInForce, QUDA_CUDA_FIELD_LOCATION);
-  cudaInForceEx->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaInForce->exchangeExtendedGhost(R,profileHISQForce,true);
 
   // Compute Naik three-link term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *inForcePtr, *gaugePtr, outForcePtr, flops);
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce, flops);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-  cudaOutForceEx->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
 
   // load v-link
   profileHISQForce.TPSTART(QUDA_PROFILE_H2D);
   cudaGauge->loadCPUField(cpuVLink);
   profileHISQForce.TPSTOP(QUDA_PROFILE_H2D);
-  copyExtendedGauge(*cudaGaugeEx, *cudaGauge, QUDA_CUDA_FIELD_LOCATION);
-  cudaGaugeEx->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaGauge->exchangeExtendedGhost(R,profileHISQForce,true);
   // Done with cudaInForce. It becomes the output force. Oops!
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   *num_failures_h = 0;
-  unitarizeForce(*inForcePtr, *outForcePtr, *gaugePtr, num_failures_d, flops);
+  unitarizeForce(*cudaInForce, *cudaOutForce, *cudaGauge, num_failures_d, flops);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  cudaMemset((void**)(outForcePtr->Gauge_p()), 0, outForcePtr->Bytes());
+  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
   // read in u-link
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   cudaGauge->loadCPUField(cpuULink);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-  copyExtendedGauge(*cudaGaugeEx, *cudaGauge, QUDA_CUDA_FIELD_LOCATION);
-  cudaGaugeEx->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaGauge->exchangeExtendedGhost(R,profileHISQForce,true);
 
   // Compute Fat7-staple term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForceCuda(fat7_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr, flops);
-  hisqCompleteForceCuda(*gParam, *outForcePtr, *gaugePtr, cudaMom, flops);
+  hisqStaplesForceCuda(fat7_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce, flops);
+  hisqCompleteForceCuda(*gParam, *cudaOutForce, *cudaGauge, cudaMom, flops);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (gParam->use_resident_mom) {
@@ -4297,18 +4243,15 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   delete cpuNaikForce;
   if (cpuMom) delete cpuMom;
 
-  delete cudaInForce;
-  delete cudaGauge;
-
   if (!gParam->make_resident_mom) {
     delete momResident;
     momResident = NULL;
   }
   if (cudaMom) delete cudaMom;
 
-  delete cudaInForceEx;
-  delete cudaOutForceEx;
-  delete cudaGaugeEx;
+  delete cudaInForce;
+  delete cudaOutForce;
+  delete cudaGauge;
   profileHISQForce.TPSTOP(QUDA_PROFILE_FREE);
   profileHISQForce.TPSTOP(QUDA_PROFILE_TOTAL);
   return;
