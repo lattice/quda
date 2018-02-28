@@ -80,7 +80,6 @@ set(QUDA_DIRAC_NDEG_TWISTED_MASS OFF CACHE BOOL "build non-degenerate twisted ma
 set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
 set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
-set(QUDA_FORCE_ASQTAD OFF CACHE BOOL "build code for asqtad fermion force")
 set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
 set(QUDA_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
@@ -402,10 +401,6 @@ endif(QUDA_LINK_HISQ)
 if(QUDA_FORCE_GAUGE)
   add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
 endif(QUDA_FORCE_GAUGE)
-
-if(QUDA_FORCE_ASQTAD)
-  add_definitions(-DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_ASQTAD)
 
 if(QUDA_FORCE_HISQ)
   add_definitions(-DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS)

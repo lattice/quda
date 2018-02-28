@@ -103,12 +103,6 @@ if(QUDA_FORCE_GAUGE)
   QUDA_CHECKBUILDTEST(gauge_force_test QUDA_BUILD_ALL_TESTS)
 endif()
 
-if(QUDA_FORCE_ASQTAD)
-  cuda_add_executable(fermion_force_test fermion_force_test.cpp fermion_force_reference.cpp)
-  target_link_libraries(fermion_force_test ${TEST_LIBS})
-  QUDA_CHECKBUILDTEST(fermion_force_test QUDA_BUILD_ALL_TESTS)
-endif()
-
 if(QUDA_GAUGE_ALG)
   cuda_add_executable(gauge_alg_test gauge_alg_test.cpp)
   target_link_libraries(gauge_alg_test ${TEST_LIBS})
@@ -116,7 +110,7 @@ if(QUDA_GAUGE_ALG)
 endif()
 
 if(QUDA_FORCE_HISQ)
-  cuda_add_executable(hisq_paths_force_test hisq_paths_force_test.cpp hisq_force_reference.cpp hisq_force_reference2.cpp fermion_force_reference.cpp   )
+  cuda_add_executable(hisq_paths_force_test hisq_paths_force_test.cpp hisq_force_reference.cpp hisq_force_reference2.cpp )
   target_link_libraries(hisq_paths_force_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(hisq_paths_force_test QUDA_BUILD_ALL_TESTS)
 
