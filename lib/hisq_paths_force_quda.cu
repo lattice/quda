@@ -1,11 +1,8 @@
 #include <quda_internal.h>
-#include <lattice_field.h>
 #include <gauge_field.h>
 #include <ks_improved_force.h>
-#include <utility>
 #include <quda_matrix.h>
 #include <tune_quda.h>
-#include <color_spinor_field.h>
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 
@@ -709,14 +706,12 @@ namespace quda {
     __global__ void sideLinkKernel(Arg arg)
     {
       typedef Matrix<complex<real>, 3> Link;
-
       int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
       int parity = blockIdx.y * blockDim.y + threadIdx.y;
 
       int x[4];
       getCoords(x, x_cb ,arg.D, parity);
-
       for (int d=0; d<4; d++) x[d] = x[d] + arg.base_idx[d];
       int e_cb = linkIndex(x,arg.E);
       parity = parity ^ arg.oddness_change;
@@ -732,9 +727,8 @@ namespace quda {
        *
        */
 
-      int y[4] = {x[0], x[1], x[2], x[3]};
-
       int mymu = posDir(arg.mu);
+      int y[4] = {x[0], x[1], x[2], x[3]};
       updateCoords(y, mymu, (mu_positive ? -1 : 1), arg);
       int point_d = linkIndex(y,arg.E);
 
@@ -793,12 +787,13 @@ namespace quda {
 
       int mymu = posDir(arg.mu);
       int y[4] = {x[0], x[1], x[2], x[3]};
-
       updateCoords(y, mymu, (mu_positive ? -1 : 1), arg);
       int point_d = linkIndex(y,arg.E);
-      real mycoeff = CoeffSign(sig_positive,parity)*arg.coeff;
 
       Link Oy = arg.p3(0, e_cb, parity);
+
+      real mycoeff = CoeffSign(sig_positive,parity)*arg.coeff;
+
       if (mu_positive) {
         if (!parity) { mycoeff = -mycoeff;} // need to change this to get away from parity
         Link oprod = arg.newOprod(arg.mu, point_d, 1-parity);
@@ -1420,31 +1415,23 @@ namespace quda {
 
             //3-link
             //Kernel A: middle link
-
             MiddleLinkArg<real> middleLinkArg( newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
             MiddleLinkForce<real, MiddleLinkArg<real> > middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK);
             middleLink.apply(0);
             checkCudaError();
 
             for (int nu=0; nu < 8; nu++) {
-              if (nu == sig || nu == opp_dir(sig)
-                  || nu == mu || nu == opp_dir(mu)){
-                continue;
-              }
+              if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
+
               //5-link: middle link
               //Kernel B
-              MiddleLinkArg<real> middleLinkArg( newOprod, Pnumu, P5, Qnumu,
-                                                 Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
+              MiddleLinkArg<real> middleLinkArg( newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
               MiddleLinkForce<real, MiddleLinkArg<real> > middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK);
               middleLink.apply(0);
               checkCudaError();
 
               for (int rho = 0; rho < 8; rho++) {
-                if (rho == sig || rho == opp_dir(sig)
-                    || rho == mu || rho == opp_dir(mu)
-                    || rho == nu || rho == opp_dir(nu)){
-                  continue;
-                }
+                if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
 
                 //7-link: middle link and side link
                 HisqForceArg<real> arg(newOprod, P5, link, Pnumu, Qnumu, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1);
@@ -1463,9 +1450,8 @@ namespace quda {
             } //nu
 
             //lepage
-            if(Lepage != 0.){
-              MiddleLinkArg<real> middleLinkArg( newOprod, P5,
-                                                 Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
+            if (Lepage != 0.) {
+              MiddleLinkArg<real> middleLinkArg( newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
               MiddleLinkForce<real, MiddleLinkArg<real> > middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK);
               middleLink.apply(0);
               checkCudaError();
