@@ -702,7 +702,7 @@ namespace quda {
     // call 1: 103680
     // call 2: 864
 
-    template <typename real, int sig_positive, int mu_positive, typename Arg>
+    template <typename real, int mu_positive, typename Arg>
     __global__ void sideLinkKernel(Arg arg)
     {
       typedef Matrix<complex<real>, 3> Link;
@@ -749,7 +749,7 @@ namespace quda {
         Link Ox = arg.qProd(0, point_d, 1-parity);
         Link Ow = mu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
 
-        real mycoeff = CoeffSign(sig_positive, parity)*arg.coeff;
+        real mycoeff = CoeffSign(goes_forward(arg.sig), parity)*arg.coeff;
         if ( (mu_positive && !parity) || (!mu_positive && parity) ) mycoeff = -mycoeff;
 
         Link oprod = arg.newOprod(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
@@ -760,7 +760,7 @@ namespace quda {
 
     // Flop count, in two-number pair (matrix_mult, matrix_add)
     // 		(0,1)
-    template<typename real, int sig_positive, int mu_positive, typename Arg>
+    template<typename real, int mu_positive, typename Arg>
     __global__ void sideLinkShortKernel(Arg arg)
     {
       typedef Matrix<complex<real>,3> Link;
@@ -792,7 +792,7 @@ namespace quda {
 
       Link Oy = arg.p3(0, e_cb, parity);
 
-      real mycoeff = CoeffSign(sig_positive,parity)*arg.coeff;
+      real mycoeff = CoeffSign(goes_forward(arg.sig),parity)*arg.coeff;
 
       if (mu_positive) {
         if (!parity) { mycoeff = -mycoeff;} // need to change this to get away from parity
@@ -1125,7 +1125,7 @@ namespace quda {
 
       TuneKey tuneKey() const {
         std::stringstream aux;
-        aux << "threads=" << arg.threads << ",sig=" << sig << ",mu=" << mu;
+        aux << "threads=" << arg.threads << ",mu=" << mu; // no sig dependence needed for tuning
         switch (type) {
         case FORCE_SIDE_LINK: aux << ",SIDE_LINK"; break; // FIXME presently uses extended fields only so tuneKey is messed up
         default: errorQuda("Undefined force type %d", type);
@@ -1139,14 +1139,8 @@ namespace quda {
         arg.sig = sig;
         switch (type) {
         case FORCE_SIDE_LINK:
-          if (goes_forward(sig) && goes_forward(mu))
-            sideLinkKernel<real,1,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else if (goes_forward(sig) && goes_backward(mu))
-            sideLinkKernel<real,1,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else if (goes_backward(sig) && goes_forward(mu))
-            sideLinkKernel<real,0,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else
-            sideLinkKernel<real,0,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          if (goes_forward(mu)) sideLinkKernel<real,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          else                  sideLinkKernel<real,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           break;
         default:
           errorQuda("Undefined force type %d", type);
@@ -1213,7 +1207,7 @@ namespace quda {
 
       TuneKey tuneKey() const {
         std::stringstream aux;
-        aux << "threads=" << arg.threads << ",sig=" << sig << ",mu=" << mu;
+        aux << "threads=" << arg.threads << ",mu=" << mu; // no sig dependence needed for tuning
         switch (type) {
         case FORCE_SIDE_LINK_SHORT: aux << ",SIDE_LINK_SHORT"; break; // FIXME presently uses extended fields only so tuneKey is messed up
         default: errorQuda("Undefined force type %d", type);
@@ -1227,14 +1221,8 @@ namespace quda {
         arg.sig = sig;
         switch (type) {
         case FORCE_SIDE_LINK_SHORT:
-          if (goes_forward(sig) && goes_forward(mu))
-            sideLinkShortKernel<real,1,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else if (goes_forward(sig) && goes_backward(mu))
-            sideLinkShortKernel<real,1,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else if (goes_backward(sig) && goes_forward(mu))
-            sideLinkShortKernel<real,0,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else
-            sideLinkShortKernel<real,0,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          if (goes_forward(mu)) sideLinkShortKernel<real,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          else                  sideLinkShortKernel<real,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           break;
         default:
           errorQuda("Undefined force type %d", type);
