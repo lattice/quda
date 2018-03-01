@@ -1,5 +1,4 @@
-#ifndef _KS_IMPROVED_FORCE_H
-#define _KS_IMPROVED_FORCE_H
+#pragma once
 
 #include <quda_internal.h>
 #include <quda.h>
@@ -8,29 +7,25 @@
 namespace quda {
   namespace fermion_force {
 
-  void hisqStaplesForceCuda(const double path_coeff[6], 
-                              const QudaGaugeParam& param,
-                              const cudaGaugeField& oprod, 
-                              const cudaGaugeField& link, 
-                              cudaGaugeField *newOprod,
-			      long long* flops = NULL);
+  void hisqStaplesForce(const double path_coeff[6],
+                        const QudaGaugeParam& param,
+                        const cudaGaugeField& oprod,
+                        const cudaGaugeField& link,
+                        cudaGaugeField *newOprod,
+                        long long* flops = NULL);
 
+   void hisqLongLinkForce(double coeff,
+                          const QudaGaugeParam& param,
+                          const cudaGaugeField &oprod,
+                          const cudaGaugeField &link,
+                          cudaGaugeField *newOprod,
+                          long long* flops = NULL);
 
-   void hisqLongLinkForceCuda(double coeff,
-                             const QudaGaugeParam& param,
-                             const cudaGaugeField &oprod,
-                             const cudaGaugeField &link,
-                             cudaGaugeField *newOprod, 
-			     long long* flops = NULL);
-
-
-   void hisqCompleteForceCuda(const QudaGaugeParam &param,
-				 const cudaGaugeField &oprod,
-                                 const cudaGaugeField &link,
-                                 cudaGaugeField *force, 
-				 long long* flops = NULL);
-
-
+   void hisqCompleteForce(const QudaGaugeParam &param,
+                          const cudaGaugeField &oprod,
+                          const cudaGaugeField &link,
+                          cudaGaugeField *force,
+                          long long* flops = NULL);
 
   void setUnitarizeForceConstants(double unitarize_eps, double hisq_force_filter, double max_det_error,
 				     bool allow_svd, bool svd_only,
@@ -49,5 +44,3 @@ namespace quda {
 
  } // namespace fermion_force
 }  // namespace quda
-
-#endif // _KS_IMPROVED_FORCE_H

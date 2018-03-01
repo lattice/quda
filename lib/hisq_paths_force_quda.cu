@@ -1386,45 +1386,43 @@ namespace quda {
       }
     };
 
-    template<class Real, class RealA, class RealB>
-      static void
-      do_hisq_staples_force_cuda( PathCoefficients<Real> act_path_coeff,
-          const QudaGaugeParam& param,
-          const cudaGaugeField &oprod,
-          const cudaGaugeField &link,
-          cudaGaugeField &Pmu,
-          cudaGaugeField &P3,
-          cudaGaugeField &P5,
-          cudaGaugeField &Pnumu,
-          cudaGaugeField &Qmu,
-          cudaGaugeField &Qnumu,
-          cudaGaugeField &newOprod)
+    template<class real>
+    static void
+    do_hisq_staples_force_cuda( PathCoefficients<real> act_path_coeff,
+                                const QudaGaugeParam& param,
+                                const cudaGaugeField &oprod,
+                                const cudaGaugeField &link,
+                                cudaGaugeField &Pmu,
+                                cudaGaugeField &P3,
+                                cudaGaugeField &P5,
+                                cudaGaugeField &Pnumu,
+                                cudaGaugeField &Qmu,
+                                cudaGaugeField &Qnumu,
+                                cudaGaugeField &newOprod)
       {
-        Real coeff;
-        Real OneLink, Lepage, FiveSt, ThreeSt, SevenSt;
-        Real mLepage, mFiveSt, mThreeSt;
+        real OneLink = act_path_coeff.one;
+        real ThreeSt = act_path_coeff.three;
+        real mThreeSt = -ThreeSt;
+        real FiveSt  = act_path_coeff.five;
+        real mFiveSt  = -FiveSt;
+        real SevenSt = act_path_coeff.seven;
+        real Lepage  = act_path_coeff.lepage;
+        real mLepage  = -Lepage;
 
-        OneLink = act_path_coeff.one;
-        ThreeSt = act_path_coeff.three; mThreeSt = -ThreeSt;
-        FiveSt  = act_path_coeff.five; mFiveSt  = -FiveSt;
-        SevenSt = act_path_coeff.seven;
-        Lepage  = act_path_coeff.lepage; mLepage  = -Lepage;
-
-        OneLinkTermArg<Real> arg(newOprod, oprod, link, OneLink);
-        OneLinkForce<Real, OneLinkTermArg<Real> > oneLink(arg, newOprod, FORCE_ONE_LINK);
+        OneLinkTermArg<real> arg(newOprod, oprod, link, OneLink);
+        OneLinkForce<real, OneLinkTermArg<real> > oneLink(arg, newOprod, FORCE_ONE_LINK);
         oneLink.apply(0);
         checkCudaError();
 
         for (int sig=0; sig<8; sig++) {
           for (int mu=0; mu<8; mu++) {
-            if ( (mu == sig) || (mu == opp_dir(sig))) {
-              continue;
-            }
+            if ( (mu == sig) || (mu == opp_dir(sig))) continue;
+
             //3-link
             //Kernel A: middle link
 
-            MiddleLinkArg<Real> middleLinkArg( newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
-            MiddleLinkForce<Real, MiddleLinkArg<Real> > middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK);
+            MiddleLinkArg<real> middleLinkArg( newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
+            MiddleLinkForce<real, MiddleLinkArg<real> > middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK);
             middleLink.apply(0);
             checkCudaError();
 
@@ -1435,9 +1433,9 @@ namespace quda {
               }
               //5-link: middle link
               //Kernel B
-              MiddleLinkArg<Real> middleLinkArg( newOprod, Pnumu, P5, Qnumu,
+              MiddleLinkArg<real> middleLinkArg( newOprod, Pnumu, P5, Qnumu,
                                                  Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
-              MiddleLinkForce<Real, MiddleLinkArg<Real> > middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK);
+              MiddleLinkForce<real, MiddleLinkArg<real> > middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK);
               middleLink.apply(0);
               checkCudaError();
 
@@ -1449,20 +1447,16 @@ namespace quda {
                 }
 
                 //7-link: middle link and side link
-                if (FiveSt != 0) coeff = SevenSt/FiveSt; else coeff = 0;
-
-                HisqForceArg<Real> arg(newOprod, P5, link, Pnumu, Qnumu, SevenSt, coeff, 1);
-                AllForce<Real, HisqForceArg<Real> > all(arg, link, sig, rho, FORCE_ALL_LINK);
+                HisqForceArg<real> arg(newOprod, P5, link, Pnumu, Qnumu, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1);
+                AllForce<real, HisqForceArg<real> > all(arg, link, sig, rho, FORCE_ALL_LINK);
                 all.apply(0);
                 checkCudaError();
 
               }//rho
 
               //5-link: side link
-              if (ThreeSt != 0)coeff = FiveSt/ThreeSt; else coeff = 0;
-
-              SideLinkArg<Real> arg(newOprod, P3, P5, Qmu, link, mFiveSt, coeff, 1);
-              SideLinkForce<Real, SideLinkArg<Real> > side(arg, link, sig, nu, FORCE_SIDE_LINK);
+              SideLinkArg<real> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1);
+              SideLinkForce<real, SideLinkArg<real> > side(arg, link, sig, nu, FORCE_SIDE_LINK);
               side.apply(0);
               checkCudaError();
 
@@ -1470,24 +1464,22 @@ namespace quda {
 
             //lepage
             if(Lepage != 0.){
-              MiddleLinkArg<Real> middleLinkArg( newOprod, P5,
+              MiddleLinkArg<real> middleLinkArg( newOprod, P5,
                                                  Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
-              MiddleLinkForce<Real, MiddleLinkArg<Real> > middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK);
+              MiddleLinkForce<real, MiddleLinkArg<real> > middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK);
               middleLink.apply(0);
               checkCudaError();
 
-              if(ThreeSt != 0)coeff = Lepage/ThreeSt ; else coeff = 0;
-
-              SideLinkArg<Real> arg(newOprod, P3, P5, Qmu, link, mLepage, coeff, 2);
-              SideLinkForce<Real, SideLinkArg<Real> > side(arg, link, sig, mu, FORCE_SIDE_LINK);
+              SideLinkArg<real> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2);
+              SideLinkForce<real, SideLinkArg<real> > side(arg, link, sig, mu, FORCE_SIDE_LINK);
               side.apply(0);
               checkCudaError();
 
             } // Lepage != 0.0
 
             //3-link side link
-            SideLinkShortArg<Real> arg(newOprod, P3, link, ThreeSt, 1);
-            SideLinkShortForce<Real, SideLinkShortArg<Real> > side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT);
+            SideLinkShortArg<real> arg(newOprod, P3, link, ThreeSt, 1);
+            SideLinkShortForce<real, SideLinkShortArg<real> > side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT);
             side.apply(0);
             checkCudaError();
 
@@ -1497,11 +1489,11 @@ namespace quda {
         return;
       } // do_hisq_staples_force_cuda
 
-    void hisqCompleteForceCuda(const QudaGaugeParam &param,
-        const cudaGaugeField &oprod,
-        const cudaGaugeField &link,
-        cudaGaugeField* force,
-	long long* flops)
+    void hisqCompleteForce(const QudaGaugeParam &param,
+                           const cudaGaugeField &oprod,
+                           const cudaGaugeField &link,
+                           cudaGaugeField* force,
+                           long long* flops)
     {
       QudaPrecision precision = checkPrecision(oprod, link, *force);
       if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1529,12 +1521,12 @@ namespace quda {
       }
     }
 
-    void hisqLongLinkForceCuda(double coeff,
-        const QudaGaugeParam &param,
-        const cudaGaugeField &oldOprod,
-        const cudaGaugeField &link,
-        cudaGaugeField  *newOprod,
-	long long* flops)
+    void hisqLongLinkForce(double coeff,
+                           const QudaGaugeParam &param,
+                           const cudaGaugeField &oldOprod,
+                           const cudaGaugeField &link,
+                           cudaGaugeField  *newOprod,
+                           long long* flops)
     {
       QudaPrecision precision = checkPrecision(*newOprod, link, oldOprod);
       if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1562,19 +1554,19 @@ namespace quda {
       }
     }
 
-    void hisqStaplesForceCuda(const double path_coeff_array[6],
-                              const QudaGaugeParam &param,
-                              const cudaGaugeField &oprod,
-                              const cudaGaugeField &link,
-                              cudaGaugeField* newOprod,
-                              long long* flops)
+    void hisqStaplesForce(const double path_coeff_array[6],
+                          const QudaGaugeParam &param,
+                          const cudaGaugeField &oprod,
+                          const cudaGaugeField &link,
+                          cudaGaugeField* newOprod,
+                          long long* flops)
       {
         // create color matrix fields with zero padding
-        GaugeFieldParam gauge_param(link.X(), param.cuda_prec, QUDA_RECONSTRUCT_NO, 0, QUDA_SCALAR_GEOMETRY);
-
-        gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
-        gauge_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+        GaugeFieldParam gauge_param(link);
+        gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
         gauge_param.order = QUDA_FLOAT2_GAUGE_ORDER;
+        gauge_param.geometry = QUDA_SCALAR_GEOMETRY;
+
         cudaGaugeField Pmu(gauge_param);
         cudaGaugeField P3(gauge_param);
         cudaGaugeField P5(gauge_param);
@@ -1582,14 +1574,7 @@ namespace quda {
         cudaGaugeField Qmu(gauge_param);
         cudaGaugeField Qnumu(gauge_param);
 
-        cudaEvent_t start, end;
-
-        cudaEventCreate(&start);
-        cudaEventCreate(&end);
-
-        cudaEventRecord(start);
-
-        if (param.cuda_prec == QUDA_DOUBLE_PRECISION) {
+        if (link.Precision() ==  QUDA_DOUBLE_PRECISION) {
           PathCoefficients<double> act_path_coeff;
           act_path_coeff.one    = path_coeff_array[0];
           act_path_coeff.naik   = path_coeff_array[1];
@@ -1598,18 +1583,8 @@ namespace quda {
           act_path_coeff.seven  = path_coeff_array[4];
           act_path_coeff.lepage = path_coeff_array[5];
 
-          do_hisq_staples_force_cuda<double,double2,double2>( act_path_coeff,
-              param,
-              oprod,
-              link,
-              Pmu,
-              P3,
-              P5,
-              Pnumu,
-              Qmu,
-              Qnumu,
-              *newOprod);
-        } else if (param.cuda_prec == QUDA_SINGLE_PRECISION) {
+          do_hisq_staples_force_cuda<double>( act_path_coeff, param, oprod, link, Pmu, P3, P5, Pnumu, Qmu, Qnumu, *newOprod);
+        } else if (link.Precision() == QUDA_SINGLE_PRECISION) {
           PathCoefficients<float> act_path_coeff;
           act_path_coeff.one    = path_coeff_array[0];
           act_path_coeff.naik   = path_coeff_array[1];
@@ -1618,25 +1593,10 @@ namespace quda {
           act_path_coeff.seven  = path_coeff_array[4];
           act_path_coeff.lepage = path_coeff_array[5];
 
-          do_hisq_staples_force_cuda<float,float2,float2>( act_path_coeff,
-              param,
-              oprod,
-              link,
-              Pmu,
-              P3,
-              P5,
-              Pnumu,
-              Qmu,
-              Qnumu,
-              *newOprod);
+          do_hisq_staples_force_cuda<float>( act_path_coeff, param, oprod, link, Pmu, P3, P5, Pnumu, Qmu, Qnumu, *newOprod);
         } else {
           errorQuda("Unsupported precision");
         }
-
-        cudaEventRecord(end);
-        cudaEventSynchronize(end);
-        float runtime;
-        cudaEventElapsedTime(&runtime, start, end);
 
 	if (flops) {
 	  int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
@@ -1644,8 +1604,6 @@ namespace quda {
 	  *flops += (long long)volume*(134784 + 24192 + 103680 + 864 + 397440 + 72 + (path_coeff_array[5] != 0 ? 28944 : 0));
 	}
 
-        cudaEventDestroy(start);
-        cudaEventDestroy(end);
       }
 
   } // namespace fermion_force

@@ -349,7 +349,7 @@ static int hisq_force_test(void)
 
   gettimeofday(&t0, NULL);
 
-  fermion_force::hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
+  fermion_force::hisqStaplesForce(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
   cudaDeviceSynchronize(); 
   gettimeofday(&t1, NULL);
 
@@ -359,7 +359,7 @@ static int hisq_force_test(void)
   cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
   cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod);
   cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
-  fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);  
+  fermion_force::hisqLongLinkForce(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);
   cudaDeviceSynchronize(); 
 
   gettimeofday(&t2, NULL);
@@ -374,7 +374,7 @@ static int hisq_force_test(void)
   //record the mom pad
   qudaGaugeParam.mom_ga_pad = gParam.pad;
 
-  fermion_force::hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);  
+  fermion_force::hisqCompleteForce(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);
 
   cudaDeviceSynchronize();
   gettimeofday(&t3, NULL);
