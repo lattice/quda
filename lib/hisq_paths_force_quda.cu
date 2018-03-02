@@ -85,7 +85,6 @@ namespace quda {
       int border[4];
       int base_idx[4];
       int oddness_change;
-
       int mu;
       int sig;
 
@@ -169,6 +168,7 @@ namespace quda {
       for (int d=0; d<4; d++) x[d] += arg.border[d];
       int e_cb = linkIndex(x,arg.E);
 
+#pragma unroll
       for (int sig=0; sig<4; ++sig) {
         Link Uw = arg.link(sig, e_cb, parity);
         Link Ox = arg.oprod(sig, e_cb, parity);
@@ -215,7 +215,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
 
       for (int i=0; i<4; i++) x[i] += arg.border[i];
-      int e_cb = linkIndexShift(x,dx,arg.E);
+      int e_cb = linkIndex(x,arg.E);
 
       /*
        *
@@ -229,6 +229,7 @@ namespace quda {
        */
 
       // compute the force for forward long links
+#pragma unroll
       for (int sig=0; sig<4; sig++) {
         int point_c = e_cb;
 
@@ -352,67 +353,38 @@ namespace quda {
        *   A is the current point (sid)
        *
        */
-      if (mu_positive) { //positive mu
-        updateCoords(y, arg.mu, -1, arg);
-        int point_d = linkIndex(y,arg.E);
-        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
-        int point_c = linkIndex(y,arg.E);
 
-        Link Uab = arg.link(posDir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
-        Link Uad = arg.link(arg.mu, point_d, 1-parity);
-        Link Ubc = arg.link(arg.mu, point_c, parity);
-        Link Ox = arg.qPrev(0, point_d, 1-parity);
-        Link Oy = arg.oprod(0, point_c, parity);
-        Link Oz = conj(Ubc)*Oy;
+      int mu = mu_positive ? arg.mu : opp_dir(arg.mu);
+      int dir = mu_positive ? -1 : 1;
 
-        if (sig_positive) {
-          Link force = arg.force(arg.sig, e_cb, parity);
-          force += Sign(parity)*mycoeff*Oz*Ox*Uad;
-          arg.force(arg.sig, e_cb, parity) = force;
-          Oy = Uab*Oz;
-        } else {
-          Oy = conj(Uab)*Oz;
-        }
+      updateCoords(y, mu, dir, arg);
+      int point_d = linkIndex(y,arg.E);
+      updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
+      int point_c = linkIndex(y,arg.E);
 
-        Link force = arg.force(arg.mu, point_d, 1-parity);
-        force += -Sign(parity)*mycoeff*Oy*Ox;
-        arg.force(arg.mu, point_d, 1-parity) = force;
+      Link Uab = arg.link(posDir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
+      Link Uad = arg.link(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
+      Link Ubc = arg.link(mu, mu_positive ? point_c : point_b, mu_positive ? parity : 1-parity);
+      Link Ox = arg.qPrev(0, point_d, 1-parity);
+      Link Oy = arg.oprod(0, point_c, parity);
+      Link Oz = mu_positive ? conj(Ubc)*Oy : Ubc*Oy;
 
-        Link shortP = arg.shortP(0, point_d, 1-parity);
-        shortP += arg.accumu_coeff*Uad*Oy;
-        arg.shortP(0, point_d, 1-parity) = shortP;
-      } else { //negative mu
-
-        int mu = opp_dir(arg.mu);
-        updateCoords(y, mu, 1, arg);
-        int point_d = linkIndex(y,arg.E);
-        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
-        int point_c = linkIndex(y,arg.E);
-
-        Link Uab = arg.link(posDir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
-        Link Uad = arg.link(mu, e_cb, parity);
-        Link Ubc = arg.link(mu, point_b, 1-parity);
-        Link Ox = arg.qPrev(0, point_d, 1-parity);
-        Link Oy = arg.oprod(0, point_c, parity);
-        Link Oz = Ubc*Oy;
-
-        if (sig_positive) {
-          Link force = arg.force(arg.sig, e_cb, parity);
-          force += Sign(parity)*mycoeff*Oz*Ox*conj(Uad);
-          arg.force(arg.sig, e_cb, parity) = force;
-          Oy = Uab*Oz;
-        } else {
-          Oy = conj(Uab)*Oz;
-        }
-
-        Link force = arg.force(mu, e_cb, parity);
-        force += Sign(parity)*mycoeff*conj(Ox)*conj(Oy);
-        arg.force(mu, e_cb, parity) = force;
-
-        Link shortP = arg.shortP(0, point_d, 1-parity);
-        shortP += arg.accumu_coeff*conj(Uad)*Oy;
-        arg.shortP(0, point_d, 1-parity) = shortP;
+      if (sig_positive) {
+        Link force = arg.force(arg.sig, e_cb, parity);
+        force += Sign(parity)*mycoeff*Oz*Ox* (mu_positive ? Uad : conj(Uad));
+        arg.force(arg.sig, e_cb, parity) = force;
+        Oy = Uab*Oz;
+      } else {
+        Oy = conj(Uab)*Oz;
       }
+
+      Link force = arg.force(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
+      force += Sign(mu_positive ? 1-parity : parity)*mycoeff* (mu_positive ? Oy*Ox : conj(Ox)*conj(Oy));
+      arg.force(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = force;
+
+      Link shortP = arg.shortP(0, point_d, 1-parity);
+      shortP += arg.accumu_coeff* (mu_positive ? Uad : conj(Uad)) *Oy;
+      arg.shortP(0, point_d, 1-parity) = shortP;
     }
 
 
@@ -755,8 +727,7 @@ namespace quda {
         Link Ox = arg.qProd(0, point_d, 1-parity);
         Link Ow = mu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
 
-        real mycoeff = CoeffSign(goes_forward(arg.sig), parity)*arg.coeff;
-        if ( (mu_positive && !parity) || (!mu_positive && parity) ) mycoeff = -mycoeff;
+        real mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
 
         Link oprod = arg.newOprod(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
         oprod += mycoeff * Ow;
