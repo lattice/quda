@@ -178,7 +178,7 @@ void initFields(int prec)
   // Now set the parameters for the cuda fields
   //param.pad = xdim*ydim*zdim/2;
 
-  //if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;
 
   switch(prec) {
@@ -261,6 +261,7 @@ void freeFields()
   delete yD;
   delete zD;
   delete hD;
+  delete mD;
   delete lD;
 
   // release memory
@@ -270,6 +271,7 @@ void freeFields()
   delete yH;
   delete zH;
   delete hH;
+  delete mH;
   delete lH;
 }
 
