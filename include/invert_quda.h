@@ -665,7 +665,7 @@ namespace quda {
     ColorSpinorField *rp;       //! residual vector
     ColorSpinorField *yp;       //! high precision accumulator
     ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField *x_sloppy; //! sloppy solution vector
+    ColorSpinorField *y_sloppy; //! sloppy solution vector
     ColorSpinorField *r_sloppy; //! sloppy residual vector
 
     std::vector<ColorSpinorField*> p;  // GCR direction vectors

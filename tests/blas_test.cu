@@ -408,7 +408,7 @@ double benchmark(int kernel, const int niter) {
       break;
 
     case 25:
-      for (int i=0; i < niter; ++i) blas::cabxpyAxNorm(a, b2, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cabxpyzAxNorm(a, b2, *xD, *yD, *yD);
       break;
 
     // double2
@@ -735,8 +735,8 @@ double test(int kernel) {
   case 25:
     *xD = *xH;
     *yD = *yH;
-    {double d = blas::cabxpyAxNorm(a, b2, *xD, *yD);
-      double h = blas::cabxpyAxNorm(a, b2, *xH, *yH);
+    {double d = blas::cabxpyzAxNorm(a, b2, *xD, *yD, *yD);
+      double h = blas::cabxpyzAxNorm(a, b2, *xH, *yH, *yH);
       error = ERROR(x) + ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
@@ -964,7 +964,7 @@ const char *names[] = {
   "xmyNorm",
   "caxpyNorm",
   "caxpyXmazNormX",
-  "cabxpyAxNorm",
+  "cabxpyzAxNorm",
   "cDotProduct",
   "xpaycDotzy",
   "caxpyDotzy",
@@ -1114,7 +1114,7 @@ INSTANTIATE_TEST_CASE_P(axpyNorm_quarter, BlasTest, ::testing::Values( make_int2
 INSTANTIATE_TEST_CASE_P(xmyNorm_quarter, BlasTest, ::testing::Values( make_int2(0,22) ));
 INSTANTIATE_TEST_CASE_P(caxpyNorm_quarter, BlasTest, ::testing::Values( make_int2(0,23) ));
 INSTANTIATE_TEST_CASE_P(caxpyXmazNormX_quarter, BlasTest, ::testing::Values( make_int2(0,24) ));
-INSTANTIATE_TEST_CASE_P(cabxpyAxNorm_quarter, BlasTest, ::testing::Values( make_int2(0,25) ));
+INSTANTIATE_TEST_CASE_P(cabxpyzAxNorm_quarter, BlasTest, ::testing::Values( make_int2(0,25) ));
 INSTANTIATE_TEST_CASE_P(cDotProduct_quarter, BlasTest, ::testing::Values( make_int2(0,26) ));
 INSTANTIATE_TEST_CASE_P(xpaycDotzy_quarter, BlasTest, ::testing::Values( make_int2(0,27) ));
 INSTANTIATE_TEST_CASE_P(caxpyDotzy_quarter, BlasTest, ::testing::Values( make_int2(0,28) ));
@@ -1159,7 +1159,7 @@ INSTANTIATE_TEST_CASE_P(axpyNorm_half, BlasTest, ::testing::Values( make_int2(1,
 INSTANTIATE_TEST_CASE_P(xmyNorm_half, BlasTest, ::testing::Values( make_int2(1,22) ));
 INSTANTIATE_TEST_CASE_P(caxpyNorm_half, BlasTest, ::testing::Values( make_int2(1,23) ));
 INSTANTIATE_TEST_CASE_P(caxpyXmazNormX_half, BlasTest, ::testing::Values( make_int2(1,24) ));
-INSTANTIATE_TEST_CASE_P(cabxpyAxNorm_half, BlasTest, ::testing::Values( make_int2(1,25) ));
+INSTANTIATE_TEST_CASE_P(cabxpyzAxNorm_half, BlasTest, ::testing::Values( make_int2(1,25) ));
 INSTANTIATE_TEST_CASE_P(cDotProduct_half, BlasTest, ::testing::Values( make_int2(1,26) ));
 INSTANTIATE_TEST_CASE_P(xpaycDotzy_half, BlasTest, ::testing::Values( make_int2(1,27) ));
 INSTANTIATE_TEST_CASE_P(caxpyDotzy_half, BlasTest, ::testing::Values( make_int2(1,28) ));
@@ -1204,7 +1204,7 @@ INSTANTIATE_TEST_CASE_P(axpyNorm_single, BlasTest, ::testing::Values( make_int2(
 INSTANTIATE_TEST_CASE_P(xmyNorm_single, BlasTest, ::testing::Values( make_int2(2,22) ));
 INSTANTIATE_TEST_CASE_P(caxpyNorm_single, BlasTest, ::testing::Values( make_int2(2,23) ));
 INSTANTIATE_TEST_CASE_P(caxpyXmazNormX_single, BlasTest, ::testing::Values( make_int2(2,24) ));
-INSTANTIATE_TEST_CASE_P(cabxpyAxNorm_single, BlasTest, ::testing::Values( make_int2(2,25) ));
+INSTANTIATE_TEST_CASE_P(cabxpyzAxNorm_single, BlasTest, ::testing::Values( make_int2(2,25) ));
 INSTANTIATE_TEST_CASE_P(cDotProduct_single, BlasTest, ::testing::Values( make_int2(2,26) ));
 INSTANTIATE_TEST_CASE_P(xpaycDotzy_single, BlasTest, ::testing::Values( make_int2(2,27) ));
 INSTANTIATE_TEST_CASE_P(caxpyDotzy_single, BlasTest, ::testing::Values( make_int2(2,28) ));
@@ -1249,7 +1249,7 @@ INSTANTIATE_TEST_CASE_P(axpyNorm_double, BlasTest, ::testing::Values( make_int2(
 INSTANTIATE_TEST_CASE_P(xmyNorm_double, BlasTest, ::testing::Values( make_int2(3,22) ));
 INSTANTIATE_TEST_CASE_P(caxpyNorm_double, BlasTest, ::testing::Values( make_int2(3,23) ));
 INSTANTIATE_TEST_CASE_P(caxpyXmazNormX_double, BlasTest, ::testing::Values( make_int2(3,24) ));
-INSTANTIATE_TEST_CASE_P(cabxpyAxNorm_double, BlasTest, ::testing::Values( make_int2(3,25) ));
+INSTANTIATE_TEST_CASE_P(cabxpyzAxNorm_double, BlasTest, ::testing::Values( make_int2(3,25) ));
 INSTANTIATE_TEST_CASE_P(cDotProduct_double, BlasTest, ::testing::Values( make_int2(3,26) ));
 INSTANTIATE_TEST_CASE_P(xpaycDotzy_double, BlasTest, ::testing::Values( make_int2(3,27) ));
 INSTANTIATE_TEST_CASE_P(caxpyDotzy_double, BlasTest, ::testing::Values( make_int2(3,28) ));
@@ -1267,3 +1267,4 @@ INSTANTIATE_TEST_CASE_P(caxpyBxpz_double, BlasTest, ::testing::Values( make_int2
 INSTANTIATE_TEST_CASE_P(caxpyBzpx_double, BlasTest, ::testing::Values( make_int2(3,40) ));
 INSTANTIATE_TEST_CASE_P(multicDotProductNorm_double, BlasTest, ::testing::Values( make_int2(3,41) ));
 INSTANTIATE_TEST_CASE_P(multicDotProduct_double, BlasTest, ::testing::Values( make_int2(3,42) ));
+

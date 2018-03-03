@@ -163,7 +163,7 @@ namespace quda {
   GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
 	   TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param),
-    nKrylov(param.Nkrylov), init(false),  rp(nullptr), yp(nullptr), tmpp(nullptr), x_sloppy(nullptr),
+    nKrylov(param.Nkrylov), init(false),  rp(nullptr), yp(nullptr), tmpp(nullptr), y_sloppy(nullptr),
     r_sloppy(nullptr)
   {
 
@@ -194,7 +194,7 @@ namespace quda {
   GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
 	   SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
-    nKrylov(param.Nkrylov), init(false), rp(nullptr), yp(nullptr), tmpp(nullptr), x_sloppy(nullptr),
+    nKrylov(param.Nkrylov), init(false), rp(nullptr), yp(nullptr), tmpp(nullptr), y_sloppy(nullptr),
     r_sloppy(nullptr)
   {
     p.resize(nKrylov);
@@ -215,8 +215,8 @@ namespace quda {
 
     if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
 
-    if (param.precision_sloppy != param.precision) {
-      if (x_sloppy) delete x_sloppy;
+    if (param.precision_sloppy != yp->Precision()) {
+      if (y_sloppy && param.use_sloppy_partial_accumulator) delete y_sloppy;
       if (r_sloppy) delete r_sloppy;
     }
 
@@ -238,7 +238,8 @@ namespace quda {
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      rp = ColorSpinorField::Create(csParam);
+
+      rp = (K || x.Precision() != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : nullptr;
 
       // high precision accumulator
       yp = ColorSpinorField::Create(csParam);
@@ -250,24 +251,28 @@ namespace quda {
 	Ap[i] = ColorSpinorField::Create(csParam);
       }
 
+      csParam.setPrecision(param.precision_sloppy);
       tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
 
-      if (param.precision_sloppy != param.precision) {
-	csParam.setPrecision(param.precision_sloppy);
-	x_sloppy = ColorSpinorField::Create(csParam);
-	r_sloppy = ColorSpinorField::Create(csParam);
+      if (param.precision_sloppy != x.Precision() && param.use_sloppy_partial_accumulator) {
+        y_sloppy = ColorSpinorField::Create(csParam);
       } else {
-	x_sloppy = &x;
-	r_sloppy = rp;
+        y_sloppy = yp;
+      }
+
+      if (param.precision_sloppy != x.Precision()) {
+	r_sloppy = K ? ColorSpinorField::Create(csParam) : nullptr;
+      } else {
+	r_sloppy = K ? rp : nullptr;
       }
 
       init = true;
     }
 
-    ColorSpinorField &r = *rp;
+    ColorSpinorField &r = rp ? *rp : *p[0];
+    ColorSpinorField &rSloppy = r_sloppy ? *r_sloppy : *p[0];
     ColorSpinorField &y = *yp;
-    ColorSpinorField &xSloppy = *x_sloppy;
-    ColorSpinorField &rSloppy = *r_sloppy;
+    ColorSpinorField &ySloppy = *y_sloppy;
     ColorSpinorField &tmp = *tmpp;
 
     double b2 = blas::norm2(b);  // norm sq of source
@@ -275,16 +280,15 @@ namespace quda {
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, y);
+      mat(r, y, x);
       r2 = blas::xmyNorm(b, r);
-      blas::copy(y, x);
     } else {
       blas::copy(r, b);
       r2 = b2;
-      blas::zero(y);
+      blas::zero(x);
     }
-    blas::zero(x); // FIXME optimize first updates of x and xSloppy
-    if (&x != &xSloppy) blas::zero(xSloppy);
+    blas::zero(y); // FIXME optimize first updates of y and ySloppy
+    if (&y != &ySloppy) blas::zero(ySloppy);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
@@ -341,15 +345,14 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       if (K) {
-
 	pushVerbosity(param.verbosity_precondition);
 	(*K)(*p[k], rSloppy);
 	popVerbosity();
 
 	// relaxation p = omega*p + (1-omega)*r
 	//if (param.omega!=1.0) blas::axpby((1.0-param.omega), rPre, param.omega, pPre);
-      } else { // no preconditioner
-	*p[k] = rSloppy;
+      } else {
+        // no preconditioner
       }
 
       matSloppy(*Ap[k], *p[k], tmp);
@@ -360,7 +363,7 @@ namespace quda {
 
       orthoDir(beta, Ap, k, pipeline);
 
-      double3 Apr = blas::cDotProductNormA(*Ap[k], rSloppy);
+      double3 Apr = blas::cDotProductNormA(*Ap[k], K ? rSloppy : *p[k]);
 
       if (getVerbosity()>= QUDA_DEBUG_VERBOSE) {
 	printfQuda("GCR debug iter=%d: Apr=(%e,%e,%e)\n", total_iter, Apr.x, Apr.y, Apr.z);
@@ -375,7 +378,7 @@ namespace quda {
       alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-      r2 = blas::cabxpyAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], rSloppy); 
+      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[(k+1)%nKrylov]);
 
       k++;
       total_iter++;
@@ -387,17 +390,16 @@ namespace quda {
       if (k==nKrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
 	// update the solution vector
-	updateSolution(xSloppy, alpha, beta, gamma, k, p);
+	updateSolution(ySloppy, alpha, beta, gamma, k, p);
 
 	// recalculate residual in high precision
-	blas::copy(x, xSloppy);
-	blas::xpy(x, y);
+	blas::xpy(ySloppy, x);
 
 	if (r2 < stop && param.sloppy_converge) break;
-	mat(r, y, x);
+	mat(r, x, y);
 	r2 = blas::xmyNorm(b, r);  
 
-	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
 	// break-out check if we have reached the limit of the precision
 	if (r2 > r2_old) {
@@ -420,7 +422,7 @@ namespace quda {
 
 	  PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
 	  blas::copy(rSloppy, r);
-	  blas::zero(xSloppy);
+	  blas::zero(ySloppy);
 
 	  r2_old = r2;
 
@@ -433,8 +435,6 @@ namespace quda {
       }
 
     }
-
-    blas::copy(x, y);
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);

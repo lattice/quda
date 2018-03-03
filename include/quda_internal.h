@@ -344,11 +344,24 @@ namespace quda {
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
 		   const char *func, const char *file, const char *line);
 
+  /**
+     @brief Wrapper around cudaMemcpyAsync used for auto-profiling
+     @param dst Destination pointer
+     @param src Source pointer
+     @param count Size of transfer
+     @param kind Type of memory copy
+     @param stream Which stream to launch copy into
+  */
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
+                        const cudaStream_t &stream, const char *func, const char *file, const char *line);
+
 } // namespace quda
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemcpyAsync(dst, src, count, kind, stream) ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 namespace quda{
   /**
      * Check that the resident gauge field is compatible with the requested inv_param

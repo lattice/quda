@@ -131,9 +131,9 @@ namespace quda {
 	if (dst.Precision() == src.Precision()) {
     printf("Entered copy, matching precision, copy from GPU to GPU\n");
 	  if (src.Bytes() != dst.Bytes()) errorQuda("Precisions match, but bytes do not");
-	  qudaMemcpy(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice);
+	  qudaMemcpyAsync(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice, *blas::getStream());
 	  if (dst.Precision() == QUDA_HALF_PRECISION || dst.Precision() == QUDA_QUARTER_PRECISION) {
-	    qudaMemcpy(dst.Norm(), src.Norm(), dst.NormBytes(), cudaMemcpyDeviceToDevice);
+	    qudaMemcpyAsync(dst.Norm(), src.Norm(), dst.NormBytes(), cudaMemcpyDeviceToDevice, *blas::getStream());
 	    blas::bytes += 2*(unsigned long long)dst.RealLength()*sizeof(float);
 	  }
 	} else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
