@@ -4044,7 +4044,7 @@ void computeAsqtadForceQuda(void* const milc_momentum,
 
   profileAsqtadForce.TPSTART(QUDA_PROFILE_COMPUTE);
   cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
-  hisqStaplesForce(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce, &partialFlops);
+  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff, &partialFlops);
   *flops += partialFlops;
   profileAsqtadForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -4054,7 +4054,7 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   cudaInForce->exchangeExtendedGhost(R,profileAsqtadForce,true);
 
   profileAsqtadForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqLongLinkForce(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce, &partialFlops);
+  hisqLongLinkForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff[1], &partialFlops);
   *flops += partialFlops;
   completeKSForce(*cudaMom, *cudaOutForce, *cudaGauge, QUDA_CUDA_FIELD_LOCATION, &partialFlops);
   *flops += partialFlops;
@@ -4182,7 +4182,7 @@ void computeHISQForceQuda(void* const milc_momentum,
   cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForce(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce, flops);
+  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff, flops);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Load naik outer product
@@ -4193,7 +4193,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   // Compute Naik three-link term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqLongLinkForce(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce, flops);
+  hisqLongLinkForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff[1], flops);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
 
@@ -4220,8 +4220,8 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   // Compute Fat7-staple term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForce(fat7_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce, flops);
-  hisqCompleteForce(*gParam, *cudaOutForce, *cudaGauge, cudaMom, flops);
+  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, fat7_coeff, flops);
+  hisqCompleteForce(*cudaMom, *cudaOutForce, *cudaGauge, flops);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (gParam->use_resident_mom) {
