@@ -82,7 +82,7 @@ bool skip_kernel(int precision, int kernel) {
   if ( Nspin == 2 && ( precision == 0 || precision ==1 ) ) {
     // avoid quarter, half precision tests if doing coarse fields
     return true;
-  } else if (Nspin == 2 && kernel == 1) {
+  } else if (Nspin == 2 && (kernel == 1 || kernel == 2)) {
     // avoid low-precision copy if doing coarse fields
     return true;
   } else if (Ncolor != 3 && (kernel == 31 || kernel == 32)) {
@@ -92,6 +92,8 @@ bool skip_kernel(int precision, int kernel) {
     // only benchmark high-precision copy() if double is supported
     return true;
   }
+
+  // Avoid 
 
   return false;
 }
@@ -235,7 +237,8 @@ void initFields(int prec)
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 &&
-		(prec == 0 || low_aux_prec == QUDA_HALF_PRECISION) );
+		(prec == 0 || prec == 1 || low_aux_prec == QUDA_HALF_PRECISION || mid_aux_prec == QUDA_HALF_PRECISION ||
+                                low_aux_prec == QUDA_QUARTER_PRECISION || mid_aux_prec == QUDA_QUARTER_PRECISION) );
 
   if ( flag ) {
     *vD = *vH;

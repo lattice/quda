@@ -58,7 +58,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
           copyGenericColorSpinorDQ(dst, src, location, (double*)Dst, (char*)Src, 0, (float*)srcNorm);
         } else {
-          errorQuda("Unsupported Precision %d", src.Precision());
+          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -70,7 +70,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
           copyGenericColorSpinorSQ(dst, src, location, (float*)Dst, (char*)Src, 0, (float*)srcNorm);
         } else {
-          errorQuda("Unsupported Precision %d", src.Precision());
+          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_HALF_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -82,7 +82,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
           copyGenericColorSpinorHQ(dst, src, location, (short*)Dst, (char*)Src, (float*)dstNorm, (float*)srcNorm);
         } else {
-          errorQuda("Unsupported Precision %d", src.Precision());
+          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -94,10 +94,10 @@ namespace quda {
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
           copyGenericColorSpinorQQ(dst, src, location, (char*)Dst, (char*)Src, (float*)dstNorm, (float*)srcNorm);
         } else {
-          errorQuda("Unsupported Precision %d", src.Precision());
+          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else {
-        errorQuda("Unsupported Precision %d", dst.Precision());
+        errorQuda("Unsupported Destination Precision %d", dst.Precision());
       }
     } else {
       if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -106,7 +106,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
           copyGenericColorSpinorMGDS(dst, src, location, (double*)Dst, (float*)Src);
         } else {
-          errorQuda("Unsupported Precision %d", src.Precision());
+          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -118,7 +118,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
           copyGenericColorSpinorMGSQ(dst, src, location, (float*)Dst, (char*)Src);
         } else {
-          errorQuda("Unsupported Precision %d", src.Precision());
+          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_HALF_PRECISION) {
         if (src.Precision() == QUDA_SINGLE_PRECISION) {
@@ -128,7 +128,7 @@ namespace quda {
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
           copyGenericColorSpinorMGHQ(dst, src, location, (short*)Dst, (char*)Src);
         } else {
-          errorQuda("Unsupported Precision %d", src.Precision());
+          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
         if (src.Precision() == QUDA_SINGLE_PRECISION) {
@@ -138,10 +138,10 @@ namespace quda {
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
           copyGenericColorSpinorMGQQ(dst, src, location, (char*)Dst, (char*)Src);
         } else {
-          errorQuda("Unsupported Precision %d", src.Precision());
+          errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else {
-        errorQuda("Unsupported Precision %d", dst.Precision());
+        errorQuda("Unsupported Destination Precision %d", dst.Precision());
       }
     }
   }  

@@ -76,6 +76,11 @@ bool skip_kernel(int precision, int kernel) {
   QudaPrecision this_prec = precision == 3 ? QUDA_DOUBLE_PRECISION : precision  == 2 ? QUDA_SINGLE_PRECISION : precision == 1 ? QUDA_HALF_PRECISION : QUDA_QUARTER_PRECISION;
   if (prec != QUDA_INVALID_PRECISION && this_prec != prec) return true;
 
+  // mg copy isn't initialized for quarter or half
+  if (precision == 0 || precision == 1) return true;
+
+  // if we're doing an MG test, skip copying from single or double to fixed.
+  if ((precision == 3 || precision == 2) && (kernel == 1 || kernel == 2)) return true;
 
   return false;
 }
@@ -234,9 +239,11 @@ void initFields(int prec)
   // check for successful allocation
   checkCudaError();
 
-  // only do copy if not doing half precision with mg
+  // only do copy if not doing half or quarter precision with mg
   bool flag = !(param.nSpin == 2 &&
-		(prec == 0 || prec == 1 || low_aux_prec == QUDA_HALF_PRECISION || low_aux_prec == QUDA_QUARTER_PRECISION) );
+		(prec == 0 || prec == 1 || low_aux_prec == QUDA_HALF_PRECISION ||
+        low_aux_prec == QUDA_QUARTER_PRECISION || mid_aux_prec == QUDA_HALF_PRECISION ||
+        mid_aux_prec == QUDA_QUARTER_PRECISION) );
 
   if ( flag ) {
     *vD = *vH;
