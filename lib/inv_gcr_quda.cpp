@@ -217,7 +217,7 @@ namespace quda {
 
     if (init && param.precision_sloppy != yp->Precision()) {
       if (y_sloppy && param.use_sloppy_partial_accumulator) delete y_sloppy;
-      if (r_sloppy) delete r_sloppy;
+      if (r_sloppy && r_sloppy != rp) delete r_sloppy;
     }
 
     for (int i=0; i<nKrylov; i++) {
