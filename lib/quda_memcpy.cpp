@@ -9,8 +9,8 @@ namespace quda {
     const void *src;
     const size_t count;
     const cudaMemcpyKind kind;
+    const bool async;
     const char *name;
-    bool async;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -18,7 +18,7 @@ namespace quda {
   public:
     inline QudaMemCopy(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
                        bool async, const char *func, const char *file, const char *line)
-      : dst(dst), src(src), count(count), kind(kind) {
+      : dst(dst), src(src), count(count), kind(kind), async(async) {
 
       if (!async) {
         switch (kind) {
