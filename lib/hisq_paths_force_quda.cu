@@ -128,9 +128,9 @@ namespace quda {
       const bool q_mu;
       const bool q_prev;
 
-      FatLinkArg(GaugeField &force, const GaugeField &oprod, const GaugeField &link, real coeff, HisqForceType type)
-        : BaseForceArg<real,reconstruct>(link, 0), outA(force), outB(force), pMu(oprod), p3(oprod), qMu(oprod),
-        oProd(oprod), qProd(oprod), qPrev(oprod), coeff(coeff), accumu_coeff(0),
+      FatLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, real coeff, HisqForceType type)
+        : BaseForceArg<real,reconstruct>(link, 0), outA(force), outB(force), pMu(oProd), p3(oProd), qMu(oProd),
+        oProd(oProd), qProd(oProd), qPrev(oProd), coeff(coeff), accumu_coeff(0),
         p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_ONE_LINK) errorQuda("This constructor is for FORCE_ONE_LINK"); }
 
@@ -138,21 +138,21 @@ namespace quda {
                  const GaugeField &oProd, const GaugeField &qPrev, const GaugeField &link,
                  real coeff, int overlap, HisqForceType type)
         : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
-        oProd(oProd), qProd(qProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(true)
+        oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(true)
       { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
                  const GaugeField &oProd, const GaugeField &link,
                  real coeff, int overlap, HisqForceType type)
         : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
-        oProd(oProd), qProd(qProd), qPrev(qMu), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(false)
+        oProd(oProd), qProd(oProd), qPrev(qMu), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(false)
       { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &oProd,
                  const GaugeField &qPrev, const GaugeField &link,
                  real coeff, int overlap, HisqForceType type)
         : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(newOprod), pMu(P3), p3(P3), qMu(qPrev),
-        oProd(oProd), qProd(qProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(false), q_mu(false), q_prev(true)
+        oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(false), q_mu(false), q_prev(true)
       { if (type != FORCE_LEPAGE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &P3,
@@ -165,14 +165,14 @@ namespace quda {
       FatLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &link,
                  real coeff, int overlap, HisqForceType type)
         : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(newOprod),
-        pMu(P3), p3(P3), qMu(qProd), oProd(P3), qProd(P3), qPrev(P3), coeff(coeff), accumu_coeff(0.0),
+        pMu(P3), p3(P3), qMu(P3), oProd(P3), qProd(P3), qPrev(P3), coeff(coeff), accumu_coeff(0.0),
         p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_SIDE_LINK_SHORT) errorQuda("This constructor is for FORCE_SIDE_LINK_SHORT"); }
 
-      FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &oprod, const GaugeField &qPrev,
+      FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qPrev,
                  const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type, bool dummy)
-        : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(shortP), oProd(oprod), qPrev(qPrev),
-        pMu(shortP), p3(shortP), qMu(qProd), qProd(qProd), // dummy
+        : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(shortP), oProd(oProd), qPrev(qPrev),
+        pMu(shortP), p3(shortP), qMu(qPrev), qProd(qPrev), // dummy
         coeff(coeff), accumu_coeff(accumu_coeff), p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_ALL_LINK) errorQuda("This constructor is for FORCE_ALL_LINK"); }
 
@@ -849,8 +849,6 @@ namespace quda {
       }
       checkCudaError();
 
-      printfQuda("%d newOprod = %e\n", __LINE__, norm2(newOprod));
-
       if (flops) {
         int volume = 1;
         for (int d=0; d<4; d++) volume += link.X()[d]-2*link.R()[d]; // compute physical volume for useful flops
@@ -1066,7 +1064,6 @@ namespace quda {
       if (!newOprod.isNative()) errorQuda("Unsupported gauge order %d", newOprod.Order());
       if (checkLocation(newOprod,oldOprod,link) == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU not implemented");
 
-      printfQuda("%d newOprod = %e oldOprod = %e link = %e\n", __LINE__, norm2(newOprod), norm2(oldOprod), norm2(link));
       QudaPrecision precision = checkPrecision(newOprod, link, oldOprod);
       if (precision == QUDA_DOUBLE_PRECISION) {
         if (link.Reconstruct() == QUDA_RECONSTRUCT_NO) {
@@ -1091,7 +1088,6 @@ namespace quda {
       } else {
         errorQuda("Unsupported precision %d", precision);
       }
-      printfQuda("%d newOprod = %e oldOprod = %e link = %e\n", __LINE__, norm2(newOprod), norm2(oldOprod), norm2(link));
       checkCudaError();
     }
 
