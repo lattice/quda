@@ -215,9 +215,9 @@ namespace quda {
 
     if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
 
-    if (param.precision_sloppy != yp->Precision()) {
+    if (init && param.precision_sloppy != yp->Precision()) {
       if (y_sloppy && param.use_sloppy_partial_accumulator) delete y_sloppy;
-      if (r_sloppy) delete r_sloppy;
+      if (r_sloppy && r_sloppy != rp) delete r_sloppy;
     }
 
     for (int i=0; i<nKrylov; i++) {
@@ -280,7 +280,7 @@ namespace quda {
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, y, x);
+      mat(r, x, y);
       r2 = blas::xmyNorm(b, r);
     } else {
       blas::copy(r, b);
