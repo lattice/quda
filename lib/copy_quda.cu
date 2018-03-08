@@ -129,7 +129,6 @@ namespace quda {
 	int partitions = (src.IsComposite() ? src.CompositeDim() : 1) * (src.SiteSubset());
 
 	if (dst.Precision() == src.Precision()) {
-    printf("Entered copy, matching precision, copy from GPU to GPU\n");
 	  if (src.Bytes() != dst.Bytes()) errorQuda("Precisions match, but bytes do not");
 	  qudaMemcpyAsync(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice, *blas::getStream());
 	  if (dst.Precision() == QUDA_HALF_PRECISION || dst.Precision() == QUDA_QUARTER_PRECISION) {

@@ -437,7 +437,9 @@ namespace quda {
 
     QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
       ? param.mg_global.precision_null[param.level]  : csParam.Precision();
-    double tol = prec == QUDA_HALF_PRECISION ? 5e-3 : prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-10;
+    // may want to revisit this---these were relaxed for cases where ghost_precision < precision
+    // these were set while hacking in tests of quarter precision ghosts
+    double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
@@ -510,6 +512,7 @@ namespace quda {
     transfer->R(*x_coarse, *tmp2);
     (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
+
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("emulated\n");
     for (int x=0; x<x_coarse->Volume(); x++) tmp1->PrintVector(x);
@@ -521,6 +524,8 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
 
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
+    // ESW HACK
+    printfQuda("L2 relative deviation on coarse emu %e (tol=%e)", deviation, tol);
 
     // When the mu is shifted on the coarse level; we can compute exxactly the error we introduce in the check:
     //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test

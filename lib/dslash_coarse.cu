@@ -15,6 +15,10 @@
 #define DOT_PRODUCT_SPLIT
 #endif
 
+// ESW HACK
+//#define ESW_HACK_HALF_EXCHANGE
+#define ESW_HACK_QUARTER_EXCHANGE
+
 namespace quda {
 
 #ifdef GPU_MULTIGRID
@@ -27,7 +31,16 @@ namespace quda {
 
   template <typename Float, typename yFloat, int coarseSpin, int coarseColor, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
   struct DslashCoarseArg {
+    // hack yFloat -> short for ghost precision on color spinor
+#ifdef ESW_HACK_HALF_EXCHANGE
+    typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder,Float,short> F;
+#else
+#ifdef ESW_HACK_QUARTER_EXCHANGE
+    typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder,Float,char> F;
+#else
     typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder,Float,yFloat> F;
+#endif
+#endif
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> G;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,yFloat> GY;
 
@@ -967,7 +980,16 @@ namespace quda {
 
       if (dslash && comm_partitioned() && comms) {
 	const int nFace = 1;
+  // ESW: hard code the last argument to QUDA_HALF_PRECISION or QUDA_QUARTER_PRECISION 
+#ifdef ESW_HACK_HALF_EXCHANGE
+  inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, QUDA_HALF_PRECISION);
+#else
+#ifdef ESW_HACK_QUARTER_EXCHANGE
+  inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, QUDA_QUARTER_PRECISION);
+#else
 	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, Y.Precision());
+#endif
+#endif
       }
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
@@ -982,15 +1004,15 @@ namespace quda {
 	errorQuda("Double precision multigrid has not been enabled");
 #endif
       } else if (precision == QUDA_SINGLE_PRECISION) {
-	if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-	  ApplyCoarse<float,float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-			     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
-	} else if (Y.Precision() == QUDA_HALF_PRECISION) {
-	  ApplyCoarse<float,short>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-			     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
-	} else {
-	  errorQuda("Unsupported precision %d\n", Y.Precision());
-	}
+        if (Y.Precision() == QUDA_SINGLE_PRECISION) {
+          ApplyCoarse<float,float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+        		     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+        } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+          ApplyCoarse<float,short>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+        		     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+        } else {
+          errorQuda("Unsupported precision %d\n", Y.Precision());
+        }
 	//if (dslash && comm_partitioned()) ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, true, halo_location);
       } else {
 	errorQuda("Unsupported precision %d\n", Y.Precision());
