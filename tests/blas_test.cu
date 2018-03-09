@@ -93,8 +93,6 @@ bool skip_kernel(int precision, int kernel) {
     return true;
   }
 
-  // Avoid 
-
   return false;
 }
 

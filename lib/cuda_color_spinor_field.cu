@@ -618,7 +618,6 @@ namespace quda {
 
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
-    printfQuda("Running cudaColorSpinorField::saveSpinorField.\n");
     if (reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes+norm_bytes);
       qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
@@ -629,7 +628,6 @@ namespace quda {
     } else if (typeid(dest) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION);
     } else {
-      printfQuda("Copying from GPU to CPU, maybe changing precision, reorder on GPU if needed.\n");
       void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr, *vNorm=nullptr;
       if (!zeroCopy) {
 	buffer = pool_device_malloc(dest.Bytes()+dest.NormBytes());

@@ -524,8 +524,6 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
 
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
-    // ESW HACK
-    printfQuda("L2 relative deviation on coarse emu %e (tol=%e)", deviation, tol);
 
     // When the mu is shifted on the coarse level; we can compute exxactly the error we introduce in the check:
     //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test

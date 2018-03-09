@@ -73,68 +73,22 @@ bool skip_kernel(int precision, int kernel) {
   if (test_type != -1 && kernel != test_type) return true;
 
   // if we've selected a given precision then make sure we only run that
-  QudaPrecision this_prec = precision == 3 ? QUDA_DOUBLE_PRECISION : precision  == 2 ? QUDA_SINGLE_PRECISION : precision == 1 ? QUDA_HALF_PRECISION : QUDA_QUARTER_PRECISION;
+  QudaPrecision this_prec = precision == 3 ? QUDA_DOUBLE_PRECISION : precision == 2 ? QUDA_SINGLE_PRECISION : precision == 1 ? QUDA_HALF_PRECISION : QUDA_QUARTER_PRECISION;
   if (prec != QUDA_INVALID_PRECISION && this_prec != prec) return true;
 
-  // mg copy isn't initialized for quarter or half
-  if (precision == 0 || precision == 1) return true;
-
-  // if we're doing an MG test, skip copying from single or double to fixed.
-  if ((precision == 3 || precision == 2) && (kernel == 1 || kernel == 2)) return true;
+  if ( Nspin == 2 && ( precision == 0 || precision ==1 ) ) {
+    // avoid quarter, half precision tests if doing coarse fields
+    return true;
+  } else if (Nspin == 2 && (kernel == 1 || kernel == 2)) {
+    // avoid low-precision copy if doing coarse fields
+    return true;
+  } else if ((Nprec < 4) && (kernel == 0)) {
+    // only benchmark high-precision copy() if double is supported
+    return true;
+  }
 
   return false;
 }
-
-void printFieldInfo(ColorSpinorField& field, const char* name)
-{
-  printf("\nField %s lives on the ");
-  switch (field.Location())
-  {
-    case QUDA_CUDA_FIELD_LOCATION:
-      printf("GPU");
-      break;
-    case QUDA_CPU_FIELD_LOCATION:
-      printf("CPU");
-      break;
-  }
-  printf(", is ");
-  switch (field.Precision())
-  {
-    case QUDA_QUARTER_PRECISION:
-      printf("quarter");
-      break;
-    case QUDA_HALF_PRECISION:
-      printf("half");
-      break;
-    case QUDA_SINGLE_PRECISION:
-      printf("single");
-      break;
-    case QUDA_DOUBLE_PRECISION:
-      printf("double");
-      break;
-  }
-  printf(" precision. Its layout is ");
-  switch (field.FieldOrder())
-  {
-    case QUDA_FLOAT_FIELD_ORDER:
-      printf("QUDA_FLOAT_FIELD_ORDER");
-      break;
-    case QUDA_FLOAT2_FIELD_ORDER:
-      printf("QUDA_FLOAT2_FIELD_ORDER");
-      break;
-    case QUDA_FLOAT4_FIELD_ORDER:
-      printf("QUDA_FLOAT4_FIELD_ORDER");
-      break;
-    case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER:
-      printf("QUDA_SPACE_SPIN_COLOR_FIELD_ORDER");
-      break;
-    case QUDA_SPACE_COLOR_SPIN_FIELD_ORDER:
-      printf("QUDA_SPACE_COLOR_SPIN_FIELD_ORDER");
-      break;
-  }
-  printf(", which is %snative.\n", field.isNative() ? "" : "not ");
-}
-
 
 void initFields(int prec)
 {
@@ -329,8 +283,6 @@ double test(int kernel) {
   switch (kernel) {
 
   case 0:
-    //printFieldInfo(*hD, "hD");
-    //hD->PrintVector(0);
     *hD = *hH;
     blas::copy(*yD, *hD);
     blas::copy(*yH, *hH);
