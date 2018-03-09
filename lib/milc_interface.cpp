@@ -268,10 +268,10 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 }
 
 
-void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coeff[6],
-    const void* const staple_src[4], const void* const one_link_src[4], const void* const naik_src[4],
-    const void* const w_link, const void* const v_link, const void* const u_link,
-    void* const milc_momentum)
+void qudaHisqForceOld(int prec, const double level2_coeff[6], const double fat7_coeff[6],
+                      const void* const staple_src[4], const void* const one_link_src[4], const void* const naik_src[4],
+                      const void* const w_link, const void* const v_link, const void* const u_link,
+                      void* const milc_momentum)
 {
   qudamilc_called<true>(__func__);
 
@@ -290,9 +290,38 @@ void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coe
   }
 
   long long flops;
+  computeHISQForceOldQuda(milc_momentum, &flops, level2_coeff, fat7_coeff,
+                          staple_src, one_link_src, naik_src,
+                          w_link, v_link, u_link, &gParam);
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+
+void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double** coeff, double scale, void** quark_field,
+                   const double level2_coeff[6], const double fat7_coeff[6],
+                   const void* const w_link, const void* const v_link, const void* const u_link,
+                   void* const milc_momentum)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam gParam = newMILCGaugeParam(localDim, (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_GENERAL_LINKS);
+
+  if (!invalidate_quda_mom) {
+    gParam.use_resident_mom = true;
+    gParam.make_resident_mom = true;
+    gParam.return_result_mom = false;
+  } else {
+    gParam.use_resident_mom = false;
+    gParam.make_resident_mom = false;
+    gParam.return_result_mom = true;
+  }
+
+  long long flops;
   computeHISQForceQuda(milc_momentum, &flops, level2_coeff, fat7_coeff,
-		       staple_src, one_link_src, naik_src,
-		       w_link, v_link, u_link, &gParam);
+                       w_link, v_link, u_link,
+                       quark_field, num_terms, num_naik_terms, coeff, scale,
+                       &gParam);
   qudamilc_called<false>(__func__);
   return;
 }
@@ -318,15 +347,12 @@ void qudaAsqtadForce(int prec, const double act_path_coeff[6],
 
 
 
-void qudaComputeOprod(int prec, int num_terms, double** coeff,
-    void** quark_field, void* oprod[2])
+void qudaComputeOprod(int prec, int num_terms, int num_naik_terms, double** coeff, double scale,
+                      void** quark_field, void* oprod[3])
 {
-    qudamilc_called<true>(__func__);
-  QudaGaugeParam oprodParam = newMILCGaugeParam(localDim,
-      (prec==1) ?  QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
-
-  computeStaggeredOprodQuda(oprod, quark_field, num_terms, coeff, &oprodParam);
+  qudamilc_called<true>(__func__);
+  QudaGaugeParam oprodParam = newMILCGaugeParam(localDim, (prec==1) ?  QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_GENERAL_LINKS);
+  computeStaggeredOprodQuda(oprod, quark_field, num_terms, num_naik_terms, coeff, scale, &oprodParam);
   qudamilc_called<false>(__func__);
   return;
 }

@@ -612,17 +612,47 @@ extern "C" {
    * @param u_link          SU(3) think link variables.
    * @param milc_momentum        The momentum contribution from the quark action.
    */
+  void qudaHisqForceOld(int precision,
+                        const double level2_coeff[6],
+                        const double fat7_coeff[6],
+                        const void* const staple_src[4],
+                        const void* const one_link_src[4],
+                        const void* const naik_src[4],
+                        const void* const w_link,
+                        const void* const v_link,
+                        const void* const u_link,
+                        void* const milc_momentum);
+
+  /**
+   * Compute the fermion force for the HISQ quark action.  All fields
+   * are host fields in MILC order, and the precision of these fields
+   * must match.
+   *
+   * @param precision       The precision of the fields
+   * @param num_terms The number of quark fields
+   * @param num_naik_terms The number of naik contributions
+   * @param coeff The coefficients multiplying the fermion fields in the outer product
+   * @param scale The scaling coefficient to the staple oprod for inclusion in the naik oprod sum
+   * @param quark_field The input fermion field.
+   * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
+   * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
+   * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
+   * @param v_link          Fat7 link variables.
+   * @param u_link          SU(3) think link variables.
+   * @param milc_momentum        The momentum contribution from the quark action.
+   */
   void qudaHisqForce(int precision,
+                     int num_terms,
+                     int num_naik_terms,
+                     double** coeff,
+                     double scale,
+                     void** quark_field,
 		     const double level2_coeff[6],
 		     const double fat7_coeff[6],
-		     const void* const staple_src[4],
-		     const void* const one_link_src[4],
-		     const void* const naik_src[4],
 		     const void* const w_link,
 		     const void* const v_link,
 		     const void* const u_link,
 		     void* const milc_momentum);
-
 
   /**
    * Compute the fermion force for the Asqtad quark action.  All fields
@@ -665,16 +695,20 @@ extern "C" {
    * Compute the staggered quark-field outer product needed for gauge generation
    *
    * @param precision The precision of the field (2 - double, 1 - single)
-   * @param num_terms The number of quak fields
-   * @param coeff The coefficient multiplying the fermion fields in the outer product
+   * @param num_terms The number of quark fields
+   * @param num_naik_terms The number of naik contributions
+   * @param coeff The coefficients multiplying the fermion fields in the outer product
+   * @param scale The scaling coefficient to the staple oprod for inclusion in the naik oprod sum
    * @param quark_field The input fermion field.
    * @param oprod The outer product to be computed.
    */
   void qudaComputeOprod(int precision,
 			int num_terms,
+			int num_naik_terms,
 			double** coeff,
+                        double scale,
 			void** quark_field,
-			void* oprod[2]);
+			void* oprod[3]);
 
 
   /**
