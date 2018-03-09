@@ -599,12 +599,16 @@ namespace quda {
 
     if (typeid(src) == typeid(cudaGaugeField)) {
 
-      // copy field and ghost zone into this field
-      copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, 
-          static_cast<const cudaGaugeField&>(src).gauge);
+      if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+        // copy field and ghost zone into this field
+        copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, static_cast<const cudaGaugeField&>(src).gauge);
 
-      if (geometry == QUDA_COARSE_GEOMETRY)
-	copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, static_cast<const cudaGaugeField&>(src).gauge, 0, 0, 3);
+        if (geometry == QUDA_COARSE_GEOMETRY)
+          copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, static_cast<const cudaGaugeField&>(src).gauge, 0, 0, 3);
+      } else {
+        copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, static_cast<const cudaGaugeField&>(src).gauge);
+        if (geometry == QUDA_COARSE_GEOMETRY) errorQuda("Extended gauge copy for coarse geometry not supported");
+      }
 
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do reorder on the CPU
@@ -613,8 +617,12 @@ namespace quda {
 	if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	  // copy field and ghost zone into buffer
 	  copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, static_cast<const cpuGaugeField&>(src).gauge);
+
+        if (geometry == QUDA_COARSE_GEOMETRY)
+          copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, static_cast<const cpuGaugeField&>(src).gauge, 0, 0, 3);
 	} else {
 	  copyExtendedGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, static_cast<const cpuGaugeField&>(src).gauge);
+          if (geometry == QUDA_COARSE_GEOMETRY) errorQuda("Extended gauge copy for coarse geometry not supported");
 	}
 
 	// this copies over both even and odd
@@ -659,6 +667,7 @@ namespace quda {
 	    if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
 	  } else {
 	    copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
+            if (geometry == QUDA_COARSE_GEOMETRY) errorQuda("Extended gauge copy for coarse geometry not supported");
 	  }
 	  free_gauge_buffer(buffer, src.Order(), src.Geometry());
 	  if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order(), geometry);
@@ -682,6 +691,12 @@ namespace quda {
     copy(cpu);
     cudaDeviceSynchronize();
     checkCudaError();
+  }
+
+  void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, TimeProfile &profile) {
+    profile.TPSTART(QUDA_PROFILE_H2D);
+    loadCPUField(cpu);
+    profile.TPSTOP(QUDA_PROFILE_H2D);
   }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const
@@ -751,6 +766,12 @@ namespace quda {
 
     cudaDeviceSynchronize();
     checkCudaError();
+  }
+
+  void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const {
+    profile.TPSTART(QUDA_PROFILE_D2H);
+    saveCPUField(cpu);
+    profile.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   void cudaGaugeField::backup() const {

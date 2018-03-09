@@ -397,8 +397,33 @@ namespace quda {
      */
     void copy(const GaugeField &src);
 
-    void loadCPUField(const cpuGaugeField &);
-    void saveCPUField(cpuGaugeField &) const;
+    /**
+       @brief Download into this field from a CPU field
+       @param[in] cpu The CPU field source
+    */
+    void loadCPUField(const cpuGaugeField &cpu);
+
+    /**
+       @brief Download into this field from a CPU field.  Overloaded
+       variant that includes profiling
+       @param[in] cpu The CPU field source
+       @param[in] profile Time profile to record the transfer
+    */
+    void loadCPUField(const cpuGaugeField &cpu, TimeProfile &profile);
+
+    /**
+       @brief Upload from this field into a CPU field
+       @param[out] cpu The CPU field source
+    */
+    void saveCPUField(cpuGaugeField &cpu) const;
+
+    /**
+       @brief Upload from this field into a CPU field.  Overloaded
+       variant that includes profiling.
+       @param[out] cpu The CPU field source
+       @param[in] profile Time profile to record the transfer
+    */
+    void saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const;
 
     // (ab)use with care
     void* Gauge_p() { return gauge; }
@@ -521,20 +546,27 @@ namespace quda {
   };
 
   /**
-     This is a debugging function, where we cast a gauge field into a
-     spinor field so we can compute its L1 norm.
+     @brief This is a debugging function, where we cast a gauge field
+     into a spinor field so we can compute its L1 norm.
      @param u The gauge field that we want the norm of
      @return The L1 norm of the gauge field
   */
   double norm1(const GaugeField &u);
 
   /**
-     This is a debugging function, where we cast a gauge field into a
-     spinor field so we can compute its L2 norm.
+     @brief This is a debugging function, where we cast a gauge field
+     into a spinor field so we can compute its L2 norm.
      @param u The gauge field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
   double norm2(const GaugeField &u);
+
+  /**
+     @brief Scale the gauge field by the scalar a.
+     @param[in] a scalar multiplier
+     @param[in] u The gauge field we want to multiply
+   */
+  void ax(const double &a, GaugeField &u);
 
   /**
      This function is used for  extracting the gauge ghost zone from a
