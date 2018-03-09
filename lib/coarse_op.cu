@@ -17,6 +17,8 @@ typedef int storeType;
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
+
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
 		  const GaugeField &g, const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
@@ -160,7 +162,7 @@ namespace quda {
     checkPrecision(X, Y, g);
     checkPrecision(uv, av, T.Vectors(X.Location()));
 
-    printfQuda("Computing Y field......\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
@@ -183,8 +185,10 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
-    printfQuda("....done computing Y field\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
   }
+
+#endif // GPU_MULTIGRID
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
@@ -192,6 +196,7 @@ namespace quda {
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
 		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
+#ifdef GPU_MULTIGRID
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X);
 
@@ -221,7 +226,8 @@ namespace quda {
       //Create a copy of the gauge field with no reconstruction, required for fine-grained access
       GaugeFieldParam gf_param(gauge);
       gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-      gf_param.setPrecision(gf_param.precision);
+      gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
+      gf_param.setPrecision(gf_param.Precision());
       U = new cudaGaugeField(gf_param);
 
       U->copy(gauge);
@@ -230,7 +236,7 @@ namespace quda {
     CloverFieldParam cf_param;
     cf_param.nDim = 4;
     cf_param.pad = 0;
-    cf_param.precision = clover ? clover->Precision() : QUDA_SINGLE_PRECISION;
+    cf_param.setPrecision(clover ? clover->Precision() : QUDA_SINGLE_PRECISION);
 
     // if we have no clover term then create an empty clover field
     for(int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = clover ? clover->X()[i] : 0;
@@ -259,7 +265,7 @@ namespace quda {
     ColorSpinorParam UVparam(T.Vectors(location));
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
-    UVparam.precision = T.Vectors(location).Precision();
+    UVparam.setPrecision(T.Vectors(location).Precision());
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 
@@ -275,6 +281,9 @@ namespace quda {
 
     if (C != clover) delete C;
     if (U != &gauge) delete U;
+#else
+    errorQuda("Multigrid has not been built");
+#endif // GPU_MULTIGRID
   }
 
 } //namespace quda

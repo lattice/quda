@@ -1,4 +1,3 @@
-#include <transfer.h>
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <gauge_field.h>
@@ -277,6 +276,8 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", out.Precision());
     }
+
+    in.bufferIndex = (1 - in.bufferIndex);
     return;
   }
 

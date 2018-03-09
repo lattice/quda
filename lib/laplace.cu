@@ -1,9 +1,11 @@
-#include <transfer.h>
+#include <gauge_field.h>
 #include <gauge_field_order.h>
+#include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <stencil.h>
 #include <color_spinor.h>
+#include <worker.h>
 
 /**
    This is a basic gauged Laplace operator
@@ -283,6 +285,8 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
+
+    in.bufferIndex = (1 - in.bufferIndex);
   }
 
 

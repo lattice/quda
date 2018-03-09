@@ -18,10 +18,9 @@
 #include <algorithm>
 #include <memory>
 
-#ifdef DEFLATEDSOLVER
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
-#endif
+
 
 /*
 GMRES-DR algorithm:
@@ -34,7 +33,6 @@ namespace quda {
     using namespace blas;
     using namespace std;
 
-#ifdef DEFLATEDSOLVER
     using namespace Eigen;
 
     using DynamicStride   = Stride<Dynamic, Dynamic>;
@@ -45,7 +43,6 @@ namespace quda {
 
 //special types needed for compatibility with QUDA blas:
     using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
-#endif
 
     struct SortedEvals{
 
@@ -62,7 +59,6 @@ namespace quda {
     class GMResDRArgs{
 
       public:
-#ifdef DEFLATEDSOLVER
        VectorSet   ritzVecs;
        DenseMatrix H;
        Vector      eta;
@@ -87,10 +83,8 @@ namespace quda {
        ~GMResDRArgs(){
           if(Vkp1) delete Vkp1;
        }
-#endif
    };
 
-#ifdef DEFLATEDSOLVER
    template<libtype which_lib> void ComputeHarmonicRitz(GMResDRArgs &args) {errorQuda("\nUnknown library type.\n");}
 
    template <> void ComputeHarmonicRitz<libtype::magma_lib>(GMResDRArgs &args)
@@ -189,7 +183,6 @@ namespace quda {
 
        return;
     }
-#endif
 
     void fillFGMResDRInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
       inner.tol = outer.tol_precondition;
@@ -219,7 +212,6 @@ namespace quda {
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param),
     Vm(nullptr), Zm(nullptr), profile(profile), gmresdr_args(nullptr), init(false)
  {
-#ifdef DEFLATEDSOLVER
      fillFGMResDRInnerSolveParam(Kparam, param);
 
      if (param.inv_type_precondition == QUDA_CG_INVERTER) 
@@ -234,9 +226,7 @@ namespace quda {
        K = nullptr;
      else
        errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
-#else
-     errorQuda("Deflated solver was not enabled.\n");
-#endif
+
 
      return;
  }
@@ -280,7 +270,6 @@ namespace quda {
 
  void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels)
  {
-#ifdef DEFLATEDSOLVER
    GMResDRArgs &args = *gmresdr_args;
 
    if(do_gels) {
@@ -306,14 +295,12 @@ namespace quda {
    c_ += minusHeta;
 
    blas::caxpy(static_cast<Complex*>(minusHeta.data()), V_, r_);
-#endif
    return;
  }
 
 
  void GMResDR::RestartVZH()
  {
-#ifdef DEFLATEDSOLVER
    GMResDRArgs &args = *gmresdr_args;
 
    if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
@@ -377,7 +364,6 @@ namespace quda {
    blas::ax(1.0/ sqrt(blas::norm2(Vm->Component(args.k))), Vm->Component(args.k));
 
    args.ritzVecs.setZero();
-#endif
    return;
  }
 
@@ -385,7 +371,6 @@ namespace quda {
 int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = false)
  {
    int j = start_idx;
-#ifdef DEFLATEDSOLVER
    GMResDRArgs &args = *gmresdr_args;
    ColorSpinorField &tmp = *tmpp;
 
@@ -462,13 +447,11 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
      blas::cDotProduct(args.c, v_, r_);
 
    }
-#endif
    return (j-start_idx);
  }
 
  void GMResDR::operator()(ColorSpinorField &x, ColorSpinorField &b)
  {
-#ifdef DEFLATEDSOLVER
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     const double tol_threshold     = 1.2;
@@ -654,7 +637,6 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    param.rhs_idx += 1;
 
    if(ep) delete ep;
-#endif
    return;
  }
 

@@ -64,6 +64,7 @@ static QudaSumFloat *d_reduce=0;
 static QudaSumFloat *h_reduce=0;
 static QudaSumFloat *hd_reduce=0;
 static cudaEvent_t reduceEnd;
+static bool fast_reduce_enabled = false;
 
 namespace quda {
   namespace blas {
@@ -74,6 +75,7 @@ namespace quda {
     void* getMappedHostReduceBuffer() { return hd_reduce; }
     void* getHostReduceBuffer() { return h_reduce; }
     cudaEvent_t* getReduceEvent() { return &reduceEnd; }
+    bool getFastReduce() { return fast_reduce_enabled; }
 
     void initReduce()
     {
@@ -127,6 +129,13 @@ namespace quda {
       }
 
       cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
+
+      // enable fast reductions with CPU spin waiting as opposed to using CUDA events
+      char *fast_reduce_env = getenv("QUDA_ENABLE_FAST_REDUCE");
+      if (fast_reduce_env && strcmp(fast_reduce_env,"1") == 0) {
+        warningQuda("Experimental fast reductions enabled");
+        fast_reduce_enabled = true;
+      }
 
       checkCudaError();
     }
@@ -429,27 +438,27 @@ namespace quda {
 
 
     /**
-       double cabxpyAxNorm(float a, complex b, float *x, float *y, n){}
-       First performs the operation y[i] += a*b*x[i]
+       double cabxpyzAxNorm(float a, complex b, float *x, float *y, float *z){}
+       First performs the operation z[i] = y[i] + a*b*x[i]
        Second performs x[i] *= a
        Third returns the norm of x
     */
     template <typename ReduceType, typename Float2, typename FloatN>
-    struct cabxpyaxnorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
+    struct cabxpyzaxnorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Float2 a;
       Float2 b;
-      cabxpyaxnorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      cabxpyzaxnorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { x *= a.x; Caxpy_(b, x, y); norm2_<ReduceType>(sum,y); }
+      { x *= a.x; Caxpy_(b, x, y); z = y; norm2_<ReduceType>(sum,z); }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 10; } //! flops per element
     };
 
 
-    double cabxpyAxNorm(const double &a, const Complex &b,
-			ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,cabxpyaxnorm,1,1,0,0,0,false>
-	(make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, x, x, x);
+    double cabxpyzAxNorm(const double &a, const Complex &b,
+			ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double,QudaSumFloat,cabxpyzaxnorm,1,0,1,0,0,false>
+	(make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, z, x, x);
     }
 
 

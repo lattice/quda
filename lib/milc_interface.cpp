@@ -51,9 +51,7 @@ static bool create_quda_gauge = false;
 
 static bool invalidate_quda_mom = true;
 
-#ifdef DEFLATEDSOLVER
 static void *df_preconditioner = NULL;
-#endif
 
 // set to 1 for GPU resident pipeline (not yet supported in mainline MILC)
 #define MOM_PIPE 0
@@ -748,7 +746,7 @@ static void setColorSpinorParams(const int dim[4],
   for(int dir=0; dir<4; ++dir) param->x[dir] = dim[dir];
   param->x[0] /= 2;
 
-  param->precision = precision;
+  param->setPrecision(precision);
   param->pad = 0;
   param->siteSubset = QUDA_PARITY_SITE_SUBSET;
   param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -1220,7 +1218,7 @@ void qudaEigCGInvert(int external_precision,
     double* const final_fermilab_residual,
     int *num_iters)
 {
-#ifdef DEFLATEDSOLVER
+
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
@@ -1325,9 +1323,6 @@ void qudaEigCGInvert(int external_precision,
 
   qudamilc_called<false>(__func__, verbosity);
 
-#else
-  errorQuda("Deflation solver was not built.");
-#endif
   return;
 } // qudaEigCGInvert
 
@@ -1640,7 +1635,6 @@ void qudaEigCGCloverInvert(int external_precision,
     double* const final_fermilab_residual,
     int *num_iters)
 {
-#ifdef DEFLATEDSOLVER
   qudamilc_called<true>(__func__);
   if(target_fermilab_residual == 0 && target_residual == 0){
     errorQuda("qudaCloverInvert: requesting zero residual\n");
@@ -1709,9 +1703,6 @@ void qudaEigCGCloverInvert(int external_precision,
   if ( (clover || cloverInverse) && last_rhs_flag) qudaFreeCloverField();
   if (link && last_rhs_flag) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
-#else
-  errorQuda("Deflation solver was not built.");
-#endif
   return;
 } // qudaEigCGCloverInvert
 
@@ -1777,17 +1768,17 @@ void qudaCloverMultishiftInvert(int external_precision,
     // default is chronological CG
     if (!quda_solver || strcmp(quda_solver,"CHRONO_CG_SOLVER")==0) {
       // use CG with chronological forecasting
-      invertParam.use_resident_chrono = 1;
-      invertParam.make_resident_chrono = 1;
-      invertParam.max_chrono_dim = 10;
+      invertParam.chrono_use_resident = 1;
+      invertParam.chrono_make_resident = 1;
+      invertParam.chrono_max_dim = 10;
     } else if (strcmp(quda_solver,"BICGSTAB_SOLVER")==0){
       // use two-step BiCGStab
       invertParam.inv_type = QUDA_BICGSTAB_INVERTER;
       invertParam.solve_type = QUDA_DIRECT_PC_SOLVE;
     } else if (strcmp(quda_solver,"CG_SOLVER")==0){
       // regular CG
-      invertParam.use_resident_chrono = 0;
-      invertParam.make_resident_chrono = 0;
+      invertParam.chrono_use_resident = 0;
+      invertParam.chrono_make_resident = 0;
     }
 
     invertQuda(solutionArray[0], source, &invertParam);

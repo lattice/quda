@@ -270,6 +270,9 @@ namespace quda {
     /** Wrapper for the sloppy smoothing coarse grid operator */
     DiracMatrix *matCoarseSmootherSloppy;
 
+    /** Parallel hyper-cubic random number generator for generating null-space vectors */
+    RNG *rng;
+
   public:
     /** 
       Constructor for MG class

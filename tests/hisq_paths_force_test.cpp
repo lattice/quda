@@ -334,7 +334,7 @@ hisq_force_init()
 
 #ifdef MULTI_GPU
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam_ex.precision = prec;
+  gParam_ex.setPrecision(prec);
   gParam_ex.reconstruct = link_recon;
   //gParam_ex.pad = E1*E2*E3/2;
   gParam_ex.pad = 0;
@@ -345,7 +345,7 @@ hisq_force_init()
 
 #else
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam.precision = qudaGaugeParam.cuda_prec;
+  gParam.setPrecision(qudaGaugeParam.cuda_prec);
   gParam.reconstruct = link_recon;
   gParam.pad = X1*X2*X3/2;
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;

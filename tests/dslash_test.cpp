@@ -276,7 +276,7 @@ void init(int argc, char **argv) {
   }
 
 
-  csParam.precision = inv_param.cpu_prec;
+  csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
 
   if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
@@ -348,8 +348,8 @@ void init(int argc, char **argv) {
   if (!transfer) {
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
-    csParam.precision = inv_param.cuda_prec;
-    if (csParam.precision == QUDA_DOUBLE_PRECISION ) {
+    csParam.setPrecision(inv_param.cuda_prec);
+    if (csParam.Precision() == QUDA_DOUBLE_PRECISION ) {
       csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     } else {
       /* Single and half */

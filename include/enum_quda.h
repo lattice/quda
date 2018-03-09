@@ -352,7 +352,13 @@ extern "C" {
     QUDA_CORNER_SOURCE,
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
-  
+
+  typedef enum QudaNoiseType_s {
+    QUDA_NOISE_GAUSS,
+    QUDA_NOISE_UNIFORM,
+    QUDA_NOISE_INVALID = QUDA_INVALID_ENUM
+  } QudaNoiseType;
+
   // used to select projection method for deflated solvers
   typedef enum QudaProjectionType_s {
       QUDA_MINRES_PROJECTION,

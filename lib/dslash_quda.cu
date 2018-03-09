@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <stack>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -59,6 +60,30 @@ namespace quda {
   void setKernelPackT(bool packT) { kernelPackT = packT; }
 
   bool getKernelPackT() { return kernelPackT; }
+
+  static std::stack<bool> kptstack;
+
+  void pushKernelPackT(bool packT)
+  {
+    kptstack.push(getKernelPackT());
+    setKernelPackT(packT);
+
+    if (kptstack.size() > 10)
+    {
+      warningQuda("KernelPackT stack contains %u elements.  Is there a missing popKernelPackT() somewhere?",
+      static_cast<unsigned int>(kptstack.size()));
+    }
+  }
+
+  void popKernelPackT()
+  {
+    if (kptstack.empty())
+    {
+      errorQuda("popKernelPackT() called with empty stack");
+    }
+    setKernelPackT(kptstack.top());
+    kptstack.pop();
+  }
 
   namespace dslash {
     int it = 0;
