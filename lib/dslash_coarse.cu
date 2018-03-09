@@ -17,7 +17,7 @@
 
 // ESW HACK
 //#define ESW_HACK_HALF_EXCHANGE
-#define ESW_HACK_QUARTER_EXCHANGE
+//#define ESW_HACK_QUARTER_EXCHANGE
 
 namespace quda {
 
