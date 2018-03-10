@@ -1002,7 +1002,7 @@ namespace quda {
       virtual ~HisqForce() { }
 
       void apply(const cudaStream_t &stream) {
-        TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);//getVerbosity());
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (type) {
         case FORCE_LONG_LINK:
           longLinkKernel<real,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
