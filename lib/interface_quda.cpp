@@ -4393,7 +4393,6 @@ void computeHISQForceQuda(void* const milc_momentum,
                           int num_terms,
                           int num_naik_terms,
                           double **coeff,
-                          double scale,
                           QudaGaugeParam* gParam)
 {
 #ifdef  GPU_STAGGERED_OPROD
@@ -4516,7 +4515,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
     { // naik terms
       oneLinkOprod->copy(*stapleOprod);
-      ax(scale, *oneLinkOprod);
+      ax(level2_coeff[0], *oneLinkOprod);
       GaugeField *oprod[2] = {oneLinkOprod, naikOprod};
 
       // loop over different quark fields

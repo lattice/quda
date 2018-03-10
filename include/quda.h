@@ -1020,7 +1020,6 @@ extern "C" {
    * @param num             The number of quark fields
    * @param num_naik        The number of naik contributions
    * @param coeff           The coefficient multiplying the fermion fields in the outer product
-   * @param scale           The scaling coefficient to the staple oprod for inclusion in the naik oprod sum
    * @param param.          The field parameters.
    */
   void computeHISQForceQuda(void* momentum,
@@ -1034,7 +1033,6 @@ extern "C" {
                             int num,
                             int num_naik,
                             double** coeff,
-                            double scale,
                             QudaGaugeParam* param);
 
   /**

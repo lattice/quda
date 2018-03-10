@@ -632,7 +632,6 @@ extern "C" {
    * @param num_terms The number of quark fields
    * @param num_naik_terms The number of naik contributions
    * @param coeff The coefficients multiplying the fermion fields in the outer product
-   * @param scale The scaling coefficient to the staple oprod for inclusion in the naik oprod sum
    * @param quark_field The input fermion field.
    * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
    * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
@@ -645,7 +644,6 @@ extern "C" {
                      int num_terms,
                      int num_naik_terms,
                      double** coeff,
-                     double scale,
                      void** quark_field,
 		     const double level2_coeff[6],
 		     const double fat7_coeff[6],

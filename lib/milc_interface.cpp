@@ -298,7 +298,7 @@ void qudaHisqForceOld(int prec, const double level2_coeff[6], const double fat7_
 }
 
 
-void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double** coeff, double scale, void** quark_field,
+void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double** coeff, void** quark_field,
                    const double level2_coeff[6], const double fat7_coeff[6],
                    const void* const w_link, const void* const v_link, const void* const u_link,
                    void* const milc_momentum)
@@ -320,7 +320,7 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double** coeff, 
   long long flops;
   computeHISQForceQuda(milc_momentum, &flops, level2_coeff, fat7_coeff,
                        w_link, v_link, u_link,
-                       quark_field, num_terms, num_naik_terms, coeff, scale,
+                       quark_field, num_terms, num_naik_terms, coeff,
                        &gParam);
   qudamilc_called<false>(__func__);
   return;
