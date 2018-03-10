@@ -847,6 +847,8 @@ namespace quda {
       } else {
         errorQuda("Unsupported precision");
       }
+
+      cudaDeviceSynchronize();
       checkCudaError();
 
       if (flops) {
@@ -1089,6 +1091,7 @@ namespace quda {
         errorQuda("Unsupported precision %d", precision);
       }
       checkCudaError();
+      cudaDeviceSynchronize();
     }
 
     void hisqCompleteForce(GaugeField &force, const GaugeField &oprod, const GaugeField &link, long long* flops)
@@ -1123,6 +1126,7 @@ namespace quda {
         errorQuda("Unsupported precision %d", precision);
       }
       checkCudaError();
+      cudaDeviceSynchronize();
     }
   } // namespace fermion_force
 } // namespace quda
