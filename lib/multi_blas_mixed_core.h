@@ -9,7 +9,7 @@ namespace mixed {
 		       CompositeColorSpinorField &x, CompositeColorSpinorField &y,
 		       CompositeColorSpinorField &z, CompositeColorSpinorField &w) {
 
-    if (Location(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
 
       if (x[0]->Precision() != z[0]->Precision()) {
         errorQuda("multiblas has not been built for vectors x, z as different precisions.\n");

@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <fast_intdiv.h>
 #include <convert.h>
 
@@ -52,10 +53,8 @@ enum KernelType {
     bool is_composite;//currently staggered only
     int composite_Vh;
 #endif 
-#ifdef MULTI_GPU
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
-#endif
 
     double a;
     float a_f;
@@ -71,6 +70,9 @@ enum KernelType {
 
     double a_inv;
     float a_inv_f;
+
+    double rho;
+    float rho_f;
 
     double mferm;
     float mferm_f;
@@ -105,6 +107,9 @@ enum KernelType {
     void *cloverInv;
     float *cloverInvNorm;
 
+    double twist_a;
+    double twist_b;
+
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
     cudaTextureObject_t inTexNorm;
@@ -130,9 +135,12 @@ enum KernelType {
       printfQuda("threads = %d\n", threads);
       printfQuda("parity = %d\n", parity);
       printfQuda("X = {%d, %d, %d, %d}\n", (int)X[0], (int)X[1], (int)X[2], (int)X[3]);
+      printfQuda("Xh = {%d, %d, %d, %d}\n", (int)Xh[0], (int)Xh[1], (int)Xh[2], (int)Xh[3]);
+      printfQuda("volume4CB = %d\n", (int)volume4CB);
 #ifdef GPU_DOMAIN_WALL_DIRAC
       printfQuda("Ls = %d\n", Ls);
 #endif
+      printfQuda("kernel_type = %d\n", kernel_type);
       printfQuda("commDim = {%d, %d, %d, %d}\n", commDim[0], commDim[1], commDim[2], commDim[3]);
       printfQuda("ghostDim = {%d, %d, %d, %d}\n", ghostDim[0], ghostDim[1], ghostDim[2], ghostDim[3]);
       printfQuda("ghostOffset = {{%d, %d}, {%d, %d}, {%d, %d}, {%d, %d}}\n", ghostOffset[0][0], ghostOffset[0][1], 
@@ -143,22 +151,36 @@ enum KernelType {
                                                                                  ghostNormOffset[1][0], ghostNormOffset[1][1],
                                                                                  ghostNormOffset[2][0], ghostNormOffset[2][1],
                                                                                  ghostNormOffset[3][0], ghostNormOffset[3][1]);
-      printfQuda("kernel_type = %d\n", kernel_type);
       printfQuda("sp_stride = %d\n", sp_stride);
 #ifdef GPU_CLOVER_DIRAC
       printfQuda("cl_stride = %d\n", cl_stride);
 #endif
+#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
+      printfQuda("fl_stride = %d\n", fl_stride);
+#endif
+#ifdef GPU_STAGGERED_DIRAC
+      printfQuda("gauge_stride = %d\n", gauge_stride);
+      printfQuda("long_gauge_stride = %d\n", long_gauge_stride);
+      printfQuda("fat_link_max = %e\n", fat_link_max);
+#endif
+      printfQuda("threadDimMapLower = {%d, %d, %d, %d}\n", threadDimMapLower[0], threadDimMapLower[1],
+		 threadDimMapLower[2], threadDimMapLower[3]);
+      printfQuda("threadDimMapUpper = {%d, %d, %d, %d}\n", threadDimMapUpper[0], threadDimMapUpper[1],
+		 threadDimMapUpper[2], threadDimMapUpper[3]);
+      printfQuda("a = %e\n", a);
+      printfQuda("b = %e\n", b);
+      printfQuda("c = %e\n", c);
+      printfQuda("d = %e\n", d);
+      printfQuda("a_inv = %e\n", a_inv);
+      printfQuda("rho = %e\n", rho);
+      printfQuda("mferm = %e\n", mferm);
+      printfQuda("tProjScale = %e\n", tProjScale);
+      printfQuda("twist_a = %e\n", twist_a);
+      printfQuda("twist_b = %e\n", twist_b);
     }
   };
 
   static DslashParam dslashParam;
-
-
-
-#ifdef MULTI_GPU
-  static double twist_a = 0.0;
-  static double twist_b = 0.0;
-#endif
 
 
 #define MAX(a,b) ((a)>(b) ? (a):(b))

@@ -154,33 +154,6 @@ namespace quda {
     /** Type of ghost exchange to perform */
     QudaGhostExchange ghostExchange;
 
-    /** Pinned-memory buffer that is used by all derived classes */
-    static void *bufferPinned[2]; 
-
-    /** Whether the pinned-memory buffer has already been initialized or not */
-    static bool bufferPinnedInit[2];
-
-    /** The size in bytes of pinned-memory buffer */
-    static size_t bufferPinnedBytes[2];
-
-    /** Resize the pinned-memory buffer */
-    void resizeBufferPinned(size_t bytes, const int index=0) const;
-
-    /** Keep track of resizes to the pinned memory buffers */
-    static size_t bufferPinnedResizeCount;
-
-    /** Device-memory buffer that is used by all derived classes */
-    static void *bufferDevice; 
-
-    /** Whether the device-memory buffer has already been initialized or not */
-    static bool bufferDeviceInit;
-
-    /** The size in bytes of device-memory buffer */
-    static size_t bufferDeviceBytes;
-
-    /** Resize the device-memory buffer */
-    void resizeBufferDevice(size_t bytes) const;
-
     // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
 
     /** The number of dimensions we partition for communication */
@@ -216,6 +189,36 @@ namespace quda {
        Remove ghost pointer for sending to
     */
     static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
+
+    /**
+       The current size of the static ghost allocation
+    */
+    static size_t ghostFaceBytes;
+
+    /**
+       Whether the ghost buffers have been initialized
+    */
+    static bool initGhostFaceBuffer;
+
+    /**
+       Size in bytes of this ghost field
+    */
+    mutable size_t ghost_bytes;
+
+    /**
+       Size in bytes of the ghost in each dimension
+    */
+    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
+
+    /**
+       Real-number offsets to each ghost zone
+    */
+    mutable int ghostOffset[QUDA_MAX_DIM][2];
+
+    /**
+       Real-number (in floats) offsets to each ghost zone for norm field
+    */
+    mutable int ghostNormOffset[QUDA_MAX_DIM][2];
 
     /** Pinned memory buffer used for sending all messages */
     void *my_face_h[2];
@@ -314,6 +317,10 @@ namespace quda {
     /** The type of allocation we are going to do for this field */
     QudaMemoryType mem_type;
 
+    mutable char *backup_h;
+    mutable char *backup_norm_h;
+    mutable bool backed_up;
+
   public:
 
     /**
@@ -335,9 +342,27 @@ namespace quda {
     virtual ~LatticeField();
     
     /**
-       Free the pinned-memory buffer
+       @brief Allocate the static ghost buffers
+       @param[in] ghost_bytes Size of the ghost buffer to allocate
     */
-    static void freeBuffer(int index=0);
+    void allocateGhostBuffer(size_t ghost_bytes) const;
+
+    /**
+       @brief Free statically allocated ghost buffers
+    */
+    static void freeGhostBuffer(void);
+
+    /**
+       Create the communication handlers (both host and device)
+       @param[in] no_comms_fill Whether to allocate halo buffers for
+       dimensions that are not partitioned
+    */
+    void createComms(bool no_comms_fill=false);
+
+    /**
+       Destroy the communication handlers
+    */
+    void destroyComms();
 
     /**
        Create the inter-process communication handlers
@@ -358,6 +383,11 @@ namespace quda {
        Helper function to determine if local-to-remote (receive) peer-to-peer copy is complete
     */
     inline bool ipcRemoteCopyComplete(int dir, int dim);
+
+    /**
+       Handle to local copy event used for peer-to-peer synchronization
+    */
+    const cudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
 
     /**
        Handle to remote copy event used for peer-to-peer synchronization
@@ -478,13 +508,13 @@ namespace quda {
     virtual void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL)
     { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false)
+    virtual void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
     { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false)
+    virtual int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
     { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false)
+    virtual void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
     { errorQuda("Not implemented"); }
 
     virtual void scatter(int nFace, int dagger, int dir)
@@ -492,6 +522,12 @@ namespace quda {
 
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
+
+    /** @brief Backs up the LatticeField */
+    virtual void backup() const { errorQuda("Not implemented"); }
+
+    /** @brief Restores the cpuGaugeField */
+    virtual void restore() { errorQuda("Not implemented"); }
   };
   
   /**
@@ -500,10 +536,12 @@ namespace quda {
      @param[in] b Input field
      @return If location is unique return the location
    */
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b) {
+  inline QudaFieldLocation Location_(const char *func, const char *file, int line,
+				     const LatticeField &a, const LatticeField &b) {
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (a.Location() == b.Location()) location = a.Location();
-    else errorQuda("Locations %d %d do not match", a.Location(), b.Location());
+    else errorQuda("Locations %d %d do not match  (%s:%d in %s())\n",
+		   a.Location(), b.Location(), file, line, func);
     return location;
   }
 
@@ -515,9 +553,12 @@ namespace quda {
      @return If location is unique return the location
    */
   template <typename... Args>
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b, const Args &... args) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,args...));
+  inline QudaFieldLocation Location_(const char *func, const char *file, int line,
+				     const LatticeField &a, const LatticeField &b, const Args &... args) {
+    return static_cast<QudaFieldLocation>(Location_(func,file,line,a,b) & Location_(func,file,line,a,args...));
   }
+
+#define checkLocation(...)Location_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Helper function for determining if the precision of the fields is the same.
@@ -525,10 +566,12 @@ namespace quda {
      @param[in] b Input field
      @return If precision is unique return the precision
    */
-  inline QudaPrecision Precision(const LatticeField &a, const LatticeField &b) {
+  inline QudaPrecision Precision_(const char *func, const char *file, int line,
+				  const LatticeField &a, const LatticeField &b) {
     QudaPrecision precision = QUDA_INVALID_PRECISION;
     if (a.Precision() == b.Precision()) precision = a.Precision();
-    else errorQuda("Precisions %d %d do not match", a.Precision(), b.Precision());
+    else errorQuda("Precisions %d %d do not match (%s:%d in %s())\n",
+		   a.Precision(), b.Precision(), file, line, func);
     return precision;
   }
 
@@ -540,12 +583,16 @@ namespace quda {
      @return If precision is unique return the precision
    */
   template <typename... Args>
-  inline QudaPrecision Precision(const LatticeField &a, const LatticeField &b, const Args &... args) {
-    return static_cast<QudaPrecision>(Precision(a,b) & Precision(a,args...));
+  inline QudaPrecision Precision_(const char *func, const char *file, int line,
+				  const LatticeField &a, const LatticeField &b,
+				  const Args &... args) {
+    return static_cast<QudaPrecision>(Precision_(func,file,line,a,b) & Precision_(func,file,line,a,args...));
   }
 
+#define checkPrecision(...) Precision_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
   /**
-     @brief Return whether data is reorderd on the CPU or GPU.  This can set
+     @brief Return whether data is reordered on the CPU or GPU.  This can set
      at QUDA initialization using the environment variable
      QUDA_REORDER_LOCATION.
      @return Reorder location

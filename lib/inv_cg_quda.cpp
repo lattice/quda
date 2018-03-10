@@ -1,6 +1,9 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <limits>
+#include <memory>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -8,14 +11,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
-#include <limits>
-#include <cmath>
-
-#include <face_quda.h>
-
-#include <iostream>
-
 
 namespace quda {
 
@@ -106,7 +101,7 @@ namespace quda {
   }
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
+    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
 
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
@@ -347,7 +342,7 @@ namespace quda {
         // here we are deploying the alternative beta computation
         Complex cg_norm = blas::axpyCGNorm(-alpha[j], Ap, rSloppy);
         r2 = real(cg_norm);  // (r_new, r_new)
-        std::cout << "altS " << imag(cg_norm) << " regS" << r2 << " deltaS " << (r2-imag(cg_norm))/r2 << std::endl;
+        //std::cout << "altS " << imag(cg_norm) << " regS" << r2 << " deltaS " << (r2-imag(cg_norm))/r2 << std::endl;
         sigma = r2;//imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
 
@@ -397,11 +392,11 @@ namespace quda {
 	  } else {
 
 	    if ( (j+1)%Np == 0 ) {
-	      Complex alpha_[Np];
+	      const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
 	      for (int i=0; i<Np; i++) alpha_[i] = alpha[i];
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
-	      blas::caxpy(alpha_, p, x_);
+	      blas::caxpy(alpha_.get(), p, x_);
 	      blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
 	    }
 
@@ -434,13 +429,13 @@ namespace quda {
       } else {
 
 	{
-	  Complex alpha_[Np];
+	  const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
 	  for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	  std::vector<ColorSpinorField*> x_;
 	  x_.push_back(&xSloppy);
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	  blas::caxpy(alpha_, p_, x_);
+	  blas::caxpy(alpha_.get(), p_, x_);
 	  blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
 	}
 
@@ -544,13 +539,13 @@ namespace quda {
 
       // if we have converged and need to update any trailing solutions
       if (converged && steps_since_reliable > 0 && (j+1)%Np != 0 ) {
-	Complex alpha_[Np];
+	const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
 	for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	std::vector<ColorSpinorField*> x_;
 	x_.push_back(&xSloppy);
 	std::vector<ColorSpinorField*> p_;
 	for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	blas::caxpy(alpha_, p_, x_);
+	blas::caxpy(alpha_.get(), p_, x_);
 	blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
       }
 
@@ -607,6 +602,5 @@ namespace quda {
 
     return;
   }
-
 
 }  // namespace quda

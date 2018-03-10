@@ -36,6 +36,8 @@ extern "C" {
 
   QudaTwistFlavorType get_flavor_type(char* s);
 
+  int get_rank_order(char* s);
+
   QudaDslashType get_dslash_type(char* s);
   const char* get_dslash_str(QudaDslashType type);
 
@@ -43,6 +45,14 @@ extern "C" {
   const char* get_solver_str(QudaInverterType type);
 
   const char* get_quda_ver_str();
+
+  QudaExtLibType get_solve_ext_lib_type(char* s);
+
+  QudaFieldLocation get_df_location_ritz(char* s);
+
+  QudaMemoryType get_df_mem_type_ritz(char* s);
+
+
 #ifdef __cplusplus
 }
 #endif

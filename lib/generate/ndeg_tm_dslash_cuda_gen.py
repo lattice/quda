@@ -10,13 +10,13 @@ def complexToStr(c):
     def fltToString(a):
         if a == int(a): return `int(a)`
         else: return `a`
-    
+
     def imToString(a):
         if a == 0: return "0i"
         elif a == -1: return "-i"
         elif a == 1: return "i"
         else: return fltToString(a)+"i"
-    
+
     re = c.real
     im = c.imag
     if re == 0 and im == 0: return "0"
@@ -146,7 +146,7 @@ def def_input_spinor():
     str += "// input spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
     str += "#define spinorFloat double\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_DOUBLE2\n"
         str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_DOUBLE2\n"
 
@@ -157,7 +157,7 @@ def def_input_spinor():
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_FLOAT4\n"
         str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_FLOAT4\n"
     for s in range(0,4):
@@ -189,7 +189,7 @@ def def_gauge():
 
     str += "\n"
     str += "#endif // GAUGE_DOUBLE\n\n"
-            
+
     str += "// conjugated gauge link\n"
     for m in range(0,3):
         for n in range(0,3):
@@ -282,7 +282,7 @@ def prolog():
 
 
     # set the pointer if using shared memory for pseudo registers
-#    if sharedFloatsPerFlavor > 0 and not sharedDslash: 
+#    if sharedFloatsPerFlavor > 0 and not sharedDslash:
     if sharedFloatsPerFlavor > 0:
         prolog_str += (
 """
@@ -321,7 +321,7 @@ if (kernel_type == INTERIOR_KERNEL) {
 
   // only need to check Y and Z dims currently since X and T set to match exactly
   if (coord[1] >= param.X[1]) return;
-  if (coord[2] >= param.X[2]) return; 
+  if (coord[2] >= param.X[2]) return;
 
 """)
         else:
@@ -418,7 +418,7 @@ if (sid >= param.threads) return;
 
 // read spinor from device memory
 READ_SPINOR(SPINORTEX, param.sp_stride, sid, sid);
-""")            
+""")
     return prolog_str
 # end def prolog
 
@@ -428,7 +428,7 @@ def gen(dir, pack_only=False):
     projStr = projectorToStr(projectors[projIdx])
     def proj(i,j):
         return projectors[projIdx][4*i+j]
-    
+
     # if row(i) = (j, c), then the i'th row of the projector can be represented
     # as a multiple of the j'th row: row(i) = c row(j)
     def row(i):
@@ -456,7 +456,7 @@ def gen(dir, pack_only=False):
     cond += "#endif\n"
 
     str = ""
-    
+
     projName = "P"+`dir/2`+["-","+"][projIdx%2]
     str += "// Projector "+projName+"\n"
     for l in projStr.splitlines():
@@ -543,21 +543,21 @@ def gen(dir, pack_only=False):
 
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-#if (dir+1) % 2 == 0: 
+#if (dir+1) % 2 == 0:
  #         load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
-  #  else: 
+  #  else:
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
    #       load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
 
     load_half_flv1 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
-    
+
     load_half_flv2 = "// read half spinor for the second flavor from device memory\n"
     load_half_flv2 += "const int fl_idx = sp_idx + ghostFace[static_cast<int>(kernel_type)];\n"
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    #if (dir+1) % 2 == 0: 
+    #if (dir+1) % 2 == 0:
      #     load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
-    #else: 
+    #else:
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
      #     load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
 
@@ -589,7 +589,7 @@ def gen(dir, pack_only=False):
                     elif re==0:
                         strRe += sign(-im)+in_im(s,c)
                         strIm += sign(im)+in_re(s,c)
-                
+
             project += h1_re(h,c)+" = "+strRe+";\n"
             project += h1_im(h,c)+" = "+strIm+";\n"
 
@@ -673,14 +673,14 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
     prep_half_cond3 = "}\n"
     prep_half_cond3 += "#endif // MULTI_GPU\n"
     prep_half_cond3 += "\n"
-    
+
     ident = "// identity gauge matrix\n"
     for m in range(0,3):
         for h in range(0,2):
             ident += "spinorFloat "+h2_re(h,m)+" = " + h1_re(h,m) + "; "
             ident += "spinorFloat "+h2_im(h,m)+" = " + h1_im(h,m) + ";\n"
     ident += "\n"
-    
+
     mult = ""
     for m in range(0,3):
         mult += "// multiply row "+`m`+"\n"
@@ -694,7 +694,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
                 im += h2_im(h,m) + " += " + g_im(dir,m,c) + " * "+h1_re(h,c)+";\n"
             mult += re + im
         mult += "\n"
-    
+
     reconstruct_flv1 = ""
     for m in range(0,3):
 
@@ -704,7 +704,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
                 h_out = h+2
             reconstruct_flv1 += out1_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
             reconstruct_flv1 += out1_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
-    
+
         for s in range(2,4):
             (h,c) = row(s)
             re = c.real
@@ -717,7 +717,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             elif re == 0:
                 reconstruct_flv1 += out1_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
                 reconstruct_flv1 += out1_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
-        
+
         reconstruct_flv1 += "\n"
 
     reconstruct_flv2 = ""
@@ -729,7 +729,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
                 h_out = h+2
             reconstruct_flv2 += out2_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
             reconstruct_flv2 += out2_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
-    
+
         for s in range(2,4):
             (h,c) = row(s)
             re = c.real
@@ -742,7 +742,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             elif re == 0:
                 reconstruct_flv2 += out2_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
                 reconstruct_flv2 += out2_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
-        
+
         reconstruct_flv2 += "\n"
 
 
@@ -753,9 +753,9 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         str += " else "
         str += block(load_gauge + reconstruct_gauge + "{\n"+ prep_half_cond1 + prep_half_flv1 + prep_half_cond2 + load_half_cond + prep_face_flv1 + prep_half + prep_half_cond3 + mult + reconstruct_flv1 + "}\n" + "{\n"+ prep_half_cond1 + prep_half_flv2 + prep_half_cond2 + load_half_cond + prep_face_flv2 + prep_half + prep_half_cond3 + mult + reconstruct_flv2 +"}\n")
     else:
-        str += decl_half + load_gauge + reconstruct_gauge 
-        str +="{\n" + prep_half_cond1 + prep_half_flv1 + prep_half_cond2 + load_half_cond + prep_face_flv1 + prep_half + prep_half_cond3 + mult + reconstruct_flv1 + "}\n" 
-        str +="{\n" + prep_half_cond1 + prep_half_flv2 + prep_half_cond2 + load_half_cond + prep_face_flv2 + prep_half + prep_half_cond3 + mult + reconstruct_flv2 + "}\n"     
+        str += decl_half + load_gauge + reconstruct_gauge
+        str +="{\n" + prep_half_cond1 + prep_half_flv1 + prep_half_cond2 + load_half_cond + prep_face_flv1 + prep_half + prep_half_cond3 + mult + reconstruct_flv1 + "}\n"
+        str +="{\n" + prep_half_cond1 + prep_half_flv2 + prep_half_cond2 + load_half_cond + prep_face_flv2 + prep_half + prep_half_cond3 + mult + reconstruct_flv2 + "}\n"
 
     if pack_only:
         out = load_spinor + decl_half + project
@@ -797,7 +797,7 @@ def twisted():
     if dagger :
        a1 += " - a *"
        a2 += " + a *"
-    else:     
+    else:
        a1 += " + a *"
        a2 += " - a *"
 
@@ -968,7 +968,7 @@ def xpay():
     if dagger :
        a1 += " - a *"
        a2 += " + a *"
-    else:     
+    else:
        a1 += " + a *"
        a2 += " - a *"
 
@@ -1062,20 +1062,20 @@ case EXTERIOR_KERNEL_Y:
   incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==X1m1));
 }
 
-""")    
+""")
     str += "\n"
     str += "if (!incomplete)\n"
     str += "#endif // MULTI_GPU\n"
     str += "// apply twisted mass rotation\n"
     str += block( "\n" + twisted() + xpay() )
-    
+
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
     str += "WRITE_FLAVOR_SPINOR();\n\n"
 
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#undef WRITE_SPINOR_SHARED\n"
         str += "#undef READ_SPINOR_SHARED\n"
     if sharedFloatsPerFlavor > 0: str += "#undef SHARED_STRIDE\n\n"
@@ -1104,7 +1104,7 @@ case EXTERIOR_KERNEL_Y:
                     str += "#undef "+out1_im(s,c)+"\n"
     str += "\n"
 
-    str += "#undef VOLATILE\n" 
+    str += "#undef VOLATILE\n"
 
     return str
 # end def epilog
@@ -1130,7 +1130,7 @@ def generate_dslash_kernels(arch):
     if arch >= 200:
         sharedFloatsPerFlavor = 0
         #sharedDslash = True
-        sharedDslash = False    
+        sharedDslash = False
         name = "fermi"
     elif arch >= 120:
         sharedFloatsPerFlavor = 0

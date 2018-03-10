@@ -1,5 +1,5 @@
 #include <tune_quda.h>
-#include <int32_to_char.h>
+#include <uint_to_char.h>
 
 namespace quda {
 
@@ -56,12 +56,8 @@ namespace quda {
 
     TuneKey tuneKey() const {
       char vol[128];
-      if (count < INT_MAX) {
-	strcpy(vol,"bytes=");
-	i32toa(vol+6, count);
-      } else {
-	sprintf(vol, "bytes=%llu", (long long unsigned int)count);
-      }
+      strcpy(vol,"bytes=");
+      u64toa(vol+6, (uint64_t)count);
       return TuneKey(vol, name, aux);
     }
 
@@ -76,7 +72,7 @@ namespace quda {
       printfQuda("%s bytes = %llu\n", __func__, (long long unsigned int)count);
 
     if (count == 0) return;
-#if 0
+#if 1
     QudaMemCopy copy(dst, src, count, kind, func, file, line);
     copy.apply(0);
 #else

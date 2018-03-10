@@ -343,7 +343,13 @@ namespace quda {
 	// reduce down to the first group of column-split threads
 	constexpr int warp_size = 32; // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
-	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2) out[color_local] += __shfl_down(out[color_local], offset);
+	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2)
+#if (__CUDACC_VER_MAJOR__ >= 9)
+	  out[color_local] += __shfl_down_sync(WARP_CONVERGED, out[color_local], offset);
+#else
+	  out[color_local] += __shfl_down(out[color_local], offset);
+#endif
+
 #endif
 	int c = color_block + color_local; // global color index
 	if (color_offset == 0) {
@@ -890,10 +896,10 @@ namespace quda {
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
       // check all precisions match
-      QudaPrecision precision = Precision(out, inA, inB, Y, X);
+      QudaPrecision precision = checkPrecision(out, inA, inB, Y, X);
 
       // check all locations match
-      Location(out, inA, inB, Y, X);
+      checkLocation(out, inA, inB, Y, X);
 
       MemoryLocation pack_destination[2*QUDA_MAX_DIM]; // where we will pack the ghost buffer to
       MemoryLocation halo_location[2*QUDA_MAX_DIM]; // where we load the halo from

@@ -1,5 +1,5 @@
 
-Copyright (c) 2009-2016 QUDA Developers
+Copyright (c) 2009-2017, QUDA Developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 QUDA is supported by NVIDIA, and includes the NVIDIA-licensed
 libraries cub and generics.
 
-Copyright (c) 2011-2015, NVIDIA Corporation
+Copyright (c) 2011-2017, NVIDIA Corporation
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -145,7 +145,32 @@ This file is supplied under the following license.
   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
   DEALINGS IN THE SOFTWARE.
 
+QUDA uses the branchlut integer-to-char conversion functions taken
+from itoa benchmark of Milo Yip (https://github.com/miloyip/itoa-benchmark).
+Located in include/uint_to_char.h, these routines are supplied under
+the following license.
 
+    Copyright (C) 2014 Milo Yip
+
+    Permission is hereby granted, free of charge, to any person
+    obtaining a copy of this software and associated documentation
+    files (the "Software"), to deal in the Software without
+    restriction, including without limitation the rights to use, copy,
+    modify, merge, publish, distribute, sublicense, and/or sell copies
+    of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be
+    included in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
 
 QUDA leverages LLNL's PMPI wrapper generator for generation of NVTX
 wrappers to enable the Visual Profiler to display MPI timeline

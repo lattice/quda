@@ -75,6 +75,10 @@ extern "C" {
     int return_result_gauge; /**< Return the result gauge field */
     int return_result_mom;   /**< Return the result momentum field */
 
+    size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+
   } QudaGaugeParam;
 
 
@@ -202,6 +206,7 @@ extern "C" {
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
     double clover_coeff;                   /**< Coefficient of the clover term */
+    double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
     double trlogA[2];                      /**< The trace log of the clover term (even/odd computed separately) */
@@ -290,24 +295,18 @@ extern "C" {
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
     */
-    int max_search_dim;//for magma library this parameter must be multiple 16?
+    int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
     /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
     int deflation_grid;
-    /** eigCG: specifies whether to use reduced eigenvector set */
-    int use_reduced_vector_set;
     /** eigCG: selection criterion for the reduced eigenvector set */
     double eigenval_tol;
-    /** mixed precision eigCG tuning parameter:  whether to use cg refinement corrections in the incremental stage */
-    int use_cg_updates;
-    /** mixed precision eigCG tuning parameter:  tolerance for cg refinement corrections in the incremental stage */
-    double cg_iterref_tol;
     /** mixed precision eigCG tuning parameter:  minimum search vector space restarts */
     int eigcg_max_restarts;
     /** initCG tuning parameter:  maximum restarts */
     int max_restart_num;
-    /** initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle */
+    /** initCG tuning parameter:  tolerance for cg refinement corrections in the deflation stage */
     double inc_tol;
 
     /** Whether to make the solution vector(s) after the solve */
@@ -327,6 +326,9 @@ extern "C" {
 
     /** The index to indeicate which chrono history we are augmenting */
     int chrono_index;
+
+    /** Which external library to use in the linear solvers (MAGMA or Eigen) */
+    QudaExtLibType extlib_type;
 
   } QudaInvertParam;
 
@@ -361,6 +363,9 @@ extern "C" {
     /** The precision of the Ritz vectors */
     QudaPrecision cuda_prec_ritz;
 
+    /** The memory type used to keep the Ritz vectors */
+    QudaMemoryType mem_type_ritz;
+
     /** Location where deflation should be done */
     QudaFieldLocation location;
 
@@ -378,6 +383,9 @@ extern "C" {
 
     /**< The time taken by the multigrid solver setup */
     double secs;
+
+    /** Which external library to use in the deflation operations (MAGMA or Eigen) */
+    QudaExtLibType extlib_type;
 
   } QudaEigParam;
 
@@ -728,15 +736,12 @@ extern "C" {
   void destroyMultigridQuda(void *mg_instance);
 
   /**
-<<<<<<< HEAD
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
-=======
->>>>>>> 5c038cb32c1ab09c9fcd09c41a001f1a1bd857a3
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1003,18 +1008,6 @@ extern "C" {
     const QudaGaugeParam* param);
 
 
-
-  void computeHISQForceCompleteQuda(void* momentum,
-                      const double level2_coeff[6],
-                      const double fat7_coeff[6],
-                      void** quark_array,
-                      int num_terms,
-                      double** quark_coeff,
-                      const void* const w_link,
-                      const void* const v_link,
-                      const void* const u_link,
-                      const QudaGaugeParam* param);
-
   /**
    * Generate Gaussian distributed gauge field
    * @param seed Seed
@@ -1026,6 +1019,19 @@ extern "C" {
    * @param Array for storing the averages (total, spatial, temporal)
    */
   void plaqQuda(double plaq[3]);
+
+  /**
+   * Performs Wuppertal smearing on a given spinor using the gauge field 
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param nSteps Number of steps to apply.
+   * @param alpha  Alpha coefficient for Wuppertal smearing.
+   */
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, 
+                             unsigned int nSteps, double alpha);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared

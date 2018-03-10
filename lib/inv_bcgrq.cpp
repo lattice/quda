@@ -13,8 +13,6 @@
 #include <limits>
 #include <cmath>
 
-#include <face_quda.h>
-
 #include <iostream>
 #include <Eigen/Dense>
 #include <cuda_profiler_api.h>
@@ -246,7 +244,7 @@ int BlockCG::block_reliable(double &rNorm, double &maxrx, double &maxrr, const d
 template <int nsrc>
 void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
-  if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");
+  if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");
 
   profile.TPSTART(QUDA_PROFILE_INIT);
 

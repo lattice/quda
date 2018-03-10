@@ -71,7 +71,11 @@ module quda_fortran
      integer(4) :: return_result_gauge ! Return the result gauge field
      integer(4) :: return_result_mom   ! Return the result momentum field
 
-  end type quda_gauge_param
+     integer(8) :: gauge_offset ! Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+     integer(8) :: mom_offset   ! Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+     integer(8) :: site_size    ! Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+
+ end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
   type quda_invert_param
@@ -167,6 +171,7 @@ module quda_fortran
      QudaUseInitGuess :: use_init_guess
 
      real(8) :: clover_coeff ! Coefficient of the clover term
+     real(8) :: clover_rho   ! Real number added to the clover diagonal (not to inverse)
      integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
      real(8), dimension(2) :: trlogA    ! The trace log of the clover term (even/odd computed separately)
 
@@ -258,6 +263,9 @@ module quda_fortran
 
      ! The index to indeicate which chrono history we are augmenting */
      integer(4)::chrono_index
+
+     ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     QudaExtLibType::extlib_type
 
   end type quda_invert_param
 

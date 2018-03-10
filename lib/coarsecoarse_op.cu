@@ -11,6 +11,8 @@
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
+
   template <typename Float, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
@@ -143,7 +145,7 @@ namespace quda {
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv,
 			const Transfer &T, const GaugeField &g, const GaugeField &clover, const GaugeField &cloverInv,
 			double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
-    Precision(X, Y, uv, T.Vectors(), g);
+    checkPrecision(X, Y, uv, T.Vectors(), g);
 
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -160,14 +162,17 @@ namespace quda {
     printfQuda("....done computing Y field\n");
   }
 
+#endif // GPU_MULTIGRID
+
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
 		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
+#ifdef GPU_MULTIGRID
     QudaPrecision precision = Y.Precision();
-    QudaFieldLocation location = Location(X, Y, Xinv, Yhat, gauge, clover, cloverInv);
+    QudaFieldLocation location = checkLocation(X, Y, Xinv, Yhat, gauge, clover, cloverInv);
 
     //Create a field UV which holds U*V.  Has the same similar
     //structure to V but double the number of spins so we can store
@@ -183,6 +188,9 @@ namespace quda {
     calculateYcoarse(Y, X, Xinv, Yhat, *uv, T, gauge, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
 
     delete uv;
+#else
+    errorQuda("Multigrid has not been built");
+#endif // GPU_MULTIGRID
   }
   
 } //namespace quda

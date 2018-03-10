@@ -23,12 +23,13 @@ extern "C" {
     QUDA_SU3_LINKS,
     QUDA_GENERAL_LINKS,
     QUDA_THREE_LINKS,
-    QUDA_MOMENTUM,
+    QUDA_MOMENTUM_LINKS,
     QUDA_COARSE_LINKS, // used for coarse-gauge field with multigrid
+    QUDA_SMEARED_LINKS, // used for loading and saving gaugeSmeared in the interface
     QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
     QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
     QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,
-    QUDA_ASQTAD_MOM_LINKS  = QUDA_MOMENTUM,
+    QUDA_ASQTAD_MOM_LINKS  = QUDA_MOMENTUM_LINKS,
     QUDA_ASQTAD_GENERAL_LINKS = QUDA_GENERAL_LINKS,
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
   } QudaLinkType;
@@ -41,6 +42,7 @@ extern "C" {
     QUDA_QDPJIT_GAUGE_ORDER, // expect *gauge[mu], even-odd, complex-column-row-spacetime
     QUDA_CPS_WILSON_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, column-row color
     QUDA_MILC_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, row-column order
+    QUDA_MILC_SITE_GAUGE_ORDER, // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
     QUDA_BQCD_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime+halos, column-row order
     QUDA_TIFR_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime, column-row order
     QUDA_TIFR_PADDED_GAUGE_ORDER, // expect *gauge, mu, parity, t, z+halo, y, x/2, column-row order
@@ -90,23 +92,10 @@ extern "C" {
     QUDA_ASQTAD_DSLASH,
     QUDA_TWISTED_MASS_DSLASH,
     QUDA_TWISTED_CLOVER_DSLASH,
+    QUDA_LAPLACE_DSLASH,
+    QUDA_COVDEV_DSLASH,
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
-
-  typedef enum QudaDslashPolicy_s {
-    QUDA_DSLASH,
-    QUDA_FUSED_DSLASH,
-    QUDA_GPU_COMMS_DSLASH,
-    QUDA_FUSED_GPU_COMMS_DSLASH,
-    QUDA_ZERO_COPY_DSLASH_PACK,
-    QUDA_FUSED_ZERO_COPY_DSLASH_PACK,
-    QUDA_ZERO_COPY_DSLASH,
-    QUDA_FUSED_ZERO_COPY_DSLASH,
-    QUDA_DSLASH_ASYNC,
-    QUDA_FUSED_DSLASH_ASYNC,
-    QUDA_PTHREADS_DSLASH,
-    QUDA_DSLASH_NC
-  } QudaDslashPolicy;
 
   typedef enum QudaInverterType_s {
     QUDA_CG_INVERTER,
@@ -296,6 +285,9 @@ extern "C" {
     QUDA_TWISTED_CLOVERPC_DIRAC,
     QUDA_COARSE_DIRAC,
     QUDA_COARSEPC_DIRAC,
+    QUDA_GAUGE_LAPLACE_DIRAC,
+    QUDA_GAUGE_LAPLACEPC_DIRAC,
+    QUDA_GAUGE_COVDEV_DIRAC,
     QUDA_INVALID_DIRAC = QUDA_INVALID_ENUM
   } QudaDiracType;
 
@@ -465,6 +457,14 @@ extern "C" {
     QUDA_CONTRACT_TSLICE_MINUS,
     QUDA_CONTRACT_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
+
+  //Allows to choose an appropriate external library
+  typedef enum QudaExtLibType_s {
+    QUDA_CUSOLVE_EXTLIB,
+    QUDA_EIGEN_EXTLIB,
+    QUDA_MAGMA_EXTLIB,
+    QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
+  } QudaExtLibType;
 
 #ifdef __cplusplus
 }

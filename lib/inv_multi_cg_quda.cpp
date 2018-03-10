@@ -8,7 +8,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <face_quda.h>
 
 /*!
  * Generic Multi Shift Solver 
@@ -156,7 +155,7 @@ namespace quda {
 
   void MultiShiftCG::operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b)
   {
-    if (Location(*(x[0]), b) != QUDA_CUDA_FIELD_LOCATION)
+    if (checkLocation(*(x[0]), b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
 
     profile.TPSTART(QUDA_PROFILE_INIT);
@@ -461,8 +460,8 @@ namespace quda {
 	printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     }
     
-    
     for (int i=0; i<num_offset; i++) {
+      if (iter[i] == 0) iter[i] = k;
       blas::copy(*x[i], *x_sloppy[i]);
       if (reliable) blas::xpy(*y[i], *x[i]);
     }
@@ -508,8 +507,8 @@ namespace quda {
 	}
       }
 
-      if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && tmp5_p != y[1]) delete tmp5_p;
-      if (tmp4_p != &tmp1 && tmp4_p != y[0]) delete tmp4_p;
+      if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && (reliable ? tmp5_p != y[1] : 1)) delete tmp5_p;
+      if (tmp4_p != &tmp1 && (reliable ? tmp4_p != y[0] : 1)) delete tmp4_p;
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
 	printfQuda("MultiShift CG: Converged after %d iterations\n", k);

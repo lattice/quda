@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <algorithm>
 
 #include <util_quda.h>
 #include <test_util.h>
@@ -11,8 +12,6 @@
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
-
-#include "face_quda.h"
 
 #if defined(QMP_COMMS)
 #include <qmp.h>
@@ -36,9 +35,10 @@ extern int tdim;
 extern int Lsdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
+extern QudaPrecision  prec;
 extern QudaPrecision  prec_sloppy;
 extern QudaPrecision  prec_precondition;
+extern QudaPrecision  prec_ritz;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
@@ -67,6 +67,22 @@ extern void usage(char** );
 
 extern double clover_coeff;
 extern bool compute_clover;
+
+extern int nev;
+extern int max_search_dim;
+extern int deflation_grid;
+extern double tol_restart;
+
+extern int eigcg_max_restarts;
+extern int max_restart_num;
+extern double inc_tol;
+extern double eigenval_tol;
+
+extern QudaExtLibType   solver_ext_lib;
+extern QudaExtLibType   deflation_ext_lib;
+
+extern QudaFieldLocation location_ritz;
+extern QudaMemoryType    mem_type_ritz;
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -102,6 +118,7 @@ QudaPrecision &cpu_prec = prec;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
+QudaPrecision &cuda_prec_ritz = prec_ritz;
 
 void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.X[0] = xdim;
@@ -211,28 +228,24 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.rhs_idx  = 0;
 
+  inv_param.nev = nev;
+  inv_param.max_search_dim = max_search_dim;
+  inv_param.deflation_grid = deflation_grid;
+  inv_param.tol_restart = tol_restart;
+  inv_param.eigcg_max_restarts = eigcg_max_restarts;
+  inv_param.max_restart_num = max_restart_num;
+  inv_param.inc_tol = inc_tol;
+  inv_param.eigenval_tol = eigenval_tol;
+
+
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-    inv_param.nev = 8;
-    inv_param.max_search_dim = 64;
-    inv_param.deflation_grid = 16;//to test the stuff
-    inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
-    inv_param.use_reduced_vector_set = true;
-    inv_param.use_cg_updates = false;
-    inv_param.cg_iterref_tol = 5e-2;
-    inv_param.eigcg_max_restarts = 3;
-    inv_param.max_restart_num = 3;
-    inv_param.inc_tol = 1e-2;
-    inv_param.eigenval_tol = 1e-2;
   }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-    inv_param.nev = 7;
-    inv_param.max_search_dim = 15;
-    inv_param.deflation_grid = 100;//to test the stuff
     inv_param.tol_restart = 0.0;//restart is not requested...
   }
 
-  inv_param.cuda_prec_ritz = cuda_prec_sloppy;
+  inv_param.cuda_prec_ritz = cuda_prec_ritz;
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.verbosity_precondition = QUDA_SILENT;
 
@@ -253,20 +266,24 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-2;
-  inv_param.maxiter_precondition = 16;
+  inv_param.maxiter_precondition = 10;
   inv_param.omega = 1.0;
+
+  inv_param.extlib_type = solver_ext_lib;
 }
 
 void setDeflationParam(QudaEigParam &df_param) {
 
   df_param.import_vectors = QUDA_BOOLEAN_NO;
-  df_param.cuda_prec_ritz = cuda_prec_sloppy;
-
-  df_param.location       = QUDA_CUDA_FIELD_LOCATION;
   df_param.run_verify     = QUDA_BOOLEAN_NO;
 
-  df_param.nk       = df_param.invert_param->nev;
-  df_param.np       = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
+  df_param.nk             = df_param.invert_param->nev;
+  df_param.np             = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
+  df_param.extlib_type    = deflation_ext_lib;
+
+  df_param.cuda_prec_ritz = prec_ritz;
+  df_param.location       = location_ritz;
+  df_param.mem_type_ritz  = mem_type_ritz;
 
   // set file i/o parameters
   strcpy(df_param.vec_infile, vec_infile);
