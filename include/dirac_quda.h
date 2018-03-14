@@ -105,7 +105,7 @@ namespace quda {
     mutable ColorSpinorField *tmp1; // temporary hack
     mutable ColorSpinorField *tmp2; // temporary hack
     QudaDiracType type; 
-    QudaPrecision halo_precision; // only does something for DiracCoarse at present
+    mutable QudaPrecision halo_precision; // only does something for DiracCoarse at present
 
     bool newTmp(ColorSpinorField **, const ColorSpinorField &) const;
     void deleteTmp(ColorSpinorField **, const bool &reset) const;
@@ -180,6 +180,8 @@ namespace quda {
 				double kappa, double mass=0., double mu=0., double mu_factor=0.) const
     {errorQuda("Not implemented");}
 
+    QudaPrecision HaloPrecision() const { return halo_precision; }
+    void setHaloPrecision(QudaPrecision halo_precision_) const { halo_precision = halo_precision_; }
   };
 
   // Full Wilson
