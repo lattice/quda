@@ -460,6 +460,9 @@ extern "C" {
     /** Over/under relaxation factor for the smoother at each level */
     double omega[QUDA_MAX_MG_LEVEL];
 
+    /** Precision to use for halo communication in the smoother */
+    QudaPrecision smoother_halo_precision[QUDA_MAX_MG_LEVEL];
+
     /** Whether to use additive or multiplicative Schwarz preconditioning in the smoother */
     QudaSchwarzType smoother_schwarz_type[QUDA_MAX_MG_LEVEL];
 
