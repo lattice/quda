@@ -746,8 +746,6 @@ namespace quda {
 	Float *ghost[8];
 	int nParity;
 
-	FloatNOrder() {}
-
 	void *backup_h; //! host memory for backing up the field when tuning
 	size_t bytes;
 

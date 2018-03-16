@@ -173,11 +173,12 @@ new_cudaGaugeField(QudaGaugeParam& gp, QUDA_REAL *hbuf_u[])
   GaugeField *cpu_gf   = static_cast<GaugeField*>(new cpuGaugeField(gf_param));
 
   gf_param.create         = QUDA_NULL_FIELD_CREATE;
-//  gf_param.precision      = gp.cuda_prec;
+  //  gf_param.precision      = gp.cuda_prec;
   gf_param.reconstruct    = gp.reconstruct;
   gf_param.ghostExchange  = QUDA_GHOST_EXCHANGE_PAD;
   gf_param.pad            = gp.ga_pad;
   gf_param.order          = QUDA_FLOAT2_GAUGE_ORDER;
+  gf_param.setPrecision(QUDA_DOUBLE_PRECISION);
 
   GaugeField *cuda_gf = NULL;
   cuda_gf = new cudaGaugeField(gf_param);

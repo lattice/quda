@@ -23,9 +23,9 @@ namespace quda {
     
     typedef typename colorspinor_mapper<QUDA_REAL,QUDA_Ns,QUDA_Nc>::type Propagator;        
 
-    Propagator pIn1[QUDA_PROP_NVEC];  // Input propagator 1
-    Propagator pIn2[QUDA_PROP_NVEC];  // Input propagator 2
-    Propagator pOut[QUDA_PROP_NVEC];  // Output propagator 
+    Propagator *pIn1[QUDA_PROP_NVEC];  // Input propagator 1
+    Propagator *pIn2[QUDA_PROP_NVEC];  // Input propagator 2
+    Propagator *pOut[QUDA_PROP_NVEC];  // Output propagator 
     
     const int parity;                 // only use this for single parity fields
     const int nParity;                // number of parities we're working on
@@ -43,14 +43,21 @@ namespace quda {
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB(propIn1[0]->VolumeCB()), nVec(cParam.nVec), cntrID(cParam.cntrID)
     {
-      
       for(int ivec=0;ivec<nVec;ivec++){
-	pIn1[ivec].init(*propIn1[ivec]);
-	pIn2[ivec].init(*propIn2[ivec]);
-	pOut[ivec].init(*propOut[ivec]);
+	pIn1[ivec] = new Propagator(*propIn1[ivec]);
+	pIn2[ivec] = new Propagator(*propIn2[ivec]);
+	pOut[ivec] = new Propagator(*propOut[ivec]);
       }
-
-    }    
+    }
+    
+    ~ContractQQArg(){
+      for(int ivec=0;ivec<nVec;ivec++){
+	delete pIn1[ivec];
+	delete pIn2[ivec];
+	delete pOut[ivec];
+      }
+    }
+    
   }; //-- Structure definition
 
   
@@ -74,8 +81,8 @@ namespace quda {
     Vector In2[QUDA_PROP_NVEC];						\
     									\
     for(int i=0;i<12;i++){						\
-      In1[i] = arg->pIn1[i](x_cb, pty);					\
-      In2[i] = arg->pIn2[i](x_cb, pty);					\
+      In1[i] = arg->pIn1[i]->operator()(x_cb, pty);			\
+      In2[i] = arg->pIn2[i]->operator()(x_cb, pty);			\
     }									\
     rotatePropBasis(In1,QLUA_quda2qdp);					\
     rotatePropBasis(In2,QLUA_quda2qdp);					\
@@ -150,7 +157,7 @@ namespace quda {
     rotatePropBasis(out, QLUA_qdp2quda);
         
     for(int ivec=0;ivec<arg->nVec;ivec++)
-      arg->pOut[ivec](x_cb, pty) = out[ivec];
+      arg->pOut[ivec]->operator()(x_cb, pty) = out[ivec];
     
   } //-- function closes
   
