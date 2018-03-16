@@ -1583,7 +1583,7 @@ namespace quda {
     ColorSpinorParam param(*this);
     param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.location = QUDA_CPU_FIELD_LOCATION;
-    param.create = QUDA_NULL_FIELD_CREATE;
+    param.create = (sourceType == QUDA_POINT_SOURCE ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE);
 
     cpuColorSpinorField tmp(param);
     tmp.Source(sourceType, st, s, c);
@@ -1701,7 +1701,7 @@ namespace quda {
       genericCudaPrintVector<Float,4,3>(field,i);
     }
     else if (field.Ncolor() == 3 && field.Nspin() == 1)  {
-      genericCudaPrintVector<Float,4,1>(field,i);
+      genericCudaPrintVector<Float,1,3>(field,i);
     }
     else if (field.Ncolor() == 6 && field.Nspin() == 2) { // wilson free field MG
       genericCudaPrintVector<Float,2,6>(field,i);
