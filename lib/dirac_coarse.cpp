@@ -317,9 +317,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out,in);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim);
+      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim);
+      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
     }
 
     int n = in.Nspin()*in.Ncolor();

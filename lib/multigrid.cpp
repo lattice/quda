@@ -270,6 +270,7 @@ namespace quda {
 
     // create smoothing operators
     diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
+    diracParam.halo_precision = param.mg_global.smoother_halo_precision[param.level+1];
 
     if (diracCoarseSmoother) delete diracCoarseSmoother;
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
@@ -896,6 +897,10 @@ namespace quda {
         diracSmootherSloppy->setCommDim(commDim);
     }
 
+    // if quarter precision halo, promote for null-space finding to half precision
+    QudaPrecision halo_precision = diracSmootherSloppy->HaloPrecision();
+    if (halo_precision == QUDA_QUARTER_PRECISION) diracSmootherSloppy->setHaloPrecision(QUDA_HALF_PRECISION);
+
     Solver *solve;
     DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
     DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
@@ -1002,6 +1007,8 @@ namespace quda {
     delete solve;
     if (mdagm) delete mdagm;
     if (mdagmSloppy) delete mdagmSloppy;
+
+    diracSmootherSloppy->setHaloPrecision(halo_precision); // restore halo precision
 
     delete x;
     delete b;
