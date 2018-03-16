@@ -2,7 +2,7 @@
 include_directories(.)
 
 #build a common library for all test utilities
-set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
+set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp face_gauge.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 
 set(TEST_LIBS quda quda_test )
@@ -14,6 +14,11 @@ MACRO (QUDA_CHECKBUILDTEST mytarget qudabuildtests)
 ENDMACRO()
 #define tests
 
+# if we build with QDP JIT the tests cannot run anyway
+if(QUDA_INTERFACE_QDPJIT)
+  set(QUDA_BUILD_ALL_TESTS OFF)
+endif()
+
 if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_DOMAIN_WALL)
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )
@@ -23,19 +28,17 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
   target_link_libraries(invert_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(invert_test QUDA_BUILD_ALL_TESTS)
 
-
   if(QUDA_BLOCKSOLVER)
     cuda_add_executable(invertmsrc_test invertmsrc_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
     target_link_libraries(invertmsrc_test ${TEST_LIBS})
     QUDA_CHECKBUILDTEST(invertmsrc_test QUDA_BUILD_ALL_TESTS)
   endif()
+endif()
 
-  if(QUDA_DEFLATEDSOLVER)
+if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_DOMAIN_WALL OR QUDA_DIRAC_STAGGERED)
     cuda_add_executable(deflated_invert_test deflated_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
     target_link_libraries(deflated_invert_test ${TEST_LIBS})
     QUDA_CHECKBUILDTEST(deflated_invert_test QUDA_BUILD_ALL_TESTS)
-  endif()
-
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
@@ -82,6 +85,10 @@ QUDA_CHECKBUILDTEST(pack_test QUDA_BUILD_ALL_TESTS)
 cuda_add_executable(blas_test blas_test.cu)
 target_link_libraries(blas_test ${TEST_LIBS})
 QUDA_CHECKBUILDTEST(blas_test QUDA_BUILD_ALL_TESTS)
+
+cuda_add_executable(covdev_test covdev_test.cpp  covdev_reference.cpp)
+target_link_libraries(covdev_test ${TEST_LIBS})
+QUDA_CHECKBUILDTEST(covdev_test QUDA_BUILD_ALL_TESTS)
 
 if(QUDA_LINK_ASQTAD OR QUDA_LINK_HISQ)
   cuda_add_executable(llfat_test llfat_test.cpp llfat_reference.cpp)

@@ -1,6 +1,5 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
-#include <face_quda.h>
 
 namespace quda {
 

@@ -4,6 +4,7 @@
 #include <index_helper.cuh>
 #include <stencil.h>
 #include <color_spinor.h>
+#include <worker.h>
 
 /**
    This is a basic gauged Laplace operator
@@ -174,7 +175,6 @@ namespace quda {
     }
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
-    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / arg.nParity; }
 
   public:
     Laplace(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
@@ -285,6 +285,8 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
+
+    in.bufferIndex = (1 - in.bufferIndex);
   }
 
 

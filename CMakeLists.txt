@@ -50,7 +50,7 @@ endif()
 project("QUDA" VERSION 0.9.0)
 
 if(NOT GITVERSION)
-  set(GITVERSION ${CMAKE_VERSION})
+  set(GITVERSION ${PROJECT_VERSION})
 endif()
 
 
@@ -67,8 +67,8 @@ if(NOT QUDA_GPU_ARCH)
   message ("-- Building QUDA for arch " "${QUDA_DEFAULT_GPU_ARCH}")
 endif()
 
-set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60)
+set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
@@ -128,39 +128,40 @@ set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
 set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
+set(QUDA_NVML OFF CACHE BOOL "use NVML to report CUDA graphics driver version" )
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template for multi-blas /-reduce")
 
+set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
 
-# GPUdirect options
-set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
-
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
-set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
+
+option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
+mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 
+mark_as_advanced(QUDA_OPENMP)
+
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
-
-mark_as_advanced(QUDA_GPU_DIRECT)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
@@ -178,41 +179,65 @@ set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 # we need to check for some packages
 find_package(PythonInterp)
 
+if(QUDA_BUILD_SHAREDLIB AND ${CMAKE_VERSION} VERSION_LESS 3.8.0)
+  message(FATAL_ERROR "Building QUDA as shared library is only support with cmake 3.8 and newer.")
+endif()
+
 if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
   find_package(CUDAWrapper)
   set(USING_CUDA_LANG_SUPPORT True)
   set(CMAKE_CUDA_STANDARD 11)
   set(CMAKE_CUDA_STANDARD_REQUIRED True)
+  set(QUDA_SHAREDLIB_INTERFACE "INTERFACE")
+  set(QUDA_SHAREDLIB_PUBLIC "PUBLIC")
+  set(QUDA_SHAREDLIB_PRIVATE "PRIVATE")
 else()
   set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host side compiler used by NVCC")
   mark_as_advanced(CUDA_HOST_COMPILER)
   find_package(CUDA REQUIRED)
   set(USING_CUDA_LANG_SUPPORT False)
+  set(QUDA_SHAREDLIB_INTERFACE "")
+  set(QUDA_SHAREDLIB_PUBLIC "")
+  set(QUDA_SHAREDLIB_PRIVATE "")
 endif()
 
 #######################################################################
 ## QUDA depends on Eigen
 ## this part makes sure we can download eigen if it is not found
 if (QUDA_DOWNLOAD_EIGEN)
+  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2)
+  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2)
+  set(EIGEN_SHA dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6)
+  if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION} )
+    message(STATUS "Checking for Eigen tarball and downloading if necessary.")
+  endif()
+  FILE(DOWNLOAD ${EIGEN_URL} ${EIGEN_DOWNLOAD_LOCATION} EXPECTED_HASH SHA256=${EIGEN_SHA} STATUS EIGEN_DOWNLOADED)
+  list(GET EIGEN_DOWNLOADED 0 EIGEN_DOWNLOADED_CODE)
+  list(GET EIGEN_DOWNLOADED 1 EIGEN_DOWNLOADED_MSG)
+  if(${EIGEN_DOWNLOADED_CODE})
+    message(SEND_ERROR "Could not download Eigen automatically (${EIGEN_DOWNLOADED_MSG}). Please download eigen from ${EIGEN_URL} and save it to ${EIGEN_DOWNLOAD_LOCATION} and try running cmake again.")
+  endif()
+
   include(ExternalProject)
   ExternalProject_Add(Eigen
-    URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2
-    URL_HASH SHA256=dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/eigen/
+    URL ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2
+    URL_HASH SHA256=${EIGEN_SHA}
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
     CONFIGURE_COMMAND ""
     BUILD_COMMAND COMMAND ""
     INSTALL_COMMAND ""
   )
   ExternalProject_Get_Property(Eigen source_dir)
-  set(EIGEN_INCLUDE_DIRS ${source_dir}/EIGEN)
+  set(EIGEN_INCLUDE_DIRS ${source_dir})
 else()
+  # fall back to using find_package
   find_package(Eigen QUIET)
   if(NOT EIGEN_FOUND)
     message(FATAL_ERROR "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components.")
   endif()
 endif()
-include_directories(${EIGEN_INCLUDE_DIRS})
-
+include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
+## Now we hopefully found some way to get eigen to work
 
 # We need threads
 find_package(Threads REQUIRED)
@@ -255,11 +280,12 @@ if(QUDA_QMP)
     message( FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is set" )
   endif()
   add_definitions(-DQMP_COMMS)
-  set(QUDA_QMP_LDFLAGS  "" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-  set(QUDA_QMP_LIBS  "" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+  set(QUDA_QMP_LDFLAGS  ${QUDA_QMP_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+  set(QUDA_QMP_LIBS  ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   #FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
@@ -339,12 +365,6 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
-endif()
-
-if(QUDA_DEFLATEDSOLVER)
-  add_definitions(-DDEFLATEDSOLVER)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_ALTRELIABLE)
@@ -433,7 +453,12 @@ if(QUDA_INTERFACE_NVTX)
 endif(QUDA_INTERFACE_NVTX)
 
 if(QUDA_NVTX)
-  FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
+  if(CMAKE_VERSION VERSION_GREATER  3.7.99)
+    get_filename_component(cuda_dir "${CMAKE_CUDA_COMPILER}" DIRECTORY)
+    FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt PATHS  ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} "${cuda_dir}/..")
+  else()
+    FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64/)
+  endif()
   LIST(APPEND QUDA_LIBS ${CUDA_NVTX_LIB})
 endif(QUDA_NVTX)
 
@@ -444,10 +469,6 @@ endif(NOT QUDA_BLAS_TEX)
 if(NOT QUDA_FERMI_DBLE_TEX)
   add_definitions(-DFERMI_NO_DBLE_TEX)
 endif(NOT QUDA_FERMI_DBLE_TEX)
-
-if(GPU_DIRECT)
-  add_definitions(-DGPU_DIRECT)
-endif(GPU_DIRECT)
 
 if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
@@ -479,13 +500,17 @@ if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
   enable_language(Fortran)
 endif()
 
-
+if(QUDA_NVML)
+  add_definitions(-DQUDA_NVML)
+  find_package(NVML REQUIRED)
+  include_directories(SYSTEM NVML_INCLUDE_DIR)
+endif(QUDA_NVML)
 
 if(QUDA_NUMA_NVML)
   add_definitions(-DNUMA_NVML)
   set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
   find_package(NVML REQUIRED)
-  include_directories(NVML_INCLUDE_DIR)
+  include_directories(SYSTEM NVML_INCLUDE_DIR)
 endif(QUDA_NUMA_NVML)
 
 
@@ -493,6 +518,16 @@ if(QUDA_CONTRACT)
   add_definitions(-DGPU_CONTRACT)
 endif(QUDA_CONTRACT)
 
+
+if(QUDA_OPENMP)
+  FIND_PACKAGE( OpenMP REQUIRED)
+  if(OPENMP_FOUND)
+    message("OPENMP FOUND")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+  endif()
+endif()
 
 # COMPILER OPTIONS and BUILD types
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -507,6 +542,10 @@ STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
 
+# this allows simplified running of clang-tidy 
+if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
+   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
 # build up git version
@@ -530,7 +569,7 @@ add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 # NVCC FLAGS independet off build type
 if(NOT USING_CUDA_LANG_SUPPORT)
-  set(QUDA_NVCC_FLAGS -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+  set(QUDA_NVCC_FLAGS "-std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false")
 else()
   set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
   set(CMAKE_CUDA_FLAGS "-arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
@@ -646,3 +685,4 @@ mark_as_advanced(CMAKE_F_FLAGS)
 ### add tests and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
+add_subdirectory(doc)

@@ -6,7 +6,6 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
-#include <face_quda.h>
 
 // include because of nasty globals used in the tests
 #include <dslash_util.h>
@@ -14,9 +13,11 @@
 // google test
 #include <gtest.h>
 
+extern int test_type;
+extern QudaPrecision prec;
 extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
-extern int nvec;
+extern int nvec[QUDA_MAX_MG_LEVEL];
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -45,7 +46,7 @@ int Ncolor;
 
 void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
 {
-  param.precision = precision;
+  param.setPrecision(precision);
   if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   } else {
@@ -71,6 +72,13 @@ display_test_info()
 int Nprec = 3;
 
 bool skip_kernel(int precision, int kernel) {
+  // if we've selected a given kernel then make sure we only run that
+  if (test_type != -1 && kernel != test_type) return true;
+
+  // if we've selected a given precision then make sure we only run that
+  QudaPrecision this_prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
+  if (prec != QUDA_INVALID_PRECISION && this_prec != prec) return true;
+
   if ( Nspin == 2 && precision == 0) {
     // avoid half precision tests if doing coarse fields
     return true;
@@ -109,7 +117,7 @@ void initFields(int prec)
 
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  param.precision = QUDA_DOUBLE_PRECISION;
+  param.setPrecision(QUDA_DOUBLE_PRECISION);
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
   param.create = QUDA_ZERO_FIELD_CREATE;
@@ -868,7 +876,7 @@ double test(int kernel) {
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Nsrc; j++) {
 	B2[i*Nsrc+j] = blas::cDotProduct(xmD->Component(i), xmD->Component(j));
-	error += fabs(A2[i*Nsrc+j] - B2[i*Nsrc+j])/fabs(B2[i*Nsrc+j]);
+	error += std::abs(A2[i*Nsrc+j] - B2[i*Nsrc+j])/std::abs(B2[i*Nsrc+j]);
       }
     }
     error /= Nsrc*Nsrc;
@@ -882,7 +890,7 @@ double test(int kernel) {
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) {
 	B[i*Msrc+j] = blas::cDotProduct(xmD->Component(i), ymD->Component(j));
-	error += fabs(A[i*Msrc+j] - B[i*Msrc+j])/fabs(B[i*Msrc+j]);
+	error += std::abs(A[i*Msrc+j] - B[i*Msrc+j])/std::abs(B[i*Msrc+j]);
       }
     }
     error /= Nsrc*Msrc;
@@ -949,6 +957,9 @@ const char *names[] = {
 
 int main(int argc, char** argv)
 {
+  prec = QUDA_INVALID_PRECISION;
+  test_type = -1;
+
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -960,7 +971,8 @@ int main(int argc, char** argv)
   // override spin setting if mg solver is set to test coarse grids
   if (inv_type == QUDA_MG_INVERTER) {
     Nspin = 2;
-    Ncolor = nvec;
+    Ncolor = nvec[0];
+    if (Ncolor == 0) Ncolor = 24;
   } else {
     // set spin according to the type of dslash
     Nspin = (dslash_type == QUDA_ASQTAD_DSLASH ||

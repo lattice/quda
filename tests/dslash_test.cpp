@@ -79,7 +79,7 @@ extern bool kernel_pack_t;
 extern double mass; // mass of Dirac operator
 extern double mu;
 
-QudaVerbosity verbosity = QUDA_VERBOSE;
+extern QudaVerbosity verbosity;
 
 void init(int argc, char **argv) {
 
@@ -239,6 +239,7 @@ void init(int argc, char **argv) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
+    inv_param.clover_cuda_prec_precondition = inv_param.clover_cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
     hostClover = malloc((size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
@@ -275,7 +276,7 @@ void init(int argc, char **argv) {
   }
 
 
-  csParam.precision = inv_param.cpu_prec;
+  csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
 
   if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
@@ -347,8 +348,8 @@ void init(int argc, char **argv) {
   if (!transfer) {
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
-    csParam.precision = inv_param.cuda_prec;
-    if (csParam.precision == QUDA_DOUBLE_PRECISION ) {
+    csParam.setPrecision(inv_param.cuda_prec);
+    if (csParam.Precision() == QUDA_DOUBLE_PRECISION ) {
       csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     } else {
       /* Single and half */
@@ -446,15 +447,32 @@ void end() {
 
 }
 
+struct DslashTime {
+  double event_time;
+  double cpu_time;
+  double cpu_min;
+  double cpu_max;
+
+  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) {}
+};
+
 // execute kernel
-double dslashCUDA(int niter) {
+DslashTime dslashCUDA(int niter) {
+
+  DslashTime dslash_time;
+  timeval tstart, tstop;
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventCreate(&end);
+
+  comm_barrier();
   cudaEventRecord(start, 0);
 
   for (int i = 0; i < niter; i++) {
+
+    gettimeofday(&tstart, NULL);
+
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
       switch (test_type) {
         case 0:
@@ -591,6 +609,18 @@ double dslashCUDA(int niter) {
           break;
       }
     }
+
+    gettimeofday(&tstop, NULL);
+    long ds = tstop.tv_sec - tstart.tv_sec;
+    long dus = tstop.tv_usec - tstart.tv_usec;
+    double elapsed = ds + 0.000001*dus;
+
+    dslash_time.cpu_time += elapsed;
+    // skip first and last iterations since they may skew these metrics if comms are not synchronous
+    if (i>0 && i<niter) {
+      if (elapsed < dslash_time.cpu_min) dslash_time.cpu_min = elapsed;
+      if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
+    }
   }
     
   cudaEventRecord(end, 0);
@@ -600,14 +630,14 @@ double dslashCUDA(int niter) {
   cudaEventDestroy(start);
   cudaEventDestroy(end);
 
-  double secs = runTime / 1000; //stopwatchReadSeconds();
+  dslash_time.event_time = runTime / 1000;
 
   // check for errors
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
-  return secs;
+  return dslash_time;
 }
 
 void dslashRef() {
@@ -962,10 +992,6 @@ int main(int argc, char **argv)
 
   init(argc, argv);
 
-  float spinorGiB = (float)Vh*spinorSiteSize*inv_param.cuda_prec / (1 << 30);
-  printfQuda("\nSpinor mem: %.3f GiB\n", spinorGiB);
-  printfQuda("Gauge mem: %.3f GiB\n", gauge_param.gaugeGiB);
-  
   int attempts = 1;
   dslashRef();
   for (int i=0; i<attempts; i++) {
@@ -976,19 +1002,22 @@ int main(int argc, char **argv)
     }
     printfQuda("Executing %d kernel loops...\n", niter);
     if (!transfer) dirac->Flops();
-    double secs = dslashCUDA(niter);
+    DslashTime dslash_time = dslashCUDA(niter);
     printfQuda("done.\n\n");
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
     // print timing information
-    printfQuda("%fus per kernel call\n", 1e6*secs / niter);
+    printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
     //FIXME No flops count for twisted-clover yet
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
-    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("Effective halo bi-directional bandwidth = %f for aggregate message size %lu bytes\n",
-	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
+    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
+
+    printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
+	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
+	       1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
+	       2*cudaSpinor->GhostBytes());
 
     double norm2_cpu = blas::norm2(*spinorRef);
     double norm2_cpu_cuda= blas::norm2(*spinorOut);

@@ -9,7 +9,6 @@
 #include <staggered_dslash_reference.h>
 #include <quda.h>
 #include <string.h>
-#include <face_quda.h>
 #include "misc.h"
 #include <gauge_field.h>
 #include <blas_quda.h>
@@ -18,10 +17,6 @@
 #include <qmp.h>
 #elif defined(MPI_COMMS)
 #include <mpi.h>
-#endif
-
-#ifdef MULTI_GPU
-#include <face_quda.h>
 #endif
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -237,7 +232,7 @@ invert_test(void)
   csParam.x[0] /= 2;
   csParam.x[4] = 1;
 
-  csParam.precision = inv_param.cpu_prec;
+  csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;

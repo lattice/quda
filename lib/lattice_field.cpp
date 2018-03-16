@@ -4,18 +4,8 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
-#include <face_quda.h>
 
 namespace quda {
-
-  void* LatticeField::bufferPinned[] = {NULL};
-  bool LatticeField::bufferPinnedInit[] = {false};
-  size_t LatticeField::bufferPinnedBytes[] = {0};
-  size_t LatticeField::bufferPinnedResizeCount = 0;
-
-  void* LatticeField::bufferDevice = NULL;
-  bool LatticeField::bufferDeviceInit = false;
-  size_t LatticeField::bufferDeviceBytes = 0;
 
   bool LatticeField::initIPCComms = false;
 
@@ -45,11 +35,16 @@ namespace quda {
 
   void* LatticeField::ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
+  bool LatticeField::initGhostFaceBuffer = false;
+  size_t LatticeField::ghostFaceBytes = 0;
+
   int LatticeField::bufferIndex = 0;
 
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
-    : nDim(field.Ndim()), pad(field.Pad()), precision(field.Precision()),
-      siteSubset(field.SiteSubset()), mem_type(field.MemType()),  ghostExchange(field.GhostExchange())
+    : precision(field.Precision()), ghost_precision(field.Precision()),
+      nDim(field.Ndim()), pad(field.Pad()),
+      siteSubset(field.SiteSubset()), mem_type(field.MemType()),
+      ghostExchange(field.GhostExchange()), scale(field.Scale())
   {
     for(int dir=0; dir<nDim; ++dir) {
       x[dir] = field.X()[dir];
@@ -58,9 +53,14 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeFieldParam &param)
-    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
-      siteSubset(param.siteSubset), ghostExchange(param.ghostExchange), initComms(false), mem_type(param.mem_type)
+    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim),
+      precision(param.Precision()), ghost_precision(param.GhostPrecision()),
+      scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
+      ghost_bytes(0), ghost_bytes_old(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
+      backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
+    precisionCheck();
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
@@ -83,13 +83,28 @@ namespace quda {
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
 
+    switch (precision) {
+    case QUDA_DOUBLE_PRECISION:
+    case QUDA_SINGLE_PRECISION:
+    case QUDA_HALF_PRECISION:
+      break;
+    default:
+      errorQuda("Unknown precision %d", precision);
+    }
+
     setTuningString();
   }
 
   LatticeField::LatticeField(const LatticeField &field)
-    : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
-      siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), initComms(false), mem_type(field.mem_type)
+    : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim),
+      precision(field.precision), ghost_precision(field.ghost_precision),
+      scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange),
+      ghost_bytes(0), ghost_bytes_old(0),
+      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
+      backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
+    precisionCheck();
     for (int i=0; i<nDim; i++) {
       x[i] = field.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
@@ -116,6 +131,165 @@ namespace quda {
   }
 
   LatticeField::~LatticeField() { }
+
+  void LatticeField::allocateGhostBuffer(size_t ghost_bytes) const
+  {
+    // only allocate if not already allocated or buffer required is bigger than previously
+    if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes) {
+
+      if (initGhostFaceBuffer) {
+	if (ghost_bytes) {
+	  for (int b=0; b<2; b++) {
+	    device_pinned_free(ghost_recv_buffer_d[b]);
+	    device_pinned_free(ghost_send_buffer_d[b]);
+	    host_free(ghost_pinned_buffer_h[b]);
+	  }
+	}
+      }
+
+      if (ghost_bytes > 0) {
+	for (int b=0; b<2; ++b) {
+	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+
+	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+
+	  // pinned buffer used for sending and receiving
+	  ghost_pinned_buffer_h[b] = mapped_malloc(2*ghost_bytes);
+
+	  // set the matching device-mapper pointer
+	  cudaHostGetDevicePointer(&ghost_pinned_buffer_hd[b], ghost_pinned_buffer_h[b], 0);
+	}
+
+	initGhostFaceBuffer = true;
+	ghostFaceBytes = ghost_bytes;
+      }
+
+      LatticeField::ghost_field_reset = true; // this signals that we must reset the IPC comms
+    }
+
+  }
+
+  void LatticeField::freeGhostBuffer(void)
+  {
+    destroyIPCComms();
+
+    if (!initGhostFaceBuffer) return;
+
+    for (int b=0; b<2; b++) {
+      // free receive buffer
+      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
+      ghost_recv_buffer_d[b] = nullptr;
+
+      // free send buffer
+      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
+      ghost_send_buffer_d[b] = nullptr;
+
+      // free pinned memory buffers
+      if (ghost_pinned_buffer_h[b]) host_free(ghost_pinned_buffer_h[b]);
+      ghost_pinned_buffer_h[b] = nullptr;
+      ghost_pinned_buffer_hd[b] = nullptr;
+    }
+    initGhostFaceBuffer = false;
+  }
+
+  void LatticeField::createComms(bool no_comms_fill, bool bidir)
+  {
+    destroyComms(); // if we are requesting a new number of faces destroy and start over
+
+    // initialize the ghost pinned buffers
+    for (int b=0; b<2; b++) {
+      my_face_h[b] = ghost_pinned_buffer_h[b];
+      my_face_hd[b] = ghost_pinned_buffer_hd[b];
+      from_face_h[b] = static_cast<char*>(my_face_h[b]) + ghost_bytes;
+      from_face_hd[b] = static_cast<char*>(my_face_hd[b]) + ghost_bytes;
+    }
+
+    // initialize ghost send pointers
+    size_t offset = 0;
+    for (int i=0; i<nDimComms; i++) {
+      if (!commDimPartitioned(i) && no_comms_fill==false) continue;
+
+      for (int b=0; b<2; ++b) {
+	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
+	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
+
+	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
+	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
+
+	my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
+	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*ghost_precision;
+      } // loop over b
+
+      // if not bidir then forwards and backwards will alias
+      if (bidir) offset += ghost_face_bytes[i];
+
+      for (int b=0; b<2; ++b) {
+	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
+	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
+
+	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
+	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
+
+	my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
+	from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*ghost_precision;
+      } // loop over b
+      offset += ghost_face_bytes[i];
+
+    } // loop over dimension
+
+    bool gdr = comm_gdr_enabled(); // only allocate rdma buffers if GDR enabled
+
+    // initialize the message handlers
+    for (int i=0; i<nDimComms; i++) {
+      if (!commDimPartitioned(i)) continue;
+
+      for (int b=0; b<2; ++b) {
+	mh_send_fwd[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
+	mh_send_back[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
+
+	mh_recv_fwd[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
+	mh_recv_back[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
+
+	mh_send_rdma_fwd[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
+	mh_send_rdma_back[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
+
+	mh_recv_rdma_fwd[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
+	mh_recv_rdma_back[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
+      } // loop over b
+
+    } // loop over dimension
+
+    initComms = true;
+    checkCudaError();
+  }
+
+  void LatticeField::destroyComms()
+  {
+    if (initComms) {
+
+      for (int b=0; b<2; ++b) {
+	for (int i=0; i<nDimComms; i++) {
+	  if (commDimPartitioned(i)) {
+	    if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
+	    if (mh_recv_back[b][i]) comm_free(mh_recv_back[b][i]);
+	    if (mh_send_fwd[b][i]) comm_free(mh_send_fwd[b][i]);
+	    if (mh_send_back[b][i]) comm_free(mh_send_back[b][i]);
+
+	    if (mh_recv_rdma_fwd[b][i]) comm_free(mh_recv_rdma_fwd[b][i]);
+	    if (mh_recv_rdma_back[b][i]) comm_free(mh_recv_rdma_back[b][i]);
+	    if (mh_send_rdma_fwd[b][i]) comm_free(mh_send_rdma_fwd[b][i]);
+	    if (mh_send_rdma_back[b][i]) comm_free(mh_send_rdma_back[b][i]);
+	  }
+	}
+      } // loop over b
+
+      initComms = false;
+      checkCudaError();
+    }
+
+  }
 
   void LatticeField::createIPCComms() {
     if ( initIPCComms && !ghost_field_reset ) return;
@@ -164,7 +338,8 @@ namespace quda {
       // open the remote memory handles and set the send ghost pointers
       for (int dim=0; dim<4; ++dim) {
 	if (comm_dim(dim)==1) continue;
-	const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
+	// even if comm_dim(2) == 2, we not have p2p enabled in both directions, so check this
+	const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
 	for (int dir=0; dir<num_dir; ++dir) {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
 	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
@@ -247,7 +422,7 @@ namespace quda {
       if (comm_peer2peer_enabled(0,dim)) {
 	for (int b=0; b<2; b++) {
 	  // send to processor in backward direction
-	  mh_send_p2p_back[b][dim] = comm_declare_send_relative(&buffer_recv_p2p_back[b][dim], dim, -1, sizeof(int));
+	  mh_send_p2p_back[b][dim] = comm_declare_send_relative(&buffer_send_p2p_back[b][dim], dim, -1, sizeof(int));
 	  // receive from processor in backward direction
 	  mh_recv_p2p_back[b][dim] = comm_declare_receive_relative(&buffer_recv_p2p_back[b][dim], dim, -1, sizeof(int));
 	}
@@ -267,24 +442,26 @@ namespace quda {
     for (int dim=0; dim<4; ++dim) {
 
       if (comm_dim(dim)==1) continue;
-      const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
+      const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
 
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
-	  comm_free(mh_send_p2p_fwd[b][dim]);
-	  comm_free(mh_recv_p2p_fwd[b][dim]);
-	  cudaEventDestroy(ipcCopyEvent[b][1][dim]);
-
-	  // only close this handle if it doesn't alias the back ghost
-	  if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+	  if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
+	  if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
+	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
+	    cudaEventDestroy(ipcCopyEvent[b][1][dim]);
+	    // only close this handle if it doesn't alias the back ghost
+	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+	  }
 	}
 
 	if (comm_peer2peer_enabled(0,dim)) {
-	  comm_free(mh_send_p2p_back[b][dim]);
-	  comm_free(mh_recv_p2p_back[b][dim]);
-	  cudaEventDestroy(ipcCopyEvent[b][0][dim]);
-
-	  cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+	  if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
+	  if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
+	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
+	    cudaEventDestroy(ipcCopyEvent[b][0][dim]);
+	    cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+	  }
 	}
       } // buffer
     } // iterate over dim
@@ -301,6 +478,10 @@ namespace quda {
   bool LatticeField::ipcRemoteCopyComplete(int dir, int dim)
   {
     return (cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
+  }
+
+  const cudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
+    return ipcCopyEvent[bufferIndex][dir][dim];
   }
 
   const cudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
@@ -358,12 +539,11 @@ namespace quda {
 	       typeid(*this)==typeid(cpuColorSpinorField) ||
 	       typeid(*this)==typeid(cpuGaugeField)) {
       location = QUDA_CPU_FIELD_LOCATION;
-      location = QUDA_CPU_FIELD_LOCATION;
     } else {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
     }
     return location;
-}
+  }
 
   void LatticeField::read(char *filename) {
     errorQuda("Not implemented");
@@ -392,41 +572,6 @@ namespace quda {
     return -1;
   }
 
-  void LatticeField::resizeBufferPinned(size_t bytes, const int idx) const {
-    if ((bytes > bufferPinnedBytes[idx] || bufferPinnedInit[idx] == 0) && bytes > 0) {
-      if (bufferPinnedInit[idx]) host_free(bufferPinned[idx]);
-      bufferPinned[idx] = pinned_malloc(bytes);
-      bufferPinnedBytes[idx] = bytes;
-      bufferPinnedInit[idx] = true;
-      bufferPinnedResizeCount++;
-      if (bufferPinnedResizeCount == 0) bufferPinnedResizeCount = 1; // keep 0 as initialization state
-    }
-  }
-
-  void LatticeField::resizeBufferDevice(size_t bytes) const {
-    if ((bytes > bufferDeviceBytes || bufferDeviceInit == 0) && bytes > 0) {
-      if (bufferDeviceInit) device_free(bufferDevice);
-      bufferDevice = device_malloc(bytes);
-      bufferDeviceBytes = bytes;
-      bufferDeviceInit = true;
-    }
-  }
-
-  void LatticeField::freeBuffer(int index) {
-    if (bufferPinnedInit[index]) {
-      host_free(bufferPinned[index]);
-      bufferPinned[index] = NULL;
-      bufferPinnedBytes[index] = 0;
-      bufferPinnedInit[index] = false;
-    }
-    if (bufferDeviceInit) {
-      device_free(bufferDevice);
-      bufferDevice = NULL;
-      bufferDeviceBytes = 0;
-      bufferDeviceInit = false;
-    }
-  }
-
   // This doesn't really live here, but is fine for the moment
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param)
   {
@@ -435,7 +580,9 @@ namespace quda {
       output << "x[" << i << "] = " << param.x[i] << std::endl;    
     }
     output << "pad = " << param.pad << std::endl;
-    output << "precision = " << param.precision << std::endl;
+    output << "precision = " << param.Precision() << std::endl;
+    output << "ghost_precision = " << param.GhostPrecision() << std::endl;
+    output << "scale = " << param.scale << std::endl;
 
     output << "ghostExchange = " << param.ghostExchange << std::endl;
     for (int i=0; i<param.nDim; i++) {

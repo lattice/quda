@@ -1,4 +1,5 @@
 #include <blas_cublas.h>
+#include <cublas_v2.h>
 #include <malloc_quda.h>
 
 #define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \
@@ -21,6 +22,24 @@ namespace quda {
 
   namespace cublas { 
 
+#ifdef CUBLAS_LIB
+    static cublasHandle_t handle;
+#endif
+
+    void init() {
+#ifdef CUBLAS_LIB
+      cublasStatus_t error = cublasCreate(&handle);
+      if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed with error %d", error);
+#endif
+    }
+
+    void destroy() {
+#ifdef CUBLAS_LIB
+      cublasStatus_t error = cublasDestroy(handle);
+      if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError indestroying cublas context, error code = %d\n", error);
+#endif
+    }
+
     // mini kernel to set the array of pointers needed for batched cublas
     template<typename T>
     __global__ void set_pointer(T **output_array_a, T *input_a, T **output_array_b, T *input_b, int batch_offset)
@@ -38,7 +57,6 @@ namespace quda {
       gettimeofday(&start, NULL);
 
       size_t size = 2*n*n*prec*batch;
-
       void *A_d = location == QUDA_CUDA_FIELD_LOCATION ? A : pool_device_malloc(size);
       void *Ainv_d = location == QUDA_CUDA_FIELD_LOCATION ? Ainv : pool_device_malloc(size);
       if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, cudaMemcpyHostToDevice);
@@ -47,10 +65,6 @@ namespace quda {
       int *dinfo_array = static_cast<int*>(pool_device_malloc(batch*sizeof(int)));
       int *info_array = static_cast<int*>(pool_pinned_malloc(batch*sizeof(int)));
 
-      cublasHandle_t handle;
-      cublasStatus_t error = cublasCreate(&handle);
-      if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed");
-
       if (prec == QUDA_SINGLE_PRECISION) {
 	typedef cuFloatComplex C;
 	C **A_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
@@ -58,7 +72,7 @@ namespace quda {
 
 	set_pointer<C><<<batch,1>>>(A_array, (C*)A_d, Ainv_array, (C*)Ainv_d, n*n);
 
-	error = cublasCgetrfBatched(handle, n, A_array, n, dipiv, dinfo_array, batch);
+	cublasStatus_t error = cublasCgetrfBatched(handle, n, A_array, n, dipiv, dinfo_array, batch);
 	flops += batch*FLOPS_CGETRF(n,n);
 
 	if (error != CUBLAS_STATUS_SUCCESS)
@@ -73,8 +87,7 @@ namespace quda {
 	  }
 	}
     
-	error = cublasCgetriBatched(handle, n, (const C**)A_array, n, dipiv,
-				    Ainv_array, n, dinfo_array, batch);
+	error = cublasCgetriBatched(handle, n, (const C**)A_array, n, dipiv, Ainv_array, n, dinfo_array, batch);
 	flops += batch*FLOPS_CGETRI(n);
 
 	if (error != CUBLAS_STATUS_SUCCESS)
@@ -93,15 +106,9 @@ namespace quda {
 	pool_device_free(Ainv_array);
 	pool_device_free(A_array);
 
-      } else if (prec == QUDA_DOUBLE_PRECISION) {
-
       } else {
 	errorQuda("%s not implemented for precision=%d", __func__, prec);
       }
-
-      error = cublasDestroy(handle);
-      if (error != CUBLAS_STATUS_SUCCESS)
-	errorQuda("\nError indestroying cublas context, error code = %d\n", error);
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	qudaMemcpy(Ainv, Ainv_d, size, cudaMemcpyDeviceToHost);
@@ -119,8 +126,8 @@ namespace quda {
       long dus = stop.tv_usec - start.tv_usec;
       double time = ds + 0.000001*dus;
 
-      printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n",
-		 time, 1e-9 * flops / time);
+      if (getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
 #endif // CUBLAS_LIB
 
       return flops;

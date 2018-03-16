@@ -1,6 +1,10 @@
 #pragma once
+#include <quda_constants.h>
 #include <float_vector.h>
+#include <comm_quda.h>
+#include <blas_quda.h>
 
+#include <thrust_helper.cuh>
 using namespace quda;
 #include <cub/cub.cuh>
 
@@ -71,6 +75,10 @@ namespace quda {
     __device__ __host__ inline void operator+=(const vector_type &a) {
 #pragma unroll
       for (int i=0; i<n; i++) data[i] += a[i];
+    }
+    __device__ __host__ inline void operator=(const vector_type &a) {
+#pragma unroll
+      for (int i=0; i<n; i++) data[i] = a[i];
     }
     __device__ __host__ vector_type() {
 #pragma unroll

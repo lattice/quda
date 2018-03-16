@@ -57,7 +57,6 @@ extern "C" {
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
-    double gaugeGiB;  /**< The storage used by the gauge fields */
 
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
@@ -74,6 +73,10 @@ extern "C" {
     int make_resident_mom;   /**< Make the result momentum field resident */
     int return_result_gauge; /**< Return the result gauge field */
     int return_result_mom;   /**< Return the result momentum field */
+
+    size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
 
   } QudaGaugeParam;
 
@@ -218,8 +221,6 @@ extern "C" {
     int cl_pad;                            /**< The padding to use for the clover fields */
 
     int iter;                              /**< The number of iterations performed by the solver */
-    double spinorGiB;                      /**< The memory footprint of the fermion fields */
-    double cloverGiB;                      /**< The memory footprint of the clover fields */
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
 
@@ -291,24 +292,18 @@ extern "C" {
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
     */
-    int max_search_dim;//for magma library this parameter must be multiple 16?
+    int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
     /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
     int deflation_grid;
-    /** eigCG: specifies whether to use reduced eigenvector set */
-    int use_reduced_vector_set;
     /** eigCG: selection criterion for the reduced eigenvector set */
     double eigenval_tol;
-    /** mixed precision eigCG tuning parameter:  whether to use cg refinement corrections in the incremental stage */
-    int use_cg_updates;
-    /** mixed precision eigCG tuning parameter:  tolerance for cg refinement corrections in the incremental stage */
-    double cg_iterref_tol;
     /** mixed precision eigCG tuning parameter:  minimum search vector space restarts */
     int eigcg_max_restarts;
     /** initCG tuning parameter:  maximum restarts */
     int max_restart_num;
-    /** initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle */
+    /** initCG tuning parameter:  tolerance for cg refinement corrections in the deflation stage */
     double inc_tol;
 
     /** Whether to make the solution vector(s) after the solve */
@@ -318,16 +313,22 @@ extern "C" {
     int use_resident_solution;
 
     /** Whether to use the solution vector to augment the chronological basis */
-    int make_resident_chrono;
+    int chrono_make_resident;
+
+    /** Whether the solution should replace the last entry in the chronology */
+    int chrono_replace_last;
 
     /** Whether to use the resident chronological basis */
-    int use_resident_chrono;
+    int chrono_use_resident;
 
     /** The maximum length of the chronological history to store */
-    int max_chrono_dim;
+    int chrono_max_dim;
 
     /** The index to indeicate which chrono history we are augmenting */
     int chrono_index;
+
+    /** Which external library to use in the linear solvers (MAGMA or Eigen) */
+    QudaExtLibType extlib_type;
 
   } QudaInvertParam;
 
@@ -362,6 +363,9 @@ extern "C" {
     /** The precision of the Ritz vectors */
     QudaPrecision cuda_prec_ritz;
 
+    /** The memory type used to keep the Ritz vectors */
+    QudaMemoryType mem_type_ritz;
+
     /** Location where deflation should be done */
     QudaFieldLocation location;
 
@@ -379,6 +383,9 @@ extern "C" {
 
     /**< The time taken by the multigrid solver setup */
     double secs;
+
+    /** Which external library to use in the deflation operations (MAGMA or Eigen) */
+    QudaExtLibType extlib_type;
 
   } QudaEigParam;
 
@@ -399,17 +406,65 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
+    /** Precision to store the null-space vectors in (post block orthogonalization) */
+    QudaPrecision precision_null[QUDA_MAX_MG_LEVEL];
+
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
 
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
 
+    /** Number of setup iterations */
+    int num_setup_iter[QUDA_MAX_MG_LEVEL];
+
     /** Tolerance to use in the setup phase */
     double setup_tol[QUDA_MAX_MG_LEVEL];
 
+    /** Maximum number of iterations for each setup solver */
+    int setup_maxiter[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum number of iterations for refreshing the null-space vectors */
+    int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
+
+    /** Null-space type to use in the setup phase */
+    QudaSetupType setup_type;
+
+    /** Pre orthonormalize vectors in the setup phase */
+    QudaBoolean pre_orthonormalize;
+
+    /** Post orthonormalize vectors in the setup phase */
+    QudaBoolean post_orthonormalize;
+
+    /** The solver that wraps around the coarse grid correction and smoother */
+    QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance to use for the smoother / solver on each level */
+    double smoother_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Number of pre-smoother applications on each level */
+    int nu_pre[QUDA_MAX_MG_LEVEL];
+
+    /** Number of post-smoother applications on each level */
+    int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Over/under relaxation factor for the smoother at each level */
+    double omega[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to use additive or multiplicative Schwarz preconditioning in the smoother */
+    QudaSchwarzType smoother_schwarz_type[QUDA_MAX_MG_LEVEL];
+
+    /** Number of Schwarz cycles to apply */
+    int smoother_schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
     /** The type of residual to send to the next coarse grid, and thus the
 	type of solution to receive back from this coarse grid */
@@ -421,23 +476,14 @@ extern "C" {
     /** The type of multigrid cycle to perform at each level */
     QudaMultigridCycleType cycle_type[QUDA_MAX_MG_LEVEL];
 
-    /** Number of pre-smoother applications on each level */
-    int nu_pre[QUDA_MAX_MG_LEVEL];
-
-    /** Number of post-smoother applications on each level */
-    int nu_post[QUDA_MAX_MG_LEVEL];
-
-    /** Tolerance to use for the smoother / solver on each level */
-    double smoother_tol[QUDA_MAX_MG_LEVEL];
-
-    /** Over/under relaxation factor for the smoother at each level */
-    double omega[QUDA_MAX_MG_LEVEL];
-
     /** Whether to use global reductions or not for the smoother / solver at each level */
     QudaBoolean global_reduction[QUDA_MAX_MG_LEVEL];
 
     /** Location where each level should be done */
     QudaFieldLocation location[QUDA_MAX_MG_LEVEL];
+
+    /** Location where the coarse-operator construction will be computedn */
+    QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
@@ -729,15 +775,12 @@ extern "C" {
   void destroyMultigridQuda(void *mg_instance);
 
   /**
-<<<<<<< HEAD
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
-=======
->>>>>>> 5c038cb32c1ab09c9fcd09c41a001f1a1bd857a3
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1003,18 +1046,6 @@ extern "C" {
     const void* const u_link,
     const QudaGaugeParam* param);
 
-
-
-  void computeHISQForceCompleteQuda(void* momentum,
-                      const double level2_coeff[6],
-                      const double fat7_coeff[6],
-                      void** quark_array,
-                      int num_terms,
-                      double** quark_coeff,
-                      const void* const w_link,
-                      const void* const v_link,
-                      const void* const u_link,
-                      const QudaGaugeParam* param);
 
   /**
    * Generate Gaussian distributed gauge field

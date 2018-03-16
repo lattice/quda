@@ -11,7 +11,6 @@
 
 #include <gauge_field.h>
 #include <color_spinor_field.h>
-#include <face_quda.h>
 
 #include <dslash_util.h>
 #include <string.h>
@@ -196,7 +195,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = Z[d];
-  csParam.precision = precision;
+  csParam.setPrecision(precision);
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.x[0] /= 2;

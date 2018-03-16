@@ -22,16 +22,22 @@
 #define QUDA_MEMORY_MAPPED 2
 #define QUDA_MEMORY_INVALID QUDA_INVALID_ENUM
 
+#define QUDA_CUSOLVE_EXTLIB  0
+#define QUDA_EIGEN_EXTLIB    1
+#define QUDA_MAGMA_EXTLIB    2
+#define QUDA_EXTLIB_INVALID QUDA_INVALID_ENUM
+
 #define QUDA_SU3_LINKS     0
 #define QUDA_GENERAL_LINKS 1
 #define QUDA_THREE_LINKS   2
 #define QUDA_MOMENTUM      3
 #define QUDA_COARSE_LINKS  4
 #define QUDA_SMEARED_LINKS 5
+
 #define QUDA_WILSON_LINKS         QUDA_SU3_LINKS
 #define QUDA_ASQTAD_FAT_LINKS     QUDA_GENERAL_LINKS
 #define QUDA_ASQTAD_LONG_LINKS    QUDA_THREE_LINKS
-#define QUDA_ASQTAD_MOM_LINKS     QUDA_MOMENTUM
+#define QUDA_ASQTAD_MOM_LINKS     QUDA_MOMENTUM_LINKS
 #define QUDA_ASQTAD_GENERAL_LINKS QUDA_GENERAL_LINKS
 #define QUDA_INVALID_LINKS        QUDA_INVALID_ENUM
 
@@ -43,9 +49,10 @@
 #define QUDA_QDPJIT_GAUGE_ORDER 6 //expect *gauge[4] even-odd spacetime row-column color
 #define QUDA_CPS_WILSON_GAUGE_ORDER 7 //expect *gauge even-odd spacetime column-row color
 #define QUDA_MILC_GAUGE_ORDER 8 //expect *gauge even-odd mu spacetime row-column order
-#define QUDA_BQCD_GAUGE_ORDER 9 //expect *gauge mu even-odd spacetime+halos row-column order
-#define QUDA_TIFR_GAUGE_ORDER 10
-#define QUDA_TIFR_PADDED_GAUGE_ORDER 11
+#define QUDA_MILC_SITE_GAUGE_ORDER 9 // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
+#define QUDA_BQCD_GAUGE_ORDER 10 //expect *gauge mu even-odd spacetime+halos row-column order
+#define QUDA_TIFR_GAUGE_ORDER 11
+#define QUDA_TIFR_PADDED_GAUGE_ORDER 12
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)
@@ -88,20 +95,6 @@
 #define QUDA_LAPLACE_DSLASH 9
 #define QUDA_INVALID_DSLASH QUDA_INVALID_ENUM
 
-#define QudaDslashPolicy integer(4)
-#define QUDA_DSLASH 0
-#define QUDA_GPU_COMMS_DSLASH 1
-#define QUDA_FUSED_DSLASH 2
-#define QUDA_FUSED_GPU_COMMS_DSLASH 3
-#define QUDA_ZERO_COPY_DSLASH_PACK 4
-#define QUDA_FUSED_ZERO_COPY_DSLASH_PACK 5
-#define QUDA_ZERO_COPY_DSLASH 5
-#define QUDA_FUSED_ZERO_COPY_DSLASH 6
-#define QUDA_DSLASH_ASYNC 7
-#define QUDA_FUSED_DSLASH_ASYNC 8
-#define QUDA_PTHREADS_DSLASH 9
-#define QUDA_DSLASH_NC 10
-
 #define QudaInverterType integer(4)
 #define QUDA_CG_INVERTER 0
 #define QUDA_BICGSTAB_INVERTER 1
@@ -122,6 +115,9 @@
 #define QUDA_BICGSTABL_INVERTER 16
 #define QUDA_CGNE_INVERTER 17 
 #define QUDA_CGNR_INVERTER 18
+#define QUDA_CG3_INVERTER 19
+#define QUDA_CG3NE_INVERTER 20
+#define QUDA_CG3NR_INVERTER 21
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaEigType integer(4)
@@ -324,6 +320,7 @@
 #define QUDA_RANDOM_SOURCE 1
 #define QUDA_CONSTANT_SOURCE 2
 #define QUDA_SINUSOIDAL_SOURCE 3
+#define QUDA_CORNER_SOURCE 4
 #define QUDA_INVALID_SOURCE QUDA_INVALID_ENUM
 
 #define QudaProjectionType integer(4)
@@ -371,6 +368,11 @@
 #define QUDA_COMPUTE_NULL_VECTOR_YES 1
 #define QUDA_COMPUTE_NULL_VECTOR_INVALID QUDA_INVALID_ENUM
 
+#define QudaSetupType integer(4)
+#define QUDA_NULL_VECTOR_SETUP 0
+#define QUDA_TEST_VECTOR_SETUP 1
+#define QUDA_INVALID_SETUP_TYPE QUDA_INVALID_ENUM
+
 #define QudaBoolean integer(4)
 #define QUDA_BOOLEAN_NO 0
 #define QUDA_BOOLEAN_YES 1
@@ -417,5 +419,11 @@
 #define QUDA_CONTRACT_TSLICE_PLUS 7
 #define QUDA_CONTRACT_TSLICE_MINUS 8
 #define QUDA_CONTRACT_INVALID QUDA_INVALID_ENUM
+
+#define QudaExtLibType integer(4)
+#define QUDA_CUSOLVE_EXTLIB 0
+#define QUDA_EIGEN_EXTLIB 1
+#define QUDA_MAGMA_EXTLIB 2
+#define QUDA_EXTLIB_INVALID QUDA_INVALID_ENUM
 
 #endif 

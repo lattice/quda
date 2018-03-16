@@ -1,7 +1,12 @@
-all: make.inc lib tests
+all: 
+	@echo 'Please use cmake to build quda, see the README file.'
+	@exit 1
+
+old:	make.inc lib tests
 
 make.inc:
-	@echo 'Please run configure to create make.inc before building.'
+	@echo 'Please run autoconf and ./configure to create make.inc before building.'
+	@acho 'Note that this is DEPRECTATED and you are on your own.'
 	@exit 1
 
 lib:

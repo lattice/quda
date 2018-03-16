@@ -83,6 +83,7 @@ namespace quda {
 
     int nColor; // Number of colors of the field
     int nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
+    int nVec;  // number of packed vectors (for multigrid transfer operator)
 
     QudaTwistFlavorType twistFlavor; // used by twisted mass
 
@@ -107,7 +108,7 @@ namespace quda {
 
   ColorSpinorParam()
     : LatticeFieldParam(), location(QUDA_INVALID_FIELD_LOCATION), nColor(0),
-      nSpin(0), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
+      nSpin(0), nVec(1), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS),
       create(QUDA_INVALID_FIELD_CREATE), PCtype(QUDA_PC_INVALID),
       is_composite(false), composite_dim(0), is_component(false), component_id(0) { ; }
@@ -118,7 +119,7 @@ namespace quda {
     : LatticeFieldParam(4, X, 0, inv_param.cpu_prec), location(location), nColor(3),
       nSpin( (inv_param.dslash_type == QUDA_ASQTAD_DSLASH ||
               inv_param.dslash_type == QUDA_STAGGERED_DSLASH ||
-	      inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ? 1 : 4),
+	      inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ? 1 : 4), nVec(1),
       twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
@@ -177,8 +178,8 @@ namespace quda {
   ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
 		   QudaFieldLocation location=QUDA_CUDA_FIELD_LOCATION)
     : LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
-      location(location), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), twistFlavor(cpuParam.twistFlavor),
-      siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER),
+      location(location), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), nVec(cpuParam.nVec),
+      twistFlavor(cpuParam.twistFlavor), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER),
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
       create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0), is_composite(cpuParam.is_composite), composite_dim(cpuParam.composite_dim), is_component(false), component_id(0)
       {
@@ -191,9 +192,10 @@ namespace quda {
        If using CUDA native fields, this function will ensure that the
        field ordering is appropriate for the new precision setting to
        maintain this status
-       @param precision New precision value
+       @param precision_ New precision value
+       @param ghost_precision_ New ghost precision value
      */
-    void setPrecision(QudaPrecision precision) {
+    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) {
       // is the current status in native field order?
       bool native = false;
       if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1 || nSpin==2) &&
@@ -202,6 +204,7 @@ namespace quda {
 	    (nSpin==4) && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
 
       this->precision = precision;
+      this->ghost_precision = (ghost_precision == QUDA_INVALID_PRECISION) ? precision : ghost_precision;
 
       // if this is a native field order, let's preserve that status, else keep the same field order
       if (native) fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ?
@@ -215,6 +218,7 @@ namespace quda {
       printfQuda("nDim = %d\n", nDim);
       for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
       printfQuda("precision = %d\n", precision);
+      printfQuda("ghost_precision = %d\n", ghost_precision);
       printfQuda("pad = %d\n", pad);
       printfQuda("siteSubset = %d\n", siteSubset);
       printfQuda("siteOrder = %d\n", siteOrder);
@@ -238,7 +242,7 @@ namespace quda {
   class ColorSpinorField : public LatticeField {
 
   private:
-    void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor,
+    void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
 		QudaPrecision precision, int pad, QudaSiteSubset subset,
 		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
 		QudaDWFPCType PCtype);
@@ -249,6 +253,7 @@ namespace quda {
 
     int nColor;
     int nSpin;
+    int nVec;
 
     int nDim;
     int x[QUDA_MAX_DIM];
@@ -277,18 +282,11 @@ namespace quda {
     void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
     mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
-    mutable int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
-    mutable int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
-
-    mutable size_t ghost_length; // length of ghost zone
-    mutable size_t ghost_norm_length; // length of ghost zone for norm
 
     mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
-    mutable size_t ghost_bytes; // size in bytes of the ghost field
-    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
@@ -304,6 +302,11 @@ namespace quda {
     //
     CompositeColorSpinorField components;
 
+    /**
+       Compute the required extended ghost zone sizes and offsets
+       @param[in] nFace The depth of the halo
+       @param[in] spin_project Whether we are spin projecting
+    */
     void createGhostZone(int nFace, bool spin_project=true) const;
 
     // resets the above attributes based on contents of param
@@ -325,6 +328,7 @@ namespace quda {
 
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
+    int Nvec() const { return nVec; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int* X() const { return x; }
@@ -371,9 +375,11 @@ namespace quda {
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
+       @param[in] ghost_precision The precision used for the ghost exchange
      */
     virtual void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-			       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const = 0;
+			       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
+			       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const = 0;
 
     /**
       This function returns true if the field is stored in an internal
@@ -403,7 +409,6 @@ namespace quda {
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
     QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
-    size_t GhostLength() const { return ghost_length; }
     const int *GhostFace() const { return ghostFace; }
     int GhostOffset(const int i) const { return ghostOffset[i][0]; }
     int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
@@ -486,9 +491,6 @@ namespace quda {
 
     bool reference; // whether the field is a reference or not
 
-    static size_t ghostFaceBytes;
-    static bool initGhostFaceBuffer;
-
     mutable void *ghost_field_tex[4]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
 
     void create(const QudaFieldCreate);
@@ -532,21 +534,11 @@ namespace quda {
     void createComms(int nFace, bool spin_project=true);
 
     /**
-       @brief Destroy the communication handlers and buffers
-    */
-    void destroyComms();
-
-    /**
        @brief Allocate the ghost buffers
        @param[in] nFace Depth of each halo
        @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
     */
     void allocateGhostBuffer(int nFace, bool spin_project=true) const;
-
-    /**
-       @brief Free statically allocated ghost buffers
-    */
-    static void freeGhostBuffer(void);
 
     /**
        @brief Packs the cudaColorSpinorField's ghost zone
@@ -622,11 +614,63 @@ namespace quda {
 
     void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
 
-    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
+    /**
+       @brief Initiate halo communication receive
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr Whether we are using GDR on the receive side
+    */
+    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false);
+
+    /**
+       @brief Initiate halo communication sending
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr Whether we are using GDR on the send side
+    */
+    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false);
+
+    /**
+       @brief Initiate halo communication
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr_send Whether we are using GDR on the send side
+       @param[in] gdr_recv Whether we are using GDR on the receive side
+    */
+    void commsStart(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+
+    /**
+       @brief Non-blocking query if the halo communication has completed
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr_send Whether we are using GDR on the send side
+       @param[in] gdr_recv Whether we are using GDR on the receive side
+    */
+    int commsQuery(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+
+    /**
+       @brief Wait on halo communication to complete
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr_send Whether we are using GDR on the send side
+       @param[in] gdr_recv Whether we are using GDR on the receive side
+    */
+    void commsWait(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
 
     void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
@@ -647,9 +691,11 @@ namespace quda {
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
+       @param[in] ghost_precision The precision used for the ghost exchange
      */
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
+		       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
@@ -671,6 +717,16 @@ namespace quda {
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
 
     void PrintVector(unsigned int x);
+
+    /**
+       @brief Backs up the cudaColorSpinorField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the cudaColorSpinorField
+    */
+    void restore();
   };
 
   // CPU implementation
@@ -726,7 +782,7 @@ namespace quda {
     void zero();
 
     /**
-       @brieff This is a unified ghost exchange function for doing a complete
+       @brief This is a unified ghost exchange function for doing a complete
        halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
@@ -737,10 +793,21 @@ namespace quda {
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Dummy for CPU
        @param[in] gdr_recv Dummy for GPU
+       @param[in] ghost_precision The precision used for the ghost exchange
      */
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
+		       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
 
+    /**
+       @brief Backs up the cpuColorSpinorField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the cpuColorSpinorField
+    */
+    void restore();
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,

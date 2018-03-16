@@ -89,16 +89,16 @@ pack_test: pack_test.o test_util.o misc.o $(QUDA)
 blas_test: blas_test.o gtest-all.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o $(QUDA)
+llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o face_gauge.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
-gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o $(QUDA)
+gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o face_gauge.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
-unitarize_link_test: unitarize_link_test.o gtest-all.o test_util.o misc.o $(QUDA)
+unitarize_link_test: unitarize_link_test.o gtest-all.o test_util.o misc.o face_gauge.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o hisq_force_reference2.o fermion_force_reference.o test_util.o misc.o $(QUDA)

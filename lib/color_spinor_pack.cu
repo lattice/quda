@@ -4,16 +4,49 @@
 #include <tune_quda.h>
 #include <fast_intdiv.h>
 
+/**
+   @file color_spinor_pack.cu
+
+   @brief This is the implementation of the color-spinor halo packer
+   for an arbitrary field.  This implementation uses the fine-grained
+   accessors and should support all field types reqgardless of
+   precision, number of color or spins etc.
+
+   Using a different precision of the field and of the halo is
+   supported, though only QUDA_SINGLE_PRECISION fields with
+   QUDA_HALF_PRECISION halos are instantiated.  When an integer format
+   is requested for the halos then block-float format is used.
+
+   As well as tuning basic block sizes, the autotuner also tunes for
+   the dimensions to assign to each thread.  E.g., dim_thread=1 means
+   we have one thread for all dimensions, dim_thread=4 means we have
+   four threads (e.g., one per dimension).  We always uses seperate
+   threads for forwards and backwards directions.  Dimension,
+   direction and parity are assigned to the z thread dimension.
+
+   If doing block-float format, since all spin and color components of
+   a given site have to reside in the same thread block (to allow us
+   to compute the max element) we override the autotuner to keep the z
+   thread dimensions in the grid and not the block, and allow for
+   smaller tuning increments of the thread block dimension in x to
+   ensure that we can always fit within a single thread block.  It is
+   this constraint that gives rise for the need to cap the limit for
+   block-float support, e.g., MAX_BLOCK_FLOAT_NC.
+
+   At present we launch a volume of threads (actually multiples
+   thereof for direction / dimension) and thus we have coalesced reads
+   but not coalesced writes.  A more optimal implementation will
+   launch a surface of threads for each halo giving coalesced writes.
+ */
+
 namespace quda {
 
   template <typename Field>
   struct PackGhostArg {
 
     Field field;
-    void **ghost;
-    const void *v;
     int_fastdiv X[QUDA_MAX_DIM];
-    const int volumeCB;
+    const int_fastdiv volumeCB;
     const int nDim;
     const int nFace;
     const int parity;
@@ -21,11 +54,10 @@ namespace quda {
     const int dagger;
     const QudaDWFPCType pc_type;
     int commDim[4]; // whether a given dimension is partitioned or not
+    int_fastdiv nParity2dim_threads;
 
-    PackGhostArg(Field field, void **ghost, const ColorSpinorField &a, int parity, int nFace, int dagger)
+    PackGhostArg(Field field, const ColorSpinorField &a, int parity, int nFace, int dagger)
       : field(field),
-	ghost(ghost),
-	v(a.V()),
 	volumeCB(a.VolumeCB()),
 	nDim(a.Ndim()),
 	nFace(nFace),
@@ -43,76 +75,180 @@ namespace quda {
     }
   };
 
-  template <typename Float, int Ns, int Ms, int Nc, int Mc, int nDim, typename Arg>
-  __device__ __host__ inline void packGhost(Arg &arg, int cb_idx, int parity, int spinor_parity, int spin_block, int color_block) {
-    typedef typename mapper<Float>::type RegType;
+// this is the maximum number of colors for which we support block-float format
+#define MAX_BLOCK_FLOAT_NC 32
+
+  /**
+     Compute the max element over the spin-color components of a given site.
+   */
+  template <typename Float, int Ns, int Ms, int Nc, int Mc, typename Arg>
+  __device__ __host__ inline Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block, bool active) {
+
+    Float thread_max = 0.0;
+    Float site_max = active ? 0.0 : 1.0;
+
+#ifdef __CUDA_ARCH__
+    // workout how big a shared-memory allocation we need
+    // just statically compute the largest size needed to avoid templating on block size
+    constexpr int max_block_size = 1024; // all supported GPUs have 1024 as their max block size
+    constexpr int bank_width = 32; // shared memory has 32 banks
+    constexpr int color_spin_threads = Nc <= MAX_BLOCK_FLOAT_NC ? (Ns/Ms) * (Nc/Mc) : 1;
+    // this is the largest size of blockDim.x (rounded up to multiples of bank_width)
+    constexpr int thread_width_x = ( (max_block_size / color_spin_threads + bank_width-1) / bank_width) * bank_width;
+    __shared__ Float v[ (Ns/Ms) * (Nc/Mc) * thread_width_x];
+    const auto &rhs = arg.field;
+    if (active) {
+#pragma unroll
+      for (int spin_local=0; spin_local<Ms; spin_local++) {
+	int s = spin_block + spin_local;
+#pragma unroll
+	for (int color_local=0; color_local<Mc; color_local++) {
+	  int c = color_block + color_local;
+	  complex<Float> z = rhs(spinor_parity, x_cb, s, c);
+	  thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
+	  thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
+	}
+      }
+      v[ ( (spin_block/Ms) * (Nc/Mc) + (color_block/Mc)) * blockDim.x + threadIdx.x ] = thread_max;
+    }
+
+    __syncthreads();
+   
+    if (active) {
+#pragma unroll
+      for (int sc=0; sc<(Ns/Ms) * (Nc/Mc); sc++) {
+	site_max = site_max > v[sc*blockDim.x + threadIdx.x] ? site_max : v[sc*blockDim.x + threadIdx.x];
+      }
+    }
+#else
+    errorQuda("Not supported on CPU");
+#endif
+
+    return site_max;
+  }
+
+
+  template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim, int dir, typename Arg>
+  __device__ __host__ inline void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block) {
 
     int x[5] = { };
-    if (nDim == 5) getCoords5(x, cb_idx, arg.X, parity, arg.pc_type);
-    else getCoords(x, cb_idx, arg.X, parity);
+    if (nDim == 5) getCoords5(x, x_cb, arg.X, parity, arg.pc_type);
+    else getCoords(x, x_cb, arg.X, parity);
 
-#pragma unroll
-    for (int dim=0; dim<4; dim++) {
-      if (arg.commDim[dim] && x[dim] < arg.nFace){
+    const auto &rhs = arg.field;
+
+    {
+      Float max = 1.0;
+      if (block_float) {
+        bool active = ( arg.commDim[dim] && ( (dir == 0 && x[dim] < arg.nFace) || (dir == 1 && x[dim] >= arg.X[dim] - arg.nFace) ) );
+        max = compute_site_max<Float,Ns,Ms,Nc,Mc>(arg, x_cb, parity, spinor_parity, spin_block, color_block, active);
+      }      
+
+      if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace) {
 	for (int spin_local=0; spin_local<Ms; spin_local++) {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
-	    arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0>(x,arg.X,dim,arg.nFace), s, c)
-	      = arg.field(spinor_parity, cb_idx, s, c);
+	    arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0>(x,arg.X,dim,arg.nFace), s, c, 0, max) = rhs(spinor_parity, x_cb, s, c);
 	  }
 	}
       }
-      
-      if (arg.commDim[dim] && x[dim] >= arg.X[dim] - arg.nFace){
+
+      if (dir == 1 && arg.commDim[dim] && x[dim] >= arg.X[dim] - arg.nFace) {
 	for (int spin_local=0; spin_local<Ms; spin_local++) {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
-	    arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1>(x,arg.X,dim,arg.nFace), s, c)
-	      = arg.field(spinor_parity, cb_idx, s, c);
+	    arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1>(x,arg.X,dim,arg.nFace), s, c, 0, max) = rhs(spinor_parity, x_cb, s, c);
 	  }
 	}
       }
     }
   }
 
-  template <typename Float, int Ns, int Ms, int Nc, int Mc, int nDim, typename Arg>
+  template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, typename Arg>
   void GenericPackGhost(Arg &arg) {
     for (int parity=0; parity<arg.nParity; parity++) {
       parity = (arg.nParity == 2) ? parity : arg.parity;
       const int spinor_parity = (arg.nParity == 2) ? parity : 0;
-      for (int i=0; i<arg.volumeCB; i++)
-	for (int spin_block=0; spin_block<Ns; spin_block+=Ms)
-	  for (int color_block=0; color_block<Nc; color_block+=Mc)
-	    packGhost<Float,Ns,Ms,Nc,Mc,nDim>(arg, i, parity, spinor_parity, spin_block, color_block);
+      for (int dim=0; dim<4; dim++)
+	for (int dir=0; dir<2; dir++)
+	  for (int x_cb=0; x_cb<arg.volumeCB; x_cb++)
+	    for (int spin_block=0; spin_block<Ns; spin_block+=Ms)
+	      for (int color_block=0; color_block<Nc; color_block+=Mc)
+		switch(dir) {
+		case 0: // backwards pack
+		  switch(dim) {
+		  case 0: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,0,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+		  case 1: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,1,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+		  case 2: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,2,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+		  case 3: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,3,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+		  }
+		  break;
+		case 1: // forwards pack
+		  switch(dim) {
+		  case 0: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,0,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+		  case 1: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,1,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+		  case 2: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,2,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+		  case 3: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,3,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+		  }
+		}
     }
   }
 
-  template <typename Float, int Ns, int Ms, int Nc, int Mc, int nDim, typename Arg>
+  template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim_threads, typename Arg>
   __global__ void GenericPackGhostKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    if (x_cb >= arg.volumeCB) return;
+    int spin_color_block = blockDim.y*blockIdx.y + threadIdx.y;
+    int parity_dim_dir = blockDim.z*blockIdx.z + threadIdx.z;
 
-    const int parity = (arg.nParity == 2) ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
+    // ensure all threads are always active so it safe to synchronize
+    x_cb %= arg.volumeCB;
+    spin_color_block %= (Ns/Ms)*(Nc/Mc);
+    parity_dim_dir %= arg.nParity2dim_threads;
+
+    const int dim_dir = parity_dim_dir % (2*dim_threads);
+    const int dim0 = dim_dir / 2;
+    const int dir = dim_dir % 2;
+    const int parity = (arg.nParity == 2) ? (parity_dim_dir / (2*dim_threads) ) : arg.parity;
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
-    const int spin_color_block = blockDim.y*blockIdx.y + threadIdx.y;
-    if (spin_color_block >= (Ns/Ms)*(Nc/Mc)) return; // ensure only valid threads
     const int spin_block = (spin_color_block / (Nc / Mc)) * Ms;
     const int color_block = (spin_color_block % (Nc / Mc)) * Mc;
-    packGhost<Float,Ns,Ms,Nc,Mc,nDim>(arg, x_cb, parity, spinor_parity, spin_block, color_block);
+
+#pragma unroll
+    for (int dim=dim0; dim<4; dim+=dim_threads) {
+      switch(dir) {
+      case 0:
+	switch(dim) {
+	case 0: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,0,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+	case 1: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,1,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+	case 2: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,2,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+	case 3: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,3,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+	}
+	break;
+      case 1:
+	switch(dim) {
+	case 0: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,0,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+	case 1: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,1,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+	case 2: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,2,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+	case 3: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,3,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
+	}
+	break;
+      }
+    }
   }
 
-  template <typename Float, int Ns, int Ms, int Nc, int Mc, typename Arg>
+  template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, typename Arg>
   class GenericPackGhostLauncher : public TunableVectorYZ {
     Arg &arg;
     const ColorSpinorField &meta;
     unsigned int minThreads() const { return arg.volumeCB; }
     bool tuneGridDim() const { return false; }
+    bool tuneAuxDim() const { return true; }
 
   public:
     inline GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta, MemoryLocation *destination)
-      : TunableVectorYZ((Ns/Ms)*(Nc/Mc), arg.nParity), arg(arg), meta(meta) {
+      : TunableVectorYZ((Ns/Ms)*(Nc/Mc), 2*arg.nParity), arg(arg), meta(meta) {
       strcpy(aux, meta.AuxString());
       strcat(aux,comm_dim_partitioned_string());
 
@@ -135,17 +271,78 @@ namespace quda {
 
     inline void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	if (arg.nDim == 5) GenericPackGhost<Float,Ns,Ms,Nc,Mc,5,Arg>(arg);
-	else GenericPackGhost<Float,Ns,Ms,Nc,Mc,4,Arg>(arg);
+	if (arg.nDim == 5) GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,5,Arg>(arg);
+	else GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,4,Arg>(arg);
       } else {
 	const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	if (arg.nDim == 5) GenericPackGhostKernel<Float,Ns,Ms,Nc,Mc,5,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	else GenericPackGhostKernel<Float,Ns,Ms,Nc,Mc,4,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	arg.nParity2dim_threads = arg.nParity*2*tp.aux.x;
+	switch(tp.aux.x) {
+	case 1:
+	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,1,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  else GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,1,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  break;
+	case 2:
+	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,2,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  else GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,2,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  break;
+	case 4:
+	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,4,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  else GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,4,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  break;
+	}
       }
+    }
+
+    // if doing block float then all spin-color components must be within the same block
+    void setColorSpinBlock(TuneParam &param) const {
+      param.block.y = (Ns/Ms)*(Nc/Mc);
+      param.grid.y = 1;
+      param.block.z = 1;
+      param.grid.z = arg.nParity*2*param.aux.x;
+    }
+
+    bool advanceBlockDim(TuneParam &param) const {
+      if (!block_float) {
+	return TunableVectorYZ::advanceBlockDim(param);
+      } else {
+	bool advance = Tunable::advanceBlockDim(param);
+	setColorSpinBlock(param); // if doing block float then all spin-color components must be within the same block
+	return advance;
+      }
+    }
+
+    int blockStep() const { return block_float ? 2 : TunableVectorYZ::blockStep(); }
+    int blockMin() const { return block_float ? 2 : TunableVectorYZ::blockMin(); }
+
+    bool advanceAux(TuneParam &param) const {
+      if (param.aux.x < 4) {
+	param.aux.x *= 2;
+	const_cast<GenericPackGhostLauncher*>(this)->resizeVector((Ns/Ms)*(Nc/Mc), arg.nParity*2*param.aux.x);
+	TunableVectorYZ::initTuneParam(param);
+	if (block_float) setColorSpinBlock(param);
+	return true;
+      }
+      param.aux.x = 1;
+      const_cast<GenericPackGhostLauncher*>(this)->resizeVector((Ns/Ms)*(Nc/Mc), arg.nParity*2*param.aux.x);
+      TunableVectorYZ::initTuneParam(param);
+      if (block_float) setColorSpinBlock(param);
+      return false;
     }
 
     TuneKey tuneKey() const {
       return TuneKey(meta.VolString(), typeid(*this).name(), aux);
+    }
+
+    virtual void initTuneParam(TuneParam &param) const {
+      TunableVectorYZ::initTuneParam(param);
+      param.aux = make_int4(1,1,1,1);
+      if (block_float) setColorSpinBlock(param);
+    }
+
+    virtual void defaultTuneParam(TuneParam &param) const {
+      TunableVectorYZ::defaultTuneParam(param);
+      param.aux = make_int4(1,1,1,1);
+      if (block_float) setColorSpinBlock(param);
     }
 
     long long flops() const { return 0; }
@@ -153,84 +350,97 @@ namespace quda {
       size_t totalBytes = 0;
       for (int d=0; d<4; d++) {
 	if (!comm_dim_partitioned(d)) continue;
-	totalBytes += 2*arg.nFace*2*Ns*Nc*meta.SurfaceCB(d)*meta.Precision();
+	totalBytes += arg.nFace*2*Ns*Nc*meta.SurfaceCB(d)*(meta.Precision() + meta.GhostPrecision());
       }
       return totalBytes;
     }
   };
 
-  template <typename Float, QudaFieldOrder order, int Ns, int Nc>
+  template <typename Float, typename ghostFloat, QudaFieldOrder order, int Ns, int Nc>
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			       int nFace, int dagger, MemoryLocation *destination) {
 
-    typedef typename colorspinor::FieldOrderCB<Float,Ns,Nc,1,order> Q;
+    typedef typename mapper<Float>::type RegFloat;
+    typedef typename colorspinor::FieldOrderCB<RegFloat,Ns,Nc,1,order,Float,ghostFloat> Q;
     Q field(a, nFace, 0, ghost);
 
-    constexpr int spins_per_thread = 1; // make this autotunable
-    constexpr int colors_per_thread = 1;
-    PackGhostArg<Q> arg(field, ghost, a, parity, nFace, dagger);
-    GenericPackGhostLauncher<Float,Ns,spins_per_thread,Nc,colors_per_thread,PackGhostArg<Q> >
+    constexpr int spins_per_thread = Ns == 1 ? 1 : 2; // make this autotunable?
+    constexpr int colors_per_thread = Nc%2 == 0 ? 2 : 1;
+    PackGhostArg<Q> arg(field, a, parity, nFace, dagger);
+
+    // if we only have short precision for the ghost then this means we have block-float
+    constexpr bool block_float = (sizeof(Float) == QUDA_SINGLE_PRECISION &&
+				  sizeof(ghostFloat) == QUDA_HALF_PRECISION && Nc <= MAX_BLOCK_FLOAT_NC) ? true : false;
+    if (sizeof(Float) == QUDA_SINGLE_PRECISION && sizeof(ghostFloat) == QUDA_HALF_PRECISION && Nc > MAX_BLOCK_FLOAT_NC)
+      errorQuda("Block-float format not supported for Nc = %d", Nc);
+
+    GenericPackGhostLauncher<RegFloat,block_float,Ns,spins_per_thread,Nc,colors_per_thread,PackGhostArg<Q> >
       launch(arg, a, destination);
+
     launch.apply(0);
   }
 
-  template <typename Float, QudaFieldOrder order, int Ns>
+  template <typename Float, typename ghostFloat, QudaFieldOrder order, int Ns>
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			       int nFace, int dagger, MemoryLocation *destination) {
     
     if (a.Ncolor() == 2) {
-      genericPackGhost<Float,order,Ns,2>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,2>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 3) {
-      genericPackGhost<Float,order,Ns,3>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,3>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 4) {
-      genericPackGhost<Float,order,Ns,4>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,4>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 6) {
-      genericPackGhost<Float,order,Ns,6>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,6>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 8) {
-      genericPackGhost<Float,order,Ns,8>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,8>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 12) {
-      genericPackGhost<Float,order,Ns,12>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,12>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 16) {
-      genericPackGhost<Float,order,Ns,16>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,16>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 18) { // Needed for two level free field Wilson
+      genericPackGhost<Float,ghostFloat,order,Ns,18>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 20) {
-      genericPackGhost<Float,order,Ns,20>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,20>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 24) {
-      genericPackGhost<Float,order,Ns,24>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,24>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 28) {
-      genericPackGhost<Float,order,Ns,28>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,28>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 32) {
-      genericPackGhost<Float,order,Ns,32>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,32>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 36) { // Needed for three level free field Wilson
+      genericPackGhost<Float,ghostFloat,order,Ns,36>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 48) {
-      genericPackGhost<Float,order,Ns,48>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,48>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 72) {
-      genericPackGhost<Float,order,Ns,72>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,72>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 96) {
-      genericPackGhost<Float,order,Ns,96>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,96>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 256) {
-      genericPackGhost<Float,order,Ns,256>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,256>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 576) {
-      genericPackGhost<Float,order,Ns,576>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,576>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 768) {
-      genericPackGhost<Float,order,Ns,768>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,768>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 1024) {
-      genericPackGhost<Float,order,Ns,1024>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,Ns,1024>(ghost, a, parity, nFace, dagger, destination);
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
     }
 
   }
 
-  template <typename Float, QudaFieldOrder order>
+  template <typename Float, typename ghostFloat, QudaFieldOrder order>
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			       int nFace, int dagger, MemoryLocation *destination) {
 
     if (a.Nspin() == 4) {
-      genericPackGhost<Float,order,4>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,4>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Nspin() == 2) {
-      genericPackGhost<Float,order,2>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,2>(ghost, a, parity, nFace, dagger, destination);
 #ifdef GPU_STAGGERED_DIRAC
     } else if (a.Nspin() == 1) {
-      genericPackGhost<Float,order,1>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,order,1>(ghost, a, parity, nFace, dagger, destination);
 #endif
     } else {
       errorQuda("Unsupported nSpin = %d", a.Nspin());
@@ -238,14 +448,16 @@ namespace quda {
 
   }
 
-  template <typename Float>
+  template <typename Float, typename ghostFloat>
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			       int nFace, int dagger, MemoryLocation *destination) {
 
     if (a.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      genericPackGhost<Float,QUDA_FLOAT2_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,QUDA_FLOAT2_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
+      genericPackGhost<Float,ghostFloat,QUDA_FLOAT4_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      genericPackGhost<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
+      genericPackGhost<Float,ghostFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
     } else {
       errorQuda("Unsupported field order = %d", a.FieldOrder());
     }
@@ -272,9 +484,25 @@ namespace quda {
     if (!partitioned) return;
 
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      genericPackGhost<double>(ghost, a, parity, nFace, dagger, destination);
+      if (a.GhostPrecision() == QUDA_DOUBLE_PRECISION) {
+	genericPackGhost<double,double>(ghost, a, parity, nFace, dagger, destination);
+      } else {
+	errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
+      }
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-      genericPackGhost<float>(ghost, a, parity, nFace, dagger, destination);
+      if (a.GhostPrecision() == QUDA_SINGLE_PRECISION) {
+	genericPackGhost<float,float>(ghost, a, parity, nFace, dagger, destination);
+      } else if (a.GhostPrecision() == QUDA_HALF_PRECISION) {
+	genericPackGhost<float,short>(ghost, a, parity, nFace, dagger, destination);
+      } else {
+	errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
+      }
+    } else if (a.Precision() == QUDA_HALF_PRECISION) {
+      if (a.GhostPrecision() == QUDA_HALF_PRECISION) {
+	genericPackGhost<short,short>(ghost, a, parity, nFace, dagger, destination);
+      } else {
+	errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
+      }
     } else {
       errorQuda("Unsupported precision %d", a.Precision());
     }

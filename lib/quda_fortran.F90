@@ -48,7 +48,6 @@ module quda_fortran
      integer(4) :: staple_pad   ! Used by link fattening
      integer(4) :: llfat_ga_pad ! Used by link fattening
      integer(4) :: mom_ga_pad   ! Used by the gauge and fermion forces
-     real(8) :: gauge_gib
 
      ! Set the staggered phase type of the links
      QudaStaggeredPhase :: staggered_phase_type
@@ -71,7 +70,11 @@ module quda_fortran
      integer(4) :: return_result_gauge ! Return the result gauge field
      integer(4) :: return_result_mom   ! Return the result momentum field
 
-  end type quda_gauge_param
+     integer(8) :: gauge_offset ! Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+     integer(8) :: mom_offset   ! Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+     integer(8) :: site_size    ! Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+
+ end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
   type quda_invert_param
@@ -182,8 +185,6 @@ module quda_fortran
      integer(4) :: cl_pad
 
      integer(4) :: iter
-     real(8) :: spinor_gib
-     real(8) :: clover_gib
      real(8) :: gflops
      real(8) :: secs
 
@@ -249,16 +250,22 @@ module quda_fortran
      integer(4)::use_resident_solution  ! Whether to use the resident solution vector(s)
 
      ! Whether to use the solution vector to augment the chronological forecast
-     integer(4)::make_resident_chrono
+     integer(4)::chrono_make_resident
+
+     !Whether the solution should replace the last entry in the chronology */
+     integer(4)::chrono_replace_last
 
      ! Whether to use the resident chronological basis
-     integer(4)::use_resident_chrono
+     integer(4)::chrono_use_resident
 
      ! The maximum length of the chronological history to store
-     integer(4)::max_chrono_dim
+     integer(4)::chrono_max_dim
 
      ! The index to indeicate which chrono history we are augmenting */
      integer(4)::chrono_index
+
+     ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     QudaExtLibType::extlib_type
 
   end type quda_invert_param
 

@@ -2,7 +2,6 @@
 #include <string.h>
 #include <iostream>
 #include <typeinfo>
-#include <face_quda.h>
 
 namespace quda {
 
@@ -10,32 +9,30 @@ namespace quda {
 
     }*/
 
-  ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) {
+  ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) : LatticeFieldParam()  {
     field.fill(*this);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
     : LatticeField(param), init(false), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
-      ghost_length(0), ghost_norm_length(0),
-      bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
+      ghost( ), ghostNorm( ), ghostFace( ),
+      bytes(0), norm_bytes(0), even(0), odd(0),
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
   {
-    create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor,
-	   param.precision, param.pad, param.siteSubset, param.siteOrder,
+    create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor,
+	   param.Precision(), param.pad, param.siteSubset, param.siteOrder,
 	   param.fieldOrder, param.gammaBasis, param.PCtype);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
     : LatticeField(field), init(false), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
-      ghost_length(0), ghost_norm_length(0),
-      bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
+      ghost( ), ghostNorm( ), ghostFace( ),
+      bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
-    create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor,
-	   field.precision, field.pad, field.siteSubset, field.siteOrder,
+    create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor,
+	   field.Precision(), field.pad, field.siteSubset, field.siteOrder,
 	   field.fieldOrder, field.gammaBasis, field.PCtype);
   }
 
@@ -45,11 +42,7 @@ namespace quda {
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const {
 
-    if (typeid(*this) == typeid(cpuColorSpinorField)) {
-      ghost_length = 0;
-      ghost_norm_length = 0;
-      return;
-    }
+    if (typeid(*this) == typeid(cpuColorSpinorField)) return;
 
     // For Wilson we half the number of effective faces if the fields are spin projected.
     int num_faces = ((nSpin == 4 && spin_project) ? 1 : 2) * nFace;
@@ -61,7 +54,7 @@ namespace quda {
     int x5   = nDim == 5 ? x[4] : 1; ///includes DW  and non-degenerate TM ghosts
     for (int i=0; i<dims; i++) {
       ghostFace[i] = 0;
-      if (commDimPartitioned(i)) {
+      if (comm_dim_partitioned(i)) {
 	ghostFace[i] = 1;
 	for (int j=0; j<dims; j++) {
 	  if (i==j) continue;
@@ -74,50 +67,49 @@ namespace quda {
       if (i==0) {
 	ghostOffset[i][0] = 0;
       } else {
-        if (precision == QUDA_HALF_PRECISION) {
+        if (ghost_precision == QUDA_HALF_PRECISION) {
           ghostOffset[i][0] = (ghostNormOffset[i-1][1] + num_norm_faces*ghostFace[i-1]/2)*sizeof(float)/sizeof(short);
-          // Adjust so that the offsets are multiples of 4 shorts
-          // This ensures that the dslash kernel can read the ghost field data as an array of short4's
+          // Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
           ghostOffset[i][0] = 4*((ghostOffset[i][0] + 3)/4);
         } else {
 	  ghostOffset[i][0] = ghostOffset[i-1][0] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
         }
       }
 
-      if (precision == QUDA_HALF_PRECISION) {
+      if (ghost_precision == QUDA_HALF_PRECISION) {
         ghostNormOffset[i][0] = (ghostOffset[i][0] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*sizeof(short)/sizeof(float);
         ghostOffset[i][1] = (ghostNormOffset[i][0] + num_norm_faces*ghostFace[i]/2)*sizeof(float)/sizeof(short);
-        // Adjust so that the offsets are multiples of 4 shorts
-        // This ensures that the dslash kernel can read the ghost field data as an array of short4's
+	// Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
         ghostOffset[i][1] = 4*((ghostOffset[i][1] + 3)/4);
         ghostNormOffset[i][1] = (ghostOffset[i][1] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*sizeof(short)/sizeof(float);
       } else {
         ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
       }
 
-      if (getVerbosity() == QUDA_DEBUG_VERBOSE)
-	printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d %6d ghostNormOffset = %6d, %6d\n",
-		   i, ghostFace[i], commDimPartitioned(i), ghostOffset[i][0], ghostOffset[i][1], ghostNormOffset[i][0], ghostNormOffset[i][1]);
+      int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
+      ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*ghost_precision;
+      if (ghost_precision == QUDA_HALF_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
+
     } // dim
 
     int ghostNormVolume = num_norm_faces * ghostVolume;
     ghostVolume *= num_faces;
 
-    ghost_length = ghostVolume*nColor*nSpin*2;
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
+    size_t ghost_length = ghostVolume*nColor*nSpin*2;
+    size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
       printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
       printfQuda("ghost length = %lu, ghost norm length = %lu\n", ghost_length, ghost_norm_length);
     }
 
-    ghost_bytes = (size_t)ghost_length*precision;
-    if (precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
+    ghost_bytes = (size_t)ghost_length*ghost_precision;
+    if (ghost_precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
   } // createGhostZone
 
-  void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor,
+  void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset,
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
 				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
@@ -132,6 +124,7 @@ namespace quda {
     nDim = Ndim;
     nColor = Nc;
     nSpin = Ns;
+    nVec = Nvec;
     twistFlavor = Twistflavor;
 
     PCtype = DWFPC;
@@ -159,11 +152,11 @@ namespace quda {
     real_length = volume*nColor*nSpin*2; // physical length
 
     bytes = (size_t)length * precision; // includes pads and ghost zones
-    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
-      if (isNative()) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+      if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
       norm_bytes = 0;
     }
@@ -248,7 +241,7 @@ namespace quda {
         //this->composite_descr.id           = 0;
       }
 
-      create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor,
+      create(src.nDim, src.x, src.nColor, src.nSpin, src.nVec, src.twistFlavor,
 	     src.precision, src.pad, src.siteSubset,
 	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);
     }
@@ -256,15 +249,17 @@ namespace quda {
   }
 
   // Resets the attributes of this field if param disagrees (and is defined)
-  void ColorSpinorField::reset(const ColorSpinorParam &param) {
-
+  void ColorSpinorField::reset(const ColorSpinorParam &param)
+  {
     if (param.nColor != 0) nColor = param.nColor;
     if (param.nSpin != 0) nSpin = param.nSpin;
+    if (param.nVec != 0) nVec = param.nVec;
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
 
     if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
 
-    if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
+    if (param.Precision() != QUDA_INVALID_PRECISION) precision = param.Precision();
+    if (param.GhostPrecision() != QUDA_INVALID_PRECISION) ghost_precision = param.GhostPrecision();
     if (param.nDim != 0) nDim = param.nDim;
 
     composite_descr.is_composite     = param.is_composite;
@@ -303,11 +298,11 @@ namespace quda {
     real_length = volume*nColor*nSpin*2;
 
     bytes = (size_t)length * precision; // includes pads
-    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
-      if (isNative()) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+      if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
       norm_bytes = 0;
     }
@@ -353,8 +348,10 @@ namespace quda {
     param.location = Location();
     param.nColor = nColor;
     param.nSpin = nSpin;
+    param.nVec = nVec;
     param.twistFlavor = twistFlavor;
-    param.precision = precision;
+    param.fieldOrder = fieldOrder;
+    param.setPrecision(precision, ghost_precision);
     param.nDim = nDim;
 
     param.is_composite  = composite_descr.is_composite;
@@ -366,7 +363,6 @@ namespace quda {
     param.pad = pad;
     param.siteSubset = siteSubset;
     param.siteOrder = siteOrder;
-    param.fieldOrder = fieldOrder;
     param.gammaBasis = gammaBasis;
     param.PCtype = PCtype;
     param.create = QUDA_INVALID_FIELD_CREATE;
@@ -384,7 +380,7 @@ namespace quda {
     const int Ninternal = 2*nColor*nSpin;
     size_t total_bytes = 0;
     for (int i=0; i<nDimComms; i++) {
-      bytes[i] = siteSubset*nFace*surfaceCB[i]*Ninternal*precision;
+      bytes[i] = siteSubset*nFace*surfaceCB[i]*Ninternal*ghost_precision;
       if (comm_dim_partitioned(i)) total_bytes += 2*bytes[i]; // 2 for fwd/bwd
     }
 
@@ -517,7 +513,7 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
     } else if (precision == QUDA_SINGLE_PRECISION ||
-	       precision == QUDA_HALF_PRECISION) {
+	       (precision == QUDA_HALF_PRECISION && nColor == 3)) {
       if (nSpin == 4) {
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
       } else if (nSpin == 2) {
@@ -541,6 +537,10 @@ namespace quda {
 
     if (a.Nspin() != b.Nspin()) {
       errorQuda("checkSpinor: spins do not match: %d %d", a.Nspin(), b.Nspin());
+    }
+
+    if (a.Nvec() != b.Nvec()) {
+      errorQuda("checkSpinor: nVec does not match: %d %d", a.Nvec(), b.Nvec());
     }
 
     if (a.TwistFlavor() != b.TwistFlavor()) {
@@ -762,7 +762,7 @@ namespace quda {
 
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) {
-      fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.precision!= QUDA_DOUBLE_PRECISION) ?
+      fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.Precision()!= QUDA_DOUBLE_PRECISION) ?
 	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
     }
 
@@ -786,12 +786,11 @@ namespace quda {
     for (int d=0; d<a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
     out << "volume = " << a.volume << std::endl;
     out << "precision = " << a.precision << std::endl;
+    out << "ghost_precision = " << a.ghost_precision << std::endl;
     out << "pad = " << a.pad << std::endl;
     out << "stride = " << a.stride << std::endl;
     out << "real_length = " << a.real_length << std::endl;
     out << "length = " << a.length << std::endl;
-    out << "ghost_length = " << a.ghost_length << std::endl;
-    out << "ghost_norm_length = " << a.ghost_norm_length << std::endl;
     out << "bytes = " << a.bytes << std::endl;
     out << "norm_bytes = " << a.norm_bytes << std::endl;
     out << "siteSubset = " << a.siteSubset << std::endl;

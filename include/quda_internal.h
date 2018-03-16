@@ -28,6 +28,7 @@
 #endif
 
 #define MAX_SHORT 32767.0f
+#define MAX_CHAR 127.0f
 
 #define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
 #define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
@@ -309,14 +310,10 @@ namespace quda {
 #undef PUSH_RANGE
 #undef POP_RANGE
 
-#ifdef MULTI_GPU
 #ifdef PTHREADS
   const int Nstream = 10;
 #else
   const int Nstream = 9;
-#endif
-#else
-  const int Nstream = 1;
 #endif
 
   /**
@@ -333,7 +330,7 @@ namespace quda {
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, __FILE__, __STRINGIFY__(__LINE__));
+#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 namespace quda{
   /**
      * Check that the resident gauge field is compatible with the requested inv_param

@@ -1,5 +1,5 @@
-#ifndef _COMM_QUDA_H
-#define _COMM_QUDA_H
+#pragma once
+#include <cstdint>
 
 #ifdef __cplusplus
 extern "C" {
@@ -140,10 +140,33 @@ extern "C" {
   int comm_gpuid(void);
 
   /**
+     @brief Gather all hostnames
+     @param[out] hostname_recv_buf char array of length
+     128*comm_size() that will be filled in GPU ids for all processes.
+     Each hostname is in rank order, with 128 bytes for each.
+   */
+  void comm_gather_hostname(char *hostname_recv_buf);
+
+  /**
+     @brief Gather all GPU ids
+     @param[out] gpuid_recv_buf int array of length comm_size() that
+     will be filled in GPU ids for all processes (in rank order).
+   */
+  void comm_gather_gpuid(int *gpuid_recv_buf);
+
+  /**
      Enabled peer-to-peer communication.
      @param hostname_buf Array that holds all process hostnames
    */
   void comm_peer2peer_init(const char *hostname_recv_buf);
+
+  /**
+     @brief Returns true if any peer-to-peer capability is present on
+     this system (regardless of whether it has been disabled or not.  We
+     use this, for example, to determine if we need to allocate pinned
+     device memory or not.
+  */
+  bool comm_peer2peer_present();
 
   /**
      Query if peer-to-peer communication is enabled globally
@@ -160,9 +183,38 @@ extern "C" {
   bool comm_peer2peer_enabled(int dir, int dim);
 
   /**
-     Query if GPU Direct RDMA communication is enabled
+     @brief Enable / disable peer-to-peer communication: used for dslash
+     policies that do not presently support peer-to-peer communication
+     @param[in] enable Boolean flag to enable / disable peer-to-peer communication
+  */
+  void comm_enable_peer2peer(bool enable);
+
+  /**
+     Query if intra-node (non-peer-to-peer) communication is enabled
+     in a given dimension and direction
+     @param dir Direction (0 - backwards, 1 forwards)
+     @param dim Dimension (0-3)
+     @return Whether intra-node communication is enabled
+  */
+  bool comm_intranode_enabled(int dir, int dim);
+
+  /**
+     @brief Enable / disable intra-node (non-peer-to-peer)
+     communication
+     @param[in] enable Boolean flag to enable / disable intra-node
+     (non peer-to-peer) communication
+  */
+  void comm_enable_intranode(bool enable);
+
+  /**
+     @brief Query if GPU Direct RDMA communication is enabled (global setting)
   */
   bool comm_gdr_enabled();
+
+  /**
+     @brief Query if GPU Direct RDMA communication is blacklisted for this GPU
+  */
+  bool comm_gdr_blacklist();
 
   /**
      Create a persistent message handler for a relative send
@@ -210,14 +262,27 @@ extern "C" {
   int comm_query(MsgHandle *mh);
   void comm_allreduce(double* data);
   void comm_allreduce_max(double* data);
+  void comm_allreduce_min(double* data);
   void comm_allreduce_array(double* data, size_t size);
   void comm_allreduce_int(int* data);
+  void comm_allreduce_xor(uint64_t *data);
   void comm_broadcast(void *data, size_t nbytes);
   void comm_barrier(void);
   void comm_abort(int status);
 
+  void reduceMaxDouble(double &);
+  void reduceDouble(double &);
+  void reduceDoubleArray(double *, const int len);
+  int commDim(int);
+  int commCoords(int);
+  int commDimPartitioned(int dir);
+  void commDimPartitionedSet(int dir);
+  bool commGlobalReduction();
+  void commGlobalReductionSet(bool global_reduce);
+
+  bool commAsyncReduction();
+  void commAsyncReductionSet(bool global_reduce);
+
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* _COMM_QUDA_H */

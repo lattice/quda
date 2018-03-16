@@ -78,15 +78,7 @@ namespace quda {
   void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover);     // regular clover term
-      cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		 &static_cast<const cudaColorSpinorField&>(in), parity);
-    } else {
-      errorQuda("Not implemented");
-    }
-
+    ApplyClover(out, in, clover, false, parity);
     flops += 504ll*in.Volume();
   }
 
@@ -96,7 +88,7 @@ namespace quda {
     if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
       ColorSpinorParam param(in);
       param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
+      param.fieldOrder =  param.Precision() == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
         (param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
       param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       In = ColorSpinorField::Create(param);
@@ -107,7 +99,7 @@ namespace quda {
     if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
       ColorSpinorParam param(out);
       param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
+      param.fieldOrder =  param.Precision() == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
         (param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
       param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       Out = ColorSpinorField::Create(param);
@@ -155,9 +147,10 @@ namespace quda {
     // do nothing
   }
 
-  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+				   double kappa, double mass, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
@@ -184,16 +177,7 @@ namespace quda {
 				const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      // needs to be cloverinv
-      FullClover cs(clover, true);
-      cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		 &static_cast<const cudaColorSpinorField&>(in), parity);
-    } else {
-      errorQuda("Not supported");
-    }
-
+    ApplyClover(out, in, clover, true, parity);
     flops += 504ll*in.Volume();
   }
 
@@ -243,40 +227,24 @@ namespace quda {
     double kappa2 = -kappa*kappa;
     bool reset1 = newTmp(&tmp1, in);
 
-    if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+    bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
+    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+
+    if (!symmetric) {
       // DiracCloverPC::Dslash applies A^{-1}Dslash
-      Dslash(*tmp1, in, QUDA_ODD_PARITY);
+      Dslash(*tmp1, in, parity[0]);
       // DiracClover::DslashXpay applies (A - kappa^2 D)
-      DiracClover::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      // DiracCloverPC::Dslash applies A^{-1}Dslash
-      Dslash(*tmp1, in, QUDA_EVEN_PARITY);
-      // DiracClover::DslashXpay applies (A - kappa^2 D)
-      DiracClover::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2);
+      DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2);
     } else if (!dagger) { // symmetric preconditioning
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-	Dslash(*tmp1, in, QUDA_ODD_PARITY);
-	DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-	Dslash(*tmp1, in, QUDA_EVEN_PARITY);
-	DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
-      } else {
-	errorQuda("Invalid matpcType");
-      }
+      Dslash(*tmp1, in, parity[0]);
+      DslashXpay(out, *tmp1, parity[1], in, kappa2);
     } else { // symmetric preconditioning, dagger
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-	CloverInv(out, in, QUDA_EVEN_PARITY); 
-	Dslash(*tmp1, out, QUDA_ODD_PARITY);
-	DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-	CloverInv(out, in, QUDA_ODD_PARITY); 
-	Dslash(*tmp1, out, QUDA_EVEN_PARITY);
-	DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
-      } else {
-	errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
-      }
+      CloverInv(out, in, parity[1]);
+      Dslash(*tmp1, out, parity[0]);
+      DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
     }
-  
+
     deleteTmp(&tmp1, reset1);
   }
 
@@ -372,9 +340,10 @@ namespace quda {
 
   }
 
-  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+				     double kappa, double mass, double mu, double mu_factor) const {
     double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
+    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 
 } // namespace quda

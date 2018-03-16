@@ -1,11 +1,13 @@
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
-  multigrid.cpp transfer.cpp transfer_util.cu inv_bicgstab_quda.cpp
+  coarse_op_preconditioned.cu
+  multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
+  inv_cg3_quda.cpp inv_cg3ne_quda.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp interface_qlua.cpp  util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu qlua_contract_kernels.cu qlua_contract_wrappers.cu
@@ -17,7 +19,7 @@ set (QUDA_OBJS
   dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
-  dirac_twisted_mass.cpp tune.cpp fat_force_quda.cpp
+  dirac_twisted_mass.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
   field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
@@ -26,9 +28,9 @@ set (QUDA_OBJS
   dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu
   dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
   multi_blas_quda.cu copy_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
+  multi_reduce_quda.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
-  clover_deriv_quda.cu clover_invert.cu clover_rho.cu copy_gauge_extended.cu
+  clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_gauss.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_ss.cu
@@ -36,19 +38,20 @@ set (QUDA_OBJS
   copy_color_spinor_hd.cu copy_color_spinor_hs.cu
   copy_color_spinor_hh.cu copy_color_spinor_mg_dd.cu
   copy_color_spinor_mg_ds.cu copy_color_spinor_mg_sd.cu
+  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_sh.cu
   copy_color_spinor_mg_ss.cu copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
-  staggered_oprod.cu staggered_oprod_new.cu clover_trace_quda.cu ks_force_quda.cu
+  staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu fermion_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
-  ritz_quda.cpp eig_solver.cpp blas_cublas.cu blas_magma.cu misc_helpers.cu
+  ritz_quda.cpp eig_solver.cpp blas_cublas.cu blas_magma.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
-  quda_memcpy.cpp quda_arpack_interface.cpp deflation.cpp version.cpp )
+  quda_memcpy.cpp quda_arpack_interface.cpp deflation.cpp checksum.cu version.cpp )
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})
@@ -100,45 +103,49 @@ endif()
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
-# add dependencies for linking
-# if CUDA_CUDA_LIBRARY (driver api) is not found look for stubs
-FIND_LIBRARY(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
 
-target_link_libraries(quda ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} ${CUDA_CUDA_LIBRARY})
+target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
-  target_link_libraries(quda ${QIO_LIB} ${LIME_LIB})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${QIO_LIB} ${LIME_LIB})
 endif()
 
 if(QUDA_QDPJIT)
-  target_link_libraries(quda ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_QMP)
-  target_link_libraries(quda ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_MPI)
-  target_link_libraries(quda ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_MAGMA)
-  target_link_libraries(quda ${MAGMA})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${MAGMA})
 endif()
 
 if(QUDA_ARPACK)
-  target_link_libraries(quda ${PARPACK_OR_ARPACK})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${PARPACK_OR_ARPACK})
+endif()
+
+if(QUDA_NVML)
+  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${NVML_LIBRARY})
 endif()
 
 if(QUDA_NUMA_NVML)
-target_link_libraries(quda ${NVML_LIBRARY})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${NVML_LIBRARY})
 endif()
 
 
 # malloc.cpp uses both the driver and runtime api
 # So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub version
-find_library(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
-target_link_libraries(quda ${CUDA_CUDA_LIBRARY})
+# for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake 
+if(${CMAKE_VERSION} VERSION_LESS 3.8)
+  find_library(CUDA_cuda_LIBRARY cuda HINTS ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64 PATH_SUFFIXES stubs )
+endif()
+target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${CUDA_cuda_LIBRARY})
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
 if (QUDA_DOWNLOAD_EIGEN)

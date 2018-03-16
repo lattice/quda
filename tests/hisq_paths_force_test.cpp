@@ -5,13 +5,10 @@
 #include <quda.h>
 #include "test_util.h"
 #include "gauge_field.h"
-#include "fat_force_quda.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
 #include "hw_quda.h"
-#include <fat_force_quda.h>
-#include <face_quda.h>
 #include <dslash_quda.h> 
 #include <sys/time.h>
 
@@ -226,17 +223,12 @@ hisq_force_init()
   int gSize = qudaGaugeParam.cpu_prec;
   // this is a hack to get the gauge field to appear as a void** rather than void*
   for(int i=0;i < 4;i++){
-#ifdef GPU_DIRECT
     if(cudaMallocHost(&siteLink_2d[i], V*gaugeSiteSize* qudaGaugeParam.cpu_prec) == cudaErrorMemoryAllocation) {
       errorQuda("ERROR: cudaMallocHost failed for sitelink_2d\n");
     }
     if(cudaMallocHost((void**)&siteLink_ex_2d[i], V_ex*gaugeSiteSize*qudaGaugeParam.cpu_prec) == cudaErrorMemoryAllocation) {
       errorQuda("ERROR: cudaMallocHost failed for sitelink_ex_2d\n");
     }
-#else
-    siteLink_2d[i] = malloc(V*gaugeSiteSize* qudaGaugeParam.cpu_prec);
-    siteLink_ex_2d[i] = malloc(V_ex*gaugeSiteSize*qudaGaugeParam.cpu_prec);
-#endif
     if(siteLink_2d[i] == NULL || siteLink_ex_2d[i] == NULL){
       errorQuda("malloc failed for siteLink_2d/siteLink_ex_2d\n");
     }
@@ -342,7 +334,7 @@ hisq_force_init()
 
 #ifdef MULTI_GPU
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam_ex.precision = prec;
+  gParam_ex.setPrecision(prec);
   gParam_ex.reconstruct = link_recon;
   //gParam_ex.pad = E1*E2*E3/2;
   gParam_ex.pad = 0;
@@ -353,7 +345,7 @@ hisq_force_init()
 
 #else
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam.precision = qudaGaugeParam.cuda_prec;
+  gParam.setPrecision(qudaGaugeParam.cuda_prec);
   gParam.reconstruct = link_recon;
   gParam.pad = X1*X2*X3/2;
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
@@ -489,13 +481,8 @@ hisq_force_init()
 hisq_force_end()
 {
   for(int i = 0;i < 4; i++){
-#ifdef GPU_DIRECT
     cudaFreeHost(siteLink_2d[i]);
     cudaFreeHost(siteLink_ex_2d[i]);
-#else
-    free(siteLink_2d[i]);
-    free(siteLink_ex_2d[i]);
-#endif
   }
   free(siteLink_1d);
 

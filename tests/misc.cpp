@@ -215,7 +215,7 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
 
   // only apply temporal boundary condition if I'm the last node in T
 #ifdef MULTI_GPU
-  bool last_node_in_t = (commCoords(3) == commDim(3)-1);
+  bool last_node_in_t = (comm_coord(3) == comm_dim(3)-1);
 #else
   bool last_node_in_t = true;
 #endif
@@ -825,6 +825,22 @@ get_test_type(int t)
     return ret;
 }
 
+int get_rank_order(char* s)
+{
+  int ret = -1;
+
+  if (strcmp(s, "col") == 0) {
+    ret = 0;
+  } else if (strcmp(s, "row") == 0) {
+    ret = 1;
+  } else {
+    fprintf(stderr, "Error: invalid rank order type\n");
+    exit(1);
+  }
+
+  return ret;
+}
+
 QudaDslashType
 get_dslash_type(char* s)
 {
@@ -1050,6 +1066,25 @@ get_solve_str(QudaSolveType type)
   return ret;
 }
 
+QudaSchwarzType
+get_schwarz_type(char* s)
+{
+  QudaSchwarzType ret = QUDA_INVALID_SCHWARZ;
+
+  if (strcmp(s, "false") == 0) {
+    ret = QUDA_INVALID_SCHWARZ;
+  } else if (strcmp(s, "add") == 0) {
+    ret = QUDA_ADDITIVE_SCHWARZ;
+  } else if (strcmp(s, "mul") == 0) {
+    ret = QUDA_MULTIPLICATIVE_SCHWARZ;
+  } else {
+    fprintf(stderr, "Error: invalid Schwarz type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
 QudaTwistFlavorType
 get_flavor_type(char* s)
 {
@@ -1138,8 +1173,14 @@ get_solver_type(char* s)
     ret = QUDA_CGNE_INVERTER;
   } else if (strcmp(s, "cgnr") == 0){
     ret = QUDA_CGNR_INVERTER;
+  } else if (strcmp(s, "cg3") == 0){
+    ret = QUDA_CG3_INVERTER;
+  } else if (strcmp(s, "cg3ne") == 0){
+    ret = QUDA_CG3NE_INVERTER;
+  } else if (strcmp(s, "cg3nr") == 0){
+    ret = QUDA_CG3NR_INVERTER;
   } else {
-    fprintf(stderr, "Error: invalid solver type\n");	
+    fprintf(stderr, "Error: invalid solver type %s\n", s);
     exit(1);
   }
   
@@ -1200,6 +1241,21 @@ get_solver_str(QudaInverterType type)
   case QUDA_BICGSTABL_INVERTER:
     ret = "bicgstab-l";
     break;
+  case QUDA_CGNE_INVERTER:
+    ret = "cgne";
+    break;
+  case QUDA_CGNR_INVERTER:
+    ret = "cgnr";
+    break;
+  case QUDA_CG3_INVERTER:
+    ret = "cg3";
+    break;
+  case QUDA_CG3NE_INVERTER:
+    ret = "cg3ne";
+    break;
+  case QUDA_CG3NR_INVERTER:
+    ret = "cg3nr";
+    break;
   default:
     ret = "unknown";
     errorQuda("Error: invalid solver type %d\n", type);
@@ -1222,4 +1278,61 @@ get_quda_ver_str()
 	  ext_num);
   return vstr;
 }
+
+
+QudaExtLibType
+get_solve_ext_lib_type(char* s)
+{
+  QudaExtLibType ret = QUDA_EXTLIB_INVALID;
+
+  if (strcmp(s, "eigen") == 0) {
+    ret = QUDA_EIGEN_EXTLIB;
+  } else if (strcmp(s, "magma") == 0) {
+    ret = QUDA_MAGMA_EXTLIB;
+  } else {
+    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+QudaFieldLocation
+get_location(char* s)
+{
+  QudaFieldLocation ret = QUDA_INVALID_FIELD_LOCATION;
+
+  if (strcmp(s, "cpu") == 0 || strcmp(s, "host") == 0) {
+    ret = QUDA_CPU_FIELD_LOCATION;
+  } else if (strcmp(s, "gpu") == 0 || strcmp(s, "cuda") == 0) {
+    ret = QUDA_CUDA_FIELD_LOCATION;
+  } else {
+    fprintf(stderr, "Error: invalid location %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+
+QudaMemoryType
+get_df_mem_type_ritz(char* s)
+{
+  QudaMemoryType ret = QUDA_MEMORY_INVALID;
+
+  if (strcmp(s, "device") == 0) {
+    ret = QUDA_MEMORY_DEVICE;
+  } else if (strcmp(s, "pinned") == 0) {
+    ret = QUDA_MEMORY_PINNED;
+  } else if (strcmp(s, "mapped") == 0) {
+    ret = QUDA_MEMORY_MAPPED;
+  } else {
+    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+
 

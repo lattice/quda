@@ -6,7 +6,6 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 #include <dslash_quda.h>
-#include <face_quda.h>
 #include <blas_quda.h>
 #include <dirac_quda.h>
 #include <typeinfo>

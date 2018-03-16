@@ -20,7 +20,6 @@
 #include <dslash_quda.h>
 #include <sys/time.h>
 #include <blas_quda.h>
-#include <face_quda.h>
 
 #include <inline_ptx.h>
 
@@ -98,6 +97,10 @@ namespace quda {
       // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
       dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
       dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
+#ifdef USE_TEXTURE_OBJECTS
+      dslashParam.ghostTex = in->GhostTex();
+      dslashParam.ghostTexNorm = in->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
 
 #ifdef SHARED_WILSON_DSLASH
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
@@ -182,14 +185,13 @@ namespace quda {
     inSpinor->createComms(1);
 
 #ifdef GPU_CLOVER_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
     for(int i=0;i<4;i++){
-      dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
+      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
       dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
       dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
       dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
+      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
     }
 
     void *cloverP, *cloverNormP;
@@ -199,10 +201,10 @@ namespace quda {
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
     if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
+      errorQuda("Mixing gauge precision (%d) and spinor precision (%d) not supported", gauge.Precision(), in->Precision());
 
     if (in->Precision() != clover_prec)
-      errorQuda("Mixing clover and spinor precision not supported");
+      errorQuda("Mixing clover precision (%d) and spinor precision (%d) not supported", clover_prec, in->Precision());
 
     DslashCuda *dslash = 0;
     size_t regSize = sizeof(float);

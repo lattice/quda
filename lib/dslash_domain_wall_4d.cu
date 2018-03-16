@@ -20,7 +20,6 @@
 #include <dslash_quda.h>
 #include <sys/time.h>
 #include <blas_quda.h>
-#include <face_quda.h>
 
 #include <inline_ptx.h>
 
@@ -178,6 +177,10 @@ namespace quda {
       // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
       dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
       dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
+#ifdef USE_TEXTURE_OBJECTS
+      dslashParam.ghostTex = in->GhostTex();
+      dslashParam.ghostTexNorm = in->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
 
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       
@@ -269,19 +272,19 @@ namespace quda {
     //currently splitting in space-time is impelemented:
     int dirs = 4;
     for(int i = 0;i < dirs; i++){
-      dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
+      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
       dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
       dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
       dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
+      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
     }  
 
     void *gauge0, *gauge1;
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
     if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
+      errorQuda("Mixing gauge precision (%d) and spinor precision (%d) not supported", gauge.Precision(), in->Precision());
 
     DslashCuda *dslash = 0;
     size_t regSize = sizeof(float);
@@ -305,7 +308,7 @@ namespace quda {
 
     DslashPolicyImp* dslashImp = NULL;
     if (DS_type != 0) {
-      dslashImp = DslashFactory::create(QUDA_DSLASH_NC);
+      dslashImp = DslashFactory::create(QudaDslashPolicy::QUDA_DSLASH_NC);
       (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
       delete dslashImp;
     } else {
