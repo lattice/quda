@@ -18,8 +18,8 @@ namespace quda {
 
     typedef typename colorspinor_mapper<QC_REAL,QC_Ns,QC_Nc>::type Propagator;
     
-    Propagator *prop[QUDA_PROP_NVEC];  // Input propagator
-
+    Propagator prop[QUDA_PROP_NVEC];
+    
     const qluaCntr_Type cntrType;     // contraction type 
     const int nParity;                // number of parities we're working on
     const int nFace;                  // hard code to 1 for now
@@ -36,13 +36,7 @@ namespace quda {
       lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
       volumeCB(propIn[0]->VolumeCB()),volume(propIn[0]->Volume())
     {
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
-	prop[ivec] = new Propagator(*propIn[ivec]);
-    }
-  ~QluaContractArg() 
-    {
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
-        delete prop[ivec];
+      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) prop[ivec].init(*propIn[ivec]);
     }
 
   };//-- Structure definition
@@ -53,7 +47,7 @@ namespace quda {
     typedef typename colorspinor_mapper<QC_REAL,QC_Ns,QC_Nc>::type Propagator;
     typedef typename gauge_mapper<QC_REAL,QUDA_RECONSTRUCT_NO>::type Gauge;
     
-    Propagator *prop[QUDA_PROP_NVEC];  // Input propagator
+    Propagator prop[QUDA_PROP_NVEC];  // Input propagator
     Gauge U;                          // Gauge Field
 
     const qluaCntr_Type cntrType;     // contraction type 
@@ -72,14 +66,9 @@ namespace quda {
       lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
       volumeCB(propIn[0]->VolumeCB()),volume(propIn[0]->Volume())
     {
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) 
-        prop[ivec] = new Propagator(*propIn[ivec]);
+      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) prop[ivec].init(*propIn[ivec]);
     }
-  ~QluaContractArgU()
-    {
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) 
-        delete prop[ivec];
-    }
+
   };//-- Structure definition
   //---------------------------------------------------------------------------
 
@@ -195,7 +184,7 @@ namespace quda {
     Vector vec[QUDA_PROP_NVEC];
 
     for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec[i] = arg->prop[i]->operator()(x_cb, pty);
+      vec[i] = arg->prop[i](x_cb, pty);
     }
     rotatePropBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
 
