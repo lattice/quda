@@ -99,10 +99,10 @@ namespace quda {
         // set all color components to zero
         for (int c2=0; c2<p.Ncolor(); c2++) {
           p(parity,x_cb,0,c2) = 0.0;
-          // except the corner and color we want
-          if (s == corner)
-            p(parity,x_cb,0,c) = (double)v;
         }
+        // except the corner and color we want
+        if (s == corner)
+          p(parity,x_cb,0,c) = (double)v;
       }
     }
   }
@@ -322,6 +322,10 @@ namespace quda {
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
     if (a.Ncolor() == 3 && a.Nspin() == 4)  {
       FieldOrderCB<Float,4,3,1,order> A(a);
+      print_vector(A, x);
+    }
+    else if (a.Ncolor() == 3 && a.Nspin() == 1)  {
+      FieldOrderCB<Float,1,3,1,order> A(a);
       print_vector(A, x);
     }
     else if (a.Ncolor() == 2 && a.Nspin() == 2) {

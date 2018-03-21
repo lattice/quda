@@ -872,16 +872,16 @@ static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
     resEven[dir] = res[dir];
     resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
   }
-    
+
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
       for (int m = 0; m < 3; m++) {
-	for (int n = 0; n < 3; n++) {
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
-	}
+        for (int n = 0; n < 3; n++) {
+          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0; 
+          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0;
+        }
       }
     }
   }
@@ -916,12 +916,17 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
       for (int m = 1; m < 3; m++) { // last 2 rows
-	for (int n = 0; n < 3; n++) { // 3 columns
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;                    
-	}
+        for (int n = 0; n < 3; n++) { // 3 columns
+          // ESW hack free fields with staggered phases
+          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0; 
+          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0;
+          /*resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
+          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;*/                    
+        }
       }
       normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
       orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
@@ -2914,6 +2919,9 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }
     geo_block_size[level][3] = tsize;
     i++;
+
+    // staggered hack
+    geo_block_size[level][4] = 1;
 
     ret = 0;
     goto out;

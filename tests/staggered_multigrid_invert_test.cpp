@@ -510,12 +510,14 @@ int main(int argc, char **argv)
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
 
-  if (dslash_type == QUDA_LAPLACE_DSLASH) {
-    construct_gauge_field(qdp_fatlink, 0, gauge_param.cpu_prec, &gauge_param);
-  } else {
+  //if (dslash_type == QUDA_LAPLACE_DSLASH) {
+  // Force unit gauge fields without phases just for convenience */
+  //  construct_gauge_field(qdp_fatlink, 0, gauge_param.cpu_prec, &gauge_param);
+  //} else {
+    // hard coded plus hacked to force free field with staggered phases
     construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gauge_param.cpu_prec,
            &gauge_param, dslash_type);
-  }
+  //}
 
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<V; ++i){
@@ -541,7 +543,7 @@ int main(int argc, char **argv)
   if (pc) csParam.x[0] /= 2;
   //csParam.x[4] = Nsrc;
 
-  csParam.precision = inv_param.cpu_prec;
+  csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
   csParam.siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;

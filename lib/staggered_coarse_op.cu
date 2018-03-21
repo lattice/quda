@@ -49,9 +49,9 @@ namespace quda {
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(X));
 
       calculateStaggeredY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
-	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-	 vAccessor, gAccessor, Y, X, uv, v, mass, dirac, matpc,
-	 T.fineToCoarse(location), T.coarseToFine(location));
+        (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
+         vAccessor, gAccessor, Y, X, uv, v, mass, dirac, matpc,
+         T.fineToCoarse(location), T.coarseToFine(location));
 
     } else {
 
@@ -100,8 +100,6 @@ namespace quda {
       calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, uv, T, g, c, mass dirac, matpc);
 #endif
     if (coarseColor == 24) { // free field staggered
-      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, mass, dirac, matpc);
-    } else if (coarseColor == 24) { // free field staggered
       calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, mass, dirac, matpc);
     } else if (coarseColor == 96) {
       calculateStaggeredY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, uv, T, g, mass, dirac, matpc);
@@ -200,7 +198,7 @@ namespace quda {
       //Create a copy of the gauge field with no reconstruction, required for fine-grained access
       GaugeFieldParam gf_param(gauge);
       gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-      gf_param.setPrecision(gf_param.precision);
+      gf_param.setPrecision(gf_param.Precision());
       U = new cudaGaugeField(gf_param);
 
       U->copy(gauge);
@@ -210,7 +208,7 @@ namespace quda {
     ColorSpinorParam UVparam(T.Vectors(location));
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
-    UVparam.precision = T.Vectors(location).Precision();
+    UVparam.setPrecision(T.Vectors(location).Precision());
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 

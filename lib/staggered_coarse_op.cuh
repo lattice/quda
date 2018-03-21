@@ -113,8 +113,7 @@ namespace quda {
 
       for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
         for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-          // need to check if I'm properly accessing elements of spin-less objs
-          UV[ic] += arg.U(dim, parity, x_cb, ic, jc) * W.Ghost(dim, 1, (parity+1)&1, ghost_idx, 0 /*b/c no spin? */, jc, ic_c);
+          UV[ic] += arg.U(dim, parity, x_cb, ic, jc) * W.Ghost(dim, 1, (parity+1)&1, ghost_idx, 0, jc, ic_c);
         }  //Fine color columns
       }  //Fine color rows
 
@@ -124,14 +123,14 @@ namespace quda {
       for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
         for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
           // need to check if I'm properly accessing elements of spin-less objs
-          UV[ic] += arg.U(dim, parity, x_cb, ic, jc) * W((parity+1)&1, y_cb, 0 /* b/c no spin? */, jc, ic_c);
+          UV[ic] += arg.U(dim, parity, x_cb, ic, jc) * W((parity+1)&1, y_cb, 0, jc, ic_c);
         }  //Fine color columns
       }  //Fine color rows
 
     }
 
     for(int c = 0; c < fineColor; c++) {
-      arg.UV(parity,x_cb,0 /*?*/,c,ic_c) = UV[c];
+      arg.UV(parity,x_cb,0,c,ic_c) = UV[c];
     }
 
   } // computeStaggeredUV
@@ -170,14 +169,10 @@ namespace quda {
      @param[in] x_cb Checkboarded x dimension
    */
   template <typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  __device__ __host__ inline void multiplyStaggeredVUV(complex<Float>& vuv, const Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
+  __device__ __host__ inline void multiplyStaggeredVUV(complex<Float> vuv[], const Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
 
-    // We can reduce this to computing just one value. All gauge links
-    // couple even-to-odd, and chirality is also even-to-odd,
-    // so once we know the parity we're working with we exactly
-    // know the spins.
-
-    vuv = 0.0;
+#pragma unroll
+    for (int i=0; i<coarseSpin*coarseSpin; i++) vuv[i] = 0.0;
 
     const int s = 0; // fine spin is always 0, since it's staggered.
     const int s_c_row = arg.spin_map(s,parity); // Coarse spin row index
@@ -186,19 +181,19 @@ namespace quda {
     // we desire the positive (negative) hopping term.
 
     int s_col = 0;
-    const int s_c_col = arg.spin_map(s_col,parity); // Coarse spin col index
+    const int s_c_col = arg.spin_map(s_col,1-parity); // Coarse spin col index
 
 #pragma unroll
     for (int ic = 0; ic < fineColor; ic++) { //Sum over fine color
       if (dir == QUDA_BACKWARDS) {
 
         // off diagonal contribution
-        vuv += conj(arg.V(parity, x_cb, 0, ic, ic_c)) * arg.UV(parity, x_cb, 0, ic, jc_c);
+        vuv[s_c_row*coarseSpin+s_c_col] += conj(arg.V(parity, x_cb, 0, ic, ic_c)) * arg.UV(parity, x_cb, s_col, ic, jc_c);
 
       } else {
 
         // off diagonal contribution
-        vuv -= conj(arg.V(parity, x_cb, 0, ic, ic_c)) * arg.UV(parity, x_cb, 0, ic, jc_c);
+        vuv[s_c_row*coarseSpin+s_c_col] -= conj(arg.V(parity, x_cb, 0, ic, ic_c)) * arg.UV(parity, x_cb, s_col, ic, jc_c);
         
       }
     } //Fine color
@@ -261,12 +256,15 @@ namespace quda {
     int coord[QUDA_MAX_DIM];
     int coord_coarse[QUDA_MAX_DIM];
 
-    // Right off the bat: the fine lattice parity tells me s_row and s_col.
-    const int s_row = parity;
-    const int s_col = 1-parity;
-
     getCoords(coord, x_cb, arg.x_size, parity);
     for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/arg.geo_bs[d];
+
+    // ESW note: debug this later. We need to update
+    // multiplyStaggeredVUV to only grab the relevant component.
+
+    // Can use the fine coordinates to find out s_row and s_col.
+    //const int s_row = (coord[0]+coord[1]+coord[2]+coord[3])%2;
+    //const int s_col = 1-s_row;
 
     //Check to see if we are on the edge of a block.  If adjacent site
     //is in same block, M = X, else M = Y
@@ -283,19 +281,19 @@ namespace quda {
     int coarse_x_cb = ((coord_coarse[3]*arg.xc_size[2]+coord_coarse[2])*arg.xc_size[1]+coord_coarse[1])*(arg.xc_size[0]/2) + coord_coarse[0];
 #endif
 
-    complex<Float> vuv = 0.0;
+    complex<Float> vuv[coarseSpin*coarseSpin];
     multiplyStaggeredVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, parity, x_cb, c_row, c_col);
 
     constexpr int dim_index = (dir == QUDA_BACKWARDS) ? dim : dim + 4;
 #if defined(SHARED_ATOMIC) && __CUDA_ARCH__
-    __shared__ complex<storeType> X[4];
-    __shared__ complex<storeType> Y[4];
+    __shared__ complex<storeType> X[4][coarseSpin][coarseSpin];
+    __shared__ complex<storeType> Y[4][coarseSpin][coarseSpin];
     int x_ = coarse_x_cb%arg.aggregates_per_block;
 
     if (virtualThreadIdx(arg) == 0 && threadIdx.y == 0) {
       for (int s_row = 0; s_row<coarseSpin; s_row++) { 
         for (int s_col = 0; s_col<coarseSpin; s_col++) {
-          Y[x_]= 0; X[x_] = 0;
+          Y[x_][s_row][s_col]= 0; X[x_][s_row][s_col] = 0;
         }
       }
     }
@@ -303,39 +301,75 @@ namespace quda {
     __syncthreads();
 
     if (!isDiagonal) {
-      if (gauge::fixed_point<Float,storeType()) {
-        Float scale = arg.Y_atomic.accessor.scale;
-        complex<storeType> a(round(scale * vuv.real()),
-          round(scale * vuv.imag()));
-        atomicAdd(&Y[x_],a);
-      } else {
-        atomicAdd(&Y[x_],(*reinterpret_cast<complex<storeType> >(&vuv)));
-      }
+#pragma unroll
+      for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+        for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+          if (gauge::fixed_point<Float,storeType()) {
+            Float scale = arg.Y_atomic.accessor.scale;
+            complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
+              round(scale * vuv[s_row*coarseSpin+s_col].imag()));
+            atomicAdd(&Y[x_][s_row][s_col],a);
+          } else {
+            atomicAdd(&Y[x_][s_row][s_col],(*reinterpret_cast<complex<storeType> >(vuv)[s_row*coarseSpin+s_col]));
+          }
+        } // chiral column block
+      } // chiral row block
     } else {
-      if (gauge::fixed_point<Float,storeType()) {
-        Float scale = arg.X_atomic.accessor.scale;
-        complex<storeType> a(round(scale * vuv.real()),
-          round(scale * vuv.imag()));
-        atomicAdd(&X[x_],a);
-      } else {
-        atomicAdd(&X[x_],(*reinterpret_cast<complex<storeType> >(&vuv)));
-      }
+#pragma unroll
+      for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+        for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+          if (gauge::fixed_point<Float,storeType()) {
+            Float scale = arg.X_atomic.accessor.scale;
+            complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
+              round(scale * vuv[s_row*coarseSpin+s_col].imag()));
+            atomicAdd(&X[x_][s_row][s_col],a);
+          } else {
+            atomicAdd(&X[x_][s_row][s_col],(*reinterpret_cast<complex<storeType> >(vuv)[s_row*coarseSpin+s_col]));
+          }
+        } // chiral column block
+      } // chiral row block
     }
 
     __syncthreads();
 
     if (virtualThreadIdx(arg)==0 && threadIdx.y==0) {
 
-      arg.Y_atomic(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) = Y[x_];
+#pragma unroll
+      for (int s_row = 0; s_row < coarseSpin; s_row++) { // chiral row block
+#pragma unroll
+        for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+          arg.Y_atomic(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) = Y[x_][s_row][s_col];
+        } // chiral column block
+      } // chiral row block
 
       if (dir == QUDA_BACKWARDS) {
-        arg.X_atomic(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row) += conj(X[x_]);
+#pragma unroll
+        for (int s_row = 0; s_row < coarseSpin; s_row++) { // chiral row block
+#pragma unroll
+          for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+            arg.X_atomic(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row) += conj(X[x_][s_row][s_col]);
+          } // chiral column
+        } // chiral row
       } else {
-        arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += X[x_];
+#pragma unroll
+        for (int s_row = 0; s_row < coarseSpin; s_row++) { // chiral row block
+#pragma unroll
+          for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+            arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += X[x_][s_row][s_col];
+          } // chiral block
+        } // chiral row
       }
 
       if (!arg.bidirectional) {
-        arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) -= X[x_];
+#pragma unroll
+        for (int s_row = 0; s_row < coarseSpin; s_row++) { // chiral row block
+#pragma unroll
+          for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+            arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) -= X[x_][s_row][s_col];
+          } // chiral col
+        } // chiral row
       }
 
     }
@@ -343,17 +377,41 @@ namespace quda {
 #else
 
     if (!isDiagonal) {
-      arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv);
+#pragma unroll
+      for (int s_row = 0; s_row < coarseSpin; s_row++) { // chiral row block
+#pragma unroll
+        for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+          arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
+        } // chiral col
+      } // chiral row
     } else {
 
       if (dir == QUDA_BACKWARDS) {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row,conj(vuv));
+#pragma unroll
+        for (int s_row = 0; s_row < coarseSpin; s_row++) { // chiral row block
+#pragma unroll
+          for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+            arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row,conj(vuv[s_row*coarseSpin+s_col]));
+          } // chiral col
+        } // chiral row
       } else {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv);
+#pragma unroll
+        for (int s_row = 0; s_row < coarseSpin; s_row++) { // chiral row block
+#pragma unroll
+          for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+            arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
+          } // chiral col
+        } // chiral row
       }
 
       if (!arg.bidirectional) {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,-vuv);
+#pragma unroll
+        for (int s_row = 0; s_row < coarseSpin; s_row++) { // chiral row block
+#pragma unroll
+          for (int s_col = 0; s_col < coarseSpin; s_col++) { // chiral column block
+            arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,-vuv[s_row*coarseSpin+s_col]);
+          } // chiral col
+        } // chiral row
       }
 
     }
@@ -422,24 +480,21 @@ namespace quda {
 
   /**
    * Compute the forward links from backwards links by flipping the
-   * sign of the spin projector
+   * sign
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ void computeStaggeredYreverse(Arg &arg, int parity, int x_cb, int ic_c) {
     auto &Y = arg.Y_atomic;
 
     for (int d=0; d<4; d++) {
-      for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
-        for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-
-          const Float sign = (s_row == s_col) ? static_cast<Float>(1.0) : static_cast<Float>(-1.0);
-
+      for (int s_row = 0; s_row < nSpin; s_row++) { // chiral row block
+        for (int s_col = 0; s_col < nSpin; s_col++) { // chiral col block
+          const Float sign = static_cast<Float>(-1.0);
           for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
             Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = sign*Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
-          } //Color column
-
-        } //Spin column
-      } //Spin row
+          } // color column
+        } // chiral col
+      } // chiral row
     } // dimension
 
   }
@@ -476,7 +531,7 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
         for(int s = 0; s < nSpin; s++) { //Spin
           for(int c = 0; c < nColor; c++) { //Color
-            arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(arg.mass,0.0);
+            arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(2.0*arg.mass,0.0); // staggered conventions
           } //Color
         } //Spin
       } // x_cb
@@ -493,7 +548,7 @@ namespace quda {
 
     for(int s = 0; s < nSpin; s++) { //Spin
       for(int c = 0; c < nColor; c++) { //Color
-        arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(arg.mass,0.0);
+        arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(2.0*arg.mass,0.0); // staggered conventions
       } //Color
     } //Spin
    }
@@ -584,22 +639,25 @@ namespace quda {
       long long flops_ = 0;
       switch (type) {
       case COMPUTE_UV:
-	// when fine operator is coarse take into account that the link matrix has spin dependence
-	flops_ = 2l * arg.fineVolumeCB * 8 * coarseColor * fineColor * fineColor;
-	break;
+        // when fine operator is coarse take into account that the link matrix has spin dependence
+        flops_ = 2l * arg.fineVolumeCB * 8 * coarseColor * fineColor * fineColor;
+        break;
       case COMPUTE_VUV:
-	// when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
-	flops_ = 2l * arg.fineVolumeCB * 8 * coarseColor * coarseColor * fineColor / coarseSpin;
-	break;
+        // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
+        flops_ = 2l * arg.fineVolumeCB * 8 * coarseColor * coarseColor * fineColor / coarseSpin;
+        break;
       case COMPUTE_REVERSE_Y:
-	// no floating point operations
-	flops_ = 0;
-	break;
+        // no floating point operations
+        flops_ = 0;
+        break;
       case COMPUTE_MASS:
-	flops_ = 2l * arg.coarseVolumeCB*coarseSpin*coarseColor;
-	break;
+        flops_ = 2l * arg.coarseVolumeCB*coarseSpin*coarseColor;
+        break;
+      case COMPUTE_CONVERT: // no floating point operations
+        flops_ = 0;
+        break;
       default:
-	errorQuda("Undefined compute type %d", type);
+        errorQuda("Undefined compute type %d", type);
       }
       // 2 from parity, 8 from complex
       return flops_;
@@ -610,21 +668,21 @@ namespace quda {
       long long bytes_ = 0;
       switch (type) {
       case COMPUTE_UV:
-	bytes_ = arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes()*coarseColor;
-	break;
+        bytes_ = arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes()*coarseColor;
+        break;
       case COMPUTE_VUV:
-	bytes_ = 2*arg.Y.Bytes() + (arg.bidirectional ? 1 : 2) * 2*arg.X.Bytes() + arg.UV.Bytes() + arg.V.Bytes();
-	break;
+        bytes_ = 2*arg.Y.Bytes() + (arg.bidirectional ? 1 : 2) * 2*arg.X.Bytes() + arg.UV.Bytes() + arg.V.Bytes();
+        break;
       case COMPUTE_REVERSE_Y:
-	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
+        bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
       case COMPUTE_MASS:
-	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
-	break;
+        bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
+        break;
       case COMPUTE_CONVERT:
-	bytes_ = 2*(arg.X.Bytes() + arg.X_atomic.Bytes() + 8*(arg.Y.Bytes() + arg.Y_atomic.Bytes()));
-	break;
+        bytes_ = 2*(arg.X.Bytes() + arg.X_atomic.Bytes() + 8*(arg.Y.Bytes() + arg.Y_atomic.Bytes()));
+        break;
       default:
-	errorQuda("Undefined compute type %d", type);
+        errorQuda("Undefined compute type %d", type);
       }
       return bytes_;
     }
@@ -634,15 +692,15 @@ namespace quda {
       switch (type) {
       case COMPUTE_UV:
       case COMPUTE_VUV:
-	threads = arg.fineVolumeCB;
-	break;
+        threads = arg.fineVolumeCB;
+        break;
       case COMPUTE_REVERSE_Y:
       case COMPUTE_MASS:
       case COMPUTE_CONVERT:
-	threads = arg.coarseVolumeCB;
-	break;
+        threads = arg.coarseVolumeCB;
+        break;
       default:
-	errorQuda("Undefined compute type %d", type);
+        errorQuda("Undefined compute type %d", type);
       }
       return threads;
     }
@@ -652,7 +710,7 @@ namespace quda {
   public:
     CalculateStaggeredY(Arg &arg, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X)
       : TunableVectorYZ(2,1), arg(arg), type(COMPUTE_INVALID),
-	meta(meta), Y(Y), X(X), dim(0), dir(QUDA_BACKWARDS)
+        meta(meta), Y(Y), X(X), dim(0), dir(QUDA_BACKWARDS)
     {
       strcpy(aux, meta.AuxString());
       strcat(aux,comm_dim_partitioned_string());
@@ -1020,12 +1078,13 @@ namespace quda {
     // do exchange of null-space vectors
     const int nFace = 1;
     v.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
-    arg.V.resetGhost(v.Ghost());  // point the accessor to the correct ghost buffer
+    arg.V.resetGhost(v, v.Ghost());  // point the accessor to the correct ghost buffer
     LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
 
     printfQuda("V2 = %e\n", arg.V.norm2());
 
     // work out what to set the scales to
+    // ESW hack
     if (coarseGaugeAtomic::fixedPoint()) {
       double max = 100.0; // FIXME - more accurate computation needed?
       arg.Y_atomic.resetScale(max);

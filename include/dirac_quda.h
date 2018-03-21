@@ -152,6 +152,7 @@ namespace quda {
     static Dirac* create(const DiracParam &param);
 
     double Kappa() const { return kappa; }
+    virtual double Mass() const { return mass; } // in case of factor of 2 convention for staggered
     virtual double Mu() const { return 0.; }
     virtual double MuFactor() const { return 0.; }
 
@@ -766,6 +767,7 @@ namespace quda {
   class DiracCoarse : public Dirac {
 
   protected:
+    double mass;
     double mu;
     double mu_factor;
     const Transfer *transfer; /** restrictor / prolongator defined here */
@@ -813,6 +815,7 @@ namespace quda {
     void createYhat(bool gpu = true) const;
 
   public:
+    double Mass() const { return mass; }
     double Mu() const { return mu; }
     double MuFactor() const { return mu_factor; }
 
