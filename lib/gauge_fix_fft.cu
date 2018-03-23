@@ -1087,18 +1087,16 @@ namespace quda {
                                reunit_allow_svd, reunit_svd_only,
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
-    int* num_failures_dev;
-    cudaMalloc((void**)&num_failures_dev, sizeof(int));
+    int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
     cudaMemset(num_failures_dev, 0, sizeof(int));
-    if ( num_failures_dev == NULL ) errorQuda("cudaMalloc failed for dev_pointer\n");
     unitarizeLinks(data, data, num_failures_dev);
     qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+
+    pool_device_free(num_failures_dev);
     if ( num_failures > 0 ) {
-      cudaFree(num_failures_dev);
       errorQuda("Error in the unitarization\n");
       exit(1);
     }
-    cudaFree(num_failures_dev);
     // end reunitarize
 
 

@@ -17,7 +17,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	lattice_field.o gauge_field.o cpu_gauge_field.o			\
 	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\
 	gauge_update_quda.o dirac_clover.o dirac_wilson.o		\
-	dirac_staggered.o dirac_improved_staggered.o covd.o		\
+	dirac_staggered.o dirac_improved_staggered.o gauge_covdev.o	\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
 	llfat_quda.o							\
@@ -104,9 +104,7 @@ asym_wilson_clover_fused_exterior_dslash_dagger_gt200_core.h		\
 asym_wilson_clover_fused_exterior_dslash_fermi_core.h			\
 asym_wilson_clover_fused_exterior_dslash_gt200_core.h			\
 contract_core.h contract_core_minus.h contract_core_plus.h		\
-covDev_mu0_core.h covDev_mu0_dagger_core.h covDev_mu1_core.h		\
-covDev_mu1_dagger_core.h covDev_mu2_core.h covDev_mu2_dagger_core.h	\
-covDev_mu3_core.h covDev_mu3_dagger_core.h dw_dslash4_core.h		\
+dw_dslash4_core.h		\
 dw_dslash4_dagger_core.h dw_dslash5_core.h dw_dslash5_dagger_core.h	\
 dw_dslash5inv_core.h dw_dslash5inv_dagger_core.h dw_dslash_core.h	\
 dw_dslash_dagger_core.h dw_fused_exterior_dslash4_core.h		\

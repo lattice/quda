@@ -12,6 +12,8 @@
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
+
   template <typename Float, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
 		  const GaugeField &g, const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
@@ -161,12 +163,15 @@ namespace quda {
     printfQuda("....done computing Y field\n");
   }
 
+#endif // GPU_MULTIGRID
+
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
 		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
+#ifdef GPU_MULTIGRID
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X, Xinv, Yhat);
 
@@ -249,6 +254,9 @@ namespace quda {
 
     if (C != clover) delete C;
     if (U != &gauge) delete U;
+#else
+    errorQuda("Multigrid has not been built");
+#endif // GPU_MULTIGRID
   }
 
 } //namespace quda
