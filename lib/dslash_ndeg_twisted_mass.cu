@@ -80,7 +80,6 @@ namespace quda {
 		      const double epsilon, const double k, const int dagger)
       : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), dslashType(dslashType)
     { 
-      bindSpinorTex<sFloat>(in, out, x); 
       a = kappa;
       b = mu;
       c = epsilon;
@@ -116,6 +115,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
       dslashParam.ghostTex = in->GhostTex();
       dslashParam.ghostTexNorm = in->GhostTexNorm();
+#else
+      bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
 
 #ifdef SHARED_WILSON_DSLASH
