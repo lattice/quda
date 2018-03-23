@@ -54,6 +54,7 @@ namespace quda {
 
     void axpyZpbx(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, const double &b);
     void axpyBzpcx(const double &a, ColorSpinorField& x, ColorSpinorField& y, const double &b, ColorSpinorField& z, const double &c);
+    void xpayWpazBzpx(ColorSpinorField& x, const double &a, ColorSpinorField& y, const double &b, ColorSpinorField& z, ColorSpinorField& w);
 
     void caxpby(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y);
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
@@ -100,6 +101,9 @@ namespace quda {
  
     double2 pipeEigCGMergedReduceOp(const double &a, ColorSpinorField &s, ColorSpinorField &p, ColorSpinorField &z,
                                const double &b, ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &w, ColorSpinorField &q, const double c, ColorSpinorField &v);
+
+    double2 pipeEigCGMergedReduceOp2(const double &a, ColorSpinorField &s, ColorSpinorField &p,
+                               const double &b, ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &w, const double c, ColorSpinorField &v);
 
    /**
        @brief Compute the block "caxpy" with over the set of

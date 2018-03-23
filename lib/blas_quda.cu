@@ -388,6 +388,33 @@ namespace quda {
 				    x, y, z, x);
       }
     }
+
+    /**
+       Functor performing the operations: y[i] = x[i] + a*y[i]; z[i] = w[i] + a*z[i]; x[i] = b*z[i] + x[i]; 
+    */
+    template <typename Float2, typename FloatN>
+    struct xpayWpazBzpx_ : public BlasFunctor<Float2,FloatN> {
+      const Float2 a;
+      const Float2 b;
+      xpayWpazBzpx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      { y = x + a.x*y; z = w + a.x*z; x += b.x*z; }
+      static int streams() { return 7; } //! total number of input and output streams
+      static int flops() { return 6; } //! flops per element
+    };
+
+    void xpayWpazBzpx(ColorSpinorField& x, const double &a, ColorSpinorField& y,
+		  const double &b, ColorSpinorField& z, ColorSpinorField& w) {
+      if (x.Precision() != y.Precision()) {
+	// call hacked mixed precision kernel
+        errorQuda("Mixed precision version is not supported.\n");  
+      } else {
+	// swap arguments around
+	blasCuda<xpayWpazBzpx_,1,1,1,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+				    x, y, z, w);
+      }
+    }
+
     
     /**
        Functor performing the operations y[i] = a*x[i] + y[i] and x[i] = b*z[i] + x[i]

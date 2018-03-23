@@ -23,6 +23,17 @@
 #include <Eigen/Dense>
 #include <deflation.h>
 
+#define DEBUGMODE
+
+#include <thread>
+
+//examples
+#include <utility>
+#include <chrono>
+#include <functional>
+#include <atomic>
+#include <fstream>
+
 
 /*
 Based on  eigCG(nev, m) algorithm:
@@ -76,7 +87,7 @@ namespace quda {
        ~EigCGArgs() { V2k.reset(); }
 
        //method for constructing Lanczos matrix :
-       inline void SetLanczos(Complex diag_val, Complex offdiag_val) { 
+       inline void SetLanczosAndIncrementSearchIndex(Complex diag_val, Complex offdiag_val) { 
          if(run_residual_correction) return;
 
          Tm.diagonal<0>()[id] = diag_val; 
@@ -256,7 +267,7 @@ namespace quda {
   }
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), eigcg_tsks(nullptr), profile(profile), init(false)
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), eigcg_tsks(nullptr), profile(profile), pipelined_search_space_restart(false), init(false)
   {
     if( param.rhs_idx < param.deflation_grid )  printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.\n", param.m, param.nev);
     else {  
@@ -466,7 +477,7 @@ namespace quda {
 
       //
       lanczos_offdiag  = (-sqrt(beta)*alpha_inv);
-      args.SetLanczos(lanczos_diag, lanczos_offdiag);
+      args.SetLanczosAndIncrementSearchIndex(lanczos_diag, lanczos_offdiag);
 
       k++;
 
@@ -687,8 +698,7 @@ namespace quda {
          printfQuda("Running DCG correction cycle.\n");
        }
 
-//       int iters = genericEigCGsolve(eSloppy, rSloppy);
-       int iters =  param.pipeline ? pipeEigCGsolve(eSloppy, rSloppy) : eigCGsolve(eSloppy, rSloppy) ;
+       int iters = param.pipeline ? pipeEigCGsolve(eSloppy, rSloppy) : eigCGsolve(eSloppy, rSloppy) ; //genericEigCGsolve(eSloppy, rSloppy);
 
        bool update_ritz = !dcg_cycle && (eigcg_args->restarts > 1) && !defl.is_complete(); 
 
@@ -749,10 +759,13 @@ namespace quda {
     private:
 
       static const int pipeline_length = 4;
+
       std::unique_ptr<Complex[]> lanczos_diag;
       std::unique_ptr<Complex[]> lanczos_offdiag;
 
     public:
+
+      int pipeline_idx;
       //
       std::shared_ptr<ColorSpinorField> & Vm;
       std::shared_ptr<EigCGArgs> & eigcg_args;
@@ -776,7 +789,7 @@ namespace quda {
 
       std::shared_ptr<ColorSpinorFieldSet> Vpipeline; //eigCG accumulation vectors needed to keep Lanczos basis vectors during the restart
 
-      EigCGTasks(std::shared_ptr<ColorSpinorField> & Vm, std::shared_ptr<EigCGArgs> & eigcg_args) : Vm(Vm), eigcg_args(eigcg_args),  wtype(tasktype::default_task), 
+      EigCGTasks(std::shared_ptr<ColorSpinorField> & Vm, std::shared_ptr<EigCGArgs> & eigcg_args) : pipeline_idx(0), Vm(Vm), eigcg_args(eigcg_args),  wtype(tasktype::default_task), 
 recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 ? 4 : 2 ), is_mgpu_task(false), inv_sqrt_r2(0.0) {
 
         lanczos_diag    = std::move(std::unique_ptr<Complex[] >(new Complex[pipeline_length], std::default_delete<Complex[]>()));
@@ -801,16 +814,20 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
 
       }
 
-      inline void StoreLanzcos(Complex diag, Complex offdiag, int idx) { 
-         if(idx >= pipeline_length) errorQuda("Cannot store Lanczos coefficients\n");
+      inline void StoreLanzcosAndIncrementPipelineIdx(Complex diag, Complex offdiag, const bool store_flag) { 
 
-         lanczos_diag[idx]    = diag;
-         lanczos_offdiag[idx] = offdiag;
+         if(!store_flag) return; //nothing to do
 
+         if(pipeline_idx == pipeline_length) errorQuda("Cannot cannot increment current pipeline index.\n");
+
+         lanczos_diag   [pipeline_idx] = diag;
+         lanczos_offdiag[pipeline_idx] = offdiag;
+
+         pipeline_idx += 1;
       }
 
-      inline void RestoreSearchSpace(int current_pipeline_idx) { 
-         if(current_pipeline_idx >= pipeline_length) errorQuda("Cannot restore Lanczos params.\n");
+      inline void RestoreSearchSpace() { 
+         if(pipeline_idx >= pipeline_length) errorQuda("Cannot restore Lanczos params.\n");
 
          //reset background task
          wtype = tasktype::default_task;
@@ -820,10 +837,12 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
          //first we need to reset search space index:
          args.ResetSearchIdx(); 
          //now perform postponed copy operations: 
-         for(int i = 0; i < current_pipeline_idx; i++) {
+         for(int i = 0; i < pipeline_idx; i++) {
            Vm->Component(args.id+i) = Vpipeline->Component(i); 
-           args.SetLanczos(lanczos_diag[i], lanczos_offdiag[i]);     
+           args.SetLanczosAndIncrementSearchIndex(lanczos_diag[i], lanczos_offdiag[i]);     
          } 
+
+         pipeline_idx = 0;
       }
 
       inline void StartCommunicationTask( double2 local_reduce ) {
@@ -847,9 +866,11 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
 
       inline void SetComputeTask(tasktype new_task) { wtype = new_task; }
 
-      inline void ResetTasks() { wtype = tasktype::default_task; }
+      inline void ResetTasks() { pipeline_idx = 0; wtype = tasktype::default_task; }
 
-      inline void SetRestartParameters(ColorSpinorField &w, double inv_r) {  *wp2 = w;  inv_sqrt_r2 = inv_r;  }
+      inline tasktype ReportTask() { return wtype; }
+
+      inline void SetRestartParameters(const ColorSpinorField &w, const double inv_r) {  *wp2 = w;  inv_sqrt_r2 = inv_r;  }
 
       virtual ~EigCGTasks() {
         host_free(allreduceHandle);
@@ -879,7 +900,6 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
             Block<MatrixXcd>(args.ritzVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
             args.ritzVecs.block(m-1, k, 1, k).setZero();
           } else if (count == 2) {
-
             MatrixXcd Q2k(MatrixXcd::Identity(m, 2*k));
             HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(args.ritzVecs.data(), m, 2*k) );
             Q2k.applyOnTheLeft( ritzVecs2k_qr.householderQ() );
@@ -899,11 +919,11 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
 
           if(count == 0) zero(*args.V2k);
 
-          const int work_sz = (count != n_update-1) ? _m_update_per_apply : args.m - _m_update_per_apply ;
+          const int work_sz = (count != n_update-1) ? _m_update_per_apply : args.m - count*_m_update_per_apply ;
 
           std::vector<ColorSpinorField*> curr_vm(Vm->Components().begin() + count*_m_update_per_apply, Vm->Components().begin() + count*_m_update_per_apply + work_sz);
 
-          RowMajorDenseMatrix Alpha(args.ritzVecs.block(count*_m_update_per_apply,0,args.m, 2*args.k));//!
+          RowMajorDenseMatrix Alpha(args.ritzVecs.block(count*_m_update_per_apply,0,work_sz, 2*args.k));//args.m->work_sz
           caxpy((static_cast<Complex*>(Alpha.data())), curr_vm, args.V2k->Components());
 
         } else if (wtype == tasktype::restart_lanczos_task) {
@@ -913,7 +933,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
             for(int i = 0; i < 2*args.k; i++) args.Tm(i,i) = args.Tmvals(i);//??
           }
 
-          const int work_sz = (count != n_update-1) ? _2k_update_per_apply : 2*args.k - _2k_update_per_apply ;
+          const int work_sz = (count != n_update-1) ? _2k_update_per_apply : 2*args.k - count*_2k_update_per_apply ;
 
           std::vector<ColorSpinorField*> v2k( Vm->Components().begin() + count*_2k_update_per_apply, Vm->Components().begin() + count*_2k_update_per_apply + work_sz );
 
@@ -947,27 +967,36 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
   }
 
 
-  bool IncEigCG::PipelinedRestart(const int current_pipeline_idx)
+  void IncEigCG::PipelinedRestart( double&& lanczos_diag, double&& lanczos_offdiag, ColorSpinorField *wp, double a)
   {
-    bool is_locked = true;
-
     EigCGTasks &tasks = *eigcg_tsks;
 
-    if(current_pipeline_idx == 0) {
-       tasks.SetComputeTask(tasktype::compute_ritz_task);
-    } else if (current_pipeline_idx == 1) {
-       tasks.SetComputeTask(tasktype::restart_v_task);
-    } else if (current_pipeline_idx == 2) {
-       tasks.SetComputeTask(tasktype::restart_lanczos_task);
-    } else if (current_pipeline_idx == 3) {
-       //it's almost done, now copy stuff and return:
-       tasks.RestoreSearchSpace(current_pipeline_idx);
- 
-       is_locked             = false; /* the search space is released */
-    } 
+    tasks.StoreLanzcosAndIncrementPipelineIdx(lanczos_diag, lanczos_offdiag, pipelined_search_space_restart);
 
-    return is_locked;
+    pipelined_search_space_restart = true;
+
+    switch ( tasks.pipeline_idx ) {
+      case 0 :
+        tasks.SetRestartParameters(*wp, a);
+        tasks.SetComputeTask(tasktype::compute_ritz_task);
+        break;
+      case 1 :
+        tasks.SetComputeTask(tasktype::restart_v_task);
+        break; 
+      case 2 :
+        tasks.SetComputeTask(tasktype::restart_lanczos_task);
+        break;
+      case 3 ://it's almost done, now copy stuff and return:
+        tasks.RestoreSearchSpace();
+      default :
+        pipelined_search_space_restart = false; /* the search space is released */
+        break;
+    }
+
+    return;
   }
+
+//#define PIPEEIGCGDEBUG
 
   int IncEigCG::pipeEigCGsolve(ColorSpinorField &x, ColorSpinorField &b){
 
@@ -976,13 +1005,15 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
     EigCGArgs  &args  = *eigcg_args;
     EigCGTasks &tasks = *eigcg_tsks; 
 
+    args.ResetAccumBuffer(x); //reserve additional buffer for Ritz vectors search space
+
     ColorSpinorParam csParam(b);
 
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
 
     std::shared_ptr<ColorSpinorField> zp  = ColorSpinorField::CreateSmartPtr(csParam);
-    std::shared_ptr<ColorSpinorField> tp  = nullptr;
+    ColorSpinorField *tp = &Vm->Component(0);//for the first iteration
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &p = *pp;
@@ -1011,7 +1042,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
 
     double &gamma = local_reduce.x, &delta = local_reduce.y;
 
-    Complex lanczos_diag, lanczos_offdiag;
+    double lanczos_diag, lanczos_offdiag;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -1046,74 +1077,66 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
     matSloppy(q, w, tmp);
 
     int j = 0;
-    int pipeline_idx = 0;
 
-    PrintStats( "PEigCG", j, norm2(r), b2, heavy_quark_res);
+    PrintStats( "pipeEigCG", j, norm2(r), b2, heavy_quark_res);
     param.delta = 1e-8;
 
     bool local_stop           = false;
-    bool search_space_restart = false;
 
-    while((!convergence(gamma, heavy_quark_res, stop, param.tol_hq) && j) < param.maxiter || !local_stop){
-
-      int updateX = (rNorm < param.delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-      int updateR = ((rNorm < param.delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
-
-      // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if( convergence(gamma, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = 1;
-
-      if( search_space_restart ) {
-        tasks.StoreLanzcos(lanczos_diag, lanczos_offdiag, pipeline_idx);
-
-        search_space_restart = PipelinedRestart( pipeline_idx );
-
-        dslash::aux_worker   = search_space_restart ? &tasks : nullptr;
-
-        tp.reset(search_space_restart ? &tasks.Vpipeline->Component( pipeline_idx ) : &Vm->Component(args.id)); 
-      } else { //nop for the first iteration
-        args.SetLanczos(lanczos_diag, lanczos_offdiag);
-
-        tp.reset(&Vm->Component(args.id));
-      }
+    while((!convergence(gamma, heavy_quark_res, stop, param.tol_hq) && (j < param.maxiter)) && !local_stop){
 
       ColorSpinorField &t = *tp;
 
-#ifndef PIPEEIGCGDEBUG
-      local_reduce = pipeEigCGMergedReduceOp(beta, s, p, z, aplha, r, x, w, q, gamma_inv, t);
-#else
-      xpay(r,beta,p);
-      xpay(w,beta,s);
-      xpay(q,beta,z);
-
-      axpy(sqrt(gamma_inv), r, t);
-
-      axpy(+alpha, p, x);
-      axpy(-alpha, s, r);
-      axpy(-alpha, z, w);
-
-      gamma  = norm2(r);
-      delta  = reDotProduct(w, r);
-#endif
+#ifdef MAX_PIPELINING
+      xpayWpazBzpx(w, beta, s, -alpha, z, q);
+      local_reduce = pipeEigCGMergedReduceOp2(beta, s, p, alpha, r, x, w, gamma_inv, t);
+      //
       tasks.StartCommunicationTask(local_reduce);
       //allow non-blocking allreduce operation
       matSloppy(q, w, tmp);
       //sync and copy results
       tasks.StopCommunicationTask(local_reduce);
+#else
+      local_reduce = pipeEigCGMergedReduceOp(beta, s, p, z, alpha, r, x, w, q, gamma_inv, t);
+      tasks.StartCommunicationTask(local_reduce);
+      //allow non-blocking allreduce operation
+      matSloppy(q, w, tmp);
+      //sync and copy results
+      tasks.StopCommunicationTask(local_reduce);
+#endif
 
       lanczos_diag  = (alpha_inv + beta*alpha_old_inv);
 
       gamma_old_inv = gamma_inv;
       gamma_inv     = 1.0 / gamma;
       beta          = gamma * gamma_old_inv;
-
       alpha_old_inv = alpha_inv;
       alpha_inv     = delta * gamma_inv - beta * alpha_old_inv;
       alpha         = 1.0 / alpha_inv;
 
-      lanczos_offdiag = (-sqrt(beta)*alpha_inv);
+      lanczos_offdiag = (-sqrt(beta)*alpha_old_inv);
+
+      if(!pipelined_search_space_restart) {
+        //Warning: don't commute with the next if-statement
+        args.SetLanczosAndIncrementSearchIndex(lanczos_diag, lanczos_offdiag);
+
+        if( args.id == args.m ) {
+          warningQuda("Do search space restart.");
+          PipelinedRestart(0.0, 0.0, &w, sqrt(gamma_inv) );//will set pipelined_search_space_restart to true
+          dslash::aux_worker = &tasks;
+        } 
+
+      } else {//still updates the search space
+        PipelinedRestart( std::move(lanczos_diag), std::move(lanczos_offdiag) );
+        dslash::aux_worker = pipelined_search_space_restart ? &tasks : nullptr;//set to nullptr when restart finished
+      } 
+
+      tp = pipelined_search_space_restart ? &tasks.Vpipeline->Component( tasks.pipeline_idx ) : &Vm->Component(args.id); 
+
+      int updateX = (rNorm < param.delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
+      int updateR = ((rNorm < param.delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
 
       if(  (updateR || updateX)  ) { // do postponed restart:
-
         warningQuda("Do eigCG restart.\n");
         local_stop = true;
       }
@@ -1124,13 +1147,6 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if( convergence(gamma, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = 1;
-
-      pipeline_idx = search_space_restart ? (pipeline_idx + 1) :  0 ;
-
-      if( args.id == args.m  ) {
-        search_space_restart = true;
-        tasks.SetRestartParameters(w, sqrt(gamma_inv));
-      }  
 
       j += 1;
       PrintStats( "pipeEigCG", j, gamma, b2, heavy_quark_res);
@@ -1152,10 +1168,11 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residual
-    xpy(y, x);
-    mat(r, x, tmp);
-    double true_res = blas::xmyNorm(b, r);
-    param.true_res = sqrt(true_res / b2);
+    //xpy(y, x);
+    matSloppy(r, x, y);
+    param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
+
+    PrintSummary("eigCG", j, gamma, b2);
 
     // reset the flops counters
     blas::flops = 0;

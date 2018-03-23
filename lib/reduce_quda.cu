@@ -1066,6 +1066,7 @@ namespace quda {
          dot_v2_<scalar> (sum.x, r, r);
          dot_v2_<scalar> (sum.y, r, w);
       }
+
       static int streams() { return 18; } //! total number of input and output streams
       static int flops() { return (16+6); } //! flops per real element
     };
@@ -1108,6 +1109,7 @@ namespace quda {
          dot_v2_<scalar> (sum.x, r, r);
          dot_v2_<scalar> (sum.y, r, w);
       }
+
       static int streams() { return 18; } //! total number of input and output streams
       static int flops() { return (16+6); } //! flops per real element
     };
@@ -1121,6 +1123,58 @@ namespace quda {
       return reduce::mergedReduceCuda<double2, QudaSumFloat2,pipeEigCGMergedReduceOp_,1,1,1,1,1,1,0,1,false>
 	  (make_double2(a, 0.0), make_double2(b, 0.0), make_double2(c, 0.0), s, p, z, r, x, w, q, v);
     }
+
+
+    /**
+       This convoluted kernel does the following:
+      //
+      xpay(r,beta, p);
+      axpy(+alpha, p, x);
+      axpy(sqrt(gamma_inv), r, t);
+      axpy(-alpha, s, r);
+
+      gamma  = norm2(r);
+      delta  = reDotProduct(w, r);
+
+    */
+
+
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct xpayBypzCxBwpxNorm_ : public PipeReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      Float2 b;
+      Float2 c;
+      xpayBypzCxBwpxNorm_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
+      __device__ void operator()(ReduceType &sum, FloatN &s, FloatN &p, FloatN &z, FloatN &r, FloatN &x, FloatN &w, FloatN &q, FloatN &v) { 
+	typedef typename ScalarType<ReduceType>::type scalar;
+//prefetch x and v:
+         //p = r + a.x*p;
+         xpay_v2_(r,a,p);
+         //v = c*r;
+         axpy_v2_(c,r,v);
+         //r = r - b.x*s;
+         axpy_v2_(-b,s,r);
+         //x = x + b.x*p;
+         axpy_v2_(b,p,x);
+
+         dot_v2_<scalar> (sum.x, r, r);
+         dot_v2_<scalar> (sum.y, r, w);
+
+      }
+
+      static int streams() { return 18; } //! total number of input and output streams
+      static int flops() { return (16+6); } //! flops per real element
+    };
+
+    double2 pipeEigCGMergedReduceOp2(const double &a, ColorSpinorField &s, ColorSpinorField &p,/* ColorSpinorField &z,*/
+                               const double &b, ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &w,/* ColorSpinorField &q,*/ const double c, ColorSpinorField &v) {
+      if (x.Precision() != p.Precision()) {
+         errorQuda("\nMixed blas is not implemented.\n");
+      }
+      return reduce::mergedReduceCuda<double2, QudaSumFloat2,xpayBypzCxBwpxNorm_,1,1,0,1,1,0,0,1,false>
+          (make_double2(a, 0.0), make_double2(b, 0.0), make_double2(c, 0.0), s, p, w, r, x, w, w, v);
+    }
+
 #endif
 
    } // namespace blas
