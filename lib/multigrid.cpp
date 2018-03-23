@@ -11,7 +11,9 @@ namespace quda {
 
   using namespace blas;
 
-  static bool debug = false;
+  static bool debug = true;
+  static bool esw_debug = true; // for my own spammy prints
+  static bool esw_matelem_debug = false; // for matelem checks
 
   MG::MG(MGParam &param, TimeProfile &profile_global)
     : Solver(param, profile), param(param), transfer(0), resetTransfer(false), presmoother(0), postsmoother(0),
@@ -98,6 +100,8 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d of %d levels\n", transfer ? "Resetting":"Creating", param.level+1, param.Nlevel);
     createSmoother();
 
+    if ( esw_debug ) printfQuda("Created smoother.\n");
+
     // Refresh the null-space vectors if we need to
     if (refresh && param.level < param.Nlevel-1) {
       if (param.mg_global.setup_maxiter_refresh[param.level]) generateNullVectors(param.B, refresh);
@@ -115,7 +119,7 @@ namespace quda {
         }
       } else {
         // create transfer operator
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
+        /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Creating transfer operator\n");
         transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
                                 param.mg_global.precision_null[param.level], profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
@@ -138,13 +142,13 @@ namespace quda {
 
         // if we're not generating on all levels then we need to propagate the vectors down
         if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO) {
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
+          /* if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Restricting null space vectors\n");
           for (int i=0; i<param.Nvec; i++) {
             zero(*(*B_coarse)[i]);
             transfer->R(*(*B_coarse)[i], *(param.B[i]));
           }
         }
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer operator done\n");
+        /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Transfer operator done\n");
       }
 
       createCoarseDirac();
@@ -342,13 +346,13 @@ namespace quda {
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
       if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
-	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
-	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-	coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
+        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
+        sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+        coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
       } else {
-	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
-	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-	coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
+        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+        sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+        coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
       }
 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
@@ -497,73 +501,77 @@ namespace quda {
     }
 #endif
 
-    setOutputPrefix("");
-
-    // Get lattice size
-    const int* latDim = tmp1->X();
-    const int* latDimCoarse = x_coarse->X();
-
-    // Set a source
-    int source[4] = { 1, 0, 0, 0 };
-    int sink[4];
-
-    // Matrix elements of original operator
-    for (int c3 = 0; c3 < 3; c3++)
+    if ( esw_matelem_debug )
     {
-      printfQuda("\nOriginal operator, color %d\n", c3);
+      setOutputPrefix("");
 
-      // ESW make sure I know how to take matrix elements of the original op.
-      tmp1->Source(QUDA_POINT_SOURCE, getPrintVectorIndex(latDim, source), 0, c3);
+      // Get lattice size
+      const int* latDim = tmp1->X();
 
-      printfQuda("Printing site (%d, %d, %d, %d) of tmp1\n", source[0], source[1], source[2], source[3]);
-      tmp1->PrintVector(getPrintVectorIndex(latDim, source));
+      // Set a source
+      int source[4] = { 1, 0, 0, 0 };
+      int sink[4];
 
-      // Apply the fine matvec
-      (*param.matResidual)(*tmp2,*tmp1);
+      // Matrix elements of original operator
+      for (int c3 = 0; c3 < 3; c3++)
+      {
+        printfQuda("\nOriginal operator, color %d\n", c3);
 
-      sink[0] = source[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = source[3];
-      printfQuda("Printing site (%d, %d, %d, %d) of tmp2\n", sink[0], sink[1], sink[2], sink[3]);
-      tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
-      Complex matelem = cDotProduct(*tmp1, *tmp2);
-      printfQuda("ESW Debug: Local matrix element fine staggered (%.8e, %.8e)\n", matelem.real(), matelem.imag());
-      printfQuda("Mass for comparison: %.8e. Should be off by a factor of 2.\n", diracResidual->Mass());
+        // ESW make sure I know how to take matrix elements of the original op.
+        tmp1->Source(QUDA_POINT_SOURCE, getPrintVectorIndex(latDim, source), 0, c3);
 
-      // Check other matrix elements.
-      
-      // +x
-      printfQuda("ESW Debug: +x mat elem: ");
-      sink[0] = (source[0]+1)%latDim[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = source[3];
-      tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
-      // -x
-      printfQuda("ESW Debug: -x mat elem: ");
-      sink[0] = (source[0]-1+latDim[0])%latDim[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = source[3];
-      tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
-      // +y
-      printfQuda("ESW Debug: +y mat elem: ");
-      sink[0] = source[0]; sink[1] = (source[1]+1)%latDim[1]; sink[2] = source[2]; sink[3] = source[3];
-      tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
-      // -y
-      printfQuda("ESW Debug: -y mat elem: ");
-      sink[0] = source[0]; sink[1] = (source[1]-1+latDim[1])%latDim[1]; sink[2] = source[2]; sink[3] = source[3];
-      tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
-      // +z
-      printfQuda("ESW Debug: +z mat elem: ");
-      sink[0] = source[0]; sink[1] = source[1]; sink[2] = (source[2]+1)%latDim[2]; sink[3] = source[3];
-      tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
-      // -z
-      printfQuda("ESW Debug: -z mat elem: ");
-      sink[0] = source[0]; sink[1] = source[1]; sink[2] = (source[2]-1+latDim[2])%latDim[2]; sink[3] = source[3];
-      tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
-      // +t
-      printfQuda("ESW Debug: +t mat elem: ");
-      sink[0] = source[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = (source[3]+1)%latDim[3];
-      tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
-      // -t
-      printfQuda("ESW Debug: -t mat elem: ");
-      sink[0] = source[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = (source[3]-1+latDim[3])%latDim[3];
-      tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+        printfQuda("Printing site (%d, %d, %d, %d) of tmp1\n", source[0], source[1], source[2], source[3]);
+        tmp1->PrintVector(getPrintVectorIndex(latDim, source));
 
-    }
+        // Apply the fine matvec
+        (*param.matResidual)(*tmp2,*tmp1);
+
+        sink[0] = source[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = source[3];
+        printfQuda("Printing site (%d, %d, %d, %d) of tmp2\n", sink[0], sink[1], sink[2], sink[3]);
+        tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+        Complex matelem = cDotProduct(*tmp1, *tmp2);
+        printfQuda("ESW Debug: Local matrix element fine staggered (%.8e, %.8e)\n", matelem.real(), matelem.imag());
+        printfQuda("Mass for comparison: %.8e. Should be off by a factor of 2.\n", diracResidual->Mass());
+
+        // Check other matrix elements.
+        
+        // +x
+        printfQuda("ESW Debug: +x mat elem: ");
+        sink[0] = (source[0]+1)%latDim[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = source[3];
+        tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+        // -x
+        printfQuda("ESW Debug: -x mat elem: ");
+        sink[0] = (source[0]-1+latDim[0])%latDim[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = source[3];
+        tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+        // +y
+        printfQuda("ESW Debug: +y mat elem: ");
+        sink[0] = source[0]; sink[1] = (source[1]+1)%latDim[1]; sink[2] = source[2]; sink[3] = source[3];
+        tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+        // -y
+        printfQuda("ESW Debug: -y mat elem: ");
+        sink[0] = source[0]; sink[1] = (source[1]-1+latDim[1])%latDim[1]; sink[2] = source[2]; sink[3] = source[3];
+        tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+        // +z
+        printfQuda("ESW Debug: +z mat elem: ");
+        sink[0] = source[0]; sink[1] = source[1]; sink[2] = (source[2]+1)%latDim[2]; sink[3] = source[3];
+        tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+        // -z
+        printfQuda("ESW Debug: -z mat elem: ");
+        sink[0] = source[0]; sink[1] = source[1]; sink[2] = (source[2]-1+latDim[2])%latDim[2]; sink[3] = source[3];
+        tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+        // +t
+        printfQuda("ESW Debug: +t mat elem: ");
+        sink[0] = source[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = (source[3]+1)%latDim[3];
+        tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+        // -t
+        printfQuda("ESW Debug: -t mat elem: ");
+        sink[0] = source[0]; sink[1] = source[1]; sink[2] = source[2]; sink[3] = (source[3]-1+latDim[3])%latDim[3];
+        tmp2->PrintVector(getPrintVectorIndex(latDim, sink));
+
+      }
+
+      setOutputPrefix(prefix);
+    } // esw_debug
 
     /*if (getVerbosity() >= QUDA_SUMMARIZE)*/ printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c\n");
     x_coarse->Source(QUDA_RANDOM_SOURCE);
@@ -578,17 +586,18 @@ namespace quda {
 
 
     // ESW this is valid for staggered because we're testing a unitary transform
-
-    /*if (getVerbosity() >= QUDA_SUMMARIZE)*/ printfQuda("\nStaggered unitarity: Checking 0 = (1 - P P^\\dagger) eta_c\n");
+    /*
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("\nStaggered unitarity: Checking 0 = (1 - P P^\\dagger) eta_c\n");
     tmp1->Source(QUDA_RANDOM_SOURCE);
     transfer->R(*x_coarse, *tmp1);
     transfer->P(*tmp2, *x_coarse);
-    /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*tmp1), norm2(*tmp2), norm2(*x_coarse));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*tmp1), norm2(*tmp2), norm2(*x_coarse));
 
     deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
-    /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("L2 relative deviation = %e\n", deviation);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n", deviation);
     if (deviation > tol ) errorQuda("L2 relative deviation = %e > %e failed", deviation, tol);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("\nChecking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
+    */
 
     // Re-initialize x_coarse
     x_coarse->Source(QUDA_RANDOM_SOURCE);
@@ -635,69 +644,78 @@ namespace quda {
     zero(*tmp_coarse);
     zero(*r_coarse);
 
-    printfQuda("\n--------------------\n");
-
-    // ESW debug
-    for (int xc = 0; xc < 2/*6*/; xc++)
+    if ( esw_matelem_debug )
     {
-      for (int s3 = 0; s3 < tmp_coarse->Nspin(); s3++)
-      {
-        for (int c3 = 0; c3 < tmp_coarse->Ncolor(); c3+=8) // corresponds to the 3 source colors
-        {
-          
-          //tmp_coarse->Source(QUDA_RANDOM_SOURCE);
-          source[0] = xc & 1; source[1] = (xc & 2)>>1; source[2] = (xc & 4)>>2; source[3] = (xc & 8)>>3;
-          printfQuda("\nSite (%d,%d,%d,%d), Coarse spin %d, Coarse color %d\n", source[0], source[1], source[2], source[3], s3, c3);
-          tmp_coarse->Source(QUDA_POINT_SOURCE, getPrintVectorIndex(latDimCoarse, source), s3, c3);
-          transfer->P(*tmp1, *tmp_coarse);
+      setOutputPrefix("");
+      printfQuda("\n--------------------\n");
 
-          if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-            double kappa = diracResidual->Kappa();
-            double mass = diracResidual->Mass();
-            if (param.level==0) {
-              if (tmp1->Nspin() == 4)
-              {
-                diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
-                diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
-              } else if (tmp1->Nspin() == 2) { // if the coarse op is on top
+      // Get lattice size
+      const int* latDimCoarse = x_coarse->X();
+
+      // Set a source
+      int source[4] = { 1, 0, 0, 0 };
+
+      // ESW debug
+      for (int xc = 0; xc < 2/*6*/; xc++)
+      {
+        for (int s3 = 0; s3 < tmp_coarse->Nspin(); s3++)
+        {
+          for (int c3 = 0; c3 < tmp_coarse->Ncolor(); c3+=8) // corresponds to the 3 source colors
+          {
+            
+            //tmp_coarse->Source(QUDA_RANDOM_SOURCE);
+            source[0] = xc & 1; source[1] = (xc & 2)>>1; source[2] = (xc & 4)>>2; source[3] = (xc & 8)>>3;
+            printfQuda("\nSite (%d,%d,%d,%d), Coarse spin %d, Coarse color %d\n", source[0], source[1], source[2], source[3], s3, c3);
+            tmp_coarse->Source(QUDA_POINT_SOURCE, getPrintVectorIndex(latDimCoarse, source), s3, c3);
+            transfer->P(*tmp1, *tmp_coarse);
+
+            if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+              double kappa = diracResidual->Kappa();
+              double mass = diracResidual->Mass();
+              if (param.level==0) {
+                if (tmp1->Nspin() == 4)
+                {
+                  diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
+                  diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+                } else if (tmp1->Nspin() == 2) { // if the coarse op is on top
+                  diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
+                  diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+                } else { // staggered
+                  diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 2.0*mass); // stag convention
+                  diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 2.0*mass); // stag convention
+                }
+              } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
                 diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
                 diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
-              } else { // staggered
-                diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 2.0*mass); // stag convention
-                diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 2.0*mass); // stag convention
               }
-            } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
-              diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
-              diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+            } else {
+              //printfQuda("ESW directly performing staggered matvec\n");
+              (*param.matResidual)(*tmp2,*tmp1);
             }
-          } else {
-            //printfQuda("ESW directly performing staggered matvec\n");
-            (*param.matResidual)(*tmp2,*tmp1);
-          }
 
-          transfer->R(*x_coarse, *tmp2);
-          (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
+            transfer->R(*x_coarse, *tmp2);
+            (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
-          // ESW print components
-          printfQuda("\nEmulated component:\n");
-          x_coarse->PrintVector(getPrintVectorIndex(latDimCoarse, source));
-          printfQuda("\nCoarse component:\n");
-          r_coarse->PrintVector(getPrintVectorIndex(latDimCoarse, source));
+            // ESW print components
+            printfQuda("\nEmulated component:\n");
+            x_coarse->PrintVector(getPrintVectorIndex(latDimCoarse, source));
+            printfQuda("\nCoarse component:\n");
+            r_coarse->PrintVector(getPrintVectorIndex(latDimCoarse, source));
 
-          if (c3 == 0 && s3 == 0)
-          {
-            printfQuda("\nEmulated:\n");
-            for (int i = 0; i < 2/**2*2*2*/; i++) { x_coarse->PrintVector(i); }
-            printfQuda("\nCoarse:\n");
-            for (int i = 0; i < 2/**2*2*2*/; i++) { r_coarse->PrintVector(i); }
+            if (c3 == 0 && s3 == 0)
+            {
+              printfQuda("\nEmulated:\n");
+              for (int i = 0; i < 2/**2*2*2*/; i++) { x_coarse->PrintVector(i); }
+              printfQuda("\nCoarse:\n");
+              for (int i = 0; i < 2/**2*2*2*/; i++) { r_coarse->PrintVector(i); }
+            }
           }
         }
       }
-    }
-    setOutputPrefix(prefix);
+      setOutputPrefix(prefix);
+    } // esw_debug
 
 
-    //tmp_coarse->Source(QUDA_POINT_SOURCE, getPrintVectorIndex(latDimCoarse, source), s3, c3);
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp1, *tmp_coarse);
 
@@ -781,8 +799,6 @@ namespace quda {
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
 
-    errorQuda("Done for now!\n");
-
 #ifdef ARPACK_LIB
     printfQuda("\nCheck eigenvector overlap for level %d\n", param.level);
 
@@ -854,6 +870,7 @@ namespace quda {
     QudaSolutionType inner_solution_type = param.coarse_grid_solution_type;
 
     if (debug) printfQuda("outer_solution_type = %d, inner_solution_type = %d\n", outer_solution_type, inner_solution_type);
+    if ( esw_debug ) printfQuda("smoother_solve_type = %d\n", param.smoother_solve_type);
 
     if ( outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");
@@ -867,7 +884,7 @@ namespace quda {
       //transfer->setTransferGPU(false); // use this to force location of transfer (need to check if still works for multi-level)
       
       // do the pre smoothing
-      if ( debug ) printfQuda("pre-smoothing b2=%e\n", norm2(b));
+      if ( debug ) printfQuda("pre-smoothing b2=%e site subset %d\n", norm2(b), b.SiteSubset());
 
       ColorSpinorField *out=nullptr, *in=nullptr;
 
@@ -882,7 +899,11 @@ namespace quda {
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) *b_tilde = *in;
       else b_tilde = &b;
 
+      if ( esw_debug ) printfQuda("about to apply pre-smoother\n");
+
       (*presmoother)(*out, *in);
+
+      if ( debug ) printfQuda("applied pre-smoother\n");
 
       ColorSpinorField &solution = inner_solution_type == outer_solution_type ? x : x.Even();
       diracSmoother->reconstruct(solution, b, inner_solution_type);
@@ -890,23 +911,27 @@ namespace quda {
       // if using preconditioned smoother then need to reconstruct full residual
       // FIXME extend this check for precision, Schwarz, etc.
       bool use_solver_residual =
-	( (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION) ||
-	  (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION) )
-	? true : false;
+        ( (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION) ||
+          (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION) )
+        ? true : false;
 
       // FIXME this is currently borked if inner solver is preconditioned
       double r2 = 0.0;
-      if (use_solver_residual) {
-	if (debug) r2 = norm2(*r);
-      } else {
-	(*param.matResidual)(*r, x);
-	if (debug) r2 = xmyNorm(b, *r);
-	else axpby(1.0, b, -1.0, *r);
-      }
+      /*if (inner_solution_type == QUDA_MAT_SOLUTION)
+      {
+        if (use_solver_residual) {
+          if (debug) r2 = norm2(*r);
+        } else {
+          (*param.matResidual)(*r, x);
+          if (debug) r2 = xmyNorm(b, *r);
+          else axpby(1.0, b, -1.0, *r);
+        }
+      }*/
 
       // We need this to ensure that the coarse level has been created.
       // e.g. in case of iterative setup with MG we use just pre- and post-smoothing at the first iteration.
       if (transfer) {
+
         // restrict to the coarse grid
         transfer->R(*r_coarse, residual);
         if ( debug ) printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", norm2(x), r2, norm2(*r_coarse));
@@ -919,11 +944,14 @@ namespace quda {
         if ( debug ) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
 
         // prolongate back to this grid
+        if ( esw_debug ) printfQuda("r site subset = %d\n", r->SiteSubset());
         ColorSpinorField &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // define according to inner solution type
         transfer->P(x_coarse_2_fine, *x_coarse); // repurpose residual storage
 
         xpy(x_coarse_2_fine, solution); // sum to solution FIXME - sum should be done inside the transfer operator
-        if ( debug ) {
+
+        // Currently borked if inner solver is PC
+        if ( debug && inner_solution_type == QUDA_MAT_SOLUTION ) {
           printfQuda("Prolongated coarse solution y2 = %e\n", norm2(*r));
           printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
                      norm2(x), norm2(*r));
@@ -933,10 +961,10 @@ namespace quda {
       // do the post smoothing
       //residual = outer_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // refine for outer solution type
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-	in = b_tilde;
+        in = b_tilde;
       } else { // this incurs unecessary copying
-	*r = b;
-	in = r;
+        *r = b;
+        in = r;
       }
 
       // we should keep a copy of the prepared right hand side as we've already destroyed it
@@ -956,11 +984,13 @@ namespace quda {
       diracSmoother->reconstruct(x, b, outer_solution_type);
     }
 
-    if ( debug ) {
+    // currently broken if inner solver is preconditioned
+    /*if ( debug && inner_solution_type == QUDA_MAT_SOLUTION ) {
+      printfQuda("About to compute residual\n");
       (*param.matResidual)(*r, x);
       double r2 = xmyNorm(b, *r);
       printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x), r2);
-    }
+    }*/
 
     setOutputPrefix(param.level == 0 ? "" : prefix_bkup);
   }

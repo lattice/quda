@@ -176,8 +176,8 @@ namespace quda {
       if (!enable_cpu) errorQuda("enable_cpu = %d so cannot reset", enable_cpu);
       BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs);
       if (enable_gpu) { // if the GPU fields has been initialized then we need to update
-      	*V_d = *V_h;
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
+        *V_d = *V_h;
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
       }
     }
   }

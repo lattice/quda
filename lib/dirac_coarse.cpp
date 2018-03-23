@@ -55,8 +55,8 @@ namespace quda {
   void DiracCoarse::createY(bool gpu) const
   {
     int ndim = transfer->Vectors().Ndim();
-    if (ndim == 5 && transfer->Vectors().Nspin() == 1)
-      ndim = 4; // forced case for staggered
+    if (ndim == 5 && transfer->Vectors().Nspin() != 4)
+      ndim = 4; // forced case for staggered, coarsened staggered
     int x[QUDA_MAX_DIM];
     const int *geo_bs = transfer->Geo_bs(); // Number of coarse sites.
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
@@ -96,7 +96,8 @@ namespace quda {
   void DiracCoarse::createYhat(bool gpu) const
   {
     int ndim = transfer->Vectors().Ndim();
-    if (ndim == 5 && transfer->Vectors().Nspin() == 1) ndim = 4; // all staggered fermions are 5-d
+    if (ndim == 5 && transfer->Vectors().Nspin() != 4)
+      ndim = 4;  // forced case for staggered, coarsened staggered
     int x[QUDA_MAX_DIM];
     const int *geo_bs = transfer->Geo_bs(); // Number of coarse sites.
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
@@ -150,8 +151,8 @@ namespace quda {
     printfQuda("ESW: About to run createPreconditionedCoarseOp\n");
 
     // ESW: skip for now
-    //if (gpu_setup) createPreconditionedCoarseOp(*Yhat_d,*Xinv_d,*Y_d,*X_d);
-    //else createPreconditionedCoarseOp(*Yhat_h,*Xinv_h,*Y_h,*X_h);
+    if (gpu_setup) createPreconditionedCoarseOp(*Yhat_d,*Xinv_d,*Y_d,*X_d);
+    else createPreconditionedCoarseOp(*Yhat_h,*Xinv_h,*Y_h,*X_h);
 
     printfQuda("ESW: Finished createPreconditionedCoarseOp\n");
 

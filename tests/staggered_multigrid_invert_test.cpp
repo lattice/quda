@@ -279,10 +279,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-    //mg_param.smoother_solve_type[i] = mg_solve_type[i]; // EVEN-ODD
-
-    // ESW HACK
-    mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
+    mg_param.smoother_solve_type[i] = mg_solve_type[i]; // EVEN-ODD
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
     mg_param.smoother_schwarz_type[i] = schwarz_type[i];
@@ -637,7 +634,7 @@ int main(int argc, char **argv)
   fflush(stdout);
 
   // free the multigrid solver
-  //destroyMultigridQuda(mg_preconditioner);
+  destroyMultigridQuda(mg_preconditioner);
 
   // stop the timer
   time0 += clock();
