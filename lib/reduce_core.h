@@ -52,7 +52,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #endif
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      if (x.Nspin() == 4) { //wilson
+      if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
 	value = reduceCuda<doubleN,ReduceType,float4,float4,float4,M,Reducer,
@@ -61,7 +61,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else if (x.Nspin() == 1 || x.Nspin() == 2) {
+      } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin()==4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) ) {
 #if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");

@@ -79,7 +79,7 @@ namespace quda {
 		     ColorSpinorField &y, ColorSpinorField &z);
     double caxpyXmazNormX(const Complex &a, ColorSpinorField &x,
 			  ColorSpinorField &y, ColorSpinorField &z);
-    double cabxpyAxNorm(const double &a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
+    double cabxpyzAxNorm(const double &a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
     void caxpbypz(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &,
 		  ColorSpinorField &);

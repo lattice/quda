@@ -257,8 +257,11 @@ static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
 static TimeProfile profileInit2End("initQuda-endQuda",false);
 
 static bool enable_profiler = false;
+static bool do_not_profile_quda = false;
 
 static void profilerStart(const char *f) {
+
+
 
   static std::vector<int> target_list;
   static bool enable = false;
@@ -271,38 +274,54 @@ static void profilerStart(const char *f) {
 
       int target;
       while(target_stream >> target) {
-	target_list.push_back(target);
-	if (target_stream.peek() == ',') target_stream.ignore();
-      }
+       target_list.push_back(target);
+       if (target_stream.peek() == ',') target_stream.ignore();
+     }
 
-      if (target_list.size() > 0) {
-	std::sort(target_list.begin(), target_list.end());
-	target_list.erase( unique( target_list.begin(), target_list.end() ), target_list.end() );
-	warningQuda("Targeted profiling enabled for %lu functions\n", target_list.size());
-	enable = true;
-      }
+     if (target_list.size() > 0) {
+       std::sort(target_list.begin(), target_list.end());
+       target_list.erase( unique( target_list.begin(), target_list.end() ), target_list.end() );
+       warningQuda("Targeted profiling enabled for %lu functions\n", target_list.size());
+       enable = true;
+     }
+   }
+
+
+    char* donotprofile_env = getenv("QUDA_DO_NOT_PROFILE"); // disable profiling of QUDA parts
+    if (donotprofile_env && (!strcmp(donotprofile_env, "0") == 0))  {
+      do_not_profile_quda=true;
+      printfQuda("Disabling profiling in QUDA\n");
     }
-
     init = true;
   }
 
   static int target_count = 0;
   static unsigned int i = 0;
-  if (enable) {
-    if (i < target_list.size() && target_count++ == target_list[i]) {
-      enable_profiler = true;
-      printfQuda("Starting profiling for %s\n", f);
-      cudaProfilerStart();
+  if (do_not_profile_quda){
+    cudaProfilerStop();
+    printfQuda("Stopping profiling in QUDA\n");
+  } else {
+    if (enable) {
+      if (i < target_list.size() && target_count++ == target_list[i]) {
+        enable_profiler = true;
+        printfQuda("Starting profiling for %s\n", f);
+        cudaProfilerStart();
       i++; // advance to next target
     }
   }
 }
+}
 
 static void profilerStop(const char *f) {
-  if (enable_profiler) {
-    printfQuda("Stopping profiling for %s\n", f);
-    cudaProfilerStop();
-    enable_profiler = false;
+  if(do_not_profile_quda){
+    cudaProfilerStart();
+  } else {
+
+    if (enable_profiler) {
+      printfQuda("Stopping profiling for %s\n", f);
+      cudaProfilerStop();
+      enable_profiler = false;
+    }
   }
 }
 
@@ -2396,11 +2415,12 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
 
-  ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
-  cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-  cpuParam.setPrecision(param->cuda_prec_sloppy);
+  ColorSpinorParam csParam(0, *param, cudaGauge->X(), pc_solution, mg_param.setup_location[0]);
+  csParam.create = QUDA_NULL_FIELD_CREATE;
+  csParam.setPrecision(param->cuda_prec_sloppy);
+  csParam.fieldOrder = mg_param.setup_location[0] == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   B.resize(mg_param.n_vec[0]);
-  for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
+  for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = ColorSpinorField::Create(csParam);
 
   // fill out the MG parameters for the fine level
   mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);

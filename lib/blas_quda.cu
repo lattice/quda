@@ -152,8 +152,13 @@ namespace quda {
     };
 
     void xpy(ColorSpinorField &x, ColorSpinorField &y) {
-      blasCuda<xpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
-			     make_double2(0.0, 0.0), x, y, x, x);
+      if (x.Precision() != y.Precision()) {
+        mixed::blasCuda<xpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
+                                      make_double2(0.0, 0.0), x, y, x, x);
+      } else {
+        blasCuda<xpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
+                               make_double2(0.0, 0.0), x, y, x, x);
+      }
     }
 
     /**

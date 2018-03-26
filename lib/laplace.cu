@@ -1,5 +1,6 @@
-#include <transfer.h>
+#include <gauge_field.h>
 #include <gauge_field_order.h>
+#include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <stencil.h>

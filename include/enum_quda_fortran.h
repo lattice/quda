@@ -327,6 +327,11 @@
 #define QUDA_CORNER_SOURCE 4
 #define QUDA_INVALID_SOURCE QUDA_INVALID_ENUM
 
+#define QudaNoiseType integer(4)
+#define QUDA_NOISE_GAUSS 0
+#define QUDA_NOISE_UNIFORM 1
+#define QUDA_NOISE_INVALID QUDA_INVALID_ENUM
+
 #define QudaProjectionType integer(4)
 #define QUDA_MINRES_PROJECTION 0
 #define QUDA_GALERKIN_PROJECTION 1
