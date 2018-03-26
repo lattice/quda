@@ -11,24 +11,24 @@
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
+      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
+      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type,register_block_size> <<<gridDim, blockDim, shared, stream>>> (param); \
     }									\
   }
 
