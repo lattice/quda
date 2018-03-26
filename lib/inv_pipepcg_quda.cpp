@@ -151,7 +151,7 @@ namespace quda {
 
     ColorSpinorParam csParam(b);
 
-    auto  MergedLocalReducer = K ? pipePCGRRFletcherReevesMergedOp : pipePCGRRMergedOp;
+    auto  MergedLocalReducer = K ? pipePCGRRPolakRibiereMergedOp : pipePCGRRMergedOp;
 
     if (!init) {
       // high precision fields:
@@ -188,7 +188,6 @@ namespace quda {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
     ColorSpinorField *yp = ColorSpinorField::Create(csParam);
-    ColorSpinorField *lp = ColorSpinorField::Create(csParam);
 
     ColorSpinorField *rp_sloppy   = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : rp;
     ColorSpinorField *tmpp_sloppy = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : tmpp;
@@ -206,7 +205,6 @@ namespace quda {
     ColorSpinorField &z = *zp;
 
     ColorSpinorField &y = *yp;
-    ColorSpinorField &l = *lp;
 
     ColorSpinorField &r_sloppy = *rp_sloppy;
     ColorSpinorField &x_sloppy = *xp_sloppy;
@@ -283,6 +281,7 @@ namespace quda {
     if(K) {
       rPre = r_sloppy;
 
+      zero(pPre);
       commGlobalReductionSet(false);
       (*K)(pPre, rPre);
       commGlobalReductionSet(true);
@@ -346,6 +345,7 @@ tau = 10 * sqrt(uro) fails!
     if(K) {
       rPre = w;
 
+      zero(pPre);
       commGlobalReductionSet(false);
       (*K)(pPre, rPre);
       commGlobalReductionSet(true);
@@ -458,6 +458,7 @@ tau = 10 * sqrt(uro) fails!
         if(K) {
           rPre = r_sloppy;
 
+          zero(pPre);
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
@@ -471,10 +472,9 @@ tau = 10 * sqrt(uro) fails!
         matSloppy(w, u, tmp_sloppy);
         matSloppy(s, p, tmp_sloppy);
 
-        zero(l);
-
         if(K) {
           rPre = s;
+          zero(pPre);
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
@@ -503,6 +503,7 @@ tau = 10 * sqrt(uro) fails!
           xpay(w, -1.0, n);
           rPre = n;
 
+          zero(pPre);
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
@@ -529,7 +530,8 @@ tau = 10 * sqrt(uro) fails!
           n = r_sloppy;
           xpay(w, -1.0, n);
           rPre = n;
-         
+
+          zero(pPre);         
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
@@ -582,7 +584,6 @@ tau = 10 * sqrt(uro) fails!
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-    delete lp;
     delete yp;
 
     delete[] local_reduce;

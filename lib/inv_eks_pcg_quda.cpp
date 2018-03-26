@@ -90,13 +90,25 @@ inline void printmat(const char* label, const Matrix& mat)
 }
 
 
+int *malloc_int(const int n) {
+  auto *ptr = static_cast<int*>(safe_malloc(n*sizeof(int)));
+  return ptr; 
+}
+
+void free_int(void *ptr) {
+  host_free(ptr);
+}
+
 // compute the fine-to-coarse site map
 void EKS_PCG::CreateSourceBlock(ColorSpinorField& b) {
-#if  0
+
   int x [QUDA_MAX_DIM];
 
 
-  index_map = static_cast<int*>(safe_malloc(b.Volume()*sizeof(int)));//store it for the next RHS?
+  //index_map = static_cast<int*>(safe_malloc(b.Volume()*sizeof(int)));//store it for the next RHS?
+  //index_map = std::move(std::shared_ptr<int>(new int[b.Volume()], std::default_delete<int[]>()));
+  //index_map = std::move(std::shared_ptr<int>(malloc_int(b.Volume()), free_int));
+  if(index_map == nullptr) index_map = std::move(std::shared_ptr<int>(static_cast<int*>(safe_malloc(b.Volume()*sizeof(int))), [](void *ptr) {host_free(ptr);} ));
 
   // compute the coarse grid point for every site (assuming parity ordering currently)
   for (int i = 0; i < b.Volume(); i++) {
@@ -110,49 +122,45 @@ void EKS_PCG::CreateSourceBlock(ColorSpinorField& b) {
     // compute the coarse-offset index and store in fine_to_coarse
     int k;
     int parity  = 0;
-    int lattbs0 = latt_bs[d]; 
+    int lattbs0 = latt_bs[0]; 
 
-    if (B->SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+    if (b.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
       for (int d = 0; d < b.Ndim(); d++) parity += x[d];
       parity = parity & 1;
       latt_bs[0]  /= 2;
     }
 
     k = parity;
-    for (int d = yp->Ndim()-1; d >= 0; d--) k = latt_bs[d]*k + x[d];
+    for (int d = b.Ndim()-1; d >= 0; d--) k = latt_bs[d]*k + x[d];
 
-    index_map[i] = k;
+    index_map.get()[i] = k;
 
     latt_bs[0] = lattbs0;
 
     //printfQuda("block after (%d,%d,%d,%d), block idx %d\n", x[0], x[1], x[2], x[3], k);
   }
 
-  // now create an inverse-like variant of this
-
-  std::vector<Int2> latt_sort(b.Volume());
-  for (unsigned int i=0; i<geo_sort.size(); i++) latt_sort[i] = Int2(index_map[i], i);
-#endif
-}
-
-
-template <int nsrc>
-void EKS_PCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
-
-  profile.TPSTART(QUDA_PROFILE_INIT);
-
-   ColorSpinorParam csParam(x);
-
-  csParam.is_composite  = true;
-  csParam.composite_dim = nsrc;
-  csParam.nDim = 5;
-  csParam.x[4] = 1;
-
-
-  profile.TPSTOP(QUDA_PROFILE_FREE);
-
   return;
 }
+
+
+  template <int nsrc>
+  void EKS_PCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
+
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
+     ColorSpinorParam csParam(x);
+
+    csParam.is_composite  = true;
+    csParam.composite_dim = nsrc;
+    csParam.nDim = 5;
+    csParam.x[4] = 1;
+
+
+    profile.TPSTOP(QUDA_PROFILE_FREE);
+
+    return;
+  }
 
 
   EKS_PCG::EKS_PCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
@@ -171,39 +179,29 @@ void EKS_PCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     }
   }
 
-void EKS_PCG::operator()(ColorSpinorField& x, ColorSpinorField& b) {
+  void EKS_PCG::operator()(ColorSpinorField& x, ColorSpinorField& b) {
 
+    if (param.num_src > QUDA_MAX_BLOCK_SRC) //that looks missleading but okay for the moment
+      errorQuda("Requested number of right-hand sides %d exceeds max %d\n", param.num_src, QUDA_MAX_BLOCK_SRC);
 
+    switch (param.num_src) {
+      case  1: solve_n< 1>(x, b); break;
+      case  2: solve_n< 2>(x, b); break;
+      case  4: solve_n< 4>(x, b); break;
+      case  8: solve_n< 8>(x, b); break;
+      case 12: solve_n<12>(x, b); break;
+      case 16: solve_n<16>(x, b); break;
+      case 24: solve_n<24>(x, b); break;
+      case 32: solve_n<32>(x, b); break;
+      case 48: solve_n<48>(x, b); break; 
+      case 64: solve_n<64>(x, b); break;
+      default:
+      errorQuda("EKSCG with dimension %d not supported", param.num_src);
+    }
 
-  if (param.num_src > QUDA_MAX_BLOCK_SRC)
-    errorQuda("Requested number of right-hand sides %d exceeds max %d\n", param.num_src, QUDA_MAX_BLOCK_SRC);
-
-  switch (param.num_src) {
-  case  1: solve_n< 1>(x, b); break;
-  case  2: solve_n< 2>(x, b); break;
-  case  3: solve_n< 3>(x, b); break;
-  case  4: solve_n< 4>(x, b); break;
-  case  5: solve_n< 5>(x, b); break;
-  case  6: solve_n< 6>(x, b); break;
-  case  7: solve_n< 7>(x, b); break;
-  case  8: solve_n< 8>(x, b); break;
-  case  9: solve_n< 9>(x, b); break;
-  case 10: solve_n<10>(x, b); break;
-  case 11: solve_n<11>(x, b); break;
-  case 12: solve_n<12>(x, b); break;
-  case 13: solve_n<13>(x, b); break;
-  case 14: solve_n<14>(x, b); break;
-  case 15: solve_n<15>(x, b); break;
-  case 16: solve_n<16>(x, b); break;
-  case 24: solve_n<24>(x, b); break;
-  case 32: solve_n<32>(x, b); break;
-  case 48: solve_n<48>(x, b); break; 
-  case 64: solve_n<64>(x, b); break;
-  default:
-    errorQuda("Block-CG with dimension %d not supported", param.num_src);
+    return; 
   }
 
+}//quda namespace
 
 
-}
-}

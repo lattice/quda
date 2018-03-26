@@ -758,7 +758,7 @@ namespace quda {
     ColorSpinorField *rp;       //! residual vector
     ColorSpinorField *yp;       //! high precision accumulator
     ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField *y_sloppy; //! sloppy solution vector
+    ColorSpinorField *x_sloppy; //! sloppy solution vector
     ColorSpinorField *r_sloppy; //! sloppy residual vector
 
     std::vector<ColorSpinorField*> p;  // GCR direction vectors
@@ -961,7 +961,7 @@ namespace quda {
 
     /** The lattice grid blocking, correlated with nsrc */
     std::array<int, 5>    latt_bs;
-    std::shared_ptr<int> *index_map;//might be useful for the next RHS
+    std::shared_ptr<int>  index_map;//might be useful for the next RHS
 
     bool init;
 
