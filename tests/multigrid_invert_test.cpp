@@ -305,6 +305,9 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
+  // Is NOT a staggered solve
+  mg_param.is_staggered = QUDA_BOOLEAN_NO;
+
   // set file i/o parameters
   strcpy(mg_param.vec_infile, vec_infile);
   strcpy(mg_param.vec_outfile, vec_outfile);

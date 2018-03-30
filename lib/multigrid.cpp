@@ -2,6 +2,8 @@
 #include <qio_field.h>
 #include <string.h>
 
+#include <Eigen/Dense>
+
 // ESW DEBUG
 #include <index_helper.cuh>
 
@@ -12,7 +14,7 @@ namespace quda {
   using namespace blas;
 
   static bool debug = true;
-  static bool esw_debug = true; // for my own spammy prints
+  static bool esw_debug = false; // for my own spammy prints
   static bool esw_matelem_debug = false; // for matelem checks
 
   MG::MG(MGParam &param, TimeProfile &profile_global)
@@ -62,7 +64,12 @@ namespace quda {
       }
     }
 
-    if (param.level < param.Nlevel-1) {
+    // For staggered, check if we're doing a Kahler-Dirac transform on this
+    // level
+    if (param.is_kahler_dirac_prec) { 
+      buildFreeVectors(param.B);
+    }
+    else if (param.level < param.Nlevel-1) {
       if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
         if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) {
 
@@ -151,7 +158,12 @@ namespace quda {
         /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Transfer operator done\n");
       }
 
-      createCoarseDirac();
+      // Call a different function if we're doing the Kahler-Dirac prec step.
+      //if (param.is_kahler_dirac_prec) {
+      //  createKahlerDiracPrec();
+      //} else {
+        createCoarseDirac();
+      //}
 
       // creating or resetting the coarse level
       if (coarse) {
@@ -255,6 +267,7 @@ namespace quda {
 
   void MG::createCoarseDirac() {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating coarse Dirac operator\n");
+
     // check if we are coarsening the preconditioned system then
     bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
     QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
@@ -282,6 +295,66 @@ namespace quda {
 
     if (diracCoarseSmoother) delete diracCoarseSmoother;
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
+
+
+    // Test matrix elements of KD-prec operator
+    if ( esw_debug )
+    {
+      diracParam.type = QUDA_COARSEPC_DIRAC;
+      diracParam.tmp1 = &(tmp_coarse->Even());
+      diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
+
+      typedef Eigen::Matrix<std::complex<float>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> cMatrix;
+      int length = tmp_coarse->Length()/2; // length includes *2 for complex
+      ColorSpinorParam csParam2(*tmp_coarse);
+      csParam2.siteSubset = QUDA_FULL_SITE_SUBSET;
+      csParam2.location = QUDA_CPU_FIELD_LOCATION;
+      csParam2.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      csParam2.create = QUDA_ZERO_FIELD_CREATE;
+      ColorSpinorField* lhs = new cpuColorSpinorField(csParam2);
+      ColorSpinorField* ihs = new cpuColorSpinorField(csParam2);
+      ColorSpinorField* rhs = new cpuColorSpinorField(csParam2);
+      cMatrix mat_cplx = cMatrix::Zero(length, length);
+
+      printfQuda("Precision %d Volume %d Spin %d Color %d Length %d\n", static_cast<int>(lhs->Precision()), lhs->Volume(), lhs->Nspin(), lhs->Ncolor(), length);
+      for (int x = 0; x < lhs->Volume(); x++)
+      {
+        for (int s = 0; s < lhs->Nspin(); s++)
+        {
+          for (int c = 0; c < lhs->Ncolor(); c++)
+          {
+            int index = ((x*lhs->Nspin()+s)*lhs->Ncolor()+c);
+            printfQuda("Index %d\n", index);
+            blas::zero(*lhs);
+            blas::zero(*ihs);
+            blas::zero(*rhs);
+            //lhs->Source(QUDA_POINT_SOURCE, x, s, c);
+            (static_cast<std::complex<float>*>(lhs->V()))[index] = 1.0;
+            /*diracCoarseSmoother->DslashXpay(rhs->Even(), lhs->Odd(), QUDA_EVEN_PARITY, lhs->Even(), 1.0);
+            diracCoarseSmoother->DslashXpay(rhs->Odd(), lhs->Even(), QUDA_ODD_PARITY, lhs->Odd(), 1.0);*/
+            diracCoarseResidual->M(*ihs, *lhs);
+            (dynamic_cast<DiracCoarse*>(diracCoarseResidual))->CloverInv(rhs->Even(), ihs->Even(), QUDA_EVEN_PARITY);
+            (dynamic_cast<DiracCoarse*>(diracCoarseResidual))->CloverInv(rhs->Odd(), ihs->Odd(), QUDA_ODD_PARITY);
+            std::complex<float> *rhs_data = (std::complex<float>*)rhs->V();
+            std::complex<float> *pointer_in = &(mat_cplx(index*lhs->Volume()*lhs->Nspin()*lhs->Ncolor()));
+            for (int i = 0; i < length; i++) { pointer_in[i] = rhs_data[i]; }
+          }
+        }
+      }
+      delete lhs;
+      delete ihs;
+      delete rhs;
+
+      Eigen::ComplexEigenSolver<cMatrix> eigensolve_cplx_indef(length);
+      eigensolve_cplx_indef.compute(mat_cplx);
+      cMatrix eigs = eigensolve_cplx_indef.eigenvalues();
+      for (int i = 0; i < length; i++) {
+        printfQuda("%d %.8e %.8e\n", i, eigs(i).real(), eigs(i).imag());
+      }
+      errorQuda("Well that's enough.\n");
+    }
+
+
     if (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) {
       diracParam.type = QUDA_COARSEPC_DIRAC;
       diracParam.tmp1 = &(tmp_coarse->Even());

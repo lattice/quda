@@ -246,6 +246,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
+  mg_param.is_staggered = QUDA_BOOLEAN_YES;
+
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
@@ -295,10 +297,10 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     // if we are using an outer even-odd preconditioned solve, then we
     // use single parity injection into the coarse grid
-    //mg_param.coarse_grid_solution_type[i] = solve_type == mg_solve_type[i] ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    mg_param.coarse_grid_solution_type[i] = solve_type == mg_solve_type[i] ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
     // ESW HACK
-    mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    //mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
     mg_param.omega[i] = omega; // over/under relaxation factor
 
@@ -419,7 +421,7 @@ int main(int argc, char **argv)
     mg_solve_type[i] = QUDA_INVALID_SOLVE;
     schwarz_type[i] = QUDA_INVALID_SCHWARZ;
     schwarz_cycle[i] = 1;
-    smoother_type[i] = QUDA_MR_INVERTER;
+    smoother_type[i] = QUDA_BICGSTABL_INVERTER; //QUDA_MR_INVERTER; // ESW hack, MR doesn't work for top level staggered
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;

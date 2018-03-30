@@ -96,6 +96,13 @@ namespace quda {
     /** Filename for where to load/store the null space */
     char filename[100];
 
+    /** Whether or not this is a staggered solve or not
+        ESW hack for now */
+    QudaBoolean is_staggered;
+
+    /** Whether or not we're doing a Kahler-Dirac prec staggered solve */
+    QudaBoolean is_kahler_dirac_prec;
+
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
@@ -124,13 +131,24 @@ namespace quda {
       coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
-      setup_location(param.setup_location[level])
+      setup_location(param.setup_location[level]),
+      is_staggered(param.is_staggered)
       { 
-	// set the block size
-	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
+        // set the block size
+        for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
 
-	// set the smoother relaxation factor
-	omega = param.omega[level];
+        // set the smoother relaxation factor
+        omega = param.omega[level];
+
+        // For staggered, check if we're doing a Kahler-Dirac transform on this level.
+        // This happens if we're doing a staggered solve where we're computing
+        // null vectors but the requested nvec==24 and the block size is all 2's,
+        // which is the unitary transform case. 
+        is_kahler_dirac_prec =  (is_staggered && level == 0 &&
+          mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO &&
+          strcmp(mg_global.vec_infile, "")==0 && B.size() == 24 &&
+          geoBlockSize[0] == 2 && geoBlockSize[1] == 2 &&
+          geoBlockSize[2] == 2 && geoBlockSize[3] == 2) ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
       }
 
     MGParam(const MGParam &param, 
@@ -160,13 +178,24 @@ namespace quda {
       coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
-      setup_location(param.mg_global.setup_location[level])
+      setup_location(param.mg_global.setup_location[level]),
+      is_staggered(param.is_staggered)
       {
-	// set the block size
-	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
+        // set the block size
+        for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
 
-	// set the smoother relaxation factor
-	omega = param.mg_global.omega[level];
+        // set the smoother relaxation factor
+        omega = param.mg_global.omega[level];
+
+        // For staggered, check if we're doing a Kahler-Dirac transform on this level.
+        // This happens if we're doing a staggered solve where we're computing
+        // null vectors but the requested nvec==24 and the block size is all 2's,
+        // which is the unitary transform case. 
+        is_kahler_dirac_prec =  (is_staggered && level == 0 &&
+          mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO &&
+          strcmp(mg_global.vec_infile, "")==0 && B.size() == 24 &&
+          geoBlockSize[0] == 2 && geoBlockSize[1] == 2 &&
+          geoBlockSize[2] == 2 && geoBlockSize[3] == 2) ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
       }
 
   };
