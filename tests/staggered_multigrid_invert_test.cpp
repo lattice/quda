@@ -308,6 +308,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.setup_location[i] = setup_location[i];
   }
 
+  // ESW hack
+  mg_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;
+  mg_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
+  mg_param.coarse_grid_solution_type[2] = QUDA_MAT_SOLUTION;
+  mg_param.coarse_grid_solution_type[3] = QUDA_MAT_SOLUTION;
+
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
 
@@ -421,7 +427,7 @@ int main(int argc, char **argv)
     mg_solve_type[i] = QUDA_INVALID_SOLVE;
     schwarz_type[i] = QUDA_INVALID_SCHWARZ;
     schwarz_cycle[i] = 1;
-    smoother_type[i] = QUDA_BICGSTABL_INVERTER; //QUDA_MR_INVERTER; // ESW hack, MR doesn't work for top level staggered
+    smoother_type[i] = QUDA_BICGSTABL_INVERTER; //QUDA_MR_INVERTER; // MR doesn't work for top level staggered
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
