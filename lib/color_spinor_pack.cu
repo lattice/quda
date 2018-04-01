@@ -424,6 +424,18 @@ namespace quda {
       genericPackGhost<Float,ghostFloat,order,Ns,768>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 1024) {
       genericPackGhost<Float,ghostFloat,order,Ns,1024>(ghost, a, parity, nFace, dagger, destination);
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (a.Ncolor() == 2304) { // staggered KD 24 -> 96 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,2304>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 3072) { // staggered KD 24 -> 128 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,3072>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 9216) { // staggered 96 -> 96
+      genericPackGhost<Float,ghostFloat,order,Ns,9216>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 12288) { // staggered 96 -> 128 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,12288>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 16384) { // staggered 128 -> 128 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,16384>(ghost, a, parity, nFace, dagger, destination);
+#endif
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
     }

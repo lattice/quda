@@ -500,6 +500,12 @@ namespace quda {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 32) {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+#ifdef GPU_STAGGERED_DIRAC
+      } else if (nVec == 96) {
+  Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else if (nVec == 128) {
+  Restrict<Float,fineSpin,fineColor,coarseSpin,128>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+#endif
       } else {
 	errorQuda("Unsupported nVec %d", nVec);
       }
@@ -510,6 +516,24 @@ namespace quda {
       } else {
 	errorQuda("Unsupported nVec %d", nVec);
       }
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (in.Ncolor() == 96) {
+      const int fineColor = 96;
+      if (nVec == 96) {
+  Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else if (nVec == 128) {
+  Restrict<Float,fineSpin,fineColor,coarseSpin,128>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else {
+  errorQuda("Unsupported nVec %d", nVec);
+      }
+    } else if (in.Ncolor() == 128) {
+      const int fineColor = 128;
+      if (nVec == 128) {
+  Restrict<Float,fineSpin,fineColor,coarseSpin,128>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else {
+  errorQuda("Unsupported nVec %d", nVec);
+      }
+#endif
     } else {
       errorQuda("Unsupported nColor %d", in.Ncolor());
     }

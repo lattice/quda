@@ -881,6 +881,12 @@ namespace quda {
 #endif
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,yFloat,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (inA.Ncolor() == 96) {
+      ApplyCoarse<Float,yFloat,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+    } else if (inA.Ncolor() == 128) {
+      ApplyCoarse<Float,yFloat,128,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+#endif
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }

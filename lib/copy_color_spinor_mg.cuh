@@ -275,6 +275,23 @@ namespace quda {
   case 1024:								\
     CopyGenericColorSpinor<1024>(dst, src, location, dst_ptr, src_ptr);	\
     break;								\
+#ifdef GPU_STAGGERED_DIRAC
+  case 2304:               \
+    CopyGenericColorSpinor<2304>(dst, src, location, dst_ptr, src_ptr); \
+    break;                \
+  case 3072:               \
+    CopyGenericColorSpinor<3072>(dst, src, location, dst_ptr, src_ptr);  \
+    break;                \
+  case 9216:               \
+    CopyGenericColorSpinor<9216>(dst, src, location, dst_ptr, src_ptr);  \
+    break;                \
+  case 12288:               \
+    CopyGenericColorSpinor<12288>(dst, src, location, dst_ptr, src_ptr);  \
+    break;                \
+  case 16384:                \
+    CopyGenericColorSpinor<16384>(dst, src, location, dst_ptr, src_ptr); \
+    break;                \
+#endif
   default:								\
     errorQuda("Ncolors=%d not supported", src.Ncolor());		\
   }

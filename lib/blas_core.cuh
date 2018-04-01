@@ -236,6 +236,12 @@ template <typename Float, typename yFloat, int nSpin, QudaFieldOrder order,
     genericBlas<Float,yFloat,nSpin,24,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 32) {
     genericBlas<Float,yFloat,nSpin,32,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (x.Ncolor() == 96) {
+    genericBlas<Float,yFloat,nSpin,96,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 128) {
+    genericBlas<Float,yFloat,nSpin,128,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+#endif
   } else {
     errorQuda("nColor = %d not implemeneted",x.Ncolor());
   }

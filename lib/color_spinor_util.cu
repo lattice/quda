@@ -139,6 +139,12 @@ namespace quda {
       genericSource<Float,nSpin,24,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 32) {
       genericSource<Float,nSpin,32,order>(a,sourceType, x, s, c);
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (a.Ncolor() == 96) {
+      genericSource<Float,nSpin,96,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 128) {
+      genericSource<Float,nSpin,128,order>(a,sourceType, x, s, c);
+#endif
     } else {
       errorQuda("Unsupported nColor=%d\n", a.Ncolor());
     }
