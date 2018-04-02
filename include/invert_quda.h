@@ -892,6 +892,7 @@ namespace quda {
 
     TimeProfile &profile;    //time profile for initCG solver
 
+    bool pipelined_search_space_restart;
     bool init;
 
   public:
@@ -911,7 +912,7 @@ namespace quda {
     //pipelined eigCG solver:
     int pipeEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //
-    bool PipelinedRestart(const int current_pipeline_idx);
+    void PipelinedRestart(double&& lan_diag, double&& lan_offdiag, ColorSpinorField *wp = nullptr, double a = 0.0);
 
   };
 
