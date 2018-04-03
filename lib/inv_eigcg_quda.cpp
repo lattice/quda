@@ -516,7 +516,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
-
+exit(-1);
     return k;
   }
 
@@ -964,20 +964,31 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
   // this is the Worker pointer 
   namespace dslash {
     extern Worker* aux_worker;
+    extern Worker* aux_communicator;
   }
 
 
-  void IncEigCG::PipelinedRestart( double&& lanczos_diag, double&& lanczos_offdiag, ColorSpinorField *wp, double a)
+  void IncEigCG::PipelinedRestart( double&& lanczos_diag, double&& lanczos_offdiag, double&& a)
   {
+    EigCGArgs  &args  = *eigcg_args;
     EigCGTasks &tasks = *eigcg_tsks;
+
+    if(!pipelined_search_space_restart) {
+      args.SetLanczosAndIncrementSearchIndex(lanczos_diag, lanczos_offdiag);
+      //Check if we need to restart the search subspace
+      if( args.id == args.m ) pipelined_search_space_restart = true;
+      else return;
+    } 
+
+    warningQuda("Do search space restart.");
 
     tasks.StoreLanzcosAndIncrementPipelineIdx(lanczos_diag, lanczos_offdiag, pipelined_search_space_restart);
 
-    pipelined_search_space_restart = true;
+    dslash::aux_worker = &tasks;
 
     switch ( tasks.pipeline_idx ) {
       case 0 :
-        tasks.SetRestartParameters(*wp, a);
+        tasks.SetRestartParameters(*r_pre, a);
         tasks.SetComputeTask(tasktype::compute_ritz_task);
         break;
       case 1 :
@@ -990,6 +1001,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
         tasks.RestoreSearchSpace();
       default :
         pipelined_search_space_restart = false; /* the search space is released */
+        dslash::aux_worker = nullptr;
         break;
     }
 
@@ -1115,21 +1127,8 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
       alpha         = 1.0 / alpha_inv;
 
       lanczos_offdiag = (-sqrt(beta)*alpha_old_inv);
-
-      if(!pipelined_search_space_restart) {
-        //Warning: don't commute with the next if-statement
-        args.SetLanczosAndIncrementSearchIndex(lanczos_diag, lanczos_offdiag);
-
-        if( args.id == args.m ) {
-          warningQuda("Do search space restart.");
-          PipelinedRestart(0.0, 0.0, &w, sqrt(gamma_inv) );//will set pipelined_search_space_restart to true
-          dslash::aux_worker = &tasks;
-        } 
-
-      } else {//still updates the search space
-        PipelinedRestart( std::move(lanczos_diag), std::move(lanczos_offdiag) );
-        dslash::aux_worker = pipelined_search_space_restart ? &tasks : nullptr;//set to nullptr when restart finished
-      } 
+      //will restart the search space or just update the lanczos matrix
+      PipelinedRestart( std::move(lanczos_diag), std::move(lanczos_offdiag), !pipelined_search_space_restart ? std::move(sqrt(gamma_inv)) : 0.0);
 
       tp = pipelined_search_space_restart ? &tasks.Vpipeline->Component( tasks.pipeline_idx ) : &Vm->Component(args.id); 
 
@@ -1180,6 +1179,8 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
     matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+//!
+exit(-1);
 
     return j;
   }

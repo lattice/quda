@@ -912,7 +912,7 @@ namespace quda {
     //pipelined eigCG solver:
     int pipeEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //
-    void PipelinedRestart(double&& lan_diag, double&& lan_offdiag, ColorSpinorField *wp = nullptr, double a = 0.0);
+    void PipelinedRestart(double&& lan_diag, double&& lan_offdiag, double&& a);
 
   };
 
