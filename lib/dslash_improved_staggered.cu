@@ -81,7 +81,6 @@ namespace quda {
 			const cudaColorSpinorField *x, const double a, const int dagger)
       : DslashCuda(out, in, x, reconstruct, dagger), nSrc(in->X(4))
     { 
-      bindSpinorTex<sFloat>(in, out, x);
       dslashParam.gauge0 = (void*)fat0;
       dslashParam.gauge1 = (void*)fat1;
       dslashParam.longGauge0 = (void*)long0;
@@ -99,6 +98,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
       dslashParam.ghostTex = in->GhostTex();
       dslashParam.ghostTexNorm = in->GhostTexNorm();
+#else
+      bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
 
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
