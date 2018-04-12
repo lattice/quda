@@ -968,7 +968,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
   }
 
 
-  void IncEigCG::PipelinedRestart( ColorSpinorField *buffer, double&& lanczos_diag, double&& lanczos_offdiag, double&& a)
+  void IncEigCG::PipelinedRestart( ColorSpinorField *&buffer, double&& lanczos_diag, double&& lanczos_offdiag, double&& a)
   {
     EigCGArgs  &args  = *eigcg_args;
     EigCGTasks &tasks = *eigcg_tsks;
@@ -1108,7 +1108,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
 
 #ifdef MAX_PIPELINING
       xpayWpazBzpx(w, beta, s, -alpha, z, q);
-      local_reduce = pipeEigCGMergedReduceOp2(beta, s, p, alpha, r, x, w, gamma_inv, t);
+      local_reduce = pipeEigCGMergedReduceOp2(beta, s, p, alpha, r, x, w, sqrt(gamma_inv), t);
       //
       tasks.StartCommunicationTask(local_reduce);
       //allow non-blocking allreduce operation
@@ -1116,7 +1116,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
       //sync and copy results
       tasks.StopCommunicationTask(local_reduce);
 #else
-      local_reduce = pipeEigCGMergedReduceOp(beta, s, p, z, alpha, r, x, w, q, gamma_inv, t);
+      local_reduce = pipeEigCGMergedReduceOp(beta, s, p, z, alpha, r, x, w, q, sqrt(gamma_inv), t);
       tasks.StartCommunicationTask(local_reduce);
       //allow non-blocking allreduce operation
       matSloppy(q, w, tmp);

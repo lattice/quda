@@ -799,6 +799,25 @@ namespace quda {
 
 
 #ifdef PIPEEIGCG
+    /**
+       Functor to perform the operation y = a * x  (real-valued, copy version)
+    */
+    __device__ void axCopy_v2_(const double2 &a, const double2 &x, double2 &y) {
+      y.x = __dmul_rn (a.x, x.x);
+      y.y = __dmul_rn (a.x, x.y);
+    }
+
+   __device__ void axCopy_v2_(const float2 &a, const float2 &x, float2 &y) {
+      y.x = __fmul_rn (a.x, x.x);
+      y.y = __fmul_rn (a.x, x.y);
+    }
+
+    __device__ void axCopy_v2_(const float2 &a, const float4 &x, float4 &y) {
+      y.x = __fmul_rn (a.x, x.x);
+      y.y = __fmul_rn (a.x, x.y);
+      y.w = __fmul_rn (a.x, x.w);
+      y.z = __fmul_rn (a.x, x.z);
+    }
 
     /**
        Functor to perform the operation y += a * x  (real-valued)
@@ -1096,7 +1115,7 @@ namespace quda {
          //z = q + a.x*z;
          xpay_v2_(q,a,z);
 
-         axpy_v2_(c,r,v);
+         axCopy_v2_(c,r,v);
 
          //r = r - b.x*s;
          axpy_v2_(-b,s,r);
@@ -1151,7 +1170,7 @@ namespace quda {
          //p = r + a.x*p;
          xpay_v2_(r,a,p);
          //v = c*r;
-         axpy_v2_(c,r,v);
+         axCopy_v2_(c,r,v);
          //r = r - b.x*s;
          axpy_v2_(-b,s,r);
          //x = x + b.x*p;
