@@ -790,7 +790,7 @@ namespace quda {
       std::shared_ptr<ColorSpinorFieldSet> Vpipeline; //eigCG accumulation vectors needed to keep Lanczos basis vectors during the restart
 
       EigCGTasks(std::shared_ptr<ColorSpinorField> & Vm, std::shared_ptr<EigCGArgs> & eigcg_args) : pipeline_idx(0), Vm(Vm), eigcg_args(eigcg_args),  wtype(tasktype::default_task), 
-recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 ? 4 : 2 ), is_mgpu_task(false), inv_sqrt_r2(0.0) {
+allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 ? 4 : 2 ), is_mgpu_task(false), inv_sqrt_r2(0.0) {
 
         lanczos_diag    = std::move(std::unique_ptr<Complex[] >(new Complex[pipeline_length], std::default_delete<Complex[]>()));
         lanczos_offdiag = std::move(std::unique_ptr<Complex[] >(new Complex[pipeline_length], std::default_delete<Complex[]>()));
@@ -838,7 +838,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
          args.ResetSearchIdx(); 
          //now perform postponed copy operations: 
          for(int i = 0; i < pipeline_idx; i++) {
-           Vm->Component(args.id+i) = Vpipeline->Component(i); 
+           Vm->Component(args.id) = Vpipeline->Component(i); 
            args.SetLanczosAndIncrementSearchIndex(lanczos_diag[i], lanczos_offdiag[i]);     
          } 
 
@@ -873,7 +873,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
       inline void SetRestartParameters(const ColorSpinorField &w, const double inv_r) {  *wp2 = w;  inv_sqrt_r2 = inv_r;  }
 
       virtual ~EigCGTasks() {
-        host_free(allreduceHandle);
+        if(allreduceHandle) host_free(allreduceHandle);
       }
 
 
@@ -976,11 +976,14 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
     if(!pipelined_search_space_restart) {
 
       args.SetLanczosAndIncrementSearchIndex(lanczos_diag, lanczos_offdiag);
-      buffer = &Vm->Component(args.id);
 
       //Check if we need to restart the search subspace
-      if( args.id == args.m ) pipelined_search_space_restart = true;
-      else return;
+      if( args.id == args.m ) {
+         pipelined_search_space_restart = true;
+      } else {
+         buffer = &Vm->Component(args.id);
+         return;
+      }
 
     } else {
       tasks.StoreLanzcosAndIncrementPipelineIdx(lanczos_diag, lanczos_offdiag, pipelined_search_space_restart);
@@ -989,8 +992,6 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
     warningQuda("Do search space restart.");
 
     dslash::aux_worker = &tasks;
-
-    buffer = &tasks.Vpipeline->Component( tasks.pipeline_idx );
 
     switch ( tasks.pipeline_idx ) {
       case 0 :
@@ -1008,10 +1009,10 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
       default :
         pipelined_search_space_restart = false; /* the search space is released */
         dslash::aux_worker = nullptr;
-        buffer = &Vm->Component(args.id);//?
         break;
     }
 
+    buffer = pipelined_search_space_restart ? &tasks.Vpipeline->Component( tasks.pipeline_idx ) : &Vm->Component(args.id);
     return;
   }
 
