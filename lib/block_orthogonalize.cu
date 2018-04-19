@@ -550,7 +550,7 @@ namespace quda {
     } else if (V.Ncolor()/Nvec == 128) {
 
       constexpr int nColor = 128;
-      if (Nvec == 32) {
+      if (Nvec == 128) {
   BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,128>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
       } else {
   errorQuda("Unsupported nVec %d\n", Nvec);
