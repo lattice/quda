@@ -25,6 +25,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
   doubleN value;
   if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
+    if (!x.isNative() && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION) ) {
+      warningQuda("Device reductions on non-native fields is not supported\n");
+      doubleN value;
+      ::quda::zero(value);
+      return value;
+    }
+
     // cannot do site unrolling for arbitrary color (needs JIT)
     if (siteUnroll && x.Ncolor()!=3) errorQuda("Not supported");
     

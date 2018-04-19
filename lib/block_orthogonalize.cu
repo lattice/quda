@@ -11,13 +11,6 @@
 // this removes ghost accessor reducing the parameter space needed
 #define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
 
-#if CUDA_VERSION < 8000 && defined(__CUDA_ARCH__)
-// CUDA 7.x can't deal with array initialization from a parameter
-// pack.  This macro exposes a default constructor for the GPU
-// compiler while leaving the array initialization intact for the CPU compiler
-#define CUDA_CXX_ARRAY_WAR
-#endif
-
 #include <color_spinor_field_order.h>
 
 #include <integer_sequence.hpp> // C++11 version of this C++14 feature
@@ -31,6 +24,11 @@ namespace quda {
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
 //#define SWIZZLE
 
+  // to avoid overflowing the parameter space we put the B array into a separate constant memory buffer
+#define MAX_MATRIX_SIZE 4096
+  static __constant__ signed char B_array_d[MAX_MATRIX_SIZE];
+  static signed char B_array_h[MAX_MATRIX_SIZE];
+
   /**
       Kernel argument struct
   */
@@ -43,29 +41,30 @@ namespace quda {
     const int parity; // the parity of the input field (if single parity)
     const int nParity; // number of parities of input fine field
     int coarseVolume;
-    int geoBlockSize; // number of geometric elements in each block
+    int fineVolumeCB;
     int geoBlockSizeCB; // number of geometric elements in each checkerboarded block
-    int nBlock; // number of blocks we are orthogonalizing
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
-    const Vector B[nVec];
-
+    const Vector *B;
     template <typename... T>
     BlockOrthoArg(ColorSpinorField &V,
                   const int *fine_to_coarse, const int *coarse_to_fine,
 		  int parity, const int *geo_bs, const ColorSpinorField &meta,
 		  T... B) :
       V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-      spin_map(), parity(parity), nParity(meta.SiteSubset()), swizzle(1)
-#ifndef CUDA_CXX_ARRAY_WAR
-      , B{*B...}
-#endif
+      spin_map(), parity(parity), nParity(meta.SiteSubset()),
+      B( V.Location() == QUDA_CPU_FIELD_LOCATION ? reinterpret_cast<Vector*>(B_array_h) : nullptr)
     {
-      geoBlockSize = 1;
+      const Vector Btmp[nVec]{*B...};
+      if (sizeof(Btmp) > MAX_MATRIX_SIZE) errorQuda("B array size (%lu) is larger than maximum allowed (%d)\n", sizeof(Btmp), MAX_MATRIX_SIZE);
+      if (V.Location() == QUDA_CUDA_FIELD_LOCATION) cudaMemcpyToSymbolAsync(B_array_d, Btmp, sizeof(Btmp), 0, cudaMemcpyHostToDevice,0);
+      else memcpy(B_array_h, Btmp, sizeof(Btmp));
+
+      int geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
       geoBlockSizeCB = geoBlockSize/2;
       int chiralBlocks = (fineSpin==1) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
-      nBlock = (meta.Volume()/geoBlockSize) * chiralBlocks;
       coarseVolume = meta.Volume() / geoBlockSize;
+      fineVolumeCB = meta.VolumeCB();
       if (nParity != 2) errorQuda("BlockOrtho only presently supports full fields");
     }
   };
@@ -120,7 +119,7 @@ namespace quda {
 	    for (int b=0; b<arg.geoBlockSizeCB; b++) {
 
 	      int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
-	      int x_cb = x - parity*arg.V.VolumeCB();
+	      int x_cb = x - parity*arg.fineVolumeCB;
 
 	      complex<Float> v[nSpin][nColor];
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
@@ -138,7 +137,7 @@ namespace quda {
 	    for (int b=0; b<arg.geoBlockSizeCB; b++) {
 
 	      int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
-	      int x_cb = x - parity*arg.V.VolumeCB();
+	      int x_cb = x - parity*arg.fineVolumeCB;
 
 	      complex<Float> v[nSpin][nColor];
 	      if (i==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
@@ -161,7 +160,7 @@ namespace quda {
 	  for (int b=0; b<arg.geoBlockSizeCB; b++) {
 
 	    int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
-	    int x_cb = x - parity*arg.V.VolumeCB();
+	    int x_cb = x - parity*arg.fineVolumeCB;
 
 	    complex<Float> v[nSpin][nColor];
 	    if (j==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
@@ -181,7 +180,7 @@ namespace quda {
 	  for (int b=0; b<arg.geoBlockSizeCB; b++) {
 
 	    int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
-	    int x_cb = x - parity*arg.V.VolumeCB();
+	    int x_cb = x - parity*arg.fineVolumeCB;
 
 	    complex<Float> v[nSpin][nColor];
 	    if (j==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
@@ -221,8 +220,8 @@ namespace quda {
 #endif
     int parity = (arg.nParity == 2) ? threadIdx.y + blockIdx.y*blockDim.y : arg.parity;
     int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * blockDim.x + threadIdx.x];
-    int x_cb = x - parity*arg.V.VolumeCB();
-    if (x_cb >= arg.V.VolumeCB()) return;
+    int x_cb = x - parity*arg.fineVolumeCB;
+    if (x_cb >= arg.fineVolumeCB) return;
 
     typedef vector_type<complex<sumFloat>,coarseSpin> cvector;
     typedef vector_type<sumFloat,coarseSpin> rvector;
@@ -234,13 +233,17 @@ namespace quda {
     cvector *dot_ = (cvector*)&dot_storage;
     rvector *nrm_ = (rvector*)&dot_storage;
 
+    // cast the constant memory buffer to a Vector array
+    typedef typename std::remove_reference<decltype(*arg.B)>::type Vector;
+    const Vector *B = reinterpret_cast<const Vector*>(B_array_d);
+
     for (int j=0; j<nVec; j++) {
 
       complex<Float> v[nSpin][nColor];
 #pragma unroll
       for (int s=0; s<nSpin; s++)
 #pragma unroll
-	for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
+	for (int c=0; c<nColor; c++) v[s][c] = B[j](parity, x_cb, s, c);
 
       for (int i=0; i<j; i++) {
 
@@ -479,6 +482,7 @@ namespace quda {
     V.Scale(1.0); // by definition this is true
     BlockOrtho<double,Float,nSpin,spinBlockSize,nColor,coarseSpin,nVec> ortho(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
     ortho.apply(0);
+    checkCudaError();
   }
 
   template<typename Float, int nSpin, int spinBlockSize>
