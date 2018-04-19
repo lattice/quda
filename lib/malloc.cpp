@@ -403,20 +403,31 @@ namespace quda {
   }
 
   QudaFieldLocation get_pointer_location(const void *ptr) {
-    unsigned int attribute;
-    CUresult error = cuPointerGetAttribute(&attribute, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, reinterpret_cast<CUdeviceptr>(ptr));
-    if (error != CUDA_SUCCESS) errorQuda("cuPointerGetAttribute failed with error %d", error);
 
-    switch (attribute) {
+    CUpointer_attribute attribute[] = { CU_POINTER_ATTRIBUTE_MEMORY_TYPE };
+    CUmemorytype mem_type;
+    void *data[] = { &mem_type };
+    CUresult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<CUdeviceptr>(ptr));
+    if (error != CUDA_SUCCESS) {
+      const char *string;
+      cuGetErrorString(error, &string);
+      errorQuda("cuPointerGetAttributes failed with error %s", string);
+    }
+
+    // catch pointers that have not been created in CUDA
+    if (mem_type == 0) mem_type = CU_MEMORYTYPE_HOST;
+
+    switch (mem_type) {
     case CU_MEMORYTYPE_DEVICE:
     case CU_MEMORYTYPE_UNIFIED:
       return QUDA_CUDA_FIELD_LOCATION;
     case CU_MEMORYTYPE_HOST:
       return QUDA_CPU_FIELD_LOCATION;
     default:
-      errorQuda("Unknown memory type");
+      errorQuda("Unknown memory type %d", mem_type);
       return QUDA_INVALID_FIELD_LOCATION;
     }
+
   }
 
   namespace pool {
