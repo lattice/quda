@@ -23,6 +23,7 @@
 #endif
 
 #include <complex_quda.h>
+#include <qlua_contract.h>
 
 #define QC_REAL double
 
@@ -229,36 +230,49 @@ namespace quda {
   void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
   void copylocvolToSymbol(LONG_T locvol);
 
-  
-  __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev,
-                                                         complex<QC_REAL> *prop1_dev,
-							 complex<QC_REAL> *prop2_dev,
-							 complex<QC_REAL> *prop3_dev);
 
-  __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					  complex<QC_REAL> *prop1_dev,
-					  complex<QC_REAL> *prop2_dev);
-  
-  __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					   complex<QC_REAL> *prop1_dev,
-					   complex<QC_REAL> *prop2_dev);
+  __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, int x_cb, int pty, Propagator prop);
 
-  __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					   complex<QC_REAL> *prop1_dev,
-					   complex<QC_REAL> *prop2_dev);
-
-  __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					complex<QC_REAL> *prop1_dev,
-					complex<QC_REAL> *prop2_dev);
-
-  __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					 complex<QC_REAL> *prop1_dev,
-					 complex<QC_REAL> *prop2_dev);
-
-  __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					 complex<QC_REAL> *prop1_dev,
-					 complex<QC_REAL> *prop2_dev);
+  __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);  
+  /* ----------------------------------------------------------------------------------------------- */
  
 } //- namespace quda
 
 #endif/*QLUA_CONTRACT_KERNELS_H__*/
+
+
+
+  // __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev,
+  //                                                        complex<QC_REAL> *prop1_dev,
+  // 							 complex<QC_REAL> *prop2_dev,
+  // 							 complex<QC_REAL> *prop3_dev);
+
+  // __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
+  // 					  complex<QC_REAL> *prop1_dev,
+  // 					  complex<QC_REAL> *prop2_dev);
+  
+  // __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev,
+  // 					   complex<QC_REAL> *prop1_dev,
+  // 					   complex<QC_REAL> *prop2_dev);
+
+  // __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev,
+  // 					   complex<QC_REAL> *prop1_dev,
+  // 					   complex<QC_REAL> *prop2_dev);
+
+  // __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev,
+  // 					complex<QC_REAL> *prop1_dev,
+  // 					complex<QC_REAL> *prop2_dev);
+
+  // __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev,
+  // 					 complex<QC_REAL> *prop1_dev,
+  // 					 complex<QC_REAL> *prop2_dev);
+
+  // __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev,
+  // 					 complex<QC_REAL> *prop1_dev,
+  // 					 complex<QC_REAL> *prop2_dev);

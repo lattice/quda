@@ -14,62 +14,62 @@
 
 namespace quda {
   
-  struct QluaContractArg {
+  // struct QluaContractArgLEGACY {
 
-    typedef typename colorspinor_mapper<QC_REAL,QC_Ns,QC_Nc>::type Propagator;
+  //   typedef typename colorspinor_mapper<QC_REAL,QC_Ns,QC_Nc>::type Propagator;
     
-    Propagator prop[QUDA_PROP_NVEC];
+  //   Propagator prop[QUDA_PROP_NVEC];
     
-    const qluaCntr_Type cntrType;     // contraction type 
-    const int nParity;                // number of parities we're working on
-    const int nFace;                  // hard code to 1 for now
-    const int dim[5];                 // full lattice dimensions
-    const int commDim[4];             // whether a given dimension is partitioned or not
-    const int lL[4];      	      // 4-d local lattice dimensions
-    const int volumeCB;               // checkerboarded volume
-    const int volume;                 // full-site local volume
+  //   const qluaCntr_Type cntrType;     // contraction type 
+  //   const int nParity;                // number of parities we're working on
+  //   const int nFace;                  // hard code to 1 for now
+  //   const int dim[5];                 // full lattice dimensions
+  //   const int commDim[4];             // whether a given dimension is partitioned or not
+  //   const int lL[4];      	      // 4-d local lattice dimensions
+  //   const int volumeCB;               // checkerboarded volume
+  //   const int volume;                 // full-site local volume
     
-  QluaContractArg(ColorSpinorField **propIn, qluaCntr_Type cntrType)
-  :   cntrType(cntrType), nParity(propIn[0]->SiteSubset()), nFace(1),
-      dim{ (3-nParity) * propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3), 1 },
-      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
-      volumeCB(propIn[0]->VolumeCB()),volume(propIn[0]->Volume())
-    {
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) prop[ivec].init(*propIn[ivec]);
-    }
+  //   QluaContractArg(ColorSpinorField **propIn, qluaCntr_Type cntrType)
+  // :   cntrType(cntrType), nParity(propIn[0]->SiteSubset()), nFace(1),
+  //     dim{ (3-nParity) * propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3), 1 },
+  //     commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+  //     lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
+  //     volumeCB(propIn[0]->VolumeCB()),volume(propIn[0]->Volume())
+  //   {
+  //     for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) prop[ivec].init(*propIn[ivec]);
+  //   }
 
-  };//-- Structure definition
-  //---------------------------------------------------------------------------
+  // };//-- Structure definition
+  // //---------------------------------------------------------------------------
 
-  struct QluaContractArgU {
+  // struct QluaContractArgULEGACY {
 
-    typedef typename colorspinor_mapper<QC_REAL,QC_Ns,QC_Nc>::type Propagator;
-    typedef typename gauge_mapper<QC_REAL,QUDA_RECONSTRUCT_NO>::type Gauge;
+  //   typedef typename colorspinor_mapper<QC_REAL,QC_Ns,QC_Nc>::type Propagator;
+  //   typedef typename gauge_mapper<QC_REAL,QUDA_RECONSTRUCT_NO>::type Gauge;
     
-    Propagator prop[QUDA_PROP_NVEC];  // Input propagator
-    Gauge U;                          // Gauge Field
+  //   Propagator prop[QUDA_PROP_NVEC];  // Input propagator
+  //   Gauge U;                          // Gauge Field
 
-    const qluaCntr_Type cntrType;     // contraction type 
-    const int nParity;                // number of parities we're working on
-    const int nFace;                  // hard code to 1 for now
-    const int dim[5];                 // full lattice dimensions
-    const int commDim[4];             // whether a given dimension is partitioned or not
-    const int lL[4];      	      // 4-d local lattice dimensions
-    const int volumeCB;               // checkerboarded volume
-    const int volume;                 // full-site local volume
+  //   const qluaCntr_Type cntrType;     // contraction type 
+  //   const int nParity;                // number of parities we're working on
+  //   const int nFace;                  // hard code to 1 for now
+  //   const int dim[5];                 // full lattice dimensions
+  //   const int commDim[4];             // whether a given dimension is partitioned or not
+  //   const int lL[4];      	      // 4-d local lattice dimensions
+  //   const int volumeCB;               // checkerboarded volume
+  //   const int volume;                 // full-site local volume
     
-  QluaContractArgU(ColorSpinorField **propIn, GaugeField *U, qluaCntr_Type cntrType)
-  :   U(*U), cntrType(cntrType), nParity(propIn[0]->SiteSubset()), nFace(1),
-      dim{ (3-nParity) * propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3), 1 },
-      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
-      volumeCB(propIn[0]->VolumeCB()),volume(propIn[0]->Volume())
-    {
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) prop[ivec].init(*propIn[ivec]);
-    }
+  // QluaContractArgU(ColorSpinorField **propIn, GaugeField *U, qluaCntr_Type cntrType)
+  // :   U(*U), cntrType(cntrType), nParity(propIn[0]->SiteSubset()), nFace(1),
+  //     dim{ (3-nParity) * propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3), 1 },
+  //     commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+  //     lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
+  //     volumeCB(propIn[0]->VolumeCB()),volume(propIn[0]->Volume())
+  //   {
+  //     for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) prop[ivec].init(*propIn[ivec]);
+  //   }
 
-  };//-- Structure definition
+  // };//-- Structure definition
   //---------------------------------------------------------------------------
 
   
@@ -169,91 +169,91 @@ namespace quda {
   //---------------------------------------------------------------------------
 
   
-  __global__ void prepareDeviceProp_kernel(complex<QC_REAL> *devProp, QluaContractArg *arg){
+  // __global__ void prepareDeviceProp_kernel(complex<QC_REAL> *devProp, QluaContractArg *arg){
 
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+  //   int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+  //   int pty  = blockIdx.y*blockDim.y + threadIdx.y;
 
-    if (x_cb >= arg->volumeCB) return;
-    if (pty >= arg->nParity) return;
+  //   if (x_cb >= arg->volumeCB) return;
+  //   if (pty >= arg->nParity) return;
 
-    const int Ns = QC_Ns;
-    const int Nc = QC_Nc;
+  //   const int Ns = QC_Ns;
+  //   const int Nc = QC_Nc;
 
-    typedef ColorSpinor<QC_REAL,Nc,Ns> Vector;
-    Vector vec[QUDA_PROP_NVEC];
+  //   typedef ColorSpinor<QC_REAL,Nc,Ns> Vector;
+  //   Vector vec[QUDA_PROP_NVEC];
 
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec[i] = arg->prop[i](x_cb, pty);
-    }
-    rotatePropBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
+  //   for(int i=0;i<QUDA_PROP_NVEC;i++){
+  //     vec[i] = arg->prop[i](x_cb, pty);
+  //   }
+  //   rotatePropBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
 
-    int crd[5];
-    getCoords(crd, x_cb, arg->lL, pty);  //-- Get local coordinates crd[] at given x_cb and pty
-    crd[4] = 0;  
+  //   int crd[5];
+  //   getCoords(crd, x_cb, arg->lL, pty);  //-- Get local coordinates crd[] at given x_cb and pty
+  //   crd[4] = 0;  
 
-    int i_QudaQdp = x_cb + pty * arg->volumeCB;
-    int lV = 2*arg->volumeCB;
+  //   int i_QudaQdp = x_cb + pty * arg->volumeCB;
+  //   int lV = 2*arg->volumeCB;
 
-    for(int jc = 0; jc < Nc; jc++){
-      for(int js = 0; js < Ns; js++){
-	int vIdx = js + Ns*jc;     //-- vector index (which vector within propagator)
-	for(int ic = 0; ic < Nc; ic++){
-	  for(int is = 0; is < Ns; is++){
-	    int dIdx = ic + Nc*is; //-- spin-color index within each vector
+  //   for(int jc = 0; jc < Nc; jc++){
+  //     for(int js = 0; js < Ns; js++){
+  // 	int vIdx = js + Ns*jc;     //-- vector index (which vector within propagator)
+  // 	for(int ic = 0; ic < Nc; ic++){
+  // 	  for(int is = 0; is < Ns; is++){
+  // 	    int dIdx = ic + Nc*is; //-- spin-color index within each vector
 
-	    int pIdx = i_QudaQdp + lV*QC_QUDA_LIDX_P(ic,is,jc,js);	    
+  // 	    int pIdx = i_QudaQdp + lV*QC_QUDA_LIDX_P(ic,is,jc,js);	    
 	    
-	    devProp[pIdx] = vec[vIdx].data[dIdx];
-	  }}}
-    }
+  // 	    devProp[pIdx] = vec[vIdx].data[dIdx];
+  // 	  }}}
+  //   }
     
-  }//-- function
+  // }//-- function
 
   
-  void prepareDeviceProp(complex<QC_REAL> *devProp, ColorSpinorField **propIn, qluaCntr_Type cntrType){
+  // void prepareDeviceProp(complex<QC_REAL> *devProp, ColorSpinorField **propIn, qluaCntr_Type cntrType){
     
-    QluaContractArg arg(propIn, cntrType);
+  //   QluaContractArg arg(propIn, cntrType);
       
-    if(arg.nParity != 2) errorQuda("run_prepareDeviceProp: This function supports only Full Site Subset spinors!\n");
+  //   if(arg.nParity != 2) errorQuda("run_prepareDeviceProp: This function supports only Full Site Subset spinors!\n");
     
-    QluaContractArg *arg_dev;
-    cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
-    checkCudaErrorNoSync();
-    cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);
+  //   QluaContractArg *arg_dev;
+  //   cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
+  //   checkCudaErrorNoSync();
+  //   cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);
 
-    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+  //   dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+  //   dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
-    prepareDeviceProp_kernel<<<gridDim,blockDim>>>(devProp, arg_dev);
-    cudaDeviceSynchronize();
-    checkCudaError();
+  //   prepareDeviceProp_kernel<<<gridDim,blockDim>>>(devProp, arg_dev);
+  //   cudaDeviceSynchronize();
+  //   checkCudaError();
 
-    cudaFree(arg_dev);
-  }
+  //   cudaFree(arg_dev);
+  // }
 
   
-  void prepareDeviceProp(complex<QC_REAL> *devProp, ColorSpinorField **propIn, GaugeField *U, qluaCntr_Type cntrType){
+  // void prepareDeviceProp(complex<QC_REAL> *devProp, ColorSpinorField **propIn, GaugeField *U, qluaCntr_Type cntrType){
     
-    QluaContractArgU arg(propIn, U, cntrType);
+  //   QluaContractArgU arg(propIn, U, cntrType);
     
-    if(arg.nParity != 2) errorQuda("run_prepareDeviceProp: This function supports only Full Site Subset spinors!\n");
+  //   if(arg.nParity != 2) errorQuda("run_prepareDeviceProp: This function supports only Full Site Subset spinors!\n");
     
-    QluaContractArg *arg_dev;
-    cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
-    checkCudaErrorNoSync();
-    cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);
+  //   QluaContractArg *arg_dev;
+  //   cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
+  //   checkCudaErrorNoSync();
+  //   cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);
 
-    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+  //   dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+  //   dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
-    prepareDeviceProp_kernel<<<gridDim,blockDim>>>(devProp, arg_dev);
-    cudaDeviceSynchronize();
-    checkCudaError();
+  //   prepareDeviceProp_kernel<<<gridDim,blockDim>>>(devProp, arg_dev);
+  //   cudaDeviceSynchronize();
+  //   checkCudaError();
 
-    cudaFree(arg_dev);
-  }
-  //------------------------------------------------------------------------------------------
+  //   cudaFree(arg_dev);
+  // }
+  // //------------------------------------------------------------------------------------------
 
   
   //-Top-level function in GPU contractions
@@ -270,71 +270,46 @@ namespace quda {
     
     if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("QUDA_REAL and QC_REAL type mismatch!\n");
 
-    LONG_T locvol = mpParam.locvol;
-    
-    //-- Transform the propagators
-    double t1 = MPI_Wtime();
-    size_t propSizeCplx = sizeof(complex<QC_REAL>) * locvol * QUDA_Nc*QUDA_Nc * QUDA_Ns*QUDA_Ns;
-    
-    complex<QC_REAL> *prop1_dev = NULL;
-    complex<QC_REAL> *prop2_dev = NULL;
-    complex<QC_REAL> *prop3_dev = NULL;
-    
-    cudaMalloc((void**)&prop1_dev, propSizeCplx );
-    cudaMalloc((void**)&prop2_dev, propSizeCplx );
+   
+    //-- Define the arguments structure
+    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, mpParam.cntrType);
+    if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
+    QluaContractArg *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
     checkCudaErrorNoSync();
-    cudaMemset(prop1_dev, 0, propSizeCplx);
-    cudaMemset(prop2_dev, 0, propSizeCplx);
-
-    if( (mpParam.cntrType == what_tmd_g_F_B) || (mpParam.cntrType == what_qpdf_g_F_B) ){
-      prepareDeviceProp(prop1_dev, cudaProp1, U, mpParam.cntrType);
-      prepareDeviceProp(prop2_dev, cudaProp2, U, mpParam.cntrType);
-    }
-    else{
-      prepareDeviceProp(prop1_dev, cudaProp1, mpParam.cntrType);
-      prepareDeviceProp(prop2_dev, cudaProp2, mpParam.cntrType);
-      
-      if(mpParam.cntrType == what_baryon_sigma_UUS){
-	cudaMalloc((void**)&prop3_dev, propSizeCplx );
-	checkCudaErrorNoSync();
-	cudaMemset(prop3_dev, 0, propSizeCplx);
-	prepareDeviceProp(prop3_dev, cudaProp3, mpParam.cntrType);
-      }
-    }
-    double t2 = MPI_Wtime();    
-    printfQuda("TIMING - %s: Device Propagators prepared in %f sec.\n", func_name, t2-t1);
-    //-------------------------------------------------------------
+    cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);    
     
-    
-    //-- Call the kernel wrapper to perform contractions
+    LONG_T locvol = mpParam.locvol;
     copylocvolToSymbol(locvol); //- Copy the local volume to constant memory
 
-    dim3 blockDim(THREADS_PER_BLOCK, 1, 1);
-    dim3 gridDim((locvol + blockDim.x - 1)/blockDim.x, 1, 1);
 
-    double t5 = MPI_Wtime();    
+    //-- Call kernels that perform contractions
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    double t5 = MPI_Wtime();
     switch(mpParam.cntrType){
     case what_baryon_sigma_UUS: {
       copySmatricesToSymbol(S2, S1);
-      baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev, prop3_dev);
+      baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     case what_qbarq_g_F_B: {
-      qbarq_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
+      qbarq_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     case what_qbarq_g_F_aB: {
-      qbarq_g_P_aP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
+      qbarq_g_P_aP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     case what_qbarq_g_F_hB: {
-      qbarq_g_P_hP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
+      qbarq_g_P_hP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     case what_meson_F_B: {
-      meson_F_B_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
+      meson_F_B_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     case what_meson_F_aB: {
-      meson_F_aB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
+      meson_F_aB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     case what_meson_F_hB: {
-      meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, prop1_dev, prop2_dev);
+      meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     case what_qpdf_g_F_B:
     case what_tmd_g_F_B:
@@ -342,14 +317,11 @@ namespace quda {
     }//-- switch
     cudaDeviceSynchronize();
     checkCudaError();
-    double t6 = MPI_Wtime();    
+    double t6 = MPI_Wtime();
     printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[mpParam.cntrType], t6-t5);
-
     
     //-- Clean-up
-    cudaFree(prop1_dev);
-    cudaFree(prop2_dev);
-    if(mpParam.cntrType == what_baryon_sigma_UUS) cudaFree(prop3_dev);
+    cudaFree(arg_dev);
     free(func_name);
     
   }//-- function

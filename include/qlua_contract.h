@@ -4,13 +4,21 @@
 #ifndef QLUA_CONTRACT_H__
 #define QLUA_CONTRACT_H__
 
-#include <interface_qlua.h>
+#include <transfer.h>
 #include <complex_quda.h>
+#include <quda_internal.h>
+#include <quda_matrix.h>
+#include <index_helper.cuh>
+#include <gauge_field.h>
+#include <gauge_field_order.h>
 #include <color_spinor.h>
 #include <color_spinor_field_order.h>
+#include <interface_qlua.h>
 
 
 namespace quda {
+
+  typedef typename colorspinor_mapper<QUDA_REAL,QUDA_Ns,QUDA_Nc>::type Propagator;
 
   /**
      When copying ColorSpinorFields to GPU, Quda rotates the fields to another basis using a rotation matrix.
@@ -72,6 +80,53 @@ namespace quda {
 
   }
   //---------------------------------------------------------------------------
+
+  struct QluaContractArg {
+
+    //    typedef typename gauge_mapper<QUDA_REAL,QUDA_RECONSTRUCT_NO>::type Gauge;
+
+    Propagator prop1[QUDA_PROP_NVEC]; // Input
+    Propagator prop2[QUDA_PROP_NVEC]; // Propagators
+    Propagator prop3[QUDA_PROP_NVEC]; //
+
+    //    Gauge U;                          // Gauge Field
+
+    const qluaCntr_Type cntrType;     // contraction type
+    const int nParity;                // number of parities we're working on
+    const int nFace;                  // hard code to 1 for now
+    const int dim[5];                 // full lattice dimensions
+    const int commDim[4];             // whether a given dimension is partitioned or not
+    const int lL[4];                  // 4-d local lattice dimensions
+    const int volumeCB;               // checkerboarded volume
+    const int volume;                 // full-site local volume
+
+    QluaContractArg(ColorSpinorField **propIn1,
+                    ColorSpinorField **propIn2,
+                    ColorSpinorField **propIn3,
+                    qluaCntr_Type cntrType)
+      :   cntrType(cntrType), nParity(propIn1[0]->SiteSubset()), nFace(1), //U(*U),
+	  dim{ (3-nParity) * propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3), 1 },
+      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+      lL{propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3)},
+      volumeCB(propIn1[0]->VolumeCB()),volume(propIn1[0]->Volume())
+    {
+      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+        prop1[ivec].init(*propIn1[ivec]);
+        prop2[ivec].init(*propIn2[ivec]);
+      }
+
+      if(cntrType == what_baryon_sigma_UUS){
+        if(propIn3 == NULL) errorQuda("QluaContractArg: Input propagator-3 is not allocated!\n");
+        for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
+          prop3[ivec].init(*propIn3[ivec]);
+      }
+
+    }
+
+  };//-- Structure definition
+  //---------------------------------------------------------------------------
+
+
   
 }//-- namespace quda
 

@@ -1,4 +1,5 @@
 #include <qlua_contract_kernels.cuh>
+#include <qlua_contract.h>
 
 namespace quda {
 
@@ -768,10 +769,241 @@ namespace quda {
     QC(gvec_eq_trace_gamma_dot_G)(r,r_stride, tmpG,1);
   }
 
+
+  //---------------------------------------------------------------------------//
+  // U T I L I T Y   F U N C T I O N S   A N D   K E R N E L   W R A P P E R S //
+  //---------------------------------------------------------------------------//
+
+  void copylocvolToSymbol(LONG_T locvol){
+    cudaMemcpyToSymbol(c_locvol, &locvol, sizeof(LONG_T));
+  }
+  void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1){
+    cudaMemcpyToSymbol(cS2_gvec, S2, sizeof(complex<QC_REAL>)*QC_LEN_G);
+    cudaMemcpyToSymbol(cS1_gvec, S1, sizeof(complex<QC_REAL>)*QC_LEN_G);
+  }
+
+  __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, int x_cb, int pty, Propagator prop[]){
+
+    const int Ns = QC_Ns;
+    const int Nc = QC_Nc;
+
+    typedef ColorSpinor<QC_REAL,Nc,Ns> Vector;
+    Vector vec[QUDA_PROP_NVEC];
+
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec[i] = prop[i](x_cb, pty);
+    }
+    rotatePropBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
+
+    for(int jc = 0; jc < Nc; jc++){
+      for(int js = 0; js < Ns; js++){
+        int vIdx = js + Ns*jc;     //-- vector index (which vector within propagator)
+        for(int ic = 0; ic < Nc; ic++){
+          for(int is = 0; is < Ns; is++){
+            int dIdx = ic + Nc*is; //-- spin-color index within each vector
+
+            int pIdx = QC_QUDA_LIDX_P(ic,is,jc,js);
+
+            devProp[pIdx] = vec[vIdx].data[dIdx];
+          }}}
+    }//-jc
+
+  }//-- prepareDevicePropSite
+
+
+  //--------------------------------------------------------------------------------------
+  //--------------------------------------------------------------------------------------
+  //-- Kernel wrappers
+
+  __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+
+    LONG_T lV = c_locvol;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> prop1[QC_LEN_P];
+    complex<QC_REAL> prop2[QC_LEN_P];
+    complex<QC_REAL> prop3[QC_LEN_P];
+
+    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
+    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+    prepareDevicePropSite(prop3, x_cb, pty, arg->prop3);
+
+    qc_quda_baryon_sigma_twopt_asymsrc_gvec(Corr_dev + tid, (int)lV,
+                                            prop1, 1,
+                                            prop2, 1,
+                                            prop3, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+
+    LONG_T lV = c_locvol;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> prop1[QC_LEN_P];
+    complex<QC_REAL> prop2[QC_LEN_P];
+
+    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
+    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+
+    qc_quda_contract_tr_g_P_P(Corr_dev + tid, (int)lV,
+			      prop1, 1,
+			      prop2, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+
+    LONG_T lV = c_locvol;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> prop1[QC_LEN_P];
+    complex<QC_REAL> prop2[QC_LEN_P];
+
+    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
+    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+
+    qc_quda_contract_tr_g_P_aP(Corr_dev + tid, (int)lV,
+			       prop1, 1,
+			       prop2, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+
+    LONG_T lV = c_locvol;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> prop1[QC_LEN_P];
+    complex<QC_REAL> prop2[QC_LEN_P];
+
+    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
+    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+
+    qc_quda_contract_tr_g_P_hP(Corr_dev + tid, (int)lV,
+			       prop1, 1,
+			       prop2, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+
+    LONG_T lV = c_locvol;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> prop1[QC_LEN_P];
+    complex<QC_REAL> prop2[QC_LEN_P];
+
+    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
+    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+
+    qc_quda_contract_tr_g_P_mgbar_P(Corr_dev + tid, (int)lV,
+				    prop1, 1,
+				    prop2, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+
+    LONG_T lV = c_locvol;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> prop1[QC_LEN_P];
+    complex<QC_REAL> prop2[QC_LEN_P];
+
+    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
+    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+
+    qc_quda_contract_tr_g_P_mgbar_aP(Corr_dev + tid, (int)lV,
+				     prop1, 1,
+				     prop2, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+
+    LONG_T lV = c_locvol;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> prop1[QC_LEN_P];
+    complex<QC_REAL> prop2[QC_LEN_P];
+
+    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
+    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+
+    qc_quda_contract_tr_g_P_mgbar_hP(Corr_dev + tid, (int)lV,
+				     prop1, 1,
+				     prop2, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+} //- namespace quda
+
+
+
+
+
+
+
+
+
+
+
+
+  /*
+
   //--------------------------------------------------------------------------------------
   //--------------------------------------------------------------------------------------  
   //-- Kernel wrappers  
-
   void copylocvolToSymbol(LONG_T locvol){
     cudaMemcpyToSymbol(c_locvol, &locvol, sizeof(LONG_T));
   }
@@ -881,13 +1113,4 @@ namespace quda {
   }
   //------------------------------------------------------------------------------------------
 
-  
-} //- namespace quda
- 
-/* TODO check gamma funcs */
-/* TODO add OpenMP iteration over sites: 
-   P,P -> P: seq_u, seq_d
-   P,P -> C*16 : mesons   ; also momproj(C*16)
-   P,P,P -> C*16 : sigmab ; also momproj(C*16)
-   vD,vD -> C*16 : contraction
-*/
+  */
