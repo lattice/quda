@@ -54,6 +54,8 @@
   int fullLatticeIndex(int dim[], int index, int oddBit);
   int getOddBit(int X);
 
+  void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type, QudaPrecision local_prec);
+
   void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
   void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
 				    QudaPrecision precision, QudaGaugeParam*, 

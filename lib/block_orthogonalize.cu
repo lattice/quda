@@ -62,7 +62,6 @@ namespace quda {
       int geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
       geoBlockSizeCB = geoBlockSize/2;
-      int chiralBlocks = (fineSpin==1) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
       coarseVolume = meta.Volume() / geoBlockSize;
       fineVolumeCB = meta.VolumeCB();
       if (nParity != 2) errorQuda("BlockOrtho only presently supports full fields");
@@ -386,20 +385,32 @@ namespace quda {
 	  typedef FieldOrderCB<RegType,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,real,real,DISABLE_GHOST> Rotator;
 	  typedef FieldOrderCB<RegType,nSpin,nColor,1,QUDA_FLOAT2_FIELD_ORDER,RegType,RegType,DISABLE_GHOST> Vector;
 
+    // ESW HACK: save templating over aggregated without 2, 3, 4
 	  switch (geoBlockSize/2) {
+#if 0
 	  case   4: GPU<Rotator,Vector,  4>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x2x2x1 aggregates
+#endif
 	  case   8: GPU<Rotator,Vector,  8>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x2x2x2 aggregates
+#if 0
 	  case  16: GPU<Rotator,Vector, 16>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x2x2x1 aggregates
+#endif
 	  case  27: GPU<Rotator,Vector, 27>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 3x3x3x1 aggregates
 	  case  32: GPU<Rotator,Vector, 32>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x2x2 aggregates
+#if 0
 	  case  36: GPU<Rotator,Vector, 36>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 3x3x2x4 aggregates
+#endif
 	  case  54: GPU<Rotator,Vector, 54>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 3x3x3x4 aggregates
+#if 0
 	  case  64: GPU<Rotator,Vector, 64>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x4x4x4 aggregates
+#endif
 	  case  81: GPU<Rotator,Vector, 81>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 3x3x3x6 aggregates
+#if 0
 	  case  96: GPU<Rotator,Vector, 96>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x4x3 aggregates
 	  case 100: GPU<Rotator,Vector,100>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 5x5x2x4 aggregates
 	  case 108: GPU<Rotator,Vector,108>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 3x3x3x8 aggregates
+#endif
 	  case 128: GPU<Rotator,Vector,128>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x4x4 aggregates
+#if 0
 	  case 144: GPU<Rotator,Vector,144>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x3x6 aggregates
 	  case 192: GPU<Rotator,Vector,192>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x3x8 aggregates
 	  case 200: GPU<Rotator,Vector,200>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 6x6x6x4 aggregates
@@ -407,6 +418,7 @@ namespace quda {
 	  case 432: GPU<Rotator,Vector,432>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 6x6x6x4 aggregates
 	  case 500: GPU<Rotator,Vector,500>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 5x5x5x8 aggregates
 	  case 512: GPU<Rotator,Vector,512>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x8x8 aggregates
+#endif
 	  default: errorQuda("Block size %d not instantiated", geoBlockSize/2);
 	  }
 	} else {

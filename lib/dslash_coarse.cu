@@ -10,9 +10,11 @@
 #include <uint_to_char.h>
 #include <worker.h>
 
+#if 0 // ESW HACK REDUCE COMPILE TIME
 // splitting the dot-product between threads is buggy with CUDA 7.0
 #if __COMPUTE_CAPABILITY__ >= 300 && CUDA_VERSION >= 7050
 #define DOT_PRODUCT_SPLIT
+#endif
 #endif
 
 namespace quda {
@@ -861,8 +863,10 @@ namespace quda {
     } else if (inA.Ncolor() == 4) {
       ApplyCoarse<Float,yFloat,4,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
+#if 0 // ESW HACK FOR STAGGERED COMPILE
     if (inA.Ncolor() == 6) { // free field Wilson
       ApplyCoarse<Float,yFloat,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+#endif
 #if 0
     } else if (inA.Ncolor() == 8) {
       ApplyCoarse<Float,yFloat,8,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
@@ -872,15 +876,18 @@ namespace quda {
       ApplyCoarse<Float,yFloat,16,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
     } else if (inA.Ncolor() == 20) {
       ApplyCoarse<Float,yFloat,20,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+    } else 
 #endif
-    } else if (inA.Ncolor() == 24) {
+    if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,yFloat,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #if 0
     } else if (inA.Ncolor() == 28) {
       ApplyCoarse<Float,yFloat,28,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
+#if 0 // ESW HACK FOR STAGGERED COMPILE
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,yFloat,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+#endif
 #ifdef GPU_STAGGERED_DIRAC
     } else if (inA.Ncolor() == 96) {
       ApplyCoarse<Float,yFloat,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
@@ -991,9 +998,11 @@ namespace quda {
 	if (Y.Precision() == QUDA_SINGLE_PRECISION) {
 	  ApplyCoarse<float,float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
 			     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+#if 0 // ESW HACK REDUCE COMPILE TIME
 	} else if (Y.Precision() == QUDA_HALF_PRECISION) {
 	  ApplyCoarse<float,short>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
 			     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+#endif
 	} else {
 	  errorQuda("Unsupported precision %d\n", Y.Precision());
 	}

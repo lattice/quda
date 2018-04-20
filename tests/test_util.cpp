@@ -863,7 +863,15 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 
 }
 
-
+void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type, QudaPrecision local_prec) {
+  if (local_prec == QUDA_DOUBLE_PRECISION) {
+    applyGaugeFieldScaling_long((double**)gauge, Vh, param, dslash_type);
+  } else if (local_prec == QUDA_SINGLE_PRECISION) {
+    applyGaugeFieldScaling_long((float**)gauge, Vh, param, dslash_type);
+  } else {
+    errorQuda("Invalid type %d for applyGaugeFieldScaling_long\n", local_prec);
+  }
+}
 
 template <typename Float>
 static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {

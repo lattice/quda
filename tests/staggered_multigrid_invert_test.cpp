@@ -515,15 +515,41 @@ int main(int argc, char **argv)
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
 
+
+  void *inlinks=malloc(4*V*gaugeSiteSize*gSize);
+  void *inlink[4];
+
+  for (int dir = 0; dir < 4; dir++) {
+     inlink[dir] = (void*)((char*)inlinks + dir*V*gaugeSiteSize*gSize);
+  }
+
+  if (strcmp(latfile,"")) {
+    read_gauge_field(latfile, inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    applyGaugeFieldScaling_long(inlink, Vh, &gauge_param, dslash_type, gauge_param.cpu_prec);
+    //construct_fat_long_gauge_field(inlink, nullptr, 3, gauge_param.cpu_prec, &gauge_param, dslash_type);
+    for (int dir = 0; dir < 4; dir++) {
+      memcpy(qdp_fatlink[dir], inlink[dir] , V*gaugeSiteSize*gSize);
+    }
+
+  } else {
+
+    const int gen_type = 1; // free field.
+    warningQuda("Gen type = %d", gen_type);
+
+    construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, gen_type, gauge_param.cpu_prec, 
+         &gauge_param, dslash_type);
+  }
+
+  free(inlinks);
+
   //if (dslash_type == QUDA_LAPLACE_DSLASH) {
   // Force unit gauge fields without phases just for convenience */
   //  construct_gauge_field(qdp_fatlink, 0, gauge_param.cpu_prec, &gauge_param);
   //} else {
     // hard coded plus hacked to force free field with staggered phases
-    construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gauge_param.cpu_prec,
-           &gauge_param, dslash_type);
+    /*construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gauge_param.cpu_prec,
+           &gauge_param, dslash_type);*/
   //}
-
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<V; ++i){
       for(int j=0; j<gaugeSiteSize; ++j){
