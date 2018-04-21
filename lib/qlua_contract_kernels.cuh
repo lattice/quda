@@ -2,17 +2,10 @@
 #define QLUA_CONTRACT_KERNELS_H__
 
 #ifdef __CUDACC__
-//#  warning using nvcc
 #  define DEVFUNC_  __device__ __host__
 #  define CONSTVAR_ constexpr
 #  define INFUNC_ inline
-/* #  ifdef __CUDA_ARCH__ */
-/* #    warning nvcc device-code trajectory  */
-/* #  else */
-/* #    warning nvcc host-code trajectory */
-/* #  endif */
 #else
-//#  warning non-nvcc host code trajectory
 #  define DEVFUNC_
 #  define CONSTVAR_ const
 #  if __STDC_VERSION__ >= 199901L
@@ -245,34 +238,3 @@ namespace quda {
 } //- namespace quda
 
 #endif/*QLUA_CONTRACT_KERNELS_H__*/
-
-
-
-  // __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev,
-  //                                                        complex<QC_REAL> *prop1_dev,
-  // 							 complex<QC_REAL> *prop2_dev,
-  // 							 complex<QC_REAL> *prop3_dev);
-
-  // __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
-  // 					  complex<QC_REAL> *prop1_dev,
-  // 					  complex<QC_REAL> *prop2_dev);
-  
-  // __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev,
-  // 					   complex<QC_REAL> *prop1_dev,
-  // 					   complex<QC_REAL> *prop2_dev);
-
-  // __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev,
-  // 					   complex<QC_REAL> *prop1_dev,
-  // 					   complex<QC_REAL> *prop2_dev);
-
-  // __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev,
-  // 					complex<QC_REAL> *prop1_dev,
-  // 					complex<QC_REAL> *prop2_dev);
-
-  // __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev,
-  // 					 complex<QC_REAL> *prop1_dev,
-  // 					 complex<QC_REAL> *prop2_dev);
-
-  // __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev,
-  // 					 complex<QC_REAL> *prop1_dev,
-  // 					 complex<QC_REAL> *prop2_dev);
