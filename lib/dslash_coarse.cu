@@ -998,11 +998,9 @@ namespace quda {
 	if (Y.Precision() == QUDA_SINGLE_PRECISION) {
 	  ApplyCoarse<float,float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
 			     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
-#if 0 // ESW HACK REDUCE COMPILE TIME
 	} else if (Y.Precision() == QUDA_HALF_PRECISION) {
 	  ApplyCoarse<float,short>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
 			     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
-#endif
 	} else {
 	  errorQuda("Unsupported precision %d\n", Y.Precision());
 	}

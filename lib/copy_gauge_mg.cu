@@ -161,6 +161,20 @@ if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
     } else  if (in.Ncolor() == 64) {
       const int Nc = 64;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+#ifdef GPU_STAGGERED_DIRAC
+    } else  if (in.Ncolor() == 96) {
+      const int Nc = 96;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 128) {
+      const int Nc = 128;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 192) {
+      const int Nc = 192;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 256) {
+      const int Nc = 256;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+#endif
     } else 
 #endif // GPU_MULTIGRID
     {

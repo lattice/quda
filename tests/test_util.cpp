@@ -2763,7 +2763,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     int level = atoi(argv[i+1]);
-    if (level < 1 || level >= QUDA_MAX_MG_LEVEL) {
+    if (level < 0 /* 1 */ || level >= QUDA_MAX_MG_LEVEL) { // ESW STAGGERED HACK
       printf("ERROR: invalid multigrid level %d for coarse solver", level);
       usage(argv);
     }

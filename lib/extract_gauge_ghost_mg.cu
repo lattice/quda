@@ -67,6 +67,12 @@ namespace quda {
       extractGhostMG<Float, 48>(u, Ghost, extract, offset);
     } else if (u.Ncolor() == 64) {
       extractGhostMG<Float, 64>(u, Ghost, extract, offset);
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (u.Ncolor() == 192) {
+      extractGhostMG<Float, 192>(u, Ghost, extract, offset);
+    } else if (u.Ncolor() == 256) {
+      extractGhostMG<Float, 256>(u, Ghost, extract, offset);
+#endif
     } else {
       errorQuda("Ncolor = %d not supported", u.Ncolor());
     }

@@ -19,6 +19,8 @@
 #include <mpi.h>
 #endif
 
+#include <qio_field.h>
+
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define mySpinorSiteSize 6
 
@@ -57,6 +59,8 @@ extern int ydim;
 extern int zdim;
 extern int tdim;
 extern int gridsize_from_cmdline[];
+
+extern char latfile[];
 
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
@@ -183,7 +187,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
 
   int
-invert_test(void)
+invert_test(int argc, char** argv)
 {
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -208,11 +212,35 @@ invert_test(void)
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
 
-  if (dslash_type == QUDA_LAPLACE_DSLASH) {
-    construct_gauge_field(qdp_fatlink, 0, gaugeParam.cpu_prec, &gaugeParam);
+  // FIX ME: Also add appropriate fat/long routines for asqtad
+  if (strcmp(latfile,"") != 0) {
+    if (dslash_type == QUDA_STAGGERED_DSLASH) {
+      void *inlinks=malloc(4*V*gaugeSiteSize*gSize);
+      void *inlink[4];
+
+      for (int dir = 0; dir < 4; dir++) {
+         inlink[dir] = (void*)((char*)inlinks + dir*V*gaugeSiteSize*gSize);
+      }
+
+      read_gauge_field(latfile, inlink, gaugeParam.cpu_prec, gaugeParam.X, argc, argv);
+      applyGaugeFieldScaling_long(inlink, Vh, &gaugeParam, dslash_type, gaugeParam.cpu_prec);
+      //construct_fat_long_gauge_field(inlink, nullptr, 3, gauge_param.cpu_prec, &gauge_param, dslash_type);
+      for (int dir = 0; dir < 4; dir++) {
+        memcpy(qdp_fatlink[dir], inlink[dir] , V*gaugeSiteSize*gSize);
+      }
+
+      free(inlinks);
+    } else {
+      errorQuda("staggered_invert_test only supports loading gauge fields for dslash_type = QUDA_STAGGERED_DSLASH\n");
+    }
   } else {
-    construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec,
-				   &gaugeParam, dslash_type);
+
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      construct_gauge_field(qdp_fatlink, 0, gaugeParam.cpu_prec, &gaugeParam);
+    } else {
+      construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec,
+  				   &gaugeParam, dslash_type);
+    }
   }
 
   for(int dir=0; dir<4; ++dir){
@@ -584,7 +612,7 @@ int main(int argc, char** argv)
   
   printfQuda("dslash_type = %d\n", dslash_type);
 
-  int ret = invert_test();
+  int ret = invert_test(argc, argv);
 
   // finalize the communications layer
   finalizeComms();

@@ -117,7 +117,7 @@ namespace quda {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 32) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-#ifdef QUDA_STAGGERED_DIRAC
+#ifdef GPU_STAGGERED_DIRAC
     } else if (coarseColor == 96) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 128) {
@@ -157,7 +157,7 @@ namespace quda {
       calculateYcoarse<Float,vFloat,24>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 32) {
       calculateYcoarse<Float,vFloat,32>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-#ifdef QUDA_STAGGERED_DIRAC
+#ifdef GPU_STAGGERED_DIRAC
     } else if (g.Ncolor()/T.Vectors().Nspin() == 96) {
       calculateYcoarse<Float,vFloat,96>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 128) {

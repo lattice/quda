@@ -64,6 +64,33 @@ namespace quda {
       }
     }
 
+    // ESW HACK GENERATE STAGGERED WITHOUT CORRECT INTERFACE
+    if (param.level == 0) {
+      // generate free field vectors
+      buildFreeVectors(param.B);
+    } else {
+      if (param.level < param.Nlevel-1) {
+        if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+          if (param.B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+            rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
+            rng->Init();
+          }
+
+          // Initializing to random vectors
+          for(int i=0; i<(int)param.B.size(); i++) {
+            if (param.B[i]->Location() == QUDA_CPU_FIELD_LOCATION) param.B[i]->Source(QUDA_RANDOM_SOURCE);
+            else spinorNoise(*param.B[i], *rng, QUDA_NOISE_UNIFORM);
+          }
+          generateNullVectors(param.B);
+        } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
+          loadVectors(param.B);
+        } else { // generate free field vectors
+          buildFreeVectors(param.B);
+        }
+      }
+    }
+
+#if 0 // ESW HACK
     // For staggered, check if we're doing a Kahler-Dirac transform on this
     // level
     if (param.is_kahler_dirac_prec) { 
@@ -92,6 +119,7 @@ namespace quda {
         buildFreeVectors(param.B);
       }
     }
+#endif
 
     // in case of iterative setup with MG the coarse level may be already built
     if (!transfer) reset();
@@ -534,7 +562,7 @@ namespace quda {
 
     QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
       ? param.mg_global.precision_null[param.level]  : csParam.Precision();
-    double tol = prec == QUDA_HALF_PRECISION ? 5e-3 : prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-10;
+    double tol = prec == QUDA_HALF_PRECISION ? 1e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-10;
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 

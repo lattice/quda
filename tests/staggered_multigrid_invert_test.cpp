@@ -192,7 +192,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 
   gauge_param.scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
 
-  gauge_param.t_boundary = QUDA_PERIODIC_T; //QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   gauge_param.type = QUDA_WILSON_LINKS;
 
   // QUDA_QDP_GAUGE_ORDER causes a segfault...
@@ -311,7 +311,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   // ESW hack
   mg_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;
   mg_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
-  mg_param.coarse_grid_solution_type[2] = QUDA_MAT_SOLUTION;
+  mg_param.coarse_grid_solution_type[2] = QUDA_MATPC_SOLUTION;
   mg_param.coarse_grid_solution_type[3] = QUDA_MAT_SOLUTION;
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
