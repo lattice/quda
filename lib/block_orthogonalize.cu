@@ -389,6 +389,7 @@ namespace quda {
 	  switch (geoBlockSize/2) {
 	  case   4: GPU<Rotator,Vector,  4>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x2x2x1 aggregates
 	  case   8: GPU<Rotator,Vector,  8>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x2x2x2 aggregates
+	  case  12: GPU<Rotator,Vector, 12>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x2x2x3 aggregates
 	  case  16: GPU<Rotator,Vector, 16>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x2x2x1 aggregates
 	  case  27: GPU<Rotator,Vector, 27>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 3x3x3x1 aggregates
 	  case  32: GPU<Rotator,Vector, 32>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x2x2 aggregates
