@@ -14,7 +14,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o inv_mre.o		\
 	interface_quda.o util_quda.o color_spinor_field.o		\
 	color_spinor_util.o cpu_color_spinor_field.o			\
-	color_spinor_wuppertal.o					\
+	color_spinor_wuppertal.o color_spinor_dilute.o			\
 	cuda_color_spinor_field.o dirac.o clover_field.o		\
 	lattice_field.o gauge_field.o cpu_gauge_field.o			\
 	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\

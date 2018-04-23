@@ -353,6 +353,13 @@ extern "C" {
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
 
+  typedef enum QudaDiluteType_s {
+    QUDA_DILUTE_COLOR,
+    QUDA_DILUTE_SPIN,
+    QUDA_DILUTE_SPIN_COLOR,
+    QUDA_DILUTE_INVALID = QUDA_INVALID_ENUM
+  } QudaDiluteType;
+
   typedef enum QudaNoiseType_s {
     QUDA_NOISE_GAUSS,
     QUDA_NOISE_UNIFORM,
