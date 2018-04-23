@@ -1968,6 +1968,79 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   popVerbosity();
 }
 
+void polyQuda(void *h_out, void *h_in, double *alpha, int n, QudaInvertParam *inv_param)
+{
+  pushVerbosity(inv_param->verbosity);
+
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
+
+  if (!initialized) errorQuda("QUDA not initialized");
+  if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
+  if (cloverPrecise == NULL && ((inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)))
+    errorQuda("Clover field not allocated");
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
+      inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), pc, inv_param->input_location);
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE){
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+
+  //  double kappa = inv_param->kappa;
+  //  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= gaugePrecise->anisotropy;
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc);
+
+  Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
+  dirac->MdagM(out, in); // apply the operator
+  delete dirac; // clean up
+
+  double kappa = inv_param->kappa;
+  if (pc) {
+    if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION) {
+      blas::ax(1.0/std::pow(2.0*kappa,4), out);
+    } else if (inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+      blas::ax(0.25/(kappa*kappa), out);
+    }
+  } else {
+    if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION ||
+        inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+      blas::ax(0.25/(kappa*kappa), out);
+    }
+  }
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  *out_h = out;
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE){
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  delete out_h;
+  delete in_h;
+
+  popVerbosity();
+}
+
 namespace quda{
 bool canReuseResidentGauge(QudaInvertParam *param){
   return (gaugePrecise != NULL) and param->cuda_prec == gaugePrecise->Precision();
@@ -4973,6 +5046,8 @@ void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatQuda(h_out, h_in, inv_param); }
 void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatDagMatQuda(h_out, h_in, inv_param); }
+void poly_quda_(void *h_out, void *h_in, double *alpha, int n, QudaInvertParam *inv_param)
+{ polyQuda(h_out, h_in, alpha, n, inv_param); }
 void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) {
   fflush(stdout);
   // ensure that fifth dimension is set to 1

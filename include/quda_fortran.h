@@ -147,6 +147,20 @@ extern "C" {
   void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param);
 
   /**
+   * Apply a polynomial using the fermion operator, e.g.,
+   *  out = P(M) in,
+   * where P(x) = (x - alpha_1)(x - alpha_2)...(x-alpha_n)is a
+   * factored polynomial of degree n with roots alpha
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param alpha  Array of roots
+   * @param n      Degree of polynomial
+   * @param param  Contains all metadata regarding host and device
+   *               storage
+   */
+  void poly_quda_(void *h_out, void *h_in, double *alpha, int n, QudaInvertParam *inv_param);
+
+  /**
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
    * loadGaugeQuda().

@@ -750,7 +750,7 @@ extern "C" {
    * @param parity The destination parity of the field
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity);
+                  QudaParity parity);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}) for 4D EO preconditioned DWF.
@@ -762,7 +762,7 @@ extern "C" {
    * @param test_type Choose a type of dslash operators
    */
   void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
+                       QudaParity parity, int test_type);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}) for Mobius DWF.
@@ -774,7 +774,7 @@ extern "C" {
    * @param test_type Choose a type of dslash operators
    */
   void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
+                       QudaParity parity, int test_type);
 
   /**
    * Apply the clover operator or its inverse.
@@ -786,7 +786,7 @@ extern "C" {
    * @param inverse Whether to apply the inverse of the clover term
    */
   void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity *parity, int inverse);
+                  QudaParity *parity, int inverse);
 
   /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.
@@ -806,6 +806,19 @@ extern "C" {
    */
   void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
 
+  /**
+   * Apply a polynomial using the fermion operator, e.g.,
+   *  out = P(M) in,
+   * where P(x) = (x - alpha_1)(x - alpha_2)...(x-alpha_n)is a
+   * factored polynomial of degree n with roots alpha
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param alpha  Array of roots
+   * @param n      Degree of polynomial
+   * @param param  Contains all metadata regarding host and device
+   *               storage
+   */
+  void polyQuda(void *h_out, void *h_in, double *alpha, int n, QudaInvertParam *inv_param);
 
   /*
    * The following routines are temporary additions used by the HISQ
@@ -813,8 +826,7 @@ extern "C" {
    */
 
   void set_dim(int *);
-  void pack_ghost(void **cpuLink, void **cpuGhost, int nFace,
-      QudaPrecision precision);
+  void pack_ghost(void **cpuLink, void **cpuGhost, int nFace, QudaPrecision precision);
 
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
