@@ -49,10 +49,18 @@ endif()
 #
 project("QUDA" VERSION 0.9.0)
 
+
+message(STATUS "")
+message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
+message(STATUS "cmake version: ${CMAKE_VERSION}")
+message(STATUS "Source location: ${CMAKE_SOURCE_DIR}")
+message(STATUS "Build location: ${CMAKE_BINARY_DIR}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "")
+
 if(NOT GITVERSION)
   set(GITVERSION ${PROJECT_VERSION})
 endif()
-
 
 #######################################################################
 # QUDA OPTIONS
@@ -232,6 +240,25 @@ find_package(Threads REQUIRED)
 
 if(QUDA_MPI OR QUDA_QMP)
   add_definitions(-DMULTI_GPU)
+
+  
+# if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line check for MPICXX and MPICC environment variables
+if(NOT MPI_CXX_COMPILER)
+  message("MPI ${MPI_CXX_COMPILER} $ENV{MPICXX}")
+endif()
+  if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
+    set(MPI_CXX_COMPILER $ENV{MPICXX})
+    set(mpimessage True)
+    message(STATUS "Found environment variable MPICXX. Using it for MPI detection: $ENV{MPICXX}")
+  endif()
+  if((NOT MPI_C_COMPILER) AND DEFINED ENV{MPICC})
+    message(STATUS "Found environment variable MPICC. Using it for MPI detection: $ENV{MPICC}")
+    set(MPI_C_COMPILER $ENV{MPICC})
+    set(mpimessage True)
+  endif() 
+  if(mpimessage)
+    message("Found MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation.")
+  endif()
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
@@ -534,16 +561,21 @@ add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 # NVCC FLAGS independet off build type
 if(NOT USING_CUDA_LANG_SUPPORT)
-  set(QUDA_NVCC_FLAGS -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+  set(QUDA_NVCC_FLAGS -Wno-deprecated-gpu-targets -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+  if(QUDA_VERBOSE_BUILD)
+    LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
+  endif(QUDA_VERBOSE_BUILD)
 else()
   set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
-  set(CMAKE_CUDA_FLAGS "-arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
+  set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
+  if(QUDA_VERBOSE_BUILD)
+      set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --ptxas-options=-v" CACHE STRING "Flags used by the CUDA compiler" FORCE)
+  endif(QUDA_VERBOSE_BUILD)
 endif()
 
 
-if(QUDA_VERBOSE_BUILD)
-  LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
-endif(QUDA_VERBOSE_BUILD)
+
+
 
 # some clang warnings shouds be warning even when turning warnings into errors
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -555,7 +587,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 ## define CUDA flags when CMake < 3.8
-set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
+set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_STRICT ${CUDA_NVCC_FLAGS_DEVEL} CACHE STRING
@@ -575,24 +607,19 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     FORCE )
 
 ## define CUDA flags when CMake >= 3.8
-set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo" CACHE STRING
-    "Flags used by the CUDA compiler during regular development builds."
-    FORCE )
+set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
+set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -lineinfo -O3 -Xcompiler  -O3 ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}" CACHE STRING
+    "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT "${CMAKE_CUDA_FLAGS_DEVEL}" CACHE STRING
-    "Flags used by the CUDA compiler during strict jenkins builds."
-    FORCE )
+    "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE "${QUDA_NVCC_FLAGS} -O3 -w" CACHE STRING
-    "Flags used by the CUDA compiler during release builds."
-    FORCE )
+    "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG" CACHE STRING
-    "Flags used by the C++ compiler during host-debug builds."
-    FORCE )
+    "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG "${QUDA_NVCC_FLAGS} -G" CACHE STRING
-    "Flags used by the C++ compiler during device-debug builds."
-    FORCE )
+    "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
-    "Flags used by the C++ compiler during full (host+device) debug builds."
-    FORCE )
+    "Flags used by the C++ compiler during full (host+device) debug builds." )
 
 #define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
@@ -626,24 +653,33 @@ set(CMAKE_C_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by default )
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
-mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
-mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
-
 mark_as_advanced(CUDA_NVCC_FLAGS_DEVEL)
 mark_as_advanced(CUDA_NVCC_FLAGS_STRICT)
+mark_as_advanced(CUDA_NVCC_FLAGS_RELEASE)
+mark_as_advanced(CUDA_NVCC_FLAGS_DEBUG)
 mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
 mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
-mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
-mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
-mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CUDA_FLAGS_DEVICEDEBUG)
 
-mark_as_advanced(CMAKE_C_FLAGS_DEVEL)
-mark_as_advanced(CMAKE_C_FLAGS_STRICT)
-mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
+mark_as_advanced(CUDA_CUDA_FLAGS_DEVEL)
+mark_as_advanced(CUDA_CUDA_FLAGS_STRICT)
+mark_as_advanced(CUDA_CUDA_FLAGS_RELEASE)
+mark_as_advanced(CUDA_CUDA_FLAGS_DEBUG)
+mark_as_advanced(CUDA_CUDA_FLAGS_HOSTDEBUG)
+mark_as_advanced(CUDA_CUDA_FLAGS_DEVICEDEBUG)
+
+mark_as_advanced(CUDA_CXX_FLAGS_DEVEL)
+mark_as_advanced(CUDA_CXX_FLAGS_STRICT)
+mark_as_advanced(CUDA_CXX_FLAGS_RELEASE)
+mark_as_advanced(CUDA_CXX_FLAGS_DEBUG)
+mark_as_advanced(CUDA_CXX_FLAGS_HOSTDEBUG)
+mark_as_advanced(CUDA_CXX_FLAGS_DEVICEDEBUG)
+
+mark_as_advanced(CUDA_C_FLAGS_DEVEL)
+mark_as_advanced(CUDA_C_FLAGS_STRICT)
+mark_as_advanced(CUDA_C_FLAGS_RELEASE)
+mark_as_advanced(CUDA_C_FLAGS_DEBUG)
+mark_as_advanced(CUDA_C_FLAGS_HOSTDEBUG)
+mark_as_advanced(CUDA_C_FLAGS_DEVICEDEBUG)
 
 mark_as_advanced(CMAKE_F_FLAGS)
 
