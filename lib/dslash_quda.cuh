@@ -428,6 +428,7 @@ public:
     dslashParam.ghost = (void*)in->Ghost2();
     dslashParam.ghostNorm = (float*)(in->Ghost2());
 
+#ifdef USE_TEXTURE_OBJECTS
     dslashParam.inTex = in->Tex();
     dslashParam.inTexNorm = in->TexNorm();
     dslashParam.ghostTex = in->GhostTex();
@@ -436,6 +437,7 @@ public:
     if (out) dslashParam.outTexNorm = out->TexNorm();
     if (x) dslashParam.xTex = x->Tex();
     if (x) dslashParam.xTexNorm = x->TexNorm();
+#endif
 
 #ifdef MULTI_GPU 
     fillAux(INTERIOR_KERNEL, "type=interior");
