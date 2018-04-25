@@ -179,7 +179,7 @@ QudaInvertParam newQudaInvertParam(void) {
   QudaInvertParam ret;
   QudaInvertParam *param=&ret;
 #elif defined CHECK_PARAM
-static void checkInvertParam(QudaInvertParam *param) {
+static void checkInvertParam(QudaInvertParam *param, void *out_ptr=nullptr, void *in_ptr=nullptr) {
 #else
 void printQudaInvertParam(QudaInvertParam *param) {
   printfQuda("QUDA Inverter Parameters:\n");
@@ -311,6 +311,18 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(input_location, QUDA_INVALID_FIELD_LOCATION);
   P(output_location, QUDA_INVALID_FIELD_LOCATION);
   P(clover_location, QUDA_INVALID_FIELD_LOCATION);
+#endif
+
+#ifdef CHECK_PARAM
+  if (in_ptr && quda::get_pointer_location(in_ptr) != param->input_location) {
+    warningQuda("input_location=%d, however supplied pointer is location=%d", param->input_location, quda::get_pointer_location(in_ptr));
+    param->input_location = quda::get_pointer_location(in_ptr);
+  }
+
+  if (out_ptr && quda::get_pointer_location(out_ptr) != param->output_location) {
+    warningQuda("output_location=%d, however supplied pointer is location=%d", param->output_location, quda::get_pointer_location(out_ptr));
+    param->output_location = quda::get_pointer_location(out_ptr);
+  }
 #endif
 
   P(gamma_basis, QUDA_INVALID_GAMMA_BASIS);

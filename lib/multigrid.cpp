@@ -315,7 +315,7 @@ namespace quda {
       if (param_coarse_solver) delete param_coarse_solver;
       param_coarse_solver = new SolverParam(param);
 
-      param_coarse_solver->inv_type = param.mg_global.coarse_solver[param.level];
+      param_coarse_solver->inv_type = param.mg_global.coarse_solver[param.level+1];
       param_coarse_solver->is_preconditioner = false;
       param_coarse_solver->sloppy_converge = true; // this means we don't check the true residual before declaring convergence
 
@@ -334,7 +334,9 @@ namespace quda {
       param_coarse_solver->mg_instance = true;
       param_coarse_solver->verbosity_precondition = param.mg_global.verbosity[param.level+1];
 
-      // need this to ensure we don't use half precision on the preconditioner in GCR
+      // preconditioned solver wrapper is uniform precision
+      param_coarse_solver->precision = r_coarse->Precision();
+      param_coarse_solver->precision_sloppy = param_coarse_solver->precision;
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
       if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {

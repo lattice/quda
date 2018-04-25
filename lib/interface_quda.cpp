@@ -2639,7 +2639,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
-  checkInvertParam(param);
+  checkInvertParam(param, hp_x, hp_b);
 
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
@@ -3023,7 +3023,7 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
-  checkInvertParam(param);
+  checkInvertParam(param, _hp_x[0], _hp_b[0]);
 
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
@@ -3369,7 +3369,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   if (!initialized) errorQuda("QUDA not initialized");
 
-  checkInvertParam(param);
+  checkInvertParam(param, _hp_x[0], _hp_b);
 
   // check the gauge fields have been created
   checkGauge(param);

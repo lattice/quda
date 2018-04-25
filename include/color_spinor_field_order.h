@@ -430,21 +430,19 @@ namespace quda {
 
     protected:
       complex<storeFloat> *v;
+      const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
+      Float scale;
+      Float scale_inv;
 #ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
       mutable float *ghost_norm[8];
-#endif
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
       const QudaGammaBasis gammaBasis;
-      const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
       const int siteSubset;
       const int nParity;
       const QudaFieldLocation location;
-      Float scale;
-      Float scale_inv;
-#ifndef DISABLE_GHOST
       const GhostAccessorCB<ghostFloat,nSpin,nColor,nVec,order> ghostAccessor;
       Float ghost_scale;
       Float ghost_scale_inv;
@@ -460,19 +458,17 @@ namespace quda {
        */
     FieldOrderCB(const ColorSpinorField &field, int nFace=1, void *v_=0, void **ghost_=0)
       : v(v_? static_cast<complex<storeFloat>*>(const_cast<void*>(v_))
-          : static_cast<complex<storeFloat>*>(const_cast<void*>(field.V()))),
-        volumeCB(field.VolumeCB()), nDim(field.Ndim()),
-        gammaBasis(field.GammaBasis()), accessor(field),
-        siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
-        location(field.Location()),
-        scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+	  : static_cast<complex<storeFloat>*>(const_cast<void*>(field.V()))),
+        accessor(field), scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
 #ifndef DISABLE_GHOST
-        , ghostAccessor(field,nFace),
+        , volumeCB(field.VolumeCB()), nDim(field.Ndim()), gammaBasis(field.GammaBasis()),
+	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
+        location(field.Location()), ghostAccessor(field,nFace),
         ghost_scale(static_cast<Float>(1.0)), ghost_scale_inv(static_cast<Float>(1.0))
 #endif
       {
-        for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
 #ifndef DISABLE_GHOST
+        for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
         resetGhost(field, ghost_ ? ghost_ : field.Ghost());
 #endif
         resetScale(field.Scale());
@@ -481,24 +477,6 @@ namespace quda {
         if (!disable_ghost) errorQuda("DISABLE_GHOST macro set but corresponding disable_ghost template not set");
 #endif
       }
-
-#ifdef CUDA_CXX_ARRAY_WAR
-    /**
-     * Default constructor for the FieldOrderCB class.  This is only
-     * exposed for CUDA 7 which cannot handle C++ array initialization
-     * from a parameter pack, so with this enabled we enable the GPU
-     * compiler to see the default constructor.  Enabled
-     * block_orthogonalize.cu.
-     */
-    FieldOrderCB()
-    : v(nullptr), volumeCB(0), nDim(0), gammaBasis(QUDA_INVALID_GAMMA_BASIS),
-      siteSubset(QUDA_INVALID_SITE_SUBSET), nParity(0), location(QUDA_INVALID_FIELD_LOCATION),
-      scale(static_cast<Float>(0.0)), scale_inv(static_cast<Float>(0.0))
-#ifndef DISABLE_GHOST
-      , ghost_scale(static_cast<Float>(0.0)), ghost_scale_inv(static_cast<Float>(0.0))
-#endif
-      {  }
-#endif
 
       /**
        * Destructor for the FieldOrderCB class
@@ -606,7 +584,6 @@ namespace quda {
               block_float_ghost ? ghost_scale_inv*max : ghost_scale_inv);
 
       }
-#endif
 
       /**
    Convert from 1-dimensional index to the n-dimensional spatial index.
@@ -663,6 +640,7 @@ namespace quda {
 
       /** Return the length of dimension d */
       __device__ __host__ inline const int* X() const { return x; }
+#endif
 
       /** Returns the number of field colors */
        __device__ __host__ inline int Ncolor() const { return nColor; }
@@ -670,6 +648,10 @@ namespace quda {
       /** Returns the number of field spins */
       __device__ __host__ inline int Nspin() const { return nSpin; }
 
+      /** Returns the number of packed vectors (for mg prolongator) */
+      __device__ __host__ inline int Nvec() const { return nVec; }
+
+#ifndef DISABLE_GHOST
       /** Returns the number of field parities (1 or 2) */
       __device__ __host__ inline int Nparity() const { return nParity; }
 
@@ -681,9 +663,6 @@ namespace quda {
 
       /** Returns the field geometric dimension */
       __device__ __host__ inline QudaGammaBasis GammaBasis() const { return gammaBasis; }
-
-      /** Returns the number of packed vectors (for mg prolongator) */
-      __device__ __host__ inline int Nvec() const { return nVec; }
 
       /**
        * Returns the L2 norm squared of the field in a given dimension
@@ -727,6 +706,7 @@ namespace quda {
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }
+#endif
     };
 
     /**

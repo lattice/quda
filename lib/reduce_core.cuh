@@ -232,13 +232,6 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
 
   checkLength(x, y); checkLength(x, z); checkLength(x, w); checkLength(x, v);
 
-  if (!x.isNative() && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION) ) {
-    warningQuda("Device reductions on non-native fields is not supported\n");
-    doubleN value;
-    ::quda::zero(value);
-    return value;
-  }
-
   blasStrings.vol_str = x.VolString();
   strcpy(blasStrings.aux_tmp, x.AuxString());
   if (typeid(StoreType) != typeid(zType)) {
