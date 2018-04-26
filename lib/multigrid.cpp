@@ -430,7 +430,7 @@ namespace quda {
 
       param_coarse_solver->preserve_source = QUDA_PRESERVE_SOURCE_YES;  // or can this be no
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
-      param_coarse_solver->Nkrylov = 20;
+      param_coarse_solver->Nkrylov = (param_coarse_solver->inv_type == QUDA_BICGSTABL_INVERTER) ? 6 : 20;
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
       param_coarse_solver->global_reduction = true;
       param_coarse_solver->compute_true_res = false;

@@ -311,7 +311,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   // ESW hack
   mg_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;
   mg_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
-  mg_param.coarse_grid_solution_type[2] = QUDA_MATPC_SOLUTION;
+  mg_param.coarse_grid_solution_type[2] = QUDA_MAT_SOLUTION;
   mg_param.coarse_grid_solution_type[3] = QUDA_MAT_SOLUTION;
 
   // coarsening the spin on the first restriction is undefined for staggered fields.

@@ -416,6 +416,8 @@ namespace quda {
       genericPackGhost<Float,ghostFloat,order,Ns,72>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 96) {
       genericPackGhost<Float,ghostFloat,order,Ns,96>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 128) {
+      genericPackGhost<Float,ghostFloat,order,Ns,128>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 256) {
       genericPackGhost<Float,ghostFloat,order,Ns,256>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 576) {
@@ -504,17 +506,21 @@ namespace quda {
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
       if (a.GhostPrecision() == QUDA_SINGLE_PRECISION) {
 	genericPackGhost<float,float>(ghost, a, parity, nFace, dagger, destination);
+#if 0 // ESW COMPILE TIME
       } else if (a.GhostPrecision() == QUDA_HALF_PRECISION) {
 	genericPackGhost<float,short>(ghost, a, parity, nFace, dagger, destination);
+#endif
       } else {
 	errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
       }
+#if 0 // ESW COMPILE TIME
     } else if (a.Precision() == QUDA_HALF_PRECISION) {
       if (a.GhostPrecision() == QUDA_HALF_PRECISION) {
 	genericPackGhost<short,short>(ghost, a, parity, nFace, dagger, destination);
       } else {
 	errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
       }
+#endif
     } else {
       errorQuda("Unsupported precision %d", a.Precision());
     }
