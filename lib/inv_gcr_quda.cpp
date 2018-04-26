@@ -197,7 +197,7 @@ namespace quda {
     nKrylov(param.Nkrylov), init(false), rp(nullptr), yp(nullptr), tmpp(nullptr), y_sloppy(nullptr),
     r_sloppy(nullptr)
   {
-    p.resize(nKrylov);
+    p.resize(nKrylov+1);
     Ap.resize(nKrylov);
 
     alpha = new Complex[nKrylov];
@@ -220,10 +220,8 @@ namespace quda {
       if (r_sloppy && r_sloppy != rp) delete r_sloppy;
     }
 
-    for (int i=0; i<nKrylov; i++) {
-      if (p[i]) delete p[i];
-      if (Ap[i]) delete Ap[i];
-    }
+    for (int i=0; i<nKrylov+1; i++) if (p[i]) delete p[i];
+    for (int i=0; i<nKrylov; i++) if (Ap[i]) delete Ap[i];
 
     if (tmpp) delete tmpp;
     if (rp) delete rp;
@@ -252,10 +250,8 @@ namespace quda {
 
       // create sloppy fields used for orthogonalization
       csParam.setPrecision(param.precision_sloppy);
-      for (int i=0; i<nKrylov; i++) {
-	p[i] = ColorSpinorField::Create(csParam);
-	Ap[i] = ColorSpinorField::Create(csParam);
-      }
+      for (int i=0; i<nKrylov+1; i++) p[i] = ColorSpinorField::Create(csParam);
+      for (int i=0; i<nKrylov; i++) Ap[i] = ColorSpinorField::Create(csParam);
 
       csParam.setPrecision(param.precision_sloppy);
       tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
@@ -384,7 +380,7 @@ namespace quda {
       alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[(k+1)%nKrylov]);
+      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[k+1]);
 
       k++;
       total_iter++;
@@ -395,7 +391,7 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       if (k==nKrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
-	// update the solution vector
+        // update the solution vector
 	updateSolution(ySloppy, alpha, beta, gamma, k, p);
 
 	// recalculate residual in high precision
