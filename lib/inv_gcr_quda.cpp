@@ -182,7 +182,7 @@ namespace quda {
     else 
       errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
 
-    p.resize(nKrylov);
+    p.resize(nKrylov+1);
     Ap.resize(nKrylov);
 
     alpha = new Complex[nKrylov];
@@ -343,6 +343,8 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
+    int k_break = 0;
+
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
@@ -417,6 +419,7 @@ namespace quda {
 	  resIncrease = 0;
 	}
 
+        k_break = k;
 	k = 0;
 
 	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
@@ -460,6 +463,10 @@ namespace quda {
 	param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
       else
 	param.true_res_hq = 0.0;
+
+      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
+    } else {
+      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, K ? rSloppy : *p[k_break]);
     }
 
     param.gflops += gflops;
