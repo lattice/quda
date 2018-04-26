@@ -233,6 +233,12 @@ namespace quda {
 
   void GCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
+    if (nKrylov == 0) {
+      // Krylov space is zero-dimensional so return doing no work
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      return;
+    }
+
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     if (!init) {
