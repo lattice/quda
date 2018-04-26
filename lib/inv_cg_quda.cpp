@@ -124,8 +124,8 @@ namespace quda {
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
-    if (x.Precision() != param.precision || b.Precision() != param.precision)
-      errorQuda("Precision mismatch");
+    if (checkPrecision(x, b) != param.precision)
+      errorQuda("Precision mismatch: expected=%d, received=%d", param.precision, x.Precision());
 
 
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
