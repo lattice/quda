@@ -1302,7 +1302,7 @@ namespace quda {
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial rhs = %g\n", norm2(*b));
-
+        printfQuda("Launching solver for null-space vector %d of %d\n", i+1, (int)B.size());
         ColorSpinorField *out=nullptr, *in=nullptr;
         diracSmoother->prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
         (*solve)(*out, *in);
