@@ -283,6 +283,7 @@ namespace quda {
       if(param.smoother == QUDA_CGNE_INVERTER) param_presmooth->inv_type = QUDA_MR_INVERTER;
 
       param_postsmooth->maxiter = param.nu_post;
+      param_postsmooth->Nkrylov = param_postsmooth->maxiter;
 
       // we never need to compute the true residual for a post smoother
       param_postsmooth->compute_true_res = false;
