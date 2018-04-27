@@ -32,6 +32,7 @@ extern int test_type;
 
 extern QudaPrecision prec;
 extern QudaPrecision prec_sloppy;
+extern QudaPrecision smoother_halo_prec;
 
 extern void usage(char** );
 
@@ -249,6 +250,7 @@ int main(int argc, char** argv)
     initFields(prec);
 
     DiracParam param;
+    param.halo_precision = smoother_halo_prec;
     dirac = new DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d);
 
     // do the initial tune

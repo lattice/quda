@@ -87,6 +87,7 @@ namespace quda {
     case QUDA_DOUBLE_PRECISION:
     case QUDA_SINGLE_PRECISION:
     case QUDA_HALF_PRECISION:
+    case QUDA_QUARTER_PRECISION:
       break;
     default:
       errorQuda("Unknown precision %d", precision);

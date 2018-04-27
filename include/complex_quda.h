@@ -705,6 +705,52 @@ public:
     __host__ __device__ inline complex<double>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
 };
 
+template<>
+struct complex <char> : public char2
+{
+public:
+  typedef char value_type;
+
+  __host__ __device__ inline complex<char>(){};
+
+  __host__ __device__ inline complex<char>(const char & re, const char& im = float())
+    {
+      real(re);
+      imag(im);
+    }
+
+  __host__ __device__ inline complex<char>(const complex<char> & z) : char2(z){}
+
+  __host__ __device__ inline complex<char>& operator+=(const complex<char> z)
+    {
+      real(real()+z.real());
+      imag(imag()+z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline complex<char>& operator-=(const complex<char> z)
+    {
+      real(real()-z.real());
+      imag(imag()-z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline char real() const volatile{ return x; }
+  __host__ __device__ inline char imag() const volatile{ return y; }
+  __host__ __device__ inline char real() const{ return x; }
+  __host__ __device__ inline char imag() const{ return y; }
+  __host__ __device__ inline void real(char re)volatile{ x = re; }
+  __host__ __device__ inline void imag(char im)volatile{ y = im; }
+  __host__ __device__ inline void real(char re){ x = re; }
+  __host__ __device__ inline void imag(char im){ y = im; }
+
+  // cast operators
+  inline operator std::complex<char>() const { return std::complex<char>(real(),imag()); }
+  template <typename T>
+  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
+
+};
+
 
 template<>
 struct complex <short> : public short2

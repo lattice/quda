@@ -95,7 +95,52 @@
   I5.x *= C; I5.y *= C;	I5.z *= C; I5.w *= C;					     
 
 #define READ_SPINOR_HALF_DOWN(spinor, stride, sp_idx, norm_idx)	\
-  READ_SPINOR_HALF_DOWN_(spinor, stride, sp_idx, norm_idx)		
+  READ_SPINOR_HALF_DOWN_(spinor, stride, sp_idx, norm_idx)	
+
+#define READ_SPINOR_QUARTER_(spinor_, stride, sp_idx, norm_idx)     \
+  char4 *spinor = (char4*)spinor_;           \
+  float4 I0 = char42float4(spinor[sp_idx + 0*(stride)]);    \
+  float4 I1 = char42float4(spinor[sp_idx + 1*(stride)]);    \
+  float4 I2 = char42float4(spinor[sp_idx + 2*(stride)]);    \
+  float4 I3 = char42float4(spinor[sp_idx + 3*(stride)]);    \
+  float4 I4 = char42float4(spinor[sp_idx + 4*(stride)]);    \
+  float4 I5 = char42float4(spinor[sp_idx + 5*(stride)]);    \
+  float C = (spinor_ ## Norm)[norm_idx];         \
+  I0.x *= C; I0.y *= C; I0.z *= C; I0.w *= C;        \
+  I1.x *= C; I1.y *= C; I1.z *= C; I1.w *= C;        \
+  I2.x *= C; I2.y *= C; I2.z *= C; I2.w *= C;        \
+  I3.x *= C; I3.y *= C; I3.z *= C; I3.w *= C;        \
+  I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;        \
+  I5.x *= C; I5.y *= C; I5.z *= C; I5.w *= C;              
+
+#define READ_SPINOR_QUARTER(spinor, stride, sp_idx, norm_idx)     \
+  READ_SPINOR_QUARTER_(spinor, stride, sp_idx, norm_idx)      
+
+#define READ_SPINOR_QUARTER_UP_(spinor_, stride, sp_idx, norm_idx)       \
+  char4 *spinor = (char4*)spinor_;              \
+  float4 I0 = char42float4(spinor[sp_idx + 0*(stride)]);       \
+  float4 I1 = char42float4(spinor[sp_idx + 1*(stride)]);       \
+  float4 I2 = char42float4(spinor[sp_idx + 2*(stride)]);       \
+  float C = (spinor_ ## Norm)[norm_idx];              \
+  I0.x *= C; I0.y *= C; I0.z *= C; I0.w *= C;           \
+  I1.x *= C; I1.y *= C; I1.z *= C; I1.w *= C;           \
+  I2.x *= C; I2.y *= C; I2.z *= C; I2.w *= C;           \
+
+#define READ_SPINOR_QUARTER_UP(spinor, stride, sp_idx, norm_idx) \
+  READ_SPINOR_QUARTER_UP_(spinor, stride, sp_idx, norm_idx)    
+
+#define READ_SPINOR_QUARTER_DOWN_(spinor_, stride, sp_idx, norm_idx) \
+  char4 *spinor = (char4*)spinor_;          \
+  float4 I3 = char42float4(spinor[sp_idx + 3*stride]);     \
+  float4 I4 = char42float4(spinor[sp_idx + 4*stride]);     \
+  float4 I5 = char42float4(spinor[sp_idx + 5*stride]);     \
+  float C = (spinor_ ## Norm)[norm_idx];        \
+  I3.x *= C; I3.y *= C; I3.z *= C; I3.w *= C;       \
+  I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;       \
+  I5.x *= C; I5.y *= C; I5.z *= C; I5.w *= C;              
+
+#define READ_SPINOR_QUARTER_DOWN(spinor, stride, sp_idx, norm_idx) \
+  READ_SPINOR_QUARTER_DOWN_(spinor, stride, sp_idx, norm_idx)    
 
 #define READ_ACCUM_DOUBLE(spinor_, stride)   \
   double2 *spinor = (double2*)spinor_;	     \
@@ -138,6 +183,24 @@
   accum5.x *= C; accum5.y *= C;	accum5.z *= C; accum5.w *= C;					     
 
 #define READ_ACCUM_HALF(spinor, stride) READ_ACCUM_HALF_(spinor, stride)
+
+#define READ_ACCUM_QUARTER_(spinor_, stride)        \
+  char4 *spinor = (char4*)spinor_;           \
+  float4 accum0 = char42float4(spinor[sid + 0*stride]);     \
+  float4 accum1 = char42float4(spinor[sid + 1*stride]);     \
+  float4 accum2 = char42float4(spinor[sid + 2*stride]);     \
+  float4 accum3 = char42float4(spinor[sid + 3*stride]);     \
+  float4 accum4 = char42float4(spinor[sid + 4*stride]);     \
+  float4 accum5 = char42float4(spinor[sid + 5*stride]);     \
+  float C = (spinor_ ## Norm)[sid];          \
+  accum0.x *= C; accum0.y *= C; accum0.z *= C; accum0.w *= C;      \
+  accum1.x *= C; accum1.y *= C; accum1.z *= C; accum1.w *= C;      \
+  accum2.x *= C; accum2.y *= C; accum2.z *= C; accum2.w *= C;      \
+  accum3.x *= C; accum3.y *= C; accum3.z *= C; accum3.w *= C;      \
+  accum4.x *= C; accum4.y *= C; accum4.z *= C; accum4.w *= C;      \
+  accum5.x *= C; accum5.y *= C; accum5.z *= C; accum5.w *= C;              
+
+#define READ_ACCUM_QUARTER(spinor, stride) READ_ACCUM_QUARTER_(spinor, stride)
 
 #define READ_SPINOR_DOUBLE_TEX(spinor, stride, sp_idx, norm_idx)	\
   double2 I0 = fetch_double2((spinor), sp_idx + 0*(stride));   \
@@ -243,6 +306,13 @@
 #define READ_SPINOR_HALF_DOWN_TEX(spinor, stride, sp_idx, norm_idx)	\
   READ_SPINOR_HALF_DOWN_TEX_(spinor, stride, sp_idx, norm_idx)	\
 
+#define READ_SPINOR_QUARTER_TEX_ READ_SPINOR_HALF_TEX_
+#define READ_SPINOR_QUARTER_TEX READ_SPINOR_HALF_TEX
+#define READ_SPINOR_QUARTER_UP_TEX_ READ_SPINOR_HALF_UP_TEX_
+#define READ_SPINOR_QUARTER_UP_TEX READ_SPINOR_HALF_UP_TEX
+#define READ_SPINOR_QUARTER_DOWN_TEX_ READ_SPINOR_HALF_DOWN_TEX_
+#define READ_SPINOR_QUARTER_DOWN_TEX READ_SPINOR_HALF_DOWN_TEX
+
 #define READ_ACCUM_SINGLE_TEX(spinor, stride)			\
   float4 accum0 = TEX1DFETCH(float4, (spinor), sid + 0*(stride));	\
   float4 accum1 = TEX1DFETCH(float4, (spinor), sid + 1*(stride));	\
@@ -267,6 +337,10 @@
   accum5.x *= C; accum5.y *= C;	accum5.z *= C; accum5.w *= C;					     
 
 #define READ_ACCUM_HALF_TEX(spinor, stride) READ_ACCUM_HALF_TEX_(spinor, stride)
+
+#define READ_ACCUM_QUARTER_TEX_(spinor, stride) READ_ACCUM_HALF_TEX_(spinor, stride)
+
+#define READ_ACCUM_QUARTER_TEX(spinor, stride) READ_ACCUM_QUARTER_TEX_(spinor, stride)
 
 
 #define WRITE_SPINOR_DOUBLE2(stride)			   \
@@ -319,7 +393,7 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   param.outNorm[sid] = c0;							\
-  float scale = __fdividef(MAX_SHORT, c0);				\
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale;	\
   o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale;	\
@@ -332,6 +406,46 @@
   out[sid+3*(stride)] = make_short4(f2i(o20_re), f2i(o20_im), f2i(o21_re), f2i(o21_im)); \
   out[sid+4*(stride)] = make_short4(f2i(o22_re), f2i(o22_im), f2i(o30_re), f2i(o30_im)); \
   out[sid+5*(stride)] = make_short4(f2i(o31_re), f2i(o31_im), f2i(o32_re), f2i(o32_im));
+
+#define WRITE_SPINOR_CHAR4(stride)         \
+  char4 *out = (char4*)param.out;           \
+  float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));     \
+  float c1 = fmaxf(fabsf(o01_re), fabsf(o02_im));     \
+  float c2 = fmaxf(fabsf(o02_re), fabsf(o01_im));     \
+  float c3 = fmaxf(fabsf(o10_re), fabsf(o10_im));     \
+  float c4 = fmaxf(fabsf(o11_re), fabsf(o11_im));     \
+  float c5 = fmaxf(fabsf(o12_re), fabsf(o12_im));     \
+  float c6 = fmaxf(fabsf(o20_re), fabsf(o20_im));     \
+  float c7 = fmaxf(fabsf(o21_re), fabsf(o21_im));     \
+  float c8 = fmaxf(fabsf(o22_re), fabsf(o22_im));     \
+  float c9 = fmaxf(fabsf(o30_re), fabsf(o30_im));     \
+  float c10 = fmaxf(fabsf(o31_re), fabsf(o31_im));      \
+  float c11 = fmaxf(fabsf(o32_re), fabsf(o32_im));      \
+  c0 = fmaxf(c0, c1);             \
+  c1 = fmaxf(c2, c3);             \
+  c2 = fmaxf(c4, c5);             \
+  c3 = fmaxf(c6, c7);             \
+  c4 = fmaxf(c8, c9);             \
+  c5 = fmaxf(c10, c11);             \
+  c0 = fmaxf(c0, c1);             \
+  c1 = fmaxf(c2, c3);             \
+  c2 = fmaxf(c4, c5);             \
+  c0 = fmaxf(c0, c1);             \
+  c0 = fmaxf(c0, c2);             \
+  param.outNorm[sid] = c0;              \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);        \
+  o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale; \
+  o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale; \
+  o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale; \
+  o20_re *= scale; o20_im *= scale; o21_re *= scale; o21_im *= scale; \
+  o22_re *= scale; o22_im *= scale; o30_re *= scale; o30_im *= scale; \
+  o31_re *= scale; o31_im *= scale; o32_re *= scale; o32_im *= scale; \
+  out[sid+0*(stride)] = make_char4(f2i(o00_re), f2i(o00_im), f2i(o01_re), f2i(o01_im)); \
+  out[sid+1*(stride)] = make_char4(f2i(o02_re), f2i(o02_im), f2i(o10_re), f2i(o10_im)); \
+  out[sid+2*(stride)] = make_char4(f2i(o11_re), f2i(o11_im), f2i(o12_re), f2i(o12_im)); \
+  out[sid+3*(stride)] = make_char4(f2i(o20_re), f2i(o20_im), f2i(o21_re), f2i(o21_im)); \
+  out[sid+4*(stride)] = make_char4(f2i(o22_re), f2i(o22_im), f2i(o30_re), f2i(o30_im)); \
+  out[sid+5*(stride)] = make_char4(f2i(o31_re), f2i(o31_im), f2i(o32_re), f2i(o32_im));
 
 #define WRITE_SPINOR_DOUBLE2_STR(stride)			\
   double2 *out = (double2*)param.out;				\
@@ -383,7 +497,7 @@
   c0 = fmaxf(c0, c1);					\
   c0 = fmaxf(c0, c2);					\
   param.outNorm[sid] = c0;					\
-  float scale = __fdividef(MAX_SHORT, c0);			    \
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);			    \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale;	\
   o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale;	\
@@ -396,6 +510,46 @@
   store_streaming_short4(&out[3*(stride)+sid], f2i(o20_re), f2i(o20_im), f2i(o21_re), f2i(o21_im)); \
   store_streaming_short4(&out[4*(stride)+sid], f2i(o22_re), f2i(o22_im), f2i(o30_re), f2i(o30_im)); \
   store_streaming_short4(&out[5*(stride)+sid], f2i(o31_re), f2i(o31_im), f2i(o32_re), f2i(o32_im));
+
+#define WRITE_SPINOR_CHAR4_STR(stride)     \
+  char4 *out = (char4*)param.out;     \
+  float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im)); \
+  float c1 = fmaxf(fabsf(o01_re), fabsf(o02_im)); \
+  float c2 = fmaxf(fabsf(o02_re), fabsf(o01_im)); \
+  float c3 = fmaxf(fabsf(o10_re), fabsf(o10_im)); \
+  float c4 = fmaxf(fabsf(o11_re), fabsf(o11_im)); \
+  float c5 = fmaxf(fabsf(o12_re), fabsf(o12_im)); \
+  float c6 = fmaxf(fabsf(o20_re), fabsf(o20_im)); \
+  float c7 = fmaxf(fabsf(o21_re), fabsf(o21_im)); \
+  float c8 = fmaxf(fabsf(o22_re), fabsf(o22_im)); \
+  float c9 = fmaxf(fabsf(o30_re), fabsf(o30_im)); \
+  float c10 = fmaxf(fabsf(o31_re), fabsf(o31_im));  \
+  float c11 = fmaxf(fabsf(o32_re), fabsf(o32_im));  \
+  c0 = fmaxf(c0, c1);         \
+  c1 = fmaxf(c2, c3);         \
+  c2 = fmaxf(c4, c5);         \
+  c3 = fmaxf(c6, c7);         \
+  c4 = fmaxf(c8, c9);         \
+  c5 = fmaxf(c10, c11);         \
+  c0 = fmaxf(c0, c1);         \
+  c1 = fmaxf(c2, c3);         \
+  c2 = fmaxf(c4, c5);         \
+  c0 = fmaxf(c0, c1);         \
+  c0 = fmaxf(c0, c2);         \
+  param.outNorm[sid] = c0;          \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);          \
+  o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale; \
+  o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale; \
+  o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale; \
+  o20_re *= scale; o20_im *= scale; o21_re *= scale; o21_im *= scale; \
+  o22_re *= scale; o22_im *= scale; o30_re *= scale; o30_im *= scale; \
+  o31_re *= scale; o31_im *= scale; o32_re *= scale; o32_im *= scale; \
+  store_streaming_char4(&out[0*(stride)+sid], f2i(o00_re), f2i(o00_im), f2i(o01_re), f2i(o01_im)); \
+  store_streaming_char4(&out[1*(stride)+sid], f2i(o02_re), f2i(o02_im), f2i(o10_re), f2i(o10_im)); \
+  store_streaming_char4(&out[2*(stride)+sid], f2i(o11_re), f2i(o11_im), f2i(o12_re), f2i(o12_im)); \
+  store_streaming_char4(&out[3*(stride)+sid], f2i(o20_re), f2i(o20_im), f2i(o21_re), f2i(o21_im)); \
+  store_streaming_char4(&out[4*(stride)+sid], f2i(o22_re), f2i(o22_im), f2i(o30_re), f2i(o30_im)); \
+  store_streaming_char4(&out[5*(stride)+sid], f2i(o31_re), f2i(o31_im), f2i(o32_re), f2i(o32_im));
 
 // macros used for exterior Wilson Dslash kernels and face packing
 
@@ -427,13 +581,34 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   outNorm[sid] = c0;							\
-  float scale = __fdividef(MAX_SHORT, c0);				\
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   a0_re *= scale; a0_im *= scale; a1_re *= scale; a1_im *= scale;	\
   a2_re *= scale; a2_im *= scale; b0_re *= scale; b0_im *= scale;	\
   b1_re *= scale; b1_im *= scale; b2_re *= scale; b2_im *= scale;	\
   out[sid+0*(stride)] = make_short4(f2i(a0_re), f2i(a0_im), f2i(a1_re), f2i(a1_im)); \
   out[sid+1*(stride)] = make_short4(f2i(a2_re), f2i(a2_im), f2i(b0_re), f2i(b0_im)); \
   out[sid+2*(stride)] = make_short4(f2i(b1_re), f2i(b1_im), f2i(b2_re), f2i(b2_im));
+
+#define WRITE_HALF_SPINOR_CHAR4(stride, sid)       \
+  float c0 = fmaxf(fabsf(a0_re), fabsf(a0_im));       \
+  float c1 = fmaxf(fabsf(a1_re), fabsf(a1_im));       \
+  float c2 = fmaxf(fabsf(a2_re), fabsf(a2_im));       \
+  float c3 = fmaxf(fabsf(b0_re), fabsf(b0_im));       \
+  float c4 = fmaxf(fabsf(b1_re), fabsf(b1_im));       \
+  float c5 = fmaxf(fabsf(b2_re), fabsf(b2_im));       \
+  c0 = fmaxf(c0, c1);             \
+  c1 = fmaxf(c2, c3);             \
+  c2 = fmaxf(c4, c5);             \
+  c0 = fmaxf(c0, c1);             \
+  c0 = fmaxf(c0, c2);             \
+  outNorm[sid] = c0;              \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);        \
+  a0_re *= scale; a0_im *= scale; a1_re *= scale; a1_im *= scale; \
+  a2_re *= scale; a2_im *= scale; b0_re *= scale; b0_im *= scale; \
+  b1_re *= scale; b1_im *= scale; b2_re *= scale; b2_im *= scale; \
+  out[sid+0*(stride)] = make_char4(f2i(a0_re), f2i(a0_im), f2i(a1_re), f2i(a1_im)); \
+  out[sid+1*(stride)] = make_char4(f2i(a2_re), f2i(a2_im), f2i(b0_re), f2i(b0_im)); \
+  out[sid+2*(stride)] = make_char4(f2i(b1_re), f2i(b1_im), f2i(b2_re), f2i(b2_im));
 
 //!ndeg tm:
 /******************used by non-degenerate twisted mass**********************/
@@ -507,7 +682,7 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   param.outNorm[sid] = c0;							\
-  float scale = __fdividef(MAX_SHORT, c0);				\
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   o1_00_re *= scale; o1_00_im *= scale; o1_01_re *= scale; o1_01_im *= scale;	\
   o1_02_re *= scale; o1_02_im *= scale; o1_10_re *= scale; o1_10_im *= scale;	\
   o1_11_re *= scale; o1_11_im *= scale; o1_12_re *= scale; o1_12_im *= scale;	\
@@ -544,7 +719,7 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   param.outNorm[sid+param.fl_stride] = c0;							\
-  scale = __fdividef(MAX_SHORT, c0);				\
+  scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   o2_00_re *= scale; o2_00_im *= scale; o2_01_re *= scale; o2_01_im *= scale;	\
   o2_02_re *= scale; o2_02_im *= scale; o2_10_re *= scale; o2_10_im *= scale;	\
   o2_11_re *= scale; o2_11_im *= scale; o2_12_re *= scale; o2_12_im *= scale;	\
@@ -557,6 +732,83 @@
   out[sid+param.fl_stride+3*(param.sp_stride)] = make_short4(f2i(o2_20_re), f2i(o2_20_im), f2i(o2_21_re), f2i(o2_21_im)); \
   out[sid+param.fl_stride+4*(param.sp_stride)] = make_short4(f2i(o2_22_re), f2i(o2_22_im), f2i(o2_30_re), f2i(o2_30_im)); \
   out[sid+param.fl_stride+5*(param.sp_stride)] = make_short4(f2i(o2_31_re), f2i(o2_31_im), f2i(o2_32_re), f2i(o2_32_im));
+
+#define WRITE_FLAVOR_SPINOR_CHAR4()          \
+  char4 *out = (char4*)param.out;         \
+  float c0 = fmaxf(fabsf(o1_00_re), fabsf(o1_00_im));     \
+  float c1 = fmaxf(fabsf(o1_01_re), fabsf(o1_02_im));     \
+  float c2 = fmaxf(fabsf(o1_02_re), fabsf(o1_01_im));     \
+  float c3 = fmaxf(fabsf(o1_10_re), fabsf(o1_10_im));     \
+  float c4 = fmaxf(fabsf(o1_11_re), fabsf(o1_11_im));     \
+  float c5 = fmaxf(fabsf(o1_12_re), fabsf(o1_12_im));     \
+  float c6 = fmaxf(fabsf(o1_20_re), fabsf(o1_20_im));     \
+  float c7 = fmaxf(fabsf(o1_21_re), fabsf(o1_21_im));     \
+  float c8 = fmaxf(fabsf(o1_22_re), fabsf(o1_22_im));     \
+  float c9 = fmaxf(fabsf(o1_30_re), fabsf(o1_30_im));     \
+  float c10 = fmaxf(fabsf(o1_31_re), fabsf(o1_31_im));      \
+  float c11 = fmaxf(fabsf(o1_32_re), fabsf(o1_32_im));      \
+  c0 = fmaxf(c0, c1);             \
+  c1 = fmaxf(c2, c3);             \
+  c2 = fmaxf(c4, c5);             \
+  c3 = fmaxf(c6, c7);             \
+  c4 = fmaxf(c8, c9);             \
+  c5 = fmaxf(c10, c11);             \
+  c0 = fmaxf(c0, c1);             \
+  c1 = fmaxf(c2, c3);             \
+  c2 = fmaxf(c4, c5);             \
+  c0 = fmaxf(c0, c1);             \
+  c0 = fmaxf(c0, c2);             \
+  param.outNorm[sid] = c0;              \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);        \
+  o1_00_re *= scale; o1_00_im *= scale; o1_01_re *= scale; o1_01_im *= scale; \
+  o1_02_re *= scale; o1_02_im *= scale; o1_10_re *= scale; o1_10_im *= scale; \
+  o1_11_re *= scale; o1_11_im *= scale; o1_12_re *= scale; o1_12_im *= scale; \
+  o1_20_re *= scale; o1_20_im *= scale; o1_21_re *= scale; o1_21_im *= scale; \
+  o1_22_re *= scale; o1_22_im *= scale; o1_30_re *= scale; o1_30_im *= scale; \
+  o1_31_re *= scale; o1_31_im *= scale; o1_32_re *= scale; o1_32_im *= scale; \
+  out[sid+0*(param.sp_stride)] = make_char4(f2i(o1_00_re), f2i(o1_00_im), f2i(o1_01_re), f2i(o1_01_im)); \
+  out[sid+1*(param.sp_stride)] = make_char4(f2i(o1_02_re), f2i(o1_02_im), f2i(o1_10_re), f2i(o1_10_im)); \
+  out[sid+2*(param.sp_stride)] = make_char4(f2i(o1_11_re), f2i(o1_11_im), f2i(o1_12_re), f2i(o1_12_im)); \
+  out[sid+3*(param.sp_stride)] = make_char4(f2i(o1_20_re), f2i(o1_20_im), f2i(o1_21_re), f2i(o1_21_im)); \
+  out[sid+4*(param.sp_stride)] = make_char4(f2i(o1_22_re), f2i(o1_22_im), f2i(o1_30_re), f2i(o1_30_im)); \
+  out[sid+5*(param.sp_stride)] = make_char4(f2i(o1_31_re), f2i(o1_31_im), f2i(o1_32_re), f2i(o1_32_im)); \
+  c0 = fmaxf(fabsf(o2_00_re), fabsf(o2_00_im));     \
+  c1 = fmaxf(fabsf(o2_01_re), fabsf(o2_02_im));     \
+  c2 = fmaxf(fabsf(o2_02_re), fabsf(o2_01_im));     \
+  c3 = fmaxf(fabsf(o2_10_re), fabsf(o2_10_im));     \
+  c4 = fmaxf(fabsf(o2_11_re), fabsf(o2_11_im));     \
+  c5 = fmaxf(fabsf(o2_12_re), fabsf(o2_12_im));     \
+  c6 = fmaxf(fabsf(o2_20_re), fabsf(o2_20_im));     \
+  c7 = fmaxf(fabsf(o2_21_re), fabsf(o2_21_im));     \
+  c8 = fmaxf(fabsf(o2_22_re), fabsf(o2_22_im));     \
+  c9 = fmaxf(fabsf(o2_30_re), fabsf(o2_30_im));     \
+  c10 = fmaxf(fabsf(o2_31_re), fabsf(o2_31_im));      \
+  c11 = fmaxf(fabsf(o2_32_re), fabsf(o2_32_im));      \
+  c0 = fmaxf(c0, c1);             \
+  c1 = fmaxf(c2, c3);             \
+  c2 = fmaxf(c4, c5);             \
+  c3 = fmaxf(c6, c7);             \
+  c4 = fmaxf(c8, c9);             \
+  c5 = fmaxf(c10, c11);             \
+  c0 = fmaxf(c0, c1);             \
+  c1 = fmaxf(c2, c3);             \
+  c2 = fmaxf(c4, c5);             \
+  c0 = fmaxf(c0, c1);             \
+  c0 = fmaxf(c0, c2);             \
+  param.outNorm[sid+param.fl_stride] = c0;              \
+  scale = __fdividef(fixedMaxValue<char>::value, c0);        \
+  o2_00_re *= scale; o2_00_im *= scale; o2_01_re *= scale; o2_01_im *= scale; \
+  o2_02_re *= scale; o2_02_im *= scale; o2_10_re *= scale; o2_10_im *= scale; \
+  o2_11_re *= scale; o2_11_im *= scale; o2_12_re *= scale; o2_12_im *= scale; \
+  o2_20_re *= scale; o2_20_im *= scale; o2_21_re *= scale; o2_21_im *= scale; \
+  o2_22_re *= scale; o2_22_im *= scale; o2_30_re *= scale; o2_30_im *= scale; \
+  o2_31_re *= scale; o2_31_im *= scale; o2_32_re *= scale; o2_32_im *= scale; \
+  out[sid+param.fl_stride+0*(param.sp_stride)] = make_char4(f2i(o2_00_re), f2i(o2_00_im), f2i(o2_01_re), f2i(o2_01_im)); \
+  out[sid+param.fl_stride+1*(param.sp_stride)] = make_char4(f2i(o2_02_re), f2i(o2_02_im), f2i(o2_10_re), f2i(o2_10_im)); \
+  out[sid+param.fl_stride+2*(param.sp_stride)] = make_char4(f2i(o2_11_re), f2i(o2_11_im), f2i(o2_12_re), f2i(o2_12_im)); \
+  out[sid+param.fl_stride+3*(param.sp_stride)] = make_char4(f2i(o2_20_re), f2i(o2_20_im), f2i(o2_21_re), f2i(o2_21_im)); \
+  out[sid+param.fl_stride+4*(param.sp_stride)] = make_char4(f2i(o2_22_re), f2i(o2_22_im), f2i(o2_30_re), f2i(o2_30_im)); \
+  out[sid+param.fl_stride+5*(param.sp_stride)] = make_char4(f2i(o2_31_re), f2i(o2_31_im), f2i(o2_32_re), f2i(o2_32_im));
 
 
 /************* the following is used by staggered *****************/
@@ -610,6 +862,32 @@
 #define READ_KS_NBR_SPINOR_HALF_TEX(T, spinor, idx, mystride)	\
   READ_KS_NBR_SPINOR_HALF_TEX_(T, spinor, idx, mystride)
 
+#define READ_1ST_NBR_SPINOR_QUARTER_TEX_(spinor, idx, mystride)    \
+  float2 I0 = TEX1DFETCH(float2, (spinor), idx + 0*mystride);   \
+  float2 I1 = TEX1DFETCH(float2, (spinor), idx + 1*mystride);   \
+  float2 I2 = TEX1DFETCH(float2, (spinor), idx + 2*mystride);   \
+  {                 \
+    float C = TEX1DFETCH(float, (spinor ## Norm), norm_idx1);   \
+    I0.x *= C; I0.y *= C;           \
+    I1.x *= C; I1.y *= C;           \
+    I2.x *= C; I2.y *= C;}
+
+#define READ_1ST_NBR_SPINOR_QUARTER_TEX(spinor, idx, mystride) \
+  READ_1ST_NBR_SPINOR_HALF_TEX_(spinor, idx, mystride)      
+
+#define READ_KS_NBR_SPINOR_QUARTER_TEX_(T, spinor, idx, mystride)    \
+  T##0 = TEX1DFETCH(float2, (spinor), idx + 0*mystride);    \
+  T##1 = TEX1DFETCH(float2, (spinor), idx + 1*mystride);    \
+  T##2 = TEX1DFETCH(float2, (spinor), idx + 2*mystride);    \
+  {                 \
+    float C = TEX1DFETCH(float, (spinor ## Norm), norm_idx3);   \
+    (T##0).x *= C; (T##0).y *= C;           \
+    (T##1).x *= C; (T##1).y *= C;           \
+    (T##2).x *= C; (T##2).y *= C;}
+
+#define READ_KS_NBR_SPINOR_QUARTER_TEX(T, spinor, idx, mystride) \
+  READ_KS_NBR_SPINOR_HALF_TEX_(T, spinor, idx, mystride)
+
 #define READ_1ST_NBR_SPINOR_DOUBLE(spinor, idx, mystride)	\
   double2 I0 = spinor[idx + 0*mystride];			\
   double2 I1 = spinor[idx + 1*mystride];			\
@@ -653,6 +931,29 @@
     (T##2).x =C*short2float(S2.x); (T##2).y =C*short2float(S2.y);		\
   }
 
+#define READ_1ST_NBR_SPINOR_QUARTER(spinor, idx, mystride)     \
+  float2 I0, I1, I2;              \
+  {                 \
+    char2 S0 = in[idx + 0*mystride];         \
+    char2 S1 = in[idx + 1*mystride];         \
+    char2 S2 = in[idx + 2*mystride];         \
+    float C = inNorm[idx];            \
+    I0.x =C*char2float(S0.x); I0.y =C*char2float(S0.y);   \
+    I1.x =C*char2float(S1.x); I1.y =C*char2float(S1.y);   \
+    I2.x =C*char2float(S2.x); I2.y =C*char2float(S2.y);   \
+  }
+
+#define READ_KS_NBR_SPINOR_QUARTER(T, spinor, idx, mystride)     \
+  {                 \
+    char2 S0 = in[idx + 0*mystride];         \
+    char2 S1 = in[idx + 1*mystride];         \
+    char2 S2 = in[idx + 2*mystride];         \
+    float C = inNorm[idx];            \
+    (T##0).x =C*char2float(S0.x); (T##0).y =C*char2float(S0.y);   \
+    (T##1).x =C*char2float(S1.x); (T##1).y =C*char2float(S1.y);   \
+    (T##2).x =C*char2float(S2.x); (T##2).y =C*char2float(S2.y);   \
+  }
+
 
 #define WRITE_ST_SPINOR_DOUBLE2(out, sid, mystride)			\
   ((double2*)out)[0*mystride+sid] = make_double2(o00_re, o00_im);	\
@@ -671,12 +972,26 @@
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
   out ## Norm[sid] = c0;						\
-  float scale = __fdividef(MAX_SHORT, c0);				\
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);				\
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale;					\
   ((short2*)out)[sid+0*mystride] = make_short2(f2i(o00_re), f2i(o00_im)); \
   ((short2*)out)[sid+1*mystride] = make_short2(f2i(o01_re), f2i(o01_im)); \
   ((short2*)out)[sid+2*mystride] = make_short2(f2i(o02_re), f2i(o02_im));
+
+#define WRITE_ST_SPINOR_CHAR2(out, sid, mystride)      \
+  float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));     \
+  float c1 = fmaxf(fabsf(o01_re), fabsf(o01_im));     \
+  float c2 = fmaxf(fabsf(o02_re), fabsf(o02_im));     \
+  c0 = fmaxf(c0, c1);             \
+  c0 = fmaxf(c0, c2);             \
+  out ## Norm[sid] = c0;            \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);        \
+  o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale; \
+  o02_re *= scale; o02_im *= scale;         \
+  ((char2*)out)[sid+0*mystride] = make_char2(f2i(o00_re), f2i(o00_im)); \
+  ((char2*)out)[sid+1*mystride] = make_char2(f2i(o01_re), f2i(o01_im)); \
+  ((char2*)out)[sid+2*mystride] = make_char2(f2i(o02_re), f2i(o02_im));
 
 // Non-cache writes to minimize cache polution
 #define WRITE_ST_SPINOR_DOUBLE2_STR(out, sid, mystride) \
@@ -696,12 +1011,26 @@
   c0 = fmaxf(c0, c1);					\
   c0 = fmaxf(c0, c2);					\
   out ## Norm[sid] = c0;				\
-  float scale = __fdividef(MAX_SHORT, c0);			    \
+  float scale = __fdividef(fixedMaxValue<short>::value, c0);			    \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale;					\
   store_streaming_short2(&g_out[0*mystride+sid], f2i(o00_re), f2i(o00_im)); \
   store_streaming_short2(&g_out[1*mystride+sid], f2i(o01_re), f2i(o01_im)); \
   store_streaming_short2(&g_out[2*mystride+sid], f2i(o02_re), f2i(o02_im));
+
+#define WRITE_ST_SPINOR_CHAR2_STR(out, sid, mystride)       \
+  float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im)); \
+  float c1 = fmaxf(fabsf(o01_re), fabsf(o01_im)); \
+  float c2 = fmaxf(fabsf(o02_re), fabsf(o02_im)); \
+  c0 = fmaxf(c0, c1);         \
+  c0 = fmaxf(c0, c2);         \
+  out ## Norm[sid] = c0;        \
+  float scale = __fdividef(fixedMaxValue<char>::value, c0);          \
+  o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale; \
+  o02_re *= scale; o02_im *= scale;         \
+  store_streaming_char2(&g_out[0*mystride+sid], f2i(o00_re), f2i(o00_im)); \
+  store_streaming_char2(&g_out[1*mystride+sid], f2i(o01_re), f2i(o01_im)); \
+  store_streaming_char2(&g_out[2*mystride+sid], f2i(o02_re), f2i(o02_im));
 
 #define READ_AND_SUM_ST_SPINOR_DOUBLE_TEX(spinor,sid) {			\
   double2 tmp0 = fetch_double2((spinor), sid + 0*(param.sp_stride));		\
@@ -731,6 +1060,18 @@
 #define READ_AND_SUM_ST_SPINOR_HALF_TEX(spinor,sid)	\
   READ_AND_SUM_ST_SPINOR_HALF_TEX_(spinor,sid)
 
+#define READ_AND_SUM_ST_SPINOR_QUARTER_TEX_(spinor,sid) {      \
+  float2 tmp0 = TEX1DFETCH(float2, (spinor), sid + 0*param.sp_stride);  \
+  float2 tmp1 = TEX1DFETCH(float2, (spinor), sid + 1*param.sp_stride);  \
+  float2 tmp2 = TEX1DFETCH(float2, (spinor), sid + 2*param.sp_stride);  \
+  float C = TEX1DFETCH(float, (spinor##Norm), sid);     \
+  o00_re += C*tmp0.x; o00_im += C*tmp0.y;       \
+  o01_re += C*tmp1.x; o01_im += C*tmp1.y;       \
+  o02_re += C*tmp2.x; o02_im += C*tmp2.y; }
+
+#define READ_AND_SUM_ST_SPINOR_QUARTER_TEX(spinor,sid) \
+  READ_AND_SUM_ST_SPINOR_QUARTER_TEX_(spinor,sid)
+
 #define READ_AND_SUM_ST_SPINOR(spinor,sid)					\
   o00_re += spinor[0*param.sp_stride+sid].x; o00_im += spinor[0*param.sp_stride+sid].y; \
   o01_re += spinor[1*param.sp_stride+sid].x; o01_im += spinor[1*param.sp_stride+sid].y; \
@@ -747,6 +1088,18 @@
 
 #define READ_AND_SUM_ST_SPINOR_HALF(spinor,sid)			\
   READ_AND_SUM_ST_SPINOR_HALF_(spinor,sid)
+
+#define READ_AND_SUM_ST_SPINOR_QUARTER_(spinor,sid)      \
+  float C = spinor ## Norm[sid];        \
+  o00_re += C*char2float(spinor[0*param.sp_stride + sid].x);   \
+  o00_im += C*char2float(spinor[0*param.sp_stride + sid].y);   \
+  o01_re += C*char2float(spinor[1*param.sp_stride + sid].x);   \
+  o01_im += C*char2float(spinor[1*param.sp_stride + sid].y);   \
+  o02_re += C*char2float(spinor[2*param.sp_stride + sid].x);   \
+  o02_im += C*char2float(spinor[2*param.sp_stride + sid].y); 
+
+#define READ_AND_SUM_ST_SPINOR_QUARTER(spinor,sid)     \
+  READ_AND_SUM_ST_SPINOR_QUARTER_(spinor,sid)
 
 #define READ_ST_ACCUM_DOUBLE_TEX(spinor,sid)			   \
   double2 accum0 = fetch_double2((spinor), sid + 0*(param.sp_stride));   \
@@ -769,6 +1122,17 @@
 
 #define READ_ST_ACCUM_HALF_TEX(spinor,sid) READ_ST_ACCUM_HALF_TEX_(spinor,sid) 
 
+#define READ_ST_ACCUM_QUARTER_TEX_(spinor,sid)         \
+  float2 accum0 = TEX1DFETCH(float2, (spinor), sid + 0*param.sp_stride);  \
+  float2 accum1 = TEX1DFETCH(float2, (spinor), sid + 1*param.sp_stride);  \
+  float2 accum2 = TEX1DFETCH(float2, (spinor), sid + 2*param.sp_stride);  \
+  float C = TEX1DFETCH(float, (spinor ## Norm), sid);     \
+  accum0.x *= C; accum0.y *= C;           \
+  accum1.x *= C; accum1.y *= C;           \
+  accum2.x *= C; accum2.y *= C;       
+
+#define READ_ST_ACCUM_QUARTER_TEX(spinor,sid) READ_ST_ACCUM_HALF_QUARTER_(spinor,sid) 
+
 #define READ_ST_ACCUM_DOUBLE(spinor,sid)				   \
   double2 accum0 = spinor[sid + 0*(param.sp_stride)];			   \
   double2 accum1 = spinor[sid + 1*(param.sp_stride)];			   \
@@ -789,6 +1153,18 @@
     accum0.x =C*short2float(S0.x); accum0.y =C*short2float(S0.y);	\
     accum1.x =C*short2float(S1.x); accum1.y =C*short2float(S1.y);	\
     accum2.x =C*short2float(S2.x); accum2.y =C*short2float(S2.y);	\
+  }
+
+#define READ_ST_ACCUM_QUARTER(spinor,sid)          \
+  float2 accum0, accum1, accum2;          \
+  {                 \
+    char2 S0 = x[sid + 0*param.sp_stride];         \
+    char2 S1 = x[sid + 1*param.sp_stride];         \
+    char2 S2 = x[sid + 2*param.sp_stride];         \
+    float C = spinor##Norm[sid];          \
+    accum0.x =C*char2float(S0.x); accum0.y =C*char2float(S0.y); \
+    accum1.x =C*char2float(S1.x); accum1.y =C*char2float(S1.y); \
+    accum2.x =C*char2float(S2.x); accum2.y =C*char2float(S2.y); \
   }
 
 #define WRITE_SPINOR_SHARED_REAL(tx, ty, tz, reg)			\
@@ -961,6 +1337,36 @@
 
 #define READ_ACCUM_FLAVOR_HALF(spinor, stride, flv_stride) READ_ACCUM_FLAVOR_HALF_(spinor, stride, flv_stride)
 
+#define READ_ACCUM_FLAVOR_QUARTER_(spinor, stride, flv_stride)        \
+  float4 flv1_accum0 = char42float4(spinor[sid + 0*stride]);    \
+  float4 flv1_accum1 = char42float4(spinor[sid + 1*stride]);    \
+  float4 flv1_accum2 = char42float4(spinor[sid + 2*stride]);    \
+  float4 flv1_accum3 = char42float4(spinor[sid + 3*stride]);    \
+  float4 flv1_accum4 = char42float4(spinor[sid + 4*stride]);    \
+  float4 flv1_accum5 = char42float4(spinor[sid + 5*stride]);    \
+  float C = (spinor ## Norm)[sid];           \
+  flv1_accum0.x *= C; flv1_accum0.y *= C; flv1_accum0.z *= C; flv1_accum0.w *= C;      \
+  flv1_accum1.x *= C; flv1_accum1.y *= C; flv1_accum1.z *= C; flv1_accum1.w *= C;      \
+  flv1_accum2.x *= C; flv1_accum2.y *= C; flv1_accum2.z *= C; flv1_accum2.w *= C;      \
+  flv1_accum3.x *= C; flv1_accum3.y *= C; flv1_accum3.z *= C; flv1_accum3.w *= C;      \
+  flv1_accum4.x *= C; flv1_accum4.y *= C;       flv1_accum4.z *= C; flv1_accum4.w *= C;      \
+  flv1_accum5.x *= C; flv1_accum5.y *= C; flv1_accum5.z *= C; flv1_accum5.w *= C;      \
+  float4 flv2_accum0 = char42float4(spinor[sid + flv_stride + 0*stride]);      \
+  float4 flv2_accum1 = char42float4(spinor[sid + flv_stride + 1*stride]);      \
+  float4 flv2_accum2 = char42float4(spinor[sid + flv_stride + 2*stride]);      \
+  float4 flv2_accum3 = char42float4(spinor[sid + flv_stride + 3*stride]);      \
+  float4 flv2_accum4 = char42float4(spinor[sid + flv_stride + 4*stride]);      \
+  float4 flv2_accum5 = char42float4(spinor[sid + flv_stride + 5*stride]);      \
+  C = (spinor ## Norm)[sid + fl_stride];              \
+  flv2_accum0.x *= C; flv2_accum0.y *= C; flv2_accum0.z *= C; flv2_accum0.w *= C;       \
+  flv2_accum1.x *= C; flv2_accum1.y *= C; flv2_accum1.z *= C; flv2_accum1.w *= C;       \
+  flv2_accum2.x *= C; flv2_accum2.y *= C; flv2_accum2.z *= C; flv2_accum2.w *= C;       \
+  flv2_accum3.x *= C; flv2_accum3.y *= C; flv2_accum3.z *= C; flv2_accum3.w *= C;       \
+  flv2_accum4.x *= C; flv2_accum4.y *= C;       flv2_accum4.z *= C; flv2_accum4.w *= C;       \
+  flv2_accum5.x *= C; flv2_accum5.y *= C; flv2_accum5.z *= C; flv2_accum5.w *= C;
+
+#define READ_ACCUM_FLAVOR_QUARTER(spinor, stride, flv_stride) READ_ACCUM_FLAVOR_QUARTER_(spinor, stride, flv_stride)
+
 
 #define READ_ACCUM_FLAVOR_DOUBLE_TEX(spinor, stride, flv_stride)			\
   double2 flv1_accum0 = fetch_double2((spinor), sid + 0*(stride));   \
@@ -1034,6 +1440,37 @@
 
 #define READ_ACCUM_FLAVOR_HALF_TEX(spinor, stride, flv_stride) READ_ACCUM_HALF_FLAVOR_TEX_(spinor, stride, flv_stride)
 
+#define READ_ACCUM_QUARTER_FLAVOR_TEX_(spinor, stride, flv_stride)   \
+  float4 flv1_accum0 = TEX1DFETCH(float4, (spinor), sid + 0*(stride));  \
+  float4 flv1_accum1 = TEX1DFETCH(float4, (spinor), sid + 1*(stride));  \
+  float4 flv1_accum2 = TEX1DFETCH(float4, (spinor), sid + 2*(stride));  \
+  float4 flv1_accum3 = TEX1DFETCH(float4, (spinor), sid + 3*(stride));  \
+  float4 flv1_accum4 = TEX1DFETCH(float4, (spinor), sid + 4*(stride));  \
+  float4 flv1_accum5 = TEX1DFETCH(float4, (spinor), sid + 5*(stride));  \
+  float C = TEX1DFETCH(float, (spinor ## Norm), sid);     \
+  flv1_accum0.x *= C; flv1_accum0.y *= C; flv1_accum0.z *= C; flv1_accum0.w *= C;   \
+  flv1_accum1.x *= C; flv1_accum1.y *= C; flv1_accum1.z *= C; flv1_accum1.w *= C;   \
+  flv1_accum2.x *= C; flv1_accum2.y *= C; flv1_accum2.z *= C; flv1_accum2.w *= C;   \
+  flv1_accum3.x *= C; flv1_accum3.y *= C; flv1_accum3.z *= C; flv1_accum3.w *= C;   \
+  flv1_accum4.x *= C; flv1_accum4.y *= C;       flv1_accum4.z *= C; flv1_accum4.w *= C;   \
+  flv1_accum5.x *= C; flv1_accum5.y *= C; flv1_accum5.z *= C; flv1_accum5.w *= C;         \
+  float4 flv2_accum0 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 0*(stride));       \
+  float4 flv2_accum1 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 1*(stride));       \
+  float4 flv2_accum2 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 2*(stride));       \
+  float4 flv2_accum3 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 3*(stride));       \
+  float4 flv2_accum4 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 4*(stride));       \
+  float4 flv2_accum5 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 5*(stride));       \
+  C = TEX1DFETCH(float, (spinor ## Norm), sid + flv_stride);              \
+  flv2_accum0.x *= C; flv2_accum0.y *= C; flv2_accum0.z *= C; flv2_accum0.w *= C;   \
+  flv2_accum1.x *= C; flv2_accum1.y *= C; flv2_accum1.z *= C; flv2_accum1.w *= C;   \
+  flv2_accum2.x *= C; flv2_accum2.y *= C; flv2_accum2.z *= C; flv2_accum2.w *= C;   \
+  flv2_accum3.x *= C; flv2_accum3.y *= C; flv2_accum3.z *= C; flv2_accum3.w *= C;   \
+  flv2_accum4.x *= C; flv2_accum4.y *= C;       flv2_accum4.z *= C; flv2_accum4.w *= C;   \
+  flv2_accum5.x *= C; flv2_accum5.y *= C; flv2_accum5.z *= C; flv2_accum5.w *= C;
+
+
+#define READ_ACCUM_FLAVOR_QUARTER_TEX(spinor, stride, flv_stride) READ_ACCUM_QUARTER_FLAVOR_TEX_(spinor, stride, flv_stride)
+
 //single-flavor macros:
 
 #define ASSN_ACCUM_DOUBLE(spinor, stride, fl_stride)     \
@@ -1078,6 +1515,26 @@
 
 #define ASSN_ACCUM_HALF(spinor, stride, fl_stride) ASSN_ACCUM_HALF_(spinor, stride, fl_stride)
 
+#define ASSN_ACCUM_QUARTER_(spinor, stride, fl_stride)        \
+  accum0 = char42float4(spinor[sid + fl_stride + 0*stride]);    \
+  accum1 = char42float4(spinor[sid + fl_stride + 1*stride]);    \
+  accum2 = char42float4(spinor[sid + fl_stride + 2*stride]);    \
+  accum3 = char42float4(spinor[sid + fl_stride + 3*stride]);    \
+  accum4 = char42float4(spinor[sid + fl_stride + 4*stride]);    \
+  accum5 = char42float4(spinor[sid + fl_stride + 5*stride]);    \
+  {\
+    float C = (spinor ## Norm)[sid + fl_stride];           \
+    accum0.x *= C; accum0.y *= C; accum0.z *= C; accum0.w *= C;      \
+    accum1.x *= C; accum1.y *= C; accum1.z *= C; accum1.w *= C;      \
+    accum2.x *= C; accum2.y *= C; accum2.z *= C; accum2.w *= C;      \
+    accum3.x *= C; accum3.y *= C; accum3.z *= C; accum3.w *= C;      \
+    accum4.x *= C; accum4.y *= C; accum4.z *= C; accum4.w *= C;      \
+    accum5.x *= C; accum5.y *= C; accum5.z *= C; accum5.w *= C;    \
+  }
+                   
+
+#define ASSN_ACCUM_QUARTER(spinor, stride, fl_stride) ASSN_ACCUM_QUARTER_(spinor, stride, fl_stride)
+
 //single-flavor macros:
 
 #define ASSN_ACCUM_DOUBLE_TEX(spinor, stride, fl_stride)			\
@@ -1121,6 +1578,25 @@
   }
 
 #define ASSN_ACCUM_HALF_TEX(spinor, stride, fl_stride) ASSN_ACCUM_HALF_TEX_(spinor, stride, fl_stride)
+
+#define ASSN_ACCUM_QUARTER_TEX_(spinor, stride, fl_stride)   \
+  accum0 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 0*(stride));  \
+  accum1 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 1*(stride));  \
+  accum2 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 2*(stride));  \
+  accum3 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 3*(stride));  \
+  accum4 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 4*(stride));  \
+  accum5 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 5*(stride));  \
+  {\
+    float C = TEX1DFETCH(float, (spinor ## Norm), sid + fl_stride);     \
+    accum0.x *= C; accum0.y *= C; accum0.z *= C; accum0.w *= C;   \
+    accum1.x *= C; accum1.y *= C; accum1.z *= C; accum1.w *= C;   \
+    accum2.x *= C; accum2.y *= C; accum2.z *= C; accum2.w *= C;   \
+    accum3.x *= C; accum3.y *= C; accum3.z *= C; accum3.w *= C;   \
+    accum4.x *= C; accum4.y *= C;       accum4.z *= C; accum4.w *= C;   \
+    accum5.x *= C; accum5.y *= C; accum5.z *= C; accum5.w *= C;         \
+  }
+
+#define ASSN_ACCUM_QUARTER_TEX(spinor, stride, fl_stride) ASSN_ACCUM_QUARTER_TEX_(spinor, stride, fl_stride)
 
 //! **************************only for deg tm:*******************************
 

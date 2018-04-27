@@ -572,6 +572,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
 
 #ifndef CHECK_PARAM
+    P(smoother_halo_precision[i], QUDA_INVALID_PRECISION);
     P(smoother_schwarz_type[i], QUDA_INVALID_SCHWARZ);
     P(smoother_schwarz_cycle[i], 1);
 #else

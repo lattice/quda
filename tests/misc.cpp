@@ -684,45 +684,50 @@ get_recon(char* s)
 QudaPrecision
 get_prec(char* s)
 {
-    QudaPrecision ret = QUDA_DOUBLE_PRECISION;
-    
-    if (strcmp(s, "double") == 0){
-	ret = QUDA_DOUBLE_PRECISION;
-    }else if (strcmp(s, "single") == 0){
-	ret = QUDA_SINGLE_PRECISION;
-    }else if (strcmp(s, "half") == 0){
-	ret = QUDA_HALF_PRECISION;
-    }else{
-	fprintf(stderr, "Error: invalid precision type\n");	
-	exit(1);
-    }
-    
-    return ret;
+  QudaPrecision ret = QUDA_DOUBLE_PRECISION;
+
+  if (strcmp(s, "double") == 0) {
+    ret = QUDA_DOUBLE_PRECISION;
+  } else if (strcmp(s, "single") == 0) {
+    ret = QUDA_SINGLE_PRECISION;
+  } else if (strcmp(s, "half") == 0) {
+    ret = QUDA_HALF_PRECISION;
+  } else if (strcmp(s, "half") == 0) {
+    ret = QUDA_HALF_PRECISION;
+  } else if (strcmp(s, "quarter") == 0) {
+    ret = QUDA_QUARTER_PRECISION;
+  } else {
+    fprintf(stderr, "Error: invalid precision type\n");
+    exit(1);
+  }
+
+  return ret;
 }
 
-const char* 
+const char*
 get_prec_str(QudaPrecision prec)
 {
-    const char* ret;
-    
-    switch( prec){
-	
-    case QUDA_DOUBLE_PRECISION:
-	ret=  "double";
-	break;
-    case QUDA_SINGLE_PRECISION:
-	ret= "single";
-	break;
-    case QUDA_HALF_PRECISION:
-	ret= "half";
-	break;
-    default:
-	ret = "unknown";	
-	break;
-    }
-    
-    
-    return ret;
+  const char* ret;
+
+  switch (prec) {
+  case QUDA_DOUBLE_PRECISION:
+    ret=  "double";
+    break;
+  case QUDA_SINGLE_PRECISION:
+    ret= "single";
+    break;
+  case QUDA_HALF_PRECISION:
+    ret= "half";
+    break;
+  case QUDA_QUARTER_PRECISION:
+    ret= "quarter";
+    break;
+  default:
+    ret = "unknown";
+    break;
+  }
+
+  return ret;
 }
 
 

@@ -33,13 +33,20 @@ set (QUDA_OBJS
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
-  copy_color_spinor_dh.cu copy_color_spinor_ss.cu
-  copy_color_spinor_sd.cu copy_color_spinor_sh.cu
+  copy_color_spinor_dh.cu copy_color_spinor_dq.cu
+  copy_color_spinor_ss.cu copy_color_spinor_sd.cu
+  copy_color_spinor_sh.cu copy_color_spinor_sq.cu
   copy_color_spinor_hd.cu copy_color_spinor_hs.cu
-  copy_color_spinor_hh.cu copy_color_spinor_mg_dd.cu
-  copy_color_spinor_mg_ds.cu copy_color_spinor_mg_sd.cu
-  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_sh.cu
-  copy_color_spinor_mg_ss.cu copy_gauge_double.cu copy_gauge_single.cu
+  copy_color_spinor_hh.cu copy_color_spinor_hq.cu
+  copy_color_spinor_qd.cu copy_color_spinor_qs.cu
+  copy_color_spinor_qh.cu copy_color_spinor_qq.cu
+  copy_color_spinor_mg_dd.cu copy_color_spinor_mg_ds.cu
+  copy_color_spinor_mg_sd.cu copy_color_spinor_mg_ss.cu
+  copy_color_spinor_mg_sh.cu copy_color_spinor_mg_sq.cu
+  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
+  copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
+  copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
+  copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu fermion_force_quda.cu
