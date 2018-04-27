@@ -101,13 +101,7 @@ namespace quda {
       }
       blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
       break;
-    case 2: // two-way pipelining
-    case 3: // three-way pipelining
-    case 4: // four-way pipelining
-    case 5: // five-way pipelining
-    case 6: // six-way pipelining
-    case 7: // seven-way pipelining
-    case 8: // eight-way pipelining
+    default:
       {
 	const int N = pipeline;
 	for (int i=0; i<k-(N-1); i+=N) {
@@ -126,8 +120,6 @@ namespace quda {
 	}
       }
       break;
-    default:
-      errorQuda("Pipeline length %d type not defined", pipeline);
     }
 
   }   
@@ -338,6 +330,7 @@ namespace quda {
     int pipeline = param.pipeline;
     // Vectorized dot product only has limited support so work around
     if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION || pipeline == 0) pipeline = 1;
+    if (pipeline > nKrylov) pipeline = nKrylov;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
