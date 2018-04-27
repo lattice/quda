@@ -101,13 +101,7 @@ namespace quda {
       }
       blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
       break;
-    case 2: // two-way pipelining
-    case 3: // three-way pipelining
-    case 4: // four-way pipelining
-    case 5: // five-way pipelining
-    case 6: // six-way pipelining
-    case 7: // seven-way pipelining
-    case 8: // eight-way pipelining
+    default:
       {
 	const int N = pipeline;
 	for (int i=0; i<k-(N-1); i+=N) {
@@ -126,8 +120,6 @@ namespace quda {
 	}
       }
       break;
-    default:
-      errorQuda("Pipeline length %d type not defined", pipeline);
     }
 
   }   
@@ -182,7 +174,7 @@ namespace quda {
     else 
       errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
 
-    p.resize(nKrylov);
+    p.resize(nKrylov+1);
     Ap.resize(nKrylov);
 
     alpha = new Complex[nKrylov];
@@ -197,7 +189,7 @@ namespace quda {
     nKrylov(param.Nkrylov), init(false), rp(nullptr), yp(nullptr), tmpp(nullptr), y_sloppy(nullptr),
     r_sloppy(nullptr)
   {
-    p.resize(nKrylov);
+    p.resize(nKrylov+1);
     Ap.resize(nKrylov);
 
     alpha = new Complex[nKrylov];
@@ -220,10 +212,8 @@ namespace quda {
       if (r_sloppy && r_sloppy != rp) delete r_sloppy;
     }
 
-    for (int i=0; i<nKrylov; i++) {
-      if (p[i]) delete p[i];
-      if (Ap[i]) delete Ap[i];
-    }
+    for (int i=0; i<nKrylov+1; i++) if (p[i]) delete p[i];
+    for (int i=0; i<nKrylov; i++) if (Ap[i]) delete Ap[i];
 
     if (tmpp) delete tmpp;
     if (rp) delete rp;
@@ -252,10 +242,8 @@ namespace quda {
 
       // create sloppy fields used for orthogonalization
       csParam.setPrecision(param.precision_sloppy);
-      for (int i=0; i<nKrylov; i++) {
-	p[i] = ColorSpinorField::Create(csParam);
-	Ap[i] = ColorSpinorField::Create(csParam);
-      }
+      for (int i=0; i<nKrylov+1; i++) p[i] = ColorSpinorField::Create(csParam);
+      for (int i=0; i<nKrylov; i++) Ap[i] = ColorSpinorField::Create(csParam);
 
       csParam.setPrecision(param.precision_sloppy);
       tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
@@ -342,11 +330,14 @@ namespace quda {
     int pipeline = param.pipeline;
     // Vectorized dot product only has limited support so work around
     if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION || pipeline == 0) pipeline = 1;
+    if (pipeline > nKrylov) pipeline = nKrylov;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
+    int k_break = 0;
+
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
@@ -384,7 +375,7 @@ namespace quda {
       alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[(k+1)%nKrylov]);
+      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[k+1]);
 
       k++;
       total_iter++;
@@ -395,7 +386,7 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       if (k==nKrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
-	// update the solution vector
+        // update the solution vector
 	updateSolution(ySloppy, alpha, beta, gamma, k, p);
 
 	// recalculate residual in high precision
@@ -421,6 +412,7 @@ namespace quda {
 	  resIncrease = 0;
 	}
 
+        k_break = k;
 	k = 0;
 
 	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
@@ -464,6 +456,10 @@ namespace quda {
 	param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
       else
 	param.true_res_hq = 0.0;
+
+      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
+    } else {
+      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, K ? rSloppy : *p[k_break]);
     }
 
     param.gflops += gflops;

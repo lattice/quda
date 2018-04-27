@@ -219,8 +219,9 @@ namespace quda {
     param_presmooth->tol = param.smoother_tol;
     param_presmooth->global_reduction = param.global_reduction;
 
-    param_presmooth->schwarz_type = param.mg_global.smoother_schwarz_type[param.level];
+    param_presmooth->sloppy_converge = true; // this means we don't check the true residual before declaring convergence
 
+    param_presmooth->schwarz_type = param.mg_global.smoother_schwarz_type[param.level];
     // inner solver should recompute the true residual after each cycle if using Schwarz preconditioning
     param_presmooth->compute_true_res = (param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) ? true : false;
 
@@ -237,6 +238,7 @@ namespace quda {
 
       param_postsmooth->maxiter = param.nu_post;
       param_postsmooth->Nkrylov = param_postsmooth->maxiter;
+      param_postsmooth->pipeline = param_postsmooth->maxiter;
 
       // we never need to compute the true residual for a post smoother
       param_postsmooth->compute_true_res = false;
