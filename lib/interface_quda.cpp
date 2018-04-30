@@ -430,6 +430,21 @@ void initQudaDevice(int dev) {
     errorQuda("Device %d does not support CUDA", dev);
   }
 
+  const int my_major = __COMPUTE_CAPABILITY__ /100;
+  const int my_minor = (__COMPUTE_CAPABILITY__  - my_major*100)/10;
+  if ( deviceProp.major * 100 + deviceProp.minor * 10 < __COMPUTE_CAPABILITY__ )
+    errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. ** \n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n",deviceProp.major, deviceProp.minor, my_major, my_minor);
+
+  if ( deviceProp.major * 100 + deviceProp.minor * 10 > __COMPUTE_CAPABILITY__ ){
+      char *allow_jit_env = getenv("QUDA_ALLOW_JIT");
+  if (allow_jit_env && strcmp(allow_jit_env, "1") == 0) {
+    if (getVerbosity() > QUDA_SILENT) warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- Jitting the PTX since QUDA_ALLOW_JIT=1 was set. Note that this will take some time.\n",deviceProp.major, deviceProp.minor, my_major, my_minor);
+  }
+  else{
+    errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n If you want the PTX to be jitted for your current GPU arch please set the enviroment variable QUDA_ALLOW_JIT=1.",deviceProp.major, deviceProp.minor, my_major, my_minor);
+  }
+}
+   
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
@@ -453,7 +468,7 @@ void initQudaDevice(int dev) {
 
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-  cudaGetDeviceProperties(&deviceProp, dev);
+  // cudaGetDeviceProperties(&deviceProp, dev);
 
   { // determine if we will do CPU or GPU data reordering (default is GPU)
     char *reorder_str = getenv("QUDA_REORDER_LOCATION");
