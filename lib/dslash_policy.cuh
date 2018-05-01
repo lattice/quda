@@ -347,6 +347,22 @@ namespace {
       if (set_mapped) errorQuda("set_mapped already set");
       // in the below we switch to the mapped ghost buffer and update the tuneKey to reflect this
       in.bufferIndex += 2;
+
+      // update the ghosts for the non-p2p directions
+      for (int dim=0; dim<4; dim++) {
+        for (int dir=0; dir<2; dir++) {
+          if (!comm_peer2peer_enabled(dir, dim)) {
+            dslashParam.ghost[2*dim+dir] = (void*)in.Ghost2();
+            dslashParam.ghostNorm[2*dim+dir] = (float*)(in.Ghost2());
+
+#ifdef USE_TEXTURE_OBJECTS
+            dslashParam.ghostTex[2*dim+dir] = in.GhostTex();
+            dslashParam.ghostTexNorm[2*dim+dir] = in.GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
+          }
+        }
+      }
+
       strcpy(aux_copy,dslash.getAux(dslashParam.kernel_type));
       dslash.augmentAux(dslashParam.kernel_type, ",zero_copy");
       set_mapped = true;
@@ -354,7 +370,23 @@ namespace {
       if (!set_mapped) errorQuda("set_mapped not set");
       // reset to default
       dslash.setAux(dslashParam.kernel_type, aux_copy);
+
       in.bufferIndex -= 2;
+      // reinstate ghosts for the non-p2p directions
+      for (int dim=0; dim<4; dim++) {
+        for (int dir=0; dir<2; dir++) {
+          if (!comm_peer2peer_enabled(dir, dim)) {
+            dslashParam.ghost[2*dim+dir] = (void*)in.Ghost2();
+            dslashParam.ghostNorm[2*dim+dir] = (float*)(in.Ghost2());
+
+#ifdef USE_TEXTURE_OBJECTS
+            dslashParam.ghostTex[2*dim+dir] = in.GhostTex();
+            dslashParam.ghostTexNorm[2*dim+dir] = in.GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
+          }
+        }
+      }
+
       set_mapped = false;
     }
   }
@@ -1567,7 +1599,6 @@ struct DslashZeroCopy : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-    comm_enable_peer2peer(false);
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
@@ -1619,7 +1650,6 @@ struct DslashZeroCopy : DslashPolicyImp {
 
 	}
 
-	// FIXME - will not work with P2P until we can split where the halos originate
 	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
         if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
@@ -1636,7 +1666,6 @@ struct DslashZeroCopy : DslashPolicyImp {
 
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
-    comm_enable_peer2peer(true);
   }
 };
 
@@ -1651,7 +1680,6 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-    comm_enable_peer2peer(false);
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
@@ -1707,7 +1735,6 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
     }
 
-    // FIXME - will not work with P2P until we can split where the halos originate
     if (pattern.commDimTotal) {
       setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
 
@@ -1719,7 +1746,6 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
     completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
-    comm_enable_peer2peer(true);
   }
 };
 
@@ -1921,7 +1947,6 @@ void disable_policy(QudaDslashPolicy p){
 	   enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH);
 	 }
 
-	 // note these policies do not presently use p2p
 	 enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH);
 	 enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH);
 
