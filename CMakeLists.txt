@@ -134,7 +134,7 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 #######################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
 set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
-set(QUDA_PROPAGATE_CXXFLAGS ON CACHE BOOL "propagate CXXFLags to CUDA host compiler (for cmake >= 3.8)")
+set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXXFLags to CUDA host compiler (for cmake >= 3.8)")
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
@@ -158,7 +158,7 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
-mark_as_advanced(QUDA_PROPAGATE_CXXFLAGS)
+mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
 mark_as_advanced(QUDA_NUMA_NVML)
