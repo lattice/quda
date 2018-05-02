@@ -181,6 +181,7 @@
   double2 I10 = fetch_double2((spinor), sp_idx + 10*(stride)); \
   double2 I11 = fetch_double2((spinor), sp_idx + 11*(stride));
 
+#ifdef USE_TEXTURE_OBJECTS
 #define READ_SPINOR_GHOST_DOUBLE_TEX(spinor, stride, sp_idx, norm_idx, dir) \
   double2 I0 = fetch_double2((spinor)[dir], sp_idx + 0*(stride));       \
   double2 I1 = fetch_double2((spinor)[dir], sp_idx + 1*(stride));       \
@@ -188,6 +189,15 @@
   double2 I3 = fetch_double2((spinor)[dir], sp_idx + 3*(stride));       \
   double2 I4 = fetch_double2((spinor)[dir], sp_idx + 4*(stride));       \
   double2 I5 = fetch_double2((spinor)[dir], sp_idx + 5*(stride));
+#else
+#define READ_SPINOR_GHOST_DOUBLE_TEX(spinor, stride, sp_idx, norm_idx, dir) \
+  double2 I0 = fetch_double2((spinor), sp_idx + 0*(stride));       \
+  double2 I1 = fetch_double2((spinor), sp_idx + 1*(stride));       \
+  double2 I2 = fetch_double2((spinor), sp_idx + 2*(stride));       \
+  double2 I3 = fetch_double2((spinor), sp_idx + 3*(stride));       \
+  double2 I4 = fetch_double2((spinor), sp_idx + 4*(stride));       \
+  double2 I5 = fetch_double2((spinor), sp_idx + 5*(stride));
+#endif
 
 #define READ_SPINOR_DOUBLE_UP_TEX(spinor, stride, sp_idx, norm_idx) \
   double2 I0 = fetch_double2((spinor), sp_idx + 0*(stride));   \
@@ -227,10 +237,17 @@
   float4 I4 = TEX1DFETCH(float4, (spinor), sp_idx + 4*(stride));	\
   float4 I5 = TEX1DFETCH(float4, (spinor), sp_idx + 5*(stride));
 
+#ifdef USE_TEXTURE_OBJECTS
 #define READ_SPINOR_GHOST_SINGLE_TEX(spinor, stride, sp_idx, norm_idx, dir) \
   float4 I0 = TEX1DFETCH(float4, (spinor)[dir], sp_idx + 0*(stride));	\
   float4 I1 = TEX1DFETCH(float4, (spinor)[dir], sp_idx + 1*(stride));	\
-  float4 I2 = TEX1DFETCH(float4, (spinor)[dir], sp_idx + 2*(stride));	\
+  float4 I2 = TEX1DFETCH(float4, (spinor)[dir], sp_idx + 2*(stride));
+#else
+#define READ_SPINOR_GHOST_SINGLE_TEX(spinor, stride, sp_idx, norm_idx, dir) \
+  float4 I0 = TEX1DFETCH(float4, (spinor), sp_idx + 0*(stride));	\
+  float4 I1 = TEX1DFETCH(float4, (spinor), sp_idx + 1*(stride));	\
+  float4 I2 = TEX1DFETCH(float4, (spinor), sp_idx + 2*(stride));
+#endif
 
 #define READ_SPINOR_SINGLE_UP_TEX(spinor, stride, sp_idx, norm_idx)	\
   float4 I0 = TEX1DFETCH(float4, (spinor), sp_idx + 0*(stride));	\
@@ -260,6 +277,7 @@
 #define READ_SPINOR_HALF_TEX(spinor, stride, sp_idx, norm_idx)	   \
   READ_SPINOR_HALF_TEX_(spinor, stride, sp_idx, norm_idx)	   \
 
+#ifdef USE_TEXTURE_OBJECTS
 #define READ_SPINOR_GHOST_HALF_TEX_(spinor, stride, sp_idx, norm_idx, dir) \
   float4 I0 = TEX1DFETCH(float4, (spinor)[dir], sp_idx + 0*(stride));	\
   float4 I1 = TEX1DFETCH(float4, (spinor)[dir], sp_idx + 1*(stride));	\
@@ -267,7 +285,17 @@
   float C = TEX1DFETCH(float, (spinor ## Norm)[dir], norm_idx);		\
   I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C;                           \
   I1.x *= C; I1.y *= C;	I1.z *= C; I1.w *= C;                           \
-  I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;                           \
+  I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;
+#else
+#define READ_SPINOR_GHOST_HALF_TEX_(spinor, stride, sp_idx, norm_idx, dir) \
+  float4 I0 = TEX1DFETCH(float4, (spinor), sp_idx + 0*(stride));	\
+  float4 I1 = TEX1DFETCH(float4, (spinor), sp_idx + 1*(stride));	\
+  float4 I2 = TEX1DFETCH(float4, (spinor), sp_idx + 2*(stride));	\
+  float C = TEX1DFETCH(float, (spinor ## Norm), norm_idx);		\
+  I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C;                           \
+  I1.x *= C; I1.y *= C;	I1.z *= C; I1.w *= C;                           \
+  I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;
+#endif
 
 #define READ_SPINOR_GHOST_HALF_TEX(spinor, stride, sp_idx, norm_idx, dir) \
   READ_SPINOR_GHOST_HALF_TEX_(spinor, stride, sp_idx, norm_idx, dir)    \
@@ -619,41 +647,68 @@
   double2 I1 = fetch_double2((spinor), idx + 1*mystride);	\
   double2 I2 = fetch_double2((spinor), idx + 2*mystride);
 
+#ifdef USE_TEXTURE_OBJECTS
 #define READ_1ST_NBR_SPINOR_GHOST_DOUBLE_TEX(spinor, idx, mystride, dir) \
   double2 I0 = fetch_double2((spinor[dir]), idx + 0*mystride);	\
   double2 I1 = fetch_double2((spinor[dir]), idx + 1*mystride);	\
   double2 I2 = fetch_double2((spinor[dir]), idx + 2*mystride);
+#else
+#define READ_1ST_NBR_SPINOR_GHOST_DOUBLE_TEX(spinor, idx, mystride, dir) \
+  double2 I0 = fetch_double2((spinor), idx + 0*mystride);	\
+  double2 I1 = fetch_double2((spinor), idx + 1*mystride);	\
+  double2 I2 = fetch_double2((spinor), idx + 2*mystride);
+#endif
 
 #define READ_KS_NBR_SPINOR_DOUBLE_TEX(T, spinor, idx, mystride)	\
   T##0 = fetch_double2((spinor), idx + 0*mystride);	\
   T##1 = fetch_double2((spinor), idx + 1*mystride);	\
   T##2 = fetch_double2((spinor), idx + 2*mystride);
 
+#ifdef USE_TEXTURE_OBJECTS
 #define READ_KS_NBR_SPINOR_GHOST_DOUBLE_TEX(T, spinor, idx, mystride, dir) \
   T##0 = fetch_double2((spinor)[dir], idx + 0*mystride);                \
   T##1 = fetch_double2((spinor)[dir], idx + 1*mystride);                \
   T##2 = fetch_double2((spinor)[dir], idx + 2*mystride);
+#else
+#define READ_KS_NBR_SPINOR_GHOST_DOUBLE_TEX(T, spinor, idx, mystride, dir) \
+  T##0 = fetch_double2((spinor), idx + 0*mystride);                     \
+  T##1 = fetch_double2((spinor), idx + 1*mystride);                     \
+  T##2 = fetch_double2((spinor), idx + 2*mystride);
+#endif
 
 #define READ_1ST_NBR_SPINOR_SINGLE_TEX(spinor, idx, mystride)	\
   float2 I0 = TEX1DFETCH(float2, (spinor), idx + 0*mystride);	\
   float2 I1 = TEX1DFETCH(float2, (spinor), idx + 1*mystride);	\
   float2 I2 = TEX1DFETCH(float2, (spinor), idx + 2*mystride);
 
+#ifdef USE_TEXTURE_OBJECTS
 #define READ_1ST_NBR_SPINOR_GHOST_SINGLE_TEX(spinor, idx, mystride, dir) \
   float2 I0 = TEX1DFETCH(float2, (spinor)[dir], idx + 0*mystride);      \
   float2 I1 = TEX1DFETCH(float2, (spinor)[dir], idx + 1*mystride);	\
   float2 I2 = TEX1DFETCH(float2, (spinor)[dir], idx + 2*mystride);
+#else
+#define READ_1ST_NBR_SPINOR_GHOST_SINGLE_TEX(spinor, idx, mystride, dir) \
+  float2 I0 = TEX1DFETCH(float2, (spinor), idx + 0*mystride);           \
+  float2 I1 = TEX1DFETCH(float2, (spinor), idx + 1*mystride);           \
+  float2 I2 = TEX1DFETCH(float2, (spinor), idx + 2*mystride);
+#endif
 
 #define READ_KS_NBR_SPINOR_SINGLE_TEX(T, spinor, idx, mystride)	\
   T##0 = TEX1DFETCH(float2, (spinor), idx + 0*mystride);	\
   T##1 = TEX1DFETCH(float2, (spinor), idx + 1*mystride);	\
   T##2 = TEX1DFETCH(float2, (spinor), idx + 2*mystride);
 
+#ifdef USE_TEXTURE_OBJECTS
 #define READ_KS_NBR_SPINOR_GHOST_SINGLE_TEX(T, spinor, idx, mystride, dir) \
   T##0 = TEX1DFETCH(float2, (spinor)[dir], idx + 0*mystride);           \
   T##1 = TEX1DFETCH(float2, (spinor)[dir], idx + 1*mystride);           \
   T##2 = TEX1DFETCH(float2, (spinor)[dir], idx + 2*mystride);
-
+#else
+#define READ_KS_NBR_SPINOR_GHOST_SINGLE_TEX(T, spinor, idx, mystride, dir) \
+  T##0 = TEX1DFETCH(float2, (spinor), idx + 0*mystride);                \
+  T##1 = TEX1DFETCH(float2, (spinor), idx + 1*mystride);                \
+  T##2 = TEX1DFETCH(float2, (spinor), idx + 2*mystride);
+#endif
 
 #define READ_1ST_NBR_SPINOR_HALF_TEX_(spinor, idx, mystride)		\
   float2 I0 = TEX1DFETCH(float2, (spinor), idx + 0*mystride);		\
@@ -665,6 +720,7 @@
     I1.x *= C; I1.y *= C;						\
     I2.x *= C; I2.y *= C;}
 
+#ifdef USE_TEXTURE_OBJECTS
 #define READ_1ST_NBR_SPINOR_GHOST_HALF_TEX_(spinor, idx, mystride, dir) \
   float2 I0 = TEX1DFETCH(float2, (spinor)[dir], idx + 0*mystride);      \
   float2 I1 = TEX1DFETCH(float2, (spinor)[dir], idx + 1*mystride);      \
@@ -674,6 +730,17 @@
     I0.x *= C; I0.y *= C;						\
     I1.x *= C; I1.y *= C;						\
     I2.x *= C; I2.y *= C;}
+#else
+#define READ_1ST_NBR_SPINOR_GHOST_HALF_TEX_(spinor, idx, mystride, dir) \
+  float2 I0 = TEX1DFETCH(float2, (spinor), idx + 0*mystride);           \
+  float2 I1 = TEX1DFETCH(float2, (spinor), idx + 1*mystride);           \
+  float2 I2 = TEX1DFETCH(float2, (spinor), idx + 2*mystride);           \
+  {									\
+    float C = TEX1DFETCH(float, (spinor ## Norm), norm_idx1);           \
+    I0.x *= C; I0.y *= C;						\
+    I1.x *= C; I1.y *= C;						\
+    I2.x *= C; I2.y *= C;}
+#endif
 
 #define READ_1ST_NBR_SPINOR_HALF_TEX(spinor, idx, mystride)     \
   READ_1ST_NBR_SPINOR_HALF_TEX_(spinor, idx, mystride)
@@ -691,6 +758,7 @@
     (T##1).x *= C; (T##1).y *= C;                                       \
     (T##2).x *= C; (T##2).y *= C;}
 
+#ifdef USE_TEXTURE_OBJECTS
 #define READ_KS_NBR_SPINOR_GHOST_HALF_TEX_(T, spinor, idx, mystride, dir) \
   T##0 = TEX1DFETCH(float2, (spinor)[dir], idx + 0*mystride);		\
   T##1 = TEX1DFETCH(float2, (spinor)[dir], idx + 1*mystride);		\
@@ -700,6 +768,17 @@
     (T##0).x *= C; (T##0).y *= C;                                       \
     (T##1).x *= C; (T##1).y *= C;                                       \
     (T##2).x *= C; (T##2).y *= C;}
+#else
+#define READ_KS_NBR_SPINOR_GHOST_HALF_TEX_(T, spinor, idx, mystride, dir) \
+  T##0 = TEX1DFETCH(float2, (spinor), idx + 0*mystride);		\
+  T##1 = TEX1DFETCH(float2, (spinor), idx + 1*mystride);		\
+  T##2 = TEX1DFETCH(float2, (spinor), idx + 2*mystride);		\
+  {									\
+    float C = TEX1DFETCH(float, (spinor ## Norm), norm_idx3);           \
+    (T##0).x *= C; (T##0).y *= C;                                       \
+    (T##1).x *= C; (T##1).y *= C;                                       \
+    (T##2).x *= C; (T##2).y *= C;}
+#endif
 
 #define READ_KS_NBR_SPINOR_HALF_TEX(T, spinor, idx, mystride)	\
   READ_KS_NBR_SPINOR_HALF_TEX_(T, spinor, idx, mystride)

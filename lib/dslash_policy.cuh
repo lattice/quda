@@ -1947,8 +1947,11 @@ void disable_policy(QudaDslashPolicy p){
 	   enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH);
 	 }
 
+#ifdef USE_TEXTURE_OBJECTS
+         // pure zero-copy policies require texture objects
 	 enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH);
 	 enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH);
+#endif
 
 	 // Async variants are only supported on CUDA 8.0 and up
 #if (CUDA_VERSION >= 8000) && 0
