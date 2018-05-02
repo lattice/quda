@@ -157,9 +157,9 @@ namespace {
      @param[out] in Field that we are packing
      @param[in] dslash The dslash object
      @param[in] parity Field parity
-     @param[in] location Memory location where we are packing to - if
-     Host is requested, the only non-p2p halos will be sent to host
-     with p2p halos kept on the device
+     @param[in] location Memory location where we are packing to
+     - if Host is requested, the non-p2p halos will be sent to host
+     - if Remote is requested, the p2p halos will be written directly
      @param[in] packIndex Stream index where the packing kernel will run
   */
   inline void issuePack(cudaColorSpinorField &in, const DslashCuda &dslash, int parity, MemoryLocation location, int packIndex) {
@@ -351,7 +351,7 @@ namespace {
       // update the ghosts for the non-p2p directions
       for (int dim=0; dim<4; dim++) {
         for (int dir=0; dir<2; dir++) {
-          if (!comm_peer2peer_enabled(dir, dim)) {
+          if (!comm_peer2peer_enabled(1-dir, dim)) {
             dslashParam.ghost[2*dim+dir] = (void*)in.Ghost2();
             dslashParam.ghostNorm[2*dim+dir] = (float*)(in.Ghost2());
 
@@ -375,7 +375,7 @@ namespace {
       // reinstate ghosts for the non-p2p directions
       for (int dim=0; dim<4; dim++) {
         for (int dir=0; dir<2; dir++) {
-          if (!comm_peer2peer_enabled(dir, dim)) {
+          if (!comm_peer2peer_enabled(1-dir, dim)) {
             dslashParam.ghost[2*dim+dir] = (void*)in.Ghost2();
             dslashParam.ghostNorm[2*dim+dir] = (float*)(in.Ghost2());
 
