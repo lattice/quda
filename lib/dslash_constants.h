@@ -129,6 +129,9 @@ enum KernelType {
     cudaTextureObject_t cloverInvNormTex;
 #endif
 
+    // used by the autotuner to switch on/off remote writing vs using copy engines
+    bool remote_write;
+
     void print() {
       printfQuda("threads = %d\n", threads);
       printfQuda("parity = %d\n", parity);

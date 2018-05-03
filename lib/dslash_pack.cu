@@ -20,6 +20,7 @@
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <uint_to_char.h>
 
 namespace quda {
 
@@ -686,7 +687,7 @@ namespace quda {
     const int nFace;
     const int dim;
     const int face_num;
-    MemoryLocation location[2*QUDA_MAX_DIM];
+    const MemoryLocation location;
 
     // compute how many threads we need in total for the face packing
     unsigned int threads() const {
@@ -802,41 +803,29 @@ namespace quda {
       strcat(aux,comm);
       if (getKernelPackT()) { strcat(aux,",kernelPackT"); }
       switch (nFace) {
-      case 1:
-	strcat(aux,",nFace=1,location=");
-	break;
-      case 3:
-	strcat(aux,",nFace=3,location=");
-	break;
-      default:
-	errorQuda("Number of faces not supported");
+      case 1: strcat(aux,",nFace=1,"); break;
+      case 3: strcat(aux,",nFace=3,"); break;
+      default: errorQuda("Number of faces not supported");
       }
-#if 0  // FIXME need to support process divergent tuning for different PCIe topologies per GPU
-      // record the location of where each pack buffer is in [2*dim+dir] ordering
-      // 0 - no packing
-      // 1 - pack to local GPU memory
-      // 2 - pack to local mapped CPU memory
-      // 3 - pack to remote mapped GPU memory
-      char pack_location[9];
-      for (int dim=0; dim<4; dim++) {
-	for (int dir=0; dir<2; dir++) {
-	  pack_location[2*dim+dir] = !commDim[dim] ? '0' : location[2*dim+dir] == Device ? '1' : location[2*dim+dir] == Host ? '2' : '3';
-	}
+
+      // label the locations we are packing to
+      switch (location) {
+      case Device|Remote: strcat(aux,"device-remote"); break;
+      case   Host|Remote: strcat(aux,  "host-remote"); break;
+      case        Device: strcat(aux,       "device"); break;
+      case          Host: strcat(aux,         "host"); break;
+      default: errorQuda("Unknown pack target location %d\n", location);
       }
-      pack_location[8] = '\0';
-      strcat(aux,pack_location);
-#endif
     }
 
   public:
-    PackFace(void *faces_[], const cudaColorSpinorField *in, MemoryLocation location_[],
+    PackFace(void *faces_[], const cudaColorSpinorField *in, MemoryLocation location,
 	     const int dagger, const int parity, const int nFace, const int dim=-1, const int face_num=2)
       : in(in), dagger(dagger),
-	parity(parity), nFace(nFace), dim(dim), face_num(face_num) 
+	parity(parity), nFace(nFace), dim(dim), face_num(face_num), location(location)
     { 
       for (int d=0; d<2*QUDA_MAX_DIM; d++) {
 	faces[d] = faces_[d];
-	location[d] = location_[d];
       }
       fillAux(); 
       bindSpinorTex<FloatN>(in);
@@ -896,7 +885,7 @@ namespace quda {
     int outputPerSite() const { return 12; } // output is spin projected
 
   public:
-    PackFaceWilson(void *faces[], const cudaColorSpinorField *in, MemoryLocation location[],
+    PackFaceWilson(void *faces[], const cudaColorSpinorField *in, MemoryLocation location,
 		   const int dagger, const int parity)
       : PackFace<FloatN, Float>(faces, in, location, dagger, parity, 1) { }
     virtual ~PackFaceWilson() { }
@@ -919,7 +908,7 @@ namespace quda {
 
   };
 
-  void packFaceWilson(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location[],
+  void packFaceWilson(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location,
 		      const int dagger, const int parity, const cudaStream_t &stream) {
 
     switch(in.Precision()) {
@@ -957,7 +946,7 @@ namespace quda {
     Float b;
 
   public:
-    PackFaceTwisted(void *faces[], const cudaColorSpinorField *in, MemoryLocation location[],
+    PackFaceTwisted(void *faces[], const cudaColorSpinorField *in, MemoryLocation location,
 		    const int dagger, const int parity, Float a, Float b)
       : PackFace<FloatN, Float>(faces, in, location, dagger, parity, 1), a(a), b(b) { }
     virtual ~PackFaceTwisted() { }
@@ -982,7 +971,7 @@ namespace quda {
   };
 
   //!
-  void packTwistedFaceWilson(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location[], const int dagger,
+  void packTwistedFaceWilson(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location, const int dagger,
 			     const int parity, const double a, const double b, const cudaStream_t &stream) {
 
     switch(in.Precision()) {
@@ -1320,7 +1309,7 @@ namespace quda {
 
 
   public:
-    PackFaceStaggered(void *faces[], const cudaColorSpinorField *in, MemoryLocation location[],
+    PackFaceStaggered(void *faces[], const cudaColorSpinorField *in, MemoryLocation location,
 		      const int nFace, const int dagger, const int parity,
 		      const int dim, const int face_num, const int* R=NULL, const bool unpack=false)
       : PackFace<FloatN, Float>(faces, in, location, dagger, parity, nFace, dim, face_num), R(R), unpack(unpack) { }
@@ -1397,7 +1386,7 @@ namespace quda {
   };
 
 
-  void packFaceStaggered(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location[], int nFace,
+  void packFaceStaggered(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location, int nFace,
 			 int dagger, int parity, const int dim, const int face_num, const cudaStream_t &stream) {
 
     switch(in.Precision()) {
@@ -1424,7 +1413,7 @@ namespace quda {
     }
   }
 
-  void packFaceExtendedStaggered(void *buffer[], cudaColorSpinorField &field, MemoryLocation location[],  const int nFace, const int R[],
+  void packFaceExtendedStaggered(void *buffer[], cudaColorSpinorField &field, MemoryLocation location,  const int nFace, const int R[],
 				 int dagger, int parity, const int dim, const int face_num, const cudaStream_t &stream, bool unpack=false)
   {
     switch(field.Precision()){
@@ -1602,7 +1591,7 @@ namespace quda {
     int outputPerSite() const { return 12; } // output is spin projected
 
   public:
-    PackFaceDW(void *faces[], const cudaColorSpinorField *in, MemoryLocation location[],
+    PackFaceDW(void *faces[], const cudaColorSpinorField *in, MemoryLocation location,
 	       const int dagger, const int parity)
     : PackFace<FloatN, Float>(faces, in, location, dagger, parity, 1) { }
     virtual ~PackFaceDW() { }
@@ -1635,7 +1624,7 @@ namespace quda {
     int outputPerSite() const { return 12; } // output is spin projected
 
   public:
-    PackFaceDW4D(void *faces[], const cudaColorSpinorField *in, MemoryLocation location[],
+    PackFaceDW4D(void *faces[], const cudaColorSpinorField *in, MemoryLocation location,
 		 const int dagger, const int parity)
       : PackFace<FloatN, Float>(faces, in, location, dagger, parity, 1) { }
     virtual ~PackFaceDW4D() { }
@@ -1659,7 +1648,7 @@ namespace quda {
     long long flops() const { return outputPerSite()*this->threads(); }
   };
 
-  void packFaceDW(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location[], const int dagger,
+  void packFaceDW(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location, const int dagger,
 		  const int parity, const cudaStream_t &stream) {
 
 
@@ -1795,7 +1784,7 @@ namespace quda {
     int outputPerSite() const { return 12; } // output is spin projected
 
   public:
-    PackFaceNdegTM(void *faces[], const cudaColorSpinorField *in, MemoryLocation location[],
+    PackFaceNdegTM(void *faces[], const cudaColorSpinorField *in, MemoryLocation location,
 		   const int dagger, const int parity)
       : PackFace<FloatN, Float>(faces, in, location, dagger, parity, 1) { }
     virtual ~PackFaceNdegTM() { }
@@ -1819,7 +1808,7 @@ namespace quda {
     long long flops() const { return outputPerSite()*this->threads(); }
   };
 
-  void packFaceNdegTM(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location[], const int dagger,
+  void packFaceNdegTM(void *ghost_buf[], cudaColorSpinorField &in, MemoryLocation location, const int dagger,
 		      const int parity, const cudaStream_t &stream) {
 
     switch(in.Precision()) {
@@ -1847,7 +1836,7 @@ namespace quda {
   }
 
   void packFace(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &in,
-		MemoryLocation location[], const int nFace,
+		MemoryLocation location, const int nFace,
 		const int dagger, const int parity, 
 		const int dim, const int face_num, 
 		const cudaStream_t &stream, 
@@ -1893,7 +1882,7 @@ namespace quda {
 
 
   void packFaceExtended(void* buffer[2*QUDA_MAX_DIM], cudaColorSpinorField &field,
-			MemoryLocation location[], const int nFace, const int R[],
+			MemoryLocation location, const int nFace, const int R[],
 			const int dagger, const int parity, const int dim, const int face_num, 
 			const cudaStream_t &stream, const bool unpack)
   {
