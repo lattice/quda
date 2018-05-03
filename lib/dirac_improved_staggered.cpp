@@ -162,11 +162,6 @@ namespace quda {
 
   void DiracImprovedStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    errorQuda("DiracImprovedStaggeredPC::M() is not implemented\n");
-  }
-
-  void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
-  {
     bool reset = newTmp(&tmp1, in);
   
     QudaParity parity = QUDA_INVALID_PARITY;
@@ -186,18 +181,82 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
+  void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    // need extra temporary because of preconditioning dagger
+    // and for multi-gpu the input and output fields cannot alias
+    bool reset = newTmp(&tmp2, in);
+    M(*tmp2, in);
+    Mdag(out, *tmp2);
+    deleteTmp(&tmp2, reset);
+  }
+
   void DiracImprovedStaggeredPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 				 ColorSpinorField &x, ColorSpinorField &b, 
 				 const QudaSolutionType solType) const
   {
-    src = &b;
-    sol = &x;  
+    // we desire the solution to the preconditioned system
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      src = &b;
+      sol = &x;
+      return;
+    }
+
+    // we desire the solution to the full system
+    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      // src = 2m b_e - D_eo b_o
+      src = &(x.Odd());
+      // Exploit (massless) staggered being anti-Hermitian: 
+      // set the dagger boolean to get the "-" in "- D_eo"
+      flipDagger();
+      DiracImprovedStaggered::DslashXpay(*src, b.Odd(), QUDA_EVEN_PARITY, b.Even(), 2*mass);
+      flipDagger();
+      sol = &(x.Even());
+    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      // src = 2m b_o - D_oe b_e
+      src = &(x.Even());
+      // Exploit (massless) staggered being anti-Hermitian: 
+      // set the dagger boolean to get the "-" in "- D_oe"
+      flipDagger();
+      DiracImprovedStaggered::DslashXpay(*src, b.Even(), QUDA_ODD_PARITY, b.Odd(), 2*mass);
+      flipDagger();
+      sol = &(x.Odd());
+    } else {
+      errorQuda("MatPCType %d not valid for DiracStaggeredPC", matpcType);
+    }
+    
   }
 
   void DiracImprovedStaggeredPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				     const QudaSolutionType solType) const
   {
-    // do nothing
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      return;
+    }
+
+    checkFullSpinor(x, b);
+
+    // create full solution
+
+    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      // x_o = 1/(2m)(b_o - D_oe x_e)
+
+      // Exploit anti-Hermiticity to get the "-" in "- D_oe"
+      flipDagger();
+      DiracImprovedStaggered::DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), 1);
+      flipDagger();
+      blas::ax(1.0/(2*mass), x.Odd());
+    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      // x_e = 1/(2m)(b_e - D_eo x_o)
+
+      // Exploit anti-Hermiticity to get the "-" in "- D_eo"
+      flipDagger();
+      DiracImprovedStaggered::DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), 1);
+      flipDagger();
+      blas::ax(1.0/(2*mass), x.Even());
+    } else {
+      errorQuda("MatPCType %d not valid for DiracStaggeredPC", matpcType);
+    }
   }
 
 } // namespace quda

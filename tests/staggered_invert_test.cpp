@@ -57,6 +57,7 @@ extern int ydim;
 extern int zdim;
 extern int tdim;
 extern int gridsize_from_cmdline[];
+extern QudaMatPCType matpc_type; // preconditioning type
 
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
@@ -159,9 +160,38 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->verbosity_precondition = QUDA_SILENT;
   inv_param->cuda_prec_precondition = inv_param->cuda_prec_sloppy;
 
-  inv_param->solution_type = dslash_type == QUDA_LAPLACE_DSLASH ? QUDA_MAT_SOLUTION : QUDA_MATPCDAG_MATPC_SOLUTION;
-  inv_param->solve_type = dslash_type == QUDA_LAPLACE_DSLASH ? solve_type : QUDA_NORMOP_PC_SOLVE;
-  inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
+  if (dslash_type == QUDA_LAPLACE_DSLASH) {
+    inv_param->solution_type = QUDA_MAT_SOLUTION;
+    inv_param->solve_type = solve_type;
+  } else {
+    switch (solve_type) {
+      case QUDA_DIRECT_SOLVE:
+        inv_param->solution_type = QUDA_MAT_SOLUTION;
+        inv_param->solve_type = solve_type;
+        break;
+      case QUDA_NORMOP_SOLVE:
+        inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+        inv_param->solve_type = QUDA_DIRECT_PC_SOLVE;
+        break;
+      case QUDA_DIRECT_PC_SOLVE:
+        inv_param->solution_type = QUDA_MATPC_SOLUTION;
+        inv_param->solve_type = solve_type;
+        break;
+      case QUDA_NORMOP_PC_SOLVE:
+        inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+        inv_param->solve_type = QUDA_DIRECT_PC_SOLVE;
+        break;
+      default:
+        printfQuda("Unsupported --solve-type %d\n", (int)solve_type);
+        exit(0);
+        break;
+    }
+  }
+  /*inv_param->solution_type = dslash_type == QUDA_LAPLACE_DSLASH ? QUDA_MAT_SOLUTION : 
+                              (solve_type == QUDA_DIRECT_SOLVE ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION);
+  inv_param->solve_type = solve_type; //dslash_type == QUDA_LAPLACE_DSLASH ? solve_type : QUDA_NORMOP_PC_SOLVE;
+  */
+  inv_param->matpc_type = matpc_type;
   inv_param->dagger = QUDA_DAG_NO;
   inv_param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
@@ -175,7 +205,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->dslash_type = dslash_type;
 
   inv_param->sp_pad = X1*X2*X3/2;
-  inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+  inv_param->use_init_guess = QUDA_USE_INIT_GUESS_NO; // to avoid some complaining
 
   inv_param->input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param->output_location = QUDA_CPU_FIELD_LOCATION;
