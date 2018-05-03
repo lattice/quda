@@ -74,8 +74,11 @@ namespace quda {
     cudaEvent_t dslashStart[2];
 
     // FIX this is a hack from hell
-    // Auxiliary work that can be done while waiting on comms to finis
+    // Auxiliary work that can be done while waiting on comms to finish
     Worker *aux_worker;
+    // Any auxiliary communication op that can be done during computational stage
+    // Note that this object can be an alias of aux_worker
+    Worker *aux_communicator;
 
 #if CUDA_VERSION >= 8000
     cuuint32_t *commsEnd_h;
@@ -101,7 +104,8 @@ namespace quda {
     cudaEventCreateWithFlags(&interiorDslashEnd, cudaEventDisableTiming);
 #endif
 
-    aux_worker = NULL;
+    aux_worker = nullptr;
+    aux_communicator = nullptr;
 
 #if CUDA_VERSION >= 8000
     commsEnd_h = static_cast<cuuint32_t*>(mapped_malloc(Nstream*sizeof(int)));

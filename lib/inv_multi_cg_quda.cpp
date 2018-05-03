@@ -103,6 +103,8 @@ namespace quda {
 #endif
       if (++count == n_update) count = 0;
     }
+
+    void async_global_reduction(const cudaStream_t &stream) {  } 
     
   };
 

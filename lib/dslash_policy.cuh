@@ -125,6 +125,9 @@ namespace {
   {
     InteriorParam* param = static_cast<InteriorParam*>(interiorParam);
     cudaSetDevice(param->current_device); // set device in the new thread
+
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(param->dslash->apply(streams[Nstream-1]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
     return nullptr;
@@ -391,10 +394,13 @@ struct DslashBasic : DslashPolicyImp {
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = Nstream-1;
+
     issuePack(*in, dslash, 1-parity, Device, packIndex);
 
     issueGather(*in, dslash);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -647,6 +653,8 @@ struct DslashFusedExterior : DslashPolicyImp {
 
     issueGather(*in, dslash);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -722,6 +730,8 @@ struct DslashGDR : DslashPolicyImp {
     const int packIndex = Nstream-1;
     issuePack(*in, dslash, 1-parity, Device, packIndex);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -800,6 +810,8 @@ struct DslashFusedGDR : DslashPolicyImp {
     const int packIndex = Nstream-1;
     issuePack(*in, dslash, 1-parity, Device, packIndex);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -879,6 +891,8 @@ struct DslashGDRRecv : DslashPolicyImp {
 
     issueGather(*in, dslash);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -957,6 +971,8 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
 
     issueGather(*in, dslash);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -1046,6 +1062,8 @@ struct DslashAsync : DslashPolicyImp {
 
     issueGather(*in, dslash);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -1155,6 +1173,8 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 
     issueGather(*in, dslash);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -1255,6 +1275,8 @@ struct DslashZeroCopyPack : DslashPolicyImp {
     PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-parity, Host, packIndex);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -1344,6 +1366,8 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -1427,6 +1451,8 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
     PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-parity, Host, packIndex);
 
+//launch any aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -1507,6 +1533,8 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
 
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -1583,6 +1611,8 @@ struct DslashZeroCopy : DslashPolicyImp {
     PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-parity, Host, packIndex);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
@@ -1667,6 +1697,8 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
     PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-parity, Host, packIndex);
 
+//launch any async. aux communication task:
+    if (aux_communicator) aux_communicator->async_global_reduction(streams[Nstream-1]);
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
