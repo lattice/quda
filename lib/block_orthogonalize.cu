@@ -62,7 +62,6 @@ namespace quda {
       int geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
       geoBlockSizeCB = geoBlockSize/2;
-      int chiralBlocks = (fineSpin==1) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
       coarseVolume = meta.Volume() / geoBlockSize;
       fineVolumeCB = meta.VolumeCB();
       if (nParity != 2) errorQuda("BlockOrtho only presently supports full fields");
