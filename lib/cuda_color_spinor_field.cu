@@ -1675,23 +1675,24 @@ namespace quda {
   template<typename Float,int Ns, int Nc>
   void genericCudaPrintVector(const cudaColorSpinorField& field, unsigned int i)
   {
-    switch (field.FieldOrder())
-    {
-      case QUDA_FLOAT_FIELD_ORDER:
-        genericCudaPrintVector<Float,Ns,Nc,QUDA_FLOAT_FIELD_ORDER>(field,i);
-        break;
-      case QUDA_FLOAT2_FIELD_ORDER:
-        genericCudaPrintVector<Float,Ns,Nc,QUDA_FLOAT2_FIELD_ORDER>(field,i);
-        break;
-      case QUDA_FLOAT4_FIELD_ORDER:
-        genericCudaPrintVector<Float,Ns,Nc,QUDA_FLOAT4_FIELD_ORDER>(field,i);
-        break;
-      case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER:
-        genericCudaPrintVector<Float,Ns,Nc,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(field,i);
-        break;
-      case QUDA_SPACE_COLOR_SPIN_FIELD_ORDER:
-        genericCudaPrintVector<Float,Ns,Nc,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER>(field,i);
-        break;
+    switch (field.FieldOrder()) {
+    case QUDA_FLOAT_FIELD_ORDER:
+      genericCudaPrintVector<Float,Ns,Nc,QUDA_FLOAT_FIELD_ORDER>(field,i);
+      break;
+    case QUDA_FLOAT2_FIELD_ORDER:
+      genericCudaPrintVector<Float,Ns,Nc,QUDA_FLOAT2_FIELD_ORDER>(field,i);
+      break;
+    case QUDA_FLOAT4_FIELD_ORDER:
+      genericCudaPrintVector<Float,Ns,Nc,QUDA_FLOAT4_FIELD_ORDER>(field,i);
+      break;
+    case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER:
+      genericCudaPrintVector<Float,Ns,Nc,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(field,i);
+      break;
+    case QUDA_SPACE_COLOR_SPIN_FIELD_ORDER:
+      genericCudaPrintVector<Float,Ns,Nc,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER>(field,i);
+      break;
+    default:
+      errorQuda("Unsupported field order %d", field.FieldOrder());
     }
   }
 
