@@ -102,6 +102,7 @@ endif()
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
+# propagate CXX flags to CUDA host compiler
 if(USING_CUDA_LANG_SUPPORT AND ${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
     $<$<CONFIG:DEVEL>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVEL}>
@@ -111,6 +112,15 @@ if(USING_CUDA_LANG_SUPPORT AND ${QUDA_PROPAGATE_CXX_FLAGS})
     $<$<CONFIG:HOSTDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_HOSTDEBUG}>
     $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> 
     >)
+endif()
+
+# some clang warnings shouds be warning even when turning warnings into errors
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field>)
+# this is a hack to get colored diagnostics back when using Ninja and clang
+    if(CMAKE_GENERATOR MATCHES "Ninja")
+      target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
+    endif()
 endif()
 
 target_link_libraries(quda ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
