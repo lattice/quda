@@ -830,7 +830,7 @@ namespace quda {
       }
 
       // label the locations we are packing to
-      switch (location) {
+      switch ((int)location) {
       case Device|Remote: strcat(aux,"device-remote"); break;
       case   Host|Remote: strcat(aux,  "host-remote"); break;
       case        Device: strcat(aux,       "device"); break;
