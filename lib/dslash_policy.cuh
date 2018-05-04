@@ -174,15 +174,14 @@ namespace {
         { pack = true; break; }
 
     MemoryLocation pack_dest[2*QUDA_MAX_DIM];
-    // always packing to local device for p2p directions, and if requested pack to host (zero copy)
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
         if ( (location & Remote) && comm_peer2peer_enabled(dir,dim) ) {
-          pack_dest[2*dim+dir] = Remote;
-        } else if ( location & Host ) {
-          pack_dest[2*dim+dir] = Host;
+          pack_dest[2*dim+dir] = Remote; // pack to p2p remote
+        } else if ( location & Host && !comm_peer2peer_enabled(dir,dim) ) {
+          pack_dest[2*dim+dir] = Host;   // pack to cpu memory
         } else {
-          pack_dest[2*dim+dir] = Device;
+          pack_dest[2*dim+dir] = Device; // pack to local gpu memory
         }
       }
     }
