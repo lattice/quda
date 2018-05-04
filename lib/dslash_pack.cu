@@ -1485,7 +1485,7 @@ namespace quda {
 
     int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (face_idx < param.threads) {
+    while (tid < param.threads) {
 
       // determine which dimension we are packing
       int face_idx;
