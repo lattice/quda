@@ -995,13 +995,16 @@ void qudaInvert(int external_precision,
     gaugeParam.ga_pad = fat_pad;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam);
-
-    gaugeParam.type = QUDA_THREE_LINKS;
-    gaugeParam.ga_pad = long_pad;
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
-
+    if(longlink != NULL) {
+      gaugeParam.type = QUDA_THREE_LINKS;
+      gaugeParam.ga_pad = long_pad;
+      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+      loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+    }
     invalidate_quda_gauge = false;
+  }
+  if(longlink == NULL) {
+    invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
   }
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X)*host_precision;
