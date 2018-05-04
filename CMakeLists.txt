@@ -49,9 +49,12 @@ endif()
 #
 project("QUDA" VERSION 0.9.0)
 
-if(NOT GITVERSION)
-  set(GITVERSION ${PROJECT_VERSION})
-endif()
+message(STATUS "")
+message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
+message(STATUS "cmake version: ${CMAKE_VERSION}")
+message(STATUS "Source location: ${CMAKE_SOURCE_DIR}")
+message(STATUS "Build location: ${CMAKE_BINARY_DIR}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 
 #######################################################################
@@ -64,8 +67,10 @@ else()
   set(QUDA_DEFAULT_GPU_ARCH sm_35)
 endif()
 if(NOT QUDA_GPU_ARCH)
-  message ("-- Building QUDA for arch " "${QUDA_DEFAULT_GPU_ARCH}")
+  message (STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
 endif()
+message(STATUS "")
+
 
 set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70)
@@ -126,6 +131,7 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 #######################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
 set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
+set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)")
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
@@ -149,6 +155,7 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
+mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
 mark_as_advanced(QUDA_NUMA_NVML)
@@ -174,17 +181,6 @@ set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 # we need to check for some packages
 find_package(PythonInterp)
 
-if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
-  find_package(CUDAWrapper)
-  set(USING_CUDA_LANG_SUPPORT True)
-  set(CMAKE_CUDA_STANDARD 11)
-  set(CMAKE_CUDA_STANDARD_REQUIRED True)
-else()
-  set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host side compiler used by NVCC")
-  mark_as_advanced(CUDA_HOST_COMPILER)
-  find_package(CUDA REQUIRED)
-  set(USING_CUDA_LANG_SUPPORT False)
-endif()
 
 #######################################################################
 ## QUDA depends on Eigen
@@ -232,6 +228,25 @@ find_package(Threads REQUIRED)
 
 if(QUDA_MPI OR QUDA_QMP)
   add_definitions(-DMULTI_GPU)
+
+  
+# if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line check for MPICXX and MPICC environment variables
+if(NOT MPI_CXX_COMPILER)
+  message("MPI ${MPI_CXX_COMPILER} $ENV{MPICXX}")
+endif()
+  if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
+    set(MPI_CXX_COMPILER $ENV{MPICXX})
+    set(mpimessage True)
+    message(STATUS "Found environment variable MPICXX. Using it for MPI detection: $ENV{MPICXX}")
+  endif()
+  if((NOT MPI_C_COMPILER) AND DEFINED ENV{MPICC})
+    message(STATUS "Found environment variable MPICC. Using it for MPI detection: $ENV{MPICC}")
+    set(MPI_C_COMPILER $ENV{MPICC})
+    set(mpimessage True)
+  endif() 
+  if(mpimessage)
+    message("Found MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation.")
+  endif()
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
@@ -473,14 +488,6 @@ if(QUDA_INTERFACE_TIFR)
   add_definitions(-DBUILD_TIFR_INTERFACE)
 endif(QUDA_INTERFACE_TIFR)
 
-# derive whether we need to build the fortran interface
-if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
-  SET(BUILD_FORTRAN_INTERFACE ON)
-  enable_language(Fortran)
-endif()
-
-
-
 if(QUDA_NUMA_NVML)
   add_definitions(-DNUMA_NVML)
   set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
@@ -488,10 +495,121 @@ if(QUDA_NUMA_NVML)
   include_directories(SYSTEM NVML_INCLUDE_DIR)
 endif(QUDA_NUMA_NVML)
 
-
 if(QUDA_CONTRACT)
   add_definitions(-DGPU_CONTRACT)
 endif(QUDA_CONTRACT)
+
+
+#define CXX FLAGS
+set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
+"Flags used by the C++ compiler during regular development builds." FORCE)
+set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
+"Flags used by the C++ compiler during strict jenkins builds.")
+set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
+    "Flags used by the C++ compiler during release builds.")
+set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
+    "Flags used by the C++ compiler during host-debug builds.")
+set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas ${CLANG_FORCE_COLOR}" CACHE STRING
+    "Flags used by the C++ compiler during device-debug builds.")
+set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
+    "Flags used by the C++ compiler during full (host+device) debug builds.")
+
+enable_language(CXX)
+
+#define C FLAGS
+set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
+    "Flags used by the C compiler during regular development builds.")
+set(CMAKE_C_FLAGS_STRICT "-Wall -O3 -Werror -Wno-error=unused-private-field"  CACHE STRING
+    "Flags used by the C compiler during strict jenkins builds.")
+set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING
+    "Flags used by the C compiler during release builds.")
+set(CMAKE_C_FLAGS_HOSTDEBUG "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
+    "Flags used by the C compiler during host-debug builds.")
+set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
+"Flags used by the C compiler during device-debug builds.")
+set(CMAKE_C_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+    "Flags used by the C compiler during full (host+device) debug builds.")
+
+
+enable_language(C)
+#define FORTRAN FLAGS
+set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
+
+# derive whether we need to build the fortran interface
+if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
+  SET(BUILD_FORTRAN_INTERFACE ON)
+  enable_language(Fortran)
+endif()
+
+
+if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
+  set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
+  set(USING_CUDA_LANG_SUPPORT True)
+  set(CMAKE_CUDA_STANDARD 11)
+  set(CMAKE_CUDA_STANDARD_REQUIRED True)
+  mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
+else()
+  set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
+  mark_as_advanced(CUDA_HOST_COMPILER)
+  find_package(CUDA REQUIRED)
+  set(USING_CUDA_LANG_SUPPORT False)
+endif()
+
+# NVCC FLAGS independet off build type
+if(NOT USING_CUDA_LANG_SUPPORT)
+  set(QUDA_NVCC_FLAGS -Wno-deprecated-gpu-targets -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+  if(QUDA_VERBOSE_BUILD)
+    LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
+  endif(QUDA_VERBOSE_BUILD)
+else()
+  set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
+  set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
+  if(QUDA_VERBOSE_BUILD)
+      set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --ptxas-options=-v" CACHE STRING "Flags used by the CUDA compiler" FORCE)
+  endif(QUDA_VERBOSE_BUILD)
+endif()
+
+
+if(NOT USING_CUDA_LANG_SUPPORT)
+## define CUDA flags when CMake < 3.8
+set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
+    "Flags used by the CUDA compiler during regular development builds."
+    FORCE )
+set(CUDA_NVCC_FLAGS_STRICT ${CUDA_NVCC_FLAGS_DEVEL} CACHE STRING
+    "Flags used by the CUDA compiler during strict jenkins builds."
+    FORCE )
+set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
+    "Flags used by the C++ compiler during release builds."
+    FORCE )
+set(CUDA_NVCC_FLAGS_HOSTDEBUG ${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG CACHE STRING
+    "Flags used by the C++ compiler during host-debug builds."
+    FORCE )
+set(CUDA_NVCC_FLAGS_DEVICEDEBUG ${QUDA_NVCC_FLAGS} -G CACHE STRING
+    "Flags used by the C++ compiler during device-debug builds."
+    FORCE )
+set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
+    "Flags used by the C++ compiler during full (host+device) debug builds."
+    FORCE )
+
+else()
+
+## define CUDA flags when CMake >= 3.8
+set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
+set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -lineinfo -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}" CACHE STRING
+    "Flags used by the CUDA compiler during regular development builds.")
+set(CMAKE_CUDA_FLAGS_STRICT "${CMAKE_CUDA_FLAGS_DEVEL}" CACHE STRING
+    "Flags used by the CUDA compiler during strict jenkins builds.")
+set(CMAKE_CUDA_FLAGS_RELEASE "${QUDA_NVCC_FLAGS} -O3 -w" CACHE STRING
+    "Flags used by the CUDA compiler during release builds.")
+set(CMAKE_CUDA_FLAGS_HOSTDEBUG "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG" CACHE STRING
+    "Flags used by the C++ compiler during host-debug builds.")
+set(CMAKE_CUDA_FLAGS_DEVICEDEBUG "${QUDA_NVCC_FLAGS} -G" CACHE STRING
+    "Flags used by the C++ compiler during device-debug builds.")
+set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
+    "Flags used by the C++ compiler during full (host+device) debug builds." )
+
+  find_package(CUDAWrapper)
+endif()
 
 
 # COMPILER OPTIONS and BUILD types
@@ -500,7 +618,12 @@ include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
 include_directories(include)
 include_directories(lib)
 
+
+
 # QUDA_HASH for tunecache
+if(NOT GITVERSION)
+  set(GITVERSION ${PROJECT_VERSION})
+endif()
 file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION" )
 STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
@@ -523,125 +646,38 @@ if(DEBUG_BUILD)
   endif()
 endif()
 
-set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
-
-
 # GPU ARCH
+set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 SET(COMP_CAP "${COMP_CAP}0")
 add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
-
-# NVCC FLAGS independet off build type
-if(NOT USING_CUDA_LANG_SUPPORT)
-  set(QUDA_NVCC_FLAGS -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
-else()
-  set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
-  set(CMAKE_CUDA_FLAGS "-arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
-endif()
-
-
-if(QUDA_VERBOSE_BUILD)
-  LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
-endif(QUDA_VERBOSE_BUILD)
-
-# some clang warnings shouds be warning even when turning warnings into errors
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CLANG_NOERROR "-Wno-error=unused-private-field")
-# this is a hack to get colored diagnostics back when using Ninja and clang
-    if(CMAKE_GENERATOR MATCHES "Ninja")
-      set(CLANG_FORCE_COLOR "-fcolor-diagnostics")
-    endif()
-endif()
-
-## define CUDA flags when CMake < 3.8
-set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
-    "Flags used by the CUDA compiler during regular development builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_STRICT ${CUDA_NVCC_FLAGS_DEVEL} CACHE STRING
-    "Flags used by the CUDA compiler during strict jenkins builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
-    "Flags used by the C++ compiler during release builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_HOSTDEBUG ${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG CACHE STRING
-    "Flags used by the C++ compiler during host-debug builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_DEVICEDEBUG ${QUDA_NVCC_FLAGS} -G CACHE STRING
-    "Flags used by the C++ compiler during device-debug builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
-    "Flags used by the C++ compiler during full (host+device) debug builds."
-    FORCE )
-
-## define CUDA flags when CMake >= 3.8
-set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo" CACHE STRING
-    "Flags used by the CUDA compiler during regular development builds."
-    FORCE )
-set(CMAKE_CUDA_FLAGS_STRICT "${CMAKE_CUDA_FLAGS_DEVEL}" CACHE STRING
-    "Flags used by the CUDA compiler during strict jenkins builds."
-    FORCE )
-set(CMAKE_CUDA_FLAGS_RELEASE "${QUDA_NVCC_FLAGS} -O3 -w" CACHE STRING
-    "Flags used by the CUDA compiler during release builds."
-    FORCE )
-set(CMAKE_CUDA_FLAGS_HOSTDEBUG "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG" CACHE STRING
-    "Flags used by the C++ compiler during host-debug builds."
-    FORCE )
-set(CMAKE_CUDA_FLAGS_DEVICEDEBUG "${QUDA_NVCC_FLAGS} -G" CACHE STRING
-    "Flags used by the C++ compiler during device-debug builds."
-    FORCE )
-set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
-    "Flags used by the C++ compiler during full (host+device) debug builds."
-    FORCE )
-
-#define CXX FLAGS
-set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
-"Flags used by the C++ compiler during regular development builds.")
-set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
-"Flags used by the C++ compiler during strict jenkins builds.")
-set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
-    "Flags used by the C++ compiler during release builds.")
-set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
-    "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas ${CLANG_FORCE_COLOR}" CACHE STRING
-    "Flags used by the C++ compiler during device-debug builds.")
-set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
-    "Flags used by the C++ compiler during full (host+device) debug builds.")
-
-#define C FLAGS
-set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
-    "Flags used by the C compiler during regular development builds.")
-set(CMAKE_C_FLAGS_STRICT "-Wall -O3 -Werror -Wno-error=unused-private-field"  CACHE STRING
-    "Flags used by the C compiler during strict jenkins builds.")
-set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING
-    "Flags used by the C compiler during release builds.")
-set(CMAKE_C_FLAGS_HOSTDEBUG "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
-    "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
-"Flags used by the C compiler during device-debug builds.")
-set(CMAKE_C_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
-    "Flags used by the C compiler during full (host+device) debug builds.")
-
-#define FORTRAN FLAGS
-set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
-
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by default )
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
-mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
-mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
-
 mark_as_advanced(CUDA_NVCC_FLAGS_DEVEL)
 mark_as_advanced(CUDA_NVCC_FLAGS_STRICT)
+mark_as_advanced(CUDA_NVCC_FLAGS_RELEASE)
+mark_as_advanced(CUDA_NVCC_FLAGS_DEBUG)
 mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
 mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
+
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
+mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVICEDEBUG)
 
+mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
+mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
+mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
+mark_as_advanced(CMAKE_CXX_FLAGS_DEBUG)
+mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
+mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
+
 mark_as_advanced(CMAKE_C_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_C_FLAGS_STRICT)
+mark_as_advanced(CMAKE_C_FLAGS_RELEASE)
+mark_as_advanced(CMAKE_C_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 
