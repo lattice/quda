@@ -805,12 +805,12 @@ static inline __device__ bool isActive(const int threadDim, int offsetDim, int o
   @return dimension this face_idx corresponds to
 */
 template <int nDim=4, typename Param>
-__device__ inline int dimFromFaceIndex(int &face_idx, const Param &param){
+__device__ inline int dimFromFaceIndex(int &face_idx, const int tid, const Param &param){
 
   // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
-  const int s = (nDim == 5 ? face_idx/param.threads : 0);
+  const int s = (nDim == 5 ? tid/param.threads : 0);
 
-  face_idx = face_idx - s*param.threads; // face_idx = face_idx % param.threads
+  face_idx = tid - s*param.threads; // face_idx = face_idx % param.threads
 
   if (face_idx < param.threadDimMapUpper[0]){
     face_idx += s*param.threadDimMapUpper[0];
@@ -830,6 +830,8 @@ __device__ inline int dimFromFaceIndex(int &face_idx, const Param &param){
   }
 }
 
+template <int nDim=4, typename Param>
+__device__ inline int dimFromFaceIndex(int &face_idx, const Param &param) { return dimFromFaceIndex(face_idx, face_idx, param); }
 
 /**
   @brief Compute the face index from the lattice coordinates.
