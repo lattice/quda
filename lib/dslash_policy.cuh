@@ -453,7 +453,8 @@ struct DslashBasic : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -602,7 +603,8 @@ struct DslashPthreads : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger,  dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) ? in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -705,7 +707,8 @@ struct DslashFusedExterior : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -777,7 +780,8 @@ struct DslashGDR : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, true, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -855,7 +859,8 @@ struct DslashFusedGDR : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, true, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	}
@@ -936,7 +941,8 @@ struct DslashGDRRecv : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -1014,7 +1020,8 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -1103,7 +1110,8 @@ struct DslashAsync : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
@@ -1214,7 +1222,8 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
@@ -1306,7 +1315,8 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1395,7 +1405,8 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packScatterIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1478,7 +1489,8 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1558,7 +1570,8 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1633,7 +1646,8 @@ struct DslashZeroCopy : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1714,7 +1728,8 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir

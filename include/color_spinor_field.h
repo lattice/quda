@@ -640,7 +640,8 @@ namespace quda {
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] dagger Whether this exchange is for the conjugate operator
-       @param[in] stream CUDA stream to be used (unused)
+       @param[in] stream CUDA stream that we will post the p2p event
+       synchronization to (if nullptr then stream+d will be used
        @param[in] gdr Whether we are using GDR on the send side
        @param[in] remote_write Whether we are writing direct to remote memory (or using copy engines)
     */
