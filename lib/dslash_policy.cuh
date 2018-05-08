@@ -1308,7 +1308,7 @@ struct DslashZeroCopyPack : DslashPolicyImp {
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
     for (int i=3; i>=0; i--) { // only synchronize if we need to
-      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
         cudaStreamSynchronize(streams[packIndex]);
         break;
       }
@@ -1403,7 +1403,7 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
     for (int i=3; i>=0; i--) { // only synchronize if we need to
-      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
         cudaStreamSynchronize(streams[packScatterIndex]);
         break;
       }
@@ -1492,7 +1492,7 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
     for (int i=3; i>=0; i--) { // only synchronize if we need to
-      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
         cudaStreamSynchronize(streams[packIndex]);
         break;
       }
@@ -1578,7 +1578,7 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
     for (int i=3; i>=0; i--) { // only synchronize if we need to
-      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
         cudaStreamSynchronize(streams[packIndex]);
         break;
       }
@@ -1659,7 +1659,7 @@ struct DslashZeroCopy : DslashPolicyImp {
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
     for (int i=3; i>=0; i--) { // only synchronize if we need to
-      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
         cudaStreamSynchronize(streams[packIndex]);
         break;
       }
@@ -1746,7 +1746,7 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
     for (int i=3; i>=0; i--) { // only synchronize if we need to
-      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
         cudaStreamSynchronize(streams[packIndex]);
         break;
       }
