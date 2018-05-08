@@ -77,7 +77,6 @@ namespace quda {
 			 const cudaColorSpinorField *x, const double a, const double rho, const int dagger)
       : SharedDslashCuda(out, in, x, reconstruct, dagger)
     { 
-      bindSpinorTex<sFloat>(in, out, x);
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
       dslashParam.clover = (void*)clover;
@@ -101,6 +100,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
       dslashParam.ghostTex = in->GhostTex();
       dslashParam.ghostTexNorm = in->GhostTexNorm();
+#else
+      bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
 
 #ifdef SHARED_WILSON_DSLASH
