@@ -1307,7 +1307,12 @@ struct DslashZeroCopyPack : DslashPolicyImp {
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+        cudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1397,7 +1402,12 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packScatterIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+        cudaStreamSynchronize(streams[packScatterIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1481,7 +1491,12 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+        cudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1562,7 +1577,12 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+        cudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1638,7 +1658,12 @@ struct DslashZeroCopy : DslashPolicyImp {
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+        cudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1720,7 +1745,12 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) ) {
+        cudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
