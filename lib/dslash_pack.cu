@@ -829,13 +829,15 @@ namespace quda {
       }
 
       // label the locations we are packing to
+      // location lable is nonp2p-p2p
       switch ((int)location) {
       case Device|Remote: strcat(aux,"device-remote"); break;
       case   Host|Remote: strcat(aux,  "host-remote"); break;
-      case        Device: strcat(aux,       "device"); break;
-      case          Host: strcat(aux,         "host"); break;
+      case        Device: strcat(aux,"device-device"); break;
+      case          Host: strcat(aux, comm_peer2peer_enabled_global() ? "host-device" : "host-host"); break;
       default: errorQuda("Unknown pack target location %d\n", location);
       }
+
     }
 
   public:
