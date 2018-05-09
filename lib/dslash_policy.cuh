@@ -1843,6 +1843,15 @@ struct DslashNC : DslashPolicyImp {
 
   static std::vector<QudaDslashPolicy> policies(static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
 
+  enum class QudaP2PPolicy {
+    QUDA_P2P_DEFAULT,         // no special hanlding for p2p
+    QUDA_P2P_COPY_ENGINE,     // use copy engine for p2p traffic
+    QUDA_P2P_REMOTE_WRITE,    // write packed halos directly to peers
+    QUDA_P2P_POLICY_DISABLED, // this must be the last element
+  };
+
+  static std::vector<QudaP2PPolicy> p2p_policies(static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
+
 struct DslashFactory {
 
   static DslashPolicyImp* create(const QudaDslashPolicy &dslashPolicy)
@@ -1912,18 +1921,21 @@ struct DslashFactory {
   }
 };
 
- static bool dslash_init = false;
+  static bool dslash_init = false;
 
- static int config = 0; // 2-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
- static int first_active_policy=static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+  static int config = 0; // 3-bit number used to record the machine config (first bit for gdr / two bits for p2p) and if this changes we will force a retune
 
-void enable_policy(QudaDslashPolicy p){
-  policies[static_cast<std::size_t>(p)] = p;
-}
+  static int first_active_policy=static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
 
-void disable_policy(QudaDslashPolicy p){
-  policies[static_cast<std::size_t>(p)] = QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED;
-}
+  static int first_active_p2p_policy=static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
+
+  void enable_policy(QudaDslashPolicy p){
+    policies[static_cast<std::size_t>(p)] = p;
+  }
+
+  void disable_policy(QudaDslashPolicy p){
+    policies[static_cast<std::size_t>(p)] = QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED;
+  }
 
  class DslashPolicyTune : public Tunable {
 
@@ -1951,8 +1963,17 @@ void disable_policy(QudaDslashPolicy p){
 
      if (!dslash_init) {
 
-       if (comm_peer2peer_enabled_global()) config++;
-       if (comm_gdr_enabled()) config+=2;
+       config += comm_gdr_enabled();
+       config += 2*comm_peer2peer_enabled_global();
+
+       if (comm_peer2peer_enabled_global() & 2) {
+         p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)] = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
+       }
+       if (comm_peer2peer_enabled_global() & 1) {
+         p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE)] = QudaP2PPolicy::QUDA_P2P_COPY_ENGINE;
+       }
+       p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
+       first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT); // first active policy is presently always the default
 
        static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_POLICY");
        if (dslash_policy_env) { // set the policies to tune for explicitly
@@ -2057,8 +2078,14 @@ void disable_policy(QudaDslashPolicy p){
      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
        disableProfileCount();
 
-       for (int remote=0; remote<2; remote++) {
-         dslashParam.remote_write = remote;
+       for (auto &p2p : p2p_policies) {
+
+         if (p2p == QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED) continue;
+
+         bool p2p_enabled = comm_peer2peer_enabled_global();
+         if (p2p == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false);  // disable p2p if using default policy
+         dslashParam.remote_write = (p2p == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0);
+
          for (auto &i : policies) {
 
            if ( (i == QudaDslashPolicy::QUDA_DSLASH ||
@@ -2122,7 +2149,9 @@ void disable_policy(QudaDslashPolicy p){
              errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
            }
          }
-       }
+
+         comm_enable_peer2peer(p2p_enabled); // restore p2p state
+       } // p2p policies
 
        enableProfileCount();
        setPolicyTuning(true);
@@ -2144,7 +2173,9 @@ void disable_policy(QudaDslashPolicy p){
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
      if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
 
-     dslashParam.remote_write = tp.aux.y; // set whether we are using remote packing writes or copy engines
+     bool p2p_enabled = comm_peer2peer_enabled_global();
+     if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
+     dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
 
      // switch on kernel packing for the policies that need it
      bool kernel_pack_old = getKernelPackT();
@@ -2166,6 +2197,9 @@ void disable_policy(QudaDslashPolicy p){
      (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
      delete dslashImp;
 
+     // restore p2p state
+     comm_enable_peer2peer(p2p_enabled);
+
      // restore default kernel packing
      setKernelPackT(kernel_pack_old);
    }
@@ -2181,11 +2215,11 @@ void disable_policy(QudaDslashPolicy p){
      }
      param.aux.x = first_active_policy;
 
-     if (param.aux.y == 0) {
-       param.aux.y = 1; // enable remote writes
-       return true;
+     while ((unsigned)param.aux.y < p2p_policies.size()-1) {
+       param.aux.y++;
+       if (p2p_policies[param.aux.y] != QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED) return true;
      }
-     param.aux.y = 0; // enable copy engine
+     param.aux.y = first_active_p2p_policy;
 
      return false;
    }
@@ -2194,12 +2228,12 @@ void disable_policy(QudaDslashPolicy p){
 
    void initTuneParam(TuneParam &param) const  {
      Tunable::initTuneParam(param);
-     param.aux.x = first_active_policy; param.aux.y = 0; param.aux.z = 0; param.aux.w = config;
+     param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0; param.aux.w = config;
    }
 
    void defaultTuneParam(TuneParam &param) const  {
      Tunable::defaultTuneParam(param);
-     param.aux.x = first_active_policy; param.aux.y = 0; param.aux.z = 0; param.aux.w = config;
+     param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0; param.aux.w = config;
    }
 
    TuneKey tuneKey() const {
