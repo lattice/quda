@@ -831,7 +831,7 @@ __device__ inline int dimFromFaceIndex(int &face_idx, const int tid, const Param
 }
 
 template <int nDim=4, typename Param>
-__device__ inline int dimFromFaceIndex(int &face_idx, const Param &param) { return dimFromFaceIndex(face_idx, face_idx, param); }
+__device__ inline int dimFromFaceIndex(int &face_idx, const Param &param) { return dimFromFaceIndex<nDim>(face_idx, face_idx, param); }
 
 /**
   @brief Compute the face index from the lattice coordinates.
