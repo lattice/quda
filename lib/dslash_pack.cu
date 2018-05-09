@@ -12,8 +12,6 @@
 #endif // GPU_WILSON_DIRAC
 
 
-//#define SWIZZLE
-
 #include <quda_internal.h>
 #include <dslash_quda.h>
 #include <sys/time.h>
@@ -42,6 +40,7 @@ namespace quda {
   void setPackComms(const int *comm_dim) { ; }
 #endif
 
+#define SWIZZLE
 #include <dslash_index.cuh>
 
   // routines for packing the ghost zones (multi-GPU only)
@@ -859,12 +858,16 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
 #ifdef SWIZZLE
-      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
-        param.aux.x++;
-	return true;
+      if ( tuneGridDim() ) {  // only swizzling if we're tuning the grid dim (remote writing)
+        if (param.aux.x < (int)maxGridSize()) {
+          param.aux.x++;
+          return true;
+        } else {
+          param.aux.x = 1;
+          return false;
+        }
       } else {
-        param.aux.x = 1;
-	return false;
+        return false;
       }
 #else
       return false;
