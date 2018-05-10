@@ -860,7 +860,7 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
 #ifdef SWIZZLE
-      if ( tuneGridDim() ) {  // only swizzling if we're tuning the grid dim (remote writing)
+      if ( location & Remote ) {  // only swizzling if we're doing remote writing
         if (param.aux.x < (int)maxGridSize()) {
           param.aux.x++;
           return true;
