@@ -549,7 +549,7 @@ def gen(dir, pack_only=False):
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
    #       load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
 
-    load_half_flv1 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+    load_half_flv1 += "READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, "+`dir`+");\n\n"
 
     load_half_flv2 = "// read half spinor for the second flavor from device memory\n"
     load_half_flv2 += "const int fl_idx = sp_idx + ghostFace[static_cast<int>(kernel_type)];\n"
@@ -561,7 +561,7 @@ def gen(dir, pack_only=False):
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
      #     load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
 
-    load_half_flv2 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
+    load_half_flv2 += "READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)],"+`dir`+");\n\n"
 
     project = "// project spinor into half spinors\n"
     for h in range(0, 2):

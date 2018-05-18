@@ -656,7 +656,8 @@ namespace quda {
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, 
                                        const int dim, const QudaDirection dir,
 				       const int dagger, cudaStream_t *stream, 
-				       MemoryLocation location [2*QUDA_MAX_DIM], double a, double b)
+				       MemoryLocation location [2*QUDA_MAX_DIM],
+                                       MemoryLocation location_label, double a, double b)
   {
 #ifdef MULTI_GPU
     int face_num = (dir == QUDA_BACKWARDS) ? 0 : (dir == QUDA_FORWARDS) ? 1 : 2;
@@ -666,15 +667,20 @@ namespace quda {
       for (int dir=0; dir<2; dir++) {
 	switch(location[2*dim+dir]) {
 	case Device: // pack to local device buffer
-	  packBuffer[2*dim+dir] = my_face_dim_dir_d[bufferIndex][dim][dir]; break;
+	  packBuffer[2*dim+dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
+          break;
 	case Host:   // pack to zero-copy memory
-	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir]; break;
+	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
+          break;
+	case Remote:   // pack to remote peer memory
+	  packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + precision*ghostOffset[dim][1-dir];
+          break;
 	default: errorQuda("Undefined location %d", location[2*dim+dir]);
 	}
       }
     }
 
-    packFace(packBuffer, *this, location, nFace, dagger, parity, dim, face_num, *stream, a, b);
+    packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
@@ -835,7 +841,7 @@ namespace quda {
       }
     }
 
-    packFaceExtended(packBuffer, *this, location, nFace, R, dagger, parity, dim, face_num, *stream);
+    packFaceExtended(packBuffer, *this, location[0], nFace, R, dagger, parity, dim, face_num, *stream);
 #else
     errorQuda("packGhostExtended not built on single-GPU build");
 #endif
@@ -882,7 +888,7 @@ namespace quda {
       }
     }
 
-    packFaceExtended(packBuffer, *this, location, nFace, R, dagger, parity, dim, face_num, *stream, unpack);
+    packFaceExtended(packBuffer, *this, location[0], nFace, R, dagger, parity, dim, face_num, *stream, unpack);
 #else
     errorQuda("unpackGhostExtended not built on single-GPU build");
 #endif
@@ -925,13 +931,13 @@ namespace quda {
   }
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx,
-				  MemoryLocation location[2*QUDA_MAX_DIM], double a, double b)
+				  MemoryLocation location[2*QUDA_MAX_DIM], MemoryLocation location_label, double a, double b)
   {
     createComms(nFace); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
  
-    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, a, b);
+    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label, a, b);
   }
 
   void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, 
@@ -998,7 +1004,7 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, cudaStream_t* stream_p, bool gdr) {
+  void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, cudaStream_t* stream_p, bool gdr, bool remote_write) {
 
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
@@ -1022,101 +1028,104 @@ namespace quda {
     } else { // doing peer-to-peer
       cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + d;
 
-      // all goes here
-      void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-	+ precision*ghostOffset[dim][(dir+1)%2];
-      void *ghost_norm_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-	+ QUDA_SINGLE_PRECISION*ghostNormOffset[dim][(d+1)%2];
+      // if not using copy engine then the packing kernel will remotely write the halos
+      if (!remote_write) {
+        // all goes here
+        void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
+          + precision*ghostOffset[dim][(dir+1)%2];
+        void *ghost_norm_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
+          + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][(d+1)%2];
 
-      if (dim != 3 || getKernelPackT()) {
+        if (dim != 3 || getKernelPackT()) {
 
-	cudaMemcpyAsync(ghost_dst,
-			my_face_dim_dir_d[bufferIndex][dim][dir],
-			ghost_face_bytes[dim],
-			cudaMemcpyDeviceToDevice,
-			*copy_stream); // copy to forward processor
+          cudaMemcpyAsync(ghost_dst,
+                          my_face_dim_dir_d[bufferIndex][dim][dir],
+                          ghost_face_bytes[dim],
+                          cudaMemcpyDeviceToDevice,
+                          *copy_stream); // copy to forward processor
 
-      } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) {
+        } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) {
 
-	const int x4 = nDim==5 ? x[4] : 1;
-	const int Nt_minus_offset = (volumeCB - nFace*ghostFace[3])/x4;
+          const int x4 = nDim==5 ? x[4] : 1;
+          const int Nt_minus_offset = (volumeCB - nFace*ghostFace[3])/x4;
 
-	int offset = 0;
-	if (nSpin == 1) {
-	  offset = (dir == 0) ? 0 : Nt_minus_offset;
-	} else if (nSpin == 4) {
-	  // !dagger: send lower components backwards, send upper components forwards
-	  // dagger: send upper components backwards, send lower components forwards
-	  bool upper = dagger ? true : false;
-	  if (dir == 1) upper = !upper;
-	  int lower_spin_offset = Npad*stride;
-	  if (dir == 0) {
-	    offset = upper ? 0 : lower_spin_offset;
-	  } else {
-	    offset = (upper) ? Nt_minus_offset : lower_spin_offset + Nt_minus_offset;
-	  }
-	}
+          int offset = 0;
+          if (nSpin == 1) {
+            offset = (dir == 0) ? 0 : Nt_minus_offset;
+          } else if (nSpin == 4) {
+            // !dagger: send lower components backwards, send upper components forwards
+            // dagger: send upper components backwards, send lower components forwards
+            bool upper = dagger ? true : false;
+            if (dir == 1) upper = !upper;
+            int lower_spin_offset = Npad*stride;
+            if (dir == 0) {
+              offset = upper ? 0 : lower_spin_offset;
+            } else {
+              offset = (upper) ? Nt_minus_offset : lower_spin_offset + Nt_minus_offset;
+            }
+          }
 
-	size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
-	size_t dpitch = x4*len;
-	size_t spitch = stride*Nvec*precision;
+          size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
+          size_t dpitch = x4*len;
+          size_t spitch = stride*Nvec*precision;
 
-	for (int s=0; s<x4; s++) {
-	  void *dst = (char*)ghost_dst + s*len;
-	  void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
-	  // start the copy
-	  cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
+          for (int s=0; s<x4; s++) {
+            void *dst = (char*)ghost_dst + s*len;
+            void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+            // start the copy
+            cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	  if (precision == QUDA_HALF_PRECISION) {
-	    size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
-	    int norm_offset = (dir == 0) ? 0 : Nt_minus_offset*sizeof(float);
-	    void *dst = (char*)ghost_norm_dst + s*len;
-	    void *src = static_cast<char*>(norm) + norm_offset + s*(volumeCB/x4)*sizeof(float);
-	    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
-	  }
-	}
-      } else { // twisted doublet
-	int flavorVolume = volume / 2;
-	int flavorTFace  = ghostFace[3] / 2;
-	int flavor1_Nt_minus1_offset = (flavorVolume - flavorTFace);
-	int flavor2_Nt_minus1_offset = (volume - flavorTFace);
-	int flavor1_offset = 0;
-	int flavor2_offset = 0;
-	// !dagger: send lower components backwards, send upper components forwards
-	// dagger: send upper components backwards, send lower components forwards
-	bool upper = dagger ? true : false; // Fwd is !Back
-	if (dir == 1) upper = !upper;
-	int lower_spin_offset = Npad*stride;//ndeg tm: stride=2*flavor_volume+pad
-	if (upper) {
-	  flavor1_offset = (dir == 0 ? 0 : flavor1_Nt_minus1_offset);
-	  flavor2_offset = (dir == 0 ? flavorVolume : flavor2_Nt_minus1_offset);
-	} else {
-	  flavor1_offset = lower_spin_offset + (dir == 0 ? 0 : flavor1_Nt_minus1_offset);
-	  flavor2_offset = lower_spin_offset + (dir == 0 ? flavorVolume : flavor2_Nt_minus1_offset);
-	}
+            if (precision == QUDA_HALF_PRECISION) {
+              size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
+              int norm_offset = (dir == 0) ? 0 : Nt_minus_offset*sizeof(float);
+              void *dst = (char*)ghost_norm_dst + s*len;
+              void *src = static_cast<char*>(norm) + norm_offset + s*(volumeCB/x4)*sizeof(float);
+              cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
+            }
+          }
+        } else { // twisted doublet
+          int flavorVolume = volume / 2;
+          int flavorTFace  = ghostFace[3] / 2;
+          int flavor1_Nt_minus1_offset = (flavorVolume - flavorTFace);
+          int flavor2_Nt_minus1_offset = (volume - flavorTFace);
+          int flavor1_offset = 0;
+          int flavor2_offset = 0;
+          // !dagger: send lower components backwards, send upper components forwards
+          // dagger: send upper components backwards, send lower components forwards
+          bool upper = dagger ? true : false; // Fwd is !Back
+          if (dir == 1) upper = !upper;
+          int lower_spin_offset = Npad*stride;//ndeg tm: stride=2*flavor_volume+pad
+          if (upper) {
+            flavor1_offset = (dir == 0 ? 0 : flavor1_Nt_minus1_offset);
+            flavor2_offset = (dir == 0 ? flavorVolume : flavor2_Nt_minus1_offset);
+          } else {
+            flavor1_offset = lower_spin_offset + (dir == 0 ? 0 : flavor1_Nt_minus1_offset);
+            flavor2_offset = lower_spin_offset + (dir == 0 ? flavorVolume : flavor2_Nt_minus1_offset);
+          }
 
-	// QUDA Memcpy NPad's worth.
-	//  -- Dest will point to the right beginning PAD.
-	//  -- Each Pad has size Nvec*Vsh Floats.
-	//  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
+          // QUDA Memcpy NPad's worth.
+          //  -- Dest will point to the right beginning PAD.
+          //  -- Each Pad has size Nvec*Vsh Floats.
+          //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
 
-	void *src = static_cast<char*>(v) + flavor1_offset*Nvec*precision;
-	size_t len = flavorTFace*Nvec*precision;
-	size_t spitch = stride*Nvec*precision;//ndeg tm: stride=2*flavor_volume+pad
-	size_t dpitch = 2*len;
-	cudaMemcpy2DAsync(ghost_dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
+          void *src = static_cast<char*>(v) + flavor1_offset*Nvec*precision;
+          size_t len = flavorTFace*Nvec*precision;
+          size_t spitch = stride*Nvec*precision;//ndeg tm: stride=2*flavor_volume+pad
+          size_t dpitch = 2*len;
+          cudaMemcpy2DAsync(ghost_dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	src = static_cast<char*>(v) + flavor2_offset*Nvec*precision;
-	cudaMemcpy2DAsync(static_cast<char*>(ghost_dst)+len, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
+          src = static_cast<char*>(v) + flavor2_offset*Nvec*precision;
+          cudaMemcpy2DAsync(static_cast<char*>(ghost_dst)+len, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	if (precision == QUDA_HALF_PRECISION) {
-	  int norm_offset = (dir == 0) ? 0 : flavor1_Nt_minus1_offset*sizeof(float);
-	  void *src = static_cast<char*>(norm) + norm_offset;
-	  size_t dpitch = flavorTFace*sizeof(float);
-	  size_t spitch = flavorVolume*sizeof(float);
-	  cudaMemcpy2DAsync(ghost_norm_dst, dpitch, src, spitch, flavorTFace*sizeof(float), 2, cudaMemcpyDeviceToDevice, *copy_stream);
-	}
-      }
+          if (precision == QUDA_HALF_PRECISION) {
+            int norm_offset = (dir == 0) ? 0 : flavor1_Nt_minus1_offset*sizeof(float);
+            void *src = static_cast<char*>(norm) + norm_offset;
+            size_t dpitch = flavorTFace*sizeof(float);
+            size_t spitch = flavorVolume*sizeof(float);
+            cudaMemcpy2DAsync(ghost_norm_dst, dpitch, src, spitch, flavorTFace*sizeof(float), 2, cudaMemcpyDeviceToDevice, *copy_stream);
+          }
+        }
+      } // remote_write
 
       if (dir == 0) {
 	// record the event

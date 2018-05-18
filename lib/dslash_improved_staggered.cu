@@ -95,10 +95,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-#ifdef USE_TEXTURE_OBJECTS
-      dslashParam.ghostTex = in->GhostTex();
-      dslashParam.ghostTexNorm = in->GhostTexNorm();
-#else
+#ifndef USE_TEXTURE_OBJECTS
       bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
 
