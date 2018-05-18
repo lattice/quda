@@ -1,4 +1,4 @@
-//@HEADER
+//@ORIGINAL HEADER
 // ************************************************************************
 //
 //                 Belos: Block Linear Solvers Package
@@ -37,9 +37,10 @@
 // Questions? Contact Michael A. Heroux (maherou@sandia.gov)
 //
 // ************************************************************************
-//@HEADER
+//@ORIGINAL HEADER
 //
-// This driver reads a problem from a Harwell-Boeing (HB) file.
+// Modified for QUDA tests by A. Strelchenko (astrel@fnal.gov)
+// This driver solves normal equations for the QUDA Wilson(-Clover) fermion operator
 // The right-hand-side corresponds to a randomly generated solution.
 // The initial guesses are all set to zero.
 //
@@ -101,8 +102,6 @@ using namespace quda;
 
 static int MyPID = 0;
 
-const int transfer = 0; // include transfer time in the benchmark?
-
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -113,19 +112,11 @@ QudaInvertParam inv_param;
 
 ColorSpinorParam csParam;
 
-cpuColorSpinorField *spinor, *spinorOut, *spinorRef, *spinorTmp;
-cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp1=0, *tmp2=0;
+cudaColorSpinorField *cudaSpinor, *tmp1=nullptr, *tmp2=nullptr;
 
 void *hostGauge[4], *hostClover, *hostCloverInv;
 
 Dirac *dirac = nullptr;
-
-// What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat, 3 = MatPCDagMatPC, 4 = MatDagMat)
-// README FIRST:
-// We want to solve (MdagM)^{\dagger} MdagM x = b where x and b are parity spinor. This corresponds to case 3 but 
-// matrix should by generated for noramal MatDagMat
-
-extern int test_type;
 
 // Dirac operator type
 extern QudaDslashType dslash_type;
@@ -171,10 +162,10 @@ void display_test_info()
 {
   printfQuda("running the following test:\n");
  
-  printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type    niter\n");
-  printfQuda("%6s   %2s       %d           %12s    %d    %3d/%3d/%3d        %3d             %2d   %14s   %d\n", 
+  printfQuda("prec    recon   matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type    niter\n");
+  printfQuda("%6s   %2s   %12s    %d    %3d/%3d/%3d        %3d             %2d   %14s   %d\n", 
 	     get_prec_str(prec), get_recon_str(link_recon), 
-	     test_type, get_matpc_str(matpc_type), dagger, xdim, ydim, zdim, tdim, Lsdim,
+	     get_matpc_str(matpc_type), dagger, xdim, ydim, zdim, tdim, Lsdim,
 	     get_dslash_str(dslash_type), niter);
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -230,12 +221,9 @@ void initialize(int argc, char **argv) {
   inv_param.mu = mu;
   inv_param.mass = mass;
   inv_param.Ls = Ls;
-
-  inv_param.mass = mass;
-  inv_param.mu = mu;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
   
-  inv_param.solve_type = (test_type == 2 || test_type == 4) ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE;
+  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   inv_param.matpc_type = matpc_type;
   inv_param.dagger = dagger;
   not_dagger = (QudaDagType)((dagger + 1)%2);
@@ -270,27 +258,7 @@ void initialize(int argc, char **argv) {
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // test code only supports DeGrand-Rossi Basis
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  {
-    switch(test_type) {
-      case 0:
-      case 1:
-        //inv_param.solution_type = QUDA_MATPC_SOLUTION;
-        //break;
-      case 2:
-        //inv_param.solution_type = QUDA_MAT_SOLUTION;
-        //break;
-        errorQuda("Test type %d not supported\n", test_type);
-      case 3:
-        inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-        break;
-      case 4:
-        //inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
-        //break;
-      default:
-        errorQuda("Test type %d not defined\n", test_type);
-    }
-  }
-
+  inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   inv_param.dslash_type = dslash_type;
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -310,40 +278,6 @@ void initialize(int argc, char **argv) {
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc((size_t)V*gaugeSiteSize*gauge_param.cpu_prec);
   
-  csParam.nColor = 3;
-  csParam.nSpin = 4;
-  csParam.nDim = 4;
-  for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
-  csParam.PCtype = QUDA_5D_PC;
-
-  csParam.precision = inv_param.cpu_prec;
-  csParam.pad = 0;
-
-  {
-    if (test_type < 2 || test_type == 3) {//we use type 3
-      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      csParam.x[0] /= 2;
-    } else {
-      csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    }
-  }
-
-  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = inv_param.gamma_basis;
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-///Create a reference fields?
-
-  spinor = new cpuColorSpinorField(csParam);
-  spinorOut = new cpuColorSpinorField(csParam);
-  spinorRef = new cpuColorSpinorField(csParam);
-  spinorTmp = new cpuColorSpinorField(csParam);
-
-  csParam.x[0] = gauge_param.X[0];
-  
-  printfQuda("Randomizing fields... ");
-
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, hostGauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(hostGauge, 2, gauge_param.cpu_prec, &gauge_param);
@@ -351,7 +285,6 @@ void initialize(int argc, char **argv) {
     construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
   }
 
-  spinor->Source(QUDA_RANDOM_SOURCE, 0);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
@@ -382,7 +315,17 @@ void initialize(int argc, char **argv) {
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
   }
 
-  if (!transfer) {
+  //Create a reference spinor object 
+  {
+    csParam.nColor = 3;
+    csParam.nSpin  = 4;
+    csParam.nDim   = 4;
+    for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
+    csParam.PCtype = QUDA_5D_PC;
+
+    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    csParam.create    = QUDA_ZERO_FIELD_CREATE;
+
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;
@@ -393,74 +336,40 @@ void initialize(int argc, char **argv) {
       csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
     }
  
-    if (test_type < 2 || test_type == 3) {//we use type 3
-      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      csParam.x[0] /= 2;
-    }
+    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+    csParam.x[0] /= 2;
 
-    printfQuda("Creating cudaSpinor\n");
+    printfQuda("Creating reference cudaSpinor\n");
     cudaSpinor = new cudaColorSpinorField(csParam);
-    printfQuda("Creating cudaSpinorOut\n");
-    cudaSpinorOut = new cudaColorSpinorField(csParam);
 
     tmp1 = new cudaColorSpinorField(csParam);
-
-    if (test_type == 2 || test_type == 4) csParam.x[0] /= 2;// nop here
-
-    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     tmp2 = new cudaColorSpinorField(csParam);
 
-    printfQuda("Sending spinor field to GPU\n");
-    *cudaSpinor = *spinor;
-    
-    double cpu_norm = blas::norm2(*spinor);
-    double cuda_norm = blas::norm2(*cudaSpinor);
-    printfQuda("Source: CPU = %e, CUDA = %e\n", cpu_norm, cuda_norm);
-
-    //WARNING : we need always normal (preconditioned) system, for a parity linear system, test_type =3
-    bool pc = true;//(test_type != 2 && test_type != 4);
-
     DiracParam diracParam;
-    setDiracParam(diracParam, &inv_param, pc);
+    setDiracParam(diracParam, &inv_param, /*pc=*/true);
     diracParam.tmp1 = tmp1;
     diracParam.tmp2 = tmp2;
    
     dirac = Dirac::create(diracParam);
 
-  } else {
-    double cpu_norm = blas::norm2(*spinor);
-    printfQuda("Source: CPU = %e\n", cpu_norm);
-  }
-//Now we can initialize Tpetra:
-//  Tpetra::initialize (&argc, &argv);
-//  auto comm = Tpetra::getDefaultComm ();
-//  MyPID = comm->getRank ();
+  } 
 
   return;  
 }
 
 void end() {
   
-//First, finalize Tpetra:
-//  Tpetra::finalize ();
-//Now clean local resources:
-  if (!transfer) {
-    if(dirac != NULL)
-    {
+  {
+    if(dirac != nullptr){
       delete dirac;
-      dirac = NULL;
+      dirac = nullptr;
     }
     delete cudaSpinor;
-    delete cudaSpinorOut;
     delete tmp1;
     delete tmp2;
   }
 
   // release memory
-  delete spinor;
-  delete spinorOut;
-  delete spinorRef;
-  delete spinorTmp;
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
