@@ -1,0 +1,19 @@
+profile	0.9.0	v0.9.0a1-with_v.0.8_milc_interface-157-g94831c6-dirty-debug-sm_61	cpu_arch=x86_64,gpu_arch=sm_61,cuda_version=9000	# Last updated Thu May 17 17:17:27 2018
+
+  total time	  percentage	       calls	 time / call	          volume	name	aux	comment
+     2.11686	      61.963	         238	  0.00889437	   bytes=6291456	cudaMemcpyDeviceToHost	saveSpinorField,cuda_color_spinor_field.cu,634	# 0.00 Gflop/s, 0.71 GB/s, tuned Thu May 17 17:00:13 2018
+     1.04097	     30.4704	         239	  0.00435552	   bytes=6291456	cudaMemcpyHostToDevice	loadSpinorField,cuda_color_spinor_field.cu,590	# 0.00 Gflop/s, 1.44 GB/s, tuned Thu May 17 17:00:13 2018
+   0.0494735	     1.44815	         238	 0.000207872	      8x16x16x16	N4quda16WilsonDslashCudaI7double2S1_EE	type=interior,comm=0000,ghost=0000,reconstruct=18,Xpay	# 215.65 Gflop/s, 423.73 GB/s, tuned Thu May 10 10:18:08 2018
+   0.0494735	     1.44815	         238	 0.000207872	      8x16x16x16	N4quda16WilsonDslashCudaI7double2S1_EE	type=interior,comm=0000,ghost=0000,reconstruct=18,Xpay,dagger	# 215.65 Gflop/s, 423.73 GB/s, tuned Thu May 10 10:18:08 2018
+   0.0458179	     1.34114	         238	 0.000192512	      8x16x16x16	N4quda16WilsonDslashCudaI7double2S1_EE	type=interior,comm=0000,ghost=0000,reconstruct=18,dagger	# 224.68 Gflop/s, 457.53 GB/s, tuned Thu May 10 10:18:08 2018
+   0.0453304	     1.32688	         238	 0.000190464	      8x16x16x16	N4quda16WilsonDslashCudaI7double2S1_EE	type=interior,comm=0000,ghost=0000,reconstruct=18	# 227.10 Gflop/s, 462.45 GB/s, tuned Thu May 10 10:18:08 2018
+   0.0262764	     0.76914	           4	  0.00656909	   bytes=9437184	cudaMemcpyHostToDevice	copy,cuda_gauge_field.cu,640	# 0.00 Gflop/s, 1.44 GB/s, tuned Thu May 10 10:18:07 2018
+     0.01677	    0.490879	         477	 3.51573e-05	      8x16x16x16	N4quda4blas5Norm2Id7double2S2_EE	vol=32768,stride=32768,precision=8,Ns=4,Nc=3	# 44.74 Gflop/s, 178.95 GB/s, tuned Thu May 10 10:18:08 2018
+    0.012971	    0.379677	         239	  5.4272e-05	      8x16x16x16	N4quda15CopyColorSpinorIddLi4ELi3ENS_18CopyColorSpinorArgINS_11colorspinor11FloatNOrderIdLi4ELi3ELi2ELb0EEENS2_21SpaceSpinorColorOrderIdLi4ELi3EEEEEEE	out_stride=32768,in_stride=32768,NonRelBasis	# 0.00 Gflop/s, 231.85 GB/s, tuned Thu May 10 10:18:07 2018
+   0.0119419	    0.349553	         238	  5.0176e-05	      8x16x16x16	N4quda15CopyColorSpinorIddLi4ELi3ENS_18CopyColorSpinorArgINS_11colorspinor21SpaceSpinorColorOrderIdLi4ELi3EEENS2_11FloatNOrderIdLi4ELi3ELi2ELb0EEEEEEE	out_stride=32768,in_stride=32768,RelBasis	# 0.00 Gflop/s, 250.78 GB/s, tuned Thu May 10 10:18:14 2018
+ 0.000226336	  0.00662512	           1	 0.000226336	     16x16x16x16	N4quda9CopyGaugeIddLi18ENS_5gauge11FloatNOrderIdLi18ELi2ELi18EL20QudaStaggeredPhase_s0ELb1EEENS1_8QDPOrderIdLi18EEELb0EEE	out_stride=34816,in_stride=32768,geometry=4	# 0.00 Gflop/s, 333.56 GB/s, tuned Thu May 10 10:18:07 2018
+ 0.000159744	   0.0046759	           4	  3.9936e-05	   bytes=2359296	cudaMemcpyDeviceToDevice	exchangeGhost,cuda_gauge_field.cu,243	# 0.00 Gflop/s, 118.15 GB/s, tuned Thu May 10 10:18:07 2018
+  3.0688e-05	 0.000898274	           1	  3.0688e-05	     16x16x16x16	N4quda12ExtractGhostIdLi18ELi4ENS_5gauge11FloatNOrderIdLi18ELi2ELi18EL20QudaStaggeredPhase_s0ELb1EEEEE	stride=34816	# 0.00 Gflop/s, 153.76 GB/s, tuned Thu May 10 10:18:07 2018
+  2.7616e-05	 0.000808353	           1	  2.7616e-05	     16x16x16x16	N4quda9CopyGaugeIddLi18ENS_5gauge11FloatNOrderIdLi18ELi2ELi18EL20QudaStaggeredPhase_s0ELb1EEES4_Lb1EEE	out_stride=34816,in_stride=34816,geometry=4	# 0.00 Gflop/s, 170.86 GB/s, tuned Thu May 10 10:18:07 2018
+
+# Total time spent in kernels = 3.41633 seconds

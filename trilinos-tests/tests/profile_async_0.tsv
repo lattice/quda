@@ -1,0 +1,9 @@
+profile	0.9.0	v0.9.0a1-with_v.0.8_milc_interface-157-g94831c6-dirty-debug-sm_61	cpu_arch=x86_64,gpu_arch=sm_61,cuda_version=9000	# Last updated Thu May 17 17:17:27 2018
+
+  total time	  percentage	       calls	 time / call	          volume	name	aux	comment
+   0.0498924	     26.1301	         238	 0.000209632	      8x16x16x16	N4quda16WilsonDslashCudaI7double2S1_EE	policy,comm=0000,reconstruct=18,Xpay,dagger,topo=1111	# 213.83 Gflop/s, 420.17 GB/s, tuned Thu May 10 10:18:08 2018
+   0.0495085	     25.9291	         238	 0.000208019	      8x16x16x16	N4quda16WilsonDslashCudaI7double2S1_EE	policy,comm=0000,reconstruct=18,Xpay,topo=1111	# 215.49 Gflop/s, 423.43 GB/s, tuned Thu May 10 10:18:08 2018
+   0.0459906	     24.0866	         238	 0.000193238	      8x16x16x16	N4quda16WilsonDslashCudaI7double2S1_EE	policy,comm=0000,reconstruct=18,topo=1111	# 223.84 Gflop/s, 455.81 GB/s, tuned Thu May 10 10:18:08 2018
+   0.0455468	     23.8542	         238	 0.000191373	      8x16x16x16	N4quda16WilsonDslashCudaI7double2S1_EE	policy,comm=0000,reconstruct=18,dagger,topo=1111	# 226.02 Gflop/s, 460.26 GB/s, tuned Thu May 10 10:18:08 2018
+
+# Total time spent in asynchronous execution = 0.190938 seconds

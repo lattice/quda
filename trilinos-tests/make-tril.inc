@@ -1,0 +1,403 @@
+###### Local configuration:
+
+CUDA_INSTALL_PATH = /usr/local/cuda-9.0
+QDP_INSTALL_PATH = /opt/scidac-gcc-6.4.0-ompi-3.0.0
+QDPXX_CXXFLAGS = 
+QDPXX_LDFLAGS = 
+QDPXX_LIBS = 
+
+CPU_ARCH = x86_64  	  # x86 or x86_64
+GPU_ARCH = sm_61	  # sm_13, sm_20, sm_21, sm_30, sm_35, sm_50 or sm_52
+OS       = linux	  # linux or osx
+GIT      = git
+
+PYTHON = python	  # python 2.5 or later required for 'make gen'
+
+# compilation options
+HOST_DEBUG = yes			# compile host debug code
+DEVICE_DEBUG = no		# compile device debug code for cuda-gdb
+VERBOSE = no			# display kernel register useage
+BLAS_TEX = yes			# enable texture reads in BLAS?
+FERMI_DBLE_TEX = yes		# enable double-precision texture reads on Fermi?
+
+BUILD_WILSON_DIRAC = yes			# build Wilson Dirac operators?
+BUILD_CLOVER_DIRAC = yes			# build clover Dirac operators?
+BUILD_DOMAIN_WALL_DIRAC = no		# build domain wall Dirac operators?
+BUILD_STAGGERED_DIRAC = no			# build staggered Dirac operators?
+BUILD_TWISTED_MASS_DIRAC = no		# build twisted mass Dirac operators?
+BUILD_TWISTED_CLOVER_DIRAC = no	# build twisted clover Dirac operators?
+BUILD_NDEG_TWISTED_MASS_DIRAC = no	# build non-degenerate twisted mass Dirac operators?
+BUILD_FATLINK = no					# build code for computing asqtad fat links?
+BUILD_HISQLINK = no				# build code for computing hisq fat links?
+BUILD_GAUGE_FORCE = no				# build code for (1-loop Symanzik) gauge force?
+BUILD_FERMION_FORCE = no			# build code for asqtad fermion force?
+BUILD_HISQ_FORCE = no				# build code for hisq fermion force?
+BUILD_GAUGE_TOOLS = no				# build auxilary gauge-field tools?
+BUILD_GAUGE_ALG = no				# build gauge-fixing and pure-gauge algorithms?
+BUILD_SSTEP = no                                     # build s-step linear solvers?
+BUILD_MULTIGRID = no                                 # build multigrid linear solvers?
+
+#Dynamically invert the clover term for twisted-clover?
+DYNAMIC_CLOVER = no	# Dynamic inversion saves memory but decreases the flops
+
+# Multi-GPU options
+BUILD_MULTI_GPU = yes  # set to 'yes' to build the multi-GPU code
+BUILD_QMP = yes              # set to 'yes' to build the QMP multi-GPU code
+BUILD_MPI = no              # set to 'yes' to build the MPI multi-GPU code
+POSIX_THREADS = no     # set to 'yes' to build pthread-enabled dslash
+
+#BLAS library
+BUILD_MAGMA = no 	# build magma interface
+BUILD_MAGMA_VARS = no # build magma using env vars MAGMA_INC and MAGMA_LIB
+#ARPACK library
+BUILD_ARPACK = no     # build arpack interface
+BUILD_ARPACK_VARS = no # build arpack using env vars ARPACK_LIB
+#ARPACK library
+BUILD_ARPACK = no     # build arpack interface
+BUILD_ARPACK_VARS = no # build arpack using env vars ARPACK_LIB
+#Trilinos library
+BUILD_TRILINOS = yes     # build arpack interface
+
+# Profiling options
+MPI_NVTX = no              # set to 'yes' to add nvtx markup to MPI API calls for the visual profiler
+INTERFACE_NVTX = no            # set to 'yes' to add nvtx markup to interface calls for the visual profiler
+
+# Interface options
+BUILD_QDP_INTERFACE = yes                     # build qdp interface
+BUILD_MILC_INTERFACE = no                   # build milc interface
+BUILD_CPS_INTERFACE = no                     # build cps interface
+BUILD_QDPJIT_INTERFACE = no               # build qdpjit interface
+BUILD_BQCD_INTERFACE = no                   # build bqcd interface
+BUILD_TIFR_INTERFACE = no                   # build tifr interface
+
+# GPU contractions of spinors
+BUILD_CONTRACT = no    # build code for bilinear contraction?
+
+BUILD_QIO = yes    # set to 'yes' to build QIO code for binary I/O
+
+USE_QDPJIT = no  # build QDP-JIT support?
+
+FECC = mpicc			# front-end CC
+FECXX = mpicxx			# front-end CXX
+FEF90 = 			# front-end F90
+
+MPI_HOME=/opt/openmpi-3.0.0-gcc-6.4.0-dyn
+QMP_HOME=/opt/scidac-gcc-6.4.0-ompi-3.0.0
+QIO_HOME=/opt/scidac-gcc-6.4.0-ompi-3.0.0
+
+TRILINOS_HOME=/home/astrel/Work/Libs/install
+
+######
+
+INC = -I$(CUDA_INSTALL_PATH)/include
+
+ifeq ($(strip $(CPU_ARCH)), x86_64)
+  ifeq ($(strip $(OS)), osx)
+    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -lcuda
+    NVCCOPT = -m64
+  else
+    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart -lcuda
+  endif
+else
+  LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -lcuda -m32
+  COPT += -malign-double -m32
+  NVCCOPT += -m32
+endif
+
+COMP_CAP = $(GPU_ARCH:sm_%=%0)
+
+COPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
+NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
+
+NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
+
+ifeq ($(strip $(GIT)), git)
+  GITCOUNT = $(shell git rev-list -q `git describe -q --abbrev=0 2> /dev/null`..  2> /dev/null | wc -l 2> /dev/null)
+  ifeq ($(strip $(GITCOUNT)),0)
+    NVCCOPT += -w
+  endif
+else
+  NVCCOPT += -w
+endif
+
+ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
+  COPT += -DMULTI_GPU
+  NVCCOPT += -DMULTI_GPU
+else
+  COMM_OBJS = comm_single.o
+endif
+
+CC  = $(FECC)
+CXX = $(FECXX)
+F90 = $(FEF90)
+
+ifeq ($(strip $(BUILD_MPI)), yes)
+  MPI_CFLAGS =
+  MPI_LDFLAGS =
+  MPI_LIBS =
+  INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include
+  LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
+  COMM_OBJS = comm_mpi.o
+endif
+
+ifeq ($(strip $(BUILD_QMP)), yes)
+  QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
+  QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
+  QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
+  INC += -DQMP_COMMS $(QMP_CFLAGS)
+  LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
+  COMM_OBJS = comm_qmp.o
+endif
+
+ifeq ($(strip $(BUILD_QIO)), yes)
+  INC += -DHAVE_QIO -I$(QIO_HOME)/include
+  LIB += -L$(QIO_HOME)/lib -lqio -llime
+  QIO_UTIL = qio_field.o qio_util.o layout_hyper.o
+endif
+
+ifeq ($(strip $(MPI_NVTX)), yes)
+  COMM_OBJS += nvtx_pmpi.o
+  LIB += -lnvToolsExt
+endif
+
+ifeq ($(strip $(INTERFACE_NVTX)), yes)
+  NVCCOPT += -DINTERFACE_NVTX
+  COPT += -DINTERFACE_NVTX
+  ifneq ($(strip $(MPI_NVTX)), yes)
+    LIB += -lnvToolsExt
+  endif
+endif
+
+ifeq ($(strip $(BUILD_MAGMA)), yes)
+  ifeq ($(strip $(BUILD_MAGMA_VARS)),yes)
+     MAGMA_INCLUDE = ${MAGMA_INC}
+     LIB += ${MAGMA_LIB}
+  else
+     MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
+     LIB += $(shell pkg-config --libs magma)
+  endif
+
+  MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
+  COPT += -fopenmp  -DMAGMA_LIB
+else
+  MAGMA_INCLUDE =
+  MAGMA_FLAGS   =
+endif
+
+ifeq ($(strip $(BUILD_ARPACK)), yes)
+  ifeq ($(strip $(BUILD_ARPACK_VARS)),yes)
+     LIB += ${ARPACK_LIB}
+  else
+    ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
+        LIB += $(shell pkg-config --libs parpack)
+     else
+        LIB += $(shell pkg-config --libs arpack)
+     endif
+  endif
+
+  ARPACK_FLAGS   = -DARPACK_LIB
+  COPT += -fopenmp  -DARPACK_LIB
+else
+  ARPACK_FLAGS   =
+endif
+
+ ifeq ($(strip $(BUILD_TRILINOS)), yes)
+  export OMPI_CXX=${TRILINOS_HOME}/bin/nvcc_wrapper
+
+  TRIL_INC = ${TRILINOS_HOME}/include
+  TRIL_LIB = ${TRILINOS_HOME}/lib
+
+  TRIL_FLAGS = -pedantic -Wall -O3 -std=c++11 -lineinfo -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored -expt-extended-lambda -arch=sm_61 -Xcompiler -fopenmp
+  TRIL_LDFLAGS = -fopenmp -L${TRIL_LIB} -lbelostpetra -lbelos -ltpetraext -ltpetrainout -ltpetra -lkokkoskernels -lkokkosalgorithms -lkokkoscontainers -lkokkostsqr -ltpetraclassiclinalg -ltpetraclassicnodeapi -ltpetraclassic -lteuchoskokkoscomm -lteuchoskokkoscompat -lteuchosremainder -lteuchosnumerics -lteuchoscomm -lteuchosparameterlist -lteuchosparser -lteuchoscore -lkokkoscore -ldl -lcudart -lcublas -lcufft
+
+ endif
+
+ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
+  NVCCOPT += -DDYNAMIC_CLOVER
+  COPT += -DDYNAMIC_CLOVER
+endif
+
+ifeq ($(strip $(BUILD_MULTIGRID)), yes)
+  NVCCOPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  COPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  LIB += -lcublas
+endif
+
+ifeq ($(strip $(BUILD_SSTEP)), yes)
+  NVCCOPT += -DSSTEP
+  COPT += -DSSTEP
+endif
+
+ifeq ($(strip $(POSIX_THREADS)), yes)
+  NVCCOPT += -DPTHREADS
+  COPT += -DPTHREADS
+endif
+
+LIB += -lpthread
+
+
+ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
+  NVCCOPT += -DGPU_WILSON_DIRAC
+  COPT += -DGPU_WILSON_DIRAC
+endif
+
+ifeq ($(strip $(BUILD_DOMAIN_WALL_DIRAC)), yes)
+  NVCCOPT += -DGPU_DOMAIN_WALL_DIRAC
+  COPT += -DGPU_DOMAIN_WALL_DIRAC
+endif
+
+ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
+  NVCCOPT += -DGPU_STAGGERED_DIRAC
+  COPT += -DGPU_STAGGERED_DIRAC
+endif
+
+ifeq ($(strip $(BUILD_CLOVER_DIRAC)), yes)
+  NVCCOPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
+endif
+
+ifeq ($(strip $(BUILD_TWISTED_MASS_DIRAC)), yes)
+  NVCCOPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
+  COPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
+endif
+
+ifeq ($(strip $(BUILD_TWISTED_CLOVER_DIRAC)), yes)
+  NVCCOPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
+endif
+
+ifeq ($(strip $(BUILD_NDEG_TWISTED_MASS_DIRAC)), yes)
+  NVCCOPT += -DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
+  COPT += -DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
+endif
+
+ifeq ($(strip $(BUILD_FATLINK)), yes)
+  NVCCOPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
+endif
+
+ifeq ($(strip $(BUILD_HISQLINK)), yes)
+  ifneq ($(strip $(BUILD_FATLINK)), yes)
+    NVCCOPT += -DGPU_FATLINK
+    COPT    += -DGPU_FATLINK
+  endif
+  NVCCOPT += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
+  COPT    += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
+endif
+
+ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
+  NVCCOPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
+endif
+
+ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
+  NVCCOPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
+endif
+
+ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
+  NVCCOPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
+endif
+
+ifeq ($(strip $(BUILD_GAUGE_TOOLS)), yes)
+  NVCCOPT += -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_GAUGE_TOOLS
+endif
+
+ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
+  NVCCOPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
+  COPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
+  LIB += -lcufft -lcurand
+endif
+
+QUDA_DEBUG = false
+
+ifeq ($(strip $(HOST_DEBUG)), yes)
+  NVCCOPT += -g -DHOST_DEBUG
+  COPT += -g -fno-inline -DHOST_DEBUG
+  QUDA_DEBUG = true
+endif
+
+ifeq ($(strip $(DEVICE_DEBUG)), yes)
+  NVCCOPT += -G
+  QUDA_DEBUG = true
+endif
+
+ifeq ($(strip $(VERBOSE)), yes)
+  NVCCOPT += --ptxas-options=-v
+endif
+
+NVCCOPT += -DMAX_MULTI_BLAS_N=4
+ifeq ($(strip $(BLAS_TEX)), no)
+  NVCCOPT += -DDIRECT_ACCESS_BLAS
+  COPT += -DDIRECT_ACCESS_BLAS
+endif
+
+ifeq ($(strip $(FERMI_DBLE_TEX)), no)
+  NVCCOPT += -DFERMI_NO_DBLE_TEX
+  COPT += -DFERMI_NO_DBLE_TEX
+endif
+
+ifeq ($(strip $(BUILD_QDP_INTERFACE)), yes)
+  NVCCOPT += -DBUILD_QDP_INTERFACE
+  COPT += -DBUILD_QDP_INTERFACE
+endif
+
+ifeq ($(strip $(BUILD_MILC_INTERFACE)), yes)
+  NVCCOPT += -DBUILD_MILC_INTERFACE
+  COPT += -DBUILD_MILC_INTERFACE
+endif
+
+ifeq ($(strip $(BUILD_CPS_INTERFACE)), yes)
+  NVCCOPT += -DBUILD_CPS_INTERFACE
+  COPT += -DBUILD_CPS_INTERFACE
+endif
+
+ifeq ($(strip $(BUILD_QDPJIT_INTERFACE)), yes)
+  NVCCOPT += -DBUILD_QDPJIT_INTERFACE
+  COPT += -DBUILD_QDPJIT_INTERFACE
+endif
+
+ifeq ($(strip $(BUILD_BQCD_INTERFACE)), yes)
+  NVCCOPT += -DBUILD_BQCD_INTERFACE
+  COPT += -DBUILD_BQCD_INTERFACE
+endif
+
+ifeq ($(strip $(BUILD_TIFR_INTERFACE)), yes)
+  NVCCOPT += -DBUILD_TIFR_INTERFACE
+  COPT += -DBUILD_TIFR_INTERFACE
+endif
+
+ifeq ($(strip $(BUILD_CONTRACT)), yes)
+  NVCCOPT += -DGPU_CONTRACT
+  COPT += -DGPU_CONTRACT
+endif
+
+### Next conditional is necessary.
+### QDPXX_CXXFLAGS contains "-O3".
+### We must make sure its not given
+### twice to nvcc. It would complain.
+
+ifeq ($(strip $(USE_QDPJIT)), yes)
+  NVCCOPT += -DUSE_QDPJIT
+  COPT += -DUSE_QDPJIT
+  LIB += $(QDPXX_LDFLAGS) $(QDPXX_LIBS)
+  INC += -I$(QDP_INSTALL_PATH)/include
+
+  CFLAGS = -Wall -std=c99 $(COPT) $(INC)
+  CXXFLAGS = -Wall -std=c++11 $(COPT) $(INC) $(QDPXX_CXXFLAGS)
+  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
+  NVCCFLAGS = -std=c++11 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  LDFLAGS = -fPIC $(LIB)
+else
+  CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
+  CXXFLAGS = -Wall -std=c++11 -O3 $(COPT) $(INC)
+  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
+  NVCCFLAGS = -std=c++11 -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  LDFLAGS = -fPIC $(LIB)
+endif
+
+
+### Add any other user options like keep to NVCCOPT
+NVCCFLAGS += 
