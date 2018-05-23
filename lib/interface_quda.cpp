@@ -31,6 +31,7 @@
 #include <multigrid.h>
 
 #include <deflation.h>
+#include <quda_arpack_interface.h>
 
 #ifdef NUMA_NVML
 #include <numa_affinity.h>
@@ -176,6 +177,9 @@ static TimeProfile profileClover("loadCloverQuda");
 
 //!< Profiler for dslashQuda
 static TimeProfile profileDslash("dslashQuda");
+
+//!< Profiler for arpackEigensolveQuda
+static TimeProfile profileArpackEigensolve("arpackEigensolveQuda");
 
 //!< Profiler for invertQuda
 static TimeProfile profileInvert("invertQuda");
@@ -2652,6 +2656,66 @@ void destroyDeflationQuda(void *df) {
 #endif
   delete static_cast<deflated_solver*>(df);
 }
+
+//DMH: ARPACK goes here
+void arpackEigensolveQuda(void *h_evecs, void *h_evals,
+			  QudaInvertParam *inv_param,
+			  QudaArpackParam *arpack_param){
+
+  profilerStart(__func__);
+  
+  profileArpackEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printQudaInvertParam(inv_param);
+    printQudaArpackParam(arpack_param);
+  }
+  
+  checkInvertParam(inv_param);
+  checkArpackParam(arpack_param);
+
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(inv_param);
+
+
+
+  bool pc_solution = (inv_param->solution_type == QUDA_MATPC_SOLUTION) ||
+    (inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool mat_solution = (inv_param->solution_type == QUDA_MAT_SOLUTION) ||
+    (inv_param->solution_type ==  QUDA_MATPC_SOLUTION);
+  bool direct_solve = (inv_param->solve_type == QUDA_DIRECT_SOLVE) ||
+    (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (inv_param->solve_type == QUDA_NORMERR_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+  Timer t_predict;
+  Timer t_register;
+
+  inv_param->secs = 0;
+  inv_param->gflops = 0;
+  inv_param->iter = 0;
+
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
+
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
+
+  arpackSolve(h_evecs, h_evals, inv_param, arpack_param, dirac);
+  
+  
+}
+
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {

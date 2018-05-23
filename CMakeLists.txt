@@ -13,7 +13,8 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 # add a directory for cmake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-
+set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_C_COMPILER gcc)
 
 find_package(Git)
 SET(DEFBUILD "RELEASE")
@@ -330,23 +331,39 @@ endif(QUDA_MAGMA)
 if(QUDA_ARPACK)
   add_definitions(-DARPACK_LIB)
   find_package(PkgConfig REQUIRED)
-  if(QUDA_QMP OR QUDA_MPI)
+
+  # We always need the serial library
+  pkg_check_modules(ARPACK QUIET arpack)
+  if(NOT ARPACK_FOUND OR QUDA_ARPACK_HOME)
+    find_library(ARPACK arpack PATH ${QUDA_ARPACK_HOME})
+  else()
+    find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
+  endif()
+  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
+  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
+  
+  # Link the parallel library if required
+  if(QUDA_MPI OR QUDA_QMP)
     pkg_check_modules(PARPACK QUIET parpack)
     if(NOT PARPACK_FOUND OR QUDA_ARPACK_HOME)
       find_library(PARPACK parpack PATH ${QUDA_ARPACK_HOME})
     else()
       find_library(PARPACK ${PARPACK_LIBRARIES} PATH ${PARPACK_LIBRARY_DIRS})
     endif()
-  set(PARPACK_OR_ARPACK ${PARPACK})
-  else()
-    pkg_check_modules(ARPACK QUIET arpack)
-    if(NOT ARPACK_FOUND OR QUDA_ARPACK_HOME)
-      find_library(ARPACK arpack PATH ${QUDA_ARPACK_HOME})
-    else()
-      find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
-    endif()
-  set(PARPACK_OR_ARPACK ${ARPACK})
+    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
+    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
   endif()
+  
+  # Link ARPACK dependenices (LAPACK, BLAS)
+  set(QUDA_ARPACK_LAPACK_HOME "" CACHE PATH "path to Arpack's lapack")
+  set(QUDA_ARPACK_OPENBLAS_HOME "" CACHE PATH "path to Arpack's OpenBLAS")
+  
+  find_library(ARPACK_LAPACK lapack PATH ${QUDA_ARPACK_LAPACK_HOME}/lib64)
+  find_library(ARPACK_OPENBLAS openblas PATH ${QUDA_ARPACK_OPENBLAS_HOME}/lib)
+  
+  include_directories(SYSTEM ${QUDA_ARPACK_LAPACK_HOME}/include)
+  include_directories(SYSTEM ${QUDA_ARPACK_OPENBLAS_HOME}/include)
+    
 endif(QUDA_ARPACK)
 
 
@@ -541,10 +558,16 @@ enable_language(C)
 #define FORTRAN FLAGS
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
 
+enable_language(Fortran)
+if(QUDA_MPI OR QUDA_QMP)
+  set(CMAKE_Fortran_COMPILER mpifort)
+else()
+  set(CMAKE_Fortran_COMPILER gfortran)
+endif()
+
 # derive whether we need to build the fortran interface
-if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
+if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD OR QUDA_ARPACK)
   SET(BUILD_FORTRAN_INTERFACE ON)
-  enable_language(Fortran)
 endif()
 
 

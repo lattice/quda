@@ -1,5 +1,6 @@
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
+  color_spinor_pack.cu
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
@@ -10,7 +11,7 @@ set (QUDA_OBJS
   inv_cg3_quda.cpp inv_cg3ne_quda.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
+  color_spinor_field.cpp color_spinor_util.cu 
   color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
@@ -156,8 +157,23 @@ if(QUDA_MAGMA)
 endif()
 
 if(QUDA_ARPACK)
-  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${PARPACK_OR_ARPACK})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${ARPACK})
+  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
+  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
+
+  if(QUDA_MPI OR QUDA_QMP)
+    target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${PARPACK})
+    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
+    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)    
+  endif()
+  
+  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${ARPACK_LAPACK})
+  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${ARPACK_OPENBLAS})
+  include_directories(SYSTEM ${QUDA_ARPACK_LAPACK_HOME}/include)
+  include_directories(SYSTEM ${QUDA_ARPACK_OPENBLAS_HOME}/include)
+  
 endif()
+
 
 if(QUDA_NVML)
   target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${NVML_LIBRARY})

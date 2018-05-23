@@ -126,23 +126,23 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   return ret;
 #endif
 }
-
+ 
 // define the appropriate function for EigParam
-
+ 
 #if defined INIT_PARAM
 QudaEigParam newQudaEigParam(void) {
-  QudaEigParam ret;
+ QudaEigParam ret;
 #elif defined CHECK_PARAM
 static void checkEigParam(QudaEigParam *param) {
 #else
 void printQudaEigParam(QudaEigParam *param) {
   printfQuda("QUDA Eig Parameters:\n");
 #endif
-
+      
 #if defined INIT_PARAM
   P(RitzMat_lanczos, QUDA_INVALID_SOLUTION);
   P(RitzMat_Convcheck, QUDA_INVALID_SOLUTION);
-  P(eig_type, QUDA_INVALID_TYPE);
+  P(eig_type, QUDA_INVALID_LANCZOS);
   P(NPoly, 0);
   P(Stp_residual, 0.0);
   P(nk, 0);
@@ -172,6 +172,55 @@ void printQudaEigParam(QudaEigParam *param) {
   return ret;
 #endif
 }
+
+
+// define the appropriate function for ArpackParam 
+#if defined INIT_PARAM
+QudaArpackParam newQudaArpackParam(void) {
+ QudaArpackParam ret;
+#elif defined CHECK_PARAM
+static void checkArpackParam(QudaArpackParam *param) {
+#else
+void printQudaArpackParam(QudaArpackParam *param) {
+  printfQuda("QUDA Arpack Parameters:\n");
+#endif
+      
+#if defined INIT_PARAM
+  P(arpackMode, 0);
+  P(nEv, 0);
+  P(nKv, 0);
+  P(spectrum, QUDA_INVALID_SPECTRUM);
+  P(usePolyAcc, QUDA_BOOLEAN_NO);  
+  P(polyDeg, 0);
+  P(amin, 0.0);
+  P(amax, 0.0);
+  P(arpackTol, 0.0);
+  P(arpackMaxiter, 0);
+  P(arpackPrec, QUDA_DOUBLE_PRECISION);
+  P(useEEOp, QUDA_BOOLEAN_NO);
+  P(useFullOp, QUDA_BOOLEAN_NO);
+#else
+  P(arpackMode, INVALID_INT);
+  P(nEv, INVALID_INT);
+  P(nKv, INVALID_INT);
+  P(spectrum, QUDA_INVALID_SPECTRUM);
+  P(usePolyAcc, QUDA_BOOLEAN_NO);  
+  P(polyDeg, INVALID_INT);
+  P(amin, INVALID_DOUBLE);
+  P(amax, INVALID_DOUBLE);
+  P(arpackTol, INVALID_DOUBLE);
+  P(arpackMaxiter, INVALID_INT);
+  P(arpackPrec, QUDA_INVALID_PRECISION);
+  P(useEEOp, QUDA_BOOLEAN_NO);
+  P(useFullOp, QUDA_BOOLEAN_NO);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+ 
 // define the appropriate function for InvertParam
 
 #if defined INIT_PARAM

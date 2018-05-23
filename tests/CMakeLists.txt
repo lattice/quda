@@ -14,6 +14,17 @@ MACRO (QUDA_CHECKBUILDTEST mytarget qudabuildtests)
 ENDMACRO()
 #define tests
 
+if(QUDA_ARPACK)
+  LIST(APPEND TEST_LIBS ${ARPACK})
+  LIST(APPEND TEST_LIBS ${ARPACK_OPENBLAS})
+  LIST(APPEND TEST_LIBS ${ARPACK_LAPACK})
+  if(QUDA_MPI OR QUDA_QMP) 
+    LIST(APPEND TEST_LIBS ${PARPACK})
+  endif()
+  include_directories(SYSTEM ${QUDA_ARPACK_LAPACK_HOME}/include)
+  include_directories(SYSTEM ${QUDA_ARPACK_OPENBLAS_HOME}/include)
+endif()
+
 # if we build with QDP JIT the tests cannot run anyway
 if(QUDA_INTERFACE_QDPJIT)
   set(QUDA_BUILD_ALL_TESTS OFF)
@@ -122,6 +133,12 @@ if(QUDA_GAUGE_ALG)
   cuda_add_executable(gauge_alg_test gauge_alg_test.cpp)
   target_link_libraries(gauge_alg_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(gauge_alg_test QUDA_BUILD_ALL_TESTS)
+endif()
+
+if(QUDA_ARPACK)
+  cuda_add_executable(arpack_host_test arpack_host_test.cpp wilson_dslash_reference.cpp clover_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+  target_link_libraries(arpack_host_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(arpack_host_test QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_FORCE_HISQ)

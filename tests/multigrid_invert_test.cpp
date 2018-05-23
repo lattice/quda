@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <algorithm>
 
 #include <util_quda.h>
 #include <test_util.h>
@@ -569,8 +570,6 @@ int main(int argc, char **argv)
 
   // free the multigrid solver
   destroyMultigridQuda(mg_preconditioner);
-
-
 
   // stop the timer
   time0 += clock();

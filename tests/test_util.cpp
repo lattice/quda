@@ -1693,6 +1693,18 @@ QudaExtLibType deflation_ext_lib  = QUDA_EIGEN_EXTLIB;
 QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
+int eig_nEv = 10;
+int eig_nKv = 20;
+double eig_tol = 1e-4;
+int eig_maxiter = 100;
+bool eig_use_poly_acc = false;
+int eig_poly_deg = 15;
+double eig_amin = 20;
+double eig_amax = 40;
+QudaArpackSpectrumType arpack_spectrum = QUDA_SR_SPECTRUM;
+int arpack_mode = 7;
+char arpack_logfile[256] = "";
+
 static int dim_partitioned[4] = {0,0,0,0};
 
 int dimPartitioned(int dim)
@@ -1713,7 +1725,7 @@ void usage(char** argv )
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
   printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
-  printf("    --prec-ritz <double/single/half>  # Eigenvector precision in GPU\n");
+  printf("    --prec-ritz <double/single/half>          # Eigenvector precision in GPU\n");
   printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n");
   printf("    --recon-sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n");
   printf("    --recon-precondition <8/9/12/13/18>       # Preconditioner link reconstruction type\n");
@@ -1789,7 +1801,7 @@ void usage(char** argv )
   printf("    --mg-generate-all-levels <true/talse>     # true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
-  printf("    --mg-verbosity <level verb>                # The verbosity to use on each level of the multigrid (default summarize)\n");
+  printf("    --mg-verbosity <level verb>               # The verbosity to use on each level of the multigrid (default summarize)\n");
   printf("    --df-nev <nev>                            # Set number of eigenvectors computed within a single solve cycle (default 8)\n");
   printf("    --df-max-search-dim <dim>                 # Set the size of eigenvector search space (default 64)\n");
   printf("    --df-deflation-grid <n>                   # Set maximum number of cycles needed to compute eigenvectors(default 1)\n");
@@ -1799,14 +1811,24 @@ void usage(char** argv )
   printf("    --df-max-restart-num <n>                  # Set maximum number of the initCG restarts in the deflation stage (default 3)\n");
   printf("    --df-tol-eigenval <tol>                   # Set maximum eigenvalue residual norm (default 1e-1)\n");
 
-
   printf("    --solver-ext-lib-type <eigen/magma>       # Set external library for the solvers  (default Eigen library)\n");
   printf("    --df-ext-lib-type <eigen/magma>           # Set external library for the deflation methods  (default Eigen library)\n");
   printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory location)\n");
   printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory type for the ritz vectors  (default device memory type)\n");
 
+  printf("    --eig-nEv <n>                             # The number of eigenmodes requested from the eigensolver\n");
+  printf("    --eig-nKv <n>                             # The size of the Krylov subspace to use in the eigensolver\n");
+  printf("    --eig-tol <tol>                           # The tolerance to use in the eigensolver\n");
+  printf("    --eig-maxiter <n>                         # The maximum iterations to use in the eigensolver\n");
+  printf("    --eig-usePolyAcc <true/false>             # Use Chebyshev polynomial acceleration in the eigensolver\n");
+  printf("    --eig-polyDeg <n>                         # Set the degree of the Chebyshev polynomial acceleration in the eigensolver\n");
+  printf("    --eig-amin <Float>                        # The minimum in the polynomial acceleration\n");
+  printf("    --eig-amax <Float>                        # The maximum in the polynomial acceleration\n");
+  printf("    --arpack-spectrum <SR/LR/SM/LM/SI/LI>     # The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary\n");
+  printf("    --arpack-mode <n>                         # The problem type to be passed to Arpack\n");
+  printf("    --arpack-logfile <file_name>              # The filename storing the stdout from Arpack\n");
+  
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
-
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
   printf("    --help                                    # Print out this message\n");
 
@@ -3139,6 +3161,125 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--eig-nEv") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_nEv = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-nKv") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_nKv = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-tol") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-maxiter") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_maxiter = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--eig-usePolyAcc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      eig_use_poly_acc = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      eig_use_poly_acc = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for usePolyAcc\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-polyDeg") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_poly_deg = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-amin") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_amin = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--eig-amax") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_amax = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--arpack-spectrum") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    arpack_spectrum = get_spectrum_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--arpack-mode") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    arpack_mode = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--arpack-logfile") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    strcpy(arpack_logfile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);

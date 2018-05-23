@@ -925,6 +925,64 @@ get_dslash_str(QudaDslashType type)
     
 }
 
+QudaArpackSpectrumType get_spectrum_type(char* s) {
+
+  QudaArpackSpectrumType ret =  QUDA_INVALID_SPECTRUM;
+  
+  if (strcmp(s, "SR") == 0){
+    ret = QUDA_SR_SPECTRUM;
+  }else if (strcmp(s, "LR") == 0){
+    ret = QUDA_LR_SPECTRUM;
+  }else if (strcmp(s, "SM") == 0){
+    ret = QUDA_SM_SPECTRUM;
+  }else if (strcmp(s, "LM") == 0){
+    ret = QUDA_LM_SPECTRUM;
+  }else if (strcmp(s, "SI") == 0){
+    ret = QUDA_SI_SPECTRUM;
+  }else if (strcmp(s, "LI") == 0){
+    ret = QUDA_LI_SPECTRUM;
+  }else{
+    fprintf(stderr, "Error: invalid arpack spectrum type\n");	
+    exit(1);
+  }
+  
+  return ret;
+}
+
+const char* get_spectrum_str(QudaArpackSpectrumType type)
+{
+  const char* ret;
+  
+  switch(type){	
+  case QUDA_SR_SPECTRUM:
+    ret=  "SR";
+    break;
+  case QUDA_LR_SPECTRUM:
+    ret=  "LR";
+    break;
+  case QUDA_SM_SPECTRUM:
+    ret=  "SM";
+    break;
+  case QUDA_LM_SPECTRUM:
+    ret=  "LM";
+    break;
+  case QUDA_SI_SPECTRUM:
+    ret=  "SI";
+    break;
+  case QUDA_LI_SPECTRUM:
+    ret=  "LI";
+    break;
+  default:
+    ret = "unknown";	
+    break;
+  }
+  
+  return ret;
+    
+}
+
+
+
 QudaMassNormalization
 get_mass_normalization_type(char* s)
 {

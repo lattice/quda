@@ -338,13 +338,13 @@ extern "C" {
   // And the Lanczos algorithm use the Ritz operator.
   // For Ritz matrix operation,
   // we need to know about the solution type of dirac operator.
-  // For acceleration, we are also using chevisov polynomial method.
+  // For acceleration, we are also using Chebyshev polynomial method.
   // And nk, np values are needed Implicit Restart Lanczos method
   // which is optimized form of Lanczos algorithm
   typedef struct QudaEigParam_s {
 
     QudaInvertParam *invert_param;
-//specific for Lanczos method:
+    //specific for Lanczos method:
     QudaSolutionType  RitzMat_lanczos;
     QudaSolutionType  RitzMat_Convcheck;
     QudaEigType eig_type;
@@ -356,7 +356,7 @@ extern "C" {
     int np;
     int f_size;
     double eigen_shift;
-//more general stuff:
+    //more general stuff:
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
 
@@ -378,10 +378,10 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 
-    /** The Gflops rate of the multigrid solver setup */
+    /** The Gflops rate of the eigensolver setup */
     double gflops;
 
-    /**< The time taken by the multigrid solver setup */
+    /**< The time taken by the eigensolver setup */
     double secs;
 
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
@@ -390,6 +390,50 @@ extern "C" {
   } QudaEigParam;
 
 
+  // Parameter set for using the ARPACK interface.
+    
+  typedef struct QudaArpackParam_s {
+
+    /** Specifies the problem type to be solved by Arpack **/
+    int arpackMode;
+    
+    /** Number of the eigenvectors requested **/
+    int nEv;
+
+    /** Total size of Krylov space **/
+    int nKv;         
+
+    /** Which part of the spectrum to solve **/
+    QudaArpackSpectrumType spectrum;
+    
+    /** Use Polynomial Acceleration **/
+    QudaBoolean usePolyAcc;
+
+    /** degree of the Chebysev polynomial **/
+    int polyDeg;
+
+    /** Range used in polynomial acceleration **/
+    double amin;    
+    double amax;
+    
+    /** Tolerance on the least wel known eigenvalue **/
+    double arpackTol;
+
+    /** Maximum allowed iteration in the Arpack solver **/
+    int arpackMaxiter;
+
+    /** Name of the logfile to store Arpack's stdout **/    
+    char arpackLogfile[512];
+
+    /** Precision to be used in Arpack **/    
+    QudaPrecision arpackPrec;
+    
+    /** What type of Dirac operator we are using **/
+    QudaBoolean useEEOp;
+    QudaBoolean useFullOp;
+    
+  }QudaArpackParam;
+  
   typedef struct QudaMultigridParam_s {
 
     QudaInvertParam *invert_param;
@@ -661,6 +705,15 @@ extern "C" {
   QudaEigParam newQudaEigParam(void);
 
   /**
+   * A new QudaArpackParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaArpackParam arpack_param = newQudaArpackParam();
+   */
+  QudaArpackParam newQudaArpackParam(void);
+  
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -729,7 +782,23 @@ extern "C" {
    */
   void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
                    void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
-
+  //DMH: FIXME^
+  
+  /**
+   * Perform the solve, according to the parameters set in inv_param and 
+   * arpack_param. It is assumed that the gauge field has already been loaded 
+   * via loadGaugeQuda().
+   * @param h_evecs    1D array holding the eigenvalues
+   * @param h_evals    The eigenvalues.    
+   * @param inv_param  Contains all metadata regarding host and device
+   *                   storage and solver parameters
+   * @param a_param    Contains all the data required by ARPACK to perform
+   *                   the solve.
+   */
+  void arpackEigensolveQuda(void *h_evecs, void *h_evals,
+			    QudaInvertParam *inv_param,
+			    QudaArpackParam *a_param);
+  
   /**
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
