@@ -40,7 +40,7 @@ namespace quda {
   void setPackComms(const int *comm_dim) { ; }
 #endif
 
-  //#define STRIPED
+#define STRIPED
 #ifdef STRIPED
 #else
 #define SWIZZLE
@@ -93,6 +93,7 @@ namespace quda {
     int sp_stride;
 
     int_fastdiv swizzle;
+    int sites_per_thread;
   };
 
   template<typename FloatN>
@@ -279,7 +280,7 @@ namespace quda {
     const int nFace = 1; // 1 face for Wilson
 
 #ifdef STRIPED
-    const int sites_per_thread = (param.threads + gridDim.x - 1) / gridDim.x;
+    const int sites_per_thread = param.sites_per_thread;
     int local_tid = threadIdx.x;
     int tid = sites_per_thread * blockIdx.x + local_tid;
 #else
@@ -820,6 +821,7 @@ namespace quda {
       }
 
       param.swizzle = tp.aux.x;
+      param.sites_per_thread = (param.threads + tp.grid.x - 1) / tp.grid.x;
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
