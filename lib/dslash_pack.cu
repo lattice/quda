@@ -93,7 +93,7 @@ namespace quda {
     int sp_stride;
 
     int_fastdiv swizzle;
-    int sites_per_thread;
+    int sites_per_block;
   };
 
   template<typename FloatN>
@@ -280,16 +280,16 @@ namespace quda {
     const int nFace = 1; // 1 face for Wilson
 
 #ifdef STRIPED
-    const int sites_per_thread = param.sites_per_thread;
+    const int sites_per_block = param.sites_per_block;
     int local_tid = threadIdx.x;
-    int tid = sites_per_thread * blockIdx.x + local_tid;
+    int tid = sites_per_block * blockIdx.x + local_tid;
 #else
     int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
-    constexpr int sites_per_thread = 1;
+    constexpr int sites_per_block = 1;
     constexpr int local_tid = 0;
 #endif
 
-    while ( local_tid < sites_per_thread && tid < param.threads ) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -821,14 +821,20 @@ namespace quda {
       }
 
       param.swizzle = tp.aux.x;
-      param.sites_per_thread = (param.threads + tp.grid.x - 1) / tp.grid.x;
+      param.sites_per_block = (param.threads + tp.grid.x - 1) / tp.grid.x;
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-    bool tuneGridDim() const { return location & Host; } // Only tune grid dimension if doing zero-copy writing
-    unsigned int maxGridSize() const { return tuneGridDim() ? deviceProp.multiProcessorCount/4 : Tunable::maxGridSize(); } // use no more than a quarter of the GPU
+#ifdef STRIPED
+    bool tuneGridDim() const { return true; } // If striping, always tune grid dimension
+    unsigned int maxGridSize() const { return (location & Host) ? deviceProp.multiProcessorCount/4 : Tunable::maxGridSize(); } // use no more than a quarter of the GPU
+#else
+    bool tuneGridDim() const { return location & Host; } // only tune grid dimension if doing zero-copy writing
+    unsigned int maxGridSize() const { return tuneGridDim ? deviceProp.multiProcessorCount/4 : Tunable::maxGridSize(); } // use no more than a quarter of the GPU
+#endif
+
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
     unsigned int minThreads() const { return threads(); }
 
