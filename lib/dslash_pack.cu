@@ -40,7 +40,12 @@ namespace quda {
   void setPackComms(const int *comm_dim) { ; }
 #endif
 
+  //#define STRIPED
+#ifdef STRIPED
+#else
 #define SWIZZLE
+#endif
+
 #include <dslash_index.cuh>
 
   // routines for packing the ghost zones (multi-GPU only)
@@ -273,9 +278,17 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for Wilson
 
+#ifdef STRIPED
+    const int sites_per_thread = (param.threads + gridDim.x - 1) / gridDim.x;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_thread * blockIdx.x + local_tid;
+#else
     int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_thread = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_thread && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -338,7 +351,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
