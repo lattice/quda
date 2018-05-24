@@ -366,9 +366,18 @@ namespace quda {
   template <int dagger, typename FloatN, int nFace>
     __global__ void packFaceExtendedWilsonKernel(PackParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -431,7 +440,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -440,9 +454,18 @@ namespace quda {
   template <int dagger, typename FloatN, int nFace>
     __global__ void unpackFaceExtendedWilsonKernel(PackParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -508,7 +531,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -645,9 +673,17 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for Wilson
 
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -707,7 +743,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1141,9 +1182,18 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void packFaceStaggeredKernel(PackParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       const int Ls = param.X[4];
 
@@ -1205,8 +1255,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
-
+#endif
     } // while tid
 
   }
@@ -1215,9 +1269,18 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void packFaceExtendedStaggeredKernel(PackExtendedParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -1279,7 +1342,12 @@ namespace quda {
         }
       }
 
-      tid  += blockDim.x*gridDim.x;
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
+      tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1288,9 +1356,18 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void unpackFaceExtendedStaggeredKernel(PackExtendedParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -1352,7 +1429,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1514,9 +1596,17 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for dwf
 
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -1579,7 +1669,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1590,9 +1685,17 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for Wilson
 
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       const int Ls = param.X[4];
 
@@ -1655,7 +1758,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1791,9 +1899,17 @@ namespace quda {
     const int nFace = 1; // 1 face for Wilson
     const int Nf = 2;
 
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -1855,7 +1971,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
