@@ -768,8 +768,8 @@ namespace quda {
      return;
   }
 
-//#define PIPEEIGCGDEBUG
-//#define MAX_PIPELINING
+#define PIPEEIGCGDEBUG
+#define MAX_PIPELINING
 
   // this is the Worker pointer 
   namespace dslash {
@@ -868,7 +868,7 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
 
       inline void PipelinedRecursions( double &alpha, double &beta, double &gamma_inv ) {
 
-        if(wtype == tasktype::invalid_task) errorQuda("Cannot launch compute task.\n");
+        if(wtype == tasktype::invalid_task) errorQuda("Cannot launch default compute task.\n");
 
         if(wtype == tasktype::default_task) {//just load coeffs for the postponed merged BLAS operation
 
@@ -953,7 +953,7 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
           case tasktype::default_task :
 #ifdef MAX_PIPELINING
             if(count == 0) {//only single stage
-              *localbuff = pipeEigCGMergedReduceOp2(beta, *sp, *pp, alpha, *rp, *yp, *wp, gamma_inv, Vm->Component( args.idx ));
+              *localbuff = pipeEigCGMergedReduceOp2(beta, *sp, *pp, alpha, *rp, *yp, *wp, gamma_inv, Vm->Component( args.id ));
               async_global_reduce = tasktype::run_global_reduction_task;
             }
 #endif 
@@ -984,6 +984,10 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
               SelfAdjointEigenSolver<MatrixXcd> es_h2k(args.H2k);
               Block<MatrixXcd>(args.ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
               args.Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
+#ifdef PIPEEIGCGDEBUG
+              printfQuda("Print Eigenvalues:\n"); 
+              std::cout << args.Tmvals.segment(0,2*k) << std::endl;
+#endif
             } else {
               //empty cycle
             }
@@ -1034,15 +1038,8 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
           {
             if(pipeline_idx >= pipeline_length) errorQuda("Cannot restore Lanczos params.\n");
 
-#ifdef MAX_PIPELINING
-            if(count == 0) {//run regular merged blas
-              *localbuff = pipeEigCGMergedReduceOp2(beta, *sp, *pp, alpha, *rp, *yp, *wp, gamma_inv, Vm->Component( args.idx ));
-              async_global_reduce = tasktype::run_global_reduction_task;
-            } else if(count == 1) {
-#else
             //first we need to reset search space index:
-            if(count == 0) {
-#endif
+            if(count == 0) {//run regular merged blas
               args.ResetSearchIdx(); 
               //now perform postponed copy operations: 
               for(int i = 0; i < pipeline_idx; i++) {
@@ -1050,8 +1047,8 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
                 zero(Vpipeline->Component(i)); 
                 args.SetLanczosAndIncrementSearchIndex(lanczos_diag[i], lanczos_offdiag[i]);     
               }
-              //
-              pipeline_idx = 0;
+              //Warning: set to default task, be sure it works for MAX_PIPELINING case 
+              ResetTasks();
             } 
           }
           break;
@@ -1081,6 +1078,8 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
 
     tasks.UpdateLanczosAndIncrementIdx(lanczos_diag, lanczos_offdiag);
 
+//??    if( tasks.ReportTask() == tasktype::invalid_task) tasks.SetComputeTask(tasktype::default_task);
+
     if( tasks.ReportTask() == tasktype::default_task ) return;//return if we do not need to restart the search subspace
 
     warningQuda("Do search space restart.");
@@ -1103,7 +1102,8 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
         tasks.SetComputeTask(tasktype::restore_search_space_task);
         break;
       default :
-        tasks.SetComputeTask(tasktype::default_task); /* the search space is released */
+//        tasks.SetComputeTask(tasktype::default_task); /* the search space is released */
+        tasks.ResetTasks();
 #ifndef MAX_PIPELINING
         dslash::aux_worker = nullptr;
 #endif
@@ -1132,9 +1132,6 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
     return;
   }
 
-//#define PIPEEIGCGDEBUG
-#define MAX_PIPELINING
-
   int IncEigCG::pipeEigCGsolve(ColorSpinorField &x, ColorSpinorField &b){
 
     profile.TPSTART(QUDA_PROFILE_INIT);
@@ -1149,8 +1146,10 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
     ColorSpinorField &tmp = *tmpp;
 
 #ifdef MAX_PIPELINING
+    warningQuda("Max pipelining..\n");
     dslash::aux_worker = &tasks;
 #else
+    warningQuda("Regular pipelining..\n");
     dslash::aux_worker = nullptr;
 #endif
     tasks.Init(p_pre, pp, rp, yp, r_pre);
@@ -1240,10 +1239,10 @@ allreduceHandle(nullptr), recvbuff(new double[2], [](double *p) {delete[] p;}), 
       int updateX = (rNorm < param.delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
       int updateR = ((rNorm < param.delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
 
-      if(  (updateR || updateX)  ) { // do postponed restart:
-        warningQuda("Do eigCG restart.\n");
-        local_stop = true;
-      }
+//      if(  (updateR || updateX)  ) { // do postponed restart:
+//        warningQuda("Do eigCG restart.\n");
+//        local_stop = true;
+//      }
 
       rNorm = sqrt(gamma);
       if(rNorm > maxrx) maxrx = rNorm;
