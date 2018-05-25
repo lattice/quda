@@ -297,7 +297,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     // if we are using an outer even-odd preconditioned solve, then we
     // use single parity injection into the coarse grid
-    mg_param.coarse_grid_solution_type[i] = solve_type == mg_solve_type[i] ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    mg_param.coarse_grid_solution_type[i] = mg_solve_type[i] == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
     // ESW HACK
     //mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
@@ -309,10 +309,10 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   }
 
   // ESW hack
-  mg_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;
+  /*mg_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;
   mg_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
   mg_param.coarse_grid_solution_type[2] = QUDA_MAT_SOLUTION;
-  mg_param.coarse_grid_solution_type[3] = QUDA_MAT_SOLUTION;
+  mg_param.coarse_grid_solution_type[3] = QUDA_MAT_SOLUTION;*/
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
@@ -374,11 +374,10 @@ void setInvertParam(QudaInvertParam &inv_param) {
   // no need to set clover params
 
   // do we want full solution or single-parity solution
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solution_type = (solve_type == QUDA_DIRECT_PC_SOLVE) ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
   // do we want to use an even-odd preconditioned solve or not
-  // inv_param.solve_type = solve_type;
-  inv_param.solve_type = QUDA_DIRECT_SOLVE; // ESW HACK
+  inv_param.solve_type = solve_type;
   inv_param.matpc_type = matpc_type;
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
@@ -427,7 +426,7 @@ int main(int argc, char **argv)
     mg_solve_type[i] = QUDA_INVALID_SOLVE;
     schwarz_type[i] = QUDA_INVALID_SCHWARZ;
     schwarz_cycle[i] = 1;
-    smoother_type[i] = QUDA_BICGSTABL_INVERTER; //QUDA_MR_INVERTER; // MR doesn't work for top level staggered
+    smoother_type[i] = QUDA_GCR_INVERTER; 
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
@@ -473,6 +472,12 @@ int main(int argc, char **argv)
       //dslash_type != QUDA_TWISTED_MASS_DSLASH &&
       //dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
+    exit(0);
+  }
+
+  // ESW HACK: needs to be addressed
+  if (solve_type == QUDA_DIRECT_PC_SOLVE || mg_solve_type[0] == QUDA_DIRECT_PC_SOLVE) {
+    printfQuda("staggered_multigtid_invert_test doesn't support preconditioned outer solve yet.\n");
     exit(0);
   }
 
@@ -645,6 +650,7 @@ int main(int argc, char **argv)
 
   /* end stuff stolen from staggered_invert_test */
 
+  //if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   inv_param.solve_type = solve_type; // restore actual solve_type we want to do
 
   /* ESW HACK: comment this out to do a non-MG solve. */

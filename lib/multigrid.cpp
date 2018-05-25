@@ -1063,6 +1063,8 @@ namespace quda {
         }
       }
 
+      if ( debug ) printfQuda("preparing to post smooth\n");
+
       // do the post smoothing
       //residual = outer_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // refine for outer solution type
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
@@ -1077,7 +1079,11 @@ namespace quda {
 
       (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
 
+      if ( debug ) printfQuda("exited postsmooth, about to reconstruct\n");
+
       diracSmoother->reconstruct(x, b, outer_solution_type);
+
+      if ( debug ) printfQuda("finished reconstruct\n");
 
     } else { // do the coarse grid solve
 
@@ -1234,6 +1240,20 @@ namespace quda {
 
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
     csParam.gammaBasis = (B[0]->Nspin() == 1) ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS;
+
+#define ESW_MRHS
+
+#ifdef ESW_MRHS
+    // ESW HACK: Hard code naive multi-rhs for now
+    const int num_simul = 2;
+    if (B.size() % num_simul != 0) {
+      errorQuda("For multi-RHS null vector generation, number of simultaneous solves must divide into null space size.\n");
+    }
+
+    csParam.is_composite = true;
+    csParam.composite_dim = num_simul;
+#endif
+
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
     ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
@@ -1252,6 +1272,9 @@ namespace quda {
     DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
     DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
     if (solverParam.inv_type == QUDA_CG_INVERTER) {
+#ifdef ESW_MRHS
+      solverParam.num_src = num_simul;
+#endif
       solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_MG_INVERTER) {
       // in case MG has not been created, we create the Smoother
@@ -1292,25 +1315,57 @@ namespace quda {
         }
       }
 
+#ifdef ESW_MRHS
+      // Guaranteed above that this divides in evenly.
+      const int num_simul_solves = (int)B.size() / num_simul;
+#endif
+
+      
+#ifdef ESW_MRHS
+      for (int i = 0; i < num_simul_solves; i++) {
+#else
       // launch solver for each source
       for (int i=0; i<(int)B.size(); i++) {
+#endif
         if (param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
-          *b = *B[i];  // inverting against the vector
-          zero(*x);    // with zero initial guess
+          zero(*x); // with zero initial guess
+#ifdef ESW_MRHS
+          for (int j = 0; j < num_simul; j++) {
+            b->Component(j) = *B[i*num_simul+j];
+          }
+#else
+          *b = *B[i];
+#endif
         } else {
+#ifdef ESW_MRHS
+          for (int j = 0; j < num_simul; j++) {
+            x->Component(j) = *B[i*num_simul+j];
+          }
+#else
           *x = *B[i];
+#endif
         }
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial rhs = %g\n", norm2(*b));
-        printfQuda("Launching solver for null-space vector %d of %d\n", i+1, (int)B.size());
+#ifdef ESW_MRHS
+        printfQuda("Launching solver for null-space vector %d through %d of %d total\n", i*num_simul, (i+1)*num_simul-1, (int)B.size());
+#else
+        printfQuda("Launching solver for null-space vector %d of %d total\n", i, (int)B.size());
+#endif
         ColorSpinorField *out=nullptr, *in=nullptr;
         diracSmoother->prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
         (*solve)(*out, *in);
         diracSmoother->reconstruct(*x, *b, QUDA_MAT_SOLUTION);
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(*x));
+#ifdef ESW_MRHS
+        for (int j = 0; j < num_simul; j++) {
+          *B[i*num_simul+j] = x->Component(j);
+        }
+#else
         *B[i] = *x;
+#endif
       }
 
       // global orthonormalization of the generated null-space vectors
