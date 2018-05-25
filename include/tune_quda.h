@@ -78,7 +78,7 @@ namespace quda {
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
-	const unsigned int max_blocks = 2*deviceProp.multiProcessorCount;
+	const unsigned int max_blocks = maxGridSize();
 	const int step = 1;
 	param.grid.x += step;
 	if (param.grid.x > max_blocks) {
@@ -93,6 +93,7 @@ namespace quda {
     }
 
     virtual unsigned int maxBlockSize() const { return deviceProp.maxThreadsDim[0]; }
+    virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
 
     virtual int blockStep() const { return deviceProp.warpSize; }
     virtual int blockMin() const { return deviceProp.warpSize; }

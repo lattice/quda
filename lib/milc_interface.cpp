@@ -51,7 +51,7 @@ static bool create_quda_gauge = false;
 
 static bool invalidate_quda_mom = true;
 
-static void *df_preconditioner = NULL;
+static void *df_preconditioner = nullptr;
 
 // set to 1 for GPU resident pipeline (not yet supported in mainline MILC)
 #define MOM_PIPE 0
@@ -234,7 +234,7 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
   param.staggered_phase_applied = 1;
   param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
 
-  computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param);
+  computeKSLinkQuda(fatlink, longlink, nullptr, inlink, const_cast<double*>(act_path_coeff), &param);
   qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver
@@ -256,7 +256,7 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
              (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
              QUDA_GENERAL_LINKS);
 
-  computeKSLinkQuda(fatlink, NULL, ulink, inlink, const_cast<double*>(act_path_coeff), &param);
+  computeKSLinkQuda(fatlink, nullptr, ulink, inlink, const_cast<double*>(act_path_coeff), &param);
   qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver
@@ -994,13 +994,16 @@ void qudaInvert(int external_precision,
     gaugeParam.ga_pad = fat_pad;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam);
-
-    gaugeParam.type = QUDA_THREE_LINKS;
-    gaugeParam.ga_pad = long_pad;
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
-
+    if(longlink != nullptr) {
+      gaugeParam.type = QUDA_THREE_LINKS;
+      gaugeParam.ga_pad = long_pad;
+      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+      loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+    }
     invalidate_quda_gauge = false;
+  }
+  if(longlink == nullptr) {
+    invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
   }
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X)*host_precision;

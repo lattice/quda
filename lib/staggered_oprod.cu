@@ -330,7 +330,7 @@ namespace quda {
     cudaDeviceSynchronize();
 
     MemoryLocation location[2*QUDA_MAX_DIM] = {Device, Device, Device, Device, Device, Device, Device, Device};
-    a.pack(nFace, 1-parity, dag, Nstream-1, location);
+    a.pack(nFace, 1-parity, dag, Nstream-1, location, Device);
 
     cudaDeviceSynchronize();
 

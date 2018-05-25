@@ -394,7 +394,8 @@ namespace quda {
     // first transfer src1
     cudaDeviceSynchronize();
 
-    a.pack(1, 1-parity, dag, Nstream-1, 0);
+    MemoryLocation location[2*QUDA_MAX_DIM] = {Device, Device, Device, Device, Device, Device, Device, Device};
+    a.pack(1, 1-parity, dag, Nstream-1, location, Device);
 
     cudaDeviceSynchronize();
 

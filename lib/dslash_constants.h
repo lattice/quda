@@ -86,8 +86,8 @@ enum KernelType {
     void *in;
     float *inNorm;
 
-    void *ghost;
-    float *ghostNorm;
+    void *ghost[2*QUDA_MAX_DIM];
+    float *ghostNorm[2*QUDA_MAX_DIM];
 
     void *x;
     float *xNorm;
@@ -113,8 +113,8 @@ enum KernelType {
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
     cudaTextureObject_t inTexNorm;
-    cudaTextureObject_t ghostTex;
-    cudaTextureObject_t ghostTexNorm;
+    cudaTextureObject_t ghostTex[2*QUDA_MAX_DIM];
+    cudaTextureObject_t ghostTexNorm[2*QUDA_MAX_DIM];
     cudaTextureObject_t xTex;
     cudaTextureObject_t xTexNorm;
     cudaTextureObject_t outTex;
@@ -130,6 +130,9 @@ enum KernelType {
     cudaTextureObject_t cloverInvTex;
     cudaTextureObject_t cloverInvNormTex;
 #endif
+
+    // used by the autotuner to switch on/off remote writing vs using copy engines
+    bool remote_write;
 
     void print() {
       printfQuda("threads = %d\n", threads);

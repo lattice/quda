@@ -425,19 +425,28 @@ public:
     dslashParam.inNorm = (float*)in->Norm();
     dslashParam.x = x ? (void*)x->V() : nullptr;
     dslashParam.xNorm = x ? (float*)x->Norm() : nullptr;
-    dslashParam.ghost = (void*)in->Ghost2();
-    dslashParam.ghostNorm = (float*)(in->Ghost2());
 
 #ifdef USE_TEXTURE_OBJECTS
     dslashParam.inTex = in->Tex();
     dslashParam.inTexNorm = in->TexNorm();
-    dslashParam.ghostTex = in->GhostTex();
-    dslashParam.ghostTexNorm = in->GhostTexNorm();
     if (out) dslashParam.outTex = out->Tex();
     if (out) dslashParam.outTexNorm = out->TexNorm();
     if (x) dslashParam.xTex = x->Tex();
     if (x) dslashParam.xTexNorm = x->TexNorm();
-#endif
+#endif // USE_TEXTURE_OBJECTS
+
+    for (int dim=0; dim<4; dim++) {
+      for (int dir=0; dir<2; dir++) {
+        dslashParam.ghost[2*dim+dir] = (void*)in->Ghost2();
+        dslashParam.ghostNorm[2*dim+dir] = (float*)(in->Ghost2());
+
+#ifdef USE_TEXTURE_OBJECTS
+        dslashParam.ghostTex[2*dim+dir] = in->GhostTex();
+        dslashParam.ghostTexNorm[2*dim+dir] = in->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
+
+      }
+    }
 
 #ifdef MULTI_GPU 
     fillAux(INTERIOR_KERNEL, "type=interior");

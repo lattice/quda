@@ -193,10 +193,7 @@ namespace quda {
       // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
       dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
       dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
-#ifdef USE_TEXTURE_OBJECTS
-      dslashParam.ghostTex = in->GhostTex();
-      dslashParam.ghostTexNorm = in->GhostTexNorm();
-#else
+#ifndef USE_TEXTURE_OBJECTS
       bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
 
