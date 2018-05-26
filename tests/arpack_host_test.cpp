@@ -330,11 +330,12 @@ int main(int argc, char **argv)
   // *** application-specific.
 
   setDims(gauge_param.X);
-
   setSpinorSiteSize(24);
 
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ?
+    sizeof(double) : sizeof(float);
+  size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ?
+    sizeof(double) : sizeof(float);
 
   void *gauge[4], *clover=0, *clover_inv=0;
 
@@ -352,15 +353,17 @@ int main(int argc, char **argv)
     construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
   }
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
+      dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    double norm = 0.1; // clover components are rands in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = inv_param.clover_cpu_prec;
     clover = malloc(V*cloverSiteSize*cSize);
     clover_inv = malloc(V*cloverSiteSize*cSize);
-    if (!compute_clover) construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
-
+    if (!compute_clover)
+      construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
+    
     inv_param.compute_clover = compute_clover;
     if (compute_clover) inv_param.return_clover = 1;
     inv_param.compute_clover_inverse = 1;
@@ -380,19 +383,48 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
   //Do ARPACK test here
-
-  //Memeory allocation and precision is handled in quda_arpack_interface.
   void *hostEvecs;
   void *hostEvals;
+  //Do memory allocations here.
+  int vol = xdim*ydim*zdim*tdim;
+  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+    hostEvecs = (void*)malloc(vol*24*arpack_param.nKv*sizeof(float));
+    hostEvals = (void*)malloc(     2*arpack_param.nKv*sizeof(float));
+  } else {
+    hostEvecs = (void*)malloc(vol*24*arpack_param.nKv*sizeof(double));
+    hostEvals = (void*)malloc(     2*arpack_param.nKv*sizeof(double));
+  }
 
-  //This function returns the hostEVecs and hostEVals pointers, populated with the
+  
+  //This function returns the hostEvecs and hostEvals pointers, populated with the
   //requested data, at the requested prec.
   arpackEigensolveQuda(hostEvecs, hostEvals, &inv_param, &arpack_param, &gauge_param);
 
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    //printfQuda("%e %e\n", ((float*)hostEvecs)[0], ((float*)hostEvals)[0]);
-  } else {
-    //printfQuda("%e %e\n", ((double*)hostEvecs)[0], ((double*)hostEvals)[0]);
+  //Access the eigenmode data
+  printfQuda("First 10 elements of the eigenvectors and the eigenvalues:\n");    
+  for(int i=0; i<arpack_param.nEv; i++) {
+    printfQuda("eigenvector %d:\n",i);
+    for(int j=0; j<10; j++) {
+      if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+	printfQuda("(%e,%e)\n",		   
+		   ((float*)hostEvecs)[i*vol*24 + j],
+		   ((float*)hostEvecs)[i*vol*24 + j+1]);
+      } else {
+	printfQuda("(%e,%e)\n",		   
+		     ((double*)hostEvecs)[i*vol*24 + j],
+		   ((double*)hostEvecs)[i*vol*24 + j+1]);
+      }
+    }
+    printfQuda("eigenvalue %d = ", i);
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      printfQuda("(%e,%e)\n",		   
+		 ((float*)hostEvals)[i*2],
+		 ((float*)hostEvals)[i*2+1]);
+    } else {
+	printfQuda("(%e,%e)\n",		   
+		   ((double*)hostEvals)[i*2],
+		   ((double*)hostEvals)[i*2+1]);
+    }
   }
   
   

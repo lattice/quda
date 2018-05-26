@@ -100,15 +100,6 @@ namespace quda{
 
     float tol_ = arpack_param->arpackTol;
     
-    //Do memory allocations here.
-    float *h_evecs_lc = (float*)malloc(local_vol*12*2*nkv_*sizeof(float));
-    float *h_evals_lc = (float*)malloc(             2*nkv_*sizeof(float));
-    //Memory checks
-    if((h_evecs_lc == NULL) ||
-       (h_evals_lc == NULL) ) {
-      errorQuda("eigenSolver: not enough memory for host eigenvalues/vectors.\n");
-    }
-    
     float *h_evals_sorted  = (float*)malloc(nkv_*2*sizeof(float));
     int *h_evals_sorted_idx = (int*)malloc(nkv_*sizeof(int));
 
@@ -136,10 +127,10 @@ namespace quda{
 
     //Alias pointers
     std::complex<float> *h_evecs_ = NULL;
-    h_evecs_ = (std::complex<float>*) &(h_evecs_lc[0]);    
+    h_evecs_ = (std::complex<float>*) (float*)h_evecs;    
     std::complex<float> *h_evals_ = NULL;
-    h_evals_ = (std::complex<float>*) &(h_evals_lc[0]);
-
+    h_evals_ = (std::complex<float>*) (float*)h_evals;
+    
     //Memory checks
     if((iparam_ == NULL) ||
        (ipntr_ == NULL) || 
@@ -335,8 +326,6 @@ namespace quda{
     free(w_workl_);
     free(w_workev_);
     free(w_rwork_);
-    free(h_evals_lc);
-    free(h_evecs_lc);
     free(select_);
     free(spectrum);
     
@@ -386,15 +375,6 @@ namespace quda{
 
     double tol_ = arpack_param->arpackTol;
     
-    //Do memory allocations here.
-    double *h_evecs_lc = (double*)malloc(local_vol*12*2*nkv_*sizeof(double));
-    double *h_evals_lc = (double*)malloc(             2*nkv_*sizeof(double));
-    //Memory checks
-    if((h_evecs_lc == NULL) ||
-       (h_evals_lc == NULL) ) {
-      errorQuda("eigenSolver: not enough memory for host eigenvalues/vectors.\n");
-    }
-    
     double *h_evals_sorted  = (double*)malloc(nkv_*2*sizeof(double));
     int *h_evals_sorted_idx = (int*)malloc(nkv_*sizeof(int));
 
@@ -422,9 +402,9 @@ namespace quda{
 
     //Alias pointers
     std::complex<double> *h_evecs_ = NULL;
-    h_evecs_ = (std::complex<double>*) &(h_evecs_lc[0]);    
+    h_evecs_ = (std::complex<double>*) (double*)(h_evecs);    
     std::complex<double> *h_evals_ = NULL;
-    h_evals_ = (std::complex<double>*) &(h_evals_lc[0]);
+    h_evals_ = (std::complex<double>*) (double*)(h_evals);
 
     //Memory checks
     if((iparam_ == NULL) ||
@@ -490,12 +470,12 @@ namespace quda{
       ARPACK(pznaupd)(&fcomm_, &ido_, &bmat, &n_, spectrum, &nev_, &tol_,
 		      resid_, &nkv_, h_evecs_, &n_, iparam_, ipntr_,
 		      w_workd_, w_workl_, &lworkl_, w_rwork_, &info_);
-      if (info_ != 0) errorQuda("\nError in pznaupd info =  %d. Exiting.",info_);
+      if (info_ != 0) errorQuda("\nError in pznaupd info = %d. Exiting.",info_);
 #else
       ARPACK(znaupd)(&ido_, &bmat, &n_, spectrum, &nev_, &tol_, resid_, &nkv_,
 		     h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_,
 		     w_rwork_, &info_);
-      if (info_ != 0) errorQuda("\nError in znaupd info =  %d. Exiting.",info_);
+      if (info_ != 0) errorQuda("\nError in znaupd info = %d. Exiting.",info_);
 #endif
       
       //If this is the first iteration, we allocate CPU and GPU memory for QUDA
@@ -567,11 +547,6 @@ namespace quda{
       if (info_ != 0) errorQuda("\nError in zneupd info = %d. Exiting.\n", info_);
 #endif
 
-      //Do not free the eigenspace, point the h_evals and h_evecs void pointers
-      //to the data.
-      //*(double*)h_evecs = h_evecs_lc[0];
-      //*(double*)h_evals = h_evals_lc[0];
-      
       /* print out the computed ritz values and their error estimates */
       int nconv = iparam_[4];
       for(int j=0; j<nconv; j++){
@@ -626,8 +601,6 @@ namespace quda{
     free(w_workl_);
     free(w_workev_);
     free(w_rwork_);
-    //free(h_evals_lc);
-    //free(h_evecs_lc);
     free(select_);
     free(spectrum);
     
