@@ -13,8 +13,8 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 # add a directory for cmake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-set(CMAKE_CXX_COMPILER g++)
-set(CMAKE_C_COMPILER gcc)
+set(CMAKE_CXX_COMPILER g++-6)
+set(CMAKE_C_COMPILER gcc-6)
 
 find_package(Git)
 SET(DEFBUILD "RELEASE")
@@ -355,14 +355,14 @@ if(QUDA_ARPACK)
   endif()
   
   # Link ARPACK dependenices (LAPACK, BLAS)
-  set(QUDA_ARPACK_LAPACK_HOME "" CACHE PATH "path to Arpack's lapack")
-  set(QUDA_ARPACK_OPENBLAS_HOME "" CACHE PATH "path to Arpack's OpenBLAS")
+  #set(QUDA_ARPACK_LAPACK_HOME "" CACHE PATH "path to Arpack's lapack")
+  #set(QUDA_ARPACK_OPENBLAS_HOME "" CACHE PATH "path to Arpack's OpenBLAS")
   
-  find_library(ARPACK_LAPACK lapack PATH ${QUDA_ARPACK_LAPACK_HOME}/lib64)
-  find_library(ARPACK_OPENBLAS openblas PATH ${QUDA_ARPACK_OPENBLAS_HOME}/lib)
+  #find_library(ARPACK_LAPACK lapack PATH ${QUDA_ARPACK_LAPACK_HOME}/lib64)
+  #find_library(ARPACK_OPENBLAS openblas PATH ${QUDA_ARPACK_OPENBLAS_HOME}/lib)
   
-  include_directories(SYSTEM ${QUDA_ARPACK_LAPACK_HOME}/include)
-  include_directories(SYSTEM ${QUDA_ARPACK_OPENBLAS_HOME}/include)
+  #include_directories(SYSTEM ${QUDA_ARPACK_LAPACK_HOME}/include)
+  #include_directories(SYSTEM ${QUDA_ARPACK_OPENBLAS_HOME}/include)
     
 endif(QUDA_ARPACK)
 

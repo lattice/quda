@@ -204,15 +204,15 @@ void printQudaArpackParam(QudaArpackParam *param) {
   P(nEv, INVALID_INT);
   P(nKv, INVALID_INT);
   P(spectrum, QUDA_INVALID_SPECTRUM);
-  P(usePolyAcc, QUDA_BOOLEAN_NO);  
+  //P(usePolyAcc, QUDA_BOOLEAN_NO);  
   P(polyDeg, INVALID_INT);
   P(amin, INVALID_DOUBLE);
   P(amax, INVALID_DOUBLE);
   P(arpackTol, INVALID_DOUBLE);
   P(arpackMaxiter, INVALID_INT);
   P(arpackPrec, QUDA_INVALID_PRECISION);
-  P(useEEOp, QUDA_BOOLEAN_NO);
-  P(useFullOp, QUDA_BOOLEAN_NO);
+  //P(useEEOp, QUDA_BOOLEAN_NO);
+  //P(useFullOp, QUDA_BOOLEAN_NO);
 #endif
 
 #ifdef INIT_PARAM

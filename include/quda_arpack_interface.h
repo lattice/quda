@@ -9,10 +9,6 @@
 #include <vector>
 #include <algorithm>
 
-//#ifdef PRIMME_LIB
-//#include "primme.h"
-//#endif
-
 #ifdef ARPACK_LIB
 
 #define ARPACK(s) s ## _
@@ -21,8 +17,8 @@
 extern "C" {
 #endif
 
-#ifdef MULTI_GPU
-
+#if (defined (QMP_COMMS) || defined (MPI_COMMS))
+  
   extern int ARPACK(pcnaupd) (int *fcomm, int *ido, char *bmat, int *n, char *which,
 			      int *nev, float *tol, std::complex<float> *resid,
 			      int *ncv, std::complex<float> *v, int *ldv, int *iparam,
@@ -39,48 +35,70 @@ extern "C" {
 			      int *info);
   
   
-  extern int ARPACK(pcneupd) (int *fcomm, int *comp_evecs, char *howmany, int *select, std::complex<float> *evals,
-                         std::complex<float> *v, int *ldv, std::complex<float> *sigma, std::complex<float> *workev,
-                         char *bmat, int *n, char *which, int *nev, float *tol, std::complex<float> *resid,
-                         int *ncv, std::complex<float> *v1, int *ldv1, int *iparam, int *ipntr,
-                         std::complex<float> *workd, std::complex<float> *workl, int *lworkl, float *rwork, int *info);
-
-
-extern int ARPACK(pzneupd) (int *fcomm, int *comp_evecs, char *howmany, int *select, std::complex<double> *evals,
-                         std::complex<double> *v, int *ldv, std::complex<double> *sigma, std::complex<double> *workev,
-                         char *bmat, int *n, char *which, int *nev, double *tol, std::complex<double> *resid,
-                         int *ncv, std::complex<double> *v1, int *ldv1, int *iparam, int *ipntr,
-                         std::complex<double> *workd, std::complex<double> *workl, int *lworkl, double *rwork, int *info);
-
+  extern int ARPACK(pcneupd) (int *fcomm, int *comp_evecs, char *howmany, int *select,
+			      std::complex<float> *evals, std::complex<float> *v,
+			      int *ldv, std::complex<float> *sigma,
+			      std::complex<float> *workev, char *bmat, int *n,
+			      char *which, int *nev, float *tol,
+			      std::complex<float> *resid, int *ncv,
+			      std::complex<float> *v1, int *ldv1, int *iparam,
+			      int *ipntr, std::complex<float> *workd,
+			      std::complex<float> *workl, int *lworkl,
+			      float *rwork, int *info);
+  
+  
+  extern int ARPACK(pzneupd) (int *fcomm, int *comp_evecs, char *howmany, int *select,
+			      std::complex<double> *evals, std::complex<double> *v,
+			      int *ldv, std::complex<double> *sigma,
+			      std::complex<double> *workev, char *bmat, int *n,
+			      char *which, int *nev, double *tol,
+			      std::complex<double> *resid, int *ncv,
+			      std::complex<double> *v1, int *ldv1, int *iparam,
+			      int *ipntr, std::complex<double> *workd,
+			      std::complex<double> *workl, int *lworkl,
+			      double *rwork, int *info);
+  
 #else
-
-extern int ARPACK(cnaupd) (int *ido, char *bmat, int *n, char *which, int *nev, float *tol,
-                         std::complex<float> *resid, int *ncv, std::complex<float> *v, int *ldv,
-                         int *iparam, int *ipntr, std::complex<float> *workd, std::complex<float> *workl,
-                         int *lworkl, float *rwork, int *info);
-
-
-extern int ARPACK(znaupd) (int *ido, char *bmat, int *n, char *which, int *nev, double *tol,
-                         std::complex<double> *resid, int *ncv, std::complex<double> *v, int *ldv, 
-                         int *iparam, int *ipntr, std::complex<double> *workd, std::complex<double> *workl, 
-                         int *lworkl, double *rwork, int *info);
-
-
-extern int ARPACK(cneupd) (int *comp_evecs, char *howmany, int *select, std::complex<float> *evals, 
-			 std::complex<float> *v, int *ldv, std::complex<float> *sigma, std::complex<float> *workev, 
-			 char *bmat, int *n, char *which, int *nev, float *tol, std::complex<float> *resid, 
-                         int *ncv, std::complex<float> *v1, int *ldv1, int *iparam, int *ipntr, 
-                         std::complex<float> *workd, std::complex<float> *workl, int *lworkl, float *rwork, int *info);			
-
-
-extern int ARPACK(zneupd) (int *comp_evecs, char *howmany, int *select, std::complex<double> *evals, 
-			 std::complex<double> *v, int *ldv, std::complex<double> *sigma, std::complex<double> *workev, 
-			 char *bmat, int *n, char *which, int *nev, double *tol, std::complex<double> *resid, 
-                         int *ncv, std::complex<double> *v1, int *ldv1, int *iparam, int *ipntr, 
-                         std::complex<double> *workd, std::complex<double> *workl, int *lworkl, double *rwork, int *info);
-
+  
+  extern int ARPACK(cnaupd) (int *ido, char *bmat, int *n, char *which, int *nev,
+			     float *tol, std::complex<float> *resid, int *ncv,
+			     std::complex<float> *v, int *ldv, int *iparam, int *ipntr,
+			     std::complex<float> *workd, std::complex<float> *workl,
+			     int *lworkl, float *rwork, int *info);
+  
+  
+  extern int ARPACK(znaupd)(int *ido, char *bmat, int *n, char *which, int *nev,
+			    double *tol, std::complex<double> *resid, int *ncv,
+			    std::complex<double> *v, int *ldv, int *iparam, int *ipntr,
+			    std::complex<double> *workd, std::complex<double> *workl, 
+			    int *lworkl, double *rwork, int *info);
+  
+  
+  extern int ARPACK(cneupd) (int *comp_evecs, char *howmany, int *select,
+			     std::complex<float> *evals, std::complex<float> *v,
+			     int *ldv, std::complex<float> *sigma,
+			     std::complex<float> *workev, char *bmat, int *n,
+			     char *which, int *nev, float *tol,
+			     std::complex<float> *resid, int *ncv,
+			     std::complex<float> *v1, int *ldv1, int *iparam,
+			     int *ipntr, std::complex<float> *workd,
+			     std::complex<float> *workl, int *lworkl,
+			     float *rwork, int *info);			
+  
+  
+  extern int ARPACK(zneupd) (int *comp_evecs, char *howmany, int *select,
+			     std::complex<double> *evals, std::complex<double> *v,
+			     int *ldv, std::complex<double> *sigma,
+			     std::complex<double> *workev, char *bmat, int *n,
+			     char *which, int *nev, double *tol,
+			     std::complex<double> *resid, int *ncv,
+			     std::complex<double> *v1, int *ldv1, int *iparam,
+			     int *ipntr, std::complex<double> *workd,
+			     std::complex<double> *workl, int *lworkl,
+			     double *rwork, int *info);
+  
 #endif
-
+  
 #ifdef __cplusplus
 }
 #endif
@@ -117,16 +135,7 @@ namespace quda{
   void arpackSolve(void *h_evecs, void *h_evals,
 		   QudaInvertParam *inv_param,
 		   QudaArpackParam *arpack_param,
-		   Dirac &mat);
+		   DiracParam *d_param, int *local_dim);
 
-  /*
-    void arpackSolve(std::vector<ColorSpinorField*> &B, void *evals,
-    DiracMatrix &matEigen, QudaPrecision matPrec,
-    QudaPrecision arpackPrec, double tol, int nev, int ncv,
-    char *target);
-  */
-  
-  //  void primmeSolve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision primmePrec, double tol, int nev, int ncv, char *target);
-  
 }//endof namespace quda 
 

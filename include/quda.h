@@ -431,7 +431,7 @@ extern "C" {
     /** What type of Dirac operator we are using **/
     QudaBoolean useEEOp;
     QudaBoolean useFullOp;
-    
+
   }QudaArpackParam;
   
   typedef struct QudaMultigridParam_s {
@@ -794,10 +794,12 @@ extern "C" {
    *                   storage and solver parameters
    * @param a_param    Contains all the data required by ARPACK to perform
    *                   the solve.
+   * @param g_param    Gauge field meta data
    */
   void arpackEigensolveQuda(void *h_evecs, void *h_evals,
 			    QudaInvertParam *inv_param,
-			    QudaArpackParam *a_param);
+			    QudaArpackParam *a_param,
+			    QudaGaugeParam *g_param);
   
   /**
    * Perform the solve, according to the parameters set in param.  It

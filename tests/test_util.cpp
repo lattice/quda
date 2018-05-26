@@ -1702,8 +1702,8 @@ int eig_poly_deg = 15;
 double eig_amin = 20;
 double eig_amax = 40;
 QudaArpackSpectrumType arpack_spectrum = QUDA_SR_SPECTRUM;
-int arpack_mode = 7;
-char arpack_logfile[256] = "";
+int arpack_mode = 1;
+char arpack_logfile[256] = "arpack_logfile.log";
 
 static int dim_partitioned[4] = {0,0,0,0};
 

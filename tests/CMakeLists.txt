@@ -16,13 +16,9 @@ ENDMACRO()
 
 if(QUDA_ARPACK)
   LIST(APPEND TEST_LIBS ${ARPACK})
-  LIST(APPEND TEST_LIBS ${ARPACK_OPENBLAS})
-  LIST(APPEND TEST_LIBS ${ARPACK_LAPACK})
   if(QUDA_MPI OR QUDA_QMP) 
     LIST(APPEND TEST_LIBS ${PARPACK})
   endif()
-  include_directories(SYSTEM ${QUDA_ARPACK_LAPACK_HOME}/include)
-  include_directories(SYSTEM ${QUDA_ARPACK_OPENBLAS_HOME}/include)
 endif()
 
 # if we build with QDP JIT the tests cannot run anyway

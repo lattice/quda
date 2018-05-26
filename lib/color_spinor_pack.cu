@@ -389,6 +389,7 @@ namespace quda {
       genericPackGhost<Float,ghostFloat,order,Ns,2>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 3) {
       genericPackGhost<Float,ghostFloat,order,Ns,3>(ghost, a, parity, nFace, dagger, destination);
+#ifdef GPU_MULTIGRID
     } else if (a.Ncolor() == 4) {
       genericPackGhost<Float,ghostFloat,order,Ns,4>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 6) {
@@ -425,6 +426,7 @@ namespace quda {
       genericPackGhost<Float,ghostFloat,order,Ns,768>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 1024) {
       genericPackGhost<Float,ghostFloat,order,Ns,1024>(ghost, a, parity, nFace, dagger, destination);
+#endif
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
     }

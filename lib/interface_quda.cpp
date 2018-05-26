@@ -2660,7 +2660,8 @@ void destroyDeflationQuda(void *df) {
 //DMH: ARPACK goes here
 void arpackEigensolveQuda(void *h_evecs, void *h_evals,
 			  QudaInvertParam *inv_param,
-			  QudaArpackParam *arpack_param){
+			  QudaArpackParam *arpack_param,
+			  QudaGaugeParam *gauge_param){
 
   profilerStart(__func__);
   
@@ -2673,14 +2674,6 @@ void arpackEigensolveQuda(void *h_evecs, void *h_evals,
     printQudaInvertParam(inv_param);
     printQudaArpackParam(arpack_param);
   }
-  
-  checkInvertParam(inv_param);
-  checkArpackParam(arpack_param);
-
-  // check the gauge fields have been created
-  cudaGaugeField *cudaGauge = checkGauge(inv_param);
-
-
 
   bool pc_solution = (inv_param->solution_type == QUDA_MATPC_SOLUTION) ||
     (inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
@@ -2693,6 +2686,13 @@ void arpackEigensolveQuda(void *h_evecs, void *h_evals,
   bool norm_error_solve = (inv_param->solve_type == QUDA_NORMERR_SOLVE) ||
     (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
+  
+  checkInvertParam(inv_param);
+  checkArpackParam(arpack_param);
+
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(inv_param);
+
   Timer t_predict;
   Timer t_register;
 
@@ -2700,19 +2700,17 @@ void arpackEigensolveQuda(void *h_evecs, void *h_evals,
   inv_param->gflops = 0;
   inv_param->iter = 0;
 
-  Dirac *d = nullptr;
-  Dirac *dSloppy = nullptr;
-  Dirac *dPre = nullptr;
+  // set problem matrix
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, false);
 
-  // create the dirac operator
-  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
-
-  Dirac &dirac = *d;
-  Dirac &diracSloppy = *dSloppy;
-  Dirac &diracPre = *dPre;
-
-  arpackSolve(h_evecs, h_evals, inv_param, arpack_param, dirac);
+  int local_dim[4];
+  // set problem dimensions
+  for(int i=0; i<4; i++) {
+    local_dim[i] = gauge_param->X[i];
+  }
   
+  arpackSolve(h_evecs, h_evals, inv_param, arpack_param, &diracParam, local_dim);  
   
 }
 

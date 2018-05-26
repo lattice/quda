@@ -166,12 +166,6 @@ if(QUDA_ARPACK)
     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)    
   endif()
-  
-  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${ARPACK_LAPACK})
-  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${ARPACK_OPENBLAS})
-  include_directories(SYSTEM ${QUDA_ARPACK_LAPACK_HOME}/include)
-  include_directories(SYSTEM ${QUDA_ARPACK_OPENBLAS_HOME}/include)
-  
 endif()
 
 

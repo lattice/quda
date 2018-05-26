@@ -66,6 +66,12 @@ extern void usage(char** );
 extern double clover_coeff;
 extern bool compute_clover;
 
+extern int niter;
+extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
+extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
+
+int csw = 0.1;
+
 extern int eig_nEv;
 extern int eig_nKv;
 extern double eig_tol;
@@ -77,6 +83,7 @@ extern double eig_amax;
 extern QudaArpackSpectrumType arpack_spectrum;
 extern int arpack_mode;
 extern char arpack_logfile[512];
+bool isEven = false;
 
 extern bool verify_results;
 
@@ -173,8 +180,19 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 #endif
 }
 
-//Use inverter structure to define the problem
 void setInvertParam(QudaInvertParam &inv_param) {
+
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1.0 + 3.0/anisotropy);
+  }
+  
+  printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
+
+
   inv_param.Ls = 1;
 
   inv_param.sp_pad = 0;
@@ -184,16 +202,18 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
 
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    inv_param.clover_coeff = csw*inv_param.kappa;
   }
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
@@ -201,18 +221,12 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (kappa == -1.0) {
-    inv_param.mass = mass;
-    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
-  } else {
-    inv_param.kappa = kappa;
-    inv_param.mass = 0.5/kappa - (1 + 3/anisotropy);
-  }
-
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || 
+      dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
     inv_param.twist_flavor = twist_flavor;
-    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
+    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 
+      2 : 1;
 
     if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
       printfQuda("Twisted-mass doublet non supported (yet)\n");
@@ -220,32 +234,46 @@ void setInvertParam(QudaInvertParam &inv_param) {
     }
   }
 
-  inv_param.clover_coeff = clover_coeff;
-
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
-
-  // do we want full solution or single-parity solution
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+  
+  //For now, deal with hermitean operators only.
   inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solve_type = QUDA_NORMOP_SOLVE;
 
-  // do we want to use an even-odd preconditioned solve or not
-  inv_param.solve_type = solve_type;
   inv_param.matpc_type = matpc_type;
+  inv_param.inv_type = QUDA_GCR_INVERTER;
 
   inv_param.verbosity = QUDA_VERBOSE;
-  
+
+  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.tol = tol;
 
-  // require both L2 relative and heavy quark residual to determine convergence
-  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
-  inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
-
+  // require both L2 relative and heavy quark residual to determine 
+  // convergence
+  inv_param.residual_type = 
+    static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+  // specify a tolerance for the residual for heavy quark residual
+  inv_param.tol_hq = tol_hq; 
+  
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
+  inv_param.maxiter = niter;
+  inv_param.gcrNkrylov = 10;
+  inv_param.pipeline = 10;
+  inv_param.reliable_delta = 1e-4;
+
+  // domain decomposition preconditioner parameters
+  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  inv_param.precondition_cycle = 1;
+  inv_param.tol_precondition = 1e-1;
+  inv_param.maxiter_precondition = 1;
+  inv_param.omega = 1.0;
 }
+
 
 void setArpackParam(QudaArpackParam &arpack_param) {
 
@@ -259,8 +287,9 @@ void setArpackParam(QudaArpackParam &arpack_param) {
   arpack_param.amax          = eig_amax;
   arpack_param.arpackTol     = eig_tol;
   arpack_param.arpackMaxiter = eig_maxiter;
+  arpack_param.arpackPrec    = prec;
   strcpy(arpack_param.arpackLogfile, arpack_logfile);
-  
+
 }
 
 
@@ -352,17 +381,27 @@ int main(int argc, char **argv)
 
   //Do ARPACK test here
 
-  void *hostEVecs = malloc(arpack_param.nKv*V*spinorSiteSize*sSize);
-  void *hostEVals = malloc(2*arpack_param.nKv*sSize);
+  //Memeory allocation and precision is handled in quda_arpack_interface.
+  void *hostEvecs;
+  void *hostEvals;
 
-  arpackEigensolveQuda(hostEVecs, hostEVals, &inv_param, &arpack_param);
+  //This function returns the hostEVecs and hostEVals pointers, populated with the
+  //requested data, at the requested prec.
+  arpackEigensolveQuda(hostEvecs, hostEvals, &inv_param, &arpack_param, &gauge_param);
+
+  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+    //printfQuda("%e %e\n", ((float*)hostEvecs)[0], ((float*)hostEvals)[0]);
+  } else {
+    //printfQuda("%e %e\n", ((double*)hostEvecs)[0], ((double*)hostEvals)[0]);
+  }
+  
   
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  free(hostEVecs);
-  free(hostEVals);
+  free(hostEvecs);
+  free(hostEvals);
   
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
