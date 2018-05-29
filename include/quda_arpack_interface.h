@@ -1,3 +1,6 @@
+#ifndef QUDA_ARPACK_INTERFACE_H_
+#define QUDA_ARPACK_INTERFACE_H_
+
 #pragma once
 
 #include <string>
@@ -131,11 +134,18 @@ namespace quda{
    *                             'LI' -> want the eigenvalues of largest imag part.
    *                             'SI' -> want the eigenvalues of smallest imag part.
    **/
-
+  
   void arpackSolve(void *h_evecs, void *h_evals,
 		   QudaInvertParam *inv_param,
 		   QudaArpackParam *arpack_param,
 		   DiracParam *d_param, int *local_dim);
 
+  void arpackMGComparisonSolve(void *h_evecs, void *h_evals,
+			       DiracMatrix &matSmooth,
+			       QudaInvertParam *inv_param,
+			       QudaArpackParam *arpack_param,
+			       ColorSpinorParam *cpuParam);
+  
 }//endof namespace quda 
 
+#endif

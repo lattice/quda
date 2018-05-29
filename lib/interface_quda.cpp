@@ -2702,12 +2702,14 @@ void arpackEigensolveQuda(void *h_evecs, void *h_evals,
 
   // set problem matrix
   DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, false);
+  setDiracParam(diracParam, inv_param, pc_solve);
 
   int local_dim[4];
+  //gauge_param->X[0] /= 2;
   // set problem dimensions
   for(int i=0; i<4; i++) {
     local_dim[i] = gauge_param->X[i];
+    printfQuda("local_dim[%d] = %d\n", i, local_dim[i]);
   }
   
   arpackSolve(h_evecs, h_evals, inv_param, arpack_param, &diracParam, local_dim);  

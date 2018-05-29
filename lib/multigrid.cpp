@@ -439,6 +439,7 @@ namespace quda {
     csParam.create = QUDA_NULL_FIELD_CREATE;
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
+    csParam.print();
     double deviation;
 
     QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
@@ -452,14 +453,14 @@ namespace quda {
     for (int i=0; i<param.Nvec; i++) {
       // as well as copying to the correct location this also changes basis if necessary
       *tmp1 = *param.B[i]; 
-
+      
       transfer->R(*r_coarse, *tmp1);
       transfer->P(*tmp2, *r_coarse);
 
-      if (getVerbosity() >= QUDA_VERBOSE)
-	printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
-		   i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
-
+      //if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
+		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+      
       deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n", deviation);
       if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
@@ -573,6 +574,89 @@ namespace quda {
     }
 
 #ifdef ARPACK_LIB
+    
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Check eigenvector overlap for level %d\n", param.level);
+
+    sprintf(prefix,"");
+    setOutputPrefix(prefix);
+    
+    //Clone the ColorSpinorParams from the coarse grid vectors
+    ColorSpinorParam cpuParam(*param.B[0]);
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+    cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+    cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    
+    if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      cpuParam.x[0] /= 2;
+      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
+    }
+    
+    //Construct ARPACK parameters for the problem
+    QudaArpackParam arpack_param = newQudaArpackParam();    
+    arpack_param.nEv = 32;
+    arpack_param.nKv = 64;
+    arpack_param.arpackTol = 1e-7;
+    arpack_param.spectrum = QUDA_SR_SPECTRUM;
+    arpack_param.arpackPrec = QUDA_SINGLE_PRECISION;
+    arpack_param.arpackMaxiter = 10000;
+    
+    //Convenience..
+    int nEv = arpack_param.nEv;
+    int nKv = arpack_param.nKv;
+    
+    int local_vol = 1;
+    for(int i=0; i<4; i++) {
+      local_vol *= cpuParam.x[i];
+    }
+    
+    void *hostEvecs = static_cast<void*>(new std::complex<float>[nKv*local_vol*12]);
+    void *hostEvals = static_cast<void*>(new std::complex<float>[nKv]);
+
+    cpuParam.v = ((float*)hostEvecs);
+
+    //allocate space using QUDA's routines.
+    cpuColorSpinorField *temp = nullptr;
+    cudaColorSpinorField *temp1 = nullptr;
+    
+    arpackMGComparisonSolve(hostEvecs, hostEvals, *param.matSmooth,
+			    param.mg_global.invert_param, &arpack_param, &cpuParam);
+
+    //arpackMGComparisonSolve(hostEvecs, hostEvals, *diracSmoother,
+    //param.mg_global.invert_param, &arpack_param, &cpuParam);
+    
+    for (int i=0; i<nEv; i++) {
+      cpuParam.v = (float*)hostEvecs + i*12*local_vol;
+      //as well as copying to the correct location this also changes basis if necessary
+      temp = new cpuColorSpinorField(cpuParam);
+      ColorSpinorParam cudaParam(cpuParam);
+      cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+      cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+      cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+      temp1 = new cudaColorSpinorField(cudaParam);
+      
+      *temp1 = *temp;
+      
+      transfer->R(*r_coarse, *temp1);
+      transfer->P(tmp2->Odd(), *r_coarse);
+      
+      printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e P P^dag v_k = %e\n",
+		 i, norm2(*temp1), norm2(*r_coarse), norm2(tmp2->Odd()) );
+
+      deviation = sqrt( xmyNorm(*temp1, tmp2->Odd()) / norm2(*temp1) );
+      printfQuda("L2 relative deviation = %e\n", deviation);
+      delete temp;
+      delete temp1;      
+    }
+    
+    delete static_cast<std::complex<float>* >(hostEvals);
+    delete static_cast<std::complex<float>* >(hostEvecs);
+    
+    sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+    setOutputPrefix(prefix);
+    
+    //OLD ARPACK COMP CODE
+#if 0
     printfQuda("\nCheck eigenvector overlap for level %d\n", param.level);
 
     int nmodes = 128;
@@ -580,13 +664,13 @@ namespace quda {
     double arpack_tol = 1e-7;
     char *which = (char*)malloc(256*sizeof(char));
     sprintf(which, "SM");/* ARPACK which="{S,L}{R,I,M}" */
-
+    
     ColorSpinorParam cpuParam(*param.B[0]);
     cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-
+    
     cpuParam.location = QUDA_CPU_FIELD_LOCATION;
     cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-
+    
     if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) { 
       cpuParam.x[0] /= 2; 
       cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
@@ -601,8 +685,8 @@ namespace quda {
     QudaPrecision arpPrecision = QUDA_DOUBLE_PRECISION;//precision used in ARPACK routines, may not coincide with matvec precision
     
     void *evalsBuffer =  arpPrecision == QUDA_DOUBLE_PRECISION ? static_cast<void*>(new std::complex<double>[nmodes+1]) : static_cast<void*>( new std::complex<float>[nmodes+1]);
-    //
-    // arpackSolve( evecsBuffer, evalsBuffer, *param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
+    
+    arpackSolve( evecsBuffer, evalsBuffer, *param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
     
     for (int i=0; i<nmodes; i++) {
       // as well as copying to the correct location this also changes basis if necessary
@@ -614,7 +698,7 @@ namespace quda {
       printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
 		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
 
-      deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
+      deviation = sqrt( xmyNorm(*tmp1, *tmp2.Even()) / norm2(*tmp1) );
       printfQuda("L2 relative deviation = %e\n", deviation);
     }
 
@@ -624,6 +708,8 @@ namespace quda {
     else                                         delete static_cast<std::complex<float>* > (evalsBuffer);
  
     free(which);
+#endif
+    
 #else
     warningQuda("\nThis test requires ARPACK.\n");
 #endif

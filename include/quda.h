@@ -389,9 +389,27 @@ extern "C" {
 
   } QudaEigParam;
 
+  // Parameter set for the ARPACK Fortran variables.    
 
-  // Parameter set for using the ARPACK interface.
+  typedef struct arpackFortranParam_s {
     
+    // all FORTRAN communication uses underscored 
+    int ido_; 
+    int info_;       //Error information.
+    int ipntr_[14];  //Holds info about array sizes
+    int iparam_[11]; //Holds problem type parameters
+    int n_;          //Local (complex) array size
+    int nev_;        //Number of Evecs/Evals requested
+    int nkv_;        //Size of the Kyrlov space (nev_ + extra vecs)
+    int ldv_;        //Leading dimension of the Krylov space (usually n_)
+    int lworkl_;     //Size of private workspace
+    int rvec_;       //==1 compute Ritz vectors ; ==0 compute Ritz values only 
+    int max_iter_;   //Maximum ARPACK iterations.
+    
+  }arpackFortranParam;
+
+  
+  // Parameter set for using the ARPACK interface.    
   typedef struct QudaArpackParam_s {
 
     /** Specifies the problem type to be solved by Arpack **/

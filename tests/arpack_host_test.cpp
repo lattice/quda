@@ -238,10 +238,11 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
   
   //For now, deal with hermitean operators only.
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
-  inv_param.solve_type = QUDA_NORMOP_SOLVE;
-
-  inv_param.matpc_type = matpc_type;
+  inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  inv_param.solve_type = (inv_param.solution_type == QUDA_MAT_SOLUTION ?
+			  QUDA_NORMOP_SOLVE : QUDA_NORMOP_PC_SOLVE);
+  
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
   inv_param.verbosity = QUDA_VERBOSE;
@@ -411,7 +412,7 @@ int main(int argc, char **argv)
 		   ((float*)hostEvecs)[i*vol*24 + j+1]);
       } else {
 	printfQuda("(%e,%e)\n",		   
-		     ((double*)hostEvecs)[i*vol*24 + j],
+		   ((double*)hostEvecs)[i*vol*24 + j],
 		   ((double*)hostEvecs)[i*vol*24 + j+1]);
       }
     }

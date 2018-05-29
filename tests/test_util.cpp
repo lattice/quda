@@ -1696,7 +1696,7 @@ QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 int eig_nEv = 10;
 int eig_nKv = 20;
 double eig_tol = 1e-4;
-int eig_maxiter = 100;
+int eig_maxiter = 10000;
 bool eig_use_poly_acc = false;
 int eig_poly_deg = 15;
 double eig_amin = 20;
@@ -1721,7 +1721,7 @@ void usage(char** argv )
 #ifndef MULTI_GPU
   printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");     
 #endif
-  printf("    --verbosity <silent/summurize/verbose>    # The the verbosity on the top level of QUDA( default summarize)\n");
+  printf("    --verbosity <silent/summarize/verbose>    # The the verbosity on the top level of QUDA( default summarize)\n");
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
   printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
