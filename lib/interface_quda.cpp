@@ -2713,6 +2713,9 @@ void arpackEigensolveQuda(void *h_evecs, void *h_evals,
   }
   
   arpackSolve(h_evecs, h_evals, inv_param, arpack_param, &diracParam, local_dim);  
+
+  profileArpackEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
+  profilerStop(__func__);
   
 }
 

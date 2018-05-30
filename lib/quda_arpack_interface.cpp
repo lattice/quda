@@ -186,9 +186,13 @@ namespace quda{
 
     //Start ARPACK routines
     //---------------------------------------------------------------------------------
+
+    double t1;
     
     do {
-      
+
+      t1 = -((double)clock());
+	
       //Interface to arpack routines
       //----------------------------
 #if (defined (QMP_COMMS) || defined (MPI_COMMS))
@@ -242,8 +246,10 @@ namespace quda{
 	
 	*h_v2 = *d_v2;
       }
+
+      t1 += clock();
       
-      printfQuda("Arpack Iteration : %d\n", iter_cnt);
+      printfQuda("Arpack Iteration : %d (%e secs)\n", iter_cnt, t1/CLOCKS_PER_SEC);
       iter_cnt++;
       
     } while (99 != ido_ && iter_cnt < max_iter);
@@ -287,12 +293,12 @@ namespace quda{
     }
     
     //SORT THE EIGENVALUES in absolute ascending order
-    double t1 = 1.0;
+    t1 =  -((double)clock());
     //quicksort(nconv,sorted_evals,sorted_evals_index);
     //sortAbs(sorted_evals,nconv,false,sorted_evals_index);
     //Print sorted evals
-    double t2 = 2.0;
-    printfQuda("Sorting time: %f sec\n",t2-t1);
+    t1 += clock();
+    printfQuda("Sorting time: %f sec\n",t1/CLOCKS_PER_SEC);
     printfQuda("Sorted eigenvalues based on their absolute values:\n");
     
     // print out the computed ritz values and their error estimates 
@@ -557,11 +563,11 @@ namespace quda{
     }
 
     //SORT THE EIGENVALUES in absolute ascending order
-    double t1 = 1.0;
+    double t1 =  -((double)clock());
     //quicksort(nconv,sorted_evals,sorted_evals_index);
     //sortAbs(sorted_evals,nconv,false,sorted_evals_index);
     //Print sorted evals
-    double t2 = 2.0;
+    double t2 =  -((double)clock());
     printfQuda("Sorting time: %f sec\n",t2-t1);
     printfQuda("Sorted eigenvalues based on their absolute values:\n");
     
@@ -835,11 +841,11 @@ namespace quda{
     }
     
     //SORT THE EIGENVALUES in absolute ascending order
-    double t1 = 1.0;
+    double t1 =  -((double)clock());
     //quicksort(nconv,sorted_evals,sorted_evals_index);
     //sortAbs(sorted_evals,nconv,false,sorted_evals_index);
     //Print sorted evals
-    double t2 = 2.0;
+    double t2 =  -((double)clock());
     printfQuda("Sorting time: %f sec\n",t2-t1);
     printfQuda("Sorted eigenvalues based on their absolute values:\n");
     
@@ -1010,8 +1016,12 @@ namespace quda{
 
     //Start ARPACK routines
     //---------------------------------------------------------------------------------
+
+    double t1,t2;
     
     do {
+
+      t1 = -((double)clock());
       
       //Interface to arpack routines
       //----------------------------
@@ -1069,7 +1079,7 @@ namespace quda{
 	}
 	//apply matrix-vector operation here:
 	if(arpack_param->usePolyAcc) {
-	  //polyOp<double>(*mat, *d_v2, *d_v, arpack_param);
+	  //polyOp<float>((matSmooth.Expose()), *d_v2, *d_v, arpack_param);
 	  //exit(0);
 	}
 	else {
@@ -1083,8 +1093,10 @@ namespace quda{
 	*h_v2 = *d_v2;
 	//exit(0);
       }
-      
-      printfQuda("Arpack Iteration : %d\n", iter_cnt);
+
+      t1 += clock();
+	
+      printfQuda("Arpack Iteration : %d (%e secs)\n", iter_cnt, t1/CLOCKS_PER_SEC);
       iter_cnt++;
       
     } while (99 != ido_ && iter_cnt < max_iter);
@@ -1128,11 +1140,11 @@ namespace quda{
     }
     
     //SORT THE EIGENVALUES in absolute ascending order
-    double t1 = 1.0;
+    t1 =  -((double)clock());;
     //quicksort(nconv,sorted_evals,sorted_evals_index);
     //sortAbs(sorted_evals,nconv,false,sorted_evals_index);
     //Print sorted evals
-    double t2 = 2.0;
+    t2 =  -((double)clock());;
     printfQuda("Sorting time: %f sec\n",t2-t1);
     printfQuda("Sorted eigenvalues based on their absolute values:\n");
     

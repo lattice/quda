@@ -439,12 +439,13 @@ namespace quda {
     csParam.create = QUDA_NULL_FIELD_CREATE;
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
+    printfQuda("Initial verify() params\n");
     csParam.print();
     double deviation;
 
     QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
       ? param.mg_global.precision_null[param.level]  : csParam.Precision();
-    // may want to revisit this---these were relaxed for cases where ghost_precision < precision
+    // FIXME? may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
     double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
 
@@ -457,9 +458,9 @@ namespace quda {
       transfer->R(*r_coarse, *tmp1);
       transfer->P(*tmp2, *r_coarse);
 
-      //if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
-		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+      if (getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
+		   i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
       
       deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n", deviation);
@@ -532,7 +533,7 @@ namespace quda {
 
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
 
-    // When the mu is shifted on the coarse level; we can compute exxactly the error we introduce in the check:
+    // When the mu is shifted on the coarse level; we can compute exactly the error we introduce in the check:
     //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test
     if(diracResidual->Mu() != 0) {
       double delta_factor = param.mg_global.mu_factor[param.level+1] - param.mg_global.mu_factor[param.level];
@@ -593,15 +594,18 @@ namespace quda {
     
     //Construct ARPACK parameters for the problem
     QudaArpackParam arpack_param = newQudaArpackParam();    
-    arpack_param.nEv = 32;
-    arpack_param.nKv = 64;
-    arpack_param.arpackTol = 1e-7;
+    arpack_param.nEv = param.Nvec;
+    arpack_param.nKv = 2*param.Nvec;
+    arpack_param.arpackTol = 1e-6;
     arpack_param.spectrum = QUDA_SR_SPECTRUM;
-    arpack_param.arpackPrec = QUDA_SINGLE_PRECISION;
-    arpack_param.arpackMaxiter = 10000;
+    arpack_param.arpackPrec = prec;
+    arpack_param.arpackMaxiter = 10000;    
+    //arpack_param.usePolyAcc = true;
+    arpack_param.amin = 1e-8;
+    arpack_param.amax = 6.0;
+    arpack_param.polyDeg = 40;
     
     //Convenience..
-    int nEv = arpack_param.nEv;
     int nKv = arpack_param.nKv;
     
     int local_vol = 1;
@@ -621,29 +625,39 @@ namespace quda {
     arpackMGComparisonSolve(hostEvecs, hostEvals, *param.matSmooth,
 			    param.mg_global.invert_param, &arpack_param, &cpuParam);
 
-    //arpackMGComparisonSolve(hostEvecs, hostEvals, *diracSmoother,
-    //param.mg_global.invert_param, &arpack_param, &cpuParam);
-    
-    for (int i=0; i<nEv; i++) {
+    for (int i=0; i<param.Nvec; i++) {
+      //Position the pointer to the next Evec
       cpuParam.v = (float*)hostEvecs + i*12*local_vol;
+
       //as well as copying to the correct location this also changes basis if necessary
+
+      //copy hostEvec data into QUDA data structure.
       temp = new cpuColorSpinorField(cpuParam);
+
+      //Clone and adjust params for cuda vector.
       ColorSpinorParam cudaParam(cpuParam);
       cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
       cudaParam.create = QUDA_ZERO_FIELD_CREATE;
       cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
       temp1 = new cudaColorSpinorField(cudaParam);
-      
-      *temp1 = *temp;
-      
-      transfer->R(*r_coarse, *temp1);
-      transfer->P(tmp2->Odd(), *r_coarse);
-      
-      printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e P P^dag v_k = %e\n",
-		 i, norm2(*temp1), norm2(*r_coarse), norm2(tmp2->Odd()) );
 
-      deviation = sqrt( xmyNorm(*temp1, tmp2->Odd()) / norm2(*temp1) );
+      //Copy from host to device.
+      *temp1 = *temp;
+
+      //N.B. tmp1 and tmp2 may be full/half spinors.
+      //Hardcoding half spinors for now...
+      
+      //Restrict Evec, place result in r_coarse
+      transfer->R(r_coarse->Odd(), *temp1);
+      //Prolong r_coarse, place result in tmp2
+      transfer->P(tmp2->Even(), r_coarse->Odd());
+
+      //compare tmp1 and tmp2. At the very least, norms should be similar.
+      printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e P P^dag v_k = %e\n",
+		 i, norm2(*temp1), norm2(r_coarse->Odd()), norm2(tmp2->Even()) );
+
+      deviation = sqrt( xmyNorm(*temp1, tmp2->Even()) / norm2(*temp1) );
       printfQuda("L2 relative deviation = %e\n", deviation);
       delete temp;
       delete temp1;      
@@ -688,17 +702,17 @@ namespace quda {
     
     arpackSolve( evecsBuffer, evalsBuffer, *param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
     
-    for (int i=0; i<nmodes; i++) {
+    for (int i=0; i<param.Nvec; i++) {
       // as well as copying to the correct location this also changes basis if necessary
       *tmp1 = *evecsBuffer[i]; 
 
-      transfer->R(*r_coarse, *tmp1);
+      transfer->R(*r_coarse, *temp1);
       transfer->P(*tmp2, *r_coarse);
 
       printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
 		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
 
-      deviation = sqrt( xmyNorm(*tmp1, *tmp2.Even()) / norm2(*tmp1) );
+      deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
       printfQuda("L2 relative deviation = %e\n", deviation);
     }
 
