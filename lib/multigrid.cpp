@@ -592,8 +592,8 @@ namespace quda {
       if (param.smoother_solve_type != QUDA_DIRECT_SOLVE) {
       	errorQuda("Low mode check only availible for direct solves. Please reconfigure or skip test.\n");
       }
-      if (prec != QUDA_SINGLE_PRECISION) {
-	errorQuda("Low mode check only availible for single precision. Please reconfigure or skip test..\n");
+      if (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) {
+	errorQuda("Low mode check only availible for double and single precision. Please reconfigure or skip test..\n");
       }
       
       if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -618,13 +618,22 @@ namespace quda {
       for(int i=0; i<4; i++) {
 	local_vol *= cpuParam.x[i];
       }
+
+      void *hostEvecs;
+      void *hostEvals;
       
-      void *hostEvecs = static_cast<void*>(new std::complex<float>[nKv*12*local_vol]);
-      void *hostEvals = static_cast<void*>(new std::complex<float>[nKv]);
+      if(prec == QUDA_SINGLE_PRECISION) {	
+	hostEvecs = static_cast<void*>(new std::complex<float>[nKv*12*local_vol]);
+	hostEvals = static_cast<void*>(new std::complex<float>[nKv]);
+      } else {
+	hostEvecs = static_cast<void*>(new std::complex<double>[nKv*12*local_vol]);
+	hostEvals = static_cast<void*>(new std::complex<double>[nKv]);
+      }
 
       //Set CPU adress to the start of Evecs buffer
-      cpuParam.v = ((float*)hostEvecs);
-      
+      if(prec == QUDA_SINGLE_PRECISION) cpuParam.v = ((float*)hostEvecs);
+      else cpuParam.v = ((double*)hostEvecs);
+
       cpuColorSpinorField *temp = nullptr;
       cudaColorSpinorField *temp1 = nullptr;
       
@@ -633,8 +642,8 @@ namespace quda {
       
       for (int i=0; i<param.Nvec; i++) {
 	//Position the pointer to the next Evec
-	cpuParam.v = (float*)hostEvecs + i*2*12*local_vol;
-	
+	if(prec == QUDA_SINGLE_PRECISION) cpuParam.v = (float*)hostEvecs + i*2*12*local_vol;
+	else cpuParam.v = (double*)hostEvecs + i*2*12*local_vol;
 	//copy hostEvec data into QUDA data structure.
 	temp = new cpuColorSpinorField(cpuParam);
 	
@@ -691,10 +700,16 @@ namespace quda {
 	delete temp;
 	delete temp1;
       }
+
+      if(prec == QUDA_SINGLE_PRECISION) {
+	delete static_cast<std::complex<float>* >(hostEvals);
+	delete static_cast<std::complex<float>* >(hostEvecs);
+      } else {
+	delete static_cast<std::complex<double>* >(hostEvals);
+	delete static_cast<std::complex<double>* >(hostEvecs);	
+      }
       
-      delete static_cast<std::complex<float>* >(hostEvals);
-      delete static_cast<std::complex<float>* >(hostEvecs);
-      
+	
 #else
       warningQuda("\nThis test requires ARPACK.\n");
 #endif
