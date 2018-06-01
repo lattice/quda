@@ -989,11 +989,10 @@ namespace quda {
 #ifdef GPU_WILSON_DIRAC
       static PackParam<FloatN> param;
       this->prepareParam(param,tp);
-      if (this->dagger) {
-        packFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-        packFaceWilsonKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      }
+
+      void *args[] = { &param };
+      void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceWilsonKernel<1,FloatN>) : &(packFaceWilsonKernel<0,FloatN>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("Wilson face packing kernel is not built");
 #endif
@@ -1050,11 +1049,9 @@ namespace quda {
 #ifdef GPU_TWISTED_MASS_DIRAC
       static PackParam<FloatN> param;
       this->prepareParam(param,tp);
-      if (this->dagger) {
-        packTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
-      } else {
-        packTwistedFaceWilsonKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
-      }
+      void *args[] = { &a, &b, &param };
+      void (*func)(Float,Float,PackParam<FloatN>) = this->dagger ? &(packTwistedFaceWilsonKernel<1,FloatN,Float>) : &(packTwistedFaceWilsonKernel<0,FloatN,Float>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("Twisted face packing kernel is not built");
 #endif
@@ -1473,11 +1470,9 @@ namespace quda {
       static PackParam<FloatN> param;
       this->prepareParam(param,tp,this->dim, this->face_num);
       if(!R){
-        if (PackFace<FloatN,Float>::nFace==1) {
-          packFaceStaggeredKernel<FloatN, 1> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-        } else {
-          packFaceStaggeredKernel<FloatN, 3> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-        }
+        void *args[] = { &param };
+        void (*func)(PackParam<FloatN>) = PackFace<FloatN,Float>::nFace==1 ? &(packFaceStaggeredKernel<FloatN,1>) : &(packFaceStaggeredKernel<FloatN,3>);
+        cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }else{ // R!=NULL => this is an extended field
         PackExtendedParam<FloatN> extendedParam(param);
         if(!unpack){
@@ -1790,11 +1785,9 @@ namespace quda {
 #ifdef GPU_DOMAIN_WALL_DIRAC
       static PackParam<FloatN> param;
       this->prepareParam(param,tp);
-      if (this->dagger) {
-        packFaceDWKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-        packFaceDWKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      }
+      void *args[] = { &param };
+      void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceDWKernel<1,FloatN>) : &(packFaceDWKernel<0,FloatN>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("DW face packing kernel is not built");
 #endif
@@ -1823,11 +1816,9 @@ namespace quda {
 #ifdef GPU_DOMAIN_WALL_DIRAC
       static PackParam<FloatN> param;
       this->prepareParam(param,tp);
-      if (this->dagger) {
-	packFaceDW4DKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-	packFaceDW4DKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      }
+      void *args[] = { &param };
+      void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceDW4DKernel<1,FloatN>) : &(packFaceDW4DKernel<0,FloatN>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("4D preconditioned DW face packing kernel is not built");
 #endif
@@ -2003,11 +1994,9 @@ namespace quda {
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
       static PackParam<FloatN> param;
       this->prepareParam(param,tp);
-      if (this->dagger) {
-        packFaceNdegTMKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-        packFaceNdegTMKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      }
+      void *args[] = { &param };
+      void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceNdegTMKernel<1,FloatN>) : &(packFaceNdegTMKernel<0,FloatN>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("Non-degenerate twisted mass face packing kernel is not built");
 #endif
