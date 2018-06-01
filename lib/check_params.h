@@ -556,8 +556,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   // do nothing
 #elif defined CHECK_PARAM
   checkInvertParam(param->invert_param);
+  checkArpackParam(param->arpack_param);
 #else
   printQudaInvertParam(param->invert_param);
+  printQudaArpackParam(param->arpack_param);
 #endif
 
   P(n_level, INVALID_INT);
@@ -679,6 +681,8 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
+  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
 
 #ifdef INIT_PARAM
   P(gflops, 0.0);

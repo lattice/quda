@@ -104,6 +104,7 @@ extern bool compute_clover;
 extern bool verify_results;
 
 extern bool low_mode_check;
+extern bool oblique_proj_check;
 extern int eig_nEv;
 extern int eig_nKv;
 extern double eig_tol;
@@ -343,6 +344,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
   strcpy(mg_param.vec_infile, vec_infile);

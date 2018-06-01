@@ -566,6 +566,9 @@ extern "C" {
     
     /** Whether to run null Vs eigen vector overlap checks once set up is complete */
     QudaBoolean run_low_mode_check;
+
+    /** Whether to run null vector oblique checks once set up is complete */
+    QudaBoolean run_oblique_proj_check;
     
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];

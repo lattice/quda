@@ -1634,6 +1634,7 @@ QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
 bool low_mode_check = false;
+bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
@@ -1694,6 +1695,8 @@ QudaExtLibType deflation_ext_lib  = QUDA_EIGEN_EXTLIB;
 QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
+//Prefix with 'eig' with the intention of making
+//the params method (ARPACK/CUDA_Arnoldi) agnostic.
 int eig_nEv = 10;
 int eig_nKv = 20;
 double eig_tol = 1e-4;
@@ -1775,6 +1778,7 @@ void usage(char** argv )
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
   printf("    --mg-low-mode-check <true/false>          # Measure how well the null vector subspace overlaps with the low eigenmode subspace (default false)\n");
+  printf("    --mg-oblique-proj-check <true/false>      # Measure how well the null vector subspace adjusts the low eigenmode subspace (default false)\n");
   printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
@@ -1896,6 +1900,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
       low_mode_check = false;
     }else{
       fprintf(stderr, "ERROR: invalid low_mode_check type (true/false)\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-oblique-proj-check") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      oblique_proj_check = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      oblique_proj_check = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid oblique_proj_check type (true/false)\n");	
       exit(1);
     }
 

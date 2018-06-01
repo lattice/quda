@@ -428,9 +428,8 @@ namespace quda {
     return flops;
   }
 
-  /**
-     Verification that the constructed multigrid operator is valid
-   */
+  //Verification that the constructed multigrid operator is valid
+  
   void MG::verify() {
     setOutputPrefix(prefix);
 
@@ -439,8 +438,6 @@ namespace quda {
     csParam.create = QUDA_NULL_FIELD_CREATE;
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
-    printfQuda("Initial verify() Params for tmp1 and tmp2\n");
-    csParam.print();
     double deviation;
 
     QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
@@ -458,54 +455,61 @@ namespace quda {
       transfer->R(*r_coarse, *tmp1);
       transfer->P(*tmp2, *r_coarse);
 
-      //if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n",
-		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+      if (getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n",
+		   i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
       
       deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
-      //if (getVerbosity() >= QUDA_VERBOSE)
+      if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("L2 relative deviation = %e\n", deviation);
       if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
     }
 
-#if 0
-    if (getVerbosity() >= QUDA_SUMMARIZE)
-      printfQuda("Checking 1 > || (1 - DP(P^dagDP)P^dag) v_k || / || v_k || for %d vectors\n",
-		 param.Nvec);
+    if (param.mg_global.run_oblique_proj_check) {
 
-    for (int i=0; i<param.Nvec; i++) {
-      transfer->R(*r_coarse, *(param.B[i]));
-      (*coarse)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
-      setOutputPrefix(prefix); // restore output prefix
-      transfer->P(*tmp2, *x_coarse);
-      param.matResidual(*tmp1,*tmp2);
-      *tmp2 = *(param.B[i]);
-      if (getVerbosity() >= QUDA_VERBOSE) {
-	printfQuda("Vector %d: norms %e %e ", i, norm2(*param.B[i]), norm2(*tmp1));
-	printfQuda("relative residual = %e\n", sqrt(xmyNorm(*tmp2, *tmp1) / norm2(*param.B[i])) );
+      sprintf(prefix,"MG level %d (%s): Null vector Oblique Projections : ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+      setOutputPrefix(prefix);
+      
+      //Oblique projections
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+	printfQuda("Checking 1 > || (1 - DP(P^dagDP)P^dag) v_k || / || v_k || for %d vectors\n",
+		   param.Nvec);
+
+      for (int i=0; i<param.Nvec; i++) {
+	transfer->R(*r_coarse, *(param.B[i]));
+	(*coarse_solver)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
+	setOutputPrefix(prefix);                // restore prefix after return from coarse grid
+	transfer->P(*tmp2, *x_coarse);
+	(*param.matResidual)(*tmp1,*tmp2);
+	*tmp2 = *(param.B[i]);
+	if (getVerbosity() >= QUDA_SUMMARIZE) {
+	  printfQuda("Vector %d: norms %e %e\n", i, norm2(*param.B[i]), norm2(*tmp1));
+	  printfQuda("relative residual = %e\n", sqrt(xmyNorm(*tmp2, *tmp1) / norm2(*param.B[i])) );
+	}
       }
+      sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+      setOutputPrefix(prefix);
     }
-#endif
-
-    //if (getVerbosity() >= QUDA_SUMMARIZE)
-    printfQuda("Checking 0 = (1 - P^dagP) eta_c\n");
+    
+    if (getVerbosity() >= QUDA_SUMMARIZE)
+      printfQuda("Checking 0 = (1 - P^dagP) eta_c\n");
     x_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
-    //if (getVerbosity() >= QUDA_VERBOSE)
-    printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(*tmp2));
-
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(*tmp2));
+    
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
-    //if (getVerbosity() >= QUDA_VERBOSE)
-    printfQuda("L2 relative deviation = %e\n", deviation);
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("L2 relative deviation = %e\n", deviation);
     if (deviation > tol ) errorQuda("L2 relative deviation = %e > %e failed", deviation, tol);
-    //if (getVerbosity() >= QUDA_SUMMARIZE)
-    printfQuda("Checking 0 = (D_c - P^dagDP) (native coarse operator to emulated operator)\n");
-
+    if (getVerbosity() >= QUDA_SUMMARIZE)
+      printfQuda("Checking 0 = (D_c - P^dagDP) (native coarse operator to emulated operator)\n");
+    
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     zero(*tmp_coarse);
     zero(*r_coarse);
-
+    
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp1, *tmp_coarse);
 
@@ -534,13 +538,13 @@ namespace quda {
     for (int x=0; x<r_coarse->Volume(); x++) tmp2->PrintVector(x);
 #endif
 
-    //if (getVerbosity() >= QUDA_VERBOSE)
-    printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
     
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
 
     // When the mu is shifted on the coarse level; we can compute exactly the error we introduce in the check:
-    //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test
+    // it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test
     if(diracResidual->Mu() != 0) {
       double delta_factor = param.mg_global.mu_factor[param.level+1] - param.mg_global.mu_factor[param.level];
       if(fabs(delta_factor) > tol ) {
@@ -550,8 +554,8 @@ namespace quda {
 	deviation = fabs(deviation);
       }
     }
-    //if (getVerbosity() >= QUDA_VERBOSE)
-    printfQuda("L2 relative deviation = %e\n\n", deviation);
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     
     // here we check that the Hermitian conjugate operator is working
@@ -649,14 +653,41 @@ namespace quda {
 	transfer->R(*r_coarse, *temp1);
 	//Prolong r_coarse, place result in tmp2
 	transfer->P(*tmp2, *r_coarse);
+
+	sprintf(prefix,"MG level %d (%s): eigenvector Overlap : ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+	setOutputPrefix(prefix);
 	
 	printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n",
 		   i, norm2(*temp1), norm2(*r_coarse), norm2(*tmp2) );
 
-	//compare v_k and PP^dag v_k.
+	//Compare v_k and PP^dag v_k.
 	deviation = sqrt( xmyNorm(*temp1, *tmp2) / norm2(*temp1) );
 	printfQuda("L2 relative deviation = %e\n", deviation);
 
+	if (param.mg_global.run_oblique_proj_check) {
+
+	  sprintf(prefix,"MG level %d (%s): eigenvector Oblique Projections : ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+	  setOutputPrefix(prefix);
+	  
+	  //Oblique projections
+	  if (getVerbosity() >= QUDA_SUMMARIZE)
+	    printfQuda("Checking 1 > || (1 - DP(P^dagDP)P^dag) v_k || / || v_k || for vector %d\n", i);
+	  
+	  transfer->R(*r_coarse, *temp1);
+	  (*coarse_solver)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
+	  setOutputPrefix(prefix);                // restore prefix after return from coarse grid
+	  transfer->P(*tmp2, *x_coarse);
+	  (*param.matResidual)(*tmp1,*tmp2);
+
+	  if (getVerbosity() >= QUDA_SUMMARIZE) {
+	    printfQuda("Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, norm2(*temp1), norm2(*tmp1));
+	    printfQuda("L2 relative deviation = %e\n", sqrt(xmyNorm(*temp1, *tmp1) / norm2(*temp1)) );
+	  }
+	}
+
+	sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+	setOutputPrefix(prefix);
+	
 	delete temp;
 	delete temp1;
       }
@@ -667,7 +698,7 @@ namespace quda {
 #else
       warningQuda("\nThis test requires ARPACK.\n");
 #endif
-
+      
     }
     
     delete tmp1;
