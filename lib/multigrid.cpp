@@ -439,7 +439,7 @@ namespace quda {
     csParam.create = QUDA_NULL_FIELD_CREATE;
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
-    printfQuda("Initial verify() params\n");
+    printfQuda("Initial verify() Params for tmp1 and tmp2\n");
     csParam.print();
     double deviation;
 
@@ -449,7 +449,7 @@ namespace quda {
     // these were set while hacking in tests of quarter precision ghosts
     double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - PP^dag) v_k for %d vectors\n", param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
       // as well as copying to the correct location this also changes basis if necessary
@@ -458,18 +458,19 @@ namespace quda {
       transfer->R(*r_coarse, *tmp1);
       transfer->P(*tmp2, *r_coarse);
 
-      if (getVerbosity() >= QUDA_VERBOSE)
-	printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
-		   i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+      //if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n",
+		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
       
       deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n", deviation);
+      //if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("L2 relative deviation = %e\n", deviation);
       if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
     }
 
 #if 0
     if (getVerbosity() >= QUDA_SUMMARIZE)
-      printfQuda("Checking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n",
+      printfQuda("Checking 1 > || (1 - DP(P^dagDP)P^dag) v_k || / || v_k || for %d vectors\n",
 		 param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
@@ -486,16 +487,20 @@ namespace quda {
     }
 #endif
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P^\\dagger P) eta_c\n");
+    //if (getVerbosity() >= QUDA_SUMMARIZE)
+    printfQuda("Checking 0 = (1 - P^dagP) eta_c\n");
     x_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(*tmp2));
+    //if (getVerbosity() >= QUDA_VERBOSE)
+    printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(*tmp2));
 
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n", deviation);
+    //if (getVerbosity() >= QUDA_VERBOSE)
+    printfQuda("L2 relative deviation = %e\n", deviation);
     if (deviation > tol ) errorQuda("L2 relative deviation = %e > %e failed", deviation, tol);
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
+    //if (getVerbosity() >= QUDA_SUMMARIZE)
+    printfQuda("Checking 0 = (D_c - P^dagDP) (native coarse operator to emulated operator)\n");
 
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     zero(*tmp_coarse);
@@ -529,8 +534,9 @@ namespace quda {
     for (int x=0; x<r_coarse->Volume(); x++) tmp2->PrintVector(x);
 #endif
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
-
+    //if (getVerbosity() >= QUDA_VERBOSE)
+    printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
+    
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
 
     // When the mu is shifted on the coarse level; we can compute exactly the error we introduce in the check:
@@ -544,7 +550,8 @@ namespace quda {
 	deviation = fabs(deviation);
       }
     }
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n\n", deviation);
+    //if (getVerbosity() >= QUDA_VERBOSE)
+    printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     
     // here we check that the Hermitian conjugate operator is working
@@ -574,160 +581,95 @@ namespace quda {
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
 
+    if (param.mg_global.run_low_mode_check) {
 #ifdef ARPACK_LIB
-    
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Check eigenvector overlap for level %d\n", param.level);
-
-    sprintf(prefix,"");
-    setOutputPrefix(prefix);
-    
-    //Clone the ColorSpinorParams from the coarse grid vectors
-    ColorSpinorParam cpuParam(*param.B[0]);
-    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-    cpuParam.location = QUDA_CPU_FIELD_LOCATION;
-    cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    
-    if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-      cpuParam.x[0] /= 2;
-      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
-    }
-    
-    //Construct ARPACK parameters for the problem
-    QudaArpackParam arpack_param = newQudaArpackParam();    
-    arpack_param.nEv = param.Nvec;
-    arpack_param.nKv = 2*param.Nvec;
-    arpack_param.arpackTol = 1e-6;
-    arpack_param.spectrum = QUDA_SR_SPECTRUM;
-    arpack_param.arpackPrec = prec;
-    arpack_param.arpackMaxiter = 10000;    
-    //arpack_param.usePolyAcc = true;
-    arpack_param.amin = 1e-8;
-    arpack_param.amax = 6.0;
-    arpack_param.polyDeg = 40;
-    
-    //Convenience..
-    int nKv = arpack_param.nKv;
-    
-    int local_vol = 1;
-    for(int i=0; i<4; i++) {
-      local_vol *= cpuParam.x[i];
-    }
-    
-    void *hostEvecs = static_cast<void*>(new std::complex<float>[nKv*local_vol*12]);
-    void *hostEvals = static_cast<void*>(new std::complex<float>[nKv]);
-
-    cpuParam.v = ((float*)hostEvecs);
-
-    //allocate space using QUDA's routines.
-    cpuColorSpinorField *temp = nullptr;
-    cudaColorSpinorField *temp1 = nullptr;
-    
-    arpackMGComparisonSolve(hostEvecs, hostEvals, *param.matSmooth,
-			    param.mg_global.invert_param, &arpack_param, &cpuParam);
-
-    for (int i=0; i<param.Nvec; i++) {
-      //Position the pointer to the next Evec
-      cpuParam.v = (float*)hostEvecs + i*12*local_vol;
-
-      //as well as copying to the correct location this also changes basis if necessary
-
-      //copy hostEvec data into QUDA data structure.
-      temp = new cpuColorSpinorField(cpuParam);
-
-      //Clone and adjust params for cuda vector.
-      ColorSpinorParam cudaParam(cpuParam);
-      cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-      cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-      cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-      temp1 = new cudaColorSpinorField(cudaParam);
-
-      //Copy from host to device.
-      *temp1 = *temp;
-
-      //N.B. tmp1 and tmp2 may be full/half spinors.
-      //Hardcoding half spinors for now...
       
-      //Restrict Evec, place result in r_coarse
-      transfer->R(r_coarse->Odd(), *temp1);
-      //Prolong r_coarse, place result in tmp2
-      transfer->P(tmp2->Even(), r_coarse->Odd());
+      //Test constraints...
+      if (param.smoother_solve_type != QUDA_DIRECT_SOLVE) {
+      	errorQuda("Low mode check only availible for direct solves. Please reconfigure or skip test.\n");
+      }
+      if (prec != QUDA_SINGLE_PRECISION) {
+	errorQuda("Low mode check only availible for single precision. Please reconfigure or skip test..\n");
+      }
+      
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+	printfQuda("Checking eigenvector overlap for level %d\n", param.level);
+      }
+      
+      //Clone the ColorSpinorParams from the coarse grid vectors
+      ColorSpinorParam cpuParam(*param.B[0]);
+      cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+      cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+      cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      
+      //if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      //cpuParam.x[0] /= 2;
+      //cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
+      //}
+      
+      //A convenience.
+      int nKv = param.mg_global.arpack_param->nKv;
+      
+      int local_vol = 1;
+      for(int i=0; i<4; i++) {
+	local_vol *= cpuParam.x[i];
+      }
+      
+      void *hostEvecs = static_cast<void*>(new std::complex<float>[nKv*12*local_vol]);
+      void *hostEvals = static_cast<void*>(new std::complex<float>[nKv]);
 
-      //compare tmp1 and tmp2. At the very least, norms should be similar.
-      printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e P P^dag v_k = %e\n",
-		 i, norm2(*temp1), norm2(r_coarse->Odd()), norm2(tmp2->Even()) );
+      //Set CPU adress to the start of Evecs buffer
+      cpuParam.v = ((float*)hostEvecs);
+      
+      cpuColorSpinorField *temp = nullptr;
+      cudaColorSpinorField *temp1 = nullptr;
+      
+      arpackMGComparisonSolve(hostEvecs, hostEvals, *param.matSmooth,
+			      param.mg_global.arpack_param, &cpuParam);
+      
+      for (int i=0; i<param.Nvec; i++) {
+	//Position the pointer to the next Evec
+	cpuParam.v = (float*)hostEvecs + i*2*12*local_vol;
+	
+	//copy hostEvec data into QUDA data structure.
+	temp = new cpuColorSpinorField(cpuParam);
+	
+	//Clone and adjust params for cuda vector.
+	ColorSpinorParam cudaParam(cpuParam);
+	cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+	cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+	cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+	cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+	temp1 = new cudaColorSpinorField(cudaParam);
+	
+	//Copy Evec_i from host to device.
+	*temp1 = *temp;
+	
+	//Restrict Evec, place result in r_coarse
+	transfer->R(*r_coarse, *temp1);
+	//Prolong r_coarse, place result in tmp2
+	transfer->P(*tmp2, *r_coarse);
+	
+	printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n",
+		   i, norm2(*temp1), norm2(*r_coarse), norm2(*tmp2) );
 
-      deviation = sqrt( xmyNorm(*temp1, tmp2->Even()) / norm2(*temp1) );
-      printfQuda("L2 relative deviation = %e\n", deviation);
-      delete temp;
-      delete temp1;      
-    }
-    
-    delete static_cast<std::complex<float>* >(hostEvals);
-    delete static_cast<std::complex<float>* >(hostEvecs);
-    
-    sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-    setOutputPrefix(prefix);
-    
-    //OLD ARPACK COMP CODE
-#if 0
-    printfQuda("\nCheck eigenvector overlap for level %d\n", param.level);
+	//compare v_k and PP^dag v_k.
+	deviation = sqrt( xmyNorm(*temp1, *tmp2) / norm2(*temp1) );
+	printfQuda("L2 relative deviation = %e\n", deviation);
 
-    int nmodes = 128;
-    int ncv    = 256;
-    double arpack_tol = 1e-7;
-    char *which = (char*)malloc(256*sizeof(char));
-    sprintf(which, "SM");/* ARPACK which="{S,L}{R,I,M}" */
-    
-    ColorSpinorParam cpuParam(*param.B[0]);
-    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-    
-    cpuParam.location = QUDA_CPU_FIELD_LOCATION;
-    cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    
-    if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) { 
-      cpuParam.x[0] /= 2; 
-      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
-    }
-
-    std::vector<ColorSpinorField*> evecsBuffer;
-    evecsBuffer.reserve(nmodes);
-
-    for (int i = 0; i < nmodes; i++) evecsBuffer.push_back( new cpuColorSpinorField(cpuParam) );
-
-    QudaPrecision matPrecision = QUDA_SINGLE_PRECISION;//manually ajusted?
-    QudaPrecision arpPrecision = QUDA_DOUBLE_PRECISION;//precision used in ARPACK routines, may not coincide with matvec precision
-    
-    void *evalsBuffer =  arpPrecision == QUDA_DOUBLE_PRECISION ? static_cast<void*>(new std::complex<double>[nmodes+1]) : static_cast<void*>( new std::complex<float>[nmodes+1]);
-    
-    arpackSolve( evecsBuffer, evalsBuffer, *param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
-    
-    for (int i=0; i<param.Nvec; i++) {
-      // as well as copying to the correct location this also changes basis if necessary
-      *tmp1 = *evecsBuffer[i]; 
-
-      transfer->R(*r_coarse, *temp1);
-      transfer->P(*tmp2, *r_coarse);
-
-      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
-		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
-
-      deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
-      printfQuda("L2 relative deviation = %e\n", deviation);
-    }
-
-    for (unsigned int i = 0; i < evecsBuffer.size(); i++) delete evecsBuffer[i];
-
-    if( arpPrecision == QUDA_DOUBLE_PRECISION )  delete static_cast<std::complex<double>* >(evalsBuffer);
-    else                                         delete static_cast<std::complex<float>* > (evalsBuffer);
- 
-    free(which);
-#endif
-    
+	delete temp;
+	delete temp1;
+      }
+      
+      delete static_cast<std::complex<float>* >(hostEvals);
+      delete static_cast<std::complex<float>* >(hostEvecs);
+      
 #else
-    warningQuda("\nThis test requires ARPACK.\n");
+      warningQuda("\nThis test requires ARPACK.\n");
 #endif
 
+    }
+    
     delete tmp1;
     delete tmp2;
     delete tmp_coarse;
@@ -1066,7 +1008,7 @@ namespace quda {
         diracSmoother->prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
         (*solve)(*out, *in);
         diracSmoother->reconstruct(*x, *b, QUDA_MAT_SOLUTION);
-
+	
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(*x));
         *B[i] = *x;
       }

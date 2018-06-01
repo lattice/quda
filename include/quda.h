@@ -390,7 +390,6 @@ extern "C" {
   } QudaEigParam;
 
   // Parameter set for the ARPACK Fortran variables.    
-
   typedef struct arpackFortranParam_s {
     
     // all FORTRAN communication uses underscored 
@@ -406,7 +405,7 @@ extern "C" {
     int rvec_;       //==1 compute Ritz vectors ; ==0 compute Ritz values only 
     int max_iter_;   //Maximum ARPACK iterations.
     
-  }arpackFortranParam;
+  } arpackFortranParam;
 
   
   // Parameter set for using the ARPACK interface.    
@@ -447,14 +446,20 @@ extern "C" {
     QudaPrecision arpackPrec;
     
     /** What type of Dirac operator we are using **/
-    QudaBoolean useEEOp;
-    QudaBoolean useFullOp;
+    /** If !(useNormOp && useDagger) use M. **/
+    /** If useDagger == true, use Mdag  instead of M. **/
+    /** If useNormOp == true, use MdagM instead of M. **/
+    /** If useNormOp && useDagger use MMdag. **/    
+    QudaBoolean useDagger;
+    QudaBoolean useNormOp;    
 
-  }QudaArpackParam;
+  } QudaArpackParam;
   
   typedef struct QudaMultigridParam_s {
 
     QudaInvertParam *invert_param;
+
+    QudaArpackParam *arpack_param;
 
     /** Number of multigrid levels */
     int n_level;
@@ -558,7 +563,10 @@ extern "C" {
 
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
-
+    
+    /** Whether to run null Vs eigen vector overlap checks once set up is complete */
+    QudaBoolean run_low_mode_check;
+    
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];
 

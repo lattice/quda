@@ -103,6 +103,21 @@ extern bool compute_clover;
 
 extern bool verify_results;
 
+extern bool low_mode_check;
+extern int eig_nEv;
+extern int eig_nKv;
+extern double eig_tol;
+extern int eig_maxiter;
+extern bool eig_use_poly_acc;
+extern int eig_poly_deg;
+extern double eig_amin;
+extern double eig_amax;
+extern bool eig_use_normop;
+extern bool eig_use_dagger;
+extern QudaArpackSpectrumType arpack_spectrum;
+extern int arpack_mode;
+extern char arpack_logfile[512];
+
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -236,6 +251,25 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
+  QudaArpackParam &arp_param = *mg_param.arpack_param;
+  
+  arp_param.arpackMode    = arpack_mode; 
+  arp_param.nEv           = eig_nEv;
+  arp_param.nKv           = eig_nKv;
+  arp_param.spectrum      = arpack_spectrum;
+  arp_param.usePolyAcc    = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  arp_param.polyDeg       = eig_poly_deg;
+  arp_param.amin          = eig_amin;
+  arp_param.amax          = eig_amax;
+  arp_param.arpackTol     = eig_tol;
+  arp_param.arpackMaxiter = eig_maxiter;
+  arp_param.arpackPrec    = prec;
+  arp_param.useNormOp     = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  arp_param.useDagger     = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  
+  strcpy(arp_param.arpackLogfile, arpack_logfile);
+
+  
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
@@ -286,7 +320,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     // if we are using an outer even-odd preconditioned solve, then we
     // use single parity injection into the coarse grid
-    mg_param.coarse_grid_solution_type[i] = solve_type == mg_solve_type[i] ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    //mg_param.coarse_grid_solution_type[i] = solve_type == mg_solve_type[i] ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    mg_param.coarse_grid_solution_type[i] = mg_solve_type[i] == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
     mg_param.omega[i] = omega; // over/under relaxation factor
 
@@ -307,6 +342,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
 
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
   strcpy(mg_param.vec_infile, vec_infile);
@@ -476,11 +512,12 @@ int main(int argc, char **argv)
   setGaugeParam(gauge_param);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
+  QudaArpackParam mg_arp_param = newQudaArpackParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   mg_param.invert_param = &mg_inv_param;
-
+  mg_param.arpack_param = &mg_arp_param;
+  
   setMultigridParam(mg_param);
-
 
   QudaInvertParam inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
@@ -501,14 +538,14 @@ int main(int argc, char **argv)
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
   }
 
-  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
+  if (strcmp(latfile,"")) {
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate a random SU(3) field
     //generate a random SU(3) field
-    //construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
     //generate a unit SU(3) field
-    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    //construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {

@@ -25,7 +25,7 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-#include <quda_arpack_interface.h>
+//#include <quda_arpack_interface.h>
 
 // Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
 extern QudaDslashType dslash_type;
@@ -80,10 +80,11 @@ extern bool eig_use_poly_acc;
 extern int eig_poly_deg;
 extern double eig_amin;
 extern double eig_amax;
+extern bool eig_use_normop;
+extern bool eig_use_dagger;
 extern QudaArpackSpectrumType arpack_spectrum;
 extern int arpack_mode;
 extern char arpack_logfile[512];
-bool isEven = false;
 
 extern bool verify_results;
 
@@ -289,6 +290,9 @@ void setArpackParam(QudaArpackParam &arpack_param) {
   arpack_param.arpackTol     = eig_tol;
   arpack_param.arpackMaxiter = eig_maxiter;
   arpack_param.arpackPrec    = prec;
+  arpack_param.useNormOp     = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  arpack_param.useDagger     = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  
   strcpy(arpack_param.arpackLogfile, arpack_logfile);
 
 }
@@ -349,9 +353,9 @@ int main(int argc, char **argv)
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate a random SU(3) field
     //generate a random SU(3) field
-    //construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
     //generate a unit SU(3) field
-    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    //construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH ||

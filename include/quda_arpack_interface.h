@@ -99,6 +99,8 @@ extern "C" {
 			     int *ipntr, std::complex<double> *workd,
 			     std::complex<double> *workl, int *lworkl,
 			     double *rwork, int *info);
+
+
   
 #endif
   
@@ -142,7 +144,6 @@ namespace quda{
 
   void arpackMGComparisonSolve(void *h_evecs, void *h_evals,
 			       DiracMatrix &matSmooth,
-			       QudaInvertParam *inv_param,
 			       QudaArpackParam *arpack_param,
 			       ColorSpinorParam *cpuParam);
   
