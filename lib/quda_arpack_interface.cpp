@@ -1661,6 +1661,7 @@ namespace quda{
 			       ColorSpinorParam *cpuParam){
     
     if(arpack_param->arpackPrec == QUDA_DOUBLE_PRECISION) {
+      errorQuda("arpackMGComparisonSolve for double prec Not yet implemented\n"); 
       arpack_mg_comp_solve_double(h_evecs, h_evals, matSmooth, arpack_param, cpuParam);
     }
     else {

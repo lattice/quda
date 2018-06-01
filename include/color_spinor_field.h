@@ -349,8 +349,12 @@ namespace quda {
 
     void* V() {return v;}
     const void* V() const {return v;}
+    void* V_h() {return v_h;}
+    const void* V_h() const {return v_h;}
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
+    void* Norm_h(){return norm_h;}
+    const void* Norm_h() const {return norm_h;}
     virtual const void* Ghost2() const { return nullptr; }
 
     /**

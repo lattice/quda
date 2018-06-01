@@ -264,7 +264,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   arp_param.amax          = eig_amax;
   arp_param.arpackTol     = eig_tol;
   arp_param.arpackMaxiter = eig_maxiter;
-  arp_param.arpackPrec    = prec;
+  arp_param.arpackPrec    = QUDA_SINGLE_PRECISION;
   arp_param.useNormOp     = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   arp_param.useDagger     = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   

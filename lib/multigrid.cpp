@@ -48,7 +48,6 @@ namespace quda {
       }
       if (param.B[0]->Nspin() == 1) csParam.gammaBasis = param.B[0]->GammaBasis(); // hack for staggered to avoid unnecessary basis checks
       r = ColorSpinorField::Create(csParam);
-
       // if we're using preconditioning then allocate storage for the preconditioned source vector
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
       	csParam.x[0] /= 2;
@@ -432,7 +431,7 @@ namespace quda {
   
   void MG::verify() {
     setOutputPrefix(prefix);
-
+    
     // temporary fields used for verification
     ColorSpinorParam csParam(*r);
     csParam.create = QUDA_NULL_FIELD_CREATE;
@@ -442,6 +441,7 @@ namespace quda {
 
     QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
       ? param.mg_global.precision_null[param.level]  : csParam.Precision();
+    
     // FIXME? may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
     double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
@@ -587,21 +587,21 @@ namespace quda {
 
     if (param.mg_global.run_low_mode_check) {
 #ifdef ARPACK_LIB
+
+      param.mg_global.arpack_param->arpackTol = tol;
       
       //Test constraints...
       if (param.smoother_solve_type != QUDA_DIRECT_SOLVE) {
       	errorQuda("Low mode check only availible for direct solves. Please reconfigure or skip test.\n");
-      }
-      if (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) {
-	errorQuda("Low mode check only availible for double and single precision. Please reconfigure or skip test..\n");
       }
       
       if (getVerbosity() >= QUDA_SUMMARIZE) {
 	printfQuda("Checking eigenvector overlap for level %d\n", param.level);
       }
       
-      //Clone the ColorSpinorParams from the coarse grid vectors
+      //Clone the ColorSpinorParams from the coarse grid vectors. 
       ColorSpinorParam cpuParam(*param.B[0]);
+      cpuParam.setPrecision(QUDA_SINGLE_PRECISION); //force single prec for ARPACK
       cpuParam.create = QUDA_ZERO_FIELD_CREATE;
       cpuParam.location = QUDA_CPU_FIELD_LOCATION;
       cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -619,47 +619,39 @@ namespace quda {
 	local_vol *= cpuParam.x[i];
       }
 
-      void *hostEvecs;
-      void *hostEvals;
+      void *hostEvecs = static_cast<void*>(new std::complex<float>[nKv*12*local_vol]);
+      void *hostEvals = static_cast<void*>(new std::complex<float>[nKv]);
       
-      if(prec == QUDA_SINGLE_PRECISION) {	
-	hostEvecs = static_cast<void*>(new std::complex<float>[nKv*12*local_vol]);
-	hostEvals = static_cast<void*>(new std::complex<float>[nKv]);
-      } else {
-	hostEvecs = static_cast<void*>(new std::complex<double>[nKv*12*local_vol]);
-	hostEvals = static_cast<void*>(new std::complex<double>[nKv]);
-      }
-
       //Set CPU adress to the start of Evecs buffer
-      if(prec == QUDA_SINGLE_PRECISION) cpuParam.v = ((float*)hostEvecs);
-      else cpuParam.v = ((double*)hostEvecs);
+      cpuParam.v = ((float*)hostEvecs);
 
-      cpuColorSpinorField *temp = nullptr;
-      cudaColorSpinorField *temp1 = nullptr;
-      
+      param.mg_global.arpack_param->arpackPrec = QUDA_SINGLE_PRECISION;
       arpackMGComparisonSolve(hostEvecs, hostEvals, *param.matSmooth,
 			      param.mg_global.arpack_param, &cpuParam);
+
+      cpuColorSpinorField *cpuTemp = nullptr;
       
+      //Clone and adjust params for cuda vector.
+      ColorSpinorParam cudaParam(cpuParam);
+      cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+      cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+      cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+
+      cudaColorSpinorField *gpuTemp = nullptr;
+      gpuTemp = new cudaColorSpinorField(cudaParam);
+
       for (int i=0; i<param.Nvec; i++) {
-	//Position the pointer to the next Evec
-	if(prec == QUDA_SINGLE_PRECISION) cpuParam.v = (float*)hostEvecs + i*2*12*local_vol;
-	else cpuParam.v = (double*)hostEvecs + i*2*12*local_vol;
-	//copy hostEvec data into QUDA data structure.
-	temp = new cpuColorSpinorField(cpuParam);
-	
-	//Clone and adjust params for cuda vector.
-	ColorSpinorParam cudaParam(cpuParam);
-	cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-	cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-	cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-	cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-	temp1 = new cudaColorSpinorField(cudaParam);
+	//HACKY: Position the cpu pointer to the next Evec. Possible to change
+	//address of the cpuColorSpinorField object?
+	cpuParam.v = (float*)hostEvecs + i*2*12*local_vol;
+	cpuTemp = new cpuColorSpinorField(cpuParam);
 	
 	//Copy Evec_i from host to device.
-	*temp1 = *temp;
-	
+	*gpuTemp = *cpuTemp;
+
 	//Restrict Evec, place result in r_coarse
-	transfer->R(*r_coarse, *temp1);
+	transfer->R(*r_coarse, *gpuTemp);
 	//Prolong r_coarse, place result in tmp2
 	transfer->P(*tmp2, *r_coarse);
 
@@ -667,10 +659,10 @@ namespace quda {
 	setOutputPrefix(prefix);
 	
 	printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n",
-		   i, norm2(*temp1), norm2(*r_coarse), norm2(*tmp2) );
+		   i, norm2(*gpuTemp), norm2(*r_coarse), norm2(*tmp2) );
 
 	//Compare v_k and PP^dag v_k.
-	deviation = sqrt( xmyNorm(*temp1, *tmp2) / norm2(*temp1) );
+	deviation = sqrt( xmyNorm(*gpuTemp, *tmp2) / norm2(*gpuTemp) );
 	printfQuda("L2 relative deviation = %e\n", deviation);
 
 	if (param.mg_global.run_oblique_proj_check) {
@@ -682,34 +674,30 @@ namespace quda {
 	  if (getVerbosity() >= QUDA_SUMMARIZE)
 	    printfQuda("Checking 1 > || (1 - DP(P^dagDP)P^dag) v_k || / || v_k || for vector %d\n", i);
 	  
-	  transfer->R(*r_coarse, *temp1);
+	  transfer->R(*r_coarse, *gpuTemp);
 	  (*coarse_solver)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
 	  setOutputPrefix(prefix);                // restore prefix after return from coarse grid
 	  transfer->P(*tmp2, *x_coarse);
 	  (*param.matResidual)(*tmp1,*tmp2);
 
 	  if (getVerbosity() >= QUDA_SUMMARIZE) {
-	    printfQuda("Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, norm2(*temp1), norm2(*tmp1));
-	    printfQuda("L2 relative deviation = %e\n", sqrt(xmyNorm(*temp1, *tmp1) / norm2(*temp1)) );
+	    printfQuda("Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, norm2(*gpuTemp), norm2(*tmp1));
+	    printfQuda("L2 relative deviation = %e\n", sqrt(xmyNorm(*gpuTemp, *tmp1) / norm2(*gpuTemp)) );
 	  }
 	}
 
 	sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
 	setOutputPrefix(prefix);
-	
-	delete temp;
-	delete temp1;
-      }
 
-      if(prec == QUDA_SINGLE_PRECISION) {
-	delete static_cast<std::complex<float>* >(hostEvals);
-	delete static_cast<std::complex<float>* >(hostEvecs);
-      } else {
-	delete static_cast<std::complex<double>* >(hostEvals);
-	delete static_cast<std::complex<double>* >(hostEvecs);	
+	delete cpuTemp;
+	
       }
       
-	
+      delete gpuTemp;
+      
+      delete static_cast<std::complex<float>* >(hostEvals);
+      delete static_cast<std::complex<float>* >(hostEvecs);
+
 #else
       warningQuda("\nThis test requires ARPACK.\n");
 #endif
