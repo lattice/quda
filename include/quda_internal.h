@@ -1,8 +1,7 @@
 #ifndef _QUDA_INTERNAL_H
 #define _QUDA_INTERNAL_H
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <quda_cuda_api.h>
 #include <sys/time.h>
 #include <string>
 #include <complex>
@@ -321,26 +320,10 @@ namespace quda {
 #endif
 
   /**
-     @brief Wrapper around cudaMemcpy used for auto-profiling
-     @param dst Destination pointer
-     @param src Source pointer
-     @param count Size of transfer
-     @param kind Type of memory copy
-  */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-		   const char *func, const char *file, const char *line);
-
-} // namespace quda
-
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-namespace quda{
-  /**
      * Check that the resident gauge field is compatible with the requested inv_param
      * @param inv_param   Contains all metadata regarding host and device storage
      */
-bool canReuseResidentGauge(QudaInvertParam *inv_param);
+  bool canReuseResidentGauge(QudaInvertParam *inv_param);
 }
 
 #endif // _QUDA_INTERNAL_H

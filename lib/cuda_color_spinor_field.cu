@@ -704,7 +704,7 @@ namespace quda {
 
       void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
 
-      cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream);
+      qudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream);
 
     } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) { // do multiple cudaMemcpys
 
@@ -735,14 +735,14 @@ namespace quda {
       for (int s=0; s<x4; s++) { // loop over multiple 4-d volumes (if they exist)
 	void *dst = (char*)ghost_spinor + s*len;
 	void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
-	cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
+        qudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
 	if (precision == QUDA_HALF_PRECISION) {
 	  size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
 	  int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
 	  void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*precision + s*len;
 	  void *src = (char*)norm + norm_offset + s*(volumeCB/x4)*sizeof(float);
-	  cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
+          qudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
 	}
       }
     }else{
@@ -775,10 +775,10 @@ namespace quda {
       size_t len = flavorTFace*Nvec*precision;
       size_t spitch = stride*Nvec*precision;//ndeg tm: stride=2*flavor_volume+pad
       size_t dpitch = 2*len;
-      cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
+      qudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
       dst = (char*)ghost_spinor+len;
       src = (char*)v + flavor2_offset*Nvec*precision;
-      cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
+      qudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
       if (precision == QUDA_HALF_PRECISION) {
         int Nt_minus1_offset = (flavorVolume - flavorTFace);
@@ -787,7 +787,7 @@ namespace quda {
 	void *src = (char*)norm + norm_offset;
         size_t dpitch = flavorTFace*sizeof(float);
         size_t spitch = flavorVolume*sizeof(float);
-	cudaMemcpy2DAsync(dst, dpitch, src, spitch, flavorTFace*sizeof(float), 2, cudaMemcpyDeviceToHost, *stream);
+	qudaMemcpy2DAsync(dst, dpitch, src, spitch, flavorTFace*sizeof(float), 2, cudaMemcpyDeviceToHost, *stream);
       }
     }
 #else
@@ -811,7 +811,7 @@ namespace quda {
 
     if (precision == QUDA_HALF_PRECISION) len += nFace*ghostFace[dim]*sizeof(float);
 
-    cudaMemcpyAsync(ghost_dst, src, len, cudaMemcpyHostToDevice, *stream);
+    qudaMemcpyAsync(ghost_dst, src, len, cudaMemcpyHostToDevice, *stream);
   }
 
 
