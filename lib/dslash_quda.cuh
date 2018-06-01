@@ -2,33 +2,42 @@
 
 #if (__COMPUTE_CAPABILITY__ >= 700)
 // for running on Volta we set large shared memory mode to prefer hitting in L2
-#define SET_CACHE(x) cudaFuncSetAttribute(x, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
+#define SET_CACHE(f) cudaFuncSetAttribute(f, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
 #else
-#define SET_CACHE(x)
+#define SET_CACHE(f)
+#endif
+
+#if 1
+#define LAUNCH_KERNEL(f, grid, block, shared, stream, param)            \
+  void *args[] = { &param };                                            \
+  void (*func)( const DslashParam ) = &(f);                             \
+  cudaLaunchKernel( (const void*)func, grid, block, args, shared, stream);
+#else
+#define LAUNCH_KERNEL(f, grid, block, shared, stream, param) f<<<grid, block, shared, stream>>>(param)
 #endif
 
 #define EVEN_MORE_GENERIC_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   }
 
@@ -47,27 +56,27 @@
 #define EVEN_MORE_GENERIC_STAGGERED_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 18 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
-      FUNC ## FLOAT ## 18 ## 13 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 13 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 18 ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 12 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_9) {			\
-      FUNC ## FLOAT ## 18 ## 9 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 9 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 18 ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 8 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
-      FUNC ## FLOAT ## 18 ## 13 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 13 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 18 ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_9) {			\
-      FUNC ## FLOAT ## 18 ## 9 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 9 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 18 ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }                                                                   \
   }
 
@@ -174,13 +183,13 @@
 #define EVEN_MORE_GENERIC_ASYM_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
     SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-    FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+    LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
   } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
     SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type> ); \
-    FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+    LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
   } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
     SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> ); \
-    FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+    LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
   }									
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
@@ -248,46 +257,46 @@
   if (x == 0 && d == 0) {						\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Twist ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## Twist ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Twist ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Twist ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## Twist ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Twist ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else {								\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Twist ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## Twist ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Twist ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else if (x != 0 && d == 0) {					\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Twist ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## Twist ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Twist ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Twist ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## Twist ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Twist ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Twist ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## Twist ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Twist ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else if (x == 0 && d != 0) {					\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else {								\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else{								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   }
 
