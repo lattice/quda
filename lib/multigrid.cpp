@@ -73,7 +73,7 @@ namespace quda {
 	}
 	
         if ( param.mg_global.num_setup_iter[param.level] > 0 ) {
-	  if (param.mg_global.run_low_mode_check) {
+	  if (param.mg_global.use_low_modes) {
 	    generateEigenVectors(param.B);
 	  } else {
 	    generateNullVectors(param.B);
