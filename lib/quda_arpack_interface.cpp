@@ -1010,10 +1010,10 @@ namespace quda{
   }
 
 
-  void arpack_mg_comp_solve_float(void *h_evecs, void *h_evals,
-				  DiracMatrix &matSmooth,
-				  QudaArpackParam *arpack_param,
-				  ColorSpinorParam *cpuParam){
+  void arpack_mg_solve_float(void *h_evecs, void *h_evals,
+			     DiracMatrix &matSmooth,
+			     QudaArpackParam *arpack_param,
+			     ColorSpinorParam *cpuParam){
 
     //Construct parameters and memory allocation
     //---------------------------------------------------------------------------------
@@ -1326,11 +1326,11 @@ namespace quda{
     
   }
 
-    void arpack_mg_comp_solve_double(void *h_evecs, void *h_evals,
-				  DiracMatrix &matSmooth,
-				  QudaArpackParam *arpack_param,
-				  ColorSpinorParam *cpuParam){
-
+    void arpack_mg_solve_double(void *h_evecs, void *h_evals,
+				DiracMatrix &matSmooth,
+				QudaArpackParam *arpack_param,
+				ColorSpinorParam *cpuParam){
+      
     //Construct parameters and memory allocation
     //---------------------------------------------------------------------------------
 
@@ -1656,16 +1656,16 @@ namespace quda{
     }
   }
 
-  void arpackMGComparisonSolve(void *h_evecs, void *h_evals, DiracMatrix &matSmooth,
-			       QudaArpackParam *arpack_param,
-			       ColorSpinorParam *cpuParam){
+  void arpackMGSolve(void *h_evecs, void *h_evals, DiracMatrix &matSmooth,
+		     QudaArpackParam *arpack_param,
+		     ColorSpinorParam *cpuParam){
     
     if(arpack_param->arpackPrec == QUDA_DOUBLE_PRECISION) {
       errorQuda("arpackMGComparisonSolve for double prec Not yet implemented\n"); 
-      arpack_mg_comp_solve_double(h_evecs, h_evals, matSmooth, arpack_param, cpuParam);
+      arpack_mg_solve_double(h_evecs, h_evals, matSmooth, arpack_param, cpuParam);
     }
     else {
-      arpack_mg_comp_solve_float(h_evecs, h_evals, matSmooth, arpack_param, cpuParam);
+      arpack_mg_solve_float(h_evecs, h_evals, matSmooth, arpack_param, cpuParam);
     }
     
   }  

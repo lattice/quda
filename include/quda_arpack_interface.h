@@ -113,28 +113,29 @@ extern "C" {
 namespace quda{
   
   /**
-   *  Interface function to the external ARPACK library. This function utilizes 
+   *  Interface functions to the external ARPACK library. These functions utilize 
    *  ARPACK's implemntation of the Implicitly Restarted Arnoldi Method to compute a 
    *  number of eigenvectors/eigenvalues with user specified features, such as those 
-   *  with small real part, small magnitude etc. Parallel (OMP/MPI) version
-   *  is also supported.
-   *  @param[in/out] B           Container of eigenvectors
-   *  @param[in/out] evals       A pointer to eigenvalue array.
-   *  @param[in]     matEigen    Any QUDA implementation of the matrix-vector operation
-   *  @param[in]     matPrec     Precision of the matrix-vector operation
-   *  @param[in]     arpackPrec  Precision of IRAM procedures. 
-   *  @param[in]     tol         tolerance for computing eigenvalues with ARPACK
-   *  @param[in]     nev         number of eigenvectors 
-   *  @param[in]     ncv         size of the subspace used by IRAM. 
-   *                             ncv must satisfy the two inequalities 
-   *                             2 <= ncv-nev and ncv <= *B[0].Length()
-   *  @param[in]     target      eigenvector selection criteria:  
-   *                             'LM' -> want the eigenvalues of largest mag.
-   *                             'SM' -> want the eigenvalues of smallest mag.
-   *                             'LR' -> want the eigenvalues of largest real part.
-   *                             'SR' -> want the eigenvalues of smallest real part.
-   *                             'LI' -> want the eigenvalues of largest imag part.
-   *                             'SI' -> want the eigenvalues of smallest imag part.
+   *  with small real part, small magnitude etc. Parallel (OMP/MPI) versions
+   *  are also supported.
+   *
+   *  arpackSolve
+   *  @param[in/out] h_evecs       A pointer to eigenvector array.
+   *  @param[in/out] h_evals       A pointer to eigenvalue array.
+   *  @param[in]     inv_param     Parameter container defining the problem matrix.
+   *  @param[in]     arpack_param  Parameter container defining the how the matrix 
+   *                               is to be solved.
+   *  @param[in]     d_param       Parameter container for generating the dirac matrix.
+   *  @param[in]     local_dim     Integer array defining local spacetime dimensions. 
+
+   *  arpackMGSolve
+   *  @param[in/out] h_evecs       A pointer to eigenvector array.
+   *  @param[in/out] h_evals       A pointer to eigenvalue array.
+   *  @param[in]     matSmooth     An explicit construction of teh problem matrix.
+   *  @param[in]     arpack_param  Parameter container defining the how the matrix 
+   *                               is to be solved.
+   *  @param[in]     local_dim     Parameter container with meta data for the 
+   *                               eigenvectors.
    **/
   
   void arpackSolve(void *h_evecs, void *h_evals,
@@ -142,10 +143,10 @@ namespace quda{
 		   QudaArpackParam *arpack_param,
 		   DiracParam *d_param, int *local_dim);
 
-  void arpackMGComparisonSolve(void *h_evecs, void *h_evals,
-			       DiracMatrix &matSmooth,
-			       QudaArpackParam *arpack_param,
-			       ColorSpinorParam *cpuParam);
+  void arpackMGSolve(void *h_evecs, void *h_evals,
+		     DiracMatrix &matSmooth,
+		     QudaArpackParam *arpack_param,
+		     ColorSpinorParam *cpuParam);
   
 }//endof namespace quda 
 

@@ -1633,6 +1633,7 @@ QudaInverterType inv_type;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
+bool use_low_modes = false;
 bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
@@ -1778,6 +1779,7 @@ void usage(char** argv )
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
   printf("    --mg-low-mode-check <true/false>          # Measure how well the null vector subspace overlaps with the low eigenmode subspace (default false)\n");
+  printf("    --mg-use-low-modes <true/false>           # Use the low eigenmodes as the null vector subspace (default false)\n");
   printf("    --mg-oblique-proj-check <true/false>      # Measure how well the null vector subspace adjusts the low eigenmode subspace (default false)\n");
   printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
@@ -1903,6 +1905,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
       exit(1);
     }
 
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-use-low-modes") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      use_low_modes = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      use_low_modes = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid use_low_modes type (true/false)\n");	
+      exit(1);
+    }
+    
     i++;
     ret = 0;
     goto out;
