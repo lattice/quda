@@ -4,10 +4,10 @@
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead
-#define USE_DRIVER_API
+//#define USE_DRIVER_API
 
 // if this macro is defined then we profile the CUDA API calls
-//#define API_PROFILE
+#define API_PROFILE
 
 #ifdef API_PROFILE
 #define PROFILE(f, idx)                                 \
@@ -259,6 +259,23 @@ namespace quda {
     return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
+    return error;
+#endif
+  }
+
+  cudaError_t qudaDeviceSynchronize()
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuCtxSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    switch (error) {
+    case CUDA_SUCCESS:
+      return cudaSuccess;
+    default: // should always return successful
+      errorQuda("cuCtxSynchronize return error code %d", error);
+    }
+    return cudaErrorUnknown;
+#else
+    PROFILE(cudaError_t error = cudaDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
     return error;
 #endif
   }

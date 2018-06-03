@@ -1129,11 +1129,11 @@ namespace quda {
 
       if (dir == 0) {
 	// record the event
-	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], *copy_stream);
+	qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], *copy_stream);
 	// send to the processor in the -1 direction
 	comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } else {
-	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
+	qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
 	// send to the processor in the +1 direction
 	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
       }
@@ -1392,7 +1392,7 @@ namespace quda {
     // prepost receive
     for (int i=0; i<2*nDimComms; i++) const_cast<cudaColorSpinorField*>(this)->recvStart(nFace, i, dagger, 0, gdr_recv);
 
-    if (gdr_send || pack_host) cudaDeviceSynchronize(); // need to make sure packing has finished before kicking off MPI
+    if (gdr_send || pack_host) qudaDeviceSynchronize(); // need to make sure packing has finished before kicking off MPI
 
     for (int p2p=0; p2p<2; p2p++) {
       for (int dim=0; dim<nDimComms; dim++) {
@@ -1413,7 +1413,7 @@ namespace quda {
 	    comms_complete[2*dim+dir] = const_cast<cudaColorSpinorField*>(this)->commsQuery(nFace, 2*dim+dir, dagger, 0, gdr_send, gdr_recv);
 	    if (comms_complete[2*dim+dir]) {
 	      comms_done++;
-	      if (comm_peer2peer_enabled(1-dir,dim)) cudaStreamWaitEvent(0, ipcRemoteCopyEvent[bufferIndex][1-dir][dim], 0);
+	      if (comm_peer2peer_enabled(1-dir,dim)) qudaStreamWaitEvent(0, ipcRemoteCopyEvent[bufferIndex][1-dir][dim], 0);
 	    }
 	  }
 	}

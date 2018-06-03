@@ -218,7 +218,7 @@ namespace quda {
       }
 
       // if gdr enabled then synchronize
-      if (comm_gdr_enabled()) cudaDeviceSynchronize();
+      if (comm_gdr_enabled()) qudaDeviceSynchronize();
 
       // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
       for (int dim=0; dim<nDim; dim++) {
@@ -255,7 +255,7 @@ namespace quda {
       bufferIndex = 1-bufferIndex;
     } // link_dir
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 
   // This does the opposite of exchangeGhost and sends back the ghost
@@ -306,7 +306,7 @@ namespace quda {
       }
 
       // if gdr enabled then synchronize
-      if (comm_gdr_enabled()) cudaDeviceSynchronize();
+      if (comm_gdr_enabled()) qudaDeviceSynchronize();
 
       // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
       for (int dim=0; dim<nDim; dim++) {
@@ -338,7 +338,7 @@ namespace quda {
       bufferIndex = 1-bufferIndex;
     } // link_dir
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 
   void cudaGaugeField::allocateGhostBuffer(const int *R, bool no_comms_fill) const
@@ -501,7 +501,7 @@ namespace quda {
 	}
 
 	// if either direction is not peer-to-peer then we need to synchronize
-	if (!comm_peer2peer_enabled(0,dim) || !comm_peer2peer_enabled(1,dim)) cudaDeviceSynchronize();
+	if (!comm_peer2peer_enabled(0,dim) || !comm_peer2peer_enabled(1,dim)) qudaDeviceSynchronize();
 
 	// if we pass a stream to sendStart then we must ensure that stream is synchronized
 	for (int dir=0; dir<2; dir++) sendStart(dim, dir, &streams[dir]);
@@ -527,7 +527,7 @@ namespace quda {
     }
 
     bufferIndex = 1-bufferIndex;
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 
   void cudaGaugeField::setGauge(void *gauge_)
@@ -674,7 +674,7 @@ namespace quda {
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) {
     copy(cpu);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     checkCudaError();
   }
 
@@ -743,7 +743,7 @@ namespace quda {
     cpu.staggeredPhaseApplied = staggeredPhaseApplied;
     cpu.staggeredPhaseType = staggeredPhaseType;
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     checkCudaError();
   }
 
