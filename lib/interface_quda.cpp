@@ -1368,6 +1368,7 @@ void endQuda(void)
     TimeProfile::PrintGlobal();
 
     printLaunchTimer();
+    printAPIProfile();
 
     printfQuda("\n");
     printPeakMemUsage();

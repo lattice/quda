@@ -106,4 +106,9 @@ namespace quda {
    */
   cudaError_t qudaEventSynchronize(cudaEvent_t event);
   
+  /**
+     @brief Print out the timer profile for CUDA API calls
+   */
+  void printAPIProfile();
+
 } // namespace quda

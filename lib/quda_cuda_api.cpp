@@ -1,11 +1,30 @@
 #include <tune_quda.h>
 #include <uint_to_char.h>
+#include <quda_internal.h>
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead
 #define USE_DRIVER_API
 
+// if this macro is defined then we profile the CUDA API calls
+//#define API_PROFILE
+
+#ifdef API_PROFILE
+#define PROFILE(f, idx)                                 \
+  apiTimer.TPSTART(idx);				\
+  f;                                                    \
+  apiTimer.TPSTOP(idx);
+#else
+#define PROFILE(f, idx) f;
+#endif
+
 namespace quda {
+
+#ifdef USE_DRIVER_API
+  static TimeProfile apiTimer("CUDA API calls (driver)");
+#else
+  static TimeProfile apiTimer("CUDA API calls (runtime)");
+#endif
 
   class QudaMemCopy : public Tunable {
 
@@ -112,16 +131,17 @@ namespace quda {
 #ifdef USE_DRIVER_API
     switch (kind) {
     case cudaMemcpyDeviceToHost:
-      cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, stream);
+      PROFILE(cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
       break;
     case cudaMemcpyHostToDevice:
-      cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, stream);
+      PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
       break;
     default:
       errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
     }
 #else
-    cudaMemcpyAsync(dst, src, count, kind, stream);
+    PROFILE(cudaMemcpyAsync(dst, src, count, kind, stream),
+            kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
 #endif
   }
 
@@ -150,16 +170,16 @@ namespace quda {
     default:
       errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
     }
-    cuMemcpy2DAsync(&param, stream);
+    PROFILE(cuMemcpy2DAsync(&param, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
 #else
-    cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind);
+    PROFILE(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
 #endif
   }
 
   cudaError_t qudaEventQuery(cudaEvent_t event)
   {
 #ifdef USE_DRIVER_API
-    CUresult error = cuEventQuery(event);
+    PROFILE(CUresult error = cuEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
     switch (error) {
     case CUDA_SUCCESS:
       return cudaSuccess;
@@ -170,14 +190,15 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    return cudaEventQuery(event);
+    PROFILE(cudaError_t error = cudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
+    return error;
 #endif
   }
 
   cudaError_t qudaEventRecord(cudaEvent_t event, cudaStream_t stream)
   {
 #ifdef USE_DRIVER_API
-    CUresult error = cuEventRecord(event, stream);
+    PROFILE(CUresult error = cuEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
     switch (error) {
     case CUDA_SUCCESS:
       return cudaSuccess;
@@ -186,14 +207,15 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    return cudaEventRecord(event);
+    PROFILE(cudaError_t error = cudaEventRecord(event), QUDA_PROFILE_EVENT_RECORD);
+    return error;
 #endif
   }
 
   cudaError_t qudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags)
   {
 #ifdef USE_DRIVER_API
-    CUresult error = cuStreamWaitEvent(stream, event, flags);
+    PROFILE(CUresult error = cuStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
     switch (error) {
     case CUDA_SUCCESS:
       return cudaSuccess;
@@ -202,14 +224,15 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    return cudaStreamWaitEvent(stream, event, flags);
+    PROFILE(cudaError_t error = cudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
+    return error;
 #endif
   }
 
   cudaError_t qudaStreamSynchronize(cudaStream_t stream)
   {
 #ifdef USE_DRIVER_API
-    CUresult error = cuStreamSynchronize(stream);
+    PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
     switch (error) {
     case CUDA_SUCCESS:
       return cudaSuccess;
@@ -218,14 +241,15 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    return cudaStreamSynchronize(stream);
+    PROFILE(cudaError_t error = cudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    return error;
 #endif
   }
 
   cudaError_t qudaEventSynchronize(cudaEvent_t event)
   {
 #ifdef USE_DRIVER_API
-    CUresult error = cuEventSynchronize(event);
+    PROFILE(CUresult error = cuEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
     switch (error) {
     case CUDA_SUCCESS:
       return cudaSuccess;
@@ -234,7 +258,14 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    return cudaEventSynchronize(event);
+    PROFILE(cudaError_t error = cudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
+    return error;
+#endif
+  }
+
+  void printAPIProfile() {
+#ifdef API_PROFILE
+    apiTimer.Print();
 #endif
   }
 
