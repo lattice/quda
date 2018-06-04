@@ -355,22 +355,6 @@ namespace {
       if (set_mapped) errorQuda("set_mapped already set");
       // in the below we switch to the mapped ghost buffer and update the tuneKey to reflect this
       in.bufferIndex += 2;
-
-      // update the ghosts for the non-p2p directions
-      for (int dim=0; dim<4; dim++) {
-        for (int dir=0; dir<2; dir++) {
-          if (!comm_peer2peer_enabled(1-dir, dim)) {
-            dslashParam.ghost[2*dim+dir] = (void*)in.Ghost2();
-            dslashParam.ghostNorm[2*dim+dir] = (float*)(in.Ghost2());
-
-#ifdef USE_TEXTURE_OBJECTS
-            dslashParam.ghostTex[2*dim+dir] = in.GhostTex();
-            dslashParam.ghostTexNorm[2*dim+dir] = in.GhostTexNorm();
-#endif // USE_TEXTURE_OBJECTS
-          }
-        }
-      }
-
       strcpy(aux_copy,dslash.getAux(dslashParam.kernel_type));
       dslash.augmentAux(dslashParam.kernel_type, ",zero_copy");
       set_mapped = true;
@@ -378,23 +362,7 @@ namespace {
       if (!set_mapped) errorQuda("set_mapped not set");
       // reset to default
       dslash.setAux(dslashParam.kernel_type, aux_copy);
-
       in.bufferIndex -= 2;
-      // reinstate ghosts for the non-p2p directions
-      for (int dim=0; dim<4; dim++) {
-        for (int dir=0; dir<2; dir++) {
-          if (!comm_peer2peer_enabled(1-dir, dim)) {
-            dslashParam.ghost[2*dim+dir] = (void*)in.Ghost2();
-            dslashParam.ghostNorm[2*dim+dir] = (float*)(in.Ghost2());
-
-#ifdef USE_TEXTURE_OBJECTS
-            dslashParam.ghostTex[2*dim+dir] = in.GhostTex();
-            dslashParam.ghostTexNorm[2*dim+dir] = in.GhostTexNorm();
-#endif // USE_TEXTURE_OBJECTS
-          }
-        }
-      }
-
       set_mapped = false;
     }
   }
@@ -2182,7 +2150,7 @@ struct DslashFactory {
      auto p = static_cast<QudaDslashPolicy>(tp.aux.x);
      if ( p == QudaDslashPolicy::QUDA_GDR_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
-	        p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
+          p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
           p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||

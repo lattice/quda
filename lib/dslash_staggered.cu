@@ -89,11 +89,8 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-#ifndef USE_TEXTURE_OBJECTS
-      bindSpinorTex<sFloat>(in, out, x);
-#endif // USE_TEXTURE_OBJECTS
-
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      setParam();
       dslashParam.swizzle = tp.aux.x;
       STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
