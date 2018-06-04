@@ -4,10 +4,10 @@
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead
-//#define USE_DRIVER_API
+#define USE_DRIVER_API
 
 // if this macro is defined then we profile the CUDA API calls
-#define API_PROFILE
+//#define API_PROFILE
 
 #ifdef API_PROFILE
 #define PROFILE(f, idx)                                 \
