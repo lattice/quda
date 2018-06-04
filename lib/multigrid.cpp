@@ -1278,8 +1278,8 @@ namespace quda {
     
     param.mg_global.arpack_param->arpackPrec = QUDA_SINGLE_PRECISION;
     
-    arpackMGSolve(hostEvecs, hostEvals, *param.matSmooth,
-		  param.mg_global.arpack_param, &cpuParam);
+    arpackSolve(hostEvecs, hostEvals, *(param.matSmooth->Expose()),
+		param.mg_global.arpack_param, &cpuParam);
     
     cpuColorSpinorField *cpuTemp = nullptr;
     

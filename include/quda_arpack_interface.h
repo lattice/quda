@@ -20,6 +20,14 @@
 extern "C" {
 #endif
 
+  /**
+   *  Interface functions to the external ARPACK library. These functions utilize 
+   *  ARPACK's implemntation of the Implicitly Restarted Arnoldi Method to compute a 
+   *  number of eigenvectors/eigenvalues with user specified features, such as those 
+   *  with small real part, small magnitude etc. Parallel (OMP/MPI) versions
+   *  are also supported.
+   */
+  
 #if (defined (QMP_COMMS) || defined (MPI_COMMS))
   
   extern int ARPACK(pcnaupd) (int *fcomm, int *ido, char *bmat, int *n, char *which,
@@ -113,41 +121,32 @@ extern "C" {
 namespace quda{
   
   /**
-   *  Interface functions to the external ARPACK library. These functions utilize 
-   *  ARPACK's implemntation of the Implicitly Restarted Arnoldi Method to compute a 
-   *  number of eigenvectors/eigenvalues with user specified features, such as those 
-   *  with small real part, small magnitude etc. Parallel (OMP/MPI) versions
-   *  are also supported.
+   *  arpackSolve()
    *
-   *  arpackSolve
+   *  The QUDA interface function. One passes two allocated arrays to hold the
+   *  the eigenmode data, the problem matrix, the arpack parameters defining 
+   *  what problem is to be solves, and a container for QUDA data structure 
+   *  types.
+   *
    *  @param[in/out] h_evecs       A pointer to eigenvector array.
    *  @param[in/out] h_evals       A pointer to eigenvalue array.
-   *  @param[in]     inv_param     Parameter container defining the problem matrix.
-   *  @param[in]     arpack_param  Parameter container defining the how the matrix 
-   *                               is to be solved.
-   *  @param[in]     d_param       Parameter container for generating the dirac matrix.
-   *  @param[in]     local_dim     Integer array defining local spacetime dimensions. 
-
-   *  arpackMGSolve
-   *  @param[in/out] h_evecs       A pointer to eigenvector array.
-   *  @param[in/out] h_evals       A pointer to eigenvalue array.
-   *  @param[in]     matSmooth     An explicit construction of teh problem matrix.
+   *  @param[in]     matSmooth     An explicit construction of the problem matrix.
    *  @param[in]     arpack_param  Parameter container defining the how the matrix 
    *                               is to be solved.
    *  @param[in]     local_dim     Parameter container with meta data for the 
-   *                               eigenvectors.
+   *                               QUDA color-spinor eigenvectors.
    **/
   
   void arpackSolve(void *h_evecs, void *h_evals,
-		   QudaInvertParam *inv_param,
+		   const Dirac &mat,
 		   QudaArpackParam *arpack_param,
-		   DiracParam *d_param, int *local_dim);
+		   ColorSpinorParam *cpuParam);
 
-  void arpackMGSolve(void *h_evecs, void *h_evals,
-		     DiracMatrix &matSmooth,
-		     QudaArpackParam *arpack_param,
-		     ColorSpinorParam *cpuParam);
+  void arpackSolveProto(void *h_evecs, void *h_evals,
+			const Dirac &mat,
+			QudaArpackParam *arpack_param,
+			ColorSpinorParam *cpuParam);
   
-}//endof namespace quda 
+}//end of namespace quda 
 
 #endif

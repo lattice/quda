@@ -365,6 +365,18 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
+
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1.0 + 3.0/anisotropy);
+  }
+  
+  printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
+  
+
   inv_param.Ls = 1;
 
   inv_param.sp_pad = 0;
@@ -392,15 +404,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (kappa == -1.0) {
-    inv_param.mass = mass;
-    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
-  } else {
-    inv_param.kappa = kappa;
-    inv_param.mass = 0.5/kappa - (1 + 3/anisotropy);
-  }
-
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH ||
+      dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;

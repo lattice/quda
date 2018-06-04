@@ -395,8 +395,9 @@ extern "C" {
     // all FORTRAN communication uses underscored 
     int ido_; 
     int info_;       //Error information.
-    int ipntr_[14];  //Holds info about array sizes
-    int iparam_[11]; //Holds problem type parameters
+    int *ipntr_;     //Holds info about array sizes
+    int *iparam_;    //Holds problem type parameters
+    int *select_;
     int n_;          //Local (complex) array size
     int nev_;        //Number of Evecs/Evals requested
     int nkv_;        //Size of the Kyrlov space (nev_ + extra vecs)
@@ -404,6 +405,10 @@ extern "C" {
     int lworkl_;     //Size of private workspace
     int rvec_;       //==1 compute Ritz vectors ; ==0 compute Ritz values only 
     int max_iter_;   //Maximum ARPACK iterations.
+    char howmany_;   // 
+    char bmat_;      //Matrix in A v = \lambda B v
+    char *spectrum_; //Part of the eigenspectrum to be calculated {S,L},{R,I,M}
+    int *fcomm_;     //MPI comms array
     
   } arpackFortranParam;
 

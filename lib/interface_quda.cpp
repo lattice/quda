@@ -2676,26 +2676,25 @@ void arpackEigensolveQuda(void *h_evecs, void *h_evals,
 
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
-  
-  cudaGaugeField *cudaGauge = checkGauge(inv_param);
+
   checkInvertParam(inv_param);
   checkArpackParam(arpack_param);
+  cudaGaugeField *cudaGauge = checkGauge(inv_param);
   
-  inv_param->secs = 0;
-  inv_param->gflops = 0;
-  inv_param->iter = 0;
-
   //Define problem matrix
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc_solve);
-
-  int local_dim[4];
-  for(int i=0; i<4; i++) {
-    local_dim[i] = cudaGauge->X()[i];
-  }
   
-  arpackSolve(h_evecs, h_evals, inv_param, arpack_param, &diracParam, local_dim);  
+  //Construct operator.
+  Dirac *mat = Dirac::create(diracParam);
+  
+  //For QUDA data type eigenvectors
+  ColorSpinorParam cpuParam(&h_evecs, *inv_param, cudaGauge->X(),
+			    inv_param->solution_type);
 
+  arpackSolve(h_evecs, h_evals, *mat, arpack_param, &cpuParam);
+  //arpackSolveProto(h_evecs, h_evals, *mat, arpack_param, &cpuParam);  
+  
   profileArpackEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
   

@@ -70,8 +70,6 @@ extern int niter;
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 
-int csw = 0.1;
-
 extern int eig_nEv;
 extern int eig_nKv;
 extern double eig_tol;
@@ -208,13 +206,12 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = csw*inv_param.kappa;
   }
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
@@ -235,15 +232,19 @@ void setInvertParam(QudaInvertParam &inv_param) {
     }
   }
 
+  inv_param.clover_coeff = clover_coeff;
+
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
   
   //For now, deal with hermitean operators only.
   inv_param.solution_type = QUDA_MATPC_SOLUTION;
+
   inv_param.solve_type = (inv_param.solution_type == QUDA_MAT_SOLUTION ?
 			  QUDA_NORMOP_SOLVE : QUDA_NORMOP_PC_SOLVE);
+
+  inv_param.matpc_type = matpc_type;
   
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
   inv_param.verbosity = QUDA_VERBOSE;
@@ -339,8 +340,6 @@ int main(int argc, char **argv)
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ?
     sizeof(double) : sizeof(float);
-  size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ?
-    sizeof(double) : sizeof(float);
 
   void *gauge[4], *clover=0, *clover_inv=0;
 
@@ -400,7 +399,6 @@ int main(int argc, char **argv)
     hostEvals = (void*)malloc(     2*arpack_param.nKv*sizeof(double));
   }
 
-  
   //This function returns the hostEvecs and hostEvals pointers, populated with the
   //requested data, at the requested prec.
   arpackEigensolveQuda(hostEvecs, hostEvals, &inv_param, &arpack_param, &gauge_param);
