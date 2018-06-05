@@ -76,7 +76,7 @@ void init() {
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  csParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_NULL_FIELD_CREATE;
 
@@ -89,6 +89,8 @@ void init() {
 
   setVerbosityQuda(QUDA_VERBOSE, "", stdout);
 
+  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  csParam.precision = QUDA_DOUBLE_PRECISION;
   csParam.setPrecision(prec);
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.pad = param.X[0] * param.X[1] * param.X[2];
@@ -118,7 +120,7 @@ void packTest() {
 #ifdef BUILD_CPS_INTERFACE
   {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-    
+
     GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
     cpuGaugeField cpsCpuGauge(cpsParam);
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
@@ -145,7 +147,7 @@ void packTest() {
 #ifdef BUILD_QDP_INTERFACE
   {
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-    
+
     GaugeFieldParam qdpParam(qdpCpuGauge_p, param);
     cpuGaugeField qdpCpuGauge(qdpParam);
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
