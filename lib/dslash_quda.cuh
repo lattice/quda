@@ -375,25 +375,41 @@ protected:
   const QudaReconstructType reconstruct;
   char *saveOut, *saveOutNorm;
   const int dagger;
+  static bool init;
 
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
   bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
   // all dslashes expect a 4-d volume here (dwf Ls is y thread dimension)
   unsigned int minThreads() const { return dslashParam.threads; }
+  char aux_base[TuneKey::aux_n];
   char aux[8][TuneKey::aux_n];
 
-  void fillAux(KernelType kernel_type, const char *kernel_str) {
-    strcpy(aux[kernel_type],kernel_str);
-#ifdef MULTI_GPU
+  inline void fillAuxBase() {
     char comm[5];
     comm[0] = (dslashParam.commDim[0] ? '1' : '0');
     comm[1] = (dslashParam.commDim[1] ? '1' : '0');
     comm[2] = (dslashParam.commDim[2] ? '1' : '0');
     comm[3] = (dslashParam.commDim[3] ? '1' : '0');
     comm[4] = '\0'; 
-    strcat(aux[kernel_type],",comm=");
-    strcat(aux[kernel_type],comm);
+    strcpy(aux_base,",comm=");
+    strcat(aux_base,comm);
+
+    switch (reconstruct) {
+    case QUDA_RECONSTRUCT_NO: strcat(aux_base,",reconstruct=18"); break;
+    case QUDA_RECONSTRUCT_13: strcat(aux_base,",reconstruct=13"); break;
+    case QUDA_RECONSTRUCT_12: strcat(aux_base,",reconstruct=12"); break;
+    case QUDA_RECONSTRUCT_9:  strcat(aux_base, ",reconstruct=9"); break;
+    case QUDA_RECONSTRUCT_8:  strcat(aux_base, ",reconstruct=8"); break;
+    default: break;
+    }
+
+    if (x) strcat(aux_base,",Xpay");
+    if (dagger) strcat(aux_base,",dagger");
+  }
+
+  inline void fillAux(KernelType kernel_type, const char *kernel_str) {
+    strcpy(aux[kernel_type],kernel_str);
     if (kernel_type == INTERIOR_KERNEL) {
       char ghost[5];
       ghost[0] = (dslashParam.ghostDim[0] ? '1' : '0');
@@ -404,21 +420,7 @@ protected:
       strcat(aux[kernel_type],",ghost=");
       strcat(aux[kernel_type],ghost);
     }
-#endif
-
-    if (reconstruct == QUDA_RECONSTRUCT_NO) 
-      strcat(aux[kernel_type],",reconstruct=18");
-    else if (reconstruct == QUDA_RECONSTRUCT_13) 
-      strcat(aux[kernel_type],",reconstruct=13");
-    else if (reconstruct == QUDA_RECONSTRUCT_12) 
-      strcat(aux[kernel_type],",reconstruct=12");
-    else if (reconstruct == QUDA_RECONSTRUCT_9) 
-      strcat(aux[kernel_type],",reconstruct=9");
-    else if (reconstruct == QUDA_RECONSTRUCT_8) 
-      strcat(aux[kernel_type],",reconstruct=8");
-
-    if (x) strcat(aux[kernel_type],",Xpay");
-    if (dagger) strcat(aux[kernel_type],",dagger");
+    strcat(aux[kernel_type],aux_base);
   }
 
   /**
@@ -475,7 +477,8 @@ public:
     if (x) dslashParam.xTexNorm = x->TexNorm();
 #endif // USE_TEXTURE_OBJECTS
 
-#ifdef MULTI_GPU 
+    fillAuxBase();
+#ifdef MULTI_GPU
     fillAux(INTERIOR_KERNEL, "type=interior");
     fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all");
     fillAux(EXTERIOR_KERNEL_X, "type=exterior_x");
@@ -492,28 +495,33 @@ public:
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
-    // this is a c/b field so double the x dimension
-    dslashParam.X[0] = in->X(0)*2;
-    for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
+    if (!init) { // these parameters are constant across all dslash instances for a given run
+      // this is a c/b field so double the x dimension
+      dslashParam.X[0] = in->X(0)*2;
+      for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    dslashParam.Ls = in->X(4); // needed by tuneLaunch()
+      dslashParam.Ls = in->X(4); // needed by tuneLaunch()
 #endif
-    dslashParam.Xh[0] = in->X(0);
-    for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
-    dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
+      dslashParam.Xh[0] = in->X(0);
+      for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
+      dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
 
-    int face[4];
-    for (int dim=0; dim<4; dim++) {
-      for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
-      face[dim] = Nface()/2;
+      int face[4];
+      for (int dim=0; dim<4; dim++) {
+        dslashParam.ghostDim[dim] = comm_dim_partitioned(dim); // determines whether to use regular or ghost indexing at boundary
+
+        for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
+        face[dim] = Nface()/2;
       
-      dslashParam.face_X[dim] = face[0];
-      dslashParam.face_Y[dim] = face[1];
-      dslashParam.face_Z[dim] = face[2];
-      dslashParam.face_T[dim] = face[3];
-      dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
-      dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
-      dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
+        dslashParam.face_X[dim] = face[0];
+        dslashParam.face_Y[dim] = face[1];
+        dslashParam.face_Z[dim] = face[2];
+        dslashParam.face_T[dim] = face[3];
+        dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
+        dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
+        dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
+      }
+      init = true;
     }
   }
 
@@ -699,8 +707,9 @@ public:
     return bytes_;
   }
 
-
 };
+
+bool DslashCuda::init = false;
 
 /** This derived class is specifically for driving the Dslash kernels
     that use shared memory blocking.  This only applies on Fermi and

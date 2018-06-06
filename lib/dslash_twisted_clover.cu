@@ -275,7 +275,6 @@ namespace quda {
     int bulk_threads = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->Volume() : in->Volume() / 2;
 
     for(int i=0;i<4;i++){
-      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
       dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
 
