@@ -423,12 +423,13 @@ protected:
 
   /**
      @brief Set the dslashParam for the current multi-GPU parameters
-     (set these at the last minute to ensure we alawys use the correct
+     (set these at the last minute to ensure we always use the correct
      ones while policy autotuning).
    */
-  void setParam()
+  inline void setParam()
   {
-    // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
+    if (dslashParam.kernel_type != INTERIOR_KERNEL) return;
+    // factor of 2 (or 1) for T-dimensional spin projection(FIXME - unnecessary)
     dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
     dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
 
@@ -474,19 +475,6 @@ public:
     if (x) dslashParam.xTex = x->Tex();
     if (x) dslashParam.xTexNorm = x->TexNorm();
 #endif // USE_TEXTURE_OBJECTS
-
-    for (int dim=0; dim<4; dim++) {
-      for (int dir=0; dir<2; dir++) {
-        dslashParam.ghost[2*dim+dir] = (void*)in->Ghost2();
-        dslashParam.ghostNorm[2*dim+dir] = (float*)(in->Ghost2());
-
-#ifdef USE_TEXTURE_OBJECTS
-        dslashParam.ghostTex[2*dim+dir] = in->GhostTex();
-        dslashParam.ghostTexNorm[2*dim+dir] = in->GhostTexNorm();
-#endif // USE_TEXTURE_OBJECTS
-
-      }
-    }
 
 #ifdef MULTI_GPU 
     fillAux(INTERIOR_KERNEL, "type=interior");
