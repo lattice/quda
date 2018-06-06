@@ -172,7 +172,7 @@ namespace quda {
     }
     PROFILE(cuMemcpy2DAsync(&param, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
 #else
-    PROFILE(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    PROFILE(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
 #endif
   }
 
@@ -207,7 +207,7 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    PROFILE(cudaError_t error = cudaEventRecord(event), QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(cudaError_t error = cudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
     return error;
 #endif
   }
