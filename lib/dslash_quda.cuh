@@ -447,10 +447,6 @@ protected:
         }
       }
     }
-
-#ifndef USE_TEXTURE_OBJECTS
-    bindSpinorTex<sFloat>(in, out, x);
-#endif // USE_TEXTURE_OBJECTS
   }
 
 public:
