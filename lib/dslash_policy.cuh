@@ -341,12 +341,16 @@ namespace {
 
   /**
      @brief Set the ghosts to the mapped CPU ghost buffer, or unsets
-     if already set.
+     if already set.  Note this must not be called until after the
+     interior dslash has been called, since sets the peer-to-peer
+     ghost pointers, and this need to be done without the mapped ghost
+     enabled.
+
      @param[in,out] dslash The dslash object
      @param[in,out] in The ColorSpinorField source
      @param[in] to_mapped Whether we are switching to mapped ghosts or not
    */
-  inline void setGhost(DslashCuda &dslash, cudaColorSpinorField &in, bool to_mapped) {
+  inline void setMappedGhost(DslashCuda &dslash, cudaColorSpinorField &in, bool to_mapped) {
 
     static char aux_copy[TuneKey::aux_n];
     static bool set_mapped = false;
@@ -1666,13 +1670,14 @@ struct DslashZeroCopy : DslashPolicyImp {
 	}
 
 	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-        if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+        if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] &&
+             pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
-	  setGhost(dslash, *in, true);
+          setMappedGhost(dslash, *in, true);
 	  PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-	  setGhost(dslash, *in, false);
+          setMappedGhost(dslash, *in, false);
 
 	  pattern.dslashCompleted[2*i] = 1;
 	}
@@ -1758,10 +1763,9 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
     if (pattern.commDimTotal) {
       setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
-
-      setGhost(dslash, *in, true);
+      setMappedGhost(dslash, *in, true);
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-      setGhost(dslash, *in, false);
+      setMappedGhost(dslash, *in, false);
     }
 
     completeDslash(*in);

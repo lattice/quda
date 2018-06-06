@@ -428,15 +428,18 @@ protected:
    */
   inline void setParam()
   {
-    if (dslashParam.kernel_type != INTERIOR_KERNEL) return;
-    // factor of 2 (or 1) for T-dimensional spin projection(FIXME - unnecessary)
+    // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
     dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
     dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
 
     // update the ghosts for the non-p2p directions
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
-        if (!comm_peer2peer_enabled(1-dir, dim)) {
+        /* if doing interior kernel, then this is the initial call, so
+        we must all ghost pointers else if doing exterior kernel, then
+        we only have to update the non-p2p ghosts, since these may
+        have been assigned to zero-copy memory */
+        if (!comm_peer2peer_enabled(1-dir, dim) || dslashParam.kernel_type == INTERIOR_KERNEL) {
           dslashParam.ghost[2*dim+dir] = (void*)in->Ghost2();
           dslashParam.ghostNorm[2*dim+dir] = (float*)(in->Ghost2());
 
