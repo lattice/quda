@@ -871,6 +871,19 @@ namespace quda {
 #ifdef STRIPED
     bool tuneGridDim() const { return true; } // If striping, always tune grid dimension
     unsigned int maxGridSize() const { return (location & Host) ? deviceProp.multiProcessorCount/4 : Tunable::maxGridSize(); } // use no more than a quarter of the GPU
+    unsigned int minGridSize() const {
+      // if doing a zero-copy policy then set a minimum number of
+      // thread blocks to be the number of dimensions we are
+      // communicating this is to ensure quality of service for the
+      // packing kernel when running concurrently.
+      if (location & Host) {
+        int nDimComms = 0;
+        for (int d=0; d<in->Ndim(); d++) nDimComms += comm_dim_partitioned(d);
+        return 2 * nDimComms;
+      } else {
+        return Tunable::minGridSize();
+      }
+    }
 #else
     bool tuneGridDim() const { return location & Host; } // only tune grid dimension if doing zero-copy writing
     unsigned int maxGridSize() const { return tuneGridDim ? deviceProp.multiProcessorCount/4 : Tunable::maxGridSize(); } // use no more than a quarter of the GPU
@@ -888,7 +901,8 @@ namespace quda {
       comm[3] = (commDim[3] ? '1' : '0');
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
-      if (getKernelPackT()) { strcat(aux,",kernelPackT"); }
+      strcat(aux,comm_dim_topology_string());
+     if (getKernelPackT()) { strcat(aux,",kernelPackT"); }
       switch (nFace) {
       case 1: strcat(aux,",nFace=1,"); break;
       case 3: strcat(aux,",nFace=3,"); break;
@@ -924,6 +938,11 @@ namespace quda {
       unbindSpinorTex<FloatN>(in);
     }
 
+    // if doing a zero-copy policy then ensure that each thread block
+    // runs exclusively on a given SM - this is to ensure quality of
+    // service for the packing kernel when running concurrently.
+    bool tuneSharedBytes() const { return location & Host ? false : Tunable::tuneSharedBytes(); }
+
     bool advanceAux(TuneParam &param) const
     {
 #ifdef SWIZZLE
@@ -946,6 +965,7 @@ namespace quda {
     void initTuneParam(TuneParam &param) const {
       Tunable::initTuneParam(param);
       param.aux.x = 1; // swizzle factor
+      if (location & Host) param.shared_bytes = deviceProp.sharedMemPerBlock / 2 + 1;
     }
 
     void defaultTuneParam(TuneParam &param) const {
