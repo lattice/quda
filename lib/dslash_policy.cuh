@@ -27,7 +27,7 @@ struct DslashCommsPattern {
   int commDimTotal;
   int completeSum;
 
-  DslashCommsPattern(const int commDim[], bool gdr_send=false)
+  inline DslashCommsPattern(const int commDim[], bool gdr_send=false)
     : commsCompleted{ }, dslashCompleted{ }, completeSum(0) {
 
     for (int i=0; i<Nstream-1; i++) gatherCompleted[i] = gdr_send ? 1 : 0;
@@ -326,7 +326,7 @@ namespace {
      updating the local buffers on a subsequent computation before we
      have finished sending.
   */
-  void completeDslash(const ColorSpinorField &in) {
+  inline void completeDslash(const ColorSpinorField &in) {
     // this ensures that the p2p sending is completed before any
     // subsequent work is done on the compute stream
     for (int dim=3; dim>=0; dim--) {
@@ -346,7 +346,7 @@ namespace {
      @param[in,out] in The ColorSpinorField source
      @param[in] to_mapped Whether we are switching to mapped ghosts or not
    */
-  void setGhost(DslashCuda &dslash, cudaColorSpinorField &in, bool to_mapped) {
+  inline void setGhost(DslashCuda &dslash, cudaColorSpinorField &in, bool to_mapped) {
 
     static char aux_copy[TuneKey::aux_n];
     static bool set_mapped = false;
