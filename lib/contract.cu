@@ -219,7 +219,7 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
-    cudaStreamSynchronize(streams[Nstream-1]);
+    qudaStreamSynchronize(streams[Nstream-1]);
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -268,7 +268,7 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
-    cudaStreamSynchronize(streams[Nstream-1]);
+    qudaStreamSynchronize(streams[Nstream-1]);
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);

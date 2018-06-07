@@ -92,7 +92,7 @@ class CalcFunc : TunableLocalParity {
     tp = tuneLaunch(*this, getTuning(), getVerbosity());
     arg.result_h[0] = make_double2(0.0, 0.0);
     LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
     comm_allreduce_array((double*)arg.result_h, 2);
     arg.result_h[0].x  /= (double)(4*2*arg.threads*comm_size());
@@ -130,7 +130,7 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 0) printfQuda("Determinant: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 1) printfQuda("Trace: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   checkCudaError();
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
   if (getVerbosity() >= QUDA_SUMMARIZE){
     profileGenericFunc.TPSTOP(QUDA_PROFILE_COMPUTE);
     double secs = profileGenericFunc.Last(QUDA_PROFILE_COMPUTE);

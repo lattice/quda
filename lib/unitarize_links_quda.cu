@@ -425,7 +425,7 @@ namespace{
 				      reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
     UnitarizeLinks<Float, Out, In> unitlinks(arg) ;
     unitlinks.apply(0);
-    cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
+    qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
   }
   
 template<typename Float>
@@ -587,7 +587,7 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
       ProjectSU3Arg<Float,G> arg(G(u), u, static_cast<Float>(tol), fails);
       ProjectSU3<Float,G> project(arg);
       project.apply(0);
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       checkCudaError();
     } else {
       errorQuda("Reconstruct %d not supported", u.Reconstruct());

@@ -11,7 +11,7 @@
 
 namespace quda {
 
-  enum MemoryLocation { Device, Host, Remote };
+  enum MemoryLocation { Device = 1, Host = 2, Remote = 4 };
 
   struct FullClover;
 
@@ -543,11 +543,14 @@ namespace quda {
        @param[out] buffer Optional parameter where the ghost should be
        stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
        @param[in] location Are we packing directly into local device memory, zero-copy memory or remote memory
+       @param[in] location_label Consistent label used for labeling
+       the packing tunekey since location can be difference for each process
        @param[in] a Twisted mass parameter (default=0)
        @param[in] b Twisted mass parameter (default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-		   cudaStream_t* stream, MemoryLocation location[2*QUDA_MAX_DIM], double a=0, double b=0);
+		   cudaStream_t* stream, MemoryLocation location[2*QUDA_MAX_DIM], MemoryLocation location_label,
+                   double a=0, double b=0);
 
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
@@ -598,8 +601,22 @@ namespace quda {
 
     void streamInit(cudaStream_t *stream_p);
 
+    /**
+       Pack the field halos in preparation for halo exchange, e.g., for Dslash
+       @param[in] nFace Depth of faces
+       @param[in] parity Field parity
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream index to be used for packing kernel
+       @param[in] location Array of field locations where each halo
+       will be sent (Host, Device or Remote)
+       @param[in] location_label Consistent label used for labeling
+       the packing tunekey since location can be difference for each
+       process
+       @param[in] a Used for twisted mass
+       @param[in] b Used for twisted mass
+    */
     void pack(int nFace, int parity, int dagger, int stream_idx,
-	      MemoryLocation location[], double a=0, double b=0);
+	      MemoryLocation location[], MemoryLocation location_label, double a=0, double b=0);
 
     void packExtended(const int nFace, const int R[], const int parity, const int dagger,
         const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);
@@ -619,14 +636,16 @@ namespace quda {
 
     /**
        @brief Initiate halo communication sending
-       @param[in] Depth of face exchange
+       @param[in] nFace Depth of face exchange
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] dagger Whether this exchange is for the conjugate operator
-       @param[in] stream CUDA stream to be used (unused)
+       @param[in] stream CUDA stream that we will post the p2p event
+       synchronization to (if nullptr then stream+d will be used
        @param[in] gdr Whether we are using GDR on the send side
+       @param[in] remote_write Whether we are writing direct to remote memory (or using copy engines)
     */
-    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false);
+    void sendStart(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false, bool remote_write=false);
 
     /**
        @brief Initiate halo communication
@@ -669,7 +688,13 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
-    const void* Ghost2() const { return ghost_field_tex[bufferIndex]; }
+    inline const void* Ghost2() const {
+      if (bufferIndex < 2) {
+        return ghost_recv_buffer_d[bufferIndex];
+      } else {
+        return static_cast<char*>(ghost_pinned_buffer_hd[bufferIndex%2])+ghost_bytes;
+      }
+    }
 
     /**
        @brief This is a unified ghost exchange function for doing a complete
@@ -688,10 +713,10 @@ namespace quda {
 		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
 #ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t& Tex() const { return tex; }
-    const cudaTextureObject_t& TexNorm() const { return texNorm; }
-    const cudaTextureObject_t& GhostTex() const { return ghostTex[bufferIndex]; }
-    const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm[bufferIndex]; }
+    inline const cudaTextureObject_t& Tex() const { return tex; }
+    inline const cudaTextureObject_t& TexNorm() const { return texNorm; }
+    inline const cudaTextureObject_t& GhostTex() const { return ghostTex[bufferIndex]; }
+    inline const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm[bufferIndex]; }
 #endif
 
     cudaColorSpinorField& Component(const int idx) const;

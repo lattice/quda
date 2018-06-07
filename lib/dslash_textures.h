@@ -357,16 +357,7 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
   int size = (sizeof(((spinorFloat*)0)->x) < sizeof(float)) ? sizeof(float) :
     sizeof(((spinorFloat*)0)->x);
 
-#ifdef USE_TEXTURE_OBJECTS
-  dslashParam.inTex = in->Tex();
-  dslashParam.inTexNorm = in->TexNorm();
-  dslashParam.ghostTex = in->GhostTex();
-  dslashParam.ghostTexNorm = in->GhostTexNorm();
-  if (out) dslashParam.outTex = out->Tex();
-  if (out) dslashParam.outTexNorm = out->TexNorm();
-  if (x) dslashParam.xTex = x->Tex();
-  if (x) dslashParam.xTexNorm = x->TexNorm();
-#else
+#ifndef USE_TEXTURE_OBJECTS
   if (typeid(spinorFloat) == typeid(double2)) {
     cudaBindTexture(0, spinorTexDouble, in->V(), in->Bytes()); 
     if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexDouble, in->Ghost2(), in->GhostBytes());
@@ -403,7 +394,7 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
   } else {
     errorQuda("Unsupported precision and short vector type");
   }
-#endif // USE_TEXTURE_OBJECTS
+#endif // !USE_TEXTURE_OBJECTS
 
   return size;
 }

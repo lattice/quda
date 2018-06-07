@@ -2,33 +2,42 @@
 
 #if (__COMPUTE_CAPABILITY__ >= 700)
 // for running on Volta we set large shared memory mode to prefer hitting in L2
-#define SET_CACHE(x) cudaFuncSetAttribute(x, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
+#define SET_CACHE(f) cudaFuncSetAttribute(f, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
 #else
-#define SET_CACHE(x)
+#define SET_CACHE(f)
+#endif
+
+#if 1
+#define LAUNCH_KERNEL(f, grid, block, shared, stream, param)            \
+  void *args[] = { &param };                                            \
+  void (*func)( const DslashParam ) = &(f);                             \
+  cudaLaunchKernel( (const void*)func, grid, block, args, shared, stream);
+#else
+#define LAUNCH_KERNEL(f, grid, block, shared, stream, param) f<<<grid, block, shared, stream>>>(param)
 #endif
 
 #define EVEN_MORE_GENERIC_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   }
 
@@ -47,27 +56,27 @@
 #define EVEN_MORE_GENERIC_STAGGERED_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 18 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
-      FUNC ## FLOAT ## 18 ## 13 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 13 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 18 ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 12 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_9) {			\
-      FUNC ## FLOAT ## 18 ## 9 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 9 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 18 ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 8 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
-      FUNC ## FLOAT ## 18 ## 13 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 13 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 18 ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_9) {			\
-      FUNC ## FLOAT ## 18 ## 9 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 9 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 18 ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }                                                                   \
   }
 
@@ -174,13 +183,13 @@
 #define EVEN_MORE_GENERIC_ASYM_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
     SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-    FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+    LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
   } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
     SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type> ); \
-    FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+    LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
   } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
     SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> ); \
-    FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+    LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
   }									
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
@@ -248,46 +257,46 @@
   if (x == 0 && d == 0) {						\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Twist ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## Twist ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Twist ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Twist ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## Twist ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Twist ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else {								\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Twist ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## Twist ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Twist ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else if (x != 0 && d == 0) {					\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Twist ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## Twist ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Twist ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Twist ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## Twist ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Twist ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Twist ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## Twist ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Twist ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else if (x == 0 && d != 0) {					\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else {								\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else{								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   }
 
@@ -366,25 +375,41 @@ protected:
   const QudaReconstructType reconstruct;
   char *saveOut, *saveOutNorm;
   const int dagger;
+  static bool init;
 
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
   bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
   // all dslashes expect a 4-d volume here (dwf Ls is y thread dimension)
   unsigned int minThreads() const { return dslashParam.threads; }
+  char aux_base[TuneKey::aux_n];
   char aux[8][TuneKey::aux_n];
 
-  void fillAux(KernelType kernel_type, const char *kernel_str) {
-    strcpy(aux[kernel_type],kernel_str);
-#ifdef MULTI_GPU
+  inline void fillAuxBase() {
     char comm[5];
     comm[0] = (dslashParam.commDim[0] ? '1' : '0');
     comm[1] = (dslashParam.commDim[1] ? '1' : '0');
     comm[2] = (dslashParam.commDim[2] ? '1' : '0');
     comm[3] = (dslashParam.commDim[3] ? '1' : '0');
     comm[4] = '\0'; 
-    strcat(aux[kernel_type],",comm=");
-    strcat(aux[kernel_type],comm);
+    strcpy(aux_base,",comm=");
+    strcat(aux_base,comm);
+
+    switch (reconstruct) {
+    case QUDA_RECONSTRUCT_NO: strcat(aux_base,",reconstruct=18"); break;
+    case QUDA_RECONSTRUCT_13: strcat(aux_base,",reconstruct=13"); break;
+    case QUDA_RECONSTRUCT_12: strcat(aux_base,",reconstruct=12"); break;
+    case QUDA_RECONSTRUCT_9:  strcat(aux_base, ",reconstruct=9"); break;
+    case QUDA_RECONSTRUCT_8:  strcat(aux_base, ",reconstruct=8"); break;
+    default: break;
+    }
+
+    if (x) strcat(aux_base,",Xpay");
+    if (dagger) strcat(aux_base,",dagger");
+  }
+
+  inline void fillAux(KernelType kernel_type, const char *kernel_str) {
+    strcpy(aux[kernel_type],kernel_str);
     if (kernel_type == INTERIOR_KERNEL) {
       char ghost[5];
       ghost[0] = (dslashParam.ghostDim[0] ? '1' : '0');
@@ -395,21 +420,38 @@ protected:
       strcat(aux[kernel_type],",ghost=");
       strcat(aux[kernel_type],ghost);
     }
-#endif
+    strcat(aux[kernel_type],aux_base);
+  }
 
-    if (reconstruct == QUDA_RECONSTRUCT_NO) 
-      strcat(aux[kernel_type],",reconstruct=18");
-    else if (reconstruct == QUDA_RECONSTRUCT_13) 
-      strcat(aux[kernel_type],",reconstruct=13");
-    else if (reconstruct == QUDA_RECONSTRUCT_12) 
-      strcat(aux[kernel_type],",reconstruct=12");
-    else if (reconstruct == QUDA_RECONSTRUCT_9) 
-      strcat(aux[kernel_type],",reconstruct=9");
-    else if (reconstruct == QUDA_RECONSTRUCT_8) 
-      strcat(aux[kernel_type],",reconstruct=8");
+  /**
+     @brief Set the dslashParam for the current multi-GPU parameters
+     (set these at the last minute to ensure we always use the correct
+     ones while policy autotuning).
+   */
+  inline void setParam()
+  {
+    // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
+    dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
+    dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
 
-    if (x) strcat(aux[kernel_type],",Xpay");
-    if (dagger) strcat(aux[kernel_type],",dagger");
+    // update the ghosts for the non-p2p directions
+    for (int dim=0; dim<4; dim++) {
+      for (int dir=0; dir<2; dir++) {
+        /* if doing interior kernel, then this is the initial call, so
+        we must all ghost pointers else if doing exterior kernel, then
+        we only have to update the non-p2p ghosts, since these may
+        have been assigned to zero-copy memory */
+        if (!comm_peer2peer_enabled(1-dir, dim) || dslashParam.kernel_type == INTERIOR_KERNEL) {
+          dslashParam.ghost[2*dim+dir] = (void*)in->Ghost2();
+          dslashParam.ghostNorm[2*dim+dir] = (float*)(in->Ghost2());
+
+#ifdef USE_TEXTURE_OBJECTS
+          dslashParam.ghostTex[2*dim+dir] = in->GhostTex();
+          dslashParam.ghostTexNorm[2*dim+dir] = in->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
+        }
+      }
+    }
   }
 
 public:
@@ -425,10 +467,18 @@ public:
     dslashParam.inNorm = (float*)in->Norm();
     dslashParam.x = x ? (void*)x->V() : nullptr;
     dslashParam.xNorm = x ? (float*)x->Norm() : nullptr;
-    dslashParam.ghost = (void*)in->Ghost2();
-    dslashParam.ghostNorm = (float*)(in->Ghost2());
 
-#ifdef MULTI_GPU 
+#ifdef USE_TEXTURE_OBJECTS
+    dslashParam.inTex = in->Tex();
+    dslashParam.inTexNorm = in->TexNorm();
+    if (out) dslashParam.outTex = out->Tex();
+    if (out) dslashParam.outTexNorm = out->TexNorm();
+    if (x) dslashParam.xTex = x->Tex();
+    if (x) dslashParam.xTexNorm = x->TexNorm();
+#endif // USE_TEXTURE_OBJECTS
+
+    fillAuxBase();
+#ifdef MULTI_GPU
     fillAux(INTERIOR_KERNEL, "type=interior");
     fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all");
     fillAux(EXTERIOR_KERNEL_X, "type=exterior_x");
@@ -445,28 +495,33 @@ public:
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
-    // this is a c/b field so double the x dimension
-    dslashParam.X[0] = in->X(0)*2;
-    for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
+    if (!init) { // these parameters are constant across all dslash instances for a given run
+      // this is a c/b field so double the x dimension
+      dslashParam.X[0] = in->X(0)*2;
+      for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    dslashParam.Ls = in->X(4); // needed by tuneLaunch()
+      dslashParam.Ls = in->X(4); // needed by tuneLaunch()
 #endif
-    dslashParam.Xh[0] = in->X(0);
-    for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
-    dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
+      dslashParam.Xh[0] = in->X(0);
+      for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
+      dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
 
-    int face[4];
-    for (int dim=0; dim<4; dim++) {
-      for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
-      face[dim] = Nface()/2;
+      int face[4];
+      for (int dim=0; dim<4; dim++) {
+        dslashParam.ghostDim[dim] = comm_dim_partitioned(dim); // determines whether to use regular or ghost indexing at boundary
+
+        for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
+        face[dim] = Nface()/2;
       
-      dslashParam.face_X[dim] = face[0];
-      dslashParam.face_Y[dim] = face[1];
-      dslashParam.face_Z[dim] = face[2];
-      dslashParam.face_T[dim] = face[3];
-      dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
-      dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
-      dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
+        dslashParam.face_X[dim] = face[0];
+        dslashParam.face_Y[dim] = face[1];
+        dslashParam.face_Z[dim] = face[2];
+        dslashParam.face_T[dim] = face[3];
+        dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
+        dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
+        dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
+      }
+      init = true;
     }
   }
 
@@ -652,8 +707,9 @@ public:
     return bytes_;
   }
 
-
 };
+
+bool DslashCuda::init = false;
 
 /** This derived class is specifically for driving the Dslash kernels
     that use shared memory blocking.  This only applies on Fermi and

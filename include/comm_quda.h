@@ -161,10 +161,10 @@ extern "C" {
   void comm_peer2peer_init(const char *hostname_recv_buf);
 
   /**
-     Query if peer-to-peer communication is enabled globally
-     @return Whether peer-to-peer is enabled globally
+     Query what peer-to-peer communication is enabled globally
+     @return 2-bit number reporting 1 for copy engine, 2 for remote writes
   */
-  bool comm_peer2peer_enabled_global();
+  int comm_peer2peer_enabled_global();
 
   /**
      Query if peer-to-peer communication is enabled
