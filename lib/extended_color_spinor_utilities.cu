@@ -156,17 +156,22 @@ namespace quda {
       int E[QUDA_MAX_DIM];
       int X[QUDA_MAX_DIM];
       int length;
+      int lengthEx;
       int parity;
 
       CopySpinorExArg(const OutOrder &out, const InOrder &in, const Basis& basis, const int *E, const int *X, const int parity)
         : out(out), in(in), basis(basis), parity(parity) 
       {
         this->length = 1;
+        this->lengthEx = 1;
         for(int d=0; d<4; d++){
           this->E[d] = E[d];
+          this->lengthEx *= E[d];
           this->X[d] = X[d];
           this->length *= X[d]; // smaller volume
         }
+				this->lengthEx /= 2; // For checkerboarded volume
+				this->length /= 2; // For checkerboarded volume
       }
     };
 
@@ -195,15 +200,18 @@ namespace quda {
       RegTypeIn   in[Ns*Nc*2] = { };
       RegTypeOut  out[Ns*Nc*2] = { };
 
+			int Ls = 12;
+			for(int s=0; s<Ls; s++){
       if(extend){
-        arg.in.load(in, X);
+        arg.in.load(in, arg.length*s+X);
         arg.basis(out, in);
-        arg.out.save(out, Y);
+        arg.out.save(out, arg.lengthEx*s+Y);
       }else{
-        arg.in.load(in, Y);
-        arg.basis(out,in);
-        arg.out.save(out, Y);
+        arg.in.load(in, arg.lengthEx*s+Y);
+        arg.basis(out, in);
+        arg.out.save(out, arg.length*s+X);
       }
+			}
     }
 
 
@@ -353,6 +361,11 @@ namespace quda {
       }
     }
     X[0] *= 2; E[0] *= 2; // Since we consider only a single parity at a time
+
+//		if(in.Ndim() == 5){
+//			X[1] *= in.X()[4];
+//			E[1] *= in.X()[4];
+//		}
 
     if (in.isNative()) {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
