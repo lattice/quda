@@ -40,7 +40,12 @@ namespace quda {
   void setPackComms(const int *comm_dim) { ; }
 #endif
 
+#define STRIPED
+#ifdef STRIPED
+#else
 #define SWIZZLE
+#endif
+
 #include <dslash_index.cuh>
 
   // routines for packing the ghost zones (multi-GPU only)
@@ -88,6 +93,7 @@ namespace quda {
     int sp_stride;
 
     int_fastdiv swizzle;
+    int sites_per_block;
   };
 
   template<typename FloatN>
@@ -273,9 +279,17 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for Wilson
 
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
     int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -338,7 +352,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -347,9 +366,18 @@ namespace quda {
   template <int dagger, typename FloatN, int nFace>
     __global__ void packFaceExtendedWilsonKernel(PackParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -412,7 +440,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -421,9 +454,18 @@ namespace quda {
   template <int dagger, typename FloatN, int nFace>
     __global__ void unpackFaceExtendedWilsonKernel(PackParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -489,7 +531,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -626,9 +673,17 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for Wilson
 
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -688,7 +743,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -730,15 +790,12 @@ namespace quda {
     virtual int outputPerSite() const = 0;
 
     // prepare the param struct with kernel arguments
-    void prepareParam(PackParam<FloatN> &param, TuneParam &tp, int dim=-1, int face_num=2) {
+    void prepareParam(PackParam<FloatN> &param, TuneParam &tp, bool &init, int dim=-1, int face_num=2) {
       param.in = (FloatN*)in->V();
       param.inNorm = (float*)in->Norm();
       param.dim = dim;
       param.face_num = face_num;
       param.parity = parity;
-      for(int d=0; d<in->Ndim(); d++) param.X[d] = in->X()[d];
-      for(int d=in->Ndim(); d<QUDA_MAX_DIM; d++) param.X[d] = 1;
-      param.X[0] *= 2;
 
 #ifdef USE_TEXTURE_OBJECTS
       param.inTex = in->Tex();
@@ -766,49 +823,84 @@ namespace quda {
       }
 
       param.volume_4d = in->VolumeCB()*2 / (in->Ndim() == 5 ? in->X(4) : 1);
-      param.ghostFace[0] = param.X[1]*param.X[2]*param.X[3]/2;
-      param.ghostFace[1] = param.X[0]*param.X[2]*param.X[3]/2;
-      param.ghostFace[2] = param.X[0]*param.X[1]*param.X[3]/2;
-      param.ghostFace[3] = param.X[0]*param.X[1]*param.X[2]/2;
 
-      param.dims[0][0]=param.X[1];
-      param.dims[0][1]=param.X[2];
-      param.dims[0][2]=param.X[3];
+      if (!init) {
+        for(int d=0; d<in->Ndim(); d++) param.X[d] = in->X()[d];
+        for(int d=in->Ndim(); d<QUDA_MAX_DIM; d++) param.X[d] = 1;
+        param.X[0] *= 2;
+        param.ghostFace[0] = param.X[1]*param.X[2]*param.X[3]/2;
+        param.ghostFace[1] = param.X[0]*param.X[2]*param.X[3]/2;
+        param.ghostFace[2] = param.X[0]*param.X[1]*param.X[3]/2;
+        param.ghostFace[3] = param.X[0]*param.X[1]*param.X[2]/2;
 
-      param.dims[1][0]=param.X[0];
-      param.dims[1][1]=param.X[2];
-      param.dims[1][2]=param.X[3];
+        param.dims[0][0]=param.X[1];
+        param.dims[0][1]=param.X[2];
+        param.dims[0][2]=param.X[3];
 
-      param.dims[2][0]=param.X[0];
-      param.dims[2][1]=param.X[1];
-      param.dims[2][2]=param.X[3];
+        param.dims[1][0]=param.X[0];
+        param.dims[1][1]=param.X[2];
+        param.dims[1][2]=param.X[3];
 
-      param.dims[3][0]=param.X[0];
-      param.dims[3][1]=param.X[1];
-      param.dims[3][2]=param.X[2];
+        param.dims[2][0]=param.X[0];
+        param.dims[2][1]=param.X[1];
+        param.dims[2][2]=param.X[3];
 
-      int face[4];
-      for (int dim=0; dim<4; dim++) {
-	for (int j=0; j<4; j++) face[j] = param.X[j];
-	face[dim] = nFace;
+        param.dims[3][0]=param.X[0];
+        param.dims[3][1]=param.X[1];
+        param.dims[3][2]=param.X[2];
 
-	param.face_X[dim] = face[0];
-	param.face_Y[dim] = face[1];
-	param.face_Z[dim] = face[2];
-	param.face_T[dim] = face[3];
-	param.face_XY[dim] = param.face_X[dim] * face[1];
-	param.face_XYZ[dim] = param.face_XY[dim] * face[2];
-	param.face_XYZT[dim] = param.face_XYZ[dim] * face[3];
+        int face[4];
+        for (int dim=0; dim<4; dim++) {
+          for (int j=0; j<4; j++) face[j] = param.X[j];
+          face[dim] = nFace;
+
+          param.face_X[dim] = face[0];
+          param.face_Y[dim] = face[1];
+          param.face_Z[dim] = face[2];
+          param.face_T[dim] = face[3];
+          param.face_XY[dim] = param.face_X[dim] * face[1];
+          param.face_XYZ[dim] = param.face_XY[dim] * face[2];
+          param.face_XYZT[dim] = param.face_XYZ[dim] * face[3];
+        }
+        init = true;
       }
 
       param.swizzle = tp.aux.x;
+      param.sites_per_block = (param.threads + tp.grid.x - 1) / tp.grid.x;
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-    bool tuneGridDim() const { return location & Host; } // Only tune grid dimension if doing zero-copy writing
-    unsigned int maxGridSize() const { return tuneGridDim() ? deviceProp.multiProcessorCount/4 : Tunable::maxGridSize(); } // use no more than a quarter of the GPU
+#ifdef STRIPED
+    bool tuneGridDim() const { return true; } // If striping, always tune grid dimension
+    unsigned int maxGridSize() const {
+      if (location & Host) {
+	// if zero-copy policy then set a maximum number of blocks to be
+	// the 3 * number of dimensions we are communicating
+        int nDimComms = 0;
+        for (int d=0; d<in->Ndim(); d++) nDimComms += commDim[d];
+        return 3*nDimComms;
+      } else {
+        return Tunable::maxGridSize();
+      }
+    } // use no more than a quarter of the GPU
+    unsigned int minGridSize() const {
+      if (location & Host) {
+	// if zero-copy policy then set a maximum number of blocks to be
+	// the 1 * number of dimensions we are communicating
+        int nDimComms = 0;
+        for (int d=0; d<in->Ndim(); d++) nDimComms += commDim[d];
+        return nDimComms;
+      } else {
+        return Tunable::minGridSize();
+      }
+    }
+#else
+    bool tuneGridDim() const { return location & Host; } // only tune grid dimension if doing zero-copy writing
+    unsigned int maxGridSize() const { return tuneGridDim ? deviceProp.multiProcessorCount/4 : Tunable::maxGridSize(); } // use no more than a quarter of the GPU
+#endif
+
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
     unsigned int minThreads() const { return threads(); }
 
@@ -821,6 +913,7 @@ namespace quda {
       comm[3] = (commDim[3] ? '1' : '0');
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
+      strcat(aux,comm_dim_topology_string());
       if (getKernelPackT()) { strcat(aux,",kernelPackT"); }
       switch (nFace) {
       case 1: strcat(aux,",nFace=1,"); break;
@@ -850,12 +943,18 @@ namespace quda {
 	faces[d] = faces_[d];
       }
       fillAux();
+#ifndef USE_TEXTURE_OBJECTS
       bindSpinorTex<FloatN>(in);
+#endif
     }
 
     virtual ~PackFace() {
+#ifndef USE_TEXTURE_OBJECTS
       unbindSpinorTex<FloatN>(in);
+#endif
     }
+
+    bool tuneSharedBytes() const { return location & Host ? false : Tunable::tuneSharedBytes(); }
 
     bool advanceAux(TuneParam &param) const
     {
@@ -879,6 +978,10 @@ namespace quda {
     void initTuneParam(TuneParam &param) const {
       Tunable::initTuneParam(param);
       param.aux.x = 1; // swizzle factor
+      // if doing a zero-copy policy then ensure that each thread block
+      // runs exclusively on a given SM - this is to ensure quality of
+      // service for the packing kernel when running concurrently.
+      if (location & Host) param.shared_bytes = deviceProp.sharedMemPerBlock / 2 + 1;
     }
 
     void defaultTuneParam(TuneParam &param) const {
@@ -921,12 +1024,12 @@ namespace quda {
 
 #ifdef GPU_WILSON_DIRAC
       static PackParam<FloatN> param;
-      this->prepareParam(param,tp);
-      if (this->dagger) {
-        packFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-        packFaceWilsonKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      }
+      static bool init = false;
+      this->prepareParam(param,tp,init);
+
+      void *args[] = { &param };
+      void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceWilsonKernel<1,FloatN>) : &(packFaceWilsonKernel<0,FloatN>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("Wilson face packing kernel is not built");
 #endif
@@ -982,12 +1085,11 @@ namespace quda {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
       static PackParam<FloatN> param;
-      this->prepareParam(param,tp);
-      if (this->dagger) {
-        packTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
-      } else {
-        packTwistedFaceWilsonKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
-      }
+      static bool init = false;
+      this->prepareParam(param,tp,init);
+      void *args[] = { &a, &b, &param };
+      void (*func)(Float,Float,PackParam<FloatN>) = this->dagger ? &(packTwistedFaceWilsonKernel<1,FloatN,Float>) : &(packTwistedFaceWilsonKernel<0,FloatN,Float>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("Twisted face packing kernel is not built");
 #endif
@@ -1115,9 +1217,18 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void packFaceStaggeredKernel(PackParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       const int Ls = param.X[4];
 
@@ -1179,8 +1290,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
-
+#endif
     } // while tid
 
   }
@@ -1189,9 +1304,18 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void packFaceExtendedStaggeredKernel(PackExtendedParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -1253,7 +1377,12 @@ namespace quda {
         }
       }
 
-      tid  += blockDim.x*gridDim.x;
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
+      tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1262,9 +1391,18 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void unpackFaceExtendedStaggeredKernel(PackExtendedParam<FloatN> param)
   {
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
 
-    while (tid < param.threads) {
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
+
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -1326,7 +1464,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1363,13 +1506,12 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
 
       static PackParam<FloatN> param;
-      this->prepareParam(param,tp,this->dim, this->face_num);
+      static bool init = false;
+      this->prepareParam(param,tp,init,this->dim,this->face_num);
       if(!R){
-        if (PackFace<FloatN,Float>::nFace==1) {
-          packFaceStaggeredKernel<FloatN, 1> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-        } else {
-          packFaceStaggeredKernel<FloatN, 3> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-        }
+        void *args[] = { &param };
+        void (*func)(PackParam<FloatN>) = PackFace<FloatN,Float>::nFace==1 ? &(packFaceStaggeredKernel<FloatN,1>) : &(packFaceStaggeredKernel<FloatN,3>);
+        cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }else{ // R!=NULL => this is an extended field
         PackExtendedParam<FloatN> extendedParam(param);
         if(!unpack){
@@ -1488,9 +1630,17 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for dwf
 
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -1553,7 +1703,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1564,9 +1719,17 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for Wilson
 
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       const int Ls = param.X[4];
 
@@ -1629,7 +1792,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1655,12 +1823,11 @@ namespace quda {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
       static PackParam<FloatN> param;
-      this->prepareParam(param,tp);
-      if (this->dagger) {
-        packFaceDWKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-        packFaceDWKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      }
+      static bool init = false;
+      this->prepareParam(param,tp,init);
+      void *args[] = { &param };
+      void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceDWKernel<1,FloatN>) : &(packFaceDWKernel<0,FloatN>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("DW face packing kernel is not built");
 #endif
@@ -1688,12 +1855,11 @@ namespace quda {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
       static PackParam<FloatN> param;
-      this->prepareParam(param,tp);
-      if (this->dagger) {
-	packFaceDW4DKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-	packFaceDW4DKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      }
+      static bool init = false;
+      this->prepareParam(param,tp,init);
+      void *args[] = { &param };
+      void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceDW4DKernel<1,FloatN>) : &(packFaceDW4DKernel<0,FloatN>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("4D preconditioned DW face packing kernel is not built");
 #endif
@@ -1765,9 +1931,17 @@ namespace quda {
     const int nFace = 1; // 1 face for Wilson
     const int Nf = 2;
 
-    int tid = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
+#ifdef STRIPED
+    const int sites_per_block = param.sites_per_block;
+    int local_tid = threadIdx.x;
+    int tid = sites_per_block * blockIdx.x + local_tid;
+#else
+    int tid = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
+    constexpr int sites_per_block = 1;
+    constexpr int local_tid = 0;
+#endif
 
-    while (tid < param.threads) {
+    while ( local_tid < sites_per_block && tid < param.threads ) {
 
       // determine which dimension we are packing
       int face_idx;
@@ -1829,7 +2003,12 @@ namespace quda {
         }
       }
 
+#ifdef STRIPED
+      local_tid += blockDim.x;
+      tid += blockDim.x;
+#else
       tid += blockDim.x*gridDim.x;
+#endif
     } // while tid
 
   }
@@ -1855,12 +2034,11 @@ namespace quda {
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
       static PackParam<FloatN> param;
-      this->prepareParam(param,tp);
-      if (this->dagger) {
-        packFaceNdegTMKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-        packFaceNdegTMKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      }
+      static bool init = false;
+      this->prepareParam(param,tp,init);
+      void *args[] = { &param };
+      void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceNdegTMKernel<1,FloatN>) : &(packFaceNdegTMKernel<0,FloatN>);
+      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("Non-degenerate twisted mass face packing kernel is not built");
 #endif

@@ -89,7 +89,7 @@ namespace quda {
           arg.result_h[0] = 0.;
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           LAUNCH_KERNEL(qChargeComputeKernel, tp, stream, arg, Float);
-          cudaDeviceSynchronize();
+          qudaDeviceSynchronize();
         }else{ // run the CPU code
 	  errorQuda("qChargeComputeKernel not supported on CPU");
 //          qChargeComputeCPU(arg);

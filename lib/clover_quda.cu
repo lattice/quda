@@ -182,7 +182,7 @@ namespace quda {
     CloverCompute<Float,Clover,Fmunu> cloverCompute(arg, meta, location);
     cloverCompute.apply(0);
     checkCudaError();
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 
   template<typename Float>

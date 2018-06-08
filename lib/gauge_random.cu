@@ -121,7 +121,7 @@ namespace quda {
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
           computeGenGauss<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	  cudaDeviceSynchronize();
+	  qudaDeviceSynchronize();
         } else {
           errorQuda("Randomize GaugeFields on CPU not supported yet\n");
         }

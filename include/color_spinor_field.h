@@ -688,7 +688,7 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
-    const void* Ghost2() const {
+    inline const void* Ghost2() const {
       if (bufferIndex < 2) {
         return ghost_recv_buffer_d[bufferIndex];
       } else {
@@ -713,10 +713,10 @@ namespace quda {
 		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
 #ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t& Tex() const { return tex; }
-    const cudaTextureObject_t& TexNorm() const { return texNorm; }
-    const cudaTextureObject_t& GhostTex() const { return ghostTex[bufferIndex]; }
-    const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm[bufferIndex]; }
+    inline const cudaTextureObject_t& Tex() const { return tex; }
+    inline const cudaTextureObject_t& TexNorm() const { return texNorm; }
+    inline const cudaTextureObject_t& GhostTex() const { return ghostTex[bufferIndex]; }
+    inline const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm[bufferIndex]; }
 #endif
 
     cudaColorSpinorField& Component(const int idx) const;

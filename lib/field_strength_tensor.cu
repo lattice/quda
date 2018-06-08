@@ -247,7 +247,7 @@ namespace quda {
     FmunuArg<Float,Fmunu,Gauge> arg(f_munu, gauge, meta, meta_ex);
     FmunuCompute<Float,FmunuArg<Float,Fmunu,Gauge> > fmunuCompute(arg, meta, location);
     fmunuCompute.apply(0);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     checkCudaError();
   }
 
