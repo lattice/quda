@@ -80,29 +80,32 @@ namespace quda{
     mergeAbs<Float>(unsort1, idx1, n1, unsort2, idx2, n2, inverse);
   }
 
-  
   template<typename Float>
   void polyOp(const Dirac &mat,
 	      cudaColorSpinorField &out,
 	      const cudaColorSpinorField &in,	   
 	      QudaArpackParam *arpack_param) {
-    
+        
     Float delta,theta;
     Float sigma,sigma1,sigma_old;
     Float d1,d2,d3;
-    
-    Float a = arpack_param->amin;
-    Float b = arpack_param->amax;
-    int polyDeg = arpack_param->polyDeg;
-    
+
+    double a = arpack_param->amin;
+    double b = arpack_param->amax;
+
     delta = (b-a)/2.0;
-    theta = (b+a)/2.0;    
+    theta = (b+a)/2.0;
+
     sigma1 = -delta/theta;
+
+    blas::copy(out,in);
+
+    if(arpack_param->polyDeg == 0)
+      return;
     
     d1 =  sigma1/delta;
     d2 =  1.0;
-    
-    blas::copy(out,in);
+
     if(arpack_param->useNormOp && arpack_param->useDagger) {
       mat.MMdag(out,in);
     }
@@ -115,52 +118,69 @@ namespace quda{
     else {  
       mat.M(out,in);
     }
+
     blas::axpby(d2, const_cast<cudaColorSpinorField&>(in), d1, out);
     
-    if(polyDeg == 1 )
+    //C_1(x) = x
+    if(arpack_param->polyDeg == 1 )
       return;
-    
+
+    // C_0 is the current 'in'  vector.
+    // C_1 is the current 'out' vector.
+       
+    //Clone 'in' to two temporary vectors.
     cudaColorSpinorField *tmp1 = new cudaColorSpinorField(in);
     cudaColorSpinorField *tmp2 = new cudaColorSpinorField(in);
-    
+
     blas::copy(*tmp1,in);
     blas::copy(*tmp2,out);
-    
+
+    //Using Chebyshev polynomial recursion relation,
+    //C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
+
     sigma_old = sigma1;
     
-    for(int i=2; i <= polyDeg; i++){
-      sigma = 1.0/( (2.0/sigma1) - sigma_old );
-    
+    //construct C_{m+1}(x)
+    for(int i=2; i < arpack_param->polyDeg; i++){
+
+      sigma = 1.0/(2.0/sigma1-sigma_old);
+      
       d1 = 2.0*sigma/delta;
       d2 = -d1*theta;
       d3 = -sigma*sigma_old;
-
+      
+      //mat*C_m
       if(arpack_param->useNormOp && arpack_param->useDagger) {
 	mat.MMdag(out, *tmp2);
       }
       else if(arpack_param->useNormOp && !arpack_param->useDagger) {
 	mat.MdagM(out, *tmp2);
+	printfQuda("1 0\n");
       }
       else if (!arpack_param->useNormOp && arpack_param->useDagger) {
 	mat.Mdag(out, *tmp2);
       }
       else {  
 	mat.M(out, *tmp2);
-      }	  
-
+      }
+      
       blas::ax(d3,*tmp1);
-      std::complex<Float> d1c(d1,0);
-      std::complex<Float> d2c(d2,0);
+      std::complex<double> d1c(d1,0.0);
+      std::complex<double> d2c(d2,0.0);
       blas::cxpaypbz(*tmp1,d2c,*tmp2,d1c,out);
+      
       blas::copy(*tmp1,*tmp2);
       blas::copy(*tmp2,out);
       sigma_old = sigma;
+      
     }
     
     delete tmp1;
     delete tmp2;
   }
 
+
+  
   void matVec(cudaColorSpinorField *d_v,
 	      cpuColorSpinorField *h_v,
 	      cudaColorSpinorField *d_v2,	      
@@ -238,15 +258,13 @@ namespace quda{
     iparam_[2]  = max_iter;
     iparam_[3]  = 1;
     iparam_[6]  = 1;
-    iparam_[7]  = arpack_param->arpackMode;
-
 
     //ARPACK problem type to be solved
     char howmny='P';
     char bmat = 'I';
     char *spectrum;
     spectrum = strdup("SR"); //Initialsed just to stop the compiler warning...
-    
+
     if(arpack_param->usePolyAcc){
       if (arpack_param->spectrum == QUDA_SR_SPECTRUM) spectrum = strdup("LR");
       else if (arpack_param->spectrum == QUDA_LR_SPECTRUM) spectrum = strdup("SR");
@@ -263,7 +281,7 @@ namespace quda{
       else if (arpack_param->spectrum == QUDA_SI_SPECTRUM) spectrum = strdup("SI");
       else if (arpack_param->spectrum == QUDA_LI_SPECTRUM) spectrum = strdup("LI");
     }
-
+    
     // arpackSolveInit() END
 
     // arpackSolveEigenModesFloat/Double() START
@@ -331,7 +349,7 @@ namespace quda{
 #if (defined (QMP_COMMS) || defined (MPI_COMMS))
       ARPACK(pcnaupd)(fcomm_, &ido_, &bmat, &n_, spectrum, &nev_, &tol_,
 		      resid_, &nkv_, h_evecs_, &n_, iparam_, ipntr_,
-		      w_workd_, w_workl_, &lworkl_, w_rwork_, &info_);
+		      w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 2);
       if (info_ != 0) {
 	arpackErrorHelpNAUPD();
 	errorQuda("\nError in pcnaupd info = %d. Exiting.",info_);
@@ -339,7 +357,7 @@ namespace quda{
 #else
       ARPACK(cnaupd)(&ido_, &bmat, &n_, spectrum, &nev_, &tol_, resid_, &nkv_,
 		     h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_,
-		     w_rwork_, &info_);
+		     w_rwork_, &info_, 1, 2);
       if (info_ != 0) {
 	arpackErrorHelpNAUPD();
 	errorQuda("\nError in cnaupd info = %d. Exiting.",info_);
@@ -423,8 +441,9 @@ namespace quda{
     ARPACK(pcneupd)(fcomm_, &rvec_, &howmny, select_, h_evals_, h_evecs_,
 		    &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nev_,
 		    &tol_, resid_, &nkv_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
-		    w_workl_, &lworkl_, w_rwork_ ,&info_);
+		    w_workl_, &lworkl_, w_rwork_ ,&info_, 1, 1, 2);
     if (info_ == -15) {
+      arpackErrorHelpNEUPD();
       errorQuda("\nError in pcneupd info = %d. You likely need to\n"
 		"increase the maximum ARPACK iterations. Exiting.\n", info_);
     } else if (info_ != 0) errorQuda("\nError in pcneupd info = %d. Exiting.\n", info_);
@@ -432,8 +451,9 @@ namespace quda{
     ARPACK(cneupd)(&rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_,
 		   w_workev_, &bmat, &n_, spectrum, &nev_, &tol_,
 		   resid_, &nkv_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
-		   w_workl_, &lworkl_, w_rwork_, &info_);
+		   w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
     if (info_ == -15) {
+      arpackErrorHelpNEUPD();
       errorQuda("\nError in cneupd info = %d. You likely need to\n"
 		"increase the maximum ARPACK iterations. Exiting.\n", info_);
     } else if (info_ != 0) errorQuda("\nError in cneupd info = %d. Exiting.\n", info_);
@@ -447,42 +467,43 @@ namespace quda{
     //Print out the computed ritz values, absolute values, and their error estimates
     int nconv = iparam_[4];
     for(int j=0; j<nconv; j++){
-      printfQuda("RitzValue[%04d]  %+e  %+e  %+e  error= %+e \n",j,
+      printfQuda("RitzValue[%04d]  %+e  %+e  %+e  error = %+e \n",j,
 		 real(h_evals_[j]),
 		 imag(h_evals_[j]),
 		 std::abs(h_evals_[j]),
-		 std::abs(*(w_workl_ + ipntr_[10]-1+j)));
+		 std::abs( *(w_workl_ + ipntr_[10] - 1 + j)) );
       h_evals_sorted_idx[j] = j;
       mod_h_evals_sorted[j] = std::abs(h_evals_[j]);
     }
-    
-    //Sort the eigenvalues in absolute ascending order
-    t1 =  -((double)clock());;
-    sortAbs<float>(mod_h_evals_sorted, nconv, true, h_evals_sorted_idx);
-    t1 +=  clock();
 
+    //Sort the eigenvalues in absolute ascending order
+    t1 =  -((double)clock());
+    printfQuda("You are here!\n");
+    bool inverse = true;
+    const char *L = "L";
+    const char *S = "S";
+    if(strncmp(L, spectrum, 1) == 0 && !arpack_param->usePolyAcc) {
+      inverse = false;
+    } else if(strncmp(S, spectrum, 1) == 0 && arpack_param->usePolyAcc) {
+      inverse = false;
+    } else if(strncmp(L, spectrum, 1) == 0 && arpack_param->usePolyAcc) {
+      inverse = false;
+    }
+    
+    sortAbs<float>(mod_h_evals_sorted, nconv, inverse, h_evals_sorted_idx);
+    t1 += clock();
+    
     //Print sorted evals
     printfQuda("Sorting time: %f sec\n",t1/CLOCKS_PER_SEC);
     printfQuda("Sorted eigenvalues based on their absolute values:\n");
 
-    //Sort the eigenvectors in absolute ascending order of the eigenvalues
-    int length = 2*12*local_vol;
-    float *h_evecs_sorted  = (float*)malloc(length*nev_*sizeof(float));
-    for(int a=0; a<nconv; a++) {
-      memcpy(h_evecs_sorted + a*length,
-	     (float*)h_evecs_ + h_evals_sorted_idx[a]*length,
-	     length*sizeof(float) );
-    }
-    memcpy(h_evecs, h_evecs_sorted, nconv*length*sizeof(float));
-    
-    // print out the computed ritz values and their error estimates 
-    for(int j=0; j< nconv; j++){
-      printfQuda("RitzValue[%04d]  %+e  %+e  %+e  error= %+e \n",j,
+    for(int j=0; j<nconv; j++){
+      printfQuda("RitzValue[%04d]  %+e  %+e  %+e  error = %+e \n",j,
 		 real(h_evals_[h_evals_sorted_idx[j]]),
 		 imag(h_evals_[h_evals_sorted_idx[j]]),
 		 std::abs(h_evals_[h_evals_sorted_idx[j]]),
-		 std::abs(*(w_workl_ + ipntr_[10]-1+h_evals_sorted_idx[j])) );
-    }      
+		 std::abs( *(w_workl_ + ipntr_[10] - 1 + h_evals_sorted_idx[j])) );
+    }
     
     // Print additional convergence information.
     if( (info_) == 1){
@@ -494,7 +515,39 @@ namespace quda{
 	printfQuda("Error: Arnoldi update, try increasing NkV.\n");
       }
     }
+
+    t1 = -(double)clock();
+    cpuColorSpinorField *h_v3 = NULL;
+    for(int i =0 ; i < nev_ ; i++){
+      cpuParam->v = (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_;
+      h_v3 = new cpuColorSpinorField(*cpuParam);
+      *d_v = *h_v3;                                      // d_v = v
+      //printfQuda("norm = %e\n", sqrt(blas::norm2(*d_v)));
+      if(arpack_param->useNormOp && arpack_param->useDagger) {
+	mat.MMdag(*d_v2,*d_v);
+      }
+      else if(arpack_param->useNormOp && !arpack_param->useDagger) {
+	mat.MdagM(*d_v2,*d_v);
+      }
+      else if (!arpack_param->useNormOp && arpack_param->useDagger) {
+	mat.Mdag(*d_v2,*d_v);
+      }
+      else {  
+	mat.M(*d_v2,*d_v);
+      }
+      //mat.MdagM(*d_v2,*d_v);                             // d_v2 = M*v
+      h_evals_[i] = blas::cDotProduct(*d_v, *d_v2);      // lambda = v^dag * M*v
+      blas::axpby(1.0,*d_v2,-real(h_evals_[i]),*d_v);    // d_v = ||M*v - lambda*v||
+      double L2norm = blas::norm2(*d_v);
+      printfQuda("Eval[%04d] = %+e  %+e  Residual: %+e\n",
+		 i, real(h_evals_[i]), imag(h_evals_[i]), sqrt(L2norm));
+      delete h_v3;
+    }
+    t1 += clock();
+    printfQuda("\neigenSolver: TIME_REPORT - Eigenvalues of Dirac operator: %f sec\n",
+	       t1/CLOCKS_PER_SEC);
     
+       
     // cleanup 
     free(ipntr_);
     free(iparam_);
@@ -601,10 +654,11 @@ namespace quda{
     ido_        = 0;
     info_       = 0;
     iparam_[0]  = 1;
+    iparam_[1]  = 1;
     iparam_[2]  = max_iter;
     iparam_[3]  = 1;
     iparam_[6]  = 1;
-    iparam_[7]  = arpack_param->arpackMode;
+    //iparam_[7]  = arpack_param->arpackMode;
 
     //ARPACK problem type to be solved
     char howmny='P';
@@ -652,7 +706,7 @@ namespace quda{
 #if (defined (QMP_COMMS) || defined (MPI_COMMS))
       ARPACK(pznaupd)(fcomm_, &ido_, &bmat, &n_, spectrum, &nev_, &tol_,
 		      resid_, &nkv_, h_evecs_, &n_, iparam_, ipntr_,
-		      w_workd_, w_workl_, &lworkl_, w_rwork_, &info_);
+		      w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 2);
       if (info_ != 0) {
 	arpackErrorHelpNAUPD();
 	errorQuda("\nError in pznaupd info = %d. Exiting.",info_);
@@ -660,7 +714,7 @@ namespace quda{
 #else
       ARPACK(znaupd)(&ido_, &bmat, &n_, spectrum, &nev_, &tol_, resid_, &nkv_,
 		     h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_,
-		     w_rwork_, &info_);
+		     w_rwork_, &info_, 1, 2);
       if (info_ != 0) {
 	arpackErrorHelpNAUPD();
 	errorQuda("\nError in znaupd info = %d. Exiting.",info_);
@@ -744,7 +798,7 @@ namespace quda{
     ARPACK(pzneupd)(fcomm_, &rvec_, &howmny, select_, h_evals_, h_evecs_,
 		    &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nev_,
 		    &tol_, resid_, &nkv_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
-		    w_workl_, &lworkl_, w_rwork_ ,&info_);
+		    w_workl_, &lworkl_, w_rwork_ ,&info_, 1, 1, 2);
     if (info_ == -15) {
       errorQuda("\nError in pzneupd info = %d. You likely need to\n"
 		"increase the maximum ARPACK iterations. Exiting.\n", info_);
@@ -753,7 +807,7 @@ namespace quda{
     ARPACK(zneupd)(&rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_,
 		   w_workev_, &bmat, &n_, spectrum, &nev_, &tol_,
 		   resid_, &nkv_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
-		   w_workl_, &lworkl_, w_rwork_, &info_);
+		   w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
     if (info_ == -15) {
       errorQuda("\nError in zneupd info = %d. You likely need to\n"
 		"increase the maximum ARPACK iterations. Exiting.\n", info_);
@@ -774,7 +828,7 @@ namespace quda{
     
     //Sort the eigenvalues in absolute ascending order
     t1 =  -((double)clock());;
-    sortAbs<double>(mod_h_evals_sorted, nconv, true, h_evals_sorted_idx);
+    sortAbs<double>(mod_h_evals_sorted, nconv, !arpack_param->usePolyAcc, h_evals_sorted_idx);
     t1 +=  clock();
 
     //Print sorted evals
@@ -921,8 +975,8 @@ namespace quda{
       mod_h_evals_sorted[j] = std::abs(h_evals_[j]);
     }
     
-    //Sort the eigenvalues in absolute ascending order
-    float t1 =  -((double)clock());;
+    //Sort the eigenvalues in absolute ascending order FIXME (boolean in sortAbs)
+    float t1 =  -((double)clock());
     sortAbs<float>(mod_h_evals_sorted, nconv, true, h_evals_sorted_idx);
     t1 +=  clock();
 
@@ -1025,7 +1079,7 @@ namespace quda{
 #if (defined (QMP_COMMS) || defined (MPI_COMMS))
       ARPACK(pcnaupd)(fcomm_, &ido_, &bmat_, &n_, spectrum_, &nev_, &tol_,
 		      resid_, &nkv_, h_evecs_, &ldv_, iparam_, ipntr_,
-		      w_workd_, w_workl_, &lworkl_, w_rwork_, &info_);
+		      w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 2);
       if (info_ != 0) {
 	arpackErrorHelpNAUPD();
 	errorQuda("\nError in pcnaupd info = %d. Exiting.",info_);
@@ -1033,7 +1087,7 @@ namespace quda{
 #else
       ARPACK(cnaupd)(&ido_, &bmat_, &n_, spectrum_, &nev_, &tol_, resid_, &nkv_,
 		     h_evecs_, &ldv_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_,
-		     w_rwork_, &info_);
+		     w_rwork_, &info_, 1, 2);
       if (info_ != 0) {
 	arpackErrorHelpNAUPD();
 	errorQuda("\nError in cnaupd info = %d. Exiting.",info_);
@@ -1102,7 +1156,7 @@ namespace quda{
     ARPACK(pcneupd)(fcomm_, &rvec_, &howmany_, select_, h_evals_, h_evecs_,
 		    &n_, &sigma_, w_workev_, &bmat_, &n_, spectrum_, &nev_,
 		    &tol_, resid_, &nkv_, h_evecs_, &ldv_, iparam_, ipntr_, w_workd_,
-		    w_workl_, &lworkl_, w_rwork_ ,&info_);
+		    w_workl_, &lworkl_, w_rwork_ ,&info_, 1, 1, 2);
     if (info_ == -15) {
       errorQuda("\nError in pcneupd info = %d. You likely need to\n"
 		"increase the maximum ARPACK iterations. Exiting.\n", info_);
@@ -1111,7 +1165,7 @@ namespace quda{
     ARPACK(cneupd)(&rvec_, &howmany_, select_, h_evals_, h_evecs_, &n_, &sigma_,
 		   w_workev_, &bmat_, &n_, spectrum_, &nev_, &tol_,
 		   resid_, &nkv_, h_evecs_, &ldv_, iparam_, ipntr_, w_workd_,
-		   w_workl_, &lworkl_, w_rwork_, &info_);
+		   w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
     if (info_ == -15) {
       errorQuda("\nError in cneupd info = %d. You likely need to\n"
 		"increase the maximum ARPACK iterations. Exiting.\n", info_);
@@ -1162,74 +1216,76 @@ namespace quda{
   }  
   
   void arpackErrorHelpNAUPD() {
-    printfQuda(" INFO Integer.  (INPUT/OUTPUT)\n");
-    printfQuda("      If INFO .EQ. 0, a randomly initial residual vector is used.\n");
-    printfQuda("      If INFO .NE. 0, RESID contains the initial residual vector,\n");
-    printfQuda("                         possibly from a previous run.\n");
-    printfQuda("      Error flag on output.\n");
-    printfQuda("      =  0: Normal exit.\n");
-    printfQuda("      =  1: Maximum number of iterations taken.\n");
-    printfQuda("         All possible eigenvalues of OP has been found. IPARAM(5)\n");
-    printfQuda("         returns the number of wanted converged Ritz values.\n");
-    printfQuda("      =  2: No longer an informational error. Deprecated starting\n");
-    printfQuda("         with release 2 of ARPACK.\n");
-    printfQuda("      =  3: No shifts could be applied during a cycle of the\n");
-    printfQuda("         Implicitly restarted Arnoldi iteration. One possibility\n");
-    printfQuda("         is to increase the size of NCV relative to NEV.\n");
-    printfQuda("         See remark 4 below.\n");
-    printfQuda("      = -1: N must be positive.\n");
-    printfQuda("      = -2: NEV must be positive.\n");
-    printfQuda("      = -3: NCV-NEV >= 1 and less than or equal to N.\n");
-    printfQuda("      = -4: The maximum number of Arnoldi update iteration\n");
-    printfQuda("         must be greater than zero.\n");
-    printfQuda("      = -5: WHICH must be 'LM', 'SM', 'LR', 'SR', 'LI', 'SI'\n");
-    printfQuda("      = -6: BMAT must be one of 'I' or 'G'.\n");
-    printfQuda("      = -7: Length of private work array is not sufficient.\n");
-    printfQuda("      = -8: Error return from LAPACK eigenvalue calculation;\n");
-    printfQuda("      = -9: Starting vector is zero.\n");
-    printfQuda("      = -10: IPARAM(7) must be 1,2,3.\n");
-    printfQuda("      = -11: IPARAM(7) = 1 and BMAT = 'G' are incompatible.\n");
-    printfQuda("      = -12: IPARAM(1) must be equal to 0 or 1.\n");
-    printfQuda("      = -9999: Could not build an Arnoldi factorization.\n");
-    printfQuda("         User input error highly likely.  Please\n");
-    printfQuda("         check actual array dimensions and layout.\n");
-    printfQuda("         IPARAM(5) returns the size of the current Arnoldi\n");
-    printfQuda("         factorization.\n");
+    printfQuda("Error help NAUPD\n");
+    printfQuda("INFO Integer.  (INPUT/OUTPUT)\n");
+    printfQuda("     If INFO .EQ. 0, a randomly initial residual vector is used.\n");
+    printfQuda("     If INFO .NE. 0, RESID contains the initial residual vector,\n");
+    printfQuda("                        possibly from a previous run.\n");
+    printfQuda("     Error flag on output.\n");
+    printfQuda("     =  0: Normal exit.\n");
+    printfQuda("     =  1: Maximum number of iterations taken.\n");
+    printfQuda("        All possible eigenvalues of OP has been found. IPARAM(5)\n");
+    printfQuda("        returns the number of wanted converged Ritz values.\n");
+    printfQuda("     =  2: No longer an informational error. Deprecated starting\n");
+    printfQuda("        with release 2 of ARPACK.\n");
+    printfQuda("     =  3: No shifts could be applied during a cycle of the\n");
+    printfQuda("        Implicitly restarted Arnoldi iteration. One possibility\n");
+    printfQuda("        is to increase the size of NCV relative to NEV.\n");
+    printfQuda("        See remark 4 below.\n");
+    printfQuda("     = -1: N must be positive.\n");
+    printfQuda("     = -2: NEV must be positive.\n");
+    printfQuda("     = -3: NCV-NEV >= 1 and less than or equal to N.\n");
+    printfQuda("     = -4: The maximum number of Arnoldi update iteration\n");
+    printfQuda("        must be greater than zero.\n");
+    printfQuda("     = -5: WHICH must be 'LM', 'SM', 'LR', 'SR', 'LI', 'SI'\n");
+    printfQuda("     = -6: BMAT must be one of 'I' or 'G'.\n");
+    printfQuda("     = -7: Length of private work array is not sufficient.\n");
+    printfQuda("     = -8: Error return from LAPACK eigenvalue calculation;\n");
+    printfQuda("     = -9: Starting vector is zero.\n");
+    printfQuda("     = -10: IPARAM(7) must be 1,2,3.\n");
+    printfQuda("     = -11: IPARAM(7) = 1 and BMAT = 'G' are incompatible.\n");
+    printfQuda("     = -12: IPARAM(1) must be equal to 0 or 1.\n");
+    printfQuda("     = -9999: Could not build an Arnoldi factorization.\n");
+    printfQuda("        User input error highly likely.  Please\n");
+    printfQuda("        check actual array dimensions and layout.\n");
+    printfQuda("        IPARAM(5) returns the size of the current Arnoldi\n");
+    printfQuda("        factorization.\n");
   }
 
   void arpackErrorHelpNEUPD() {
-    printfQuda(" INFO    Integer.  (OUTPUT)\n");
-    printfQuda("        Error flag on output.\n");
-    printfQuda("        =  0: Normal exit.\n");
-    printfQuda("        =  1: The Schur form computed by LAPACK routine csheqr\n");
-    printfQuda("              could not be reordered by LAPACK routine ztrsen.\n");
-    printfQuda("              Re-enter subroutine zneupd with IPARAM(5)=NCV and\n");
-    printfQuda("              increase the size of the array D to have\n");
-    printfQuda("              dimension at least dimension NCV and allocate at\n");
-    printfQuda("              least NCV\n");
-    printfQuda("              columns for Z. NOTE: Not necessary if Z and V share\n");
-    printfQuda("              the same space. Please notify the authors if this\n");
-    printfQuda("              error occurs.\n");
-    printfQuda("        = -1: N must be positive.\n");
-    printfQuda("        = -2: NEV must be positive.\n");
-    printfQuda("        = -3: NCV-NEV >= 1 and less than or equal to N.\n");
-    printfQuda("        = -5: WHICH must be 'LM', 'SM', 'LR', 'SR', 'LI', 'SI'\n");
-    printfQuda("        = -6: BMAT must be one of 'I' or 'G'.\n");
-    printfQuda("        = -7: Length of private work WORKL array is inufficient.\n");
-    printfQuda("        = -8: Error return from LAPACK eigenvalue calculation.\n");
-    printfQuda("              This should never happened.\n");
-    printfQuda("        = -9: Error return from calculation of eigenvectors.\n");
-    printfQuda("              Informational error from LAPACK routine ztrevc.\n");
-    printfQuda("        = -10: IPARAM(7) must be 1,2,3\n");
-    printfQuda("        = -11: IPARAM(7) = 1 and BMAT = 'G' are incompatible.\n");
-    printfQuda("        = -12: HOWMNY = 'S' not yet implemented\n");
-    printfQuda("        = -13: HOWMNY must be one of 'A' or 'P' if RVEC = .true.\n");
-    printfQuda("        = -14: ZNAUPD did not find any eigenvalues to sufficient\n");
-    printfQuda("               accuracy.\n");
-    printfQuda("        = -15: ZNEUPD got a different count of the number of\n");
-    printfQuda("               converged Ritz values than ZNAUPD got. This\n");
-    printfQuda("               indicates the user probably made an error in\n");
-    printfQuda("               passing data from ZNAUPD to ZNEUPD or that the\n");
-    printfQuda("               data was modified before entering ZNEUPD\n");
+    printfQuda("Error help NEUPD\n");
+    printfQuda("INFO Integer.  (OUTPUT)\n");
+    printfQuda("     Error flag on output.\n");
+    printfQuda("     =  0: Normal exit.\n");
+    printfQuda("     =  1: The Schur form computed by LAPACK routine csheqr\n");
+    printfQuda("        could not be reordered by LAPACK routine ztrsen.\n");
+    printfQuda("        Re-enter subroutine zneupd with IPARAM(5)=NCV and\n");
+    printfQuda("        increase the size of the array D to have\n");
+    printfQuda("        dimension at least dimension NCV and allocate at\n");
+    printfQuda("        least NCV\n");
+    printfQuda("        columns for Z. NOTE: Not necessary if Z and V share\n");
+    printfQuda("        the same space. Please notify the authors if this\n");
+    printfQuda("        error occurs.\n");
+    printfQuda("     = -1: N must be positive.\n");
+    printfQuda("     = -2: NEV must be positive.\n");
+    printfQuda("     = -3: NCV-NEV >= 1 and less than or equal to N.\n");
+    printfQuda("     = -5: WHICH must be 'LM', 'SM', 'LR', 'SR', 'LI', 'SI'\n");
+    printfQuda("     = -6: BMAT must be one of 'I' or 'G'.\n");
+    printfQuda("     = -7: Length of private work WORKL array is inufficient.\n");
+    printfQuda("     = -8: Error return from LAPACK eigenvalue calculation.\n");
+    printfQuda("        This should never happened.\n");
+    printfQuda("     = -9: Error return from calculation of eigenvectors.\n");
+    printfQuda("        Informational error from LAPACK routine ztrevc.\n");
+    printfQuda("     = -10: IPARAM(7) must be 1,2,3\n");
+    printfQuda("     = -11: IPARAM(7) = 1 and BMAT = 'G' are incompatible.\n");
+    printfQuda("     = -12: HOWMNY = 'S' not yet implemented\n");
+    printfQuda("     = -13: HOWMNY must be one of 'A' or 'P' if RVEC = .true.\n");
+    printfQuda("     = -14: ZNAUPD did not find any eigenvalues to sufficient\n");
+    printfQuda("        accuracy.\n");
+    printfQuda("     = -15: ZNEUPD got a different count of the number of\n");
+    printfQuda("        converged Ritz values than ZNAUPD got. This\n");
+    printfQuda("        indicates the user probably made an error in\n");
+    printfQuda("        passing data from ZNAUPD to ZNEUPD or that the\n");
+    printfQuda("        data was modified before entering ZNEUPD\n");
   }
 }

@@ -74,7 +74,13 @@ namespace quda {
 	
         if ( param.mg_global.num_setup_iter[param.level] > 0 ) {
 	  if (param.mg_global.use_low_modes) {
-	    generateEigenVectors(param.B);
+	    if (strcmp(param.mg_global.vec_infile,"") !=0 ) { // only load if infile is defined and not computing
+	      loadVectors(param.B);
+	    } else {
+	      generateEigenVectors(param.B); //Run the eigensolver
+	    }
+	  } else if (strcmp(param.mg_global.vec_infile,"") !=0 ) { // only load if infile is defined and not computing
+	    loadVectors(param.B);
 	  } else {
 	    generateNullVectors(param.B);
 	  }
@@ -775,7 +781,24 @@ namespace quda {
   //supports seperate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
 
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) errorQuda("GPU fields not supported here yet");
+    std::vector<ColorSpinorField*> B_cpu;
+    bool device = false;
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+
+      //Clone the ColorSpinorParams from the GPU coarse grid vectors. 
+      ColorSpinorParam cpuParam(*param.B[0]);
+      cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+      cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+      cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      
+      //Allocate CPU array of B vectors.
+      for (int i=0; i<param.Nvec; i++) B_cpu.push_back(ColorSpinorField::Create(cpuParam));
+      
+      //Copy to CPU 
+      for (int i=0; i <param.Nvec; i++) *B_cpu[i] = *B[i];
+     
+      device = true;
+    }    
 
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
@@ -789,16 +812,21 @@ namespace quda {
 
     void **V = new void*[Nvec];
     for (int i=0; i<Nvec; i++) { 
-      V[i] = B[i]->V();
+      if(device) V[i] = B_cpu[i]->V();
+      else V[i] = B[i]->V();
       if (V[i] == NULL) {
 	printfQuda("Could not allocate V[%d]\n", i);
       }
     }
-
+       
     if (strcmp(vec_infile.c_str(),"")!=0) {
 #ifdef HAVE_QIO
-      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+      if(device)
+	read_spinor_field(vec_infile.c_str(), &V[0], B_cpu[0]->Precision(), B_cpu[0]->X(),
+			  B_cpu[0]->Ncolor(), B_cpu[0]->Nspin(), Nvec, 0,  (char**)0);
+      else
+	read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+			  B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
 #else
       errorQuda("\nQIO library was not built.\n");      
 #endif
@@ -830,7 +858,10 @@ namespace quda {
 
       for (int i=2; i<Nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
     }
-
+      
+    //Clean up.
+    if(device) for (int i=0; i<param.Nvec; i++) delete B_cpu[i];
+    
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done loading vectors\n");
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -838,8 +869,24 @@ namespace quda {
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
 #ifdef HAVE_QIO
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) errorQuda("GPU fields not supported here yet");
-
+    
+    bool device = false;
+    std::vector<ColorSpinorField*> B_cpu;
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+      device = true;
+      //Clone the ColorSpinorParams from the GPU coarse grid vectors. 
+      ColorSpinorParam cpuParam(*param.B[0]);
+      cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+      cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+      cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      
+      //Allocate CPU array of B vectors.
+      for (int i=0; i<param.Nvec; i++) B_cpu.push_back(ColorSpinorField::Create(cpuParam));
+      
+      //Copy to CPU 
+      for (int i=0; i<param.Nvec; i++) *B_cpu[i] = *B[i];
+    }
+    
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     std::string vec_outfile(param.mg_global.vec_outfile);
@@ -851,20 +898,32 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
 
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
-      for (int i=0; i<Nvec; i++) {
-	V[i] = B[i]->V();
+      for (int i=0; i<Nvec; i++) {	  
+	if (device) {
+	  V[i] = B_cpu[i]->V();
+	  printfQuda("%p\n", V[i]); 
+	}
+	else
+	  V[i] = B[i]->V();
 	if (V[i] == NULL) {
 	  printfQuda("Could not allocate V[%d]\n", i);
 	}
       }
-
-      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
-
+      if(device) 
+	write_spinor_field(vec_outfile.c_str(), &V[0], B_cpu[0]->Precision(), B_cpu[0]->X(),
+			   B_cpu[0]->Ncolor(), B_cpu[0]->Nspin(), Nvec, 0,  (char**)0);
+      else 
+      	write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+			   B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+      
       host_free(V);
+
+      //Clean up.
+      for (int i=0; i<param.Nvec; i++) delete B_cpu[i];
+      
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done saving vectors\n");
     }
-
+    
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
 #else
@@ -1293,12 +1352,13 @@ namespace quda {
       *param.B[i] = *cpuTemp;
       delete cpuTemp;
     }
-    
+
+    //Clean up
     delete static_cast<std::complex<float>* >(hostEvals);
     delete static_cast<std::complex<float>* >(hostEvecs);
     
     if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
-      saveVectors(B);
+      saveVectors(param.B);
     }
     
 #else

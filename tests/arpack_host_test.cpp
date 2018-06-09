@@ -101,31 +101,26 @@ display_test_info()
 	     get_recon_str(link_recon), 
 	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
 
-  printfQuda("Arpack parameters\n");
+  printfQuda("   Arpack parameters\n");
   printfQuda(" - number of eigenvectors requested %d\n", eig_nEv);
   printfQuda(" - size of Krylov subspace %d\n", eig_nKv);
+  printfQuda(" - solver tolerance %e\n", eig_tol);
   printfQuda(" - Arpack mode %d\n", arpack_mode);
+  printfQuda(" - Operator: daggered (%s) , normal-op (%s)\n",
+	     eig_use_dagger ? "true" : "false",
+	     eig_use_normop ? "true" : "false");
   if(eig_use_poly_acc) {
     printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
     printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
     printfQuda(" - Chebyshev polynomial maximum %e\n", eig_amax);
-    printfQuda(" - spectrum requested ");
-    if (arpack_spectrum == QUDA_SR_SPECTRUM) printfQuda("Largest Real\n");
-    else if (arpack_spectrum == QUDA_LR_SPECTRUM) printfQuda("Smallest Real\n");
-    else if (arpack_spectrum == QUDA_SM_SPECTRUM) printfQuda("Largest Modulus\n");
-    else if (arpack_spectrum == QUDA_LM_SPECTRUM) printfQuda("Smallest Modulus\n");
-    else if (arpack_spectrum == QUDA_SI_SPECTRUM) printfQuda("Largest Imaginary\n");
-    else if (arpack_spectrum == QUDA_LI_SPECTRUM) printfQuda("Smallest Imaginary\n");
   }
-  else{
-    printfQuda(" - spectrum requested ");
-    if (arpack_spectrum == QUDA_SR_SPECTRUM) printfQuda("Smallest Real\n");
-    else if (arpack_spectrum == QUDA_LR_SPECTRUM) printfQuda("Largest Real\n");
-    else if (arpack_spectrum == QUDA_SM_SPECTRUM) printfQuda("Smallest Modulus\n");
-    else if (arpack_spectrum == QUDA_LM_SPECTRUM) printfQuda("Largest Modulus\n");
-    else if (arpack_spectrum == QUDA_SI_SPECTRUM) printfQuda("Smallest Imaginary\n");
-    else if (arpack_spectrum == QUDA_LI_SPECTRUM) printfQuda("Largest Imaginary\n");
-  }
+  printfQuda(" - spectrum requested ");
+  if (arpack_spectrum == QUDA_SR_SPECTRUM) printfQuda("Smallest Real\n");
+  else if (arpack_spectrum == QUDA_LR_SPECTRUM) printfQuda("Largest Real\n");
+  else if (arpack_spectrum == QUDA_SM_SPECTRUM) printfQuda("Smallest Modulus\n");
+  else if (arpack_spectrum == QUDA_LM_SPECTRUM) printfQuda("Largest Modulus\n");
+  else if (arpack_spectrum == QUDA_SI_SPECTRUM) printfQuda("Smallest Imaginary\n");
+  else if (arpack_spectrum == QUDA_LI_SPECTRUM) printfQuda("Largest Imaginary\n");  
   
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -191,7 +186,6 @@ void setInvertParam(QudaInvertParam &inv_param) {
   
   printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
 
-
   inv_param.Ls = 1;
 
   inv_param.sp_pad = 0;
@@ -236,22 +230,21 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
-  
-  //For now, deal with hermitean operators only.
-  inv_param.solution_type = QUDA_MATPC_SOLUTION;
 
+  //No Even-Odd PC for the moment...
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = (inv_param.solution_type == QUDA_MAT_SOLUTION ?
-			  QUDA_NORMOP_SOLVE : QUDA_NORMOP_PC_SOLVE);
-
+			  QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
+  
   inv_param.matpc_type = matpc_type;
   
   inv_param.inv_type = QUDA_GCR_INVERTER;
-
+  
   inv_param.verbosity = QUDA_VERBOSE;
-
+  
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.tol = tol;
-
+  
   // require both L2 relative and heavy quark residual to determine 
   // convergence
   inv_param.residual_type = 
@@ -417,16 +410,17 @@ int main(int argc, char **argv)
 		   ((double*)hostEvecs)[i*vol*24 + j],
 		   ((double*)hostEvecs)[i*vol*24 + j+1]);
       }
-    }
-    printfQuda("eigenvalue %d = ", i);
-    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      printfQuda("(%e,%e)\n",		   
-		 ((float*)hostEvals)[i*2],
-		 ((float*)hostEvals)[i*2+1]);
-    } else {
+      
+      printfQuda("eigenvalue %d = ", i);
+      if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+	printfQuda("(%e,%e)\n",		   
+		   ((float*)hostEvals)[i*2],
+		   ((float*)hostEvals)[i*2+1]);
+      } else {
 	printfQuda("(%e,%e)\n",		   
 		   ((double*)hostEvals)[i*2],
 		   ((double*)hostEvals)[i*2+1]);
+      }
     }
   }
   

@@ -425,15 +425,17 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.solution_type = QUDA_MAT_SOLUTION;
 
   // do we want to use an even-odd preconditioned solve or not
-  inv_param.solve_type = solve_type;
+  inv_param.solve_type = (inv_param.solution_type == QUDA_MAT_SOLUTION ?
+			  QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
+  
   inv_param.matpc_type = matpc_type;
-
+  
   inv_param.inv_type = QUDA_GCR_INVERTER;
-
+  
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.verbosity_precondition = mg_verbosity[0];
-
-
+  
+  
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.pipeline = pipeline;
   inv_param.gcrNkrylov = gcrNkrylov;
@@ -552,9 +554,9 @@ int main(int argc, char **argv)
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate a random SU(3) field
     //generate a random SU(3) field
-    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    //construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
     //generate a unit SU(3) field
-    //construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
