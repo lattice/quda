@@ -155,7 +155,6 @@ namespace quda{
       }
       else if(arpack_param->useNormOp && !arpack_param->useDagger) {
 	mat.MdagM(out, *tmp2);
-	printfQuda("1 0\n");
       }
       else if (!arpack_param->useNormOp && arpack_param->useDagger) {
 	mat.Mdag(out, *tmp2);
