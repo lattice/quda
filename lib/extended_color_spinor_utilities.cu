@@ -510,5 +510,140 @@ namespace quda {
       errorQuda("Unsupported Precision %d", dst.Precision());
     }
   }
+  
+// TODO: Simply copy the whole thing.
+
+  template< class OutOrder, class Float >
+    __device__ __host__ void zero_exterior( OutOrder& order, size_t idx, int Ls)
+    {
+      typedef typename mapper<Float>::type RegTypeOut;
+      RegTypeOut out[24] = {}; // 24=2*3*4
+			memset(out, 0, 24*sizeof(RegTypeOut));
+			
+			for(int s=0; s<Ls; s++){
+        order.save(out, order.stride*s+idx);
+			}
+    }
+
+  template< class OutOrder, class Float >
+    __global__ void zero_exterior_kernel( OutOrder order, std::vector<size_t> lst, int Ls ) // TODO: Should I pass by reference or value?
+    																																												// Intuition is that for GPU stuff should just copy by value
+		{
+      int lst_idx = blockIdx.x*blockDim.x+threadIdx.x;
+
+      while( lst_idx < lst.size() ){
+        zero_exterior<OutOrder,Float>(order, lst[lst_idx], Ls);
+        lst_idx += gridDim.x*blockDim.x;
+      }
+    }
+
+  /*
+     Host function
+   */
+  template< class OutOrder, class Float >
+    void zero_exterior( OutOrder& order, std::vector<size_t>& lst, int Ls ) 
+    {
+      for(int lst_idx=0; lst_idx<lst.size(); lst_idx++){
+        zero_exterior<OutOrder,Float>(order, lst[lst_idx], Ls);
+      }
+    }
+
+  template< class OutOrder, class Float >
+    class ZeroSpinorEx : Tunable {
+
+			OutOrder order; 
+      const std::vector<size_t>& lst;
+      const ColorSpinorField& meta;
+      QudaFieldLocation location;
+			int Ls;
+
+      private:
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+      bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
+      bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+      unsigned int minThreads() const { return lst.size(); }
+
+      public: 
+      ZeroSpinorEx( OutOrder& order_, const std::vector<size_t>& lst_, int Ls_, const ColorSpinorField& meta_, QudaFieldLocation location_)
+        : order(order_), lst(lst_), meta(meta_), location(location_), Ls(Ls_) {
+				writeAuxString("out_stride=%d,in_stride=%d", order.stride, order.stride);
+      }
+      virtual ~ZeroSpinorEx() {}
+
+      void apply(const cudaStream_t &stream){
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if(location == QUDA_CPU_FIELD_LOCATION){
+          zero_exterior<OutOrder,Float>(order, lst, Ls);    
+        }else if(location == QUDA_CUDA_FIELD_LOCATION){
+          zero_exterior_kernel<OutOrder,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(order, lst, Ls);    
+        }
+      } 
+
+      TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+
+      long long flops() const { return 0; }
+      long long bytes() const {
+        return lst.size()*2*4*3*(sizeof(Float));
+      }
+
+    }; // CopySpinorEx
+
+	std::vector<size_t> initialize_padding_index(int X0, int X1, int X2, int X3, int R0, int R1, int R2, int R3){
+			size_t extended_volume = X0*X1*X2*X3
+			size_t    inner_volume = (X0-2*R0)*(X1-2*R1)*(X2-2*R2)*(X3-2*R3);
+			std::vector<size_t> rtn(extended_volume-inner_volume);
+			for(size_t x3=0; x3 < X3; x3++){
+			for(size_t x2=0; x2 < X2; x2++){
+			for(size_t x1=0; x1 < X1; x1++){
+			for(size_t x0=0; x0 < X0; x0++){
+				if( x0>=R0 		 && x1>=R1     && x2>=R2     && x3>=R3 && 
+						x0<(X0-R0) && x1<(X1-R1) && x2<(X2-R2) && x3<(X3-R3) ){}
+				else{
+					rtn[index] = ((x3*X2+x2)*X1+x1)*X0+x0;
+					index++;
+				}
+			}}}}
+
+			if( index != extended_volume-inner_volume ){
+				errorQuda("Indexing is WRONG !!!");
+			}
+			return rtn;	
+	}
+
+  template<int X0, int X1, int X2, int X3, int R0, int R1, int R2, int R3, class Float>
+  void zero_extended_color_spinor( ColorSpinorField& f, const int parity, const QudaFieldLocation location, int Ls )
+  {
+		static std::vector<size_t> lst( initialize_padding_index(X0,X1,X2,X3,R0,R1,R2,R3) ); // some function to initialize the indexing.
+ 	
+    if( not f.isNative() ) {
+      errorQuda("Order not defined");
+    }
+   
+		typedef typename colorspinor_mapper<Float,4,3>::type color_spinor_order; // will just use this native order
+    color_spinor_order f_order(f, 1, NULL, NULL);
+    ZeroSpinorEx<color_spinor_order,Float> zeroer( f_order, lst, Ls, f, location );
+		zeroer.apply(0);
+
+  }
+
+  // interface
+	void zero_extended_color_spinor_interface( ColorSpinorField& f, const std::array<int,4>& R, QudaFieldLocation location, const int parity ){
+			
+			if( f.Ndim() < 5 || f.Ncolor() != 3 || f.Nspin() != 4 ){
+        errorQuda("Sorry I wrote this ONLY for 5D fermion field with 4*3*2=24.");
+			}
+
+      if( f.Precision() == QUDA_DOUBLE_PRECISION ){
+				zero_extended_color_spinor< f.X[0],f.X[1],f.X[2],f.X[3],R[0],R[1],R[2],R[3],double>( f, parity, location, f.X[4]);
+      }else if( f.Precision() == QUDA_SINGLE_PRECISION ){
+				zero_extended_color_spinor< f.X[0],f.X[1],f.X[2],f.X[3],R[0],R[1],R[2],R[3],float >( f, parity, location, f.X[4]);
+      }else if( f.Precision() == QUDA_HALF_PRECISION ){
+				zero_extended_color_spinor< f.X[0],f.X[1],f.X[2],f.X[3],R[0],R[1],R[2],R[3],short >( f, parity, location, f.X[4]);
+      } else {
+        errorQuda("Unsupported Precision %d", f.Precision());
+      }
+  
+	}
 
 } // quda
