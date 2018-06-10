@@ -252,6 +252,9 @@ namespace quda{
     int max_iter = arpack_param->arpackMaxiter;
     int *h_evals_sorted_idx = (int*)malloc(nkv_*sizeof(int));
 
+    //ARPACK logfile name
+    char *arpack_logfile = arpack_param->arpackLogfile;
+    
     //Assign values to ARPACK params 
     iparam_[0]  = 1;
     iparam_[2]  = max_iter;
@@ -334,6 +337,55 @@ namespace quda{
     cudaColorSpinorField *d_v2 = nullptr;
     cudaColorSpinorField *resid = nullptr;    
 
+    //ARPACK log routines
+    // Code added to print the log of ARPACK  
+    int arpack_log_u = 9999;
+    
+#if (defined (QMP_COMMS) || defined (MPI_COMMS))
+    if ( arpack_logfile != NULL  && (comm_rank() == 0) ) {
+      // correctness of this code depends on alignment in Fortran and C 
+      // being the same ; if you observe crashes, disable this part 
+      ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
+      int msglvl0 = 0, msglvl3 = 3;
+      ARPACK(pmcinitdebug)(&arpack_log_u,      //logfil
+			   &msglvl3,           //mcaupd
+			   &msglvl3,           //mcaup2
+			   &msglvl0,           //mcaitr
+			   &msglvl3,           //mceigh
+			   &msglvl0,           //mcapps
+			   &msglvl0,           //mcgets
+			   &msglvl3            //mceupd
+			   );
+      
+      printfQuda("eigenSolver: Log info:\n");
+      printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");
+      printfQuda("output is directed to %s\n",arpack_logfile);
+    }
+#else
+    if (arpack_logfile != NULL) {
+      // correctness of this code depends on alignment in Fortran and C 
+      // being the same ; if you observe crashes, disable this part 
+      
+      ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
+      int msglvl0 = 0, msglvl3 = 3;
+      ARPACK(mcinitdebug)(&arpack_log_u,      //logfil
+			  &msglvl3,           //mcaupd
+			  &msglvl3,           //mcaup2
+			  &msglvl0,           //mcaitr
+			  &msglvl3,           //mceigh
+			  &msglvl0,           //mcapps
+			  &msglvl0,           //mcgets
+			  &msglvl3            //mceupd
+			  );
+      
+      printfQuda("eigenSolver: Log info:\n");
+      printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");
+      printfQuda("output is directed to %s\n", arpack_logfile);
+    }
+    
+#endif   
+    
+    
     //Start ARPACK routines
     //---------------------------------------------------------------------------------
 
@@ -514,7 +566,19 @@ namespace quda{
 	printfQuda("Error: Arnoldi update, try increasing NkV.\n");
       }
     }
+    
+#if (defined (QMP_COMMS) || defined (MPI_COMMS))
+    if(comm_rank() == 0){
+      if (arpack_logfile != NULL){
+	ARPACK(finilog)(&arpack_log_u);
+      }
+    }
+#else
+    if (arpack_logfile != NULL)
+      ARPACK(finilog)(&arpack_log_u);
+#endif     
 
+    
     t1 = -(double)clock();
     cpuColorSpinorField *h_v3 = NULL;
     for(int i =0 ; i < nev_ ; i++){

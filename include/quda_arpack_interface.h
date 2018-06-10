@@ -69,11 +69,13 @@ extern "C" {
 			      std::complex<double> *v1, int *ldv1, int *iparam,
 			      int *ipntr, std::complex<double> *workd,
 			      std::complex<double> *workl, int *lworkl,
-			      double *rwork, int *info, int howmany_size, int bmat_size,
+			      double *rwork, int *info, int howmany_size,int bmat_size,
 			      int spectrum_size);
+
+  extern int ARPACK(pmcinitdebug)(int*, int*, int*, int*, int*, int*, int*, int*);
   
 #else
-
+  
   //Serial, single prec complex eigenvectors
   extern int ARPACK(cnaupd) (int *ido, char *bmat, int *n, char *which, int *nev,
 			     float *tol, std::complex<float> *resid, int *ncv,
@@ -115,10 +117,14 @@ extern "C" {
 			     std::complex<double> *workl, int *lworkl,
 			     double *rwork, int *info, int howmany_size, int bmat_size,
 			     int spectrum_size);
-  
-  
-  
+
+  extern int ARPACK(mcinitdebug)(int*,int*,int*,int*,int*,int*,int*,int*);
+    
 #endif
+
+  //ARPACK initlog and finilog routines for printing the ARPACK log  
+  extern int ARPACK(initlog) (int*, char*, int);
+  extern int ARPACK(finilog) (int*);
   
 #ifdef __cplusplus
 }
