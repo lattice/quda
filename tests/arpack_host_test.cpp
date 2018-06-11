@@ -408,29 +408,29 @@ int main(int argc, char **argv)
   arpackEigensolveQuda(hostEvecs, hostEvals, &inv_param, &arpack_param, &gauge_param);
 
   //Access the eigenmode data
-  printfQuda("First 10 elements of the eigenvectors and the eigenvalues:\n");    
+  printfQuda("First 12 elements of the eigenvectors and the eigenvalues:\n");    
   for(int i=0; i<arpack_param.nEv; i++) {
     printfQuda("eigenvector %d:\n",i);
-    for(int j=0; j<10; j++) {
+    for(int j=0; j<12; j++) {
       if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
 	printfQuda("(%e,%e)\n",		   
-		   ((float*)hostEvecs)[i*vol*24 + j],
-		   ((float*)hostEvecs)[i*vol*24 + j+1]);
+		   ((float*)hostEvecs)[i*vol*24 + 2*j],
+		   ((float*)hostEvecs)[i*vol*24 + 2*j+1]);
       } else {
 	printfQuda("(%e,%e)\n",		   
-		   ((double*)hostEvecs)[i*vol*24 + j],
-		   ((double*)hostEvecs)[i*vol*24 + j+1]);
+		   ((double*)hostEvecs)[i*vol*24 + 2*j],
+		   ((double*)hostEvecs)[i*vol*24 + 2*j+1]);
       }
     }      
     printfQuda("eigenvalue %d = ", i);
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
       printfQuda("(%e,%e)\n",		   
-		 ((float*)hostEvals)[i*2],
-		 ((float*)hostEvals)[i*2+1]);
+		 ((float*)hostEvals)[2*i],
+		 ((float*)hostEvals)[2*i + 1]);
     } else {
       printfQuda("(%e,%e)\n",		   
-		 ((double*)hostEvals)[i*2],
-		 ((double*)hostEvals)[i*2+1]);
+		 ((double*)hostEvals)[2*i],
+		 ((double*)hostEvals)[2*i + 1]);
     }
   }
   
