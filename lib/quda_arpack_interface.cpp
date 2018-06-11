@@ -240,7 +240,7 @@ namespace quda{
     
     // all FORTRAN communication uses underscored 
     int ido_ = 0; 
-    int info_ = 0;
+    int info_ = 0; //if 0, use random vector. If 1, initial residulal lives in resid_
     int *ipntr_ = (int*)malloc(14*sizeof(int));
     int *iparam_ = (int*)malloc(11*sizeof(int));
     int n_    = local_vol*4*3,
@@ -298,9 +298,13 @@ namespace quda{
     }
     
     //ARPACK workspace
-    std::complex<float> sigma_ = 0.0;
+    //Initial guess?
     std::complex<float> *resid_ =
-      (std::complex<float> *) malloc(ldv_*sizeof(std::complex<float>));
+      (std::complex<float> *) malloc(nkv_*ldv_*sizeof(std::complex<float>));
+    //if(info_ > 0) memcpy(resid_, h_evecs, nkv_*ldv_*sizeof(std::complex<float>));
+    //for(int a = 0; a<nkv_*ldv_; a++) printfQuda("(%e , %e)\n", real(resid_[a]), imag(resid_[a]));
+    
+    std::complex<float> sigma_ = 0.0;    
     std::complex<float> *w_workd_ =
       (std::complex<float> *) malloc(3*ldv_*sizeof(std::complex<float>));
     std::complex<float> *w_workl_ =
@@ -598,7 +602,7 @@ namespace quda{
       else {  
 	mat.M(*d_v2,*d_v);
       }
-      //mat.MdagM(*d_v2,*d_v);                             // d_v2 = M*v
+      //mat.MdagM(*d_v2,*d_v);                           // d_v2 = M*v
       h_evals_[i] = blas::cDotProduct(*d_v, *d_v2);      // lambda = v^dag * M*v
       blas::axpby(1.0,*d_v2,-real(h_evals_[i]),*d_v);    // d_v = ||M*v - lambda*v||
       double L2norm = blas::norm2(*d_v);
@@ -607,10 +611,60 @@ namespace quda{
       delete h_v3;
     }
     t1 += clock();
-    printfQuda("\neigenSolver: TIME_REPORT - Eigenvalues of Dirac operator: %f sec\n",
+    printfQuda("Eigenvalues of Dirac operator computed in: %f sec\n",
+	       t1/CLOCKS_PER_SEC);
+
+    //Compute SVD
+    t1 = -(double)clock();
+    for(int i=nev_/2 - 1; i >= 0  ; i--){
+
+      //This function assumes that you have computed the eigenvectors
+      //of MdagM, ie, the right SVD of M. The ith eigen vector in the array corresponds
+      //to the ith smallest Right Singular Vector. We will sort the array as:
+      //
+      //     EV_array_MdagM = {Rev_0, Rev_1, Rev_2, ... , Rev_(n-1)}
+      // to  SVD_array_M    = {Rsv_0, Lsv_0, Rsv_1, ... , Lsv_(n/2-1)}
+      //
+      //We start at Rev_(n/2-1), compute Lsv_(n/2-1), then move the vectors
+      //to the n-2 and n-1 positions in the array respectively.
+
+      //Copy Rev to Rsv
+      memcpy((std::complex<float>*)h_evecs_ + h_evals_sorted_idx[2*i + 1]*ldv_,
+	     (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_,
+	     2*ldv_*sizeof(float));
+      
+      cpuParam->v = (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_;
+      h_v3 = new cpuColorSpinorField(*cpuParam);      //Host Rev_i
+      *d_v = *h_v3;                                   //Device Rev_i
+
+      mat.M(*d_v2,*d_v);                              // sigma_i Lsv_i = M Rev_i   
+      h_evals_[i] = blas::cDotProduct(*d_v2, *d_v2);  // (sigma_i)^2 = (sigma_i Lsv_i)^dag * (sigma_i Lsv_i)
+
+      //Compute \sigma_i
+      h_evals_[2*i + 1] = std::complex<float>(sqrt( real(h_evals_[i]) ) , sqrt(abs(imag(h_evals_[i]))));
+      h_evals_[2*i + 0] = std::complex<float>(sqrt( real(h_evals_[i]) ) , sqrt(abs(imag(h_evals_[i]))));
+
+      //Normalise the Lsv
+      float L2norm = sqrt(blas::norm2(*d_v2));      
+      blas::ax(1.0/L2norm, *d_v2);
+      
+      //Move Lsv
+      *h_v3 = *d_v2;
+      memcpy((std::complex<float>*)h_evecs_ + h_evals_sorted_idx[2*i]*ldv_,
+	     (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_,
+	     2*ldv_*sizeof(float));
+            
+      delete h_v3;
+    }
+    for(int i=0; i < nev_; i++){
+      printfQuda("Sval[%04d] = %+e  %+e\n",
+		 i, real(h_evals_[i]), imag(h_evals_[i]));
+    }
+    
+    t1 += clock();
+    printfQuda("Left singular pairs of Dirac operator computed in: %f sec\n",
 	       t1/CLOCKS_PER_SEC);
     
-       
     // cleanup 
     free(ipntr_);
     free(iparam_);

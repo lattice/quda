@@ -1336,12 +1336,29 @@ namespace quda {
     cpuParam.v = ((float*)hostEvecs);
     
     param.mg_global.arpack_param->arpackPrec = QUDA_SINGLE_PRECISION;
+    cpuColorSpinorField *cpuTemp = nullptr;
+    
+    /*
+    //Use null vector guess
+    generateNullVectors(param.B);
+
+    //Transer to hostEvecs
+    for (int i=0; i<param.Nvec; i++) {
+      //cpuParam.v = (float*)hostEvecs + i*2*12*local_vol;
+      cpuTemp = new cpuColorSpinorField(cpuParam);      
+      //Copy Evec_i from device to host.
+      *cpuTemp = *param.B[i];
+      memcpy((float*)hostEvecs + i*2*12*local_vol, cpuTemp->V_h(), 2*12*local_vol*sizeof(float));
+      //for(int a=0; a<10; a++) printfQuda("(%e , %e)\n", (float*)cpuTemp->V_h() + 2*a, (float*)cpuTemp->V_h() + 2*a + 1);
+      //for(int a=0; a<10; a++) cpuTemp->PrintVector(a);
+      delete cpuTemp;
+      //exit(0);
+    }
+    */
     
     arpackSolve(hostEvecs, hostEvals, *(param.matSmooth->Expose()),
 		param.mg_global.arpack_param, &cpuParam);
-    
-    cpuColorSpinorField *cpuTemp = nullptr;
-    
+
     for (int i=0; i<param.Nvec; i++) {
       //HACKY: Position the cpu pointer to the next Evec. Possible to change
       //address of the cpuColorSpinorField object?

@@ -116,6 +116,7 @@ extern double eig_amin;
 extern double eig_amax;
 extern bool eig_use_normop;
 extern bool eig_use_dagger;
+extern bool eig_compute_svd;
 extern QudaArpackSpectrumType arpack_spectrum;
 extern int arpack_mode;
 extern char arpack_logfile[512];
@@ -144,6 +145,33 @@ display_test_info()
   printfQuda("Outer solver paramers\n");
   printfQuda(" - pipeline = %d\n", pipeline);
 
+  if(low_mode_check || use_low_modes) {
+    printfQuda("   Arpack parameters\n");
+    printfQuda(" - number of eigenvectors requested %d\n", eig_nEv);
+    printfQuda(" - size of Krylov subspace %d\n", eig_nKv);
+    printfQuda(" - solver tolerance %e\n", eig_tol);
+    printfQuda(" - Arpack mode %d\n", arpack_mode);
+    if(eig_compute_svd) {
+      printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
+    } else {    
+      printfQuda(" - Operator: daggered (%s) , normal-op (%s)\n",
+		 eig_use_dagger ? "true" : "false",
+		 eig_use_normop ? "true" : "false");
+    }
+    if(eig_use_poly_acc) {
+      printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
+      printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
+      printfQuda(" - Chebyshev polynomial maximum %e\n", eig_amax);
+    }
+    printfQuda(" - spectrum requested ");
+    if (arpack_spectrum == QUDA_SR_SPECTRUM) printfQuda("Smallest Real\n");
+    else if (arpack_spectrum == QUDA_LR_SPECTRUM) printfQuda("Largest Real\n");
+    else if (arpack_spectrum == QUDA_SM_SPECTRUM) printfQuda("Smallest Modulus\n");
+    else if (arpack_spectrum == QUDA_LM_SPECTRUM) printfQuda("Largest Modulus\n");
+    else if (arpack_spectrum == QUDA_SI_SPECTRUM) printfQuda("Smallest Imaginary\n");
+    else if (arpack_spectrum == QUDA_LI_SPECTRUM) printfQuda("Largest Imaginary\n");  
+  }
+  
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
@@ -268,6 +296,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   arp_param.arpackPrec    = QUDA_SINGLE_PRECISION;
   arp_param.useNormOp     = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   arp_param.useDagger     = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  arp_param.SVD           = eig_compute_svd;
+  if(eig_compute_svd) {
+    warningQuda("Overriding any previous choices of operator type. SVD demands MdagM operator.\n");
+    arp_param.useDagger = QUDA_BOOLEAN_NO;
+    arp_param.useNormOp = QUDA_BOOLEAN_YES;
+  }
   
   strcpy(arp_param.arpackLogfile, arpack_logfile);
 

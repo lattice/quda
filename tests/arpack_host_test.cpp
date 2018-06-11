@@ -80,6 +80,7 @@ extern double eig_amin;
 extern double eig_amax;
 extern bool eig_use_normop;
 extern bool eig_use_dagger;
+extern bool eig_compute_svd;
 extern QudaArpackSpectrumType arpack_spectrum;
 extern int arpack_mode;
 extern char arpack_logfile[512];
@@ -106,9 +107,13 @@ display_test_info()
   printfQuda(" - size of Krylov subspace %d\n", eig_nKv);
   printfQuda(" - solver tolerance %e\n", eig_tol);
   printfQuda(" - Arpack mode %d\n", arpack_mode);
-  printfQuda(" - Operator: daggered (%s) , normal-op (%s)\n",
-	     eig_use_dagger ? "true" : "false",
-	     eig_use_normop ? "true" : "false");
+  if(eig_compute_svd) {
+    printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
+  } else {    
+    printfQuda(" - Operator: daggered (%s) , normal-op (%s)\n",
+	       eig_use_dagger ? "true" : "false",
+	       eig_use_normop ? "true" : "false");
+  }
   if(eig_use_poly_acc) {
     printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
     printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
@@ -286,6 +291,12 @@ void setArpackParam(QudaArpackParam &arpack_param) {
   arpack_param.arpackPrec    = prec;
   arpack_param.useNormOp     = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   arpack_param.useDagger     = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  arpack_param.SVD           = eig_compute_svd;
+  if(eig_compute_svd) {
+    warningQuda("Overriding any previous choices of operator type. SVD demands MdagM operator.\n");
+    arpack_param.useDagger = QUDA_BOOLEAN_NO;
+    arpack_param.useNormOp = QUDA_BOOLEAN_YES;
+  }
   
   strcpy(arpack_param.arpackLogfile, arpack_logfile);
 
@@ -410,17 +421,16 @@ int main(int argc, char **argv)
 		   ((double*)hostEvecs)[i*vol*24 + j],
 		   ((double*)hostEvecs)[i*vol*24 + j+1]);
       }
-      
-      printfQuda("eigenvalue %d = ", i);
-      if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-	printfQuda("(%e,%e)\n",		   
-		   ((float*)hostEvals)[i*2],
-		   ((float*)hostEvals)[i*2+1]);
-      } else {
-	printfQuda("(%e,%e)\n",		   
-		   ((double*)hostEvals)[i*2],
-		   ((double*)hostEvals)[i*2+1]);
-      }
+    }      
+    printfQuda("eigenvalue %d = ", i);
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      printfQuda("(%e,%e)\n",		   
+		 ((float*)hostEvals)[i*2],
+		 ((float*)hostEvals)[i*2+1]);
+    } else {
+      printfQuda("(%e,%e)\n",		   
+		 ((double*)hostEvals)[i*2],
+		 ((double*)hostEvals)[i*2+1]);
     }
   }
   

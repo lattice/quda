@@ -197,6 +197,7 @@ void printQudaArpackParam(QudaArpackParam *param) {
   P(arpackTol, 0.0);
   P(arpackMaxiter, 0);
   P(arpackPrec, QUDA_DOUBLE_PRECISION);
+  P(SVD, QUDA_BOOLEAN_NO);
   P(useNormOp, QUDA_BOOLEAN_NO);
   P(useDagger, QUDA_BOOLEAN_NO);
 #else

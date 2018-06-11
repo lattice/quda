@@ -1708,6 +1708,7 @@ double eig_amin = 0.0;
 double eig_amax = 4;
 bool eig_use_normop = false;
 bool eig_use_dagger = false;
+bool eig_compute_svd = false;
 QudaArpackSpectrumType arpack_spectrum = QUDA_SR_SPECTRUM;
 int arpack_mode = 1;
 char arpack_logfile[256] = "arpack_logfile.log";
@@ -1837,6 +1838,7 @@ void usage(char** argv )
   printf("    --eig-amax <Float>                        # The maximum in the polynomial acceleration\n");
   printf("    --eig-useNormOp <true/false>              # Solve the MdagM problem instead of M (MMdag if eig-useDagger == true) (default false)\n");
   printf("    --eig-useDagger <true/false>              # Solve the Mdag  problem instead of M (MMdag if eig-useNormOp == true) (default false)\n");
+  printf("    --eig-computeSVD <true/false>             # Solve the MdagM problem, use to compute SVD of M (default false)\n");
   printf("    --arpack-spectrum <SR/LR/SM/LM/SI/LI>     # The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary\n");
   printf("    --arpack-mode <n>                         # The problem type to be passed to Arpack\n");
   printf("    --arpack-logfile <file_name>              # The filename storing the stdout from Arpack\n");
@@ -3351,6 +3353,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
       eig_use_dagger = false;
     }else{
       fprintf(stderr, "ERROR: invalid value for eig-useDagger (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+    if( strcmp(argv[i], "--eig-computeSVD") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      eig_compute_svd = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      eig_compute_svd = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for eig-computeSVD (true/false)\n");
       exit(1);
     }
 

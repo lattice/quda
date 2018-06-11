@@ -449,6 +449,9 @@ extern "C" {
 
     /** Precision to be used in Arpack **/    
     QudaPrecision arpackPrec;
+
+    /** Performs and MdagM solve, then constructs the SVD. **/
+    QudaBoolean SVD;
     
     /** What type of Dirac operator we are using **/
     /** If !(useNormOp && useDagger) use M. **/
