@@ -291,7 +291,7 @@ void setArpackParam(QudaArpackParam &arpack_param) {
   arpack_param.arpackPrec    = prec;
   arpack_param.useNormOp     = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   arpack_param.useDagger     = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  arpack_param.SVD           = eig_compute_svd;
+  arpack_param.SVD           = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   if(eig_compute_svd) {
     warningQuda("Overriding any previous choices of operator type. SVD demands MdagM operator.\n");
     arpack_param.useDagger = QUDA_BOOLEAN_NO;

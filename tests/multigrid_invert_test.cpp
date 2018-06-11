@@ -296,7 +296,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   arp_param.arpackPrec    = QUDA_SINGLE_PRECISION;
   arp_param.useNormOp     = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   arp_param.useDagger     = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  arp_param.SVD           = eig_compute_svd;
+  arp_param.SVD           = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   if(eig_compute_svd) {
     warningQuda("Overriding any previous choices of operator type. SVD demands MdagM operator.\n");
     arp_param.useDagger = QUDA_BOOLEAN_NO;
