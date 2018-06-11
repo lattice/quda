@@ -27,6 +27,7 @@ namespace quda {
 	localParity[d] = localParity_[d]; 
 	commDim[d] = comm_dim_partitioned(d);
 	faceVolumeCB[d] = u.SurfaceCB(d)*u.Nface();
+        printfQuda("%d X = %d faceVolumeCB = %d\n", d, X[d], faceVolumeCB[d]);
       }
     }
   };
@@ -90,6 +91,8 @@ namespace quda {
 	  } // a
 	} // d
 
+        printf("parity = %d dim = %d (X = %d A = %d B = %d C = %d) indexGhost = %d (%d)\n",
+               parity, dim, arg.X[dim], arg.A[dim], arg.B[dim], arg.C[dim], indexGhost, arg.faceVolumeCB[dim]);
 	assert(indexGhost == arg.faceVolumeCB[dim]);
       } // dim
 
@@ -253,9 +256,11 @@ namespace quda {
     //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
     // FIXME - I don't understand this, shouldn't it be commDim(dim) == 0 ?
     int localParity[nDim];
-    for (int dim=0; dim<nDim; dim++) 
+    for (int dim=0; dim<nDim; dim++) {
       //localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
       localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
+      printfQuda("%d local parity = %d\n", dim, localParity[dim]);
+    }
 
     ExtractGhostArg<Order, nDim> arg(order, u, A, B, C, f, localParity, offset);
     ExtractGhost<Float,length,nDim,Order> extractor(arg, u, location, extract);

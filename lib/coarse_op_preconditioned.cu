@@ -175,6 +175,7 @@ namespace quda {
     }
 
     // now exchange Y halos of both forwards and backwards links for multi-process dslash
+    printfQuda("Y exchange\n");
     const_cast<GaugeField&>(Y).exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
 
     // compute the preconditioned links
@@ -216,11 +217,13 @@ namespace quda {
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
     // need to put this in the bulk of the previous node - but only send backwards the backwards
     // links to and not overwrite the forwards bulk
+    printfQuda("Yhat inject\n");
     Yhat.injectGhost(QUDA_LINK_BACKWARDS);
 
     // exchange forwards links for multi-process dslash dagger
     // need to put this in the ghost zone of the next node - but only send forwards the forwards
     // links and not overwrite the backwards ghost
+    printfQuda("Yhat exchange\n");
     Yhat.exchangeGhost(QUDA_LINK_FORWARDS);
   }
 

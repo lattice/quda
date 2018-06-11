@@ -30,8 +30,10 @@ namespace quda {
       while (geo_bs[d] > 0) {
       	if (d==0 && B[0]->X(0) == geo_bs[0])
       	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);
+#if 0
       	else if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
       	  warningQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d", d, B[0]->X(d)/geo_bs[d]);
+#endif
       	else if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
       	  warningQuda("cannot block dim[%d]=%d with block size = %d", d, B[0]->X(d), geo_bs[d]);
       	else
@@ -39,7 +41,14 @@ namespace quda {
       	geo_bs[d] /= 2;
       }
       if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
+
     }
+
+    int n_even_dim = 0; // number of even dimensions
+    for (int d=0; d<ndim; d++) {
+      if (B[0]->X(d)/geo_bs[d] % 2 == 0) n_even_dim++;
+    }
+    if (n_even_dim < 2) errorQuda("At least two coarse grid dimensions must be even");
 
     this->geo_bs = new int[ndim];
     int total_block_size = 1;
@@ -260,7 +269,7 @@ namespace quda {
       // compute the lattice-site index for this offset index
       fine.LatticeIndex(x, i);
       
-      //printfQuda("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
+      printfQuda("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
 
       // compute the corresponding coarse-grid index given the block size
       for (int d=0; d<fine.Ndim(); d++) x[d] /= geo_bs[d];
@@ -270,7 +279,7 @@ namespace quda {
       coarse.OffsetIndex(k, x); // this index is parity ordered
       fine_to_coarse_h[i] = k;
 
-      //printfQuda("coarse after (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
+      printfQuda("coarse after (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
     }
 
     // now create an inverse-like variant of this

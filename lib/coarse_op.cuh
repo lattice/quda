@@ -801,7 +801,8 @@ namespace quda {
 
     //Check to see if we are on the edge of a block.  If adjacent site
     //is in same block, M = X, else M = Y
-    const bool isDiagonal = ((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim] ? true : false;
+    const bool isDiagonal = ( ((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim] ) && !( arg.comm_dim[dim] && coord[dim] == arg.x_size[dim]-1 ) ? true : false ;
+    if (c_col==0 && c_row==0) printf("coords = (%d %d %d %d) coarse = (%d %d %d %d) isDiagonal = %d\n", coord[0], coord[1], coord[2], coord[3], coord_coarse[0], coord_coarse[1], coord_coarse[2], coord_coarse[3], isDiagonal);
 
 #if defined(SHARED_ATOMIC) && __CUDA_ARCH__
     int coarse_parity = parity_coarse_;
