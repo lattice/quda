@@ -294,7 +294,10 @@ namespace quda {
 	  Arg arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 	  arg.swizzle = tp.aux.x;
 
-	  if (block_size == 4) {          // for 2x2x2x1 aggregates
+	  if (block_size == 2) {          // for 1x1x2x2 aggregates
+	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,2>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 4) {   // for 1x2x2x2 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,4>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (block_size == 8) {   // for 2x2x2x2 aggregates

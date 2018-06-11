@@ -386,7 +386,8 @@ namespace quda {
 	  typedef FieldOrderCB<RegType,nSpin,nColor,1,QUDA_FLOAT2_FIELD_ORDER,RegType,RegType,DISABLE_GHOST> Vector;
 
 	  switch (geoBlockSize/2) {
-	  case   4: GPU<Rotator,Vector,  4>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x2x2x1 aggregates
+	  case   2: GPU<Rotator,Vector,  2>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 1x1x2x2 aggregates
+	  case   4: GPU<Rotator,Vector,  4>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 1x2x2x2 aggregates
 	  case   8: GPU<Rotator,Vector,  8>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x2x2x2 aggregates
 	  case  12: GPU<Rotator,Vector, 12>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x2x2x3 aggregates
 	  case  16: GPU<Rotator,Vector, 16>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x2x2x1 aggregates
