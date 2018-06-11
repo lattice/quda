@@ -614,56 +614,59 @@ namespace quda{
     printfQuda("Eigenvalues of Dirac operator computed in: %f sec\n",
 	       t1/CLOCKS_PER_SEC);
 
-    //Compute SVD
-    t1 = -(double)clock();
-    for(int i=nev_/2 - 1; i >= 0  ; i--){
-
-      //This function assumes that you have computed the eigenvectors
-      //of MdagM, ie, the right SVD of M. The ith eigen vector in the array corresponds
-      //to the ith smallest Right Singular Vector. We will sort the array as:
-      //
-      //     EV_array_MdagM = {Rev_0, Rev_1, Rev_2, ... , Rev_(n-1)}
-      // to  SVD_array_M    = {Rsv_0, Lsv_0, Rsv_1, ... , Lsv_(n/2-1)}
-      //
-      //We start at Rev_(n/2-1), compute Lsv_(n/2-1), then move the vectors
-      //to the n-2 and n-1 positions in the array respectively.
-
-      //Copy Rev to Rsv
-      memcpy((std::complex<float>*)h_evecs_ + h_evals_sorted_idx[2*i + 1]*ldv_,
-	     (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_,
-	     2*ldv_*sizeof(float));
+    if(arpack_param->SVD) {
+      //Compute SVD
+      t1 = -(double)clock();
+      for(int i=nev_/2 - 1; i >= 0  ; i--){
+	
+	//This function assumes that you have computed the eigenvectors
+	//of MdagM, ie, the right SVD of M. The ith eigen vector in the array corresponds
+	//to the ith smallest Right Singular Vector. We will sort the array as:
+	//
+	//     EV_array_MdagM = {Rev_0, Rev_1, Rev_2, ... , Rev_(n-1)}
+	// to  SVD_array_M    = {Rsv_0, Lsv_0, Rsv_1, ... , Lsv_(n/2-1)}
+	//
+	//We start at Rev_(n/2-1), compute Lsv_(n/2-1), then move the vectors
+	//to the n-2 and n-1 positions in the array respectively.
+	
+	//Copy Rev to Rsv
+	memcpy((std::complex<float>*)h_evecs_ + h_evals_sorted_idx[2*i + 1]*ldv_,
+	       (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_,
+	       2*ldv_*sizeof(float));
+	
+	cpuParam->v = (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_;
+	h_v3 = new cpuColorSpinorField(*cpuParam);      //Host Rev_i
+	*d_v = *h_v3;                                   //Device Rev_i
+	
+	mat.M(*d_v2,*d_v);                              //  M Rev_i = M Rsv_i =  sigma_i Lsv_i =   
+	h_evals_[i] = blas::cDotProduct(*d_v2, *d_v2);  // (sigma_i)^2 = (sigma_i Lsv_i)^dag * (sigma_i Lsv_i)
+	
+	//Compute \sigma_i
+	h_evals_[2*i + 1] = std::complex<float>(sqrt( real(h_evals_[i]) ) , sqrt(imag(h_evals_[i])*imag(h_evals_[i])));
+	h_evals_[2*i + 0] = std::complex<float>(sqrt( real(h_evals_[i]) ) , sqrt(imag(h_evals_[i])*imag(h_evals_[i])));
+	
+	//Normalise the Lsv
+	float L2norm = sqrt(blas::norm2(*d_v2));      
+	blas::ax(1.0/L2norm, *d_v2);
+	
+	//Move Lsv
+	*h_v3 = *d_v2;
+	memcpy((std::complex<float>*)h_evecs_ + h_evals_sorted_idx[2*i]*ldv_,
+	       (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_,
+	       2*ldv_*sizeof(float));
+	
+	delete h_v3;
+      }
+      for(int i=0; i < nev_; i++){
+	printfQuda("Sval[%04d] = %+e  %+e\n",
+		   i, real(h_evals_[i]), imag(h_evals_[i]));
+      }
       
-      cpuParam->v = (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_;
-      h_v3 = new cpuColorSpinorField(*cpuParam);      //Host Rev_i
-      *d_v = *h_v3;                                   //Device Rev_i
-
-      mat.M(*d_v2,*d_v);                              // sigma_i Lsv_i = M Rev_i   
-      h_evals_[i] = blas::cDotProduct(*d_v2, *d_v2);  // (sigma_i)^2 = (sigma_i Lsv_i)^dag * (sigma_i Lsv_i)
-
-      //Compute \sigma_i
-      h_evals_[2*i + 1] = std::complex<float>(sqrt( real(h_evals_[i]) ) , sqrt(abs(imag(h_evals_[i]))));
-      h_evals_[2*i + 0] = std::complex<float>(sqrt( real(h_evals_[i]) ) , sqrt(abs(imag(h_evals_[i]))));
-
-      //Normalise the Lsv
-      float L2norm = sqrt(blas::norm2(*d_v2));      
-      blas::ax(1.0/L2norm, *d_v2);
-      
-      //Move Lsv
-      *h_v3 = *d_v2;
-      memcpy((std::complex<float>*)h_evecs_ + h_evals_sorted_idx[2*i]*ldv_,
-	     (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_,
-	     2*ldv_*sizeof(float));
-            
-      delete h_v3;
-    }
-    for(int i=0; i < nev_; i++){
-      printfQuda("Sval[%04d] = %+e  %+e\n",
-		 i, real(h_evals_[i]), imag(h_evals_[i]));
+      t1 += clock();
+      printfQuda("Left singular pairs of Dirac operator computed in: %f sec\n",
+		 t1/CLOCKS_PER_SEC);
     }
     
-    t1 += clock();
-    printfQuda("Left singular pairs of Dirac operator computed in: %f sec\n",
-	       t1/CLOCKS_PER_SEC);
     
     // cleanup 
     free(ipntr_);
