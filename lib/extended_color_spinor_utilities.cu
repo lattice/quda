@@ -183,35 +183,67 @@ namespace quda {
       int R[4];
       for(int d=0; d<4; d++) R[d] = (arg.E[d] - arg.X[d]) >> 1;
 
-      int za = X/(arg.X[0]/2);
-      int x0h = X - za*(arg.X[0]/2);
-      int zb = za/arg.X[1];
-      x[1] = za - zb*arg.X[1];
-      x[3] = zb / arg.X[2];
-      x[2] = zb - x[3]*arg.X[2];
-      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + arg.parity) & 1);
+			int cbE[4] = { arg.E[0]/2, arg.E[1], arg.E[2], arg.E[3] };
+			int cbX[4] = { arg.X[0]/2, arg.X[1], arg.X[2], arg.X[3] };
+			int cbR[4] = {     R[0]/2, 		 R[1],     R[2],     R[3] };
 
-      // Y is the cb spatial index into the extended gauge field
-      int Y = ((((x[3]+R[3])*arg.E[2] + (x[2]+R[2]))*arg.E[1] + (x[1]+R[1]))*arg.E[0]+(x[0]+R[0])) >> 1;
+//      int za = X/(arg.X[0]/2);
+//      int x0h = X - za*(arg.X[0]/2);
+//      int zb = za/arg.X[1];
+//      x[1] = za - zb*arg.X[1];
+//      x[3] = zb / arg.X[2];
+//      x[2] = zb - x[3]*arg.X[2];
+//      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + arg.parity) & 1);
+//
+//      // Y is the cb spatial index into the extended gauge field
+//      int Y = ((((x[3]+R[3])*arg.E[2] + (x[2]+R[2]))*arg.E[1] + (x[1]+R[1]))*arg.E[0]+(x[0]+R[0])) >> 1;
+
+			int XX = X;
+			x[0] = XX % cbX[0]; XX /= cbX[0]; 
+			x[1] = XX % cbX[1]; XX /= cbX[1];
+			x[2] = XX % cbX[2]; XX /= cbX[2];
+			x[3] = XX % cbX[3]; 
+      int Y = ((((x[3]+cbR[3])*cbE[2] + (x[2]+cbR[2]))*cbE[1] + (x[1]+cbR[1]))*cbE[0] + (x[0]+cbR[0]));
+//      int Y = ((((x[3]+1)*cbE[2] + (x[2]+1))*cbE[1] + (x[1]+1))*cbE[0] + (x[0]+1));
+
+//			printfQuda("(%02d,%02d,%02d,%02d)->(%02d,%02d,%02d,%02d).\n",);	
+//			printfQuda("%08d->%08d.\n", X, Y);	
 
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
 
-      RegTypeIn   in[Ns*Nc*2] = { };
+//			size_t out_idx;
+//			size_t in_idx;
+
+      RegTypeIn    in[Ns*Nc*2] = { };
       RegTypeOut  out[Ns*Nc*2] = { };
 
-			int Ls = 12;
-			for(int s=0; s<Ls; s++){
-      if(extend){
-        arg.in.load(in, arg.length*s+X);
-        arg.basis(out, in);
-        arg.out.save(out, arg.lengthEx*s+Y);
-      }else{
-        arg.in.load(in, arg.lengthEx*s+Y);
-        arg.basis(out, in);
-        arg.out.save(out, arg.length*s+X);
-      }
+			size_t Ls = 12;
+//			for(size_t spin=0; spin<4; spin++){
+//			for(size_t color=0; color<3; color++){
+//			for(size_t z=0; z<2; z++){
+			for(size_t s=0; s<Ls; s++){
+	      if(extend){
+//					in_idx = ((spin*3+color)*2+z)*arg.in.stride+(arg.length*s+X);
+//					in_idx = ((spin*3+color)*arg.in.stride+(arg.length*s+X))*2+z;
+//					out_idx = ((spin*3+color)*2+z)*arg.out.stride+(arg.lengthEx*s+Y);
+//					out_idx = ((spin*3+color)*arg.out.stride+(arg.lengthEx*s+Y))*2+z;
+//					arg.out.field[out_idx] = arg.in.field[in_idx];
+	        
+					arg.in.load(in, arg.length*s+X);
+	        arg.basis(out, in);
+	        arg.out.save(out, arg.lengthEx*s+Y);
+	      }else{
+//					in_idx = ((spin*3+color)*2+z)*arg.in.stride+(arg.lengthEx*s+Y);
+//					out_idx = ((spin*3+color)*2+z)*arg.out.stride+(arg.length*s+X);
+//					arg.out.field[out_idx] = arg.in.field[in_idx];
+
+	        arg.in.load(in, arg.lengthEx*s+Y);
+	        arg.basis(out, in);
+	        arg.out.save(out, arg.length*s+X);
+	      }
 			}
+//			}}}}
     }
 
 
@@ -257,8 +289,12 @@ namespace quda {
       public: 
       CopySpinorEx(CopySpinorExArg<OutOrder,InOrder,Basis> &arg, const ColorSpinorField &meta, QudaFieldLocation location)
         : arg(arg), meta(meta), location(location) {
-	writeAuxString("out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
-      }
+				writeAuxString("out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
+
+				printfQuda( "E=(%02d,%02d,%02d,%02d)", arg.E[0], arg.E[1], arg.E[2], arg.E[3] );
+				printfQuda( "X=(%02d,%02d,%02d,%02d)", arg.X[0], arg.X[1], arg.X[2], arg.X[3] );
+      
+			}
       virtual ~CopySpinorEx() {}
 
       void apply(const cudaStream_t &stream){
@@ -333,6 +369,7 @@ namespace quda {
     if (out.isNative()) {
       typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
       ColorSpinor outOrder(out, 1, Out, outNorm);
+//      colorspinor::FloatNOrder<FloatOut,4,3,1> outOrder(out,1,Out,outNorm);
       copySpinorEx<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
     } else {
@@ -370,6 +407,7 @@ namespace quda {
     if (in.isNative()) {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
       ColorSpinor inOrder(in, 1, In, inNorm);
+//      colorspinor::FloatNOrder<FloatIn,4,3,1> inOrder(in,1,In,inNorm); // note the 1 in the template spec
       extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
     } else {
       errorQuda("Order not defined");
@@ -514,25 +552,25 @@ namespace quda {
 // TODO: Simply copy the whole thing.
 
   template< class OutOrder, class Float >
-    __device__ __host__ void zero_exterior( OutOrder& order, size_t idx, int Ls)
+    __device__ __host__ void zero_exterior_local( OutOrder& order, const size_t idx, int Ls)
     {
       typedef typename mapper<Float>::type RegTypeOut;
       RegTypeOut out[24] = {}; // 24=2*3*4
 			memset(out, 0, 24*sizeof(RegTypeOut));
 			
 			for(int s=0; s<Ls; s++){
-        order.save(out, order.stride*s+idx);
+        order.save(out, order.stride*s/Ls+idx);
 			}
     }
 
   template< class OutOrder, class Float >
-    __global__ void zero_exterior_kernel( OutOrder order, std::vector<size_t> lst, int Ls ) // TODO: Should I pass by reference or value?
+    __global__ void zero_exterior_kernel( OutOrder order, const size_t* cuda_p, const size_t length, int Ls ) // TODO: Should I pass by reference or value?
     																																												// Intuition is that for GPU stuff should just copy by value
 		{
       int lst_idx = blockIdx.x*blockDim.x+threadIdx.x;
 
-      while( lst_idx < lst.size() ){
-        zero_exterior<OutOrder,Float>(order, lst[lst_idx], Ls);
+      while( lst_idx < length ){ // TODO:!!! 
+        zero_exterior_local<OutOrder,Float>(order, cuda_p[lst_idx], Ls);
         lst_idx += gridDim.x*blockDim.x;
       }
     }
@@ -540,19 +578,20 @@ namespace quda {
   /*
      Host function
    */
-  template< class OutOrder, class Float >
-    void zero_exterior( OutOrder& order, std::vector<size_t>& lst, int Ls ) 
-    {
-      for(int lst_idx=0; lst_idx<lst.size(); lst_idx++){
-        zero_exterior<OutOrder,Float>(order, lst[lst_idx], Ls);
-      }
-    }
+//  template< class OutOrder, class Float >
+//    void zero_exterior( OutOrder& order, std::vector<size_t>& lst, int Ls ) 
+//    {
+//      for(int lst_idx=0; lst_idx<lst.size(); lst_idx++){
+//        zero_exterior_local<OutOrder,Float>(order, lst[lst_idx], Ls);
+//      }
+//    }
 
   template< class OutOrder, class Float >
     class ZeroSpinorEx : Tunable {
 
 			OutOrder order; 
-      const std::vector<size_t>& lst;
+      const size_t* cuda_p;
+			const size_t length;
       const ColorSpinorField& meta;
       QudaFieldLocation location;
 			int Ls;
@@ -562,11 +601,11 @@ namespace quda {
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
       bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-      unsigned int minThreads() const { return lst.size(); }
+      unsigned int minThreads() const { return length; }
 
       public: 
-      ZeroSpinorEx( OutOrder& order_, const std::vector<size_t>& lst_, int Ls_, const ColorSpinorField& meta_, QudaFieldLocation location_)
-        : order(order_), lst(lst_), meta(meta_), location(location_), Ls(Ls_) {
+      ZeroSpinorEx( OutOrder& order_, const size_t* cuda_p_, size_t length_, int Ls_, const ColorSpinorField& meta_, QudaFieldLocation location_)
+        : order(order_), cuda_p(cuda_p_), length(length_), meta(meta_), location(location_), Ls(Ls_) {
 				writeAuxString("out_stride=%d,in_stride=%d", order.stride, order.stride);
       }
       virtual ~ZeroSpinorEx() {}
@@ -574,9 +613,10 @@ namespace quda {
       void apply(const cudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if(location == QUDA_CPU_FIELD_LOCATION){
-          zero_exterior<OutOrder,Float>(order, lst, Ls);    
+					errorQuda("WHO cares about CPU?");
+//          zero_exterior<OutOrder,Float>(order, lst, Ls);    
         }else if(location == QUDA_CUDA_FIELD_LOCATION){
-          zero_exterior_kernel<OutOrder,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(order, lst, Ls);    
+          zero_exterior_kernel<OutOrder,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(order, cuda_p, length, Ls);    
         }
       } 
 
@@ -584,14 +624,15 @@ namespace quda {
 
       long long flops() const { return 0; }
       long long bytes() const {
-        return lst.size()*2*4*3*(sizeof(Float));
+        return length*2*4*3*(sizeof(Float));
       }
 
     }; // CopySpinorEx
 
 	std::vector<size_t> initialize_padding_index(int X0, int X1, int X2, int X3, int R0, int R1, int R2, int R3){
-			size_t extended_volume = X0*X1*X2*X3
+			size_t extended_volume = X0*X1*X2*X3;
 			size_t    inner_volume = (X0-2*R0)*(X1-2*R1)*(X2-2*R2)*(X3-2*R3);
+			size_t index = 0;
 			std::vector<size_t> rtn(extended_volume-inner_volume);
 			for(size_t x3=0; x3 < X3; x3++){
 			for(size_t x2=0; x2 < X2; x2++){
@@ -610,11 +651,27 @@ namespace quda {
 			}
 			return rtn;	
 	}
-
-  template<int X0, int X1, int X2, int X3, int R0, int R1, int R2, int R3, class Float>
-  void zero_extended_color_spinor( ColorSpinorField& f, const int parity, const QudaFieldLocation location, int Ls )
+	template<class Float>
+  void zero_extended_color_spinor( ColorSpinorField& f, const std::array<int,4>& R, const int parity, const QudaFieldLocation location, int Ls )
   {
-		static std::vector<size_t> lst( initialize_padding_index(X0,X1,X2,X3,R0,R1,R2,R3) ); // some function to initialize the indexing.
+		typedef std::array<int,8> pad_info;
+		typedef std::vector<size_t> pad_lst;
+		static std::map< pad_info, pad_lst > lst_map;
+		static std::map< pad_info, size_t* > cuda_lst_map;
+	 	
+		pad_info key = { f.X()[0],f.X()[1],f.X()[2],f.X()[3],R[0],R[1],R[2],R[3] };
+
+		typename std::map< pad_info, pad_lst >::iterator it = lst_map.find(key);
+	  if( it == lst_map.end() ){
+	    printfQuda("PaddingIndexCache: to add X=(%d,%d,%d,%d)/R=(%d,%d,%d,%d).\n", f.X()[0],f.X()[1],f.X()[2],f.X()[3],R[0],R[1],R[2],R[3] );
+	    lst_map[key] = initialize_padding_index( f.X()[0],f.X()[1],f.X()[2],f.X()[3],R[0],R[1],R[2],R[3] );
+	  	size_t* cuda_p;
+			cudaMalloc( (void**)&cuda_p, lst_map[key].size()*sizeof(size_t) );
+			cuda_lst_map[key] = cuda_p;
+			cudaMemcpy(cuda_p, lst_map[key].data(), lst_map[key].size()*sizeof(size_t), cudaMemcpyHostToDevice);
+	    printfQuda("PaddingIndexCache:  added X=(%d,%d,%d,%d)/R=(%d,%d,%d,%d).\n", f.X()[0],f.X()[1],f.X()[2],f.X()[3],R[0],R[1],R[2],R[3] );
+	    printfQuda("PaddingIndexCache:  allocated %012d bytes of memory.\n", lst_map[key].size()*sizeof(size_t) );
+		}
  	
     if( not f.isNative() ) {
       errorQuda("Order not defined");
@@ -622,7 +679,7 @@ namespace quda {
    
 		typedef typename colorspinor_mapper<Float,4,3>::type color_spinor_order; // will just use this native order
     color_spinor_order f_order(f, 1, NULL, NULL);
-    ZeroSpinorEx<color_spinor_order,Float> zeroer( f_order, lst, Ls, f, location );
+    ZeroSpinorEx<color_spinor_order,Float> zeroer( f_order, cuda_lst_map[key], lst_map[key].size(), Ls, f, location );
 		zeroer.apply(0);
 
   }
@@ -635,11 +692,11 @@ namespace quda {
 			}
 
       if( f.Precision() == QUDA_DOUBLE_PRECISION ){
-				zero_extended_color_spinor< f.X[0],f.X[1],f.X[2],f.X[3],R[0],R[1],R[2],R[3],double>( f, parity, location, f.X[4]);
+				zero_extended_color_spinor<double>( f, R, parity, location, f.X()[4] );
       }else if( f.Precision() == QUDA_SINGLE_PRECISION ){
-				zero_extended_color_spinor< f.X[0],f.X[1],f.X[2],f.X[3],R[0],R[1],R[2],R[3],float >( f, parity, location, f.X[4]);
+				zero_extended_color_spinor<float >( f, R, parity, location, f.X()[4] );
       }else if( f.Precision() == QUDA_HALF_PRECISION ){
-				zero_extended_color_spinor< f.X[0],f.X[1],f.X[2],f.X[3],R[0],R[1],R[2],R[3],short >( f, parity, location, f.X[4]);
+				zero_extended_color_spinor<short >( f, R, parity, location, f.X()[4] );
       } else {
         errorQuda("Unsupported Precision %d", f.Precision());
       }
