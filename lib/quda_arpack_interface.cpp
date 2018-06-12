@@ -118,7 +118,7 @@ namespace quda{
     else {  
       mat.M(out,in);
     }
-
+    
     blas::axpby(d2, const_cast<cudaColorSpinorField&>(in), d1, out);
     
     //C_1(x) = x
@@ -473,7 +473,7 @@ namespace quda{
 	    mat.M(*d_v2,*d_v);
 	  }
 	}
-
+	
 	*h_v2 = *d_v2;
 	
       }
@@ -588,8 +588,11 @@ namespace quda{
     for(int i =0 ; i < nev_ ; i++){
       cpuParam->v = (std::complex<float>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_;
       h_v3 = new cpuColorSpinorField(*cpuParam);
-      *d_v = *h_v3;                                      // d_v = v
-      //printfQuda("norm = %e\n", sqrt(blas::norm2(*d_v)));
+
+      // d_v = v
+      *d_v = *h_v3;
+
+      // d_v2 = M*v
       if(arpack_param->useNormOp && arpack_param->useDagger) {
 	mat.MMdag(*d_v2,*d_v);
       }
@@ -602,10 +605,18 @@ namespace quda{
       else {  
 	mat.M(*d_v2,*d_v);
       }
-      //mat.MdagM(*d_v2,*d_v);                           // d_v2 = M*v
-      h_evals_[i] = blas::cDotProduct(*d_v, *d_v2);      // lambda = v^dag * M*v
-      blas::axpby(1.0,*d_v2,-real(h_evals_[i]),*d_v);    // d_v = ||M*v - lambda*v||
+
+      // lambda = v^dag * M*v
+      h_evals_[i] = blas::cDotProduct(*d_v, *d_v2);
+      
+      std::complex<float> unit(1.0,0.0);
+      std::complex<float> m_lambda(-real(h_evals_[i]),
+				   -imag(h_evals_[i]));
+
+      // d_v = ||M*v - lambda*v||
+      blas::caxpby(unit, *d_v2, m_lambda, *d_v);
       double L2norm = blas::norm2(*d_v);
+
       printfQuda("Eval[%04d] = %+e  %+e  Residual: %+e\n",
 		 i, real(h_evals_[i]), imag(h_evals_[i]), sqrt(L2norm));
       delete h_v3;
@@ -615,9 +626,10 @@ namespace quda{
 	       t1/CLOCKS_PER_SEC);
 
     if(arpack_param->SVD) {
+      
       //Compute SVD
       t1 = -(double)clock();
-      for(int i=nev_/2 - 1; i >= 0  ; i--){
+      for(int i=nev_/2 - 1; i >= 0; i--){
 	
 	//This function assumes that you have computed the eigenvectors
 	//of MdagM, ie, the right SVD of M. The ith eigen vector in the array corresponds
@@ -638,7 +650,7 @@ namespace quda{
 	h_v3 = new cpuColorSpinorField(*cpuParam);      //Host Rev_i
 	*d_v = *h_v3;                                   //Device Rev_i
 	
-	mat.M(*d_v2,*d_v);                              //  M Rev_i = M Rsv_i =  sigma_i Lsv_i =   
+	mat.M(*d_v2,*d_v);                              //  M Rev_i = M Rsv_i = sigma_i Lsv_i =   
 	h_evals_[i] = blas::cDotProduct(*d_v2, *d_v2);  // (sigma_i)^2 = (sigma_i Lsv_i)^dag * (sigma_i Lsv_i)
 	
 	//Compute \sigma_i
