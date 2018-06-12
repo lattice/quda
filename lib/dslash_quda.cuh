@@ -477,19 +477,6 @@ public:
     if (x) dslashParam.xTexNorm = x->TexNorm();
 #endif // USE_TEXTURE_OBJECTS
 
-    fillAuxBase();
-#ifdef MULTI_GPU
-    fillAux(INTERIOR_KERNEL, "type=interior");
-    fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all");
-    fillAux(EXTERIOR_KERNEL_X, "type=exterior_x");
-    fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y");
-    fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z");
-    fillAux(EXTERIOR_KERNEL_T, "type=exterior_t");
-#else
-    fillAux(INTERIOR_KERNEL, "type=single-GPU");
-#endif // MULTI_GPU
-    fillAux(KERNEL_POLICY, "policy");
-
     dslashParam.sp_stride = in->Stride();
 
     // this sets the communications pattern for the packing kernel
@@ -523,6 +510,20 @@ public:
       }
       init = true;
     }
+
+    fillAuxBase();
+#ifdef MULTI_GPU
+    fillAux(INTERIOR_KERNEL, "type=interior");
+    fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all");
+    fillAux(EXTERIOR_KERNEL_X, "type=exterior_x");
+    fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y");
+    fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z");
+    fillAux(EXTERIOR_KERNEL_T, "type=exterior_t");
+#else
+    fillAux(INTERIOR_KERNEL, "type=single-GPU");
+#endif // MULTI_GPU
+    fillAux(KERNEL_POLICY, "policy");
+
   }
 
   virtual ~DslashCuda() { }
