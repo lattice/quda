@@ -53,7 +53,7 @@ namespace quda {
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, cudaStream_t stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
                         const char *func, const char *file, const char *line);
 
   /**
@@ -69,7 +69,7 @@ namespace quda {
      @param[in] stream Stream to issue copy
   */
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t hieght, cudaMemcpyKind kind, cudaStream_t stream,
+                          size_t width, size_t hieght, cudaMemcpyKind kind, const cudaStream_t &stream,
                           const char *func, const char *file, const char *line);
 
   /**
@@ -77,14 +77,14 @@ namespace quda {
      @param[in] event Event we are querying
      @return Status of event query
    */
-  cudaError_t qudaEventQuery(cudaEvent_t event);
+  cudaError_t qudaEventQuery(cudaEvent_t &event);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
-  cudaError_t qudaEventRecord(cudaEvent_t event, cudaStream_t stream);
+  cudaError_t qudaEventRecord(cudaEvent_t &event, cudaStream_t stream=0);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
@@ -98,13 +98,13 @@ namespace quda {
      @brief Wrapper around cudaStreamSynchronize or cuStreamSynchronize
      @param[in] stream Stream which we are synchronizing with respect to
    */
-  cudaError_t qudaStreamSynchronize(cudaStream_t stream);
+  cudaError_t qudaStreamSynchronize(cudaStream_t &stream);
 
   /**
      @brief Wrapper around cudaEventSynchronize or cuEventSynchronize
      @param[in] event Event which we are synchronizing with respect to
    */
-  cudaError_t qudaEventSynchronize(cudaEvent_t event);
+  cudaError_t qudaEventSynchronize(cudaEvent_t &event);
   
   /**
      @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
