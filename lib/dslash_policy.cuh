@@ -27,7 +27,7 @@ struct DslashCommsPattern {
   int commDimTotal;
   int completeSum;
 
-  DslashCommsPattern(const int commDim[], bool gdr_send=false)
+  inline DslashCommsPattern(const int commDim[], bool gdr_send=false)
     : commsCompleted{ }, dslashCompleted{ }, completeSum(0) {
 
     for (int i=0; i<Nstream-1; i++) gatherCompleted[i] = gdr_send ? 1 : 0;
@@ -157,12 +157,14 @@ namespace {
      @param[out] in Field that we are packing
      @param[in] dslash The dslash object
      @param[in] parity Field parity
-     @param[in] location Memory location where we are packing to - if
-     Host is requested, the only non-p2p halos will be sent to host
-     with p2p halos kept on the device
+     @param[in] location Memory location where we are packing to
+     - if Host is requested, the non-p2p halos will be sent to host
+     - if Remote is requested, the p2p halos will be written directly
      @param[in] packIndex Stream index where the packing kernel will run
   */
   inline void issuePack(cudaColorSpinorField &in, const DslashCuda &dslash, int parity, MemoryLocation location, int packIndex) {
+
+    if ( (location & Device) & Host) errorQuda("MemoryLocation cannot be both Device and Host");
 
     using namespace dslash;
 
@@ -172,18 +174,24 @@ namespace {
         { pack = true; break; }
 
     MemoryLocation pack_dest[2*QUDA_MAX_DIM];
-    // always packing to local device for p2p directions, and if requested pack to host (zero copy)
-    for (int dim=0; dim<4; dim++)
-      for (int dir=0; dir<2; dir++)
-	pack_dest[2*dim+dir] = (location == Device || comm_peer2peer_enabled(dir,dim)) ? Device : Host;
-
+    for (int dim=0; dim<4; dim++) {
+      for (int dir=0; dir<2; dir++) {
+        if ( (location & Remote) && comm_peer2peer_enabled(dir,dim) ) {
+          pack_dest[2*dim+dir] = Remote; // pack to p2p remote
+        } else if ( location & Host && !comm_peer2peer_enabled(dir,dim) ) {
+          pack_dest[2*dim+dir] = Host;   // pack to cpu memory
+        } else {
+          pack_dest[2*dim+dir] = Device; // pack to local gpu memory
+        }
+      }
+    }
     if (pack) {
       PROFILE(if (dslash_pack_compute) in.pack(dslash.Nface()/2, parity, dslash.Dagger(), packIndex,
-					       pack_dest, dslashParam.twist_a, dslashParam.twist_b),
+					       pack_dest, location, dslashParam.twist_a, dslashParam.twist_b),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
 
       // Record the end of the packing
-      PROFILE(if (location != Host) cudaEventRecord(packEnd[in.bufferIndex], streams[packIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
+      PROFILE(if (location != Host) qudaEventRecord(packEnd[in.bufferIndex], streams[packIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
   }
@@ -204,14 +212,14 @@ namespace {
       for (int dir=1; dir>=0; dir--) { // forwards gather
         cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in.bufferIndex] : dslashStart[in.bufferIndex];
 
-        PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+        PROFILE(qudaStreamWaitEvent(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
         // Initialize host transfer from source spinor
         PROFILE(if (dslash_copy) in.gather(dslash.Nface()/2, dslash.Dagger(), 2*i+dir), profile, QUDA_PROFILE_GATHER);
 
         // Record the end of the gathering if not peer-to-peer
 	if (!comm_peer2peer_enabled(dir,i)) {
-	  PROFILE(cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]), profile, QUDA_PROFILE_EVENT_RECORD);
+	  PROFILE(qudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]), profile, QUDA_PROFILE_EVENT_RECORD);
 	}
       }
     }
@@ -281,7 +289,7 @@ namespace {
 
       // if peer-2-peer in a given direction then we need to insert a wait on that copy event
       if (comm_peer2peer_enabled(dir2,dim)) {
-	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	PROFILE(qudaStreamWaitEvent(streams[Nstream-1], in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
       } else {
 
 	if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
@@ -318,14 +326,14 @@ namespace {
      updating the local buffers on a subsequent computation before we
      have finished sending.
   */
-  void completeDslash(const ColorSpinorField &in) {
+  inline void completeDslash(const ColorSpinorField &in) {
     // this ensures that the p2p sending is completed before any
     // subsequent work is done on the compute stream
     for (int dim=3; dim>=0; dim--) {
       if (!dslashParam.commDim[dim]) continue;
       for (int dir=0; dir<2; dir++) {
 	if (comm_peer2peer_enabled(dir,dim)) {
-	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], in.getIPCCopyEvent(dir,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  PROFILE(qudaStreamWaitEvent(streams[Nstream-1], in.getIPCCopyEvent(dir,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	}
       }
     }
@@ -333,12 +341,16 @@ namespace {
 
   /**
      @brief Set the ghosts to the mapped CPU ghost buffer, or unsets
-     if already set.
+     if already set.  Note this must not be called until after the
+     interior dslash has been called, since sets the peer-to-peer
+     ghost pointers, and this need to be done without the mapped ghost
+     enabled.
+
      @param[in,out] dslash The dslash object
      @param[in,out] in The ColorSpinorField source
      @param[in] to_mapped Whether we are switching to mapped ghosts or not
    */
-  void setGhost(DslashCuda &dslash, cudaColorSpinorField &in, bool to_mapped) {
+  inline void setMappedGhost(DslashCuda &dslash, cudaColorSpinorField &in, bool to_mapped) {
 
     static char aux_copy[TuneKey::aux_n];
     static bool set_mapped = false;
@@ -385,13 +397,13 @@ struct DslashBasic : DslashPolicyImp {
 
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !getKernelPackT()) {
-      PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, Device, packIndex);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -408,12 +420,13 @@ struct DslashBasic : DslashPolicyImp {
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
 
 	    cudaError_t event_test = comm_peer2peer_enabled(dir,i) ? cudaSuccess : cudaErrorNotReady;
-	    if (event_test != cudaSuccess) PROFILE(event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
+	    if (event_test != cudaSuccess) PROFILE(event_test = qudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -433,9 +446,9 @@ struct DslashBasic : DslashPolicyImp {
 	  for (int dir=1; dir>=0; dir--) {
 	    if (!comm_peer2peer_enabled(1-dir,i)) { // if not peer-to-peer we post an event in the scatter stream and wait on that
 	      // Record the end of the scattering
-	      PROFILE(cudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]), profile, QUDA_PROFILE_EVENT_RECORD);
+	      PROFILE(qudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]), profile, QUDA_PROFILE_EVENT_RECORD);
 	      // wait for scattering to finish and then launch dslash
-	      PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+dir], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	      PROFILE(qudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+dir], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	    }
 	  }
 
@@ -472,7 +485,7 @@ struct DslashPthreads : DslashPolicyImp {
 #ifdef MULTI_GPU
   // Record the start of the dslash if doing communication in T and not kernel packing
     {
-      PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]),
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]),
               profile, QUDA_PROFILE_EVENT_RECORD);
     }
 		
@@ -505,7 +518,7 @@ struct DslashPthreads : DslashPolicyImp {
         { pack = true; break; }
 
     if (pack){
-      PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0),
+      PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0),
               profile, QUDA_PROFILE_STREAM_WAIT_EVENT); 
     }
 
@@ -517,7 +530,7 @@ struct DslashPthreads : DslashPolicyImp {
 
     if (pack) {
       // Record the end of the packing
-      PROFILE(cudaEventRecord(packEnd[in->bufferIndex], streams[packIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
+      PROFILE(qudaEventRecord(packEnd[in->bufferIndex], streams[packIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
     for(int i = 3; i >=0; i--){
       if (!dslashParam.commDim[i]) continue;
@@ -525,14 +538,14 @@ struct DslashPthreads : DslashPolicyImp {
       for (int dir=1; dir>=0; dir--) {
         cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in->bufferIndex] : dslashStart[in->bufferIndex];
 
-        PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0),
+        PROFILE(qudaStreamWaitEvent(streams[2*i+dir], event, 0),
 	        profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
         // Initialize host transfer from source spinor
         PROFILE(if (dslash_copy) in->gather(dslash.Nface()/2, dagger, 2*i+dir), profile, QUDA_PROFILE_GATHER);
 
         // Record the end of the gathering
-        PROFILE(cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]),
+        PROFILE(qudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]),
 	        profile, QUDA_PROFILE_EVENT_RECORD);
       }
     }
@@ -557,12 +570,13 @@ struct DslashPthreads : DslashPolicyImp {
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
 	    cudaError_t event_test = comm_peer2peer_enabled(dir,i) ? cudaSuccess : cudaErrorNotReady;
-	    if (event_test != cudaSuccess) PROFILE(event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
+	    if (event_test != cudaSuccess) PROFILE(event_test = qudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger,  dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) ? in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -586,7 +600,7 @@ struct DslashPthreads : DslashPolicyImp {
         // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
         if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	// Record the end of the scattering
-	  PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]),
+	  PROFILE(qudaEventRecord(scatterEnd[2*i], streams[2*i]),
 		  profile, QUDA_PROFILE_EVENT_RECORD);
 
 	  if(!interiorLaunched){
@@ -595,7 +609,7 @@ struct DslashPthreads : DslashPolicyImp {
           }
 
 	  // wait for scattering to finish and then launch dslash
-	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0),
+	  PROFILE(qudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0),
 		  profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
@@ -637,13 +651,13 @@ struct DslashFusedExterior : DslashPolicyImp {
 
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !getKernelPackT()) {
-      PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, Device, packIndex);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -660,12 +674,13 @@ struct DslashFusedExterior : DslashPolicyImp {
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
 	    cudaError_t event_test = comm_peer2peer_enabled(dir,i) ? cudaSuccess : cudaErrorNotReady;
-	    if (event_test != cudaSuccess) PROFILE(event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
+	    if (event_test != cudaSuccess) PROFILE(event_test = qudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -683,8 +698,8 @@ struct DslashFusedExterior : DslashPolicyImp {
 
     for (int i=3; i>=0; i--) {
       if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i))) { // if not peer-to-peer we post an event in the scatter stream and wait on that
-	PROFILE(cudaEventRecord(scatterEnd[0], streams[scatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
-	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	PROFILE(qudaEventRecord(scatterEnd[0], streams[scatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
+	PROFILE(qudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	break;
       }
     }
@@ -720,7 +735,7 @@ struct DslashGDR : DslashPolicyImp {
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, Device, packIndex);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
@@ -737,7 +752,8 @@ struct DslashGDR : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, true), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, true, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -798,7 +814,7 @@ struct DslashFusedGDR : DslashPolicyImp {
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, Device, packIndex);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
@@ -815,7 +831,8 @@ struct DslashFusedGDR : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, 0, true), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, true, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	}
@@ -869,13 +886,13 @@ struct DslashGDRRecv : DslashPolicyImp {
 
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !getKernelPackT()) {
-      PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, Device, packIndex);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -891,12 +908,13 @@ struct DslashGDRRecv : DslashPolicyImp {
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
 	    cudaError_t event_test = comm_peer2peer_enabled(dir,i) ? cudaSuccess : cudaErrorNotReady;
-	    if (event_test != cudaSuccess) PROFILE(event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
+	    if (event_test != cudaSuccess) PROFILE(event_test = qudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -947,13 +965,13 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
 
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !getKernelPackT()) {
-      PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 		
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, Device, packIndex);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -969,12 +987,13 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
 	    cudaError_t event_test = comm_peer2peer_enabled(dir,i) ? cudaSuccess : cudaErrorNotReady;
-	    if (event_test != cudaSuccess) PROFILE(event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
+	    if (event_test != cudaSuccess) PROFILE(event_test = qudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true);  // do a comms query to ensure MPI has begun
 	    }
 	  }
@@ -1036,13 +1055,13 @@ struct DslashAsync : DslashPolicyImp {
 
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !getKernelPackT()) {
-      PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, Device, packIndex);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -1058,12 +1077,13 @@ struct DslashAsync : DslashPolicyImp {
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
 	    cudaError_t event_test = comm_peer2peer_enabled(dir,i) ? cudaSuccess : cudaErrorNotReady;
-	    if (event_test != cudaSuccess) PROFILE(event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
+	    if (event_test != cudaSuccess) PROFILE(event_test = qudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
@@ -1090,9 +1110,9 @@ struct DslashAsync : DslashPolicyImp {
 	  for (int dir=1; dir>=0; dir--) {
 	    if (!comm_peer2peer_enabled(1-dir,i)) { // if not peer-to-peer we post an event in the scatter stream and wait on that
 	      // Record the end of the scattering
-	      PROFILE(cudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]), profile, QUDA_PROFILE_EVENT_RECORD);
+	      PROFILE(qudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]), profile, QUDA_PROFILE_EVENT_RECORD);
 	      // wait for scattering to finish and then launch dslash
-	      PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+dir], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	      PROFILE(qudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+dir], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	    }
 	  }
 
@@ -1145,13 +1165,13 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !getKernelPackT()) {
-      PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, Device, packIndex);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -1169,12 +1189,13 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
 	    cudaError_t event_test = comm_peer2peer_enabled(dir,i) ? cudaSuccess : cudaErrorNotReady;
-	    if (event_test != cudaSuccess) PROFILE(event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
+	    if (event_test != cudaSuccess) PROFILE(event_test = qudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
@@ -1202,8 +1223,8 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
     for (int i=3; i>=0; i--) {
       if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i))) {
 	// if not peer-to-peer we post an event in the scatter stream and wait on that
-	PROFILE(cudaEventRecord(scatterEnd[0], streams[scatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
-	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	PROFILE(qudaEventRecord(scatterEnd[0], streams[scatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
+	PROFILE(qudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	break;
       }
     }
@@ -1247,18 +1268,23 @@ struct DslashZeroCopyPack : DslashPolicyImp {
     dslashParam.threads = volume;
 
     // record start of the dslash
-    PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = getStreamIndex();
-    PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, Host, packIndex);
+    PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
+        qudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1266,7 +1292,8 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1295,9 +1322,9 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 	  for (int dir=1; dir>=0; dir--) {
 	    if (!comm_peer2peer_enabled(1-dir,i)) { // if not peer-to-peer we post an event in the scatter stream and wait on that
 	      // Record the end of the scattering
-	      PROFILE(cudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]), profile, QUDA_PROFILE_EVENT_RECORD);
+	      PROFILE(qudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]), profile, QUDA_PROFILE_EVENT_RECORD);
 	      // wait for scattering to finish and then launch dslash
-	      PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+dir], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	      PROFILE(qudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+dir], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	    }
 	  }
 
@@ -1336,18 +1363,23 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
     dslashParam.threads = volume;
 
     // record start of the dslash
-    PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
     const int packScatterIndex = getStreamIndex();
-    PROFILE(cudaStreamWaitEvent(streams[packScatterIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, Host, packScatterIndex);
+    PROFILE(qudaStreamWaitEvent(streams[packScatterIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packScatterIndex);
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packScatterIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
+        qudaStreamSynchronize(streams[packScatterIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1355,7 +1387,8 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packScatterIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1385,8 +1418,8 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
     for (int i=3; i>=0; i--) {
       if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i))) {
 	// if not peer-to-peer we post an event in the scatter stream and wait on that
-	PROFILE(cudaEventRecord(scatterEnd[0], streams[packScatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
-	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	PROFILE(qudaEventRecord(scatterEnd[0], streams[packScatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
+	PROFILE(qudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	break;
       }
     }
@@ -1419,18 +1452,23 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
     dslashParam.threads = volume;
 
     // record start of the dslash
-    PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     const int packIndex = getStreamIndex();
-    PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, Host, packIndex);
+    PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
+        qudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1438,7 +1476,8 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1499,18 +1538,23 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
     dslashParam.threads = volume;
 
     // record start of the dslash
-    PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
     const int packIndex = getStreamIndex();
-    PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, Host, packIndex);
+    PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
+        qudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1518,7 +1562,8 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1567,7 +1612,6 @@ struct DslashZeroCopy : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-    comm_enable_peer2peer(false);
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
@@ -1575,18 +1619,23 @@ struct DslashZeroCopy : DslashPolicyImp {
     dslashParam.threads = volume;
 
     // record start of the dslash
-    PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = getStreamIndex();
-    PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, Host, packIndex);
+    PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
+        qudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1594,7 +1643,8 @@ struct DslashZeroCopy : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1619,15 +1669,15 @@ struct DslashZeroCopy : DslashPolicyImp {
 
 	}
 
-	// FIXME - will not work with P2P until we can split where the halos originate
 	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-        if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+        if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] &&
+             pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
-	  setGhost(dslash, *in, true);
+          setMappedGhost(dslash, *in, true);
 	  PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-	  setGhost(dslash, *in, false);
+          setMappedGhost(dslash, *in, false);
 
 	  pattern.dslashCompleted[2*i] = 1;
 	}
@@ -1636,7 +1686,6 @@ struct DslashZeroCopy : DslashPolicyImp {
 
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
-    comm_enable_peer2peer(true);
   }
 };
 
@@ -1651,7 +1700,6 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-    comm_enable_peer2peer(false);
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
@@ -1659,18 +1707,23 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
     dslashParam.threads = volume;
 
     // record start of the dslash
-    PROFILE(cudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = getStreamIndex();
-    PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, Host, packIndex);
+    PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    cudaStreamSynchronize(streams[packIndex]);
+    for (int i=3; i>=0; i--) { // only synchronize if we need to
+      if ( !dslashParam.remote_write || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)))  ) {
+        qudaStreamSynchronize(streams[packIndex]);
+        break;
+      }
+    }
 
     for (int p2p=0; p2p<2; p2p++) { // schedule non-p2p traffic first, then do p2p
       for (int i=3; i>=0; i--) {
@@ -1678,7 +1731,8 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+                                                    false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
 	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
@@ -1707,19 +1761,16 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
     }
 
-    // FIXME - will not work with P2P until we can split where the halos originate
     if (pattern.commDimTotal) {
       setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
-
-      setGhost(dslash, *in, true);
+      setMappedGhost(dslash, *in, true);
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-      setGhost(dslash, *in, false);
+      setMappedGhost(dslash, *in, false);
     }
 
     completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
-    comm_enable_peer2peer(true);
   }
 };
 
@@ -1762,9 +1813,16 @@ struct DslashNC : DslashPolicyImp {
     QUDA_DSLASH_POLICY_DISABLED // this MUST be the last element
   };
 
- static std::vector<QudaDslashPolicy> policies(static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+  static std::vector<QudaDslashPolicy> policies(static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
 
+  enum class QudaP2PPolicy {
+    QUDA_P2P_DEFAULT,         // no special hanlding for p2p
+    QUDA_P2P_COPY_ENGINE,     // use copy engine for p2p traffic
+    QUDA_P2P_REMOTE_WRITE,    // write packed halos directly to peers
+    QUDA_P2P_POLICY_DISABLED, // this must be the last element
+  };
 
+  static std::vector<QudaP2PPolicy> p2p_policies(static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
 struct DslashFactory {
 
@@ -1835,18 +1893,21 @@ struct DslashFactory {
   }
 };
 
- static bool dslash_init = false;
+  static bool dslash_init = false;
 
- static int config = 0; // 2-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
- static int first_active_policy=static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+  static int config = 0; // 3-bit number used to record the machine config (first bit for gdr / two bits for p2p) and if this changes we will force a retune
 
-void enable_policy(QudaDslashPolicy p){
-  policies[static_cast<std::size_t>(p)] = p;
-}
+  static int first_active_policy=static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
 
-void disable_policy(QudaDslashPolicy p){
-  policies[static_cast<std::size_t>(p)] = QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED;
-}
+  static int first_active_p2p_policy=static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
+
+  void enable_policy(QudaDslashPolicy p){
+    policies[static_cast<std::size_t>(p)] = p;
+  }
+
+  void disable_policy(QudaDslashPolicy p){
+    policies[static_cast<std::size_t>(p)] = QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED;
+  }
 
  class DslashPolicyTune : public Tunable {
 
@@ -1874,8 +1935,17 @@ void disable_policy(QudaDslashPolicy p){
 
      if (!dslash_init) {
 
-       if (comm_peer2peer_enabled_global()) config++;
-       if (comm_gdr_enabled()) config+=2;
+       config += comm_gdr_enabled();
+       config += 2*comm_peer2peer_enabled_global();
+
+       if (comm_peer2peer_enabled_global() & 2) {
+         p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)] = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
+       }
+       if (comm_peer2peer_enabled_global() & 1) {
+         p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE)] = QudaP2PPolicy::QUDA_P2P_COPY_ENGINE;
+       }
+       p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
+       first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT); // first active policy is presently always the default
 
        static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_POLICY");
        if (dslash_policy_env) { // set the policies to tune for explicitly
@@ -1921,9 +1991,11 @@ void disable_policy(QudaDslashPolicy p){
 	   enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH);
 	 }
 
-	 // note these policies do not presently use p2p
+#ifdef USE_TEXTURE_OBJECTS
+         // pure zero-copy policies require texture objects
 	 enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH);
 	 enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH);
+#endif
 
 	 // Async variants are only supported on CUDA 8.0 and up
 #if (CUDA_VERSION >= 8000) && 0
@@ -1978,65 +2050,83 @@ void disable_policy(QudaDslashPolicy p){
      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
        disableProfileCount();
 
-       for (auto &i : policies) {
+       for (auto &p2p : p2p_policies) {
 
-	 if (i == QudaDslashPolicy::QUDA_DSLASH ||
-	     i == QudaDslashPolicy::QUDA_FUSED_DSLASH ||
-	     i == QudaDslashPolicy::QUDA_DSLASH_ASYNC ||
-	     i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC) {
+         if (p2p == QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED) continue;
 
-	   DslashPolicyImp* dslashImp = DslashFactory::create(i);
-	   (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
-	   delete dslashImp;
+         bool p2p_enabled = comm_peer2peer_enabled_global();
+         if (p2p == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false);  // disable p2p if using default policy
+         dslashParam.remote_write = (p2p == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0);
 
-	 } else if (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
-		    i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
-		    i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH ||
-		    i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH ||
-		    i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
-		    i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
-		    i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
-		    i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
-		    i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH ||
-		    i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH) {
-	   // these dslash policies all must have kernel packing enabled
+         for (auto &i : policies) {
 
-	   // clumsy, but we call setKernelPackT a handful of times before
-	   // we restore the the current state, so this will "just work"
-	   pushKernelPackT(getKernelPackT());
+           if ( (i == QudaDslashPolicy::QUDA_DSLASH ||
+                 i == QudaDslashPolicy::QUDA_FUSED_DSLASH ||
+                 i == QudaDslashPolicy::QUDA_DSLASH_ASYNC ||
+                 i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC) &&
+                !dslashParam.remote_write) {
 
-	   // if we are using GDR policies then we must tune the
-	   // non-GDR variants as well with and without kernel packing
-	   // enabled - this ensures that all GPUs will have the
-	   // required tune cache entries prior to potential process
-	   // divergence regardless of which GPUs are blacklisted
-	   if (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
-	       i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
-	       i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH ||
-	       i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH) {
-	     QudaDslashPolicy policy = (i==QudaDslashPolicy::QUDA_GDR_DSLASH || i==QudaDslashPolicy::QUDA_GDR_RECV_DSLASH) ?
-	       QudaDslashPolicy::QUDA_DSLASH : QudaDslashPolicy::QUDA_FUSED_DSLASH;
-	     DslashPolicyImp* dslashImp = DslashFactory::create(policy);
-	     setKernelPackT(false);
-	     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
-	     setKernelPackT(true);
-	     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
-	     delete dslashImp;
-	   }
+             DslashPolicyImp* dslashImp = DslashFactory::create(i);
+             (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+             delete dslashImp;
 
-	   setKernelPackT(true);
+           } else if ( (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
+                        i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
+                        i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH ||
+                        i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH ||
+                        i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
+                        i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
+                        i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
+                        i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
+                        i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH ||
+                        i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH) ||
+                       ((i == QudaDslashPolicy::QUDA_DSLASH ||
+                         i == QudaDslashPolicy::QUDA_FUSED_DSLASH ||
+                         i == QudaDslashPolicy::QUDA_DSLASH_ASYNC ||
+                         i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC) && dslashParam.remote_write) ) {
+             // these dslash policies all must have kernel packing enabled
 
-	   DslashPolicyImp* dslashImp = DslashFactory::create(i);
-	   (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
-	   delete dslashImp;
+             // clumsy, but we call setKernelPackT a handful of times before
+             // we restore the the current state, so this will "just work"
+             pushKernelPackT(getKernelPackT());
 
-	   // restore default kernel packing
-	   popKernelPackT();
+             // if we are using GDR policies then we must tune the
+             // non-GDR variants as well with and without kernel
+             // packing enabled - this ensures that all GPUs will have
+             // the required tune cache entries prior to potential
+             // process divergence regardless of which GPUs are
+             // blacklisted.  don't enter if remote writing since
+             // there we always use kernel packing
+             if ( (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
+                   i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
+                   i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH ||
+                   i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH) && !dslashParam.remote_write ) {
+               QudaDslashPolicy policy = (i==QudaDslashPolicy::QUDA_GDR_DSLASH || i==QudaDslashPolicy::QUDA_GDR_RECV_DSLASH) ?
+                 QudaDslashPolicy::QUDA_DSLASH : QudaDslashPolicy::QUDA_FUSED_DSLASH;
+               DslashPolicyImp* dslashImp = DslashFactory::create(policy);
+               setKernelPackT(false);
+               (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+               setKernelPackT(true);
+               (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+               delete dslashImp;
+             }
 
-	 } else if (i != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED){
-	   errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
-	 }
-       }
+             setKernelPackT(true);
+
+             DslashPolicyImp* dslashImp = DslashFactory::create(i);
+             (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+             delete dslashImp;
+
+             // restore default kernel packing
+             popKernelPackT();
+
+           } else if (i != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED){
+             errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
+           }
+         }
+
+         comm_enable_peer2peer(p2p_enabled); // restore p2p state
+       } // p2p policies
 
        enableProfileCount();
        setPolicyTuning(true);
@@ -2049,32 +2139,41 @@ void disable_policy(QudaDslashPolicy p){
    void apply(const cudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
 
-     if (config != tp.aux.y && comm_size() > 1) {
+     if (config != tp.aux.w && comm_size() > 1) {
        errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "
 		 "this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.",
-		 config, tp.aux.y);
+		 config, tp.aux.w);
      }
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
      if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
+
+     bool p2p_enabled = comm_peer2peer_enabled_global();
+     if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
+     dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
 
      // switch on kernel packing for the policies that need it, save default kernel packing
      pushKernelPackT(getKernelPackT());
      auto p = static_cast<QudaDslashPolicy>(tp.aux.x);
      if ( p == QudaDslashPolicy::QUDA_GDR_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
-	  p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
+          p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
           p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
           p == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH ||
-          p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH) {
+          p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH ||
+          dslashParam.remote_write // always use kernel packing if remote writing
+          ) {
        setKernelPackT(true);
      }
 
      DslashPolicyImp* dslashImp = DslashFactory::create(static_cast<QudaDslashPolicy>(tp.aux.x));
      (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
      delete dslashImp;
+
+     // restore p2p state
+     comm_enable_peer2peer(p2p_enabled);
 
      // restore default kernel packing
      popKernelPackT();
@@ -2085,24 +2184,31 @@ void disable_policy(QudaDslashPolicy p){
    // Find the best dslash policy
    bool advanceAux(TuneParam &param) const
    {
-      while ((unsigned)param.aux.x < policies.size()-1) {
+     while ((unsigned)param.aux.x < policies.size()-1) {
        param.aux.x++;
-       if(policies[param.aux.x] != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) return true;
+       if (policies[param.aux.x] != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) return true;
      }
-       param.aux.x = 0;
-       return false;
+     param.aux.x = first_active_policy;
+
+     while ((unsigned)param.aux.y < p2p_policies.size()-1) {
+       param.aux.y++;
+       if (p2p_policies[param.aux.y] != QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED) return true;
+     }
+     param.aux.y = first_active_p2p_policy;
+
+     return false;
    }
 
    bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
 
    void initTuneParam(TuneParam &param) const  {
      Tunable::initTuneParam(param);
-     param.aux.x = first_active_policy; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0; param.aux.w = config;
    }
 
    void defaultTuneParam(TuneParam &param) const  {
      Tunable::defaultTuneParam(param);
-     param.aux.x = first_active_policy; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0; param.aux.w = config;
    }
 
    TuneKey tuneKey() const {

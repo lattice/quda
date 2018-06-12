@@ -481,7 +481,7 @@ if ( isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==X1m1 )
   const int sp_stride_pad = ghostFace[0];
   
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 0);
   
   a0_re = i00_re;  a0_im = i00_im;
   a1_re = i01_re;  a1_im = i01_im;
@@ -648,7 +648,7 @@ if ( isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0 )
   const int sp_stride_pad = ghostFace[0];
   
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 1);
   
   a0_re = i00_re;  a0_im = i00_im;
   a1_re = i01_re;  a1_im = i01_im;
@@ -815,7 +815,7 @@ if ( isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==X2m1 )
   const int sp_stride_pad = ghostFace[1];
   
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 2);
   
   a0_re = i00_re;  a0_im = i00_im;
   a1_re = i01_re;  a1_im = i01_im;
@@ -982,7 +982,7 @@ if ( isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0 )
   const int sp_stride_pad = ghostFace[1];
   
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 3);
   
   a0_re = i00_re;  a0_im = i00_im;
   a1_re = i01_re;  a1_im = i01_im;
@@ -1149,7 +1149,7 @@ if ( isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==X3m1 )
   const int sp_stride_pad = ghostFace[2];
   
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 4);
   
   a0_re = i00_re;  a0_im = i00_im;
   a1_re = i01_re;  a1_im = i01_im;
@@ -1316,7 +1316,7 @@ if ( isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0 )
   const int sp_stride_pad = ghostFace[2];
   
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 5);
   
   a0_re = i00_re;  a0_im = i00_im;
   a1_re = i01_re;  a1_im = i01_im;
@@ -1486,7 +1486,7 @@ if ( isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
     const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 6);
     
     a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
     a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
@@ -1537,7 +1537,7 @@ if ( isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
     const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 6);
     
     a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
     a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
@@ -1696,7 +1696,7 @@ if ( isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
     const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 7);
     
     a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
     a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
@@ -1747,7 +1747,7 @@ if ( isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
     const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 7);
     
     a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
     a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;

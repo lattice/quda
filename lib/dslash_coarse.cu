@@ -1035,7 +1035,7 @@ namespace quda {
   void setPolicyTuning(bool);
 
   static bool dslash_init = false;
-  static int config = 0; // 2-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
+  static int config = 0; // 3-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
   static std::vector<DslashCoarsePolicy> policies(static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED), DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
   static int first_active_policy=static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
 
@@ -1046,7 +1046,6 @@ namespace quda {
   void disable_policy(DslashCoarsePolicy p){
     policies[static_cast<std::size_t>(p)] = DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED;
   }
-
 
  class DslashCoarsePolicyTune : public Tunable {
 
@@ -1119,8 +1118,8 @@ namespace quda {
 	  }
 	}
 
-	config += comm_peer2peer_enabled_global();
-	config += comm_gdr_enabled() * 2;
+	config += comm_gdr_enabled();
+	config += 2*comm_peer2peer_enabled_global();
 	dslash_init = true;
       }
 

@@ -783,7 +783,7 @@ namespace quda {
       }
     }
     if ( getVerbosity() >= QUDA_SUMMARIZE ) {
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (hb.flops() * 8 * nhb * 1e-9) / (secs);
@@ -809,7 +809,7 @@ namespace quda {
       }
     }
     if ( getVerbosity() >= QUDA_SUMMARIZE ) {
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (relax.flops() * 8 * nover * 1e-9) / (secs);

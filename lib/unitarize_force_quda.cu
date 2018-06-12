@@ -609,7 +609,7 @@ namespace { // anonymous
 					 max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
       UnitarizeForce<Float,UnitarizeForceArg<Gauge,Gauge> > unitarizeForce(arg, meta);
       unitarizeForce.apply(0);
-      cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
+      qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
       if(flops) *flops = unitarizeForce.flops(); 
       checkCudaError();
     }

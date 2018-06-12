@@ -497,13 +497,11 @@ namespace quda {
           pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
           printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
           d_new = dinit;
-          r0Norm = sqrt(r2);
         }
         else{
           rNorm = sqrt(r2);
           maxrr = rNorm;
           maxrx = rNorm;
-          r0Norm = rNorm;
         }
 
 
@@ -557,6 +555,7 @@ namespace quda {
         }
 
         steps_since_reliable = 0;
+        r0Norm = sqrt(r2);
         rUpdate++;
 
         heavy_quark_res_old = heavy_quark_res;

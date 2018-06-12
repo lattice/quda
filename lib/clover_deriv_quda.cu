@@ -512,7 +512,7 @@ namespace quda {
       errorQuda("Force order %d not supported", force.Order());
     } // force / oprod order
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 #endif // GPU_CLOVER
 

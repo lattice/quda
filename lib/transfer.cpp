@@ -380,7 +380,7 @@ namespace quda {
 
     // only need to synchronize if we're transferring from GPU to CPU
     if (out.Location() == QUDA_CPU_FIELD_LOCATION && in.Location() == QUDA_CUDA_FIELD_LOCATION)
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
 
     flops_ += 8*out.Ncolor()*in.Ncolor()*in.VolumeCB()*in.SiteSubset();
 

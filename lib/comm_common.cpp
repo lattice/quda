@@ -153,26 +153,43 @@ static bool intranode_enabled[2][4] = { {false,false,false,false},
     (regardless whether it is enabled or not) */
 static bool peer2peer_present = false;
 
+/** by default enable both copy engines and load/store access */
+static int enable_peer_to_peer = 3; 
+
+
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
 
-  bool disable_peer_to_peer = false;
   char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
-  if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "0") == 0) {
-    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling peer-to-peer access\n");
-    disable_peer_to_peer = true;
-  }
 
   // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
   // and comm_dim(dim) == 2 (used for perf benchmarking)
   bool disable_peer_to_peer_bidir = false;
-  if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "-1") == 0) {
-    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling bi-directional peer-to-peer access\n");
-    disable_peer_to_peer_bidir = true;
+
+  if (enable_peer_to_peer_env) {
+    enable_peer_to_peer = atoi(enable_peer_to_peer_env);
+
+    switch ( std::abs(enable_peer_to_peer) ) {
+    case 0: if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling peer-to-peer access\n"); break;
+    case 1: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store)\n"); break;
+    case 2: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines)\n"); break;
+    case 3: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n"); break;
+    default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
+    }
+
+    if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
+      if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling bi-directional peer-to-peer access\n");
+      disable_peer_to_peer_bidir = true;
+    }
+
+    enable_peer_to_peer = abs(enable_peer_to_peer);
+
+  } else { // !enable_peer_to_peer_env
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n");
   }
 
-  if (!peer2peer_init && !disable_peer_to_peer) {
+  if (!peer2peer_init && enable_peer_to_peer) {
 
     // first check that the local GPU supports UVA
     const int gpuid = comm_gpuid();
@@ -259,7 +276,7 @@ bool comm_peer2peer_enabled(int dir, int dim){
   return enable_p2p ? peer2peer_enabled[dir][dim] : false;
 }
 
-bool comm_peer2peer_enabled_global() {
+int comm_peer2peer_enabled_global() {
   if (!enable_p2p) return false;
 
   static bool init = false;
@@ -275,7 +292,7 @@ bool comm_peer2peer_enabled_global() {
     init = true;
     p2p_global = p2p > 0 ? true : false;
   }
-  return p2p_global;
+  return p2p_global * enable_peer_to_peer;
 }
 
 void comm_enable_peer2peer(bool enable) {

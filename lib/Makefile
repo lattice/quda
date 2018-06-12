@@ -62,7 +62,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	copy_color_spinor_mg_hs.o copy_color_spinor_mg_sh.o		\
 	copy_color_spinor_mg_qs.o copy_color_spinor_mg_sq.o		\
 	copy_color_spinor_mg_hh.o copy_color_spinor_mg_qq.o		\
-	quda_memcpy.o quda_arpack_interface.o deflation.o ${QIO_UTIL}   \
+	quda_cuda_api.o quda_arpack_interface.o deflation.o ${QIO_UTIL}   \
 	spinor_noise.o gauge_random.o checksum.o
 
 # header files, found in include/
