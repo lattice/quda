@@ -169,7 +169,7 @@ namespace quda {
       KSForceComplete<Float,Oprod,Gauge,Mom> completeForce(arg,meta,location);
       completeForce.apply(0);
       if(flops) *flops = completeForce.flops();	
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
     }
 
 
@@ -380,7 +380,7 @@ void computeKSLongLinkForce(Result res, Oprod oprod, Gauge gauge, int dim[4], co
   KSLongLinkArg<Result,Oprod,Gauge> arg(res, oprod, gauge, dim);
   KSLongLinkForce<Float,Result,Oprod,Gauge> computeLongLink(arg,meta,location);
   computeLongLink.apply(0);
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
 }
 
   template<typename Float>

@@ -240,7 +240,7 @@ namespace quda {
     GaugeSTOUTArg<Float,GaugeOr,GaugeDs> arg(origin, dest, dataOr, rho, dataOr.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL);
     GaugeSTOUT<Float,GaugeOr,GaugeDs> gaugeSTOUT(arg,dataOr);
     gaugeSTOUT.apply(0);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 
   template<typename Float>
@@ -742,7 +742,7 @@ namespace quda {
 						   dataOr.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL);
     GaugeOvrImpSTOUT<Float,GaugeOr,GaugeDs> gaugeOvrImpSTOUT(arg,dataOr);
     gaugeOvrImpSTOUT.apply(0);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 
   template<typename Float>

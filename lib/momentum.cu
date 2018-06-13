@@ -86,7 +86,7 @@ using namespace gauge;
     MomAction<Float,Mom> momAction(arg, meta);
 
     momAction.apply(0);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
     comm_allreduce((double*)arg.result_h);
     action = arg.result_h[0];
@@ -319,7 +319,7 @@ using namespace gauge;
     ApplyUArg<Float,Force,Gauge> arg(force, U, meta);
     ApplyU<Float,Force,Gauge> applyU(arg, meta);
     applyU.apply(0);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
   template <typename Float>
   void applyU(GaugeField &force, GaugeField &U) {
