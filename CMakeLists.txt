@@ -13,8 +13,8 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 # add a directory for cmake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-set(CMAKE_CXX_COMPILER g++-6)
-set(CMAKE_C_COMPILER gcc-6)
+#set(CMAKE_CXX_COMPILER g++-6)
+#set(CMAKE_C_COMPILER gcc-6)
 
 find_package(Git)
 SET(DEFBUILD "RELEASE")
@@ -558,16 +558,15 @@ enable_language(C)
 #define FORTRAN FLAGS
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
 
-enable_language(Fortran)
-if(QUDA_MPI OR QUDA_QMP)
-  set(CMAKE_Fortran_COMPILER mpifort)
-else()
-  set(CMAKE_Fortran_COMPILER gfortran)
-endif()
-
 # derive whether we need to build the fortran interface
 if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD OR QUDA_ARPACK)
   SET(BUILD_FORTRAN_INTERFACE ON)
+  enable_language(Fortran)
+  if(QUDA_MPI OR QUDA_QMP)  
+    #set(CMAKE_Fortran_COMPILER mpifort)
+  else()
+    #set(CMAKE_Fortran_COMPILER gfortran)
+  endif()  
 endif()
 
 
