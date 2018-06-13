@@ -82,6 +82,9 @@ namespace quda {
         case cudaMemcpyHostToDevice:
           PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
           break;
+        case cudaMemcpyDeviceToDevice:
+          PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
+          break;
         default:
           errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
         }
@@ -154,6 +157,9 @@ namespace quda {
       break;
     case cudaMemcpyHostToDevice:
       PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+      break;
+    case cudaMemcpyDeviceToDevice:
+      PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
       break;
     default:
       errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
