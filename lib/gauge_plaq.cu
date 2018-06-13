@@ -99,7 +99,7 @@ namespace quda {
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	  LAUNCH_KERNEL_LOCAL_PARITY(computePlaq, tp, stream, arg, Float, Gauge);
-	  cudaDeviceSynchronize();
+	  qudaDeviceSynchronize();
         } else {
           errorQuda("CPU not supported yet\n");
         }

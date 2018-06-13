@@ -1454,6 +1454,7 @@ void endQuda(void)
     TimeProfile::PrintGlobal();
 
     printLaunchTimer();
+    printAPIProfile();
 
     printfQuda("\n");
     printPeakMemUsage();
@@ -4191,7 +4192,7 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
   // mom += delta * [U * force]TA
   applyU(cudaForce, *gaugePrecise);
   updateMomentum(*cudaMom, delta, cudaForce);
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileStaggeredForce.TPSTART(QUDA_PROFILE_D2H);
@@ -5399,7 +5400,7 @@ void remove_staggered_phase_quda_() {
   } else {
     errorQuda("No persistent gauge field");
   }
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
 }
 
 // evaluate the kinetic term

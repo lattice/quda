@@ -120,7 +120,7 @@ namespace quda {
       pool_device_free(dinfo_array);
       pool_pinned_free(info_array);
 
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       gettimeofday(&stop, NULL);
       long ds = stop.tv_sec - start.tv_sec;
       long dus = stop.tv_usec - start.tv_usec;

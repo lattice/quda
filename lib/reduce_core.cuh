@@ -114,12 +114,12 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
 	  }
 	}
       } else {
-	cudaEventRecord(reduceEnd, stream);
-	while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
+	qudaEventRecord(reduceEnd, stream);
+	while (cudaSuccess != qudaEventQuery(reduceEnd)) { ; }
       }
     } else
 #endif
-      { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
+      { qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
   }
   doubleN cpu_sum = set(((ReduceType*)h_reduce)[0]);
   if (tp.grid.y==2) sum(cpu_sum, ((ReduceType*)h_reduce)[1]); // add other parity if needed

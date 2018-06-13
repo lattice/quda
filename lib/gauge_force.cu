@@ -307,7 +307,7 @@ namespace quda {
     pool_device_free(length_d);
     pool_device_free(path_coeff_d);
     for (int dir=0; dir<4; dir++) pool_device_free(input_path_d[dir]);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 
   template <typename Float>

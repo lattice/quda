@@ -90,6 +90,10 @@ namespace quda {
       ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*ghost_precision;
       if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
 
+
+      if(GhostOffset(i,0)%FieldOrder()) errorQuda("ghostOffset(%d,0) %d is not a multiple of FloatN\n", i, GhostOffset(i,0));
+      if(GhostOffset(i,1)%FieldOrder()) errorQuda("ghostOffset(%d,1) %d is not a multiple of FloatN\n", i, GhostOffset(i,1));
+
     } // dim
 
     int ghostNormVolume = num_norm_faces * ghostVolume;

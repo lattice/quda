@@ -72,7 +72,7 @@ namespace quda {
     dim3 nblocks = GetBlockDim(nthreads.x, rng_size);
     rngArg arg(X);
     kernel_random<<<nblocks,nthreads>>>(state, seed, rng_size, arg);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 
   RNG::RNG(int rng_sizes, int seedin, const int XX[4]) {
