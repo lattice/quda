@@ -177,7 +177,7 @@ namespace quda {
 
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis, bool extend>
-    __device__ __host__ void copyInterior(CopySpinorExArg<OutOrder,InOrder,Basis>& arg, int X)
+    __device__ __host__ int copyInterior(CopySpinorExArg<OutOrder,InOrder,Basis>& arg, int X)
     {
       int x[4];
       int R[4];
@@ -204,6 +204,7 @@ namespace quda {
 			x[2] = XX % cbX[2]; XX /= cbX[2];
 			x[3] = XX % cbX[3]; 
       int Y = ((((x[3]+cbR[3])*cbE[2] + (x[2]+cbR[2]))*cbE[1] + (x[1]+cbR[1]))*cbE[0] + (x[0]+cbR[0]));
+//      int Y = ((((x[3]+0)*cbE[2] + (x[2]+0))*cbE[1] + (x[1]+0))*cbE[0] + (x[0]+0));
 //      int Y = ((((x[3]+1)*cbE[2] + (x[2]+1))*cbE[1] + (x[1]+1))*cbE[0] + (x[0]+1));
 
 //			printfQuda("(%02d,%02d,%02d,%02d)->(%02d,%02d,%02d,%02d).\n",);	
@@ -244,18 +245,24 @@ namespace quda {
 	      }
 			}
 //			}}}}
+			return Y;
     }
 
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis, bool extend>
-    __global__ void copyInteriorKernel(CopySpinorExArg<OutOrder,InOrder,Basis> arg)
+    __global__ void copyInteriorKernel(CopySpinorExArg<OutOrder,InOrder,Basis> arg, int rank)
     {
-      int cb_idx = blockIdx.x*blockDim.x + threadIdx.x;
+      int cb_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-      while(cb_idx < arg.length){
-        copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg,cb_idx);
-        cb_idx += gridDim.x*blockDim.x;
-      }
+    while(cb_idx < arg.length){
+      // Debug code
+			int Y;
+			// if( not rank ) printf("[gridDim,blockIdx,blockDim,threadIdx,cb_idx] = [%08d,%08d,%08d,%08d,%08d]\n", gridDim.x, blockIdx.x, blockDim.x, threadIdx.x, cb_idx);
+			Y = copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg,cb_idx);
+			if( not rank ) printf("[X->Y] = [%08d->%08d]\n", cb_idx, Y);
+      // cudaDeviceSynchronize();
+			cb_idx += gridDim.x * blockDim.x;
+    }
     }
 
   /*
@@ -291,8 +298,10 @@ namespace quda {
         : arg(arg), meta(meta), location(location) {
 				writeAuxString("out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
 
-				printfQuda( "E=(%02d,%02d,%02d,%02d)", arg.E[0], arg.E[1], arg.E[2], arg.E[3] );
-				printfQuda( "X=(%02d,%02d,%02d,%02d)", arg.X[0], arg.X[1], arg.X[2], arg.X[3] );
+				printfQuda( "E=(%02d,%02d,%02d,%02d)\n", arg.E[0], arg.E[1], arg.E[2], arg.E[3] );
+				printfQuda( "X=(%02d,%02d,%02d,%02d)\n", arg.X[0], arg.X[1], arg.X[2], arg.X[3] );
+				printfQuda( "length  =%08d\n", arg.length   );
+				printfQuda( "lengthEx=%08d\n", arg.lengthEx );
       
 			}
       virtual ~CopySpinorEx() {}
@@ -300,11 +309,14 @@ namespace quda {
       void apply(const cudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-        if(location == QUDA_CPU_FIELD_LOCATION){
+				printfQuda( "tp.grid=%08d, tp.block=%08d, tp.shared_bytes=%08d, stream=%08d\n",tp.grid.x,tp.block.x,tp.shared_bytes,stream);
+        
+				if(location == QUDA_CPU_FIELD_LOCATION){
           copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg);    
         }else if(location == QUDA_CUDA_FIELD_LOCATION){
           copyInteriorKernel<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>
-            <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);    
+            //<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg, comm_rank());    
+            <<<128,32>>>(arg, comm_rank());    
         }
       } 
 
