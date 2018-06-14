@@ -318,28 +318,34 @@ namespace quda {
     }
   }
 
-  void copyExtendedGauge(GaugeField &out, const GaugeField &in,
-			 QudaFieldLocation location, void *Out, void *In) {
+	void copyExtendedGauge(GaugeField &out, const GaugeField &in,
+			QudaFieldLocation location, void *Out, void *In) {
 
-    for (int d=0; d<in.Ndim(); d++) {
-      if ( (out.X()[d] - in.X()[d]) % 2 != 0)
-	errorQuda("Cannot copy into an asymmetrically extended gauge field");
-    }
+		for (int d=0; d<in.Ndim(); d++) {
+			if ( (out.X()[d] - in.X()[d]) % 2 != 0)
+				errorQuda("Cannot copy into an asymmetrically extended gauge field");
+		}
 
-    if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-	copyGaugeEx(out, in, location, (double*)Out, (double*)In);
-      } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-	copyGaugeEx(out, in, location, (double*)Out, (float*)In);
-      }
-    } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-	copyGaugeEx(out, in, location, (float*)Out, (double*)In);
-      } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-	copyGaugeEx(out, in, location, (float*)Out, (float*)In);
-      }
-    }
+		if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+			if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+				copyGaugeEx(out, in, location, (double*)Out, (double*)In);
+			} else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+				copyGaugeEx(out, in, location, (double*)Out, (float*)In);
+			}
+		} else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+			if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+				copyGaugeEx(out, in, location, (float*)Out, (double*)In);
+			} else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+				copyGaugeEx(out, in, location, (float*)Out, (float*)In);
+			}
+		} else if( out.Precision() == QUDA_HALF_PRECISION ){
+			if (in.Precision() == QUDA_HALF_PRECISION) {
+				copyGaugeEx(out, in, location, (short*)Out, (short*)In); // TODO: half -> half
+			} 
+		} else {
+			errorQuda("Precision NOT supported");
+		}
 
-  }
+	}
 
 } // namespace quda
