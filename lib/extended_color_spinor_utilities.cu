@@ -158,9 +158,10 @@ namespace quda {
       int length;
       int lengthEx;
       int parity;
+			int Ls;
 
       CopySpinorExArg(const OutOrder &out, const InOrder &in, const Basis& basis, const int *E, const int *X, const int parity)
-        : out(out), in(in), basis(basis), parity(parity) 
+        : out(out), in(in), basis(basis), parity(parity), Ls(X[4]) 
       {
         this->length = 1;
         this->lengthEx = 1;
@@ -219,11 +220,10 @@ namespace quda {
       RegTypeIn    in[Ns*Nc*2] = { };
       RegTypeOut  out[Ns*Nc*2] = { };
 
-			size_t Ls = 12;
 //			for(size_t spin=0; spin<4; spin++){
 //			for(size_t color=0; color<3; color++){
 //			for(size_t z=0; z<2; z++){
-			for(size_t s=0; s<Ls; s++){
+			for(int s=0; s<arg.Ls; s++){
 	      if(extend){
 //					in_idx = ((spin*3+color)*2+z)*arg.in.stride+(arg.length*s+X);
 //					in_idx = ((spin*3+color)*arg.in.stride+(arg.length*s+X))*2+z;
@@ -256,10 +256,10 @@ namespace quda {
 
     while(cb_idx < arg.length){
       // Debug code
-			int Y;
+			// int Y;
 			// if( not rank ) printf("[gridDim,blockIdx,blockDim,threadIdx,cb_idx] = [%08d,%08d,%08d,%08d,%08d]\n", gridDim.x, blockIdx.x, blockDim.x, threadIdx.x, cb_idx);
-			Y = copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg,cb_idx);
-			if( not rank ) printf("[X->Y] = [%08d->%08d]\n", cb_idx, Y);
+			copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg,cb_idx);
+			// if( not rank ) printf("[X->Y] = [%08d->%08d]\n", cb_idx, Y);
       // cudaDeviceSynchronize();
 			cb_idx += gridDim.x * blockDim.x;
     }
@@ -309,14 +309,13 @@ namespace quda {
       void apply(const cudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-				printfQuda( "tp.grid=%08d, tp.block=%08d, tp.shared_bytes=%08d, stream=%08d\n",tp.grid.x,tp.block.x,tp.shared_bytes,stream);
+//				printfQuda( "tp.grid=%08d, tp.block=%08d, tp.shared_bytes=%08d, stream=%08d\n",tp.grid.x,tp.block.x,tp.shared_bytes,stream);
         
 				if(location == QUDA_CPU_FIELD_LOCATION){
           copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg);    
         }else if(location == QUDA_CUDA_FIELD_LOCATION){
           copyInteriorKernel<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>
-            //<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg, comm_rank());    
-            <<<128,32>>>(arg, comm_rank());    
+            <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg, comm_rank());    
         }
       } 
 
@@ -382,39 +381,42 @@ namespace quda {
       typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
       ColorSpinor outOrder(out, 1, Out, outNorm);
 //      colorspinor::FloatNOrder<FloatOut,4,3,1> outOrder(out,1,Out,outNorm);
-      copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
+      copySpinorEx<FloatOut,FloatIn,Ns,Nc>(outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
     } else {
       errorQuda("Order not defined");
     }
 
   }
 
-  template<typename FloatOut, typename FloatIn, int Ns, int Nc> 
-    void extendedCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, 
-        const int parity, const QudaFieldLocation location, FloatOut *Out, FloatIn *In, 
-        float* outNorm, float *inNorm){
-
-    int E[4];
-    int X[4];
-    const bool extend = (out.Volume() >= in.Volume());
-    if (extend) {
-      for (int d=0; d<4; d++) {
-	E[d] = out.X()[d];
-	X[d] = in.X()[d];
-      }
-    } else {
-      for (int d=0; d<4; d++) {
-	E[d] = in.X()[d];
-	X[d] = out.X()[d];
-      }
-    }
-    X[0] *= 2; E[0] *= 2; // Since we consider only a single parity at a time
+	template<typename FloatOut, typename FloatIn, int Ns, int Nc> 
+		void extendedCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, 
+			const int parity, const QudaFieldLocation location, FloatOut *Out, FloatIn *In, 
+			float* outNorm, float *inNorm){
+	
+		int E[5];
+		int X[5];
+		const bool extend = (out.Volume() >= in.Volume());
+		if (extend) {
+			for (int d=0; d<5; d++) {
+				E[d] = out.X()[d];
+				X[d] = in.X()[d];
+			}
+		} else {
+			for (int d=0; d<5; d++) {
+				E[d] = in.X()[d];
+				X[d] = out.X()[d];
+			}
+		}
+		X[0] *= 2; E[0] *= 2; // Since we consider only a single parity at a time
 
 //		if(in.Ndim() == 5){
 //			X[1] *= in.X()[4];
 //			E[1] *= in.X()[4];
 //		}
+
+		if( X[4] != E[4] ){
+      errorQuda("The fifth dimension length should agree: %d vs. %d.\n", X[4], E[4]);
+		}
 
     if (in.isNative()) {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
