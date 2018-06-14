@@ -80,7 +80,6 @@ namespace quda {
 		      const double epsilon, const double k, const int dagger)
       : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), dslashType(dslashType)
     { 
-      bindSpinorTex<sFloat>(in, out, x); 
       a = kappa;
       b = mu;
       c = epsilon;
@@ -110,20 +109,14 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-      // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
-      dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
-      dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
-#ifdef USE_TEXTURE_OBJECTS
-      dslashParam.ghostTex = in->GhostTex();
-      dslashParam.ghostTexNorm = in->GhostTexNorm();
-#endif // USE_TEXTURE_OBJECTS
-
 #ifdef SHARED_WILSON_DSLASH
-      if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
-	errorQuda("Shared dslash does not yet support X-dimension partitioning");
+      if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
+#ifndef USE_TEXTURE_OBJECTS
+      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
+#endif // USE_TEXTURE_OBJECTS
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
+      setParam();
       NDEG_TM_DSLASH(twistedNdegMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
 
@@ -167,7 +160,6 @@ namespace quda {
     int bulk_threads = in->Volume() / 2;
 
     for(int i=0;i<4;i++){
-      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
       dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
       dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);

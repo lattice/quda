@@ -203,11 +203,11 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
   
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
   if(deviceProp.canMapHostMemory){
-    cudaEventRecord(*getReduceEvent(), stream);
-    while(cudaSuccess != cudaEventQuery(*getReduceEvent())) {}
+    qudaEventRecord(*getReduceEvent(), stream);
+    while(cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
   } else
 #endif
-    { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
+    { qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
 
   // need to transpose for same order with vector thread reduction
   for (int i=0; i<NXZ; i++) {

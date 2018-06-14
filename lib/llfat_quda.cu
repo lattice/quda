@@ -572,7 +572,7 @@ namespace quda {
       } //rho
     } //nu
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     checkCudaError();
 #else
     errorQuda("Fat-link computation not enabled");

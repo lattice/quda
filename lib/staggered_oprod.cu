@@ -327,12 +327,12 @@ namespace quda {
     setKernelPackT(true);
 
     // first transfer src1
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
     MemoryLocation location[2*QUDA_MAX_DIM] = {Device, Device, Device, Device, Device, Device, Device, Device};
-    a.pack(nFace, 1-parity, dag, Nstream-1, location);
+    a.pack(nFace, 1-parity, dag, Nstream-1, location, Device);
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
     for(int i=3; i>=0; i--){
       if(commDimPartitioned(i)){
@@ -341,7 +341,7 @@ namespace quda {
       } // commDim(i)
     } // i=3,..,0
 
-    cudaDeviceSynchronize(); comm_barrier();
+    qudaDeviceSynchronize(); comm_barrier();
 
     for (int i=3; i>=0; i--) {
       if(commDimPartitioned(i)) {
@@ -356,7 +356,7 @@ namespace quda {
       }
     }
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     setKernelPackT(pack_old); // restore packing state
 
     a.bufferIndex = (1 - a.bufferIndex);

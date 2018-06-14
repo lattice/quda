@@ -226,11 +226,15 @@ namespace quda {
 
   void cudaCloverField::destroyTexObject() {
     if (isNative()) {
+      cudaDestroyTextureObject(tex);
+      cudaDestroyTextureObject(invTex);
       cudaDestroyTextureObject(evenTex);
       cudaDestroyTextureObject(oddTex);
       cudaDestroyTextureObject(evenInvTex);
       cudaDestroyTextureObject(oddInvTex);
       if (precision == QUDA_HALF_PRECISION) {
+	cudaDestroyTextureObject(normTex);
+	cudaDestroyTextureObject(invNormTex);
 	cudaDestroyTextureObject(evenNormTex);
 	cudaDestroyTextureObject(oddNormTex);
 	cudaDestroyTextureObject(evenInvNormTex);

@@ -156,7 +156,7 @@
 
 #if (DD_PREC==0) // double-precision fields
 
-//#define TPROJSCALE tProjScale
+#define TPROJSCALE param.tProjScale
 
 // double-precision gauge field
 #if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
@@ -177,11 +177,13 @@
 // double-precision spinor fields
 #if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
 #define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -224,7 +226,7 @@
 
 #elif (DD_PREC==1) // single-precision fields
 
-//#define TPROJSCALE tProjScale_f
+#define TPROJSCALE param.tProjScale_f
 
 // single-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -249,11 +251,13 @@
 // single-precision spinor fields
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_SINGLE
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -294,7 +298,7 @@
 
 #else             // half-precision fields
 
-//#define TPROJSCALE tProjScale_f
+#define TPROJSCALE param.tProjScale_f
 
 // half-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -319,11 +323,13 @@
 // half-precision spinor fields
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_HALF
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_HALF_TEX
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -536,6 +542,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(c
 #undef GAUGE0TEX
 #undef GAUGE1TEX
 #undef READ_SPINOR
+#undef READ_SPINOR_GHOST
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX
@@ -550,7 +557,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(c
 
 #undef SPINOR_HOP
 
-//#undef TPROJSCALE
+#undef TPROJSCALE
 
 // prepare next set of options, or clean up after final iteration
 

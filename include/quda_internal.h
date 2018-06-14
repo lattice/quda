@@ -1,8 +1,7 @@
 #ifndef _QUDA_INTERNAL_H
 #define _QUDA_INTERNAL_H
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <quda_cuda_api.h>
 #include <sys/time.h>
 #include <string>
 #include <complex>
@@ -44,6 +43,11 @@
 #define USE_TEXTURE_OBJECTS
 #endif
 
+// if not using texture objects then we need to disable multi-blas support since these don't work with texture references
+#ifndef USE_TEXTURE_OBJECTS
+#undef MAX_MULTI_BLAS_N
+#define MAX_MULTI_BLAS_N 1
+#endif
 
 
 #ifdef INTERFACE_NVTX
@@ -169,9 +173,10 @@ namespace quda {
     QUDA_PROFILE_COMMS, /**< synchronous communication */
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
+    QUDA_PROFILE_IO, /**< time spent on file i/o */
 
-    // lower level counters used in the dslash
-    QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers */
+    // lower level counters used in the dslash and api profiling
+    QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers which do not count towrads global time */
     QUDA_PROFILE_PACK_KERNEL, /**< face packing kernel */
     QUDA_PROFILE_DSLASH_KERNEL, /**< dslash kernel */
     QUDA_PROFILE_GATHER, /**< gather (device -> host) */
@@ -180,12 +185,19 @@ namespace quda {
     QUDA_PROFILE_EVENT_QUERY, /**< cuda event querying */
     QUDA_PROFILE_STREAM_WAIT_EVENT, /**< stream waiting for event completion */
 
+    QUDA_PROFILE_EVENT_SYNCHRONIZE, /**< event synchronization */
+    QUDA_PROFILE_STREAM_SYNCHRONIZE, /**< stream synchronization */
+    QUDA_PROFILE_DEVICE_SYNCHRONIZE, /**< device synchronization */
+
+    QUDA_PROFILE_MEMCPY_D2D_ASYNC, /**< device to device async copy */
+    QUDA_PROFILE_MEMCPY_D2H_ASYNC, /**< device to host async copy */
+    QUDA_PROFILE_MEMCPY2D_D2H_ASYNC, /**< device to host 2-d memcpy async copy*/
+    QUDA_PROFILE_MEMCPY_H2D_ASYNC, /**< host to device async copy */
+
     QUDA_PROFILE_COMMS_START, /**< initiating communication */
     QUDA_PROFILE_COMMS_QUERY, /**< querying communication */
 
     QUDA_PROFILE_CONSTANT, /**< time spent setting CUDA constant parameters */
-
-    QUDA_PROFILE_IO, /**< time spent on file i/o */
 
     QUDA_PROFILE_TOTAL, /**< The total time in seconds for the algorithm. Must be the penultimate type. */
     QUDA_PROFILE_COUNT /**< The total number of timers we have.  Must be last enum type. */
@@ -316,26 +328,10 @@ namespace quda {
 #endif
 
   /**
-     @brief Wrapper around cudaMemcpy used for auto-profiling
-     @param dst Destination pointer
-     @param src Source pointer
-     @param count Size of transfer
-     @param kind Type of memory copy
-  */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-		   const char *func, const char *file, const char *line);
-
-} // namespace quda
-
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-namespace quda{
-  /**
      * Check that the resident gauge field is compatible with the requested inv_param
      * @param inv_param   Contains all metadata regarding host and device storage
      */
-bool canReuseResidentGauge(QudaInvertParam *inv_param);
+  bool canReuseResidentGauge(QudaInvertParam *inv_param);
 }
 
 #endif // _QUDA_INTERNAL_H

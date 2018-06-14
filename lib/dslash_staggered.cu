@@ -79,7 +79,6 @@ namespace quda {
 			const cudaColorSpinorField *x, const double a, const int dagger)
       : DslashCuda(out, in, x, reconstruct, dagger), nSrc(in->X(4))
     { 
-      bindSpinorTex<sFloat>(in, out, x);
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
       dslashParam.a = a;
@@ -90,12 +89,11 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-#ifdef USE_TEXTURE_OBJECTS
-      dslashParam.ghostTex = in->GhostTex();
-      dslashParam.ghostTexNorm = in->GhostTexNorm();
+#ifndef USE_TEXTURE_OBJECTS
+      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
-
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      setParam();
       dslashParam.swizzle = tp.aux.x;
       STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
@@ -167,7 +165,6 @@ namespace quda {
     // in the solver for the improved staggered action
 
     for(int i=0;i<4;i++){
-      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
       dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
       dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
