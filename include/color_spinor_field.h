@@ -837,8 +837,9 @@ namespace quda {
 
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);
-	// Added by Jackson Jiqun Tu
-	void zero_extended_color_spinor_interface( ColorSpinorField& f, const std::array<int,4>& R, QudaFieldLocation location, const int parity );
+  // Added by Jackson Jiqun Tu
+  void zero_extended_color_spinor_interface( ColorSpinorField& f, const std::array<int,4>& R, QudaFieldLocation location, const int parity );
+
   /**
      @brief Generic ghost packing routine
 
