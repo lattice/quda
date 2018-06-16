@@ -645,10 +645,10 @@ namespace quda {
     size_t    inner_volume = (X0-2*R0)*(X1-2*R1)*(X2-2*R2)*(X3-2*R3);
     size_t index = 0;
     std::vector<size_t> rtn(extended_volume-inner_volume);
-    for(size_t x3=0; x3 < X3; x3++){
-      for(size_t x2=0; x2 < X2; x2++){
-        for(size_t x1=0; x1 < X1; x1++){
-          for(size_t x0=0; x0 < X0; x0++){
+    for(int x3=0; x3 < X3; x3++){
+      for(int x2=0; x2 < X2; x2++){
+        for(int x1=0; x1 < X1; x1++){
+          for(int x0=0; x0 < X0; x0++){
             if( x0>=R0 		 && x1>=R1     && x2>=R2     && x3>=R3 &&
                 x0<(X0-R0) && x1<(X1-R1) && x2<(X2-R2) && x3<(X3-R3) ){}
             else{
@@ -682,7 +682,7 @@ namespace quda {
       cuda_lst_map[key] = cuda_p;
       cudaMemcpy(cuda_p, lst_map[key].data(), lst_map[key].size()*sizeof(size_t), cudaMemcpyHostToDevice);
       printfQuda("PaddingIndexCache:  added X=(%d,%d,%d,%d)/R=(%d,%d,%d,%d).\n", f.X()[0],f.X()[1],f.X()[2],f.X()[3],R[0],R[1],R[2],R[3] );
-      printfQuda("PaddingIndexCache:  allocated %012d bytes of memory.\n", lst_map[key].size()*sizeof(size_t) );
+      printfQuda("PaddingIndexCache:  allocated %012u bytes of memory.\n", lst_map[key].size()*sizeof(size_t) );
     }
 
     if( not f.isNative() ) {

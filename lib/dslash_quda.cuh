@@ -482,7 +482,8 @@ public:
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
-    if (!init) { // these parameters are constant across all dslash instances for a given run
+//    if (!init) { // these parameters are constant across all dslash instances for a given run
+    if (true) { // Experimenting: reinitialize.
       // this is a c/b field so double the x dimension
       dslashParam.X[0] = in->X(0)*2;
       for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
