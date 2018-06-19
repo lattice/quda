@@ -526,7 +526,7 @@ def gen(dir, pack_only=False):
     load_spinor += "\n"
 
     load_half = ""
-    load_half += "const int sp_stride_pad = ghostFace[" + `dir/2` + "];\n"
+    load_half += "const int sp_stride_pad = param.ghostFace[" + `dir/2` + "];\n"
 
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"

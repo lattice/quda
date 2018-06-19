@@ -2,8 +2,6 @@
 
 void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
 void initDslashConstants(TimeProfile &profile);
-void initStaggeredConstants(const cudaGaugeField &fatgauge, 
-			    const cudaGaugeField &longgauge, TimeProfile &profile);
 void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, 
 		       const double m5h, TimeProfile &profile);
 

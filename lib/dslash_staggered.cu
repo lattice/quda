@@ -83,6 +83,7 @@ namespace quda {
       dslashParam.gauge1 = (void*)gauge1;
       dslashParam.a = a;
       dslashParam.a_f = a;
+      dslashParam.fat_link_max = gauge.LinkMax();
     }
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
@@ -158,9 +159,7 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
 
     dslashParam.Ls = out->X(4);
-
     dslashParam.parity = parity;
-    dslashParam.fat_link_max = gauge.LinkMax(); // May need to use this in the preconditioning step 
     // in the solver for the improved staggered action
 
     for(int i=0;i<4;i++){

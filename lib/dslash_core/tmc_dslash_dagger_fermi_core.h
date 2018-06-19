@@ -730,7 +730,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]<X1m1)) |
 #ifdef MULTI_GPU
   } else {
   
-    const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+    const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
     
     // read half spinor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 0);
@@ -930,7 +930,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]>0)) ||
 #ifdef MULTI_GPU
   } else {
   
-    const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+    const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
     
     // read half spinor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 1);
@@ -1145,7 +1145,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]<X2m1)) |
 #ifdef MULTI_GPU
   } else {
   
-    const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+    const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
     
     // read half spinor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 2);
@@ -1364,7 +1364,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]>0)) ||
 #ifdef MULTI_GPU
   } else {
   
-    const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+    const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
     
     // read half spinor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 3);
@@ -1579,7 +1579,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]<X3m1)) |
 #ifdef MULTI_GPU
   } else {
   
-    const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+    const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
     
     // read half spinor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 4);
@@ -1798,7 +1798,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]>0)) ||
 #ifdef MULTI_GPU
   } else {
   
-    const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+    const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
     
     // read half spinor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 5);
@@ -1994,7 +1994,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]<X4m1)) |
 #ifdef MULTI_GPU
     } else {
     
-      const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+      const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
@@ -2065,7 +2065,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]<X4m1)) |
 #ifdef MULTI_GPU
     } else {
     
-      const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+      const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
@@ -2255,7 +2255,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]>0)) ||
 #ifdef MULTI_GPU
     } else {
     
-      const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+      const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
@@ -2326,7 +2326,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]>0)) ||
 #ifdef MULTI_GPU
     } else {
     
-      const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+      const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory

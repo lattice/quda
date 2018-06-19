@@ -523,7 +523,7 @@ def gen(dir, pack_only=False):
     str += "#if (DD_PREC==2) // half precision\n"
     str += "  sp_norm_idx = face_idx + "
 #    if dir%2 == 0:
-#      str += "param.Ls*ghostFace[" + `dir/2` + "] + "
+#      str += "param.Ls*param.ghostFace[" + `dir/2` + "] + "
     str += "param.ghostNormOffset[" + `dir/2` + "][" + `1-dir%2` + "];\n"
     str += "#endif\n\n"
     str += "\n"
@@ -531,7 +531,7 @@ def gen(dir, pack_only=False):
         if domain_wall: str += "const int ga_idx = sid % param.volume4CB;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
-        if domain_wall: str += "const int ga_idx = param.volume4CB+(face_idx % ghostFace[" + `dir/2` + "]);\n"
+        if domain_wall: str += "const int ga_idx = param.volume4CB+(face_idx % param.ghostFace[" + `dir/2` + "]);\n"
         else: str += "const int ga_idx = param.volume4CB+face_idx;\n"
     str += "\n"
 
@@ -563,9 +563,9 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     if domain_wall : 
-        load_half += "const int sp_stride_pad = param.Ls*ghostFace[" + `dir/2` + "];\n"
+        load_half += "const int sp_stride_pad = param.Ls*param.ghostFace[" + `dir/2` + "];\n"
     else :
-        load_half += "const int sp_stride_pad = ghostFace[" + `dir/2` + "];\n" 
+        load_half += "const int sp_stride_pad = param.ghostFace[" + `dir/2` + "];\n" 
 
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"

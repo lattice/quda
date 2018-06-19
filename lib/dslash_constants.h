@@ -34,6 +34,8 @@ enum KernelType {
     int_fastdiv face_T[4];
 
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
+
+    int ghostFace[QUDA_MAX_DIM+1]; // number of sites in each ghost
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
     int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
     int ghostOffset[QUDA_MAX_DIM+1][2];
@@ -69,6 +71,9 @@ enum KernelType {
 
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
+
+    double coeff; // used as a gauge field scaling factor by the staggered kernels
+    float coeff_f;
 
     double a;
     float a_f;
@@ -200,7 +205,7 @@ enum KernelType {
   static DslashParam dslashParam;
 
 
-#define MAX(a,b) ((a)>(b) ? (a):(b))
+//#define MAX(a,b) ((a)>(b) ? (a):(b))
 
 typedef struct fat_force_stride_s {
   int fat_ga_stride;
@@ -236,18 +241,10 @@ __constant__ int X4X3X2;
 __constant__ int Vh;
 __constant__ int Vs;
 __constant__ int Vsh;
-__constant__ int ghostFace[QUDA_MAX_DIM+1];
 
 // domain wall constants
 __constant__ double m5_d;
 __constant__ float m5_f;
-
-// single precision constants
-__constant__ float coeff_f;
-__constant__ float pi_f;
-
-// double precision constants
-__constant__ double coeff;
 
 //for link fattening/gauge force/fermion force code
 __constant__ int E1, E2, E3, E4, E1h;
@@ -285,13 +282,6 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 
   int L4 = lat.X()[3];
   cudaMemcpyToSymbol(X4, &L4, sizeof(int));  
-
-  int ghostFace_h[4];
-  ghostFace_h[0] = L2*L3*L4/2;
-  ghostFace_h[1] = L1*L3*L4/2;
-  ghostFace_h[2] = L1*L2*L4/2;
-  ghostFace_h[3] = L1*L2*L3/2;
-  cudaMemcpyToSymbol(ghostFace, ghostFace_h, 4*sizeof(int));  
 
   int L2L1 = L2*L1;
   cudaMemcpyToSymbol(X2X1, &L2L1, sizeof(int));  
@@ -357,41 +347,6 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 }
 
 
-void initDslashConstants(TimeProfile &profile)
-{
-  profile.TPSTART(QUDA_PROFILE_CONSTANT);
-
-  float pi_f_h = M_PI;
-  cudaMemcpyToSymbol(pi_f, &pi_f_h, sizeof(float));
-
-   // set these for naive staggered
-  float coeff_fh = 1.0;
-  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
-
-  double coeff_h = 1.0;
-  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
-  
-  checkCudaError();
-
-  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
-}
-
-void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge,
-			    TimeProfile &profile)
-{
-  profile.TPSTART(QUDA_PROFILE_CONSTANT);
-
-  float coeff_fh = 1.0/longgauge.Scale();
-  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
-
-  double coeff_h = 1.0/longgauge.Scale();
-  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
-
-  checkCudaError();
-
-  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
-}
-
 //For initializing the coefficients used in MDWF
 __constant__ double mdwf_b5_d[QUDA_MAX_DWF_LS];
 __constant__ double mdwf_c5_d[QUDA_MAX_DWF_LS];
@@ -434,7 +389,6 @@ void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const do
 
 void initConstants(cudaGaugeField &gauge, TimeProfile &profile) {
   initLatticeConstants(gauge, profile);
-  initDslashConstants(profile);
 }
 
 void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 

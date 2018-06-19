@@ -435,8 +435,14 @@ protected:
     dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
     dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
 
+    dslashParam.ghostFace[0] = (dslashParam.X[1]*dslashParam.X[2]*dslashParam.X[3])/2;
+    dslashParam.ghostFace[1] = (dslashParam.X[0]*dslashParam.X[2]*dslashParam.X[3])/2;
+    dslashParam.ghostFace[2] = (dslashParam.X[0]*dslashParam.X[1]*dslashParam.X[3])/2;
+    dslashParam.ghostFace[3] = (dslashParam.X[0]*dslashParam.X[1]*dslashParam.X[2])/2;
+
     // update the ghosts for the non-p2p directions
     for (int dim=0; dim<4; dim++) {
+
       for (int dir=0; dir<2; dir++) {
         /* if doing interior kernel, then this is the initial call, so
         we must all ghost pointers else if doing exterior kernel, then
@@ -466,6 +472,9 @@ protected:
     dslashParam.An2 = make_float2(gauge.Anisotropy(), 1.0 / (gauge.Anisotropy()*gauge.Anisotropy()));
     dslashParam.TB2 = make_float2(dslashParam.t_boundary_f, 1.0 / (dslashParam.t_boundary * dslashParam.t_boundary));
     dslashParam.No2 = make_float2(1.0f, 1.0f);
+
+    dslashParam.Pt0 = (comm_coord(3) == 0) ? true : false;
+    dslashParam.PtNm1 = (comm_coord(3) == comm_dim(3)-1) ? true : false;
   }
 
 public:
@@ -491,6 +500,9 @@ public:
 #endif // USE_TEXTURE_OBJECTS
 
     dslashParam.sp_stride = in->Stride();
+
+    dslashParam.coeff = 1.0;
+    dslashParam.coeff_f = 1.0f;
 
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);

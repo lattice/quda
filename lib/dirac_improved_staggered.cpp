@@ -12,14 +12,12 @@ namespace quda {
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
     improvedstaggered::initConstants(*param.gauge, profile);    
-    improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac) 
   : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge)
   {
     improvedstaggered::initConstants(*dirac.gauge, profile);
-    improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
   DiracImprovedStaggered::~DiracImprovedStaggered() { }

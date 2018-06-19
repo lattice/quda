@@ -154,8 +154,6 @@ namespace quda {
     inSpinor->createComms(1);
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
-
     int ghost_threads[4] = {0};
     int bulk_threads = in->Volume() / 2;
 

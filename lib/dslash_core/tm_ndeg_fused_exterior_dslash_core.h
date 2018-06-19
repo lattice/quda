@@ -291,7 +291,7 @@ if (isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==X1m1)
   RECONSTRUCT_GAUGE_MATRIX(0);
   
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[0];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[0];
   
     // read half spinor for the first flavor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 0);
@@ -422,12 +422,12 @@ if (isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==X1m1)
   
   }
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[0];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[0];
   
     // read half spinor for the second flavor from device memory
-    const int fl_idx = sp_idx + ghostFace[0];
+    const int fl_idx = sp_idx + param.ghostFace[0];
 #if (DD_PREC==2)
-    const int fl_norm_idx = sp_norm_idx + ghostFace[0];
+    const int fl_norm_idx = sp_norm_idx + param.ghostFace[0];
 #endif
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 0);
     
@@ -587,7 +587,7 @@ if (isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0)
   RECONSTRUCT_GAUGE_MATRIX(1);
   
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[0];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[0];
   
     // read half spinor for the first flavor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 1);
@@ -718,12 +718,12 @@ if (isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0)
   
   }
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[0];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[0];
   
     // read half spinor for the second flavor from device memory
-    const int fl_idx = sp_idx + ghostFace[0];
+    const int fl_idx = sp_idx + param.ghostFace[0];
 #if (DD_PREC==2)
-    const int fl_norm_idx = sp_norm_idx + ghostFace[0];
+    const int fl_norm_idx = sp_norm_idx + param.ghostFace[0];
 #endif
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 1);
     
@@ -883,7 +883,7 @@ if (isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==X2m1)
   RECONSTRUCT_GAUGE_MATRIX(2);
   
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[1];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[1];
   
     // read half spinor for the first flavor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 2);
@@ -1014,12 +1014,12 @@ if (isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==X2m1)
   
   }
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[1];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[1];
   
     // read half spinor for the second flavor from device memory
-    const int fl_idx = sp_idx + ghostFace[1];
+    const int fl_idx = sp_idx + param.ghostFace[1];
 #if (DD_PREC==2)
-    const int fl_norm_idx = sp_norm_idx + ghostFace[1];
+    const int fl_norm_idx = sp_norm_idx + param.ghostFace[1];
 #endif
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 2);
     
@@ -1179,7 +1179,7 @@ if (isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0)
   RECONSTRUCT_GAUGE_MATRIX(3);
   
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[1];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[1];
   
     // read half spinor for the first flavor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 3);
@@ -1310,12 +1310,12 @@ if (isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0)
   
   }
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[1];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[1];
   
     // read half spinor for the second flavor from device memory
-    const int fl_idx = sp_idx + ghostFace[1];
+    const int fl_idx = sp_idx + param.ghostFace[1];
 #if (DD_PREC==2)
-    const int fl_norm_idx = sp_norm_idx + ghostFace[1];
+    const int fl_norm_idx = sp_norm_idx + param.ghostFace[1];
 #endif
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 3);
     
@@ -1475,7 +1475,7 @@ if (isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==X3m1)
   RECONSTRUCT_GAUGE_MATRIX(4);
   
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[2];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[2];
   
     // read half spinor for the first flavor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 4);
@@ -1606,12 +1606,12 @@ if (isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==X3m1)
   
   }
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[2];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[2];
   
     // read half spinor for the second flavor from device memory
-    const int fl_idx = sp_idx + ghostFace[2];
+    const int fl_idx = sp_idx + param.ghostFace[2];
 #if (DD_PREC==2)
-    const int fl_norm_idx = sp_norm_idx + ghostFace[2];
+    const int fl_norm_idx = sp_norm_idx + param.ghostFace[2];
 #endif
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 4);
     
@@ -1771,7 +1771,7 @@ if (isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0)
   RECONSTRUCT_GAUGE_MATRIX(5);
   
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[2];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[2];
   
     // read half spinor for the first flavor from device memory
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 5);
@@ -1902,12 +1902,12 @@ if (isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0)
   
   }
   {
-  const int sp_stride_pad = FLAVORS*ghostFace[2];
+  const int sp_stride_pad = FLAVORS*param.ghostFace[2];
   
     // read half spinor for the second flavor from device memory
-    const int fl_idx = sp_idx + ghostFace[2];
+    const int fl_idx = sp_idx + param.ghostFace[2];
 #if (DD_PREC==2)
-    const int fl_norm_idx = sp_norm_idx + ghostFace[2];
+    const int fl_norm_idx = sp_norm_idx + param.ghostFace[2];
 #endif
     READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 5);
     
@@ -2063,7 +2063,7 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1)
   if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
   {
     {
-    const int sp_stride_pad = FLAVORS*ghostFace[3];
+    const int sp_stride_pad = FLAVORS*param.ghostFace[3];
     
       // read half spinor for the first flavor from device memory
       READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 6);
@@ -2100,12 +2100,12 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1)
     
     }
     {
-    const int sp_stride_pad = FLAVORS*ghostFace[3];
+    const int sp_stride_pad = FLAVORS*param.ghostFace[3];
     
       // read half spinor for the second flavor from device memory
-      const int fl_idx = sp_idx + ghostFace[3];
+      const int fl_idx = sp_idx + param.ghostFace[3];
 #if (DD_PREC==2)
-      const int fl_norm_idx = sp_norm_idx + ghostFace[3];
+      const int fl_norm_idx = sp_norm_idx + param.ghostFace[3];
 #endif
       READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 6);
       
@@ -2148,7 +2148,7 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1)
     RECONSTRUCT_GAUGE_MATRIX(6);
     
     {
-    const int sp_stride_pad = FLAVORS*ghostFace[3];
+    const int sp_stride_pad = FLAVORS*param.ghostFace[3];
     
       // read half spinor for the first flavor from device memory
       READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 6);
@@ -2267,12 +2267,12 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1)
     
     }
     {
-    const int sp_stride_pad = FLAVORS*ghostFace[3];
+    const int sp_stride_pad = FLAVORS*param.ghostFace[3];
     
       // read half spinor for the second flavor from device memory
-      const int fl_idx = sp_idx + ghostFace[3];
+      const int fl_idx = sp_idx + param.ghostFace[3];
 #if (DD_PREC==2)
-      const int fl_norm_idx = sp_norm_idx + ghostFace[3];
+      const int fl_norm_idx = sp_norm_idx + param.ghostFace[3];
 #endif
       READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 6);
       
@@ -2417,7 +2417,7 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0)
   if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
   {
     {
-    const int sp_stride_pad = FLAVORS*ghostFace[3];
+    const int sp_stride_pad = FLAVORS*param.ghostFace[3];
     
       // read half spinor for the first flavor from device memory
       READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 7);
@@ -2454,12 +2454,12 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0)
     
     }
     {
-    const int sp_stride_pad = FLAVORS*ghostFace[3];
+    const int sp_stride_pad = FLAVORS*param.ghostFace[3];
     
       // read half spinor for the second flavor from device memory
-      const int fl_idx = sp_idx + ghostFace[3];
+      const int fl_idx = sp_idx + param.ghostFace[3];
 #if (DD_PREC==2)
-      const int fl_norm_idx = sp_norm_idx + ghostFace[3];
+      const int fl_norm_idx = sp_norm_idx + param.ghostFace[3];
 #endif
       READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 7);
       
@@ -2502,7 +2502,7 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0)
     RECONSTRUCT_GAUGE_MATRIX(7);
     
     {
-    const int sp_stride_pad = FLAVORS*ghostFace[3];
+    const int sp_stride_pad = FLAVORS*param.ghostFace[3];
     
       // read half spinor for the first flavor from device memory
       READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, 7);
@@ -2621,12 +2621,12 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0)
     
     }
     {
-    const int sp_stride_pad = FLAVORS*ghostFace[3];
+    const int sp_stride_pad = FLAVORS*param.ghostFace[3];
     
       // read half spinor for the second flavor from device memory
-      const int fl_idx = sp_idx + ghostFace[3];
+      const int fl_idx = sp_idx + param.ghostFace[3];
 #if (DD_PREC==2)
-      const int fl_norm_idx = sp_norm_idx + ghostFace[3];
+      const int fl_norm_idx = sp_norm_idx + param.ghostFace[3];
 #endif
       READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx, 7);
       

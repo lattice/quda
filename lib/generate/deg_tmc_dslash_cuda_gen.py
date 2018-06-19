@@ -627,7 +627,7 @@ def gen(dir, pack_only=False):
     load_spinor += "\n"
 
     load_half = ""
-    load_half += "const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];\n"
+    load_half += "const int sp_stride_pad = param.ghostFace[static_cast<int>(kernel_type)];\n"
     #load_half += "#if (DD_PREC==2) // half precision\n"
     #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
     #load_half += "#endif\n"

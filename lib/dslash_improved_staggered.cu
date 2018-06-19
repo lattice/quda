@@ -92,6 +92,9 @@ namespace quda {
       dslashParam.longPhase1 = (void*)phase1;
       dslashParam.a = a;
       dslashParam.a_f = a;
+      dslashParam.fat_link_max = fatGauge.LinkMax();
+      dslashParam.coeff = 1.0/longGauge.Scale();
+      dslashParam.coeff_f = (float)dslashParam.coeff;
     }
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
@@ -263,8 +266,6 @@ namespace quda {
 
 #ifdef GPU_STAGGERED_DIRAC
 
-    dslashParam.Ls = out->X(4); // use Ls as the number of sources
-
 #ifdef MULTI_GPU
     for(int i=0;i < 4; i++){
       if(comm_dim_partitioned(i) && (fatGauge.X()[i] < 6)){
@@ -273,10 +274,8 @@ namespace quda {
     }
 #endif
 
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
-
+    dslashParam.Ls = out->X(4); // use Ls as the number of sources
     dslashParam.parity = parity;
-    dslashParam.fat_link_max = fatGauge.LinkMax();
 
     for(int i=0;i<4;i++){
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();

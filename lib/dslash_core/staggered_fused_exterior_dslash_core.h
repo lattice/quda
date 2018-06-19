@@ -434,10 +434,10 @@ if (threadId.z & 1)
 #ifdef MULTI_GPU
     active = true;
     int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;	
-    nbr_idx1 = param.ghostOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0] + space_con;
-    stride1 = NFACE*ghostFace[0]*param.Ls;
+    nbr_idx1 = param.ghostOffset[0][1] + src_idx*NFACE*param.ghostFace[0] + (y[0]-(X[0]-1))*param.ghostFace[0] + space_con;
+    stride1 = NFACE*param.ghostFace[0]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx1 = param.ghostNormOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0] + space_con;
+    norm_idx1 = param.ghostNormOffset[0][1] + src_idx*NFACE*param.ghostFace[0] + (y[0]-(X[0]-1))*param.ghostFace[0] + space_con;
 #endif		    
 #endif
     READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 1);
@@ -467,10 +467,10 @@ if (threadId.z & 1)
 #ifdef MULTI_GPU
     active = true;
     int space_con = ((y[3]*X[2]+y[2])*X[1] + y[1])/2;		
-    nbr_idx3 = param.ghostOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0] + space_con;
-    stride3 = NFACE*ghostFace[0]*param.Ls;
+    nbr_idx3 = param.ghostOffset[0][1] + src_idx*NFACE*param.ghostFace[0] + (y[0]-(X[0]-3))*param.ghostFace[0] + space_con;
+    stride3 = NFACE*param.ghostFace[0]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx3 = param.ghostNormOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0] + space_con;
+    norm_idx3 = param.ghostNormOffset[0][1] + src_idx*NFACE*param.ghostFace[0] + (y[0]-(X[0]-3))*param.ghostFace[0] + space_con;
 #endif	
 #endif
     spinorFloat2 T0, T1, T2;
@@ -524,10 +524,10 @@ if (!(threadIdx.z & 1))
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx1 = param.ghostOffset[0][0] + src_idx*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0] + space_con;
-    stride1 = NFACE*ghostFace[0]*param.Ls;
+    nbr_idx1 = param.ghostOffset[0][0] + src_idx*NFACE*param.ghostFace[0] + (y[0]+NFACE-1)*param.ghostFace[0] + space_con;
+    stride1 = NFACE*param.ghostFace[0]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx1 = param.ghostNormOffset[0][0] + src_idx*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0] + space_con;
+    norm_idx1 = param.ghostNormOffset[0][0] + src_idx*NFACE*param.ghostFace[0] + (y[0]+NFACE-1)*param.ghostFace[0] + space_con;
 #endif	
 #endif
     READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 0);
@@ -563,10 +563,10 @@ if (!(threadIdx.z & 1))
 #endif	     
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx3 = param.ghostOffset[0][0] + src_idx*NFACE*ghostFace[0] + y[0]*ghostFace[0] + space_con;
-    stride3 = NFACE*ghostFace[0]*param.Ls;
+    nbr_idx3 = param.ghostOffset[0][0] + src_idx*NFACE*param.ghostFace[0] + y[0]*param.ghostFace[0] + space_con;
+    stride3 = NFACE*param.ghostFace[0]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx3 = param.ghostNormOffset[0][0] + src_idx*NFACE*ghostFace[0] + y[0]*ghostFace[0] + space_con;
+    norm_idx3 = param.ghostNormOffset[0][0] + src_idx*NFACE*param.ghostFace[0] + y[0]*param.ghostFace[0] + space_con;
 #endif
 #endif
 
@@ -614,10 +614,10 @@ if (threadId.z & 1)
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx1 = param.ghostOffset[1][1] + src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1] + space_con;
-    stride1 = NFACE*ghostFace[1]*param.Ls;
+    nbr_idx1 = param.ghostOffset[1][1] + src_idx*NFACE*param.ghostFace[1] + (y[1]-(X[1]-1))*param.ghostFace[1] + space_con;
+    stride1 = NFACE*param.ghostFace[1]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx1 = param.ghostNormOffset[1][1] + src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1] + space_con;
+    norm_idx1 = param.ghostNormOffset[1][1] + src_idx*NFACE*param.ghostFace[1] + (y[1]-(X[1]-1))*param.ghostFace[1] + space_con;
 #endif		    
 #endif 
     READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 3);
@@ -647,10 +647,10 @@ if (threadId.z & 1)
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx3 = param.ghostOffset[1][1] + src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1] + space_con;
-    stride3 = NFACE*ghostFace[1]*param.Ls;
+    nbr_idx3 = param.ghostOffset[1][1] + src_idx*NFACE*param.ghostFace[1] + (y[1]-(X[1]-3))*param.ghostFace[1] + space_con;
+    stride3 = NFACE*param.ghostFace[1]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx3 = param.ghostNormOffset[1][1] + src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1] + space_con;
+    norm_idx3 = param.ghostNormOffset[1][1] + src_idx*NFACE*param.ghostFace[1] + (y[1]-(X[1]-3))*param.ghostFace[1] + space_con;
 #endif		    
 #endif    
     spinorFloat2 T0, T1, T2;
@@ -703,10 +703,10 @@ if (!(threadIdx.z & 1))
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx1 = param.ghostOffset[1][0] + src_idx*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1] + space_con;
-    stride1 = NFACE*ghostFace[1]*param.Ls;
+    nbr_idx1 = param.ghostOffset[1][0] + src_idx*NFACE*param.ghostFace[1] + (y[1]+NFACE-1)*param.ghostFace[1] + space_con;
+    stride1 = NFACE*param.ghostFace[1]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx1 = param.ghostNormOffset[1][0] + src_idx*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1] + space_con;
+    norm_idx1 = param.ghostNormOffset[1][0] + src_idx*NFACE*param.ghostFace[1] + (y[1]+NFACE-1)*param.ghostFace[1] + space_con;
 #endif	
 #endif
     READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 2);
@@ -742,10 +742,10 @@ if (!(threadIdx.z & 1))
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx3 = param.ghostOffset[1][0] + src_idx*NFACE*ghostFace[1] + y[1]*ghostFace[1] + space_con;
-    stride3 = NFACE*ghostFace[1]*param.Ls;
+    nbr_idx3 = param.ghostOffset[1][0] + src_idx*NFACE*param.ghostFace[1] + y[1]*param.ghostFace[1] + space_con;
+    stride3 = NFACE*param.ghostFace[1]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx3 = param.ghostNormOffset[1][0] + src_idx*NFACE*ghostFace[1] + y[1]*ghostFace[1] + space_con;
+    norm_idx3 = param.ghostNormOffset[1][0] + src_idx*NFACE*param.ghostFace[1] + y[1]*param.ghostFace[1] + space_con;
 #endif
 #endif
     spinorFloat2 T0, T1, T2;
@@ -794,10 +794,10 @@ if (threadId.z & 1)
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx1 = param.ghostOffset[2][1] + src_idx*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2] + space_con;
-    stride1 = NFACE*ghostFace[2]*param.Ls;
+    nbr_idx1 = param.ghostOffset[2][1] + src_idx*NFACE*param.ghostFace[2] + (y[2]-(X[2]-1))*param.ghostFace[2] + space_con;
+    stride1 = NFACE*param.ghostFace[2]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx1 = param.ghostNormOffset[2][1] + src_idx*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2] + space_con;
+    norm_idx1 = param.ghostNormOffset[2][1] + src_idx*NFACE*param.ghostFace[2] + (y[2]-(X[2]-1))*param.ghostFace[2] + space_con;
 #endif		
 #endif
     READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 5);
@@ -827,10 +827,10 @@ if (threadId.z & 1)
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx3 = param.ghostOffset[2][1] + src_idx*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2] + space_con;
-    stride3 = NFACE*ghostFace[2]*param.Ls;
+    nbr_idx3 = param.ghostOffset[2][1] + src_idx*NFACE*param.ghostFace[2] + (y[2]-(X[2]-3))*param.ghostFace[2] + space_con;
+    stride3 = NFACE*param.ghostFace[2]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx3 = param.ghostNormOffset[2][1] + src_idx*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2] + space_con;
+    norm_idx3 = param.ghostNormOffset[2][1] + src_idx*NFACE*param.ghostFace[2] + (y[2]-(X[2]-3))*param.ghostFace[2] + space_con;
 #endif
 #endif
     spinorFloat2 T0, T1, T2;
@@ -885,10 +885,10 @@ if (!(threadIdx.z & 1))
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx1 = param.ghostOffset[2][0] + src_idx*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2] + space_con;
-    stride1 = NFACE*ghostFace[2]*param.Ls;
+    nbr_idx1 = param.ghostOffset[2][0] + src_idx*NFACE*param.ghostFace[2] + (y[2]+NFACE-1)*param.ghostFace[2] + space_con;
+    stride1 = NFACE*param.ghostFace[2]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx1 = param.ghostNormOffset[2][0] + src_idx*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2] + space_con;
+    norm_idx1 = param.ghostNormOffset[2][0] + src_idx*NFACE*param.ghostFace[2] + (y[2]+NFACE-1)*param.ghostFace[2] + space_con;
 #endif			    
 #endif
     READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 4);
@@ -924,10 +924,10 @@ if (!(threadIdx.z & 1))
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx3 = param.ghostOffset[2][0] + src_idx*NFACE*ghostFace[2] + y[2]*ghostFace[2] + space_con;
-    stride3 = NFACE*ghostFace[2]*param.Ls;
+    nbr_idx3 = param.ghostOffset[2][0] + src_idx*NFACE*param.ghostFace[2] + y[2]*param.ghostFace[2] + space_con;
+    stride3 = NFACE*param.ghostFace[2]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx3 = param.ghostNormOffset[2][0] + src_idx*NFACE*ghostFace[2] + y[2]*ghostFace[2] + space_con;
+    norm_idx3 = param.ghostNormOffset[2][0] + src_idx*NFACE*param.ghostFace[2] + y[2]*param.ghostFace[2] + space_con;
 #endif			    
 #endif
     spinorFloat2 T0, T1, T2;
@@ -975,10 +975,10 @@ if (threadId.z & 1)
 #endif
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx1 = param.ghostOffset[3][1] + src_idx*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3] + space_con;
-    stride1 = NFACE*ghostFace[3]*param.Ls;
+    nbr_idx1 = param.ghostOffset[3][1] + src_idx*NFACE*param.ghostFace[3] + (y[3]-(X[3]-1))*param.ghostFace[3] + space_con;
+    stride1 = NFACE*param.ghostFace[3]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx1 = param.ghostNormOffset[3][1] + src_idx*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3] + space_con;
+    norm_idx1 = param.ghostNormOffset[3][1] + src_idx*NFACE*param.ghostFace[3] + (y[3]-(X[3]-1))*param.ghostFace[3] + space_con;
 #endif
 #endif
     READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 7);
@@ -1009,10 +1009,10 @@ if (threadId.z & 1)
 #endif
 #ifdef MULTI_GPU
     active = true;
-    nbr_idx3 = param.ghostOffset[3][1] + src_idx*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3] + space_con;
-    stride3 = NFACE*ghostFace[3]*param.Ls;
+    nbr_idx3 = param.ghostOffset[3][1] + src_idx*NFACE*param.ghostFace[3] + (y[3]-(X[3]-3))*param.ghostFace[3] + space_con;
+    stride3 = NFACE*param.ghostFace[3]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx3 = param.ghostNormOffset[3][1] + src_idx*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3] + space_con;
+    norm_idx3 = param.ghostNormOffset[3][1] + src_idx*NFACE*param.ghostFace[3] + (y[3]-(X[3]-3))*param.ghostFace[3] + space_con;
 #endif
 #endif
 
@@ -1062,10 +1062,10 @@ if (!(threadIdx.z & 1))
     active = true;
     fat_idx = half_volume + space_con;
 
-    nbr_idx1 = param.ghostOffset[3][0] + src_idx*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3] + space_con;
-    stride1 = NFACE*ghostFace[3]*param.Ls;
+    nbr_idx1 = param.ghostOffset[3][0] + src_idx*NFACE*param.ghostFace[3] + (y[3]+NFACE-1)*param.ghostFace[3] + space_con;
+    stride1 = NFACE*param.ghostFace[3]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx1 = param.ghostNormOffset[3][0] + src_idx*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3] + space_con;
+    norm_idx1 = param.ghostNormOffset[3][0] + src_idx*NFACE*param.ghostFace[3] + (y[3]+NFACE-1)*param.ghostFace[3] + space_con;
 #endif		    
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
@@ -1095,11 +1095,11 @@ if (!(threadIdx.z & 1))
 #endif	    
 #ifdef MULTI_GPU
     active = true;
-    long_idx = half_volume + y[3]*ghostFace[3]+ space_con;
-    nbr_idx3 = param.ghostOffset[3][0] + src_idx*NFACE*ghostFace[3] + y[3]*ghostFace[3] + space_con;
-    stride3 = NFACE*ghostFace[3]*param.Ls;
+    long_idx = half_volume + y[3]*param.ghostFace[3]+ space_con;
+    nbr_idx3 = param.ghostOffset[3][0] + src_idx*NFACE*param.ghostFace[3] + y[3]*param.ghostFace[3] + space_con;
+    stride3 = NFACE*param.ghostFace[3]*param.Ls;
 #if (DD_PREC == 2) //half precision
-    norm_idx3 = param.ghostNormOffset[3][0] + src_idx*NFACE*ghostFace[3] + y[3]*ghostFace[3] + space_con;
+    norm_idx3 = param.ghostNormOffset[3][0] + src_idx*NFACE*param.ghostFace[3] + y[3]*param.ghostFace[3] + space_con;
 #endif		    
 #endif	    
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);
