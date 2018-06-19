@@ -344,7 +344,7 @@ __global__ void contractTsliceKernel(double2 *out, double2 *in1, double2 *in2, i
 {
 	int	sid	 = blockIdx.x*blockDim.x + threadIdx.x;					//number of threads is equal to Tslice volume
 												//Adjust sid to correct tslice (exe domain must be Tslice volume!)
-	int	inId	 = sid + Vsh*Tslice;							//Vsh - 3d space volume for the parity spinor (equale to exe domain!)
+	int	inId	 = sid + param.Vsh*Tslice;							//Vsh - 3d space volume for the parity spinor (equale to exe domain!)
 	int	outId; 
 	int	eutId, xCoord1, xCoord2, xCoord3, xCoord4, auxCoord1, auxCoord2;
 
@@ -1201,7 +1201,7 @@ __global__ void contractTsliceKernel	(float2 *out, float4 *in1, float4 *in2, int
 {
 	int	sid	 = blockIdx.x*blockDim.x + threadIdx.x;					//number of threads is equal to Tslice volume
 												//Adjust sid to correct tslice (exe domain must be Tslice volume!)
-	int	inId	 = sid + Vsh*Tslice;							//Vsh - 3d space volume for the parity spinor (equale to exe domain!)
+	int	inId	 = sid + param.Vsh*Tslice;							//Vsh - 3d space volume for the parity spinor (equale to exe domain!)
 	int	outId; 
 	int	eutId, xCoord1, xCoord2, xCoord3, xCoord4, auxCoord1, auxCoord2;
 

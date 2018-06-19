@@ -129,6 +129,8 @@ enum KernelType {
     double twist_a;
     double twist_b;
 
+    int Vsh; // used by contraction kernels
+
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
     cudaTextureObject_t inTexNorm;
@@ -205,8 +207,6 @@ enum KernelType {
   static DslashParam dslashParam;
 
 
-//#define MAX(a,b) ((a)>(b) ? (a):(b))
-
 typedef struct fat_force_stride_s {
   int fat_ga_stride;
   int long_ga_stride;
@@ -240,7 +240,6 @@ __constant__ int X4X3X2;
 
 __constant__ int Vh;
 __constant__ int Vs;
-__constant__ int Vsh;
 
 // domain wall constants
 __constant__ double m5_d;
@@ -267,9 +266,6 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 
   int Vspatial = lat.X()[0]*lat.X()[1]*lat.X()[2]/2; // FIXME - this should not be called Vs, rather Vsh
   cudaMemcpyToSymbol(Vs, &Vspatial, sizeof(int));
-
-  int half_Vspatial = Vspatial;
-  cudaMemcpyToSymbol(Vsh, &half_Vspatial, sizeof(int));
 
   int L1 = lat.X()[0];
   cudaMemcpyToSymbol(X1, &L1, sizeof(int));  

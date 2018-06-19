@@ -254,6 +254,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     dslashParam.threads = x.X(0)*x.X(1)*x.X(2);
+    dslashParam.Vsh = (x.X(0)*x.X(1)*x.X(2)) / x.SiteSubset();
 
     Tunable *contract = 0;
 
