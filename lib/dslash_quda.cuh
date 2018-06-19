@@ -372,6 +372,7 @@ protected:
   cudaColorSpinorField *out;
   const cudaColorSpinorField *in;
   const cudaColorSpinorField *x;
+  const GaugeField &gauge;
   const QudaReconstructType reconstruct;
   char *saveOut, *saveOutNorm;
   const int dagger;
@@ -452,13 +453,25 @@ protected:
         }
       }
     }
+
+    dslashParam.gauge_stride = gauge.Stride();
+    dslashParam.gauge_fixed = gauge.GaugeFixed();
+
+    dslashParam.anisotropy = gauge.Anisotropy();
+    dslashParam.anisotropy_f = (float)dslashParam.anisotropy;
+
+    dslashParam.t_boundary = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+    dslashParam.t_boundary_f = (float)dslashParam.t_boundary;
+
+    dslashParam.An2 = make_float2(gauge.Anisotropy(), 1.0 / (gauge.Anisotropy()*gauge.Anisotropy()));
+    dslashParam.TB2 = make_float2(dslashParam.t_boundary_f, 1.0 / (dslashParam.t_boundary * dslashParam.t_boundary));
+    dslashParam.No2 = make_float2(1.0f, 1.0f);
   }
 
 public:
   DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-	     const cudaColorSpinorField *x, const QudaReconstructType reconstruct,
-	     const int dagger) 
-    : out(out), in(in), x(x), reconstruct(reconstruct), 
+	     const cudaColorSpinorField *x, const GaugeField &gauge, const int dagger)
+    : out(out), in(in), x(x), gauge(gauge), reconstruct(gauge.Reconstruct()),
       dagger(dagger), saveOut(0), saveOutNorm(0), twist_a(0.0), twist_b(0.0)  {
 
     dslashParam.out = (void*)out->V();
@@ -792,8 +805,8 @@ protected:
 
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
-    : DslashCuda(out, in, x, reconstruct, dagger) { ; }
+		   const cudaColorSpinorField *x, const GaugeField &gauge, int dagger)
+    : DslashCuda(out, in, x, gauge, dagger) { ; }
   virtual ~SharedDslashCuda() { ; }
 
   virtual void initTuneParam(TuneParam &param) const
@@ -816,8 +829,8 @@ public:
 class SharedDslashCuda : public DslashCuda {
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
-    : DslashCuda(out, in, x, reconstruct, dagger) { }
+		   const cudaColorSpinorField *x, const GaugeField &gauge, int dagger)
+    : DslashCuda(out, in, x, gauge, dagger) { }
   virtual ~SharedDslashCuda() { }
 };
 #endif

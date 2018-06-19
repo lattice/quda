@@ -704,7 +704,7 @@ if (isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==X1m1 )
   b2_re = i12_re;  b2_im = i12_im;
   
   // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE0TEX, 0, ga_idx, ga_stride);
+  READ_GAUGE_MATRIX(G, GAUGE0TEX, 0, ga_idx, param.gauge_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(0);
@@ -865,7 +865,7 @@ if (isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0 )
   b2_re = i12_re;  b2_im = i12_im;
   
   // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE1TEX, 1, ga_idx, ga_stride);
+  READ_GAUGE_MATRIX(G, GAUGE1TEX, 1, ga_idx, param.gauge_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(1);
@@ -1026,7 +1026,7 @@ if (isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==X2m1 )
   b2_re = i12_re;  b2_im = i12_im;
   
   // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE0TEX, 2, ga_idx, ga_stride);
+  READ_GAUGE_MATRIX(G, GAUGE0TEX, 2, ga_idx, param.gauge_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(2);
@@ -1187,7 +1187,7 @@ if (isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0 )
   b2_re = i12_re;  b2_im = i12_im;
   
   // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE1TEX, 3, ga_idx, ga_stride);
+  READ_GAUGE_MATRIX(G, GAUGE1TEX, 3, ga_idx, param.gauge_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(3);
@@ -1348,7 +1348,7 @@ if (isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==X3m1 )
   b2_re = i12_re;  b2_im = i12_im;
   
   // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE0TEX, 4, ga_idx, ga_stride);
+  READ_GAUGE_MATRIX(G, GAUGE0TEX, 4, ga_idx, param.gauge_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(4);
@@ -1509,7 +1509,7 @@ if (isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0 )
   b2_re = i12_re;  b2_im = i12_im;
   
   // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE1TEX, 5, ga_idx, ga_stride);
+  READ_GAUGE_MATRIX(G, GAUGE1TEX, 5, ga_idx, param.gauge_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(5);
@@ -1649,7 +1649,7 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
   
   const int ga_idx = sid;
   
-  if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
+  if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
   {
     spinorFloat a0_re, a0_im;
     spinorFloat a1_re, a1_im;
@@ -1718,7 +1718,7 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
     b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
     
     // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(G, GAUGE0TEX, 6, ga_idx, ga_stride);
+    READ_GAUGE_MATRIX(G, GAUGE0TEX, 6, ga_idx, param.gauge_stride);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(6);
@@ -1847,7 +1847,7 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
   
   const int ga_idx = Vh+face_idx;
   
-  if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
+  if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
   {
     spinorFloat a0_re, a0_im;
     spinorFloat a1_re, a1_im;
@@ -1916,7 +1916,7 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
     b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
     
     // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(G, GAUGE1TEX, 7, ga_idx, ga_stride);
+    READ_GAUGE_MATRIX(G, GAUGE1TEX, 7, ga_idx, param.gauge_stride);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(7);

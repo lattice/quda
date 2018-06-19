@@ -75,10 +75,10 @@ namespace quda {
 
   public:
     NdegTwistedDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-		      const QudaReconstructType reconstruct, const cudaColorSpinorField *in,  const cudaColorSpinorField *x, 
-		      const QudaTwistDslashType dslashType, const double kappa, const double mu, 
-		      const double epsilon, const double k, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), dslashType(dslashType)
+                          const GaugeField &gauge, const cudaColorSpinorField *in, const cudaColorSpinorField *x,
+                          const QudaTwistDslashType dslashType, const double kappa, const double mu,
+                          const double epsilon, const double k, const int dagger)
+      : SharedDslashCuda(out, in, x, gauge, dagger), gauge0(gauge0), gauge1(gauge1), dslashType(dslashType)
     { 
       a = kappa;
       b = mu;
@@ -144,10 +144,10 @@ namespace quda {
 
 #include <dslash_policy.cuh> 
 
-  void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-				 const cudaColorSpinorField *in, const int parity, const int dagger, 
-				 const cudaColorSpinorField *x, const QudaTwistDslashType type, 
-				 const double &kappa, const double &mu, const double &epsilon, 
+  void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
+				 const cudaColorSpinorField *in, const int parity, const int dagger,
+				 const cudaColorSpinorField *x, const QudaTwistDslashType type,
+				 const double &kappa, const double &mu, const double &epsilon,
 				 const double &k,  const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
@@ -178,12 +178,12 @@ namespace quda {
     size_t regSize = sizeof(float);
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new NdegTwistedDslashCuda<double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
+      dslash = new NdegTwistedDslashCuda<double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge, in, x, type, kappa, mu, epsilon, k, dagger);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new NdegTwistedDslashCuda<float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
+      dslash = new NdegTwistedDslashCuda<float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge, in, x, type, kappa, mu, epsilon, k, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new NdegTwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
+      dslash = new NdegTwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge, in, x, type, kappa, mu, epsilon, k, dagger);
     }
 
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);

@@ -59,6 +59,8 @@ namespace quda {
   class StaggeredDslashCuda : public DslashCuda {
 
   private:
+    const GaugeField &fatGauge;
+    const GaugeField &longGauge;
     const unsigned int nSrc;
 
   protected:
@@ -76,10 +78,11 @@ namespace quda {
   public:
     StaggeredDslashCuda(cudaColorSpinorField *out, const fatGFloat *fat0, const fatGFloat *fat1,
 			const longGFloat *long0, const longGFloat *long1,
-			const phaseFloat *phase0, const phaseFloat *phase1, 
-			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
-			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger), nSrc(in->X(4))
+			const phaseFloat *phase0, const phaseFloat *phase1,
+			const GaugeField &fatGauge, const GaugeField &longGauge,
+                        const cudaColorSpinorField *in, const cudaColorSpinorField *x, const double a, const int dagger)
+      : DslashCuda(out, in, x, longGauge, dagger),
+        fatGauge(fatGauge), longGauge(longGauge), nSrc(in->X(4))
     { 
       dslashParam.gauge0 = (void*)fat0;
       dslashParam.gauge1 = (void*)fat1;
@@ -100,6 +103,8 @@ namespace quda {
 #endif // USE_TEXTURE_OBJECTS
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       setParam();
+      dslashParam.gauge_stride = fatGauge.Stride();
+      dslashParam.long_gauge_stride = longGauge.Stride();
       dslashParam.swizzle = tp.aux.x;
       IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
@@ -271,8 +276,6 @@ namespace quda {
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
     dslashParam.parity = parity;
-    dslashParam.gauge_stride = fatGauge.Stride();
-    dslashParam.long_gauge_stride = longGauge.Stride();
     dslashParam.fat_link_max = fatGauge.LinkMax();
 
     for(int i=0;i<4;i++){
@@ -301,23 +304,17 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new StaggeredDslashCuda<double2, double2, double2, double>
-	(out, (double2*)fatGauge0, (double2*)fatGauge1,
-	 (double2*)longGauge0, (double2*)longGauge1,
-	 (double*)longPhase0, (double*)longPhase1, 
-	 longGauge.Reconstruct(), in, x, k, dagger);
+	(out, (double2*)fatGauge0, (double2*)fatGauge1, (double2*)longGauge0, (double2*)longGauge1,
+	 (double*)longPhase0, (double*)longPhase1, fatGauge, longGauge, in, x, k, dagger);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new StaggeredDslashCuda<float2, float2, float4, float>
-	(out, (float2*)fatGauge0, (float2*)fatGauge1,
-	 (float4*)longGauge0, (float4*)longGauge1, 
-	 (float*)longPhase0, (float*)longPhase1,
-	 longGauge.Reconstruct(), in, x, k, dagger);
+	(out, (float2*)fatGauge0, (float2*)fatGauge1, (float4*)longGauge0, (float4*)longGauge1,
+	 (float*)longPhase0, (float*)longPhase1, fatGauge, longGauge, in, x, k, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
       dslash = new StaggeredDslashCuda<short2, short2, short4, short>
-	(out, (short2*)fatGauge0, (short2*)fatGauge1,
-	 (short4*)longGauge0, (short4*)longGauge1, 
-	 (short*)longPhase0, (short*)longPhase1,
-	 longGauge.Reconstruct(), in, x, k, dagger);
+	(out, (short2*)fatGauge0, (short2*)fatGauge1, (short4*)longGauge0, (short4*)longGauge1,
+	 (short*)longPhase0, (short*)longPhase1, fatGauge, longGauge, in, x, k, dagger);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d

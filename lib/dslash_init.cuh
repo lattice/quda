@@ -1,7 +1,6 @@
 // these are function declarions that are included in different namespaces
 
 void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
-void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile);
 void initDslashConstants(TimeProfile &profile);
 void initStaggeredConstants(const cudaGaugeField &fatgauge, 
 			    const cudaGaugeField &longgauge, TimeProfile &profile);

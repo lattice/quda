@@ -75,9 +75,9 @@ namespace quda {
 
   public:
     StaggeredDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
-			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
+			const GaugeField &gauge, const cudaColorSpinorField *in,
 			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger), nSrc(in->X(4))
+      : DslashCuda(out, in, x, gauge, dagger), nSrc(in->X(4))
     { 
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
@@ -160,7 +160,6 @@ namespace quda {
     dslashParam.Ls = out->X(4);
 
     dslashParam.parity = parity;
-    dslashParam.gauge_stride = gauge.Stride();
     dslashParam.fat_link_max = gauge.LinkMax(); // May need to use this in the preconditioning step 
     // in the solver for the improved staggered action
 
@@ -188,14 +187,14 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new StaggeredDslashCuda<double2, double2>
-	(out, (double2*)gauge0, (double2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
+	(out, (double2*)gauge0, (double2*)gauge1, gauge, in, x, k, dagger);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new StaggeredDslashCuda<float2, float2>
-	(out, (float2*)gauge0, (float2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
+	(out, (float2*)gauge0, (float2*)gauge1, gauge, in, x, k, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
       dslash = new StaggeredDslashCuda<short2, short2>
-	(out, (short2*)gauge0, (short2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
+	(out, (short2*)gauge0, (short2*)gauge1, gauge, in, x, k, dagger);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d

@@ -119,10 +119,10 @@ namespace quda {
   
   public:
     MDWFDslashPCCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
-		     const QudaReconstructType reconstruct, const cudaColorSpinorField *in, 
-		     const cudaColorSpinorField *x, const double mferm, 
+		     const GaugeField &gauge, const cudaColorSpinorField *in,
+		     const cudaColorSpinorField *x, const double mferm,
 		     const double a, const int dagger, const int DS_type)
-      : DslashCuda(out, in, x, reconstruct, dagger), DS_type(DS_type)
+      : DslashCuda(out, in, x, gauge, dagger), DS_type(DS_type)
     { 
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
@@ -262,9 +262,9 @@ namespace quda {
   // 3 = MDWF dslash5inv
   //-----------------------------------------------------
 
-  void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-		      const cudaColorSpinorField *in, const int parity, const int dagger, 
-		      const cudaColorSpinorField *x, const double &m_f, const double &k2, 
+  void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
+		      const cudaColorSpinorField *in, const int parity, const int dagger,
+		      const cudaColorSpinorField *x, const double &m_f, const double &k2,
 		      const int *commOverride, const int DS_type, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
@@ -273,7 +273,7 @@ namespace quda {
     dslashParam.parity = parity;
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    //currently splitting in space-time is impelemented:
+    //currently splitting in space-time is implemented:
     int dirs = 4;
     for(int i = 0;i < dirs; i++){
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
@@ -293,15 +293,15 @@ namespace quda {
     size_t regSize = sizeof(float);
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new MDWFDslashPCCuda<double2,double2>(out, (double2*)gauge0, (double2*)gauge1, 
-						     gauge.Reconstruct(), in, x, m_f, k2, dagger, DS_type);
+      dslash = new MDWFDslashPCCuda<double2,double2>(out, (double2*)gauge0, (double2*)gauge1,
+						     gauge, in, x, m_f, k2, dagger, DS_type);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new MDWFDslashPCCuda<float4,float4>(out, (float4*)gauge0, (float4*)gauge1, 
-						   gauge.Reconstruct(), in, x, m_f, k2, dagger, DS_type);
+      dslash = new MDWFDslashPCCuda<float4,float4>(out, (float4*)gauge0, (float4*)gauge1,
+						   gauge, in, x, m_f, k2, dagger, DS_type);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new MDWFDslashPCCuda<short4,short4>(out, (short4*)gauge0, (short4*)gauge1, 
-						   gauge.Reconstruct(), in, x, m_f, k2, dagger, DS_type);
+      dslash = new MDWFDslashPCCuda<short4,short4>(out, (short4*)gauge0, (short4*)gauge1,
+						   gauge, in, x, m_f, k2, dagger, DS_type);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d

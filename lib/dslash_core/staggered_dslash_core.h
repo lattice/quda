@@ -26,7 +26,7 @@
 #define t02_re T2.x
 #define t02_im T2.y
 
-#define time_boundary t_boundary
+#define time_boundary param.t_boundary
 
 #else
 
@@ -48,7 +48,7 @@
 #define t02_re T2.x
 #define t02_im T2.y
 
-#define time_boundary t_boundary_f
+#define time_boundary param.t_boundary_f
 
 #endif
 

@@ -76,10 +76,10 @@ namespace quda {
     }
   public:
     CloverDslashCuda(cudaColorSpinorField *out,  const gFloat *gauge0, const gFloat *gauge1, 
-		     const QudaReconstructType reconstruct, const cFloat *clover, 
+		     const GaugeField &gauge, const cFloat *clover,
 		     const float *cloverNorm, int cl_stride, const cudaColorSpinorField *in, 
 		     const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger)
+      : SharedDslashCuda(out, in, x, gauge, dagger)
     { 
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
@@ -205,17 +205,17 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new CloverDslashCuda<double2, double2, double2>
-	(out, (double2*)gauge0, (double2*)gauge1, gauge.Reconstruct(), 
-	 (double2*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
+	(out, (double2*)gauge0, (double2*)gauge1, gauge,
+         (double2*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new CloverDslashCuda<float4, float4, float4>
-	(out, (float4*)gauge0, (float4*)gauge1, gauge.Reconstruct(), 
-	 (float4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
+	(out, (float4*)gauge0, (float4*)gauge1, gauge,
+         (float4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new CloverDslashCuda<short4, short4, short4>
-	(out, (short4*)gauge0, (short4*)gauge1, gauge.Reconstruct(), 
-	 (short4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
+	(out, (short4*)gauge0, (short4*)gauge1, gauge,
+         (short4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
     }
 
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);

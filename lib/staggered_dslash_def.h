@@ -127,9 +127,15 @@
 #define RECONSTRUCT_FAT_GAUGE_MATRIX(dir, gauge, idx, sign)
 #endif //DD_FAT_RECON
 
-/*#ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, fat_ga_stride); RESCALE2(FAT, fat_link_max);
-#else*/
+#ifdef DIRECT_ACCESS_FAT_LINK
+#if (DD_FAT_RECON==8)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#elif (DD_FAT_RECON==12)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#elif (DD_FAT_RECON==18)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
+#endif
+#else
 #if (DD_FAT_RECON==8)
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4_TEX(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
 #elif (DD_FAT_RECON==12)
@@ -137,12 +143,12 @@
 #else
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
 #endif
-/*#endif // DIRECT_ACCESS_FAT_LINK
+#endif // DIRECT_ACCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_8_SHORT4(LONG, gauge, dir, idx, long_ga_stride)
-#else*/
+#define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4(LONG, gauge, dir, idx, stride)
+#else
 #define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4_TEX(LONG, gauge, dir, idx, stride)
-//#endif // DIRECT_ACCESS_LONG_LINK
+#endif // DIRECT_ACCESS_LONG_LINK
 
 #endif // DD_PREC
 
@@ -237,9 +243,15 @@
 #define RECONSTRUCT_FAT_GAUGE_MATRIX(dir, gauge, idx, sign)
 #endif
 
-/*#ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, fat_ga_stride); RESCALE2(FAT, fat_link_max);
-#else*/
+#ifdef DIRECT_ACCESS_FAT_LINK
+#if (DD_FAT_RECON==8)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#elif (DD_FAT_RECON==12)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#elif (DD_FAT_RECON==18)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
+#endif
+#else
 #if (DD_FAT_RECON==8)
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4_TEX(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
 #elif (DD_FAT_RECON==12)
@@ -247,14 +259,15 @@
 #else
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
 #endif
-/*#endif // DIRECT_ACCESS_FAT_LINK
-#ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_8_SHORT4(LONG, gauge, dir, idx, long_ga_stride)
-#else*/
+#endif // DIRECT_ACCESS_FAT_LINK
 #undef READ_LONG_PHASE
+#ifdef DIRECT_ACCESS_LONG_LINK
+#define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4(LONG, gauge, dir, idx, stride)
+#define READ_LONG_PHASE(phase, dir, idx, stride) READ_GAUGE_PHASE_SHORT(PHASE, phase, dir, idx, stride);
+#else
 #define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4_TEX(LONG, gauge, dir, idx, stride)
 #define READ_LONG_PHASE(phase, dir, idx, stride) READ_GAUGE_PHASE_SHORT_TEX(PHASE, phase, dir, idx, stride);
-//#endif // DIRECT_ACCESS_LONG_LINK
+#endif // DIRECT_ACCESS_LONG_LINK
 
 #endif // DD_PREC
 
@@ -343,6 +356,15 @@
 #define RECONSTRUCT_FAT_GAUGE_MATRIX(dir, gauge, idx, sign)
 #endif
 
+#ifdef DIRECT_ACCESS_FAT_LINK
+#if (DD_FAT_RECON==8)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#elif (DD_FAT_RECON==12)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#else
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
+#endif
+#else
 #if (DD_FAT_RECON==8)
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4_TEX(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
 #elif (DD_FAT_RECON==12)
@@ -350,12 +372,13 @@
 #else
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
 #endif
+#endif // DIRECT_ACCESS_FAT_LINK
 
-/*#ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_12_SHORT4(LONG, gauge, dir, idx, long_ga_stride)
-#else*/
+#ifdef DIRECT_ACCESS_LONG_LINK
+#define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4(LONG, gauge, dir, idx, stride)
+#else
 #define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4_TEX(LONG, gauge, dir, idx, stride)
-//#endif // DIRECT_ACCCESS_LONG_LINK
+#endif // DIRECT_ACCESS_LONG_LINK
 
 #endif // DD_PREC
 
@@ -449,6 +472,15 @@
 #define RECONSTRUCT_FAT_GAUGE_MATRIX(dir, gauge, idx, sign)
 #endif
 
+#ifdef DIRECT_ACCESS_FAT_LINK
+#if (DD_FAT_RECON==8)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#elif (DD_FAT_RECON==12)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#else
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
+#endif
+#else
 #if (DD_FAT_RECON==8)
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4_TEX(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
 #elif (DD_FAT_RECON==12)
@@ -456,13 +488,15 @@
 #else
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
 #endif
- /*#ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_12_SHORT4(LONG, gauge, dir, idx, long_ga_stride)
-#else*/
+#endif
 #undef READ_LONG_PHASE
+#ifdef DIRECT_ACCESS_LONG_LINK
+#define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4(LONG, gauge, dir, idx, stride)
+#define READ_LONG_PHASE(phase, dir, idx, stride) READ_GAUGE_PHASE_SHORT(PHASE, phase, dir, idx, stride);
+#else
 #define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4_TEX(LONG, gauge, dir, idx, stride)
-#define READ_LONG_PHASE(phase, dir, idx, stride) READ_GAUGE_PHASE_SHORT_TEX(PHASE, phase, dir, idx, stride); 
-									//#endif // DIRECT_ACCCESS_LONG_LINK
+#define READ_LONG_PHASE(phase, dir, idx, stride) READ_GAUGE_PHASE_SHORT_TEX(PHASE, phase, dir, idx, stride);
+#endif // DIRECT_ACCESS_LONG_LINK
 
 #endif // DD_PREC
 
@@ -502,7 +536,7 @@
 #define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2(LONG, gauge, dir, idx, stride)
 #else
 #define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2_TEX(LONG, gauge, dir, idx, stride)
-#endif // DIRECT_ACCCESS_LONG_LINK
+#endif // DIRECT_ACCESS_LONG_LINK
 
 #elif (DD_PREC==1) // SINGLE PRECISION
 
@@ -536,7 +570,7 @@
 #define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2(LONG, gauge, dir, idx, stride)
 #else
 #define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2_TEX(LONG, gauge, dir, idx, stride)
-#endif // DIRECT_ACCCESS_LONG_LINK
+#endif // DIRECT_ACCESS_LONG_LINK
 
 #else  // HALF PRECISION
 
@@ -548,6 +582,17 @@
 #define RECONSTRUCT_FAT_GAUGE_MATRIX(dir, gauge, idx, sign)
 #endif
 
+#ifdef DIRECT_ACCESS_FAT_LINK
+
+#if (DD_FAT_RECON==8)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#elif (DD_FAT_RECON==12)
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
+#else
+#define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
+#endif
+#else
+
 #if (DD_FAT_RECON==8)
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4_TEX(FAT, gauge, dir, idx, stride); RESCALE4(FAT, fat_link_max);
 #elif (DD_FAT_RECON==12)
@@ -555,12 +600,13 @@
 #else
 #define READ_FAT_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_link_max);
 #endif
- 
-  /*#ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2(LONG, gauge, dir, idx, long_ga_stride)
-#else*/
+#endif
+
+#ifdef DIRECT_ACCESS_LONG_LINK
+#define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(LONG, gauge, dir, idx, stride)
+#else
 #define READ_LONG_MATRIX(gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(LONG, gauge, dir, idx, stride)
-									 //#endif // DIRECT_ACCCESS_LONG_LINK
+#endif // DIRECT_ACCESS_LONG_LINK
 
 #endif // DD_PREC
 
@@ -704,10 +750,10 @@
 #endif
 #endif // USE_TEXTURE_OBJECTS
 #else
-#define LONGLINK0TEX longGauge0
-#define LONGLINK1TEX longGauge1
-#define LONGPHASE0TEX longPhase0
-#define LONGPHASE1TEX longPhase1
+#define LONGLINK0TEX param.longGauge0
+#define LONGLINK1TEX param.longGauge1
+#define LONGPHASE0TEX param.longPhase0
+#define LONGPHASE1TEX param.longPhase1
 #endif
 
 // spinor fields
@@ -760,19 +806,14 @@
 
 #else             // half-precision fields
 
-// all reads done through texture cache regardless
-
 // gauge fields
 #define DD_PREC_F H
+
+#ifndef DIRECT_ACCESS_FAT_LINK
 #ifdef USE_TEXTURE_OBJECTS
 #define FATLINK0TEX param.gauge0Tex
 #define FATLINK1TEX param.gauge1Tex
-#define LONGLINK0TEX param.longGauge0Tex
-#define LONGLINK1TEX param.longGauge1Tex
-#define LONGPHASE0TEX param.longPhase0Tex
-#define LONGPHASE1TEX param.longPhase1Tex
 #else
-
 #if (DD_IMPROVED == 1)
 #define FATLINK0TEX fatGauge0TexHalf
 #define FATLINK1TEX fatGauge1TexHalf
@@ -785,7 +826,19 @@
 #define FATLINK1TEX gauge1TexHalf4
 #endif
 #endif // DD_IMPROVED
+#endif // USE_TEXTURE_OBJECTS
+#else // DIRECT_ACCESS_FAT_LINK
+#define FATLINK0TEX param.gauge0
+#define FATLINK1TEX param.gauge1
+#endif
 
+#ifndef DIRECT_ACCESS_LONG_LINK
+#ifdef USE_TEXTURE_OBJECTS
+#define LONGLINK0TEX param.longGauge0Tex
+#define LONGLINK1TEX param.longGauge1Tex
+#define LONGPHASE0TEX param.longPhase0Tex
+#define LONGPHASE1TEX param.longPhase1Tex
+#else
 #if (DD_LONG_RECON ==18)
 #define LONGLINK0TEX longGauge0TexHalf_norecon
 #define LONGLINK1TEX longGauge1TexHalf_norecon
@@ -796,6 +849,12 @@
 #define LONGPHASE1TEX longPhase1TexHalf
 #endif
 #endif // USE_TEXTURE_OBJECTS
+#else  // DIRECT_ACCESS_LONG_LINK
+#define LONGLINK0TEX param.longGauge0
+#define LONGLINK1TEX param.longGauge1
+#define LONGPHASE0TEX param.longPhase0
+#define LONGPHASE1TEX param.longPhase1
+#endif
 
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_HALF_TEX
 #define READ_3RD_NBR_SPINOR READ_KS_NBR_SPINOR_HALF_TEX
