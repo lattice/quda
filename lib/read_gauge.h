@@ -94,8 +94,8 @@
   float4 G##2 = make_float4(0,0,0,0);					\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);					\
-  (G##3).z = (G##0).x = pi_f*(G##0).x;						\
-  (G##3).w = (G##0).y = pi_f*(G##0).y;
+  (G##3).z = (G##0).x = M_PI*(G##0).x;						\
+  (G##3).w = (G##0).y = M_PI*(G##0).y;
 
 #define READ_GAUGE_MATRIX_18_DOUBLE2(G, gauge_, dir, idx, stride)   \
   double2 *gauge = (double2*)gauge_;				    \
@@ -194,20 +194,20 @@
   float4 G##2 = make_float4(0,0,0,0);					\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);					\
-  (G##3).z = (G##0).x = pi_f*(G##0).x;					\
-  (G##3).w = (G##0).y = pi_f*(G##0).y;
+  (G##3).z = (G##0).x = M_PI*(G##0).x;					\
+  (G##3).w = (G##0).y = M_PI*(G##0).y;
 
 
 #define READ_GAUGE_PHASE_DOUBLE(P, phase, dir, idx, stride){ \
-  P = 2.*M_PI*phase[idx + (dir/2)*stride]; \
+    P = 2.*M_PI*((double*)phase)[idx + (dir/2)*stride];      \
 }
 
 #define READ_GAUGE_PHASE_FLOAT(P, phase, dir, idx, stride){ \
-  P = 2.f*pi_f*phase[idx + (dir/2)*stride];  \
+    P = 2.f*M_PI*((float*)phase)[idx + (dir/2)*stride];     \
 }
 
 #define READ_GAUGE_PHASE_SHORT(P, phase, dir, idx, stride){ \
-  P = 2.f*pi_f*short2float(phase[idx + (dir/2)*stride]);  \
+    P = 2.f*M_PI*short2float(((short*)phase)[idx + (dir/2)*stride]);    \
 } 
 
 /*!----For DW only----!*/
@@ -264,8 +264,8 @@
   G##2 = make_float4(0,0,0,0);						\
   G##3 = make_float4(0,0,0,0);						\
   G##4 = make_float4(0,0,0,0);						\
-  (G##3).z = (G##0).x = pi_f*(G##0).x;					\
-  (G##3).w = (G##0).y = pi_f*(G##0).y;
+  (G##3).z = (G##0).x = M_PI*(G##0).x;					\
+  (G##3).w = (G##0).y = M_PI*(G##0).y;
 
 #define ASSN_GAUGE_MATRIX_18_DOUBLE2(G, gauge_, dir, idx, stride)    \
    double2 *gauge = (double2*)gauge_;				     \
@@ -364,8 +364,8 @@
    G##2 = make_float4(0,0,0,0);					\
    G##3 = make_float4(0,0,0,0);					\
    G##4 = make_float4(0,0,0,0);					\
-  (G##3).z = (G##0).x = pi_f*(G##0).x;						\
-  (G##3).w = (G##0).y = pi_f*(G##0).y;
+  (G##3).z = (G##0).x = M_PI*(G##0).x;						\
+  (G##3).w = (G##0).y = M_PI*(G##0).y;
 
 
 /*----END--*/
@@ -393,9 +393,9 @@
 #define RECONSTRUCT_MATRIX_18_SINGLE(dir) 
 
 #ifndef MULTI_GPU
-#define do_boundary ga_idx >= X4X3X2X1hmX3X2X1h
+#define do_boundary ga_idx >= param.X4X3X2X1hmX3X2X1h
 #else
-#define do_boundary ( (Pt0 && (ga_idx >= Vh)) || ( PtNm1 && (ga_idx >= X4X3X2X1hmX3X2X1h) && (ga_idx < Vh) ) )
+#define do_boundary ( (param.Pt0 && (ga_idx >= param.Vh)) || ( param.PtNm1 && (ga_idx >= param.X4X3X2X1hmX3X2X1h) && (ga_idx < param.Vh) ) )
 #endif
 
 #define RECONSTRUCT_MATRIX_12_DOUBLE(dir)				\
@@ -405,7 +405,7 @@
   ACC_CONJ_PROD(g21, -g00, +g12);					\
   ACC_CONJ_PROD(g22, +g00, +g11);					\
   ACC_CONJ_PROD(g22, -g01, +g10);					\
-  double u0 = (dir < 6 ? anisotropy : (do_boundary ? t_boundary : 1)); \
+  double u0 = (dir < 6 ? param.anisotropy : (do_boundary ? param.t_boundary : 1)); \
   G6.x*=u0; G6.y*=u0; G7.x*=u0; G7.y*=u0; G8.x*=u0; G8.y*=u0;
 
 #define RECONSTRUCT_MATRIX_12_SINGLE(dir)			\
@@ -415,7 +415,7 @@
   ACC_CONJ_PROD(g21, -g00, +g12);				\
   ACC_CONJ_PROD(g22, +g00, +g11);				\
   ACC_CONJ_PROD(g22, -g01, +g10);				\
-  float u0 = (dir < 6 ? anisotropy_f : (do_boundary ? t_boundary_f : 1)); \
+  float u0 = (dir < 6 ? param.anisotropy_f : (do_boundary ? param.t_boundary_f : 1)); \
   G3.x*=u0; G3.y*=u0; G3.z*=u0; G3.w*=u0; G4.x*=u0; G4.y*=u0;
 
 #define RECONSTRUCT_MATRIX_8_DOUBLE(dir)				\
@@ -423,7 +423,7 @@
   row_sum += g01_im*g01_im;						\
   row_sum += g02_re*g02_re;						\
   row_sum += g02_im*g02_im;						\
-  double u0 = (dir < 6 ? anisotropy : (do_boundary ? t_boundary : 1)); \
+  double u0 = (dir < 6 ? param.anisotropy : (do_boundary ? param.t_boundary : 1)); \
   double u02_inv = 1.0 / (u0*u0);					\
   double column_sum = u02_inv - row_sum;				\
   double U00_mag = sqrt((column_sum > 0 ? column_sum : 0));		\
@@ -466,7 +466,7 @@
    row_sum += g02_im*g02_im;						\
    __sincosf(g21_re, &g00_im, &g00_re);					\
    __sincosf(g21_im, &g20_im, &g20_re);					\
-   float2 u0_2 = (dir < 6 ? An2 : (do_boundary ? TB2 : No2)); \
+   float2 u0_2 = (dir < 6 ? param.An2 : (do_boundary ? param.TB2 : param.No2)); \
    float column_sum = u0_2.y - row_sum;					\
    float U00_mag = column_sum * rsqrtf((column_sum > 0 ? column_sum : 1e14)); \
    g00_re *= U00_mag;							\
@@ -511,7 +511,7 @@
   ACC_CONJ_PROD(gauge##21, -gauge##00, +gauge##12);			\
   ACC_CONJ_PROD(gauge##22, +gauge##00, +gauge##11);			\
   ACC_CONJ_PROD(gauge##22, -gauge##01, +gauge##10);			\
-  {float u0 = coeff_f*sign;						\
+  {float u0 = param.coeff_f*sign;						\
     gauge##20_re *=u0;gauge##20_im *=u0; gauge##21_re *=u0; gauge##21_im *=u0; \
     gauge##22_re *=u0;gauge##22_im *=u0;}
 
@@ -522,7 +522,7 @@
   ACC_CONJ_PROD(gauge##21, -gauge##00, +gauge##12);			\
   ACC_CONJ_PROD(gauge##22, +gauge##00, +gauge##11);			\
   ACC_CONJ_PROD(gauge##22, -gauge##01, +gauge##10);			\
-  {double u0 = coeff* sign;						\
+  {double u0 = param.coeff* sign;						\
     gauge##20_re *=u0;gauge##20_im *=u0; gauge##21_re *=u0; gauge##21_im *=u0; \
     gauge##22_re *=u0;gauge##22_im *=u0;}
 
@@ -566,7 +566,7 @@
 #define RECONSTRUCT_GAUGE_MATRIX_8_DOUBLE(dir, gauge, idx, sign)	\
   double row_sum = gauge##01_re*gauge##01_re + gauge##01_im*gauge##01_im; \
   row_sum += gauge##02_re*gauge##02_re + gauge##02_im*gauge##02_im;	\
-  double u0 = coeff*sign;						\
+  double u0 = param.coeff*sign;						\
   double u02_inv = 1.0 / (u0*u0);					\
   double column_sum = u02_inv - row_sum;				\
   double U00_mag = sqrt(column_sum);					\
@@ -605,7 +605,7 @@
 #define RECONSTRUCT_GAUGE_MATRIX_8_SINGLE(dir, gauge, idx, sign)        { \
     float row_sum = gauge##01_re*gauge##01_re + gauge##01_im*gauge##01_im; \
     row_sum += gauge##02_re*gauge##02_re + gauge##02_im*gauge##02_im;	\
-    float u0 = coeff_f*sign;						\
+    float u0 = param.coeff_f*sign;						\
     float u02_inv = __fdividef(1.f, u0*u0);				\
     float column_sum = u02_inv - row_sum;				\
     float U00_mag = sqrtf(column_sum > 0 ?column_sum:0);		\
@@ -777,7 +777,7 @@
 
 
 #define READ_GAUGE_PHASE_FLOAT_TEX(P, phase, dir, idx, stride) { \
-  P = 2.f*pi_f*TEX1DFETCH(float, (phase), idx + (dir/2)*stride); \
+  P = 2.f*M_PI*TEX1DFETCH(float, (phase), idx + (dir/2)*stride); \
 }
 
 #define READ_GAUGE_PHASE_SHORT_TEX(P, phase, dir, idx, stride) READ_GAUGE_PHASE_FLOAT_TEX(P, phase, dir, idx, stride)

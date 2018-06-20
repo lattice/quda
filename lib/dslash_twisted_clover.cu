@@ -78,11 +78,11 @@ namespace quda {
 
   public:
     TwistedCloverDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-			    const QudaReconstructType reconstruct, const cFloat *clover, const float *cNorm,
+			    const GaugeField &gauge, const cFloat *clover, const float *cNorm,
 			    const cFloat *cloverInv, const float *cNrm2, int cl_stride, const cudaColorSpinorField *in,
 			    const cudaColorSpinorField *x, const QudaTwistCloverDslashType dslashType, const double kappa,
 			    const double mu, const double epsilon, const double k, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct,dagger),gauge0(gauge0), gauge1(gauge1), clover(clover),
+      : SharedDslashCuda(out, in, x, gauge, dagger), gauge0(gauge0), gauge1(gauge1), clover(clover),
 	cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2), dslashType(dslashType)
     { 
       a = kappa;
@@ -269,8 +269,6 @@ namespace quda {
     inSpinor->createComms(1);
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
-
     int ghost_threads[4] = {0};
     int bulk_threads = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->Volume() : in->Volume() / 2;
 
@@ -310,15 +308,15 @@ namespace quda {
     size_t regSize = sizeof(float);
 	
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new TwistedCloverDslashCuda<double2,double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), (double2*)cloverP, (float*)cloverNormP,
+      dslash = new TwistedCloverDslashCuda<double2,double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge, (double2*)cloverP, (float*)cloverNormP,
 								    (double2*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
 	  
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new TwistedCloverDslashCuda<float4,float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge.Reconstruct(), (float4*)cloverP, (float*)cloverNormP,
+      dslash = new TwistedCloverDslashCuda<float4,float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge, (float4*)cloverP, (float*)cloverNormP,
 								 (float4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new TwistedCloverDslashCuda<short4,short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), (short4*)cloverP, (float*)cloverNormP,
+      dslash = new TwistedCloverDslashCuda<short4,short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge, (short4*)cloverP, (float*)cloverNormP,
 								 (short4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
     }
 

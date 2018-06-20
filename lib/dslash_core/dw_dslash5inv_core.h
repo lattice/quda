@@ -42,9 +42,9 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
-#define m5 m5_d
-#define mdwf_b5 mdwf_b5_d
-#define mdwf_c5 mdwf_c5_d
+#define m5 param.m5_d
+#define mdwf_b5 param.mdwf_b5_d
+#define mdwf_c5 param.mdwf_c5_d
 #define mferm param.mferm
 #define a param.a
 #define b param.b
@@ -75,9 +75,9 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
-#define m5 m5_f
-#define mdwf_b5 mdwf_b5_f
-#define mdwf_c5 mdwf_c5_f
+#define m5 param.m5_f
+#define mdwf_b5 param.mdwf_b5_f
+#define mdwf_c5 param.mdwf_c5_f
 #define mferm param.mferm_f
 #define a param.a
 #define b param.b
@@ -132,10 +132,10 @@ int X, coord[5], boundaryCrossing;
 
 
 
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
+boundaryCrossing = sid/param.Xh[0] + sid/(param.X[1]*param.Xh[0]) + sid/(param.X[2]*param.X[1]*param.Xh[0]);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-coord[4] = X/(X1*X2*X3*X4);
+coord[4] = X/(param.X[0]*param.X[1]*param.X[2]*param.X[3]);
 
  o00_re = 0; o00_im = 0;
  o01_re = 0; o01_im = 0;

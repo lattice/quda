@@ -72,7 +72,8 @@ namespace quda {
   // Added for 4d EO preconditioning in Mobius DWF
   void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 		      const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k,
-		      const int *commDim, const int DS_type, TimeProfile &profile);
+		      const double *b5, const double *c_5, const double &m5,
+                      const int *commDim, const int DS_type, TimeProfile &profile);
 
   // staggered Dslash    
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,

@@ -590,7 +590,8 @@ void unbindTwistedCloverTex(const FullClover clover)  //We don't really need thi
 #if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
   defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
   defined(DIRECT_ACCESS_WILSON_INTER) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
-  defined(DIRECT_ACCESS_CLOVER)
+  defined(DIRECT_ACCESS_CLOVER) || defined(DIRECT_ACCESS_PACK) ||       \
+  defined(DIRECT_ACCESS_LONG_LINK) || defined(DIRECT_ACCESS_FAT_LINK)
 
   static inline __device__ float short2float(short a) {
     return (float)a/MAX_SHORT;

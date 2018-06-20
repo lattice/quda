@@ -372,6 +372,7 @@ protected:
   cudaColorSpinorField *out;
   const cudaColorSpinorField *in;
   const cudaColorSpinorField *x;
+  const GaugeField &gauge;
   const QudaReconstructType reconstruct;
   char *saveOut, *saveOutNorm;
   const int dagger;
@@ -384,7 +385,12 @@ protected:
   unsigned int minThreads() const { return dslashParam.threads; }
   char aux_base[TuneKey::aux_n];
   char aux[8][TuneKey::aux_n];
+  static char ghost_str[TuneKey::aux_n]; // string with ghostDim information
 
+  /**
+     @brief Set the base strings used by the different dslash kernel
+     types for autotuning.
+  */
   inline void fillAuxBase() {
     char comm[5];
     comm[0] = (dslashParam.commDim[0] ? '1' : '0');
@@ -408,18 +414,14 @@ protected:
     if (dagger) strcat(aux_base,",dagger");
   }
 
+  /**
+     @brief Specialize the auxiliary strings for each kernel type
+     @param[in] kernel_type The kernel_type we are generating the string got
+     @param[in] kernel_str String corresponding to the kernel type
+  */
   inline void fillAux(KernelType kernel_type, const char *kernel_str) {
     strcpy(aux[kernel_type],kernel_str);
-    if (kernel_type == INTERIOR_KERNEL) {
-      char ghost[5];
-      ghost[0] = (dslashParam.ghostDim[0] ? '1' : '0');
-      ghost[1] = (dslashParam.ghostDim[1] ? '1' : '0');
-      ghost[2] = (dslashParam.ghostDim[2] ? '1' : '0');
-      ghost[3] = (dslashParam.ghostDim[3] ? '1' : '0');
-      ghost[4] = '\0';
-      strcat(aux[kernel_type],",ghost=");
-      strcat(aux[kernel_type],ghost);
-    }
+    if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type],ghost_str);
     strcat(aux[kernel_type],aux_base);
   }
 
@@ -436,6 +438,7 @@ protected:
 
     // update the ghosts for the non-p2p directions
     for (int dim=0; dim<4; dim++) {
+
       for (int dir=0; dir<2; dir++) {
         /* if doing interior kernel, then this is the initial call, so
         we must all ghost pointers else if doing exterior kernel, then
@@ -452,15 +455,16 @@ protected:
         }
       }
     }
+
   }
 
 public:
   DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-	     const cudaColorSpinorField *x, const QudaReconstructType reconstruct,
-	     const int dagger) 
-    : out(out), in(in), x(x), reconstruct(reconstruct), 
+	     const cudaColorSpinorField *x, const GaugeField &gauge, const int dagger)
+    : out(out), in(in), x(x), gauge(gauge), reconstruct(gauge.Reconstruct()),
       dagger(dagger), saveOut(0), saveOutNorm(0), twist_a(0.0), twist_b(0.0)  {
 
+    // set parameters particular for this instance
     dslashParam.out = (void*)out->V();
     dslashParam.outNorm = (float*)out->Norm();
     dslashParam.in = (void*)in->V();
@@ -479,36 +483,73 @@ public:
 
     dslashParam.sp_stride = in->Stride();
 
+    auto X = dslashParam.X;
+    X[0] = in->X(0)*2; // this is a c/b field so double the x dimension
+    for (int i=1; i<4; i++) X[i] = in->X(i);
+    dslashParam.Ls = in->X(4); // needed by tuneLaunch()
+    dslashParam.Xh[0] = in->X(0);
+    for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
+    dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
+
+    // FIXME there is redundancy in the parameters below (face vs ghostFace vs LatticeField::surfaceCB member)
+    int face[4];
+    for (int dim=0; dim<4; dim++) {
+      for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
+      face[dim] = Nface()/2;
+      dslashParam.face_X[dim] = face[0];
+      dslashParam.face_Y[dim] = face[1];
+      dslashParam.face_Z[dim] = face[2];
+      dslashParam.face_T[dim] = face[3];
+      dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
+      dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
+      dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
+    }
+
+    dslashParam.Vh = (X[3]*X[2]*X[1]*X[0])/2;
+    dslashParam.ghostFace[0] = (X[1]*X[2]*X[3])/2;
+    dslashParam.ghostFace[1] = (X[0]*X[2]*X[3])/2;
+    dslashParam.ghostFace[2] = (X[0]*X[1]*X[3])/2;
+    dslashParam.ghostFace[3] = (X[0]*X[1]*X[2])/2;
+
+    dslashParam.X2X1 = X[1]*X[0];
+    dslashParam.X3X2X1 = X[2]*X[1]*X[0];
+    dslashParam.X2X1mX1 = (X[1]-1)*X[0];
+    dslashParam.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
+    dslashParam.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
+    dslashParam.X4X3X2X1hmX3X2X1h = dslashParam.X4X3X2X1mX3X2X1/2;
+
+    dslashParam.gauge_stride = gauge.Stride();
+    dslashParam.gauge_fixed = gauge.GaugeFixed();
+
+    dslashParam.anisotropy = gauge.Anisotropy();
+    dslashParam.anisotropy_f = (float)dslashParam.anisotropy;
+
+    dslashParam.t_boundary = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+    dslashParam.t_boundary_f = (float)dslashParam.t_boundary;
+
+    dslashParam.An2 = make_float2(gauge.Anisotropy(), 1.0 / (gauge.Anisotropy()*gauge.Anisotropy()));
+    dslashParam.TB2 = make_float2(dslashParam.t_boundary_f, 1.0 / (dslashParam.t_boundary * dslashParam.t_boundary));
+
+    dslashParam.coeff = 1.0;
+    dslashParam.coeff_f = 1.0f;
+
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
-//    if (!init) { // these parameters are constant across all dslash instances for a given run
-    if (true) { // Experimenting: reinitialize.
-      // this is a c/b field so double the x dimension
-      dslashParam.X[0] = in->X(0)*2;
-      for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
-#ifdef GPU_DOMAIN_WALL_DIRAC
-      dslashParam.Ls = in->X(4); // needed by tuneLaunch()
-#endif
-      dslashParam.Xh[0] = in->X(0);
-      for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
-      dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
-
-      int face[4];
+    if (!init) { // these parameters are constant across all dslash instances for a given run
+      char ghost[5]; // set the ghost string
       for (int dim=0; dim<4; dim++) {
         dslashParam.ghostDim[dim] = comm_dim_partitioned(dim); // determines whether to use regular or ghost indexing at boundary
-
-        for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
-        face[dim] = Nface()/2;
-      
-        dslashParam.face_X[dim] = face[0];
-        dslashParam.face_Y[dim] = face[1];
-        dslashParam.face_Z[dim] = face[2];
-        dslashParam.face_T[dim] = face[3];
-        dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
-        dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
-        dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
+        ghost[dim] = (dslashParam.ghostDim[dim] ? '1' : '0');
       }
+      ghost[4] = '\0';
+      strcpy(ghost_str,",ghost=");
+      strcat(ghost_str,ghost);
+
+      dslashParam.No2 = make_float2(1.0f, 1.0f);
+      dslashParam.Pt0 = (comm_coord(3) == 0) ? true : false;
+      dslashParam.PtNm1 = (comm_coord(3) == comm_dim(3)-1) ? true : false;
+
       init = true;
     }
 
@@ -711,7 +752,9 @@ public:
 
 };
 
+//static declarations
 bool DslashCuda::init = false;
+char DslashCuda::ghost_str[TuneKey::aux_n];
 
 /** This derived class is specifically for driving the Dslash kernels
     that use shared memory blocking.  This only applies on Fermi and
@@ -793,8 +836,8 @@ protected:
 
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
-    : DslashCuda(out, in, x, reconstruct, dagger) { ; }
+		   const cudaColorSpinorField *x, const GaugeField &gauge, int dagger)
+    : DslashCuda(out, in, x, gauge, dagger) { ; }
   virtual ~SharedDslashCuda() { ; }
 
   virtual void initTuneParam(TuneParam &param) const
@@ -817,8 +860,8 @@ public:
 class SharedDslashCuda : public DslashCuda {
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
-    : DslashCuda(out, in, x, reconstruct, dagger) { }
+		   const cudaColorSpinorField *x, const GaugeField &gauge, int dagger)
+    : DslashCuda(out, in, x, gauge, dagger) { }
   virtual ~SharedDslashCuda() { }
 };
 #endif

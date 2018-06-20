@@ -71,11 +71,11 @@ namespace quda {
     }
 
   public:
-    AsymCloverDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-			 const QudaReconstructType reconstruct, const cFloat *clover, 
+    AsymCloverDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
+			 const GaugeField &gauge, const cFloat *clover,
 			 const float *cloverNorm, int cl_stride, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double a, const double rho, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger)
+      : SharedDslashCuda(out, in, x, gauge, dagger)
     { 
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
@@ -186,16 +186,16 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new AsymCloverDslashCuda<double2, double2, double2>
-	(out, (double2*)gauge0, (double2*)gauge1, gauge.Reconstruct(), 
-	 (double2*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
+	(out, (double2*)gauge0, (double2*)gauge1, gauge,
+         (double2*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new AsymCloverDslashCuda<float4, float4, float4>
-	(out, (float4*)gauge0, (float4*)gauge1, gauge.Reconstruct(), 
+	(out, (float4*)gauge0, (float4*)gauge1, gauge,
 	 (float4*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new AsymCloverDslashCuda<short4, short4, short4>
-	(out, (short4*)gauge0, (short4*)gauge1, gauge.Reconstruct(), 
+	(out, (short4*)gauge0, (short4*)gauge1, gauge,
 	 (short4*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
     }
 

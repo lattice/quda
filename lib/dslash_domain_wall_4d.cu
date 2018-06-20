@@ -64,8 +64,7 @@ namespace quda {
     bool checkGrid(TuneParam &param) const {
       if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0] || param.grid.y > (unsigned int)deviceProp.maxGridSize[1]) {
         warningQuda("Autotuner is skipping blockDim=(%u,%u,%u), gridDim=(%u,%u,%u) because lattice volume is too large",
-        param.block.x, param.block.y, param.block.z, 
-        param.grid.x, param.grid.y, param.grid.z);
+                    param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z);
         return false;
       } else {
         return true;
@@ -117,10 +116,10 @@ namespace quda {
   
   public:
     DomainWallDslash4DPCCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
-			     const QudaReconstructType reconstruct, const cudaColorSpinorField *in, 
-			     const cudaColorSpinorField *x, const double mferm, 
+			     const GaugeField &gauge, const cudaColorSpinorField *in,
+			     const cudaColorSpinorField *x, const double mferm,
 			     const double a, const double b, const int dagger, const int DS_type)
-      : DslashCuda(out, in, x, reconstruct, dagger), DS_type(DS_type)
+      : DslashCuda(out, in, x, gauge, dagger), DS_type(DS_type)
     { 
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
@@ -285,14 +284,14 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new DomainWallDslash4DPCCuda<double2,double2>(out, (double2*)gauge0, (double2*)gauge1, 
-							     gauge.Reconstruct(), in, x, m_f, a, b, dagger, DS_type);
+							     gauge, in, x, m_f, a, b, dagger, DS_type);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new DomainWallDslash4DPCCuda<float4,float4>(out, (float4*)gauge0, (float4*)gauge1, 
-							   gauge.Reconstruct(), in, x, m_f, a, b, dagger, DS_type);
+							   gauge, in, x, m_f, a, b, dagger, DS_type);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new DomainWallDslash4DPCCuda<short4,short4>(out, (short4*)gauge0, (short4*)gauge1, 
-							   gauge.Reconstruct(), in, x, m_f, a, b, dagger, DS_type);
+							   gauge, in, x, m_f, a, b, dagger, DS_type);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d

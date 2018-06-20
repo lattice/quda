@@ -153,9 +153,9 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
-    str += "#define m5 m5_d\n"
-    str += "#define mdwf_b5 mdwf_b5_d\n"
-    str += "#define mdwf_c5 mdwf_c5_d\n"
+    str += "#define m5 param.m5_d\n"
+    str += "#define mdwf_b5 param.mdwf_b5_d\n"
+    str += "#define mdwf_c5 param.mdwf_c5_d\n"
     str += "#define mferm param.mferm\n"
     str += "#define a param.a\n"
     str += "#define b param.b\n"
@@ -166,9 +166,9 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n"
-    str += "#define m5 m5_f\n"
-    str += "#define mdwf_b5 mdwf_b5_f\n"
-    str += "#define mdwf_c5 mdwf_c5_f\n"
+    str += "#define m5 param.m5_f\n"
+    str += "#define mdwf_b5 param.mdwf_b5_f\n"
+    str += "#define mdwf_c5 param.mdwf_c5_f\n"
     str += "#define mferm param.mferm_f\n"
     str += "#define a param.a_f\n"
     str += "#define b param.b_f\n"
@@ -518,19 +518,19 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
-    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
+    boundary = ["coord[0]==(param.X[0]-1)", "coord[0]==0", "coord[1]==(param.X[1]-1)", "coord[1]==0", "coord[2]==(param.X[2]-1)", "coord[2]==0", "coord[3]==(param.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.X[0]-1)", "coord[0]>0", "coord[1]<(param.X[1]-1)", "coord[1]>0", "coord[2]<(param.X[2]-1)", "coord[2]>0", "coord[3]<(param.X[3]-1)", "coord[3]>0"]
 
     offset = ["+1", "-1", "+1", "-1", "+1", "-1", "+1", "-1"]
 
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+X1", "X-X1", "X+X2X1", "X-X2X1", "X+X3X2X1", "X-X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.X[0]", "X-param.X[0]", "X+param.X2X1", "X-param.X2X1", "X+param.X3X2X1", "X-param.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-X1m1", "X+X1m1", "X-X2X1mX1", "X+X2X1mX1", "X-X3X2X1mX2X1", "X+X3X2X1mX2X1",
-                   "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.X[0]-1)", "X+(param.X[0]-1)", "X-param.X2X1mX1", "X+param.X2X1mX1", "X-param.X3X2X1mX2X1", "X+param.X3X2X1mX2X1",
+                   "X-param.X4X3X2X1mX3X2X1", "X+param.X4X3X2X1mX3X2X1"]
 
     cond = ""
     cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.X) && " + boundary[dir] + " )\n"
@@ -549,7 +549,7 @@ def gen(dir, pack_only=False):
     str += "#if (DD_PREC==2) // half precision\n"
     str += "  sp_norm_idx = face_idx + "
 #    if dir%2 == 0:
-#      str += "param.Ls*ghostFace[" + `dir/2` + "] + "
+#      str += "param.Ls*param.ghostFace[" + `dir/2` + "] + "
     str += "param.ghostNormOffset[" + `dir/2` + "][" + `1-dir%2` + "];\n"
     str += "#endif\n\n"
     str += "\n"
@@ -560,7 +560,7 @@ def gen(dir, pack_only=False):
         if domain_wall: str += "const int ga_idx = sid % param.volume4CB;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
-        if domain_wall: str += "const int ga_idx = param.volume4CB+(face_idx % ghostFace[" + `dir/2` + "]);\n"
+        if domain_wall: str += "const int ga_idx = param.volume4CB+(face_idx % param.ghostFace[" + `dir/2` + "]);\n"
         else: str += "const int ga_idx = param.volume4CB+face_idx;\n"
     str += "\n"
 
@@ -592,9 +592,9 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     if domain_wall : 
-        load_half += "const int sp_stride_pad = param.Ls*ghostFace[" + `dir/2` + "];\n"
+        load_half += "const int sp_stride_pad = param.Ls*param.ghostFace[" + `dir/2` + "];\n"
     else :
-        load_half += "const int sp_stride_pad = ghostFace[" + `dir/2` + "];\n" 
+        load_half += "const int sp_stride_pad = param.ghostFace[" + `dir/2` + "];\n" 
 
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"
@@ -606,7 +606,7 @@ def gen(dir, pack_only=False):
 #    if (dir+1) % 2 == 0: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
 #    else: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
     load_gauge = "// read gauge matrix from device memory\n"
-    load_gauge += "ASSN_GAUGE_MATRIX(G, GAUGE"+`( dir%2)`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
+    load_gauge += "ASSN_GAUGE_MATRIX(G, GAUGE"+`( dir%2)`+"TEX, "+`dir`+", ga_idx, param.gauge_stride);\n\n"
 
     reconstruct_gauge = "// reconstruct gauge matrix\n"
     reconstruct_gauge += "RECONSTRUCT_GAUGE_MATRIX("+`dir`+");\n\n"
@@ -702,7 +702,7 @@ def gen(dir, pack_only=False):
         if ( m < 2 ): reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(load_gauge + decl_half + prep_half + reconstruct_gauge + mult + reconstruct)

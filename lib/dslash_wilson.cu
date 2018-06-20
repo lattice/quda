@@ -72,9 +72,9 @@ namespace quda {
 
   public:
     WilsonDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-		     const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
+		     const GaugeField &gauge, const cudaColorSpinorField *in,
 		     const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger)
+      : SharedDslashCuda(out, in, x, gauge, dagger)
     { 
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
@@ -105,15 +105,14 @@ namespace quda {
 #include <dslash_policy.cuh>
 
   // Wilson wrappers
-  void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
-			const int parity, const int dagger, const cudaColorSpinorField *x, const double &k, 
+  void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+			const int parity, const int dagger, const cudaColorSpinorField *x, const double &k,
 			const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
     inSpinor->createComms(1);
 
 #ifdef GPU_WILSON_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
     for(int i=0;i<4;i++){
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
       dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
@@ -133,14 +132,11 @@ namespace quda {
     DslashCuda *dslash = nullptr;
     size_t regSize = in->Precision() == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new WilsonDslashCuda<double2, double2>(out, (double2*)gauge0, (double2*)gauge1, 
-						      gauge.Reconstruct(), in, x, k, dagger);
+      dslash = new WilsonDslashCuda<double2, double2>(out, (double2*)gauge0, (double2*)gauge1, gauge, in, x, k, dagger);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new WilsonDslashCuda<float4, float4>(out, (float4*)gauge0, (float4*)gauge1,
-						    gauge.Reconstruct(), in, x, k, dagger);
+      dslash = new WilsonDslashCuda<float4, float4>(out, (float4*)gauge0, (float4*)gauge1, gauge, in, x, k, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new WilsonDslashCuda<short4, short4>(out, (short4*)gauge0, (short4*)gauge1,
-						    gauge.Reconstruct(), in, x, k, dagger);
+      dslash = new WilsonDslashCuda<short4, short4>(out, (short4*)gauge0, (short4*)gauge1, gauge, in, x, k, dagger);
     }
 
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);

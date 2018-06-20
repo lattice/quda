@@ -113,10 +113,10 @@ namespace quda {
 
   public:
     DomainWallDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-			 const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
+			 const GaugeField &gauge, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double mferm, 
 			 const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger)
+      : DslashCuda(out, in, x, gauge, dagger)
     { 
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
@@ -235,14 +235,14 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new DomainWallDslashCuda<double2,double2>(out, (double2*)gauge0, (double2*)gauge1, 
-							 gauge.Reconstruct(), in, x, m_f, k2, dagger);
+							 gauge, in, x, m_f, k2, dagger);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new DomainWallDslashCuda<float4,float4>(out, (float4*)gauge0, (float4*)gauge1, 
-						       gauge.Reconstruct(), in, x, m_f, k2, dagger);
+						       gauge, in, x, m_f, k2, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new DomainWallDslashCuda<short4,short4>(out, (short4*)gauge0, (short4*)gauge1, 
-						       gauge.Reconstruct(), in, x, m_f, k2, dagger);
+						       gauge, in, x, m_f, k2, dagger);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d
