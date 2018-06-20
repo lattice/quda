@@ -122,25 +122,24 @@ namespace quda {
     char *func_name;
     asprintf(&func_name,"QuarkContract_GPU");
     
-    if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("QUDA_REAL and QC_REAL type mismatch!\n");
+    if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
 
     printfQuda("######## %s: Running with new implementation!!!\n",func_name);
    
     //-- Define the arguments structure
-    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, mpParam.cntrType);
+    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, U, mpParam.cntrType); 
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
     QluaContractArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
     checkCudaErrorNoSync();
     cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);    
-    
-    LONG_T locvol = mpParam.locvol;
-    copylocvolToSymbol(locvol); //- Copy the local volume to constant memory
 
 
     //-- Call kernels that perform contractions
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    copylocvolToSymbol(mpParam.locvol); //- Copy the local volume to constant memory
 
     double t5 = MPI_Wtime();
     switch(mpParam.cntrType){
@@ -166,7 +165,9 @@ namespace quda {
     case what_meson_F_hB: {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
-    case what_qpdf_g_F_B:
+    case what_qpdf_g_F_B: {
+      qpdf_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+    } break;
     case what_tmd_g_F_B:
     default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[mpParam.cntrType]);
     }//-- switch

@@ -1207,6 +1207,7 @@ namespace quda {
     template <int N, typename Float>
       struct Reconstruct {
       typedef typename mapper<Float>::type RegType;
+    Reconstruct () {}
     Reconstruct(const GaugeField &u) { }
     Reconstruct(const Reconstruct<N,Float> &recon) { }
 
@@ -1229,6 +1230,7 @@ namespace quda {
       struct Reconstruct<19,Float> {
       typedef typename mapper<Float>::type RegType;
       RegType scale;
+    Reconstruct () {}
     Reconstruct(const GaugeField &u) : scale(u.LinkMax()) { }
     Reconstruct(const Reconstruct<19,Float> &recon) : scale(recon.scale) { }
 
@@ -1303,6 +1305,8 @@ namespace quda {
 	bool isLastTimeSlice;
 	QudaGhostExchange ghostExchange;
 
+      Reconstruct () {}
+
       Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
 	  isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
 	  isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false),
@@ -1342,6 +1346,7 @@ namespace quda {
       struct Reconstruct<11,Float> {
 	typedef typename mapper<Float>::type RegType;
 
+	Reconstruct () {}
 	Reconstruct(const GaugeField &u) { ; }
 	Reconstruct(const Reconstruct<11,Float> &recon) { }
 
@@ -1388,6 +1393,7 @@ namespace quda {
 	const Reconstruct<12,Float> reconstruct_12;
 	const RegType scale;
 
+      Reconstruct () {}
       Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()) { }
       Reconstruct(const Reconstruct<13,Float> &recon) : reconstruct_12(recon.reconstruct_12),
 	  scale(recon.scale) { }
@@ -1449,6 +1455,8 @@ namespace quda {
     bool isFirstTimeSlice;
     bool isLastTimeSlice;
     QudaGhostExchange ghostExchange;
+
+    Reconstruct () {}
 
     Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
       isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
@@ -1518,6 +1526,8 @@ namespace quda {
       typedef complex<RegType> Complex;
       const Reconstruct<8,Float> reconstruct_8;
       const RegType scale;
+
+    Reconstruct () {}
 
     Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()) {}
 
@@ -1589,24 +1599,31 @@ namespace quda {
       static const int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
       static const int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
       Float *gauge;
-      const AllocInt offset;
+      AllocInt offset;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<RegType,N>::type TexVector;
       cudaTextureObject_t tex;
-      const int tex_offset;
+      int tex_offset;
 #endif
       Float *ghost[4];
       QudaGhostExchange ghostExchange;
       int coords[QUDA_MAX_DIM];
       int_fastdiv X[QUDA_MAX_DIM];
       int R[QUDA_MAX_DIM];
-      const int volumeCB;
+      int volumeCB;
       int faceVolumeCB[4];
-      const int stride;
-      const int geometry;
-      const AllocInt phaseOffset;
+      int stride;
+      int geometry;
+      AllocInt phaseOffset;
       void *backup_h; //! host memory for backing up the field when tuning
       size_t bytes;
+
+    FloatNOrder() :
+      offset(0),
+#ifdef USE_TEXTURE_OBJECTS
+        tex(0), tex_offset(0)
+#endif
+      { }
 
     FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0, bool override=false)
       : reconstruct(u), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
@@ -1653,6 +1670,44 @@ namespace quda {
 	  faceVolumeCB[i] = order.faceVolumeCB[i];
 	}
       }
+
+      //-C.K. Added this function for compatibility with Contraction Code
+      void init(const GaugeField &u, Float *gauge_=0, Float **ghost_=0, bool override=false)
+      {
+        reconstruct = Reconstruct<reconLenParam,Float>(u);
+        gauge = gauge_ ? gauge_ : (Float*)u.Gauge_p();
+        offset = u.Bytes()/(2*sizeof(Float));
+        ghostExchange = u.GhostExchange();
+        volumeCB = u.VolumeCB();
+        stride = u.Stride();
+        geometry = u.Geometry();
+        phaseOffset = u.PhaseOffset();
+        backup_h = nullptr;
+        bytes = u.Bytes();
+
+        if (geometry == QUDA_COARSE_GEOMETRY)
+          errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
+
+        static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
+                       "staggered phase only presently supported for 18 and 12 reconstruct");
+        for (int i=0; i<4; i++) {
+          X[i] = u.X()[i];
+          R[i] = u.R()[i];
+          ghost[i] = ghost_ ? ghost_[i] : 0;
+          faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
+        }
+
+#ifdef USE_TEXTURE_OBJECTS
+        tex = 0;
+        tex_offset = offset/N;
+
+        if (u.Location() == QUDA_CUDA_FIELD_LOCATION) tex = static_cast<const cudaGaugeField&>(u).Tex();
+        if (!huge_alloc && this->gauge != u.Gauge_p() && !override) {
+          errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
+        }
+#endif
+      }//-init
+
       virtual ~FloatNOrder() { ; }
 
       __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {

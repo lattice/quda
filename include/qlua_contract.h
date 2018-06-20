@@ -18,7 +18,9 @@
 
 namespace quda {
 
+  //-C.K. Typedef Propagator and Gauge Field Structures
   typedef typename colorspinor_mapper<QUDA_REAL,QUDA_Ns,QUDA_Nc>::type Propagator;
+  typedef typename gauge_mapper<QUDA_REAL,QUDA_RECONSTRUCT_NO>::type GaugeU;
 
   /**
      When copying ColorSpinorFields to GPU, Quda rotates the fields to another basis using a rotation matrix.
@@ -83,13 +85,11 @@ namespace quda {
 
   struct QluaContractArg {
 
-    //    typedef typename gauge_mapper<QUDA_REAL,QUDA_RECONSTRUCT_NO>::type Gauge;
-
     Propagator prop1[QUDA_PROP_NVEC]; // Input
     Propagator prop2[QUDA_PROP_NVEC]; // Propagators
     Propagator prop3[QUDA_PROP_NVEC]; //
-
-    //    Gauge U;                          // Gauge Field
+    
+    GaugeU U;                         // Gauge Field
 
     const qluaCntr_Type cntrType;     // contraction type
     const int nParity;                // number of parities we're working on
@@ -99,16 +99,17 @@ namespace quda {
     const int lL[4];                  // 4-d local lattice dimensions
     const int volumeCB;               // checkerboarded volume
     const int volume;                 // full-site local volume
-
+    
     QluaContractArg(ColorSpinorField **propIn1,
                     ColorSpinorField **propIn2,
                     ColorSpinorField **propIn3,
+                    GaugeField *Uin,
                     qluaCntr_Type cntrType)
-      :   cntrType(cntrType), nParity(propIn1[0]->SiteSubset()), nFace(1), //U(*U),
-	  dim{ (3-nParity) * propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3), 1 },
-      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      lL{propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3)},
-      volumeCB(propIn1[0]->VolumeCB()),volume(propIn1[0]->Volume())
+      : cntrType(cntrType), nParity(propIn1[0]->SiteSubset()), nFace(1),
+	dim{ (3-nParity) * propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3), 1 },
+        commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+        lL{propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3)},
+        volumeCB(propIn1[0]->VolumeCB()),volume(propIn1[0]->Volume())
     {
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
         prop1[ivec].init(*propIn1[ivec]);
@@ -119,6 +120,11 @@ namespace quda {
         if(propIn3 == NULL) errorQuda("QluaContractArg: Input propagator-3 is not allocated!\n");
         for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
           prop3[ivec].init(*propIn3[ivec]);
+      }
+
+      if((cntrType == what_qpdf_g_F_B) || (cntrType == what_tmd_g_F_B)){
+	if(Uin == NULL) errorQuda("QluaContractArg: Gauge Field is not allocated!\n");
+	U.init(*Uin);
       }
 
     }

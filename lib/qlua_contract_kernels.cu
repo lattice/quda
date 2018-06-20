@@ -986,4 +986,30 @@ namespace quda {
   }
   //------------------------------------------------------------------------------------------
 
+  //-C.K. For now, this kernel is identical to qbarq_g_P_P_gvec_kernel
+  __global__ void qpdf_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+
+    LONG_T lV = c_locvol;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> prop1[QC_LEN_P];
+    complex<QC_REAL> prop2[QC_LEN_P];
+
+    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
+    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+
+    qc_quda_contract_tr_g_P_P(Corr_dev + tid, (int)lV,
+			      prop1, 1,
+			      prop2, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+
 } //- namespace quda
