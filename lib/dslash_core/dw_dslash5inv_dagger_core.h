@@ -42,9 +42,9 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
-#define m5 m5_d
-#define mdwf_b5 mdwf_b5_d
-#define mdwf_c5 mdwf_c5_d
+#define m5 param.m5_d
+#define mdwf_b5 param.mdwf_b5_d
+#define mdwf_c5 param.mdwf_c5_d
 #define mferm param.mferm
 #define a param.a
 #define b param.b
@@ -75,9 +75,9 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
-#define m5 m5_f
-#define mdwf_b5 mdwf_b5_f
-#define mdwf_c5 mdwf_c5_f
+#define m5 param.m5_f
+#define mdwf_b5 param.mdwf_b5_f
+#define mdwf_c5 param.mdwf_c5_f
 #define mferm param.mferm_f
 #define a param.a
 #define b param.b

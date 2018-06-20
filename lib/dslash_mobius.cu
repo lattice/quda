@@ -265,6 +265,7 @@ namespace quda {
   void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
 		      const cudaColorSpinorField *in, const int parity, const int dagger,
 		      const cudaColorSpinorField *x, const double &m_f, const double &k2,
+                      const double *b_5, const double *c_5, const double &m5,
 		      const int *commOverride, const int DS_type, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
@@ -282,6 +283,15 @@ namespace quda {
       dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
     }  
+    memcpy(dslashParam.mdwf_b5_d, b_5, out->X(4)*sizeof(double));
+    memcpy(dslashParam.mdwf_c5_d, c_5, out->X(4)*sizeof(double));
+    for (int s=0; s<out->X(4); s++) {
+      dslashParam.mdwf_b5_f[s] = (float)dslashParam.mdwf_b5_d[s];
+      dslashParam.mdwf_c5_f[s] = (float)dslashParam.mdwf_c5_d[s];
+    }
+
+    dslashParam.m5_d = m5;
+    dslashParam.m5_f = (float)m5;
 
     void *gauge0, *gauge1;
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);

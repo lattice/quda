@@ -4,10 +4,6 @@
 
 namespace quda {
 
-  namespace mobius {
-#include <dslash_init.cuh>
-  }
-
   DiracMobius::DiracMobius(const DiracParam &param) : DiracDomainWall(param) {
     memcpy(b_5, param.b_5, sizeof(double)*param.Ls);
     memcpy(c_5, param.c_5, sizeof(double)*param.Ls);
@@ -39,11 +35,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, commDim, 0, profile);   
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 0, profile);
 
     flops += 1320LL*(long long)in.Volume();
   }
@@ -54,11 +48,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, commDim, 1, profile);   
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 1, profile);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -72,11 +64,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, commDim, 2, profile);   
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 2, profile);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -93,12 +83,10 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
-		   mass, k, commDim, 0, profile);
+		   mass, k, b_5, c_5, m5, commDim, 0, profile);
 
     flops += (1320LL+48LL)*(long long)in.Volume();
   }
@@ -111,12 +99,10 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
-		   mass, k, commDim, 1, profile);
+		   mass, k, b_5, c_5, m5, commDim, 1, profile);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -132,12 +118,10 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
-		   mass, k, commDim, 2, profile);
+		   mass, k, b_5, c_5, m5, commDim, 2, profile);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -221,11 +205,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, commDim, 3, profile);
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 3, profile);
 
     long long Ls = in.X(4);
     flops += 144LL*(long long)in.Volume()*Ls + 3LL*Ls*(Ls-1LL);
@@ -240,12 +222,10 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
-		   mass, k, commDim, 3, profile);
+		   mass, k, b_5, c_5, m5, commDim, 3, profile);
 
     long long Ls = in.X(4);
     flops +=  (144LL*Ls + 48LL)*(long long)in.Volume() + 3LL*Ls*(Ls-1LL);

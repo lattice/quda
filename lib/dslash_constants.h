@@ -104,6 +104,17 @@ enum KernelType {
     double mferm;
     float mferm_f;
 
+    // domain wall constants
+    double m5_d;
+    float m5_f;
+
+    // the coefficients used in MDWF
+    double mdwf_b5_d[QUDA_MAX_DWF_LS];
+    double mdwf_c5_d[QUDA_MAX_DWF_LS];
+
+    float mdwf_b5_f[QUDA_MAX_DWF_LS];
+    float mdwf_c5_f[QUDA_MAX_DWF_LS];
+
     double tProjScale;
     float tProjScale_f;
 
@@ -226,10 +237,6 @@ typedef struct fat_force_stride_s {
   int color_matrix_stride;
 } fat_force_const_t;
 
-// domain wall constants
-__constant__ double m5_d;
-__constant__ float m5_f;
-
 //for link fattening/gauge force/fermion force code
 __constant__ int Vh;
 __constant__ int X1;
@@ -336,64 +343,4 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
   checkCudaError();
 
   profile.TPSTOP(QUDA_PROFILE_CONSTANT);
-}
-
-
-//For initializing the coefficients used in MDWF
-__constant__ double mdwf_b5_d[QUDA_MAX_DWF_LS];
-__constant__ double mdwf_c5_d[QUDA_MAX_DWF_LS];
-
-__constant__ float mdwf_b5_f[QUDA_MAX_DWF_LS];
-__constant__ float mdwf_c5_f[QUDA_MAX_DWF_LS];
-
-void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h, TimeProfile &profile)
-{
-  profile.TPSTART(QUDA_PROFILE_CONSTANT);
-
-  static int last_Ls = -1;
-  if (dim_s != last_Ls) {
-    float b_5_f[QUDA_MAX_DWF_LS];
-    float c_5_f[QUDA_MAX_DWF_LS];
-    for (int i=0; i<dim_s; i++) {
-      b_5_f[i] = (float)b_5[i];
-      c_5_f[i] = (float)c_5[i];
-    }
-
-    cudaMemcpyToSymbol(mdwf_b5_d, b_5, dim_s*sizeof(double));
-    cudaMemcpyToSymbol(mdwf_c5_d, c_5, dim_s*sizeof(double));
-    cudaMemcpyToSymbol(mdwf_b5_f, b_5_f, dim_s*sizeof(float));
-    cudaMemcpyToSymbol(mdwf_c5_f, c_5_f, dim_s*sizeof(float));
-    checkCudaError();
-    last_Ls = dim_s;
-  }
-
-  static double last_m5 = 99999;
-  if (m5h != last_m5) {
-    float m5h_f = (float)m5h;
-    cudaMemcpyToSymbol(m5_d, &m5h, sizeof(double));
-    cudaMemcpyToSymbol(m5_f, &m5h_f, sizeof(float));
-    checkCudaError();
-    last_m5 = m5h;
-  }
-
-  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
-}
-
-void initConstants(cudaGaugeField &gauge, TimeProfile &profile) {
-  initLatticeConstants(gauge, profile);
-}
-
-void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
-		   const int dagger, const QudaTwistGamma5Type twist) {
-  if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-    a = 2.0 * kappa * mu;
-    b = 1.0;
-  } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-    a = -2.0 * kappa * mu;
-    b = 1.0 / (1.0 + a*a);
-  } else {
-    errorQuda("Twist type %d not defined\n", twist);
-  }
-  if (dagger) a *= -1.0;
-
 }
