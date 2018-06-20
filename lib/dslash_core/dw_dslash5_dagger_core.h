@@ -132,10 +132,10 @@ int X, coord[5], boundaryCrossing;
 
 
 
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
+boundaryCrossing = sid/param.Xh[0] + sid/(param.X[1]*param.Xh[0]) + sid/(param.X[2]*param.X[1]*param.Xh[0]);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-coord[4] = X/(X1*X2*X3*X4);
+coord[4] = X/(param.X[0]*param.X[1]*param.X[2]*param.X[3]);
 
  o00_re = 0; o00_im = 0;
  o01_re = 0; o01_im = 0;

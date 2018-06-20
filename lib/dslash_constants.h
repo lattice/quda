@@ -42,6 +42,14 @@ enum KernelType {
     int ghostNormOffset[QUDA_MAX_DIM+1][2];
     int sp_stride; // spinor stride
 
+    // constants used to accelerate dslash indexing
+    int X2X1;
+    int X3X2X1;
+    int X2X1mX1;
+    int X3X2X1mX2X1;
+    int X4X3X2X1mX3X2X1;
+    int X4X3X2X1hmX3X2X1h;
+
 #ifdef GPU_CLOVER_DIRAC
     int cl_stride; // clover stride
 #endif
@@ -129,6 +137,7 @@ enum KernelType {
     double twist_a;
     double twist_b;
 
+    int Vh;  // checker-board volume
     int Vsh; // used by contraction kernels
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -217,35 +226,31 @@ typedef struct fat_force_stride_s {
   int color_matrix_stride;
 } fat_force_const_t;
 
-__constant__ int X1h;
-__constant__ int X1;
-__constant__ int X2;
-__constant__ int X3;
-__constant__ int X4;
-
-__constant__ int X1m1;
-__constant__ int X2m1;
-__constant__ int X3m1;
-__constant__ int X4m1;
-
-__constant__ int X2X1mX1;
-__constant__ int X3X2X1mX2X1;
-__constant__ int X4X3X2X1mX3X2X1;
-__constant__ int X4X3X2X1hmX3X2X1h;
-
-__constant__ int X2X1;
-__constant__ int X3X2;
-__constant__ int X3X2X1;
-__constant__ int X4X3X2;
-
-__constant__ int Vh;
-__constant__ int Vs;
-
 // domain wall constants
 __constant__ double m5_d;
 __constant__ float m5_f;
 
 //for link fattening/gauge force/fermion force code
+__constant__ int Vh;
+__constant__ int X1;
+__constant__ int X2;
+__constant__ int X3;
+__constant__ int X4;
+
+__constant__ int X2X1;
+__constant__ int X1h;
+__constant__ int X1m1;
+__constant__ int X2m1;
+__constant__ int X3m1;
+__constant__ int X4m1;
+
+__constant__ int X3X2;
+__constant__ int X3X2X1;
+
+__constant__ int X2X1mX1;
+__constant__ int X3X2X1mX2X1;
+__constant__ int X4X3X2X1mX3X2X1;
+
 __constant__ int E1, E2, E3, E4, E1h;
 __constant__ int Vh_ex;
 __constant__ int E2E1;
@@ -261,11 +266,9 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 
   checkCudaError();
 
+  //constants used by fatlink/gauge force/hisq force code
   int volumeCB = lat.VolumeCB();
   cudaMemcpyToSymbol(Vh, &volumeCB, sizeof(int));  
-
-  int Vspatial = lat.X()[0]*lat.X()[1]*lat.X()[2]/2; // FIXME - this should not be called Vs, rather Vsh
-  cudaMemcpyToSymbol(Vs, &Vspatial, sizeof(int));
 
   int L1 = lat.X()[0];
   cudaMemcpyToSymbol(X1, &L1, sizeof(int));  
@@ -288,9 +291,6 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
   int L3L2L1 = L3*L2*L1;
   cudaMemcpyToSymbol(X3X2X1, &L3L2L1, sizeof(int));  
   
-  int L4L3L2 = L4*L3*L2;
-  cudaMemcpyToSymbol(X4X3X2, &L4L3L2, sizeof(int));  
-
   int L1h = L1/2;
   cudaMemcpyToSymbol(X1h, &L1h, sizeof(int));  
 
@@ -315,10 +315,6 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
   int L4L3L2L1mL3L2L1 = (L4-1)*L3L2L1;
   cudaMemcpyToSymbol(X4X3X2X1mX3X2X1, &L4L3L2L1mL3L2L1, sizeof(int));  
 
-  int L4L3L2L1hmL3L2L1h = (L4-1)*L3*L2*L1h;
-  cudaMemcpyToSymbol(X4X3X2X1hmX3X2X1h, &L4L3L2L1hmL3L2L1h, sizeof(int));  
-
-  //constants used by fatlink/gauge force/hisq force code
   int E1_h  = L1+4;
   int E1h_h = E1_h/2;
   int E2_h  = L2+4;

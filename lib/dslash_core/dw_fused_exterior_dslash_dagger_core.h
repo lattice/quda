@@ -271,7 +271,7 @@ float4 G4;
 
 
 
-if (isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==X1m1 )
+if (isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==(param.X[0]-1) )
 {
  // Projector P0+
  //  1  0  0  i
@@ -601,7 +601,7 @@ if (isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0 )
  o32_im += A2_re;
 }
 
-if (isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==X2m1 )
+if (isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==(param.X[1]-1) )
 {
  // Projector P1+
  //  1  0  0  1
@@ -931,7 +931,7 @@ if (isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0 )
  o32_im -= A2_im;
 }
 
-if (isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==X3m1 )
+if (isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==(param.X[2]-1) )
 {
  // Projector P2+
  //  1  0  i  0
@@ -1261,7 +1261,7 @@ if (isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0 )
  o32_im -= B2_re;
 }
 
-if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
+if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==(param.X[3]-1) )
 {
  // Projector P3+
  //  2  0  0  0
@@ -1278,7 +1278,7 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
 
  const int ga_idx = sid % param.volume4CB;
 
- if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
+ if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)
  {
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
@@ -1482,7 +1482,7 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
 
  const int ga_idx = param.volume4CB+(face_idx % param.ghostFace[3]);
 
- if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
+ if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)
  {
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;

@@ -540,17 +540,17 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
-    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
+    boundary = ["coord[0]==(param.X[0]-1)", "coord[0]==0", "coord[1]==(param.X[1]-1)", "coord[1]==0", "coord[2]==(param.X[2]-1)", "coord[2]==0", "coord[3]==(param.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.X[0]-1)", "coord[0]>0", "coord[1]<(param.X[1]-1)", "coord[1]>0", "coord[2]<(param.X[2]-1)", "coord[2]>0", "coord[3]<(param.X[3]-1)", "coord[3]>0"]
     offset = ["+1","-1","+1","-1","+1","-1","+1","-1"];
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+X1", "X-X1", "X+X2X1", "X-X2X1", "X+X3X2X1", "X-X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.X[0]", "X-param.X[0]", "X+param.X2X1", "X-param.X2X1", "X+param.X3X2X1", "X-param.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-X1m1", "X+X1m1", "X-X2X1mX1", "X+X2X1mX1", "X-X3X2X1mX2X1", "X+X3X2X1mX2X1",
-                   "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.X[0]-1)", "X+(param.X[0]-1)", "X-param.X2X1mX1", "X+param.X2X1mX1", "X-param.X3X2X1mX2X1", "X+param.X3X2X1mX2X1",
+                   "X-param.X4X3X2X1mX3X2X1", "X+param.X4X3X2X1mX3X2X1"]
 
     cond = ""
 #    cond += "#ifdef MULTI_GPU\n"
@@ -580,7 +580,7 @@ def gen(dir, pack_only=False):
     if dir % 2 == 0:
         str += "const int ga_idx = sid;\n"
     else:
-        str += "const int ga_idx = Vh+face_idx;\n"
+        str += "const int ga_idx = param.Vh+face_idx;\n"
     str += "\n"
 
     # scan the projector to determine which loads are required
@@ -833,7 +833,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct)

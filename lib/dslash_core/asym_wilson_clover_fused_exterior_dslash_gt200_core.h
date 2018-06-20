@@ -444,7 +444,7 @@ int sid;
   o32_re = i32_re;  o32_im = i32_im;
 
 
-if ( isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==X1m1 )
+if ( isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==(param.X[0]-1) )
 {
   // Projector P0-
   // 1 0 0 -i 
@@ -625,7 +625,7 @@ if ( isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0 )
     sp_norm_idx = face_idx + param.ghostNormOffset[0][0];
 #endif
   
-  const int ga_idx = Vh+face_idx;
+  const int ga_idx = param.Vh+face_idx;
   
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
@@ -778,7 +778,7 @@ if ( isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0 )
   
 }
 
-if ( isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==X2m1 )
+if ( isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==(param.X[1]-1) )
 {
   // Projector P1-
   // 1 0 0 -1 
@@ -959,7 +959,7 @@ if ( isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0 )
     sp_norm_idx = face_idx + param.ghostNormOffset[1][0];
 #endif
   
-  const int ga_idx = Vh+face_idx;
+  const int ga_idx = param.Vh+face_idx;
   
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
@@ -1112,7 +1112,7 @@ if ( isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0 )
   
 }
 
-if ( isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==X3m1 )
+if ( isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==(param.X[2]-1) )
 {
   // Projector P2-
   // 1 0 -i 0 
@@ -1293,7 +1293,7 @@ if ( isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0 )
     sp_norm_idx = face_idx + param.ghostNormOffset[2][0];
 #endif
   
-  const int ga_idx = Vh+face_idx;
+  const int ga_idx = param.Vh+face_idx;
   
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
@@ -1446,7 +1446,7 @@ if ( isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0 )
   
 }
 
-if ( isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
+if ( isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==(param.X[3]-1) )
 {
   // Projector P3-
   // 0 0 0 0 
@@ -1462,7 +1462,7 @@ if ( isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
   
   const int ga_idx = sid;
   
-  if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
+  if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)
   {
     spinorFloat a0_re, a0_im;
     spinorFloat a1_re, a1_im;
@@ -1670,9 +1670,9 @@ if ( isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
     sp_norm_idx = face_idx + param.ghostNormOffset[3][0];
 #endif
   
-  const int ga_idx = Vh+face_idx;
+  const int ga_idx = param.Vh+face_idx;
   
-  if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
+  if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)
   {
     spinorFloat a0_re, a0_im;
     spinorFloat a1_re, a1_im;

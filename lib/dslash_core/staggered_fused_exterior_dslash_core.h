@@ -426,7 +426,7 @@ if (threadId.z & 1)
   {
     int sp_idx_1st_nbr = ((y[0]==(X[0]-1)) ? full_idx-(X[0]-1) : full_idx+1) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*param.Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -459,7 +459,7 @@ if (threadId.z & 1)
     int sp_idx_3rd_nbr = ((y[0] >= (X[0]-3)) ? full_idx-(X[0]-3) : full_idx+3) >> 1;
     READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx, long_stride);        
     READ_LONG_PHASE(LONGPHASE0TEX, 0, ga_idx, long_stride);
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*param.Vh;
     int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -517,7 +517,7 @@ if (!(threadIdx.z & 1))
     }
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*param.Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -556,7 +556,7 @@ if (!(threadIdx.z & 1))
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 		
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 		
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*param.Vh;
     int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -607,7 +607,7 @@ if (threadId.z & 1)
   {
     int sp_idx_1st_nbr = ((y[1]==(X[1]-1)) ? full_idx-(X1X0-X[0]) : full_idx+X[0]) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*param.Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -640,7 +640,7 @@ if (threadId.z & 1)
     int sp_idx_3rd_nbr = ((y[1] >= (X[1]-3) ) ? full_idx-(X[1]-3)*X[0] : full_idx+3*X[0]) >> 1;    
     READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx, long_stride);
     READ_LONG_PHASE(LONGPHASE0TEX, 2, ga_idx, long_stride);
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*param.Vh;
     int stride3 = param.sp_stride;        
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -696,7 +696,7 @@ if (!(threadIdx.z & 1))
     }    
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*param.Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -735,7 +735,7 @@ if (!(threadIdx.z & 1))
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*param.Vh;
     int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -787,7 +787,7 @@ if (threadId.z & 1)
   {
     int sp_idx_1st_nbr = ((y[2]==(X[2]-1)) ? full_idx-(X[2]-1)*X1X0 : full_idx+X1X0) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*param.Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -820,7 +820,7 @@ if (threadId.z & 1)
     int sp_idx_3rd_nbr = ((y[2]>= (X[2]-3))? full_idx -(X[2]-3)*X1X0: full_idx + 3*X1X0)>> 1;    
     READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx, long_stride);
     READ_LONG_PHASE(LONGPHASE0TEX, 4, ga_idx, long_stride);
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*param.Vh;
     int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -878,7 +878,7 @@ if (!(threadIdx.z & 1))
     }    
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*param.Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -917,7 +917,7 @@ if (!(threadIdx.z & 1))
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);         
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);         
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*param.Vh;
     int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -953,10 +953,10 @@ if (threadId.z & 1)
 {
   //direction: +T
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
-  int fat_sign = (y[3] >= (X4-1)) ? time_boundary : 1;
+  int fat_sign = (y[3] >= (param.X[3]-1)) ? time_boundary : 1;
 #endif
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
-  int long_sign = (y[3] >= (X4-3)) ? time_boundary : 1;
+  int long_sign = (y[3] >= (param.X[3]-3)) ? time_boundary : 1;
 #endif
 
   int ga_idx = half_idx;
@@ -968,7 +968,7 @@ if (threadId.z & 1)
   {    
     int sp_idx_1st_nbr = ((y[3]==(X[3]-1)) ? full_idx-(X[3]-1)*X2X1X0 : full_idx+X2X1X0) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 6, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*param.Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -1002,7 +1002,7 @@ if (threadId.z & 1)
     int sp_idx_3rd_nbr = ((y[3]>=(X[3]-3))? full_idx -(X[3]-3)*X2X1X0 : full_idx + 3*X2X1X0)>> 1;     
     READ_LONG_MATRIX(LONGLINK0TEX, 6, ga_idx, long_stride);    
     READ_LONG_PHASE(LONGPHASE0TEX, 6, ga_idx, long_stride);    
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*param.Vh;
     int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -1053,7 +1053,7 @@ if (!(threadIdx.z & 1))
   {
     int sp_idx_1st_nbr = ((y[3]==0)    ? full_idx+(X[3]-1)*X2X1X0 : full_idx-X2X1X0) >> 1;
     int fat_idx = sp_idx_1st_nbr;    
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*param.Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -1088,7 +1088,7 @@ if (!(threadIdx.z & 1))
   {
     int sp_idx_3rd_nbr = ((y[3]<3) ? full_idx + (X[3]-3)*X2X1X0: full_idx - 3*X2X1X0) >> 1;
     int long_idx = sp_idx_3rd_nbr;
-    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*param.Vh;
     int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -1142,7 +1142,7 @@ if (!(threadIdx.z & 1))
   o02_re = -o02_re;
   o02_im = -o02_im;
 #else
-READ_ACCUM(ACCUMTEX, half_idx+src_idx*Vh);
+READ_ACCUM(ACCUMTEX, half_idx+src_idx*param.Vh);
 o00_re = -o00_re + a*accum0.x;
 o00_im = -o00_im + a*accum0.y;
 o01_re = -o01_re + a*accum1.x;
@@ -1154,8 +1154,8 @@ o02_im = -o02_im + a*accum2.y;
 
 #ifdef MULTI_GPU
 if (active){
-  READ_AND_SUM_SPINOR(INTERTEX, half_idx+src_idx*Vh);
-  WRITE_SPINOR(param.out, half_idx+src_idx*Vh, param.sp_stride);
+  READ_AND_SUM_SPINOR(INTERTEX, half_idx+src_idx*param.Vh);
+  WRITE_SPINOR(param.out, half_idx+src_idx*param.Vh, param.sp_stride);
 }
 #endif
 

@@ -11,13 +11,11 @@ namespace quda {
   DiracMobius::DiracMobius(const DiracParam &param) : DiracDomainWall(param) {
     memcpy(b_5, param.b_5, sizeof(double)*param.Ls);
     memcpy(c_5, param.c_5, sizeof(double)*param.Ls);
-    mobius::initConstants(*param.gauge, profile);
   }
 
   DiracMobius::DiracMobius(const DiracMobius &dirac) : DiracDomainWall(dirac) {
     memcpy(b_5, dirac.b_5, Ls);
     memcpy(c_5, dirac.c_5, Ls);
-    mobius::initConstants(*dirac.gauge, profile);
   }
 
   DiracMobius::~DiracMobius() { }

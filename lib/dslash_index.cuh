@@ -611,9 +611,9 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, T *x, int &cb_i
 
   const auto *X = param.X;
 
-  int XYZT = Vh << 1; // X[3]*X[2]*X[1]*X[0]
-  int XYZ = X3X2X1; // X[2]*X[1]*X[0]
-  int XY = X2X1; // X[1]*X[0]
+  int XYZT = param.Vh << 1; // X[3]*X[2]*X[1]*X[0]
+  int XYZ = param.X3X2X1; // X[2]*X[1]*X[0]
+  int XY = param.X2X1; // X[1]*X[0]
 
   idx = 2*cb_idx;
   if (idxType == EVEN_X /*!(X[0] & 1)*/) { // X even

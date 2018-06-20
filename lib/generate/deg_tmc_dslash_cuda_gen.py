@@ -554,16 +554,16 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
-    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
+    boundary = ["coord[0]==(param.X[0]-1)", "coord[0]==0", "coord[1]==(param.X[1]-1)", "coord[1]==0", "coord[2]==(param.X[2]-1)", "coord[2]==0", "coord[3]==(param.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.X[0]-1)", "coord[0]>0", "coord[1]<(param.X[1]-1)", "coord[1]>0", "coord[2]<(param.X[2]-1)", "coord[2]>0", "coord[3]<(param.X[3]-1)", "coord[3]>0"]
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+X1", "X-X1", "X+X2X1", "X-X2X1", "X+X3X2X1", "X-X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.X[0]", "X-param.X[0]", "X+param.X2X1", "X-param.X2X1", "X+param.X3X2X1", "X-param.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-X1m1", "X+X1m1", "X-X2X1mX1", "X+X2X1mX1", "X-X3X2X1mX2X1", "X+X3X2X1mX2X1",
-                   "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.X[0]-1)", "X+(param.X[0]-1)", "X-param.X2X1mX1", "X+param.X2X1mX1", "X-param.X3X2X1mX2X1", "X+param.X3X2X1mX2X1",
+                   "X-param.X4X3X2X1mX3X2X1", "X+param.X4X3X2X1mX3X2X1"]
 
     cond = ""
     cond += "#ifdef MULTI_GPU\n"
@@ -594,7 +594,7 @@ def gen(dir, pack_only=False):
         str += "const int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
+        str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : param.Vh+face_idx);\n"
         str += "#else\n"
         str += "const int ga_idx = sp_idx;\n"
         str += "#endif\n"
@@ -750,7 +750,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             prep_half += indent(load_shared_1)
             prep_half += indent(project)
         elif dir == 2:
-            prep_half += indent("if (threadIdx.y == blockDim.y-1 && blockDim.y < X2 ) {\n")
+            prep_half += indent("if (threadIdx.y == blockDim.y-1 && blockDim.y < param.X[1] ) {\n")
             prep_half += indent(load_spinor)
             prep_half += indent(project)
             prep_half += indent("} else {")
@@ -758,7 +758,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             prep_half += indent(project)
             prep_half += indent("}")
         elif dir == 3:
-            prep_half += indent("if (threadIdx.y == 0 && blockDim.y < X2) {\n")
+            prep_half += indent("if (threadIdx.y == 0 && blockDim.y < param.X[1]) {\n")
             prep_half += indent(load_spinor)
             prep_half += indent(project)
             prep_half += indent("} else {")
@@ -845,7 +845,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct)
@@ -960,13 +960,13 @@ int incomplete = 0; // Have all 8 contributions been computed for this site?
 switch(kernel_type) { // intentional fall-through
 
 case INTERIOR_KERNEL:
-  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==X4m1));
+  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==(param.X[3]-1)));
 case EXTERIOR_KERNEL_T:
-  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==X3m1));
+  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==(param.X[2]-1)));
 case EXTERIOR_KERNEL_Z:
-  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==X2m1));
+  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==(param.X[1]-1)));
 case EXTERIOR_KERNEL_Y:
-  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==X1m1));
+  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==(param.X[0]-1)));
 }
 
 """)

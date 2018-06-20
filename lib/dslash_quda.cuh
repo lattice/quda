@@ -435,10 +435,20 @@ protected:
     dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
     dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
 
-    dslashParam.ghostFace[0] = (dslashParam.X[1]*dslashParam.X[2]*dslashParam.X[3])/2;
-    dslashParam.ghostFace[1] = (dslashParam.X[0]*dslashParam.X[2]*dslashParam.X[3])/2;
-    dslashParam.ghostFace[2] = (dslashParam.X[0]*dslashParam.X[1]*dslashParam.X[3])/2;
-    dslashParam.ghostFace[3] = (dslashParam.X[0]*dslashParam.X[1]*dslashParam.X[2])/2;
+    auto X = dslashParam.X;
+
+    dslashParam.Vh = (X[3]*X[2]*X[1]*X[0])/2;
+    dslashParam.ghostFace[0] = (X[1]*X[2]*X[3])/2;
+    dslashParam.ghostFace[1] = (X[0]*X[2]*X[3])/2;
+    dslashParam.ghostFace[2] = (X[0]*X[1]*X[3])/2;
+    dslashParam.ghostFace[3] = (X[0]*X[1]*X[2])/2;
+
+    dslashParam.X2X1 = X[1]*X[0];
+    dslashParam.X3X2X1 = X[2]*X[1]*X[0];
+    dslashParam.X2X1mX1 = (X[1]-1)*X[0];
+    dslashParam.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
+    dslashParam.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
+    dslashParam.X4X3X2X1hmX3X2X1h = dslashParam.X4X3X2X1mX3X2X1/2;
 
     // update the ghosts for the non-p2p directions
     for (int dim=0; dim<4; dim++) {

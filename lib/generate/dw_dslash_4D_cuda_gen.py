@@ -407,10 +407,10 @@ if (kernel_type == INTERIOR_KERNEL) {
           else:
             prolog_str+=(
 """
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
+boundaryCrossing = sid/param.Xh[0] + sid/(param.X[1]*param.Xh[0]) + sid/(param.X[2]*param.X[1]*param.Xh[0]);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-coord[4] = X/(X1*X2*X3*X4);
+coord[4] = X/(param.X[0]*param.X[1]*param.X[2]*param.X[3]);
 
 """)
 
@@ -418,12 +418,12 @@ coord[4] = X/(X1*X2*X3*X4);
           prolog_str+=(
 """
 X = 2*sid;
-int aux1 = X / X1;
-x1 = X - aux1 * X1;
-int aux2 = aux1 / X2;
-x2 = aux1 - aux2 * X2;
-x4 = aux2 / X3;
-x3 = aux2 - x4 * X3;
+int aux1 = X / param.X[0];
+x1 = X - aux1 * param.X[0];
+int aux2 = aux1 / param.X[1];
+x2 = aux1 - aux2 * param.X[1];
+x4 = aux2 / param.X[2];
+x3 = aux2 - x4 * param.X[2];
 aux1 = (param.parity + x4 + x3 + x2) & 1;
 x1 += aux1;
 X += aux1;
@@ -531,16 +531,16 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
-    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
+    boundary = ["coord[0]==(param.X[0]-1)", "coord[0]==0", "coord[1]==(param.X[1]-1)", "coord[1]==0", "coord[2]==(param.X[2]-1)", "coord[2]==0", "coord[3]==(param.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.X[0]-1)", "coord[0]>0", "coord[1]<(param.X[1]-1)", "coord[1]>0", "coord[2]<(param.X[2]-1)", "coord[2]>0", "coord[3]<(param.X[3]-1)", "coord[3]>0"]
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+X1", "X-X1", "X+X2X1", "X-X2X1", "X+X3X2X1", "X-X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.X[0]", "X-param.X[0]", "X+param.X2X1", "X-param.X2X1", "X+param.X3X2X1", "X-param.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-X1m1", "X+X1m1", "X-X2X1mX1", "X+X2X1mX1", "X-X3X2X1mX2X1", "X+X3X2X1mX2X1",
-                   "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.X[0]-1)", "X+(param.X[0]-1)", "X-param.X2X1mX1", "X+param.X2X1mX1", "X-param.X3X2X1mX2X1", "X+param.X3X2X1mX2X1",
+                   "X-param.X4X3X2X1mX3X2X1", "X+param.X4X3X2X1mX3X2X1"]
 
     cond = ""
     cond += "#ifdef MULTI_GPU\n"
@@ -731,7 +731,7 @@ def gen(dir, pack_only=False):
         if ( m < 2 ): reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (param.gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(load_gauge + decl_half + prep_half + reconstruct_gauge + mult + reconstruct)
@@ -1197,13 +1197,13 @@ int incomplete = 0; // Have all 8 contributions been computed for this site?
 
 switch(kernel_type) { // intentional fall-through
 case INTERIOR_KERNEL:
-  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==X4m1));
+  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==(param.X[3]-1)));
 case EXTERIOR_KERNEL_T:
-  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==X3m1));
+  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==(param.X[2]-1)));
 case EXTERIOR_KERNEL_Z:
-  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==X2m1));
+  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==(param.X[1]-1)));
 case EXTERIOR_KERNEL_Y:
-  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==X1m1));
+  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==(param.X[0]-1)));
 }
 
 """)
