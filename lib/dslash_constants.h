@@ -181,9 +181,7 @@ enum KernelType {
       printfQuda("X = {%d, %d, %d, %d}\n", (int)X[0], (int)X[1], (int)X[2], (int)X[3]);
       printfQuda("Xh = {%d, %d, %d, %d}\n", (int)Xh[0], (int)Xh[1], (int)Xh[2], (int)Xh[3]);
       printfQuda("volume4CB = %d\n", (int)volume4CB);
-#ifdef GPU_DOMAIN_WALL_DIRAC
       printfQuda("Ls = %d\n", Ls);
-#endif
       printfQuda("kernel_type = %d\n", kernel_type);
       printfQuda("commDim = {%d, %d, %d, %d}\n", commDim[0], commDim[1], commDim[2], commDim[3]);
       printfQuda("ghostDim = {%d, %d, %d, %d}\n", ghostDim[0], ghostDim[1], ghostDim[2], ghostDim[3]);
