@@ -229,9 +229,7 @@ namespace quda {
   void copylocvolToSymbol(LONG_T locvol);
 
 
-  __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, int x_cb, int pty, Propagator prop);
-
-  __device__ void prepareDevicePropSite2(complex<QC_REAL> *devProp, Vector *vec);
+  __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, Vector *vec);
 
   __device__ void shiftDevicePropPM1(QluaContractArg *arg,
                                      Vector *outShf, Propagator prop[],

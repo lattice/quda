@@ -783,16 +783,11 @@ namespace quda {
   }
 
 
-  __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, int x_cb, int pty, Propagator prop[]){
+  __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, Vector *vec){
 
     const int Ns = QC_Ns;
     const int Nc = QC_Nc;
 
-    Vector vec[QUDA_PROP_NVEC];
-
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec[i] = prop[i](x_cb, pty);
-    }
     rotatePropBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
 
     for(int jc = 0; jc < Nc; jc++){
@@ -809,29 +804,6 @@ namespace quda {
     }//-jc
 
   }//-- prepareDevicePropSite
-
-
-  __device__ void prepareDevicePropSite2(complex<QC_REAL> *devProp, Vector *vec){
-
-    const int Ns = QC_Ns;
-    const int Nc = QC_Nc;
-
-    rotatePropBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
-
-    for(int jc = 0; jc < Nc; jc++){
-      for(int js = 0; js < Ns; js++){
-        int vIdx = js + Ns*jc;     //-- vector index (which vector within propagator)
-        for(int ic = 0; ic < Nc; ic++){
-          for(int is = 0; is < Ns; is++){
-            int dIdx = ic + Nc*is; //-- spin-color index within each vector
-
-            int pIdx = QC_QUDA_LIDX_P(ic,is,jc,js);
-
-            devProp[pIdx] = vec[vIdx].data[dIdx];
-          }}}
-    }//-jc
-
-  }//-- prepareDevicePropSite2
 
 
   __device__ void shiftDevicePropPM1(QluaContractArg *arg,
@@ -888,14 +860,12 @@ namespace quda {
 	}
       }
     }
-    else{
-      if( (x_cb == 0) && (pty == 0) )
-	printf("shiftDeviceProp - ERROR: Got invalid shiftDir = %d\n", shiftDir);
+    else{ // All threads printing!!!
+      printf("shiftDeviceProp - ERROR: Got invalid shiftDir = %d\n", shiftDir);
       return;
     }
 
   }//- Function shiftDeviceProp
-				   
 
 
   //--------------------------------------------------------------------------------------
@@ -918,9 +888,17 @@ namespace quda {
     complex<QC_REAL> prop2[QC_LEN_P];
     complex<QC_REAL> prop3[QC_LEN_P];
 
-    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
-    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
-    prepareDevicePropSite(prop3, x_cb, pty, arg->prop3);
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    Vector vec3[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = arg->prop1[i](x_cb, pty);
+      vec2[i] = arg->prop2[i](x_cb, pty);
+      vec3[i] = arg->prop3[i](x_cb, pty);
+    }
+    prepareDevicePropSite(prop1, vec1);
+    prepareDevicePropSite(prop2, vec2);
+    prepareDevicePropSite(prop3, vec3);
 
     qc_quda_baryon_sigma_twopt_asymsrc_gvec(Corr_dev + tid, (int)lV,
                                             prop1, 1,
@@ -944,8 +922,14 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
-    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = arg->prop1[i](x_cb, pty);
+      vec2[i] = arg->prop2[i](x_cb, pty);
+    }
+    prepareDevicePropSite(prop1, vec1);
+    prepareDevicePropSite(prop2, vec2);
 
     qc_quda_contract_tr_g_P_P(Corr_dev + tid, (int)lV,
 			      prop1, 1,
@@ -968,8 +952,14 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
-    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = arg->prop1[i](x_cb, pty);
+      vec2[i] = arg->prop2[i](x_cb, pty);
+    }
+    prepareDevicePropSite(prop1, vec1);
+    prepareDevicePropSite(prop2, vec2);
 
     qc_quda_contract_tr_g_P_aP(Corr_dev + tid, (int)lV,
 			       prop1, 1,
@@ -992,8 +982,14 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
-    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = arg->prop1[i](x_cb, pty);
+      vec2[i] = arg->prop2[i](x_cb, pty);
+    }
+    prepareDevicePropSite(prop1, vec1);
+    prepareDevicePropSite(prop2, vec2);
 
     qc_quda_contract_tr_g_P_hP(Corr_dev + tid, (int)lV,
 			       prop1, 1,
@@ -1016,8 +1012,14 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
-    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = arg->prop1[i](x_cb, pty);
+      vec2[i] = arg->prop2[i](x_cb, pty);
+    }
+    prepareDevicePropSite(prop1, vec1);
+    prepareDevicePropSite(prop2, vec2);
 
     qc_quda_contract_tr_g_P_mgbar_P(Corr_dev + tid, (int)lV,
 				    prop1, 1,
@@ -1040,8 +1042,14 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
-    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = arg->prop1[i](x_cb, pty);
+      vec2[i] = arg->prop2[i](x_cb, pty);
+    }
+    prepareDevicePropSite(prop1, vec1);
+    prepareDevicePropSite(prop2, vec2);
 
     qc_quda_contract_tr_g_P_mgbar_aP(Corr_dev + tid, (int)lV,
 				     prop1, 1,
@@ -1064,8 +1072,14 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
-    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = arg->prop1[i](x_cb, pty);
+      vec2[i] = arg->prop2[i](x_cb, pty);
+    }
+    prepareDevicePropSite(prop1, vec1);
+    prepareDevicePropSite(prop2, vec2);
 
     qc_quda_contract_tr_g_P_mgbar_hP(Corr_dev + tid, (int)lV,
 				     prop1, 1,
@@ -1095,9 +1109,8 @@ namespace quda {
       vec1[i] = arg->prop1[i](x_cb, pty);
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
-
-    prepareDevicePropSite2(prop1, vec1);
-    prepareDevicePropSite2(prop2, vec2);
+    prepareDevicePropSite(prop1, vec1);
+    prepareDevicePropSite(prop2, vec2);
 
     qc_quda_contract_tr_g_P_P(Corr_dev + tid, (int)lV,
 			      prop1, 1,
