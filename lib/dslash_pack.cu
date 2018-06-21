@@ -862,7 +862,7 @@ namespace quda {
           param.face_XYZ[dim] = param.face_XY[dim] * face[2];
           param.face_XYZT[dim] = param.face_XYZ[dim] * face[3];
         }
-        init = true;
+        //init = true;
       }
 
       param.swizzle = tp.aux.x;
