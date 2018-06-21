@@ -174,6 +174,11 @@ INFUNC_ DEVFUNC_ int qc_gamma_sim_parity(int m, int n){
 #define gamma_left_coeff(m,n) (complex<QC_REAL>{gamma_left_coeff_Re(m,n,0),gamma_left_coeff_Re(m,n,1)})
 
 
+typedef enum qcShiftDirection_s {
+  shiftForward = 1,
+  shiftBackward = -1
+} qcShiftDirection;
+
 namespace quda { 
 
   DEVFUNC_ void QC(contract_tr_g_P_P)(
@@ -225,6 +230,13 @@ namespace quda {
 
 
   __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, int x_cb, int pty, Propagator prop);
+
+  __device__ void prepareDevicePropSite2(complex<QC_REAL> *devProp, Vector *vec);
+
+  __device__ void shiftDevicePropPM1(QluaContractArg *arg,
+                                     Vector *outShf, Propagator prop[],
+                                     int x_cb, int pty,
+                                     int dir, qcShiftDirection shiftDir);
 
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);

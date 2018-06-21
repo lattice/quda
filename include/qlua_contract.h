@@ -18,9 +18,10 @@
 
 namespace quda {
 
-  //-C.K. Typedef Propagator and Gauge Field Structures
+  //-C.K. Typedef Propagator, Gauge Field and Vector Structures
   typedef typename colorspinor_mapper<QUDA_REAL,QUDA_Ns,QUDA_Nc>::type Propagator;
   typedef typename gauge_mapper<QUDA_REAL,QUDA_RECONSTRUCT_NO>::type GaugeU;
+  typedef ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> Vector;
 
   /**
      When copying ColorSpinorFields to GPU, Quda rotates the fields to another basis using a rotation matrix.
@@ -35,12 +36,11 @@ namespace quda {
      After the calculation the result must be rotated back to the Quda basis R <- M^T R (qdp2quda),
      so that when Quda copies back to the CPU the result is again rotated to the QDP convention.
    */
-  __device__ __host__ inline void rotatePropBasis(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *prop, RotateType rType){
+  __device__ __host__ inline void rotatePropBasis(Vector *prop, RotateType rType){
 
     const int Ns = QUDA_Ns;
     const int Nc = QUDA_Nc;
 
-    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
     Vector res[QUDA_PROP_NVEC];
 
     complex<QUDA_REAL> zro = complex<QUDA_REAL>{0,0};

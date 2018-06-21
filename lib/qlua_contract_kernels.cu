@@ -782,12 +782,12 @@ namespace quda {
     cudaMemcpyToSymbol(cS1_gvec, S1, sizeof(complex<QC_REAL>)*QC_LEN_G);
   }
 
+
   __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, int x_cb, int pty, Propagator prop[]){
 
     const int Ns = QC_Ns;
     const int Nc = QC_Nc;
 
-    typedef ColorSpinor<QC_REAL,Nc,Ns> Vector;
     Vector vec[QUDA_PROP_NVEC];
 
     for(int i=0;i<QUDA_PROP_NVEC;i++){
@@ -809,6 +809,93 @@ namespace quda {
     }//-jc
 
   }//-- prepareDevicePropSite
+
+
+  __device__ void prepareDevicePropSite2(complex<QC_REAL> *devProp, Vector *vec){
+
+    const int Ns = QC_Ns;
+    const int Nc = QC_Nc;
+
+    rotatePropBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
+
+    for(int jc = 0; jc < Nc; jc++){
+      for(int js = 0; js < Ns; js++){
+        int vIdx = js + Ns*jc;     //-- vector index (which vector within propagator)
+        for(int ic = 0; ic < Nc; ic++){
+          for(int is = 0; is < Ns; is++){
+            int dIdx = ic + Nc*is; //-- spin-color index within each vector
+
+            int pIdx = QC_QUDA_LIDX_P(ic,is,jc,js);
+
+            devProp[pIdx] = vec[vIdx].data[dIdx];
+          }}}
+    }//-jc
+
+  }//-- prepareDevicePropSite2
+
+
+  __device__ void shiftDevicePropPM1(QluaContractArg *arg,
+				     Vector *outShf, Propagator prop[],
+				     int x_cb, int pty,
+				     int dir, qcShiftDirection shiftDir){
+    const int Ns = QC_Ns;
+    const int Nc = QC_Nc;
+    
+    typedef Matrix<complex<QC_REAL>,Nc> Link;
+    typedef ColorSpinor<QC_REAL,Nc,Ns> Vector;
+
+    const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
+    int coord[5];
+    getCoords(coord, x_cb, arg->dim, pty);
+    coord[4] = 0;
+
+    if(shiftDir == shiftForward){ // Forward shift
+      const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
+      
+      if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
+	const int ghostIdx = ghostFaceIndex<1>(coord, arg->dim, dir, arg->nFace);	
+	const Link U = arg->U(dir, x_cb, pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i].Ghost(dir, 1, ghostIdx, nbrPty);
+	  outShf[i] += U * pIn;
+	}
+      }
+      else{
+	const Link U = arg->U(dir, x_cb, pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i](fwdIdx, nbrPty);
+	  outShf[i] += U * pIn;
+	}
+      }
+    }
+    else if(shiftDir == shiftBackward){ // Backward shift
+      const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
+      const int gaugeIdx = bwdIdx;
+      
+      if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
+	const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);	
+	const Link U = arg->U.Ghost(dir, ghostIdx, 1-pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i].Ghost(dir, 0, ghostIdx, nbrPty);
+	  outShf[i] += conj(U) * pIn;
+	}
+      }
+      else{
+	const Link U = arg->U(dir, gaugeIdx, 1-pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i](bwdIdx, nbrPty);
+	  outShf[i] += conj(U) * pIn;
+	}
+      }
+    }
+    else{
+      if( (x_cb == 0) && (pty == 0) )
+	printf("shiftDeviceProp - ERROR: Got invalid shiftDir = %d\n", shiftDir);
+      return;
+    }
+
+  }//- Function shiftDeviceProp
+				   
 
 
   //--------------------------------------------------------------------------------------
@@ -1002,8 +1089,15 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    prepareDevicePropSite(prop1, x_cb, pty, arg->prop1);
-    prepareDevicePropSite(prop2, x_cb, pty, arg->prop2);
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = arg->prop1[i](x_cb, pty);
+      vec2[i] = arg->prop2[i](x_cb, pty);
+    }
+
+    prepareDevicePropSite2(prop1, vec1);
+    prepareDevicePropSite2(prop2, vec2);
 
     qc_quda_contract_tr_g_P_P(Corr_dev + tid, (int)lV,
 			      prop1, 1,
