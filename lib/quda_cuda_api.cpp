@@ -7,7 +7,7 @@
 #define USE_DRIVER_API
 
 // if this macro is defined then we profile the CUDA API calls
-//#define API_PROFILE
+#define API_PROFILE
 
 #ifdef API_PROFILE
 #define PROFILE(f, idx)                                 \
@@ -183,6 +183,7 @@ namespace quda {
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
+    if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
     return error;
   }
 

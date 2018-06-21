@@ -144,8 +144,6 @@ namespace quda {
 
     delete dslash;
     unbindGaugeTex(gauge);
-
-    checkCudaError();
 #else
     errorQuda("Wilson dslash has not been built");
 #endif // GPU_WILSON_DIRAC

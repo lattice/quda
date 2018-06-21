@@ -327,12 +327,8 @@ namespace quda {
 
     unbindGaugeTex(gauge);
     unbindTwistedCloverTex(*clover);
-	
-    checkCudaError();
 #else
-
-  errorQuda("Twisted clover dslash has not been built");
-
+    errorQuda("Twisted clover dslash has not been built");
 #endif
   }
 

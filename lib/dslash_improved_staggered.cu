@@ -327,9 +327,6 @@ namespace quda {
     delete dslash;
     unbindFatGaugeTex(fatGauge);
     unbindLongGaugeTex(longGauge);
-
-    checkCudaError();
-
 #else
     errorQuda("Staggered dslash has not been built");
 #endif  // GPU_STAGGERED_DIRAC

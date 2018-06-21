@@ -311,8 +311,6 @@ namespace quda {
 
     delete dslash;
     unbindGaugeTex(gauge);
-
-    checkCudaError();
 #else
     errorQuda("4D preconditioned Domain wall dslash has not been built");
 #endif

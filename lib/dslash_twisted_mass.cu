@@ -229,8 +229,6 @@ namespace quda {
 #endif
 
     unbindGaugeTex(gauge);
-
-    checkCudaError();
 #else
     errorQuda("Twisted mass dslash has not been built");
 #endif

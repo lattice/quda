@@ -205,8 +205,6 @@ namespace quda {
     delete dslash;
     unbindGaugeTex(gauge);
     unbindCloverTex(clover);
-
-    checkCudaError();
 #else
     errorQuda("Clover dslash has not been built");
 #endif

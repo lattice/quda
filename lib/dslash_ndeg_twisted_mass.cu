@@ -190,8 +190,6 @@ namespace quda {
     delete dslash;
 
     unbindGaugeTex(gauge);
-
-    checkCudaError();
 #else
     errorQuda("Non-degenerate twisted mass dslash has not been built");
 #endif

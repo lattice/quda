@@ -331,8 +331,6 @@ namespace quda {
 
     delete dslash;
     unbindGaugeTex(gauge);
-
-    checkCudaError();
 #else
     errorQuda("Domain wall dslash has not been built");
 #endif
