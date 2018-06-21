@@ -175,8 +175,8 @@ INFUNC_ DEVFUNC_ int qc_gamma_sim_parity(int m, int n){
 
 
 typedef enum qcShiftDirection_s {
-  shiftForward = 1,
-  shiftBackward = -1
+  qcShiftForward = 1,
+  qcShiftBackward = -1
 } qcShiftDirection;
 
 namespace quda { 

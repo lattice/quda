@@ -123,7 +123,7 @@ namespace quda {
     asprintf(&func_name,"QuarkContract_GPU");
     
     if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
-   
+
     //-- Define the arguments structure
     QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, U, mpParam.cntrType); 
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);

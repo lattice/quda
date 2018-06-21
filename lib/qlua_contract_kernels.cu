@@ -821,7 +821,7 @@ namespace quda {
     getCoords(coord, x_cb, arg->dim, pty);
     coord[4] = 0;
 
-    if(shiftDir == shiftForward){ // Forward shift
+    if(shiftDir == qcShiftForward){ // Forward shift
       const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
       
       if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
@@ -829,18 +829,18 @@ namespace quda {
 	const Link U = arg->U(dir, x_cb, pty);
 	for(int i=0;i<QUDA_PROP_NVEC;i++){
 	  const Vector pIn = prop[i].Ghost(dir, 1, ghostIdx, nbrPty);
-	  outShf[i] += U * pIn;
+	  outShf[i] = U * pIn;
 	}
       }
       else{
 	const Link U = arg->U(dir, x_cb, pty);
 	for(int i=0;i<QUDA_PROP_NVEC;i++){
 	  const Vector pIn = prop[i](fwdIdx, nbrPty);
-	  outShf[i] += U * pIn;
+	  outShf[i] = U * pIn;
 	}
       }
     }
-    else if(shiftDir == shiftBackward){ // Backward shift
+    else if(shiftDir == qcShiftBackward){ // Backward shift
       const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
       const int gaugeIdx = bwdIdx;
       
@@ -849,14 +849,14 @@ namespace quda {
 	const Link U = arg->U.Ghost(dir, ghostIdx, 1-pty);
 	for(int i=0;i<QUDA_PROP_NVEC;i++){
 	  const Vector pIn = prop[i].Ghost(dir, 0, ghostIdx, nbrPty);
-	  outShf[i] += conj(U) * pIn;
+	  outShf[i] = conj(U) * pIn;
 	}
       }
       else{
 	const Link U = arg->U(dir, gaugeIdx, 1-pty);
 	for(int i=0;i<QUDA_PROP_NVEC;i++){
 	  const Vector pIn = prop[i](bwdIdx, nbrPty);
-	  outShf[i] += conj(U) * pIn;
+	  outShf[i] = conj(U) * pIn;
 	}
       }
     }
@@ -1087,7 +1087,7 @@ namespace quda {
   }
   //------------------------------------------------------------------------------------------
 
-  //-C.K. For now, this kernel is identical to qbarq_g_P_P_gvec_kernel
+
   __global__ void qpdf_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
@@ -1105,10 +1105,12 @@ namespace quda {
 
     Vector vec1[QUDA_PROP_NVEC];
     Vector vec2[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec1[i] = arg->prop1[i](x_cb, pty);
-      vec2[i] = arg->prop2[i](x_cb, pty);
-    }
+
+    int dir1 = 1; // Shift in y-direction
+    int dir2 = 2; // Shift in z-direction
+    shiftDevicePropPM1(arg, vec1, arg->prop1, x_cb, pty, dir1, qcShiftForward);
+    shiftDevicePropPM1(arg, vec2, arg->prop2, x_cb, pty, dir2, qcShiftBackward);
+
     prepareDevicePropSite(prop1, vec1);
     prepareDevicePropSite(prop2, vec2);
 
