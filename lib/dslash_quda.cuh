@@ -2,7 +2,7 @@
 
 #if (__COMPUTE_CAPABILITY__ >= 700)
 // for running on Volta we set large shared memory mode to prefer hitting in L2
-#define SET_CACHE(f) cudaFuncSetAttribute(f, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
+#define SET_CACHE(f) qudaFuncSetAttribute( (const void*)f, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
 #else
 #define SET_CACHE(f)
 #endif
@@ -11,7 +11,7 @@
 #define LAUNCH_KERNEL(f, grid, block, shared, stream, param)            \
   void *args[] = { &param };                                            \
   void (*func)( const DslashParam ) = &(f);                             \
-  cudaLaunchKernel( (const void*)func, grid, block, args, shared, stream);
+  qudaLaunchKernel( (const void*)func, grid, block, args, shared, stream);
 #else
 #define LAUNCH_KERNEL(f, grid, block, shared, stream, param) f<<<grid, block, shared, stream>>>(param)
 #endif

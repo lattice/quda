@@ -73,6 +73,17 @@ namespace quda {
                           const char *func, const char *file, const char *line);
 
   /**
+     @brief Wrapper around cudaLaunchKernel
+     @param[in] func Device function symbol
+     @param[in] gridDim Grid dimensions
+     @param[in] blockDim Block dimensions
+     @param[in] args Arguments
+     @param[in] sharedMem Shared memory requested per thread block
+     @param[in] stream Stream identifier
+  */
+  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream);
+
+  /**
      @brief Wrapper around cudaEventQuery or cuEventQuery
      @param[in] event Event we are querying
      @return Status of event query
@@ -110,6 +121,14 @@ namespace quda {
      @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
    */
   cudaError_t qudaDeviceSynchronize();
+
+  /**
+     @brief Wrapper around cudaFuncSetAttribute
+     @param[in] func Function for which we are setting the attribute
+     @param[in] attr Attribute to set
+     @param[in] value Value to set
+  */
+  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
 
   /**
      @brief Print out the timer profile for CUDA API calls

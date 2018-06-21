@@ -1029,7 +1029,7 @@ namespace quda {
 
       void *args[] = { &param };
       void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceWilsonKernel<1,FloatN>) : &(packFaceWilsonKernel<0,FloatN>);
-      cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      qudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
 #else
       errorQuda("Wilson face packing kernel is not built");
 #endif
