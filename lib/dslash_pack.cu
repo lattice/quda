@@ -887,7 +887,7 @@ namespace quda {
       : in(in), dagger(dagger),
 	parity(parity), nFace(nFace), dim(dim), face_num(face_num), location(location)
     {
-      memcpy(faces, faces_, 2*QUDA_MAX_DIM*sizeof(int));
+      memcpy(faces, faces_, 2*QUDA_MAX_DIM*sizeof(void*));
       fillAux();
 #ifndef USE_TEXTURE_OBJECTS
       bindSpinorTex<FloatN>(in);
