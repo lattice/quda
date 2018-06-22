@@ -71,14 +71,12 @@ namespace quda {
     }
 
   public:
-    AsymCloverDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
-			 const GaugeField &gauge, const cFloat *clover,
+    AsymCloverDslashCuda(cudaColorSpinorField *out, const GaugeField &gauge, const cFloat *clover,
 			 const float *cloverNorm, int cl_stride, const cudaColorSpinorField *in,
-			 const cudaColorSpinorField *x, const double a, const double rho, const int dagger)
-      : SharedDslashCuda(out, in, x, gauge, dagger)
+			 const cudaColorSpinorField *x, const double a, const double rho,
+                         const int parity, const int dagger, const int *commOverride)
+      : SharedDslashCuda(out, in, x, gauge, parity, dagger, commOverride)
     { 
-      dslashParam.gauge0 = (void*)gauge0;
-      dslashParam.gauge1 = (void*)gauge1;
       dslashParam.clover = (void*)clover;
       dslashParam.cloverNorm = (float*)cloverNorm;
       dslashParam.a = a;
@@ -156,54 +154,31 @@ namespace quda {
 			    const cudaColorSpinorField *x, const double &a, const int *commOverride,
 			    TimeProfile &profile)
   {
-    inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->createComms(1);
-
 #ifdef GPU_CLOVER_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
-    for(int i=0;i<4;i++){
-      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
-      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
-      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
-      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
-    }
+    const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     void *cloverP, *cloverNormP;
     QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
 
-    void *gauge0, *gauge1;
-    bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-    if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
-
     if (in->Precision() != clover_prec)
       errorQuda("Mixing clover and spinor precision not supported");
 
-    DslashCuda *dslash = 0;
-    size_t regSize = sizeof(float);
-
+    DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new AsymCloverDslashCuda<double2, double2, double2>
-	(out, (double2*)gauge0, (double2*)gauge1, gauge,
-         (double2*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
-      regSize = sizeof(double);
+	(out, gauge, (double2*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new AsymCloverDslashCuda<float4, float4, float4>
-	(out, (float4*)gauge0, (float4*)gauge1, gauge,
-	 (float4*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
+	(out, gauge, (float4*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new AsymCloverDslashCuda<short4, short4, short4>
-	(out, (short4*)gauge0, (short4*)gauge1, gauge,
-	 (short4*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
+	(out, gauge, (short4*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, parity, dagger, commOverride);
     }
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
     dslash_policy.apply(0);
 
     delete dslash;
-    unbindGaugeTex(gauge);
     unbindCloverTex(clover);
 #else
     errorQuda("Clover dslash has not been built");

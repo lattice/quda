@@ -364,10 +364,6 @@
 // allow a simple interface.
 class DslashCuda : public Tunable {
 
-public:
-  double twist_a;
-  double twist_b;
-
 protected:
   cudaColorSpinorField *out;
   const cudaColorSpinorField *in;
@@ -460,9 +456,24 @@ protected:
 
 public:
   DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-	     const cudaColorSpinorField *x, const GaugeField &gauge, const int dagger)
+	     const cudaColorSpinorField *x, const GaugeField &gauge,
+             const int parity, const int dagger, const int *commOverride)
     : out(out), in(in), x(x), gauge(gauge), reconstruct(gauge.Reconstruct()),
-      dagger(dagger), saveOut(0), saveOutNorm(0), twist_a(0.0), twist_b(0.0)  {
+      dagger(dagger), saveOut(0), saveOutNorm(0) {
+
+    if (in->Precision() != gauge.Precision())
+      errorQuda("Mixing gauge %d and spinor %d precision not supported", gauge.Precision(), in->Precision());
+
+    const int nDimComms = 4;
+    for (int i=0; i<nDimComms; i++){
+      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
+      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
+
+      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
+      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
+
+      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
+    }
 
     // set parameters particular for this instance
     dslashParam.out = (void*)out->V();
@@ -480,6 +491,9 @@ public:
     if (x) dslashParam.xTex = x->Tex();
     if (x) dslashParam.xTexNorm = x->TexNorm();
 #endif // USE_TEXTURE_OBJECTS
+
+    dslashParam.parity = parity;
+    bindGaugeTex(static_cast<const cudaGaugeField&>(gauge), parity, &dslashParam.gauge0, &dslashParam.gauge1);
 
     dslashParam.sp_stride = in->Stride();
 
@@ -499,6 +513,9 @@ public:
 
     dslashParam.coeff = 1.0;
     dslashParam.coeff_f = 1.0f;
+
+    dslashParam.twist_a = 0.0;
+    dslashParam.twist_b = 0.0;
 
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
@@ -535,7 +552,7 @@ public:
 
   }
 
-  virtual ~DslashCuda() { }
+  virtual ~DslashCuda() { unbindGaugeTex(static_cast<const cudaGaugeField&>(gauge)); }
   virtual TuneKey tuneKey() const  
   { return TuneKey(in->VolString(), typeid(*this).name(), aux[dslashParam.kernel_type]); }
 
@@ -803,8 +820,9 @@ protected:
 
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, const GaugeField &gauge, int dagger)
-    : DslashCuda(out, in, x, gauge, dagger) { ; }
+		   const cudaColorSpinorField *x, const GaugeField &gauge,
+                   int parity, int dagger, const int *commOverride)
+    : DslashCuda(out, in, x, gauge, parity, dagger, commOverride) { ; }
   virtual ~SharedDslashCuda() { ; }
 
   virtual void initTuneParam(TuneParam &param) const
@@ -827,8 +845,9 @@ public:
 class SharedDslashCuda : public DslashCuda {
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, const GaugeField &gauge, int dagger)
-    : DslashCuda(out, in, x, gauge, dagger) { }
+		   const cudaColorSpinorField *x, const GaugeField &gauge,
+                   int parity, int dagger, const int *commOverride)
+    : DslashCuda(out, in, x, gauge, parity, dagger, commOverride) { }
   virtual ~SharedDslashCuda() { }
 };
 #endif

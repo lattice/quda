@@ -112,14 +112,11 @@ namespace quda {
     unsigned int sharedBytesPerThread() const { return 0; }
 
   public:
-    DomainWallDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-			 const GaugeField &gauge, const cudaColorSpinorField *in,
-			 const cudaColorSpinorField *x, const double mferm, 
-			 const double a, const int dagger)
-      : DslashCuda(out, in, x, gauge, dagger)
+    DomainWallDslashCuda(cudaColorSpinorField *out, const GaugeField &gauge, const cudaColorSpinorField *in,
+			 const cudaColorSpinorField *x, const double mferm, const double a,
+                         const int parity, const int dagger, const int* commOverride)
+      : DslashCuda(out, in, x, gauge, parity, dagger, commOverride)
     { 
-      dslashParam.gauge0 = (void*)gauge0;
-      dslashParam.gauge1 = (void*)gauge1;
       dslashParam.a = a;
       dslashParam.a_f = a;
       dslashParam.a_inv = 1.0/a;
@@ -208,41 +205,16 @@ namespace quda {
 			    const cudaColorSpinorField *x, const double &m_f, const double &k2, 
 			    const int *commOverride, TimeProfile &profile)
   {
-    inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->createComms(1);
-
-    dslashParam.parity = parity;
-
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    //currently splitting in space-time is impelemented:
-    int dirs = 4;
-    for(int i = 0;i < dirs; i++){
-      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
-      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
-      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
-      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
-    }  
-
-    void *gauge0, *gauge1;
-    bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-    if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
+    const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     DslashCuda *dslash = 0;
-    size_t regSize = sizeof(float);
-
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new DomainWallDslashCuda<double2,double2>(out, (double2*)gauge0, (double2*)gauge1, 
-							 gauge, in, x, m_f, k2, dagger);
-      regSize = sizeof(double);
+      dslash = new DomainWallDslashCuda<double2,double2>(out, gauge, in, x, m_f, k2, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new DomainWallDslashCuda<float4,float4>(out, (float4*)gauge0, (float4*)gauge1, 
-						       gauge, in, x, m_f, k2, dagger);
+      dslash = new DomainWallDslashCuda<float4,float4>(out, gauge, in, x, m_f, k2, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new DomainWallDslashCuda<short4,short4>(out, (short4*)gauge0, (short4*)gauge1, 
-						       gauge, in, x, m_f, k2, dagger);
+      dslash = new DomainWallDslashCuda<short4,short4>(out, gauge, in, x, m_f, k2, parity, dagger, commOverride);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d
@@ -250,11 +222,10 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 
     delete dslash;
-    unbindGaugeTex(gauge);
 #else
     errorQuda("Domain wall dslash has not been built");
 #endif

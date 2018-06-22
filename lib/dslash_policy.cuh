@@ -374,7 +374,6 @@ namespace {
   struct DslashPolicyImp {
 
     virtual void operator()(DslashCuda &dslash, cudaColorSpinorField* in,
-			    const size_t regSize, const int parity, const int dagger,
 			    const int volume, const int *faceVolumeCB, TimeProfile &profile) = 0;
 
     virtual ~DslashPolicyImp(){}
@@ -385,13 +384,11 @@ namespace {
  */
 struct DslashBasic : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -403,7 +400,7 @@ struct DslashBasic : DslashPolicyImp {
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -425,9 +422,9 @@ struct DslashBasic : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
+	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
 	    }
 	  }
 
@@ -472,13 +469,11 @@ struct DslashBasic : DslashPolicyImp {
 
 struct DslashPthreads : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		    const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 #ifdef PTHREADS
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -497,7 +492,7 @@ struct DslashPthreads : DslashPolicyImp {
     ReceiveParam receiveParam;
     receiveParam.profile = &profile;
     receiveParam.nFace   = (dslash.Nface() >> 1);
-    receiveParam.dagger  = dagger;
+    receiveParam.dagger  = dslash.Dagger();
 
     if(pthread_create(&receiveThread, NULL, issueMPIReceive, &receiveParam)){
       errorQuda("pthread_create failed");
@@ -525,7 +520,7 @@ struct DslashPthreads : DslashPolicyImp {
     // Initialize pack from source spinor
     MemoryLocation pack_dest[2*QUDA_MAX_DIM];
     for (int i=0; i<2*QUDA_MAX_DIM; i++) pack_dest[i] = Device;
-    PROFILE(if (dslash_pack_compute) in->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, pack_dest, twist_a, twist_b),
+    PROFILE(if (dslash_pack_compute) in->pack(dslash.Nface()/2, 1-dslashParam.parity, dslash.Dagger(), packIndex, pack_dest, twist_a, twist_b),
 	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
@@ -542,7 +537,7 @@ struct DslashPthreads : DslashPolicyImp {
 	        profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
         // Initialize host transfer from source spinor
-        PROFILE(if (dslash_copy) in->gather(dslash.Nface()/2, dagger, 2*i+dir), profile, QUDA_PROFILE_GATHER);
+        PROFILE(if (dslash_copy) in->gather(dslash.Nface()/2, dslash.Dagger(), 2*i+dir), profile, QUDA_PROFILE_GATHER);
 
         // Record the end of the gathering
         PROFILE(qudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]),
@@ -575,23 +570,23 @@ struct DslashPthreads : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger,  dslashParam.remote_write ? streams+packIndex : nullptr,
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(),  dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) ? in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
+	      if (dslash_comms) ? in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
 	    }
 	  }
 
 	  // Query if comms has finished
 	  if(!pattern.commsCompleted[2*i+dir] && pattern.commsCompleted[pattern.previousDir[2*i+dir]] &&
 	     pattern.gatherCompleted[2*i+dir]) {
-	    PROFILE(int comms_test = dslash_comms ? in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger) : 1,
+	    PROFILE(int comms_test = dslash_comms ? in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()) : 1,
 		    profile, QUDA_PROFILE_COMMS_QUERY);
 	    if (comms_test) {
 	      pattern.commsCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
 
 	      // Scatter into the end zone
-	      PROFILE(if (dslash_copy) in->scatter(dslash.Nface()/2, dagger, 2*i+dir), profile, QUDA_PROFILE_SCATTER);
+	      PROFILE(if (dslash_copy) in->scatter(dslash.Nface()/2, dslash.Dagger(), 2*i+dir), profile, QUDA_PROFILE_SCATTER);
 	    }
 	  }
 
@@ -639,13 +634,11 @@ struct DslashPthreads : DslashPolicyImp {
  */
 struct DslashFusedExterior : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		   const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -657,7 +650,7 @@ struct DslashFusedExterior : DslashPolicyImp {
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -679,9 +672,9 @@ struct DslashFusedExterior : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
+	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
 	    }
 	  }
 
@@ -722,20 +715,18 @@ struct DslashFusedExterior : DslashPolicyImp {
  */
 struct DslashGDR : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
@@ -752,9 +743,9 @@ struct DslashGDR : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, true, true); // do a comms query to ensure MPI has begun
+	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, true, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -801,20 +792,18 @@ struct DslashGDR : DslashPolicyImp {
  */
 struct DslashFusedGDR : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
@@ -831,9 +820,9 @@ struct DslashFusedGDR : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, true, true); // do a comms query to ensure MPI has begun
+	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, true, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	}
       }
@@ -874,13 +863,11 @@ struct DslashFusedGDR : DslashPolicyImp {
  */
 struct DslashGDRRecv : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -892,7 +879,7 @@ struct DslashGDRRecv : DslashPolicyImp {
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -913,9 +900,9 @@ struct DslashGDRRecv : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true);  // do a comms query to ensure MPI has begun
+	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, false, true);  // do a comms query to ensure MPI has begun
 	    }
 	  }
 
@@ -953,13 +940,11 @@ struct DslashGDRRecv : DslashPolicyImp {
  */
 struct DslashFusedGDRRecv : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		   const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -971,7 +956,7 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -992,9 +977,9 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true);  // do a comms query to ensure MPI has begun
+	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, false, true);  // do a comms query to ensure MPI has begun
 	    }
 	  }
 
@@ -1043,13 +1028,11 @@ struct DslashAsync : DslashPolicyImp {
 
 #if (CUDA_VERSION >= 8000)
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1061,7 +1044,7 @@ struct DslashAsync : DslashPolicyImp {
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -1082,15 +1065,15 @@ struct DslashAsync : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
+	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
 	      if (!comm_peer2peer_enabled(1-dir,i)) {
 		*((volatile cuuint32_t*)(commsEnd_h+2*i+1-dir)) = 0;
 		CUDA_CALL(cuStreamWaitValue32( streams[2*i+dir], commsEnd_d[2*i+1-dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
-		PROFILE(if (dslash_copy) in->scatter(dslash.Nface()/2, dagger, 2*i+dir, &streams[2*i+dir]), profile, QUDA_PROFILE_SCATTER);
+		PROFILE(if (dslash_copy) in->scatter(dslash.Nface()/2, dslash.Dagger(), 2*i+dir, &streams[2*i+dir]), profile, QUDA_PROFILE_SCATTER);
 	      }
 	    }
 	  }
@@ -1135,8 +1118,7 @@ struct DslashAsync : DslashPolicyImp {
   }
 #else
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
     errorQuda("Async dslash policy variants require CUDA 8.0 and above");
   }
 
@@ -1153,13 +1135,11 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 
 #if (CUDA_VERSION >= 8000)
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		   const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1171,7 +1151,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
     const int packIndex = Nstream-1;
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Device | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueGather(*in, dslash);
 
@@ -1194,15 +1174,15 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
+	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
 	      if (!comm_peer2peer_enabled(1-dir,i)) { // gather centric
 		*((volatile cuuint32_t*)(commsEnd_h+2*i+1-dir)) = 0;
 		CUDA_CALL(cuStreamWaitValue32( streams[scatterIndex], commsEnd_d[2*i+1-dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
-		PROFILE(if (dslash_copy) in->scatter(dslash.Nface()/2, dagger, 2*i+dir, streams+scatterIndex), profile, QUDA_PROFILE_SCATTER);
+		PROFILE(if (dslash_copy) in->scatter(dslash.Nface()/2, dslash.Dagger(), 2*i+dir, streams+scatterIndex), profile, QUDA_PROFILE_SCATTER);
 	      }
 	    }
 
@@ -1241,8 +1221,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 
 #else
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
     errorQuda("Async dslash policy variants require CUDA 8.0 and above");
   }
 
@@ -1257,13 +1236,11 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 */
 struct DslashZeroCopyPack : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1274,7 +1251,7 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 
     const int packIndex = getStreamIndex();
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
@@ -1292,9 +1269,9 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
+	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1352,13 +1329,11 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 */
 struct DslashFusedZeroCopyPack : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1367,7 +1342,7 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
 
     const int packScatterIndex = getStreamIndex();
     PROFILE(qudaStreamWaitEvent(streams[packScatterIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packScatterIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packScatterIndex);
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
@@ -1387,9 +1362,9 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packScatterIndex : nullptr,
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packScatterIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
+	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1441,13 +1416,11 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
  */
 struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1458,7 +1431,7 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
 
     const int packIndex = getStreamIndex();
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
@@ -1476,9 +1449,9 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true); // do a comms query to ensure MPI has begun
+	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, false, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1527,13 +1500,11 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
  */
 struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		   const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1542,7 +1513,7 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
 
     const int packIndex = getStreamIndex();
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
@@ -1562,9 +1533,9 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger, 0, false, true); // do a comms query to ensure MPI has begun
+	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, false, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1608,13 +1579,11 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
 */
 struct DslashZeroCopy : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1625,7 +1594,7 @@ struct DslashZeroCopy : DslashPolicyImp {
 
     const int packIndex = getStreamIndex();
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
@@ -1643,9 +1612,9 @@ struct DslashZeroCopy : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
+	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1696,13 +1665,11 @@ struct DslashZeroCopy : DslashPolicyImp {
 */
 struct DslashFusedZeroCopy : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const size_t regSize, const int parity, const int dagger,
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1713,7 +1680,7 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
     const int packIndex = getStreamIndex();
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*in, dslash, 1-parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
+    issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
@@ -1731,9 +1698,9 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
 	for (int dir=1; dir>=0; dir--) {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
-	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dagger, dslashParam.remote_write ? streams+packIndex : nullptr,
+	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
+	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1777,12 +1744,10 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
 struct DslashNC : DslashPolicyImp {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const size_t regSize, const int parity, const int dagger,
-		    const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     profile.TPSTART(QUDA_PROFILE_TOTAL);
     
-    dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1913,9 +1878,6 @@ struct DslashFactory {
 
    DslashCuda &dslash;
    cudaColorSpinorField *in;
-   const size_t regSize;
-   const int parity;
-   const int dagger;
    const int volume;
    const int *ghostFace;
    TimeProfile &profile;
@@ -1926,10 +1888,9 @@ struct DslashFactory {
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
  public:
-   DslashPolicyTune(DslashCuda &dslash, cudaColorSpinorField *in, const size_t regSize, const int parity,
-		    const int dagger, const int volume, const int *ghostFace, TimeProfile &profile)
-     : dslash(dslash), in(in), regSize(regSize), parity(parity), dagger(dagger),
-       volume(volume), ghostFace(ghostFace), profile(profile)
+   DslashPolicyTune(DslashCuda &dslash, cudaColorSpinorField *in,
+		    const int volume, const int *ghostFace, TimeProfile &profile)
+     : dslash(dslash), in(in), volume(volume), ghostFace(ghostFace), profile(profile)
    {
      in->streamInit(streams);
 
@@ -2067,7 +2028,7 @@ struct DslashFactory {
                 !dslashParam.remote_write) {
 
              DslashPolicyImp* dslashImp = DslashFactory::create(i);
-             (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+             (*dslashImp)(dslash, in, volume, ghostFace, profile);
              delete dslashImp;
 
            } else if ( (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
@@ -2102,16 +2063,16 @@ struct DslashFactory {
                  QudaDslashPolicy::QUDA_DSLASH : QudaDslashPolicy::QUDA_FUSED_DSLASH;
                DslashPolicyImp* dslashImp = DslashFactory::create(policy);
                setKernelPackT(false);
-               (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+               (*dslashImp)(dslash, in, volume, ghostFace, profile);
                setKernelPackT(true);
-               (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+               (*dslashImp)(dslash, in, volume, ghostFace, profile);
                delete dslashImp;
              }
 
              setKernelPackT(true);
 
              DslashPolicyImp* dslashImp = DslashFactory::create(i);
-             (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+             (*dslashImp)(dslash, in, volume, ghostFace, profile);
              delete dslashImp;
 
              // restore default kernel packing
@@ -2166,7 +2127,7 @@ struct DslashFactory {
      }
 
      DslashPolicyImp* dslashImp = DslashFactory::create(static_cast<QudaDslashPolicy>(tp.aux.x));
-     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+     (*dslashImp)(dslash, in, volume, ghostFace, profile);
      delete dslashImp;
 
      // restore p2p state

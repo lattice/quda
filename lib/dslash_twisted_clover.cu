@@ -57,7 +57,6 @@ namespace quda {
   class TwistedCloverDslashCuda : public SharedDslashCuda {
 
   private:
-    const gFloat *gauge0, *gauge1;
     const QudaTwistCloverDslashType dslashType;
     double a, b, c, d;
     const cFloat *clover;
@@ -77,21 +76,21 @@ namespace quda {
     }
 
   public:
-    TwistedCloverDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-			    const GaugeField &gauge, const cFloat *clover, const float *cNorm,
+    TwistedCloverDslashCuda(cudaColorSpinorField *out, const GaugeField &gauge, const cFloat *clover, const float *cNorm,
 			    const cFloat *cloverInv, const float *cNrm2, int cl_stride, const cudaColorSpinorField *in,
 			    const cudaColorSpinorField *x, const QudaTwistCloverDslashType dslashType, const double kappa,
-			    const double mu, const double epsilon, const double k, const int dagger)
-      : SharedDslashCuda(out, in, x, gauge, dagger), gauge0(gauge0), gauge1(gauge1), clover(clover),
-	cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2), dslashType(dslashType)
+			    const double mu, const double epsilon, const double k,
+                            const int parity, const int dagger, const int *commOverride)
+      : SharedDslashCuda(out, in, x, gauge, parity, dagger, commOverride),
+        clover(clover), cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2), dslashType(dslashType)
     { 
       a = kappa;
       b = mu;
       c = epsilon;
       d = k;
 
-      dslashParam.gauge0 = (void*)gauge0;
-      dslashParam.gauge1 = (void*)gauge1;
+      dslashParam.twist_a = 0.0;
+      dslashParam.twist_b = 0.0;
       dslashParam.a = kappa;
       dslashParam.a_f = kappa;
       dslashParam.b = mu;
@@ -102,88 +101,6 @@ namespace quda {
       dslashParam.cloverNorm = (float*)cNorm;
       dslashParam.cloverInv = (void*)cloverInv;
       dslashParam.cloverInvNorm = (float*)cNrm2;
-
-      switch(dslashType){
-      case QUDA_DEG_CLOVER_TWIST_INV_DSLASH:
-#ifdef MULTI_GPU 
-#ifndef DYNAMIC_CLOVER
-        fillAux(INTERIOR_KERNEL, "type=interior,CloverTwistInvDslash");
-        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,CloverTwistInvDslash");
-        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,CloverTwistInvDslash");
-        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,CloverTwistInvDslash");
-        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,CloverTwistInvDslash");
-        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,CloverTwistInvDslash");
-#else
-        fillAux(INTERIOR_KERNEL, "type=interior,CloverTwistInvDynDslash");
-        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,CloverTwistInvDynDslash");
-        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,CloverTwistInvDynDslash");
-        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,CloverTwistInvDynDslash");
-        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,CloverTwistInvDynDslash");
-        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,CloverTwistInvDynDslash");
-#endif // DYNAMIC_CLOVER
-#else
-#ifndef DYNAMIC_CLOVER
-        fillAux(INTERIOR_KERNEL, "type=single-GPU,CloverTwistInvDslash");
-#else
-        fillAux(INTERIOR_KERNEL, "type=single-GPU,CloverTwistInvDynDslash");
-#endif // DYNAMIC_CLOVER
-#endif // MULTI_GPU
-        break;
-
-      case QUDA_DEG_DSLASH_CLOVER_TWIST_INV:
-#ifdef MULTI_GPU
-#ifndef DYNAMIC_CLOVER
-        fillAux(INTERIOR_KERNEL, "type=interior,Dslash");
-        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,Dslash");
-        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,Dslash");
-        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,Dslash");
-        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,Dslash");
-        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,Dslash");
-#else
-        fillAux(INTERIOR_KERNEL, "type=interior,DynDslash");
-        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,DynDslash");
-        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,DynDslash");
-        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,DynDslash");
-        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,DynDslash");
-        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,DynDslash");
-#endif // DYNAMIC_CLOVER
-#else
-#ifndef DYNAMIC_CLOVER
-        fillAux(INTERIOR_KERNEL, "type=single-GPU,Dslash");
-#else
-        fillAux(INTERIOR_KERNEL, "type=single-GPU,DynDslash");
-#endif // DYNAMIC_CLOVER
-#endif // MULTI_GPU
-        break;
-
-      case QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY:
-#ifdef MULTI_GPU 
-#ifndef DYNAMIC_CLOVER
-        fillAux(INTERIOR_KERNEL, "type=interior,DslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,DslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,DslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,DslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,DslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,DslashCloverTwist");
-#else
-        fillAux(INTERIOR_KERNEL, "type=interior,DynDslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,DynDslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,DynDslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,DynDslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,DynDslashCloverTwist");
-        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,DynDslashCloverTwist");
-#endif // DYNAMIC_CLOVER
-#else
-#ifndef DYNAMIC_CLOVER
-        fillAux(INTERIOR_KERNEL, "type=single-GPU,DslashCloverTwist");
-#else
-        fillAux(INTERIOR_KERNEL, "type=single-GPU,DynDslashCloverTwist");
-#endif // DYNAMIC_CLOVER
-#endif // MULTI_GPU
-        break;
-      default:
-	errorQuda("Unsupported twisted-dslash type %d", dslashType);
-      }
     }
 
     virtual ~TwistedCloverDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
@@ -214,6 +131,37 @@ namespace quda {
       default:
 	errorQuda("Invalid twisted clover dslash type");
       }
+    }
+
+    TuneKey tuneKey() const
+    {
+      TuneKey key = DslashCuda::tuneKey();
+      switch (dslashType) {
+      case QUDA_DEG_CLOVER_TWIST_INV_DSLASH:
+#ifndef DYNAMIC_CLOVER
+	strcat(key.aux,",CloverTwistInvDslash");
+#else
+	strcat(key.aux,",CloverTwistInvDynDslash");
+#endif
+	break;
+      case QUDA_DEG_DSLASH_CLOVER_TWIST_INV:
+#ifndef DYNAMIC_CLOVER
+	strcat(key.aux,",Dslash");
+#else
+	strcat(key.aux,",DynDslash");
+#endif
+	break;
+      case QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY:
+#ifndef DYNAMIC_CLOVER
+        strcat(key.aux,",DslashCloverTwist");
+#else
+        strcat(key.aux,",DynDslashCloverTwist");
+#endif
+	break;
+      default:
+	errorQuda("Unsupported twisted-dslash type %d", dslashType);
+      }
+      return key;
     }
 
     long long flops() const {
@@ -265,67 +213,38 @@ namespace quda {
 			       const cudaColorSpinorField *x, const QudaTwistCloverDslashType type, const double &kappa, const double &mu, 
 			       const double &epsilon, const double &k,  const int *commOverride, TimeProfile &profile)
   {
-    inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->createComms(1);
-
 #ifdef GPU_TWISTED_CLOVER_DIRAC
-    int ghost_threads[4] = {0};
-    int bulk_threads = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->Volume() : in->Volume() / 2;
-
-    for(int i=0;i<4;i++){
-      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
-      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
-
-      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
-      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
-      ghost_threads[i] = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->GhostFace()[i] : in->GhostFace()[i] / 2;
-    }
-
-#ifdef MULTI_GPU
-    dslashParam.twist_a	= 0.;
-    dslashParam.twist_b	= 0.;
-#endif
-
-    void *gauge0, *gauge1;
-    bindGaugeTex(gauge, parity, &gauge0, &gauge1);
+    const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     void *cloverP=0, *cloverNormP=0, *cloverInvP=0, *cloverInvNormP=0;
     QudaPrecision clover_prec = bindTwistedCloverTex(*clover, *cloverInv, parity, &cloverP, &cloverNormP, &cloverInvP, &cloverInvNormP);
 
-    if (in->Precision() != clover_prec)
-      errorQuda("Mixing clover and spinor precision not supported");
+    if (in->Precision() != clover_prec) errorQuda("Mixing clover and spinor precision not supported");
 	
-    if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
-
 #ifndef DYNAMIC_CLOVER
-    if (clover->stride != cloverInv->stride) 
-      errorQuda("clover and cloverInv must have matching strides (%d != %d)", clover->stride, cloverInv->stride);
+    if (clover->stride != cloverInv->stride) errorQuda("clover and cloverInv must have matching strides (%d != %d)", clover->stride, cloverInv->stride);
 #endif
 
-    DslashCuda *dslash = 0;
-    size_t regSize = sizeof(float);
-	
+    DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new TwistedCloverDslashCuda<double2,double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge, (double2*)cloverP, (float*)cloverNormP,
-								    (double2*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
-	  
-      regSize = sizeof(double);
+      dslash = new TwistedCloverDslashCuda<double2,double2,double2>(out, gauge, (double2*)cloverP, (float*)cloverNormP, (double2*)cloverInvP, (float*)cloverInvNormP,
+                                                                    clover->stride, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new TwistedCloverDslashCuda<float4,float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge, (float4*)cloverP, (float*)cloverNormP,
-								 (float4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
+      dslash = new TwistedCloverDslashCuda<float4,float4,float4>(out, gauge, (float4*)cloverP, (float*)cloverNormP, (float4*)cloverInvP, (float*)cloverInvNormP,
+                                                                 clover->stride, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new TwistedCloverDslashCuda<short4,short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge, (short4*)cloverP, (float*)cloverNormP,
-								 (short4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
+      dslash = new TwistedCloverDslashCuda<short4,short4,short4>(out, gauge, (short4*)cloverP, (float*)cloverNormP, (short4*)cloverInvP, (float*)cloverInvNormP,
+                                                                 clover->stride, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
     }
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
-    dslash_policy.apply(0);
-	
-    delete dslash;
+    int ghost_threads[4] = {0};
+    int bulk_threads = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->Volume() : in->Volume() / 2;
+    for (int i=0;i<4;i++) ghost_threads[i] = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->GhostFace()[i] : in->GhostFace()[i] / 2;
 
-    unbindGaugeTex(gauge);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), bulk_threads, ghost_threads, profile);
+    dslash_policy.apply(0);
+
+    delete dslash;
     unbindTwistedCloverTex(*clover);
 #else
     errorQuda("Twisted clover dslash has not been built");
