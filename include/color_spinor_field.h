@@ -279,6 +279,7 @@ namespace quda {
 
   protected:
     bool init;
+    mutable bool init_ghost_zone;
 
     int nColor;
     int nSpin;
