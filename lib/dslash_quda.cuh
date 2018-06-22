@@ -483,40 +483,7 @@ public:
 
     dslashParam.sp_stride = in->Stride();
 
-    auto X = dslashParam.X;
-    X[0] = in->X(0)*2; // this is a c/b field so double the x dimension
-    for (int i=1; i<4; i++) X[i] = in->X(i);
-    dslashParam.Ls = in->X(4); // needed by tuneLaunch()
-    dslashParam.Xh[0] = in->X(0);
-    for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
-    dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
-
-    // FIXME there is redundancy in the parameters below (face vs ghostFace vs LatticeField::surfaceCB member)
-    int face[4];
-    for (int dim=0; dim<4; dim++) {
-      for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
-      face[dim] = Nface()/2;
-      dslashParam.face_X[dim] = face[0];
-      dslashParam.face_Y[dim] = face[1];
-      dslashParam.face_Z[dim] = face[2];
-      dslashParam.face_T[dim] = face[3];
-      dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
-      dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
-      dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
-    }
-
-    dslashParam.Vh = (X[3]*X[2]*X[1]*X[0])/2;
-    dslashParam.ghostFace[0] = (X[1]*X[2]*X[3])/2;
-    dslashParam.ghostFace[1] = (X[0]*X[2]*X[3])/2;
-    dslashParam.ghostFace[2] = (X[0]*X[1]*X[3])/2;
-    dslashParam.ghostFace[3] = (X[0]*X[1]*X[2])/2;
-
-    dslashParam.X2X1 = X[1]*X[0];
-    dslashParam.X3X2X1 = X[2]*X[1]*X[0];
-    dslashParam.X2X1mX1 = (X[1]-1)*X[0];
-    dslashParam.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
-    dslashParam.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
-    dslashParam.X4X3X2X1hmX3X2X1h = dslashParam.X4X3X2X1mX3X2X1/2;
+    dslashParam.dc = in->getDslashConstant(); // get precomputed constants
 
     dslashParam.gauge_stride = gauge.Stride();
     dslashParam.gauge_fixed = gauge.GaugeFixed();

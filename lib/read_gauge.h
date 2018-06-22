@@ -393,9 +393,9 @@
 #define RECONSTRUCT_MATRIX_18_SINGLE(dir) 
 
 #ifndef MULTI_GPU
-#define do_boundary ga_idx >= param.X4X3X2X1hmX3X2X1h
+#define do_boundary ga_idx >= param.dc.X4X3X2X1hmX3X2X1h
 #else
-#define do_boundary ( (param.Pt0 && (ga_idx >= param.Vh)) || ( param.PtNm1 && (ga_idx >= param.X4X3X2X1hmX3X2X1h) && (ga_idx < param.Vh) ) )
+#define do_boundary ( (param.Pt0 && (ga_idx >= param.dc.Vh)) || ( param.PtNm1 && (ga_idx >= param.dc.X4X3X2X1hmX3X2X1h) && (ga_idx < param.dc.Vh) ) )
 #endif
 
 #define RECONSTRUCT_MATRIX_12_DOUBLE(dir)				\

@@ -337,7 +337,7 @@ int sid;
 
   bool active = false;
   for(int dir=0; dir<4; ++dir){
-    active = active || isActive(dim,dir,+1,coord,param.commDim,param.X);
+    active = active || isActive(dim,dir,+1,coord,param.commDim,param.dc.X);
   }
   if(!active) return;
 
@@ -373,21 +373,21 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["coord[0]==(param.X[0]-1)", "coord[0]==0", "coord[1]==(param.X[1]-1)", "coord[1]==0", "coord[2]==(param.X[2]-1)", "coord[2]==0", "coord[3]==(param.X[3]-1)", "coord[3]==0"]
-    interior = ["coord[0]<(param.X[0]-1)", "coord[0]>0", "coord[1]<(param.X[1]-1)", "coord[1]>0", "coord[2]<(param.X[2]-1)", "coord[2]>0", "coord[3]<(param.X[3]-1)", "coord[3]>0"]
+    boundary = ["coord[0]==(param.dc.X[0]-1)", "coord[0]==0", "coord[1]==(param.dc.X[1]-1)", "coord[1]==0", "coord[2]==(param.dc.X[2]-1)", "coord[2]==0", "coord[3]==(param.dc.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.dc.X[0]-1)", "coord[0]>0", "coord[1]<(param.dc.X[1]-1)", "coord[1]>0", "coord[2]<(param.dc.X[2]-1)", "coord[2]>0", "coord[3]<(param.dc.X[3]-1)", "coord[3]>0"]
     offset = ["+1","-1","+1","-1","+1","-1","+1","-1"];
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+param.X[0]", "X-param.X[0]", "X+param.X2X1", "X-param.X2X1", "X+param.X3X2X1", "X-param.X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.dc.X[0]", "X-param.dc.X[0]", "X+param.dc.X2X1", "X-param.dc.X2X1", "X+param.dc.X3X2X1", "X-param.dc.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-(param.X[0]-1)", "X+(param.X[0]-1)", "X-param.X2X1mX1", "X+param.X2X1mX1", "X-param.X3X2X1mX2X1", "X+param.X3X2X1mX2X1",
-                   "X-param.X4X3X2X1mX3X2X1", "X+param.X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.dc.X[0]-1)", "X+(param.dc.X[0]-1)", "X-param.dc.X2X1mX1", "X+param.dc.X2X1mX1", "X-param.dc.X3X2X1mX2X1", "X+param.dc.X3X2X1mX2X1",
+                   "X-param.dc.X4X3X2X1mX3X2X1", "X+param.dc.X4X3X2X1mX3X2X1"]
 
     cond = ""
 #    cond += "#ifdef MULTI_GPU\n"
-    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.X) && " +boundary[dir]+" )\n"
+    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.dc.X) && " +boundary[dir]+" )\n"
 #    cond += "#endif\n"
 
     str = ""
@@ -413,7 +413,7 @@ def gen(dir, pack_only=False):
     if dir % 2 == 0:
         str += "const int ga_idx = sid;\n"
     else:
-        str += "const int ga_idx = param.Vh+face_idx;\n"
+        str += "const int ga_idx = param.dc.Vh+face_idx;\n"
     str += "\n"
 
     # scan the projector to determine which loads are required
@@ -482,7 +482,7 @@ def gen(dir, pack_only=False):
     load_spinor += "\n"
 
     load_half = ""
-    load_half += "const int sp_stride_pad = param.ghostFace[" + `dir/2` + "];\n"
+    load_half += "const int sp_stride_pad = param.dc.ghostFace[" + `dir/2` + "];\n"
     #load_half += "#if (DD_PREC==2) // half precision\n"
     #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
     #load_half += "#endif\n"
@@ -633,7 +633,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.dc.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct)

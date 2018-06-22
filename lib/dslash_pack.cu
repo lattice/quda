@@ -76,19 +76,8 @@ namespace quda {
 
     int dim;
     int face_num;
-    int X[QUDA_MAX_DIM]; // lattice dimensions
-    int ghostFace[4];
 
-    int_fastdiv volume_4d;
-    int_fastdiv dims[4][3];
-
-    int_fastdiv face_X[4];
-    int_fastdiv face_Y[4];
-    int_fastdiv face_Z[4];
-    int_fastdiv face_T[4];
-    int_fastdiv face_XY[4];
-    int_fastdiv face_XYZ[4];
-    int_fastdiv face_XYZT[4];
+    DslashConstant dc;
 
     int sp_stride;
 
@@ -106,9 +95,9 @@ namespace quda {
     output << "parity = " << param.parity << std::endl;
     output << "dim = " << param.dim << std::endl;
     output << "face_num = " << param.face_num << std::endl;
-    output << "X = {" << param.X[0] << ","<< param.X[1] << "," << param.X[2] << "," << param.X[3] << "," << param.X[4] << "}" << std::endl;
-    output << "ghostFace = {" << param.ghostFace[0] << ","<< param.ghostFace[1] << ","
-	   << param.ghostFace[2] << "," << param.ghostFace[3] << "}" << std::endl;
+    output << "X = {" << param.dc.X[0] << ","<< param.dc.X[1] << "," << param.dc.X[2] << "," << param.dc.X[3] << "," << param.dc.X[4] << "}" << std::endl;
+    output << "ghostFace = {" << param.dc.ghostFace[0] << ","<< param.dc.ghostFace[1] << ","
+	   << param.dc.ghostFace[2] << "," << param.dc.ghostFace[3] << "}" << std::endl;
     output << "sp_stride = " << param.sp_stride << std::endl;
     return output;
   }
@@ -300,55 +289,55 @@ namespace quda {
       // read spinor, spin-project, and write half spinor to face
       if (dim == 0) {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-        const int face_num = (face_idx >= nFace*param.ghostFace[0]) ? 1 : 0;
-        face_idx -= face_num*nFace*param.ghostFace[0];
+        const int face_num = (face_idx >= nFace*param.dc.ghostFace[0]) ? 1 : 0;
+        face_idx -= face_num*nFace*param.dc.ghostFace[0];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,0,nFace,0>(face_idx,param);
           packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in,
-                                         param.inNorm,idx, face_idx, param.ghostFace[0], param);
+                                         param.inNorm,idx, face_idx, param.dc.ghostFace[0], param);
         } else {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,0,nFace,1>(face_idx,param);
           packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in,
-                                         param.inNorm,idx, face_idx, param.ghostFace[0], param);
+                                         param.inNorm,idx, face_idx, param.dc.ghostFace[0], param);
         }
       } else if (dim == 1) {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-        const int face_num = (face_idx >= nFace*param.ghostFace[1]) ? 1 : 0;
-        face_idx -= face_num*nFace*param.ghostFace[1];
+        const int face_num = (face_idx >= nFace*param.dc.ghostFace[1]) ? 1 : 0;
+        face_idx -= face_num*nFace*param.dc.ghostFace[1];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,1,nFace,0>(face_idx,param);
           packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[1], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[1], param);
         } else {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,1,nFace,1>(face_idx,param);
           packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[1], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[1], param);
         }
       } else if (dim == 2) {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-        const int face_num = (face_idx >= nFace*param.ghostFace[2]) ? 1 : 0;
-        face_idx -= face_num*nFace*param.ghostFace[2];
+        const int face_num = (face_idx >= nFace*param.dc.ghostFace[2]) ? 1 : 0;
+        face_idx -= face_num*nFace*param.dc.ghostFace[2];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,2,nFace,0>(face_idx,param);
           packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[2], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[2], param);
         } else {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,2,nFace,1>(face_idx,param);
           packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[2], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[2], param);
         }
       } else {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-        const int face_num = (face_idx >= nFace*param.ghostFace[3]) ? 1 : 0;
-        face_idx -= face_num*nFace*param.ghostFace[3];
+        const int face_num = (face_idx >= nFace*param.dc.ghostFace[3]) ? 1 : 0;
+        face_idx -= face_num*nFace*param.dc.ghostFace[3];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,3,nFace,0>(face_idx,param);
           packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[3], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[3], param);
         } else {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,3,nFace,1>(face_idx,param);
           packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[3], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[3], param);
         }
       }
 
@@ -390,53 +379,53 @@ namespace quda {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
         // if param.face_num==2 pack both the start and the end, otherwise pack the region of the lattice
         // specified by param.face_num
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[0]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[0];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[0]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[0];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtended<0,nFace,0>(face_idx,param);
           packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in,
-                                         param.inNorm,idx, face_idx, param.ghostFace[0], param);
+                                         param.inNorm,idx, face_idx, param.dc.ghostFace[0], param);
         } else {
           const int idx = indexFromFaceIndexExtended<0,nFace,1>(face_idx,param);
           packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in,
-                                         param.inNorm,idx, face_idx, param.ghostFace[0], param);
+                                         param.inNorm,idx, face_idx, param.dc.ghostFace[0], param);
         }
       } else if (dim == 1) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[1]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[1];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[1]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[1];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtended<1,nFace,0>(face_idx,param);
           packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[1], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[1], param);
         } else {
           const int idx = indexFromFaceIndexExtended<1,nFace,1>(face_idx,param);
           packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[1], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[1], param);
         }
       } else if (dim == 2) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[2]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[2];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[2]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[2];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtended<2,nFace,0>(face_idx,param);
           packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[2], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[2], param);
         } else {
           const int idx = indexFromFaceIndexExtended<2,nFace,1>(face_idx,param);
           packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[2], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[2], param);
         }
       } else {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[3]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[3];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[3]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[3];
 
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtended<3,nFace,0>(face_idx,param);
           packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[3], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[3], param);
         } else {
           const int idx = indexFromFaceIndexExtended<3,nFace,1>(face_idx,param);
           packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in,
-                                          param.inNorm,idx, face_idx, param.ghostFace[3], param);
+                                          param.inNorm,idx, face_idx, param.dc.ghostFace[3], param);
         }
       }
 
@@ -478,56 +467,56 @@ namespace quda {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
         // if param.face_num==2 pack both the start and the end, otherwise pack the region of the lattice
         // specified by param.face_num
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[0]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[0];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[0]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[0];
 
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtended<0,nFace,0>(face_idx,param);
           unpackFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in,
-                                           param.inNorm,idx, face_idx, param.ghostFace[0], param);
+                                           param.inNorm,idx, face_idx, param.dc.ghostFace[0], param);
         } else {
           const int idx = indexFromFaceIndexExtended<0,nFace,1>(face_idx,param);
           unpackFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in,
-                                           param.inNorm,idx, face_idx, param.ghostFace[0], param);
+                                           param.inNorm,idx, face_idx, param.dc.ghostFace[0], param);
         }
       } else if (dim == 1) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[1]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[1];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[1]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[1];
 
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtended<1,nFace,0>(face_idx,param);
           unpackFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in,
-                                            param.inNorm,idx, face_idx, param.ghostFace[1], param);
+                                            param.inNorm,idx, face_idx, param.dc.ghostFace[1], param);
         } else {
           const int idx = indexFromFaceIndexExtended<1,nFace,1>(face_idx,param);
           unpackFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in,
-                                            param.inNorm,idx, face_idx, param.ghostFace[1], param);
+                                            param.inNorm,idx, face_idx, param.dc.ghostFace[1], param);
         }
       } else if (dim == 2) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[2]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[2];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[2]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[2];
 
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtended<2,nFace,0>(face_idx,param);
           unpackFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in,
-                                            param.inNorm,idx, face_idx, param.ghostFace[2], param);
+                                            param.inNorm,idx, face_idx, param.dc.ghostFace[2], param);
         } else {
           const int idx = indexFromFaceIndexExtended<2,nFace,1>(face_idx,param);
           unpackFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in,
-                                            param.inNorm,idx, face_idx, param.ghostFace[2], param);
+                                            param.inNorm,idx, face_idx, param.dc.ghostFace[2], param);
         }
       } else {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[3]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[3];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[3]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[3];
 
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtended<3,nFace,0>(face_idx,param);
           unpackFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in,
-                                            param.inNorm,idx, face_idx, param.ghostFace[3], param);
+                                            param.inNorm,idx, face_idx, param.dc.ghostFace[3], param);
         } else {
           const int idx = indexFromFaceIndexExtended<3,nFace,1>(face_idx,param);
           unpackFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in,
-					  param.inNorm,idx, face_idx, param.ghostFace[3], param);
+					  param.inNorm,idx, face_idx, param.dc.ghostFace[3], param);
         }
       }
 
@@ -694,52 +683,52 @@ namespace quda {
       // read spinor, spin-project, and write half spinor to face
       if (dim == 0) {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-        const int face_num = (face_idx >= nFace*param.ghostFace[0]) ? 1 : 0;
-        face_idx -= face_num*nFace*param.ghostFace[0];
+        const int face_num = (face_idx >= nFace*param.dc.ghostFace[0]) ? 1 : 0;
+        face_idx -= face_num*nFace*param.dc.ghostFace[0];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,0,nFace,0>(face_idx,param);
           packTwistedFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in,
-                                                param.inNorm, a, b, idx, face_idx, param.ghostFace[0], param);
+                                                param.inNorm, a, b, idx, face_idx, param.dc.ghostFace[0], param);
         } else {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,0,nFace,1>(face_idx,param);
           packTwistedFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in,
-                                                param.inNorm, a, b, idx, face_idx, param.ghostFace[0], param);
+                                                param.inNorm, a, b, idx, face_idx, param.dc.ghostFace[0], param);
         }
       } else if (dim == 1) {
-        const int face_num = (face_idx >= nFace*param.ghostFace[1]) ? 1 : 0;
-        face_idx -= face_num*nFace*param.ghostFace[1];
+        const int face_num = (face_idx >= nFace*param.dc.ghostFace[1]) ? 1 : 0;
+        face_idx -= face_num*nFace*param.dc.ghostFace[1];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,1,nFace,0>(face_idx,param);
           packTwistedFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in,
-                                                 param.inNorm, a, b, idx, face_idx, param.ghostFace[1], param);
+                                                 param.inNorm, a, b, idx, face_idx, param.dc.ghostFace[1], param);
         } else {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,1,nFace,1>(face_idx,param);
           packTwistedFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in,
-                                                 param.inNorm, a, b, idx, face_idx, param.ghostFace[1], param);
+                                                 param.inNorm, a, b, idx, face_idx, param.dc.ghostFace[1], param);
         }
       } else if (dim == 2) {
-        const int face_num = (face_idx >= nFace*param.ghostFace[2]) ? 1 : 0;
-        face_idx -= face_num*nFace*param.ghostFace[2];
+        const int face_num = (face_idx >= nFace*param.dc.ghostFace[2]) ? 1 : 0;
+        face_idx -= face_num*nFace*param.dc.ghostFace[2];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,2,nFace,0>(face_idx,param);
           packTwistedFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in,
-                                                 param.inNorm, a, b, idx, face_idx, param.ghostFace[2], param);
+                                                 param.inNorm, a, b, idx, face_idx, param.dc.ghostFace[2], param);
         } else {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,2,nFace,1>(face_idx,param);
           packTwistedFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in,
-                                                 param.inNorm, a, b, idx, face_idx, param.ghostFace[2], param);
+                                                 param.inNorm, a, b, idx, face_idx, param.dc.ghostFace[2], param);
         }
       } else {
-        const int face_num = (face_idx >= nFace*param.ghostFace[3]) ? 1 : 0;
-        face_idx -= face_num*nFace*param.ghostFace[3];
+        const int face_num = (face_idx >= nFace*param.dc.ghostFace[3]) ? 1 : 0;
+        face_idx -= face_num*nFace*param.dc.ghostFace[3];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,3,nFace,0>(face_idx,param);
           packTwistedFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in,
-                                                 param.inNorm, a, b,idx, face_idx, param.ghostFace[3], param);
+                                                 param.inNorm, a, b,idx, face_idx, param.dc.ghostFace[3], param);
         } else {
           const int idx = indexFromFaceIndex<4,QUDA_4D_PC,3,nFace,1>(face_idx,param);
           packTwistedFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in,
-                                                 param.inNorm, a, b, idx, face_idx, param.ghostFace[3], param);
+                                                 param.inNorm, a, b, idx, face_idx, param.dc.ghostFace[3], param);
         }
       }
 
@@ -790,7 +779,7 @@ namespace quda {
     virtual int outputPerSite() const = 0;
 
     // prepare the param struct with kernel arguments
-    void prepareParam(PackParam<FloatN> &param, TuneParam &tp, bool &init, int dim=-1, int face_num=2) {
+    void prepareParam(PackParam<FloatN> &param, TuneParam &tp, int dim=-1, int face_num=2) {
       param.in = (FloatN*)in->V();
       param.inNorm = (float*)in->Norm();
       param.dim = dim;
@@ -822,48 +811,7 @@ namespace quda {
         prev=i;
       }
 
-      param.volume_4d = in->VolumeCB()*2 / (in->Ndim() == 5 ? in->X(4) : 1);
-
-      if (!init) {
-        for(int d=0; d<in->Ndim(); d++) param.X[d] = in->X()[d];
-        for(int d=in->Ndim(); d<QUDA_MAX_DIM; d++) param.X[d] = 1;
-        param.X[0] *= 2;
-        param.ghostFace[0] = param.X[1]*param.X[2]*param.X[3]/2;
-        param.ghostFace[1] = param.X[0]*param.X[2]*param.X[3]/2;
-        param.ghostFace[2] = param.X[0]*param.X[1]*param.X[3]/2;
-        param.ghostFace[3] = param.X[0]*param.X[1]*param.X[2]/2;
-
-        param.dims[0][0]=param.X[1];
-        param.dims[0][1]=param.X[2];
-        param.dims[0][2]=param.X[3];
-
-        param.dims[1][0]=param.X[0];
-        param.dims[1][1]=param.X[2];
-        param.dims[1][2]=param.X[3];
-
-        param.dims[2][0]=param.X[0];
-        param.dims[2][1]=param.X[1];
-        param.dims[2][2]=param.X[3];
-
-        param.dims[3][0]=param.X[0];
-        param.dims[3][1]=param.X[1];
-        param.dims[3][2]=param.X[2];
-
-        int face[4];
-        for (int dim=0; dim<4; dim++) {
-          for (int j=0; j<4; j++) face[j] = param.X[j];
-          face[dim] = nFace;
-
-          param.face_X[dim] = face[0];
-          param.face_Y[dim] = face[1];
-          param.face_Z[dim] = face[2];
-          param.face_T[dim] = face[3];
-          param.face_XY[dim] = param.face_X[dim] * face[1];
-          param.face_XYZ[dim] = param.face_XY[dim] * face[2];
-          param.face_XYZT[dim] = param.face_XYZ[dim] * face[3];
-        }
-        //init = true;
-      }
+      param.dc = in->getDslashConstant(); // get pre-computed constants
 
       param.swizzle = tp.aux.x;
       param.sites_per_block = (param.threads + tp.grid.x - 1) / tp.grid.x;
@@ -1024,8 +972,7 @@ namespace quda {
 
 #ifdef GPU_WILSON_DIRAC
       static PackParam<FloatN> param;
-      static bool init = false;
-      this->prepareParam(param,tp,init);
+      this->prepareParam(param,tp);
 
       void *args[] = { &param };
       void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceWilsonKernel<1,FloatN>) : &(packFaceWilsonKernel<0,FloatN>);
@@ -1085,8 +1032,7 @@ namespace quda {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
       static PackParam<FloatN> param;
-      static bool init = false;
-      this->prepareParam(param,tp,init);
+      this->prepareParam(param,tp);
       void *args[] = { &a, &b, &param };
       void (*func)(Float,Float,PackParam<FloatN>) = this->dagger ? &(packTwistedFaceWilsonKernel<1,FloatN,Float>) : &(packTwistedFaceWilsonKernel<0,FloatN,Float>);
       cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
@@ -1230,7 +1176,7 @@ namespace quda {
 
     while ( local_tid < sites_per_block && tid < param.threads ) {
 
-      const int Ls = param.X[4];
+      const int Ls = param.dc.X[4];
 
       // determine which dimension we are packing
       int face_idx;
@@ -1241,52 +1187,52 @@ namespace quda {
       // read spinor and write to face
       if (dim == 0) {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-        const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.ghostFace[0]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.ghostFace[0];
+        const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.dc.ghostFace[0]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.dc.ghostFace[0];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexStaggered<0,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.out[0], param.outNorm[0], face_idx,
-                                Ls*nFace*param.ghostFace[0], param.in, param.inNorm, idx, param);
+                                Ls*nFace*param.dc.ghostFace[0], param.in, param.inNorm, idx, param);
         } else {
           const int idx = indexFromFaceIndexStaggered<0,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.out[1], param.outNorm[1], face_idx,
-                                Ls*nFace*param.ghostFace[0], param.in, param.inNorm, idx, param);
+                                Ls*nFace*param.dc.ghostFace[0], param.in, param.inNorm, idx, param);
         }
       } else if (dim == 1) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.ghostFace[1]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.ghostFace[1];
+        const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.dc.ghostFace[1]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.dc.ghostFace[1];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexStaggered<1,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.out[2], param.outNorm[2], face_idx,
-                                Ls*nFace*param.ghostFace[1], param.in, param.inNorm, idx, param);
+                                Ls*nFace*param.dc.ghostFace[1], param.in, param.inNorm, idx, param);
         } else {
           const int idx = indexFromFaceIndexStaggered<1,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.out[3], param.outNorm[3], face_idx,
-                                Ls*nFace*param.ghostFace[1], param.in, param.inNorm, idx, param);
+                                Ls*nFace*param.dc.ghostFace[1], param.in, param.inNorm, idx, param);
         }
       } else if (dim == 2) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.ghostFace[2]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.ghostFace[2];
+        const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.dc.ghostFace[2]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.dc.ghostFace[2];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexStaggered<2,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.out[4], param.outNorm[4], face_idx,
-                                Ls*nFace*param.ghostFace[2], param.in, param.inNorm, idx, param);
+                                Ls*nFace*param.dc.ghostFace[2], param.in, param.inNorm, idx, param);
         } else {
           const int idx = indexFromFaceIndexStaggered<2,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.out[5], param.outNorm[5], face_idx,
-                                Ls*nFace*param.ghostFace[2], param.in, param.inNorm, idx, param);
+                                Ls*nFace*param.dc.ghostFace[2], param.in, param.inNorm, idx, param);
         }
       } else {
-        const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.ghostFace[3]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.ghostFace[3];
+        const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.dc.ghostFace[3]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.dc.ghostFace[3];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexStaggered<3,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.out[6], param.outNorm[6], face_idx,
-                                Ls*nFace*param.ghostFace[3], param.in, param.inNorm,idx, param);
+                                Ls*nFace*param.dc.ghostFace[3], param.in, param.inNorm,idx, param);
         } else {
           const int idx = indexFromFaceIndexStaggered<3,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.out[7], param.outNorm[7], face_idx,
-                                Ls*nFace*param.ghostFace[3], param.in, param.inNorm, idx, param);
+                                Ls*nFace*param.dc.ghostFace[3], param.in, param.inNorm, idx, param);
         }
       }
 
@@ -1328,52 +1274,52 @@ namespace quda {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
         // if param.face_num==2 pack both the start and the end, otherwise pack the region of the
         // lattice specified by param.face_num
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[0]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[0];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[0]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[0];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.out[0], param.outNorm[0], face_idx,
-                                nFace*param.ghostFace[0], param.in, param.inNorm, idx, param);
+                                nFace*param.dc.ghostFace[0], param.in, param.inNorm, idx, param);
         } else {
           const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.out[1], param.outNorm[1], face_idx,
-                                nFace*param.ghostFace[0], param.in, param.inNorm, idx, param);
+                                nFace*param.dc.ghostFace[0], param.in, param.inNorm, idx, param);
         }
       } else if (dim == 1) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[1]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[1];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[1]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[1];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.out[2], param.outNorm[2], face_idx,
-                                nFace*param.ghostFace[1], param.in, param.inNorm, idx, param);
+                                nFace*param.dc.ghostFace[1], param.in, param.inNorm, idx, param);
         } else {
           const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.out[3], param.outNorm[3], face_idx,
-                                nFace*param.ghostFace[1], param.in, param.inNorm, idx, param);
+                                nFace*param.dc.ghostFace[1], param.in, param.inNorm, idx, param);
         }
       } else if (dim == 2) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[2]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[2];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[2]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[2];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.out[4], param.outNorm[4], face_idx,
-                                nFace*param.ghostFace[2], param.in, param.inNorm, idx, param);
+                                nFace*param.dc.ghostFace[2], param.in, param.inNorm, idx, param);
         } else {
           const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.out[5], param.outNorm[5], face_idx,
-                                nFace*param.ghostFace[2], param.in, param.inNorm, idx, param);
+                                nFace*param.dc.ghostFace[2], param.in, param.inNorm, idx, param);
         }
       } else {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[3]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[3];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[3]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[3];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.out[6], param.outNorm[6], face_idx,
-                                nFace*param.ghostFace[3], param.in, param.inNorm,idx, param);
+                                nFace*param.dc.ghostFace[3], param.in, param.inNorm,idx, param);
         } else {
           const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.out[7], param.outNorm[7], face_idx,
-                                nFace*param.ghostFace[3], param.in, param.inNorm, idx, param);
+                                nFace*param.dc.ghostFace[3], param.in, param.inNorm, idx, param);
         }
       }
 
@@ -1415,52 +1361,52 @@ namespace quda {
         // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
         // if param.face_num==2 pack both the start and the end, otherwist pack the region of the
         // lattice specified by param.face_num
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[0]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[0];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[0]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[0];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.in, param.inNorm, idx,
-                                param.sp_stride, param.out[0], param.outNorm[0], face_idx, nFace*param.ghostFace[0]);
+                                param.sp_stride, param.out[0], param.outNorm[0], face_idx, nFace*param.dc.ghostFace[0]);
         } else {
           const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.in, param.inNorm, idx,
-                                param.sp_stride, param.out[1], param.outNorm[1], face_idx, nFace*param.ghostFace[0]);
+                                param.sp_stride, param.out[1], param.outNorm[1], face_idx, nFace*param.dc.ghostFace[0]);
         }
       } else if (dim == 1) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[1]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[1];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[1]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[1];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.in, param.inNorm, idx,
-                                param.sp_stride, param.out[2], param.outNorm[2], face_idx, nFace*param.ghostFace[1]);
+                                param.sp_stride, param.out[2], param.outNorm[2], face_idx, nFace*param.dc.ghostFace[1]);
         } else {
           const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.in, param.inNorm, idx,
-                                param.sp_stride, param.out[3], param.outNorm[3], face_idx, nFace*param.ghostFace[1]);
+                                param.sp_stride, param.out[3], param.outNorm[3], face_idx, nFace*param.dc.ghostFace[1]);
         }
       } else if (dim == 2) {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[2]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[2];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[2]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[2];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.in, param.inNorm, idx,
-                                param.sp_stride, param.out[4], param.outNorm[4], face_idx, nFace*param.ghostFace[2]);
+                                param.sp_stride, param.out[4], param.outNorm[4], face_idx, nFace*param.dc.ghostFace[2]);
         } else {
           const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.in, param.inNorm, idx,
-                                param.sp_stride, param.out[5], param.outNorm[5], face_idx, nFace*param.ghostFace[2]);
+                                param.sp_stride, param.out[5], param.outNorm[5], face_idx, nFace*param.dc.ghostFace[2]);
         }
       } else {
-        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.ghostFace[3]) ? 1 : 0) : param.face_num;
-        if(param.face_num==2) face_idx -= face_num*nFace*param.ghostFace[3];
+        const int face_num = (param.face_num==2) ? ((face_idx >= nFace*param.dc.ghostFace[3]) ? 1 : 0) : param.face_num;
+        if(param.face_num==2) face_idx -= face_num*nFace*param.dc.ghostFace[3];
         if (face_num == 0) {
           const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,0>(face_idx,param);
           packFaceStaggeredCore(param.in, param.inNorm, idx,
-                                param.sp_stride, param.out[6], param.outNorm[6], face_idx, nFace*param.ghostFace[3]);
+                                param.sp_stride, param.out[6], param.outNorm[6], face_idx, nFace*param.dc.ghostFace[3]);
         } else {
           const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,1>(face_idx,param);
           packFaceStaggeredCore(param.in, param.inNorm, idx,
-                                param.sp_stride, param.out[7], param.outNorm[7], face_idx, nFace*param.ghostFace[3]);
+                                param.sp_stride, param.out[7], param.outNorm[7], face_idx, nFace*param.dc.ghostFace[3]);
         }
       }
 
@@ -1506,8 +1452,7 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
 
       static PackParam<FloatN> param;
-      static bool init = false;
-      this->prepareParam(param,tp,init,this->dim,this->face_num);
+      this->prepareParam(param,tp,this->dim,this->face_num);
       if(!R){
         void *args[] = { &param };
         void (*func)(PackParam<FloatN>) = PackFace<FloatN,Float>::nFace==1 ? &(packFaceStaggeredKernel<FloatN,1>) : &(packFaceStaggeredKernel<FloatN,3>);
@@ -1646,60 +1591,60 @@ namespace quda {
       int face_idx;
       const int dim = dimFromFaceIndex(face_idx, tid, param);
 
-      const int Ls = param.X[4];
+      const int Ls = param.dc.X[4];
 
       // compute where the output is located
       // compute an index into the local volume from the index into the face
       // read spinor, spin-project, and write half spinor to face
       if (dim == 0) {
         // face_num determines which end of the lattice we are packing: 0 = beginning, 1 = end
-        // FIXME these param.ghostFace constants do not incude the Ls dimension
-        const int face_num = (face_idx >= nFace*Ls*param.ghostFace[0]) ? 1 : 0;
-        face_idx -= face_num*nFace*Ls*param.ghostFace[0];
+        // FIXME these param.dc.ghostFace constants do not incude the Ls dimension
+        const int face_num = (face_idx >= nFace*Ls*param.dc.ghostFace[0]) ? 1 : 0;
+        face_idx -= face_num*nFace*Ls*param.dc.ghostFace[0];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_5D_PC,0,nFace,0>(face_idx,param);
           packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in,
-                                         param.inNorm, idx, face_idx, Ls*param.ghostFace[0], param);
+                                         param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[0], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_5D_PC,0,nFace,1>(face_idx,param);
           packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in,
-                                         param.inNorm, idx, face_idx, Ls*param.ghostFace[0], param);
+                                         param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[0], param);
         }
       } else if (dim == 1) {
-        const int face_num = (face_idx >= nFace*Ls*param.ghostFace[1]) ? 1 : 0;
-        face_idx -= face_num*nFace*Ls*param.ghostFace[1];
+        const int face_num = (face_idx >= nFace*Ls*param.dc.ghostFace[1]) ? 1 : 0;
+        face_idx -= face_num*nFace*Ls*param.dc.ghostFace[1];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_5D_PC,1,nFace,0>(face_idx,param);
           packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[1], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[1], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_5D_PC,1,nFace,1>(face_idx,param);
           packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[1], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[1], param);
         }
       } else if (dim == 2) {
-        const int face_num = (face_idx >= nFace*Ls*param.ghostFace[2]) ? 1 : 0;
-        face_idx -= face_num*nFace*Ls*param.ghostFace[2];
+        const int face_num = (face_idx >= nFace*Ls*param.dc.ghostFace[2]) ? 1 : 0;
+        face_idx -= face_num*nFace*Ls*param.dc.ghostFace[2];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_5D_PC,2,nFace,0>(face_idx,param);
           packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[2], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[2], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_5D_PC,2,nFace,1>(face_idx,param);
           packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[2], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[2], param);
         }
       } else {
-        const int face_num = (face_idx >= nFace*Ls*param.ghostFace[3]) ? 1 : 0;
-        face_idx -= face_num*nFace*Ls*param.ghostFace[3];
+        const int face_num = (face_idx >= nFace*Ls*param.dc.ghostFace[3]) ? 1 : 0;
+        face_idx -= face_num*nFace*Ls*param.dc.ghostFace[3];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_5D_PC,3,nFace,0>(face_idx,param);
           packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[3], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[3], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_5D_PC,3,nFace,1>(face_idx,param);
           packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[3], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[3], param);
         }
       }
 
@@ -1731,7 +1676,7 @@ namespace quda {
 
     while ( local_tid < sites_per_block && tid < param.threads ) {
 
-      const int Ls = param.X[4];
+      const int Ls = param.dc.X[4];
 
       // determine which dimension we are packing
       int face_idx;
@@ -1742,53 +1687,53 @@ namespace quda {
       // read spinor, spin-project, and write half spinor to face
       if (dim == 0) {
         // face_num determines which end of the lattice we are packing: 0 = beginning, 1 = end
-        // FIXME these param.ghostFace constants do not incude the Ls dimension
-        const int face_num = (face_idx >= nFace*Ls*param.ghostFace[0]) ? 1 : 0;
-        face_idx -= face_num*nFace*Ls*param.ghostFace[0];
+        // FIXME these param.dc.ghostFace constants do not incude the Ls dimension
+        const int face_num = (face_idx >= nFace*Ls*param.dc.ghostFace[0]) ? 1 : 0;
+        face_idx -= face_num*nFace*Ls*param.dc.ghostFace[0];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,0,nFace,0>(face_idx,param);
           packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in,
-                                         param.inNorm, idx, face_idx, Ls*param.ghostFace[0], param);
+                                         param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[0], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,0,nFace,1>(face_idx,param);
           packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in,
-                                         param.inNorm, idx, face_idx, Ls*param.ghostFace[0], param);
+                                         param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[0], param);
         }
       } else if (dim == 1) {
-        const int face_num = (face_idx >= nFace*Ls*param.ghostFace[1]) ? 1 : 0;
-        face_idx -= face_num*nFace*Ls*param.ghostFace[1];
+        const int face_num = (face_idx >= nFace*Ls*param.dc.ghostFace[1]) ? 1 : 0;
+        face_idx -= face_num*nFace*Ls*param.dc.ghostFace[1];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,1,nFace,0>(face_idx,param);
           packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[1], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[1], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,1,nFace,1>(face_idx,param);
           packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[1], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[1], param);
         }
       } else if (dim == 2) {
-        const int face_num = (face_idx >= nFace*Ls*param.ghostFace[2]) ? 1 : 0;
-        face_idx -= face_num*nFace*Ls*param.ghostFace[2];
+        const int face_num = (face_idx >= nFace*Ls*param.dc.ghostFace[2]) ? 1 : 0;
+        face_idx -= face_num*nFace*Ls*param.dc.ghostFace[2];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,2,nFace,0>(face_idx,param);
           packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[2], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[2], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,2,nFace,1>(face_idx,param);
           packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[2], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[2], param);
         }
       } else {
-        const int face_num = (face_idx >= nFace*Ls*param.ghostFace[3]) ? 1 : 0;
-        face_idx -= face_num*nFace*Ls*param.ghostFace[3];
+        const int face_num = (face_idx >= nFace*Ls*param.dc.ghostFace[3]) ? 1 : 0;
+        face_idx -= face_num*nFace*Ls*param.dc.ghostFace[3];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,3,nFace,0>(face_idx,param);
           packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[3], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[3], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,3,nFace,1>(face_idx,param);
           packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in,
-                                          param.inNorm, idx, face_idx, Ls*param.ghostFace[3], param);
+                                          param.inNorm, idx, face_idx, Ls*param.dc.ghostFace[3], param);
         }
       }
 
@@ -1823,8 +1768,7 @@ namespace quda {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
       static PackParam<FloatN> param;
-      static bool init = false;
-      this->prepareParam(param,tp,init);
+      this->prepareParam(param,tp);
       void *args[] = { &param };
       void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceDWKernel<1,FloatN>) : &(packFaceDWKernel<0,FloatN>);
       cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
@@ -1855,8 +1799,7 @@ namespace quda {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
       static PackParam<FloatN> param;
-      static bool init = false;
-      this->prepareParam(param,tp,init);
+      this->prepareParam(param,tp);
       void *args[] = { &param };
       void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceDW4DKernel<1,FloatN>) : &(packFaceDW4DKernel<0,FloatN>);
       cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);
@@ -1952,54 +1895,54 @@ namespace quda {
       // read spinor, spin-project, and write half spinor to face
       if (dim == 0) {
         // face_num determines which end of the lattice we are packing:
-        // 0 = beginning, 1 = end FIXME these param.ghostFace constants
+        // 0 = beginning, 1 = end FIXME these param.dc.ghostFace constants
         // do not include the Nf dimension
-        const int face_num = (face_idx >= nFace*Nf*param.ghostFace[0]) ? 1 : 0;
-        face_idx -= face_num*nFace*Nf*param.ghostFace[0];
+        const int face_num = (face_idx >= nFace*Nf*param.dc.ghostFace[0]) ? 1 : 0;
+        face_idx -= face_num*nFace*Nf*param.dc.ghostFace[0];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,0,nFace,0>(face_idx,param);
           packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in,
-                                         param.inNorm, idx, face_idx, Nf*param.ghostFace[0], param);
+                                         param.inNorm, idx, face_idx, Nf*param.dc.ghostFace[0], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,0,nFace,1>(face_idx,param);
           packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in,
-                                         param.inNorm, idx, face_idx, Nf*param.ghostFace[0], param);
+                                         param.inNorm, idx, face_idx, Nf*param.dc.ghostFace[0], param);
         }
       } else if (dim == 1) {
-        const int face_num = (face_idx >= nFace*Nf*param.ghostFace[1]) ? 1 : 0;
-        face_idx -= face_num*nFace*Nf*param.ghostFace[1];
+        const int face_num = (face_idx >= nFace*Nf*param.dc.ghostFace[1]) ? 1 : 0;
+        face_idx -= face_num*nFace*Nf*param.dc.ghostFace[1];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,1,nFace,0>(face_idx,param);
           packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in,
-                                          param.inNorm, idx, face_idx, Nf*param.ghostFace[1], param);
+                                          param.inNorm, idx, face_idx, Nf*param.dc.ghostFace[1], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,1,nFace,1>(face_idx,param);
           packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in,
-                                          param.inNorm, idx, face_idx, Nf*param.ghostFace[1], param);
+                                          param.inNorm, idx, face_idx, Nf*param.dc.ghostFace[1], param);
         }
       } else if (dim == 2) {
-        const int face_num = (face_idx >= nFace*Nf*param.ghostFace[2]) ? 1 : 0;
-        face_idx -= face_num*nFace*Nf*param.ghostFace[2];
+        const int face_num = (face_idx >= nFace*Nf*param.dc.ghostFace[2]) ? 1 : 0;
+        face_idx -= face_num*nFace*Nf*param.dc.ghostFace[2];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,2,nFace,0>(face_idx,param);
           packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in,
-                                          param.inNorm, idx, face_idx, Nf*param.ghostFace[2], param);
+                                          param.inNorm, idx, face_idx, Nf*param.dc.ghostFace[2], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,2,nFace,1>(face_idx,param);
           packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in,
-                                          param.inNorm, idx, face_idx, Nf*param.ghostFace[2], param);
+                                          param.inNorm, idx, face_idx, Nf*param.dc.ghostFace[2], param);
         }
       } else {
-        const int face_num = (face_idx >= nFace*Nf*param.ghostFace[3]) ? 1 : 0;
-        face_idx -= face_num*nFace*Nf*param.ghostFace[3];
+        const int face_num = (face_idx >= nFace*Nf*param.dc.ghostFace[3]) ? 1 : 0;
+        face_idx -= face_num*nFace*Nf*param.dc.ghostFace[3];
         if (face_num == 0) {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,3,nFace,0>(face_idx,param);
           packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in,
-                                          param.inNorm, idx, face_idx, Nf*param.ghostFace[3], param);
+                                          param.inNorm, idx, face_idx, Nf*param.dc.ghostFace[3], param);
         } else {
           const int idx = indexFromFaceIndex<5,QUDA_4D_PC,3,nFace,1>(face_idx,param);
           packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in,
-                                          param.inNorm, idx, face_idx, Nf*param.ghostFace[3], param);
+                                          param.inNorm, idx, face_idx, Nf*param.dc.ghostFace[3], param);
         }
       }
 
@@ -2034,8 +1977,7 @@ namespace quda {
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
       static PackParam<FloatN> param;
-      static bool init = false;
-      this->prepareParam(param,tp,init);
+      this->prepareParam(param,tp);
       void *args[] = { &param };
       void (*func)(PackParam<FloatN>) = this->dagger ? &(packFaceNdegTMKernel<1,FloatN>) : &(packFaceNdegTMKernel<0,FloatN>);
       cudaLaunchKernel( (const void*)func, tp.grid, tp.block, args, tp.shared_bytes, stream);

@@ -368,7 +368,7 @@ int sp_norm_idx;
         prolog_str += (
 """
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*param.Ls) return;
+if (sid >= param.threads*param.dc.Ls) return;
 
 int dim;
 int face_idx;
@@ -403,8 +403,8 @@ int X;
 
 dim = dimFromFaceIndex<5>(sid, param); // sid is also modified
 
-//const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
-const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim])*param.Ls >> 1);
+//const int face_volume = (param.threads*param.dc.Ls >> 1); // volume of one face
+const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim])*param.dc.Ls >> 1);
 
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
@@ -431,7 +431,7 @@ case 3:
 {
   bool active = false;
   for(int dir=0; dir<4; ++dir){
-    active = active || isActive(dim,dir,+1,coord,param.commDim,param.X);
+    active = active || isActive(dim,dir,+1,coord,param.commDim,param.dc.X);
   }
   if(!active) return;
 }
@@ -518,22 +518,22 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["coord[0]==(param.X[0]-1)", "coord[0]==0", "coord[1]==(param.X[1]-1)", "coord[1]==0", "coord[2]==(param.X[2]-1)", "coord[2]==0", "coord[3]==(param.X[3]-1)", "coord[3]==0"]
-    interior = ["coord[0]<(param.X[0]-1)", "coord[0]>0", "coord[1]<(param.X[1]-1)", "coord[1]>0", "coord[2]<(param.X[2]-1)", "coord[2]>0", "coord[3]<(param.X[3]-1)", "coord[3]>0"]
+    boundary = ["coord[0]==(param.dc.X[0]-1)", "coord[0]==0", "coord[1]==(param.dc.X[1]-1)", "coord[1]==0", "coord[2]==(param.dc.X[2]-1)", "coord[2]==0", "coord[3]==(param.dc.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.dc.X[0]-1)", "coord[0]>0", "coord[1]<(param.dc.X[1]-1)", "coord[1]>0", "coord[2]<(param.dc.X[2]-1)", "coord[2]>0", "coord[3]<(param.dc.X[3]-1)", "coord[3]>0"]
 
     offset = ["+1", "-1", "+1", "-1", "+1", "-1", "+1", "-1"]
 
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+param.X[0]", "X-param.X[0]", "X+param.X2X1", "X-param.X2X1", "X+param.X3X2X1", "X-param.X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.dc.X[0]", "X-param.dc.X[0]", "X+param.dc.X2X1", "X-param.dc.X2X1", "X+param.dc.X3X2X1", "X-param.dc.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-(param.X[0]-1)", "X+(param.X[0]-1)", "X-param.X2X1mX1", "X+param.X2X1mX1", "X-param.X3X2X1mX2X1", "X+param.X3X2X1mX2X1",
-                   "X-param.X4X3X2X1mX3X2X1", "X+param.X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.dc.X[0]-1)", "X+(param.dc.X[0]-1)", "X-param.dc.X2X1mX1", "X+param.dc.X2X1mX1", "X-param.dc.X3X2X1mX2X1", "X+param.dc.X3X2X1mX2X1",
+                   "X-param.dc.X4X3X2X1mX3X2X1", "X+param.dc.X4X3X2X1mX3X2X1"]
 
     cond = ""
-    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.X) && " + boundary[dir] + " )\n"
+    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.dc.X) && " + boundary[dir] + " )\n"
 
 
     str = ""
@@ -549,7 +549,7 @@ def gen(dir, pack_only=False):
     str += "#if (DD_PREC==2) // half precision\n"
     str += "  sp_norm_idx = face_idx + "
 #    if dir%2 == 0:
-#      str += "param.Ls*param.ghostFace[" + `dir/2` + "] + "
+#      str += "param.dc.Ls*param.dc.ghostFace[" + `dir/2` + "] + "
     str += "param.ghostNormOffset[" + `dir/2` + "][" + `1-dir%2` + "];\n"
     str += "#endif\n\n"
     str += "\n"
@@ -557,11 +557,11 @@ def gen(dir, pack_only=False):
 
 
     if dir % 2 == 0:
-        if domain_wall: str += "const int ga_idx = sid % param.volume4CB;\n"
+        if domain_wall: str += "const int ga_idx = sid % param.dc.volume_4d_cb;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
-        if domain_wall: str += "const int ga_idx = param.volume4CB+(face_idx % param.ghostFace[" + `dir/2` + "]);\n"
-        else: str += "const int ga_idx = param.volume4CB+face_idx;\n"
+        if domain_wall: str += "const int ga_idx = param.dc.volume_4d_cb+(face_idx % param.dc.ghostFace[" + `dir/2` + "]);\n"
+        else: str += "const int ga_idx = param.dc.volume_4d_cb+face_idx;\n"
     str += "\n"
 
     # scan the projector to determine which loads are required
@@ -592,9 +592,9 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     if domain_wall : 
-        load_half += "const int sp_stride_pad = param.Ls*param.ghostFace[" + `dir/2` + "];\n"
+        load_half += "const int sp_stride_pad = param.dc.Ls*param.dc.ghostFace[" + `dir/2` + "];\n"
     else :
-        load_half += "const int sp_stride_pad = param.ghostFace[" + `dir/2` + "];\n" 
+        load_half += "const int sp_stride_pad = param.dc.ghostFace[" + `dir/2` + "];\n" 
 
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"
@@ -702,7 +702,7 @@ def gen(dir, pack_only=False):
         if ( m < 2 ): reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (param.gauge_fixed && ga_idx < param.X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.dc.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(load_gauge + decl_half + prep_half + reconstruct_gauge + mult + reconstruct)
@@ -733,23 +733,23 @@ def gen_dw_inv():
     str += "// 'w' means output vector\n"
     str += "// 'v' means input vector\n"
     str += "{\n"
-    str += "  int base_idx = sid%param.volume4CB;\n"
+    str += "  int base_idx = sid%param.dc.volume_4d_cb;\n"
     str += "  int sp_idx;\n\n"
     str += "// let's assume the index,\n"
     str += "// s = output vector index,\n"
     str += "// s' = input vector index and\n"
     str += "// 'a'= kappa5\n"
     str += "\n"
-    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,param.Ls)*mferm);\n"
+    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,param.dc.Ls)*mferm);\n"
     str += "  spinorFloat factorR;\n"
     str += "  spinorFloat factorL;\n"
     str += "\n"
-    str += "  for(int s = 0; s < param.Ls; s++)\n  {\n"
+    str += "  for(int s = 0; s < param.dc.Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    factorR = ( coord[4] > s ? -inv_d_n*pow(kappa,param.Ls-coord[4]+s)*mferm : inv_d_n*pow(kappa,s-coord[4]))/2.0;\n\n"
+        str += "    factorR = ( coord[4] > s ? -inv_d_n*pow(kappa,param.dc.Ls-coord[4]+s)*mferm : inv_d_n*pow(kappa,s-coord[4]))/2.0;\n\n"
     else : 
-        str += "    factorR = ( coord[4] < s ? -inv_d_n*pow(kappa,param.Ls-s+coord[4])*mferm : inv_d_n*pow(kappa,coord[4]-s))/2.0;\n\n"
-    str += "    sp_idx = base_idx + s*param.volume4CB;\n"
+        str += "    factorR = ( coord[4] < s ? -inv_d_n*pow(kappa,param.dc.Ls-s+coord[4])*mferm : inv_d_n*pow(kappa,coord[4]-s))/2.0;\n\n"
+    str += "    sp_idx = base_idx + s*param.dc.volume_4d_cb;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
     str += "    o00_re += factorR*(i00_re + i20_re);\n" 
@@ -778,9 +778,9 @@ def gen_dw_inv():
     str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
     if dagger == True :  
-        str += "    factorL = ( coord[4] < s ? -inv_d_n*pow(kappa,param.Ls-s+coord[4])*mferm : inv_d_n*pow(kappa,coord[4]-s))/2.0;\n\n"
+        str += "    factorL = ( coord[4] < s ? -inv_d_n*pow(kappa,param.dc.Ls-s+coord[4])*mferm : inv_d_n*pow(kappa,coord[4]-s))/2.0;\n\n"
     else : 
-        str += "    factorL = ( coord[4] > s ? -inv_d_n*pow(kappa,param.Ls-coord[4]+s)*mferm : inv_d_n*pow(kappa,s-coord[4]))/2.0;\n\n"
+        str += "    factorL = ( coord[4] > s ? -inv_d_n*pow(kappa,param.dc.Ls-coord[4]+s)*mferm : inv_d_n*pow(kappa,s-coord[4]))/2.0;\n\n"
 
     str += "    o00_re += factorL*(i00_re - i20_re);\n"
     str += "    o00_im += factorL*(i00_im - i20_im);\n"

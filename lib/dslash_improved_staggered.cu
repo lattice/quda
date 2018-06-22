@@ -274,7 +274,6 @@ namespace quda {
     }
 #endif
 
-    dslashParam.Ls = out->X(4); // use Ls as the number of sources
     dslashParam.parity = parity;
 
     for(int i=0;i<4;i++){

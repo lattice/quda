@@ -158,7 +158,6 @@ namespace quda {
 
 #ifdef GPU_STAGGERED_DIRAC
 
-    dslashParam.Ls = out->X(4);
     dslashParam.parity = parity;
     // in the solver for the improved staggered action
 

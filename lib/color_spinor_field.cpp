@@ -111,6 +111,63 @@ namespace quda {
     if (precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
+    { // compute temporaries needed by dslash and packing kernels
+      auto &X = dslash_constant.X;
+      for (int dim=0; dim<nDim; dim++) X[dim] = x[dim];
+      for (int dim=nDim; dim<QUDA_MAX_DIM; dim++) X[dim] = 1;
+      if (siteSubset == QUDA_PARITY_SITE_SUBSET) X[0] = 2*X[0];
+
+      for (int i=0; i<nDim; i++) dslash_constant.Xh[i] = X[i]/2;
+
+      dslash_constant.Ls = X[4];
+      dslash_constant.volume_4d_cb = volumeCB / (nDim == 5 ? x[4] : 1);
+      dslash_constant.volume_4d = 2 * dslash_constant.volume_4d_cb;
+
+      int face[4];
+      for (int dim=0; dim<4; dim++) {
+        for (int j=0; j<4; j++) face[j] = X[j];
+        face[dim] = nFace;
+        dslash_constant.face_X[dim] = face[0];
+        dslash_constant.face_Y[dim] = face[1];
+        dslash_constant.face_Z[dim] = face[2];
+        dslash_constant.face_T[dim] = face[3];
+        dslash_constant.face_XY[dim] = dslash_constant.face_X[dim] * face[1];
+        dslash_constant.face_XYZ[dim] = dslash_constant.face_XY[dim] * face[2];
+        dslash_constant.face_XYZT[dim] = dslash_constant.face_XYZ[dim] * face[3];
+      }
+
+      dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
+      dslash_constant.ghostFace[0] = (X[1]*X[2]*X[3])/2;
+      dslash_constant.ghostFace[1] = (X[0]*X[2]*X[3])/2;
+      dslash_constant.ghostFace[2] = (X[0]*X[1]*X[3])/2;
+      dslash_constant.ghostFace[3] = (X[0]*X[1]*X[2])/2;
+
+      dslash_constant.X2X1 = X[1]*X[0];
+      dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
+      dslash_constant.X2X1mX1 = (X[1]-1)*X[0];
+      dslash_constant.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
+      dslash_constant.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
+      dslash_constant.X4X3X2X1hmX3X2X1h = dslash_constant.X4X3X2X1mX3X2X1/2;
+
+      // used by indexFromFaceIndexStaggered
+      dslash_constant.dims[0][0]=X[1];
+      dslash_constant.dims[0][1]=X[2];
+      dslash_constant.dims[0][2]=X[3];
+
+      dslash_constant.dims[1][0]=X[0];
+      dslash_constant.dims[1][1]=X[2];
+      dslash_constant.dims[1][2]=X[3];
+
+      dslash_constant.dims[2][0]=X[0];
+      dslash_constant.dims[2][1]=X[1];
+      dslash_constant.dims[2][2]=X[3];
+
+      dslash_constant.dims[3][0]=X[0];
+      dslash_constant.dims[3][1]=X[1];
+      dslash_constant.dims[3][2]=X[2];
+    }
+
+
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor,
