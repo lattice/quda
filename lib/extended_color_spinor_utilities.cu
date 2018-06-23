@@ -296,10 +296,10 @@ namespace quda {
         : arg(arg), meta(meta), location(location) {
         writeAuxString("out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
 
-        printfQuda( "E=(%02d,%02d,%02d,%02d)\n", arg.E[0], arg.E[1], arg.E[2], arg.E[3] );
-        printfQuda( "X=(%02d,%02d,%02d,%02d)\n", arg.X[0], arg.X[1], arg.X[2], arg.X[3] );
-        printfQuda( "length  =%08d\n", arg.length   );
-        printfQuda( "lengthEx=%08d\n", arg.lengthEx );
+//        printfQuda( "E=(%02d,%02d,%02d,%02d)\n", arg.E[0], arg.E[1], arg.E[2], arg.E[3] );
+//        printfQuda( "X=(%02d,%02d,%02d,%02d)\n", arg.X[0], arg.X[1], arg.X[2], arg.X[3] );
+//        printfQuda( "length  =%08d\n", arg.length   );
+//        printfQuda( "lengthEx=%08d\n", arg.lengthEx );
 
       }
       virtual ~CopySpinorEx() {}

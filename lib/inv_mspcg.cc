@@ -107,8 +107,9 @@ namespace quda {
     mat(NULL),  mat_sloppy(NULL), mat_precondition(NULL),
     nrm_op(NULL), nrm_op_sloppy(NULL), nrm_op_precondition(NULL), 
     vct_dr(NULL), vct_dp(NULL), vct_dmmp(NULL), vct_dtmp(NULL),
-    r(NULL), p(NULL), z(NULL), mmp(NULL), tmp(NULL), fr(NULL), fz(NULL), 
-    immp(NULL), ip(NULL), itmp(NULL),
+    r(NULL), p(NULL), z(NULL), mmp(NULL), tmp(NULL), fr(NULL), 
+    immp(NULL), ip(NULL), 
+    ifmmp(NULL), ifp(NULL), iftmp(NULL), 
     inner_iterations(ic)
   { 
 
@@ -290,14 +291,22 @@ namespace quda {
     blas::zero(ix);
 
     double rk2 = blas::norm2(ib);
-    double Mpk2, MdagMpk2, alpha, beta, rkp12;
+    double Mpk2, alpha, beta, rkp12;
 
     printfQuda("inner_cg: before starting: r2 = %8.4e \n", rk2);
     blas::copy(*ip, ib);
 
     for(int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++){
-      (*nrm_op_precondition)(*immp, *ip, *itmp);
-      zero_extended_color_spinor_interface( *immp, R, QUDA_CUDA_FIELD_LOCATION, 0);
+      
+      copier_timer.Start("woo", "hoo", 0);
+      copyExtendedColorSpinor(*ifp, *ip, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
+      copier_timer.Stop("woo", "hoo", 0);
+//      zero_extended_color_spinor_interface( *ifp, R, QUDA_CUDA_FIELD_LOCATION, 0);
+      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
+      copier_timer.Start("woo", "hoo", 0);
+      copyExtendedColorSpinor(*immp, *ifmmp, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
+      copier_timer.Stop("woo", "hoo", 0);
+      
       Mpk2 = reDotProduct(*ip, *immp);
 
       alpha = rk2 / Mpk2; 
@@ -323,7 +332,7 @@ namespace quda {
 
   int MSPCG::outer_cg( ColorSpinorField& dx, ColorSpinorField& db, double quit )
   {
-    double Mpk2, MdagMpk2, alpha, beta, rkp12;
+    double Mpk2, alpha, beta, rkp12;
     precise_timer.Start("woo", "hoo", 0);
     (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = nrm_op * x
     precise_timer.Stop("woo", "hoo", 0);
@@ -405,19 +414,22 @@ namespace quda {
     mmp  = new cudaColorSpinorField(csParam);
     tmp  = new cudaColorSpinorField(csParam);
     
-    for(int i=0; i<4; ++i){
-      csParam.x[i] += 2*R[i];
-    }
     csParam.setPrecision(dirac_param_precondition.gauge->Precision());
 
 // f* means fine/preconditioning
     fr  =  new cudaColorSpinorField(csParam);
-    fz  =  new cudaColorSpinorField(csParam);
 
 // i* means inner preconditioning
     immp=  new cudaColorSpinorField(csParam);
     ip  =  new cudaColorSpinorField(csParam);
-    itmp=  new cudaColorSpinorField(csParam);
+    
+    for(int i=0; i<4; ++i){
+      csParam.x[i] += 2*R[i];
+    }
+    csParam.setPrecision(dirac_param_precondition.gauge->Precision());
+    ifmmp=  new cudaColorSpinorField(csParam);
+    ifp  =  new cudaColorSpinorField(csParam);
+    iftmp=  new cudaColorSpinorField(csParam);
 
     blas::zero(*fr);
 
@@ -446,19 +458,21 @@ namespace quda {
 
       blas::copy(*r, *vct_dr); // throw true residual into the sloppy solver.
       blas::zero(*x);
-      copier_timer.Start("woo", "hoo", 0);
-      copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
-      copier_timer.Stop("woo", "hoo", 0);
-      
+//      copier_timer.Start("woo", "hoo", 0);
+//      copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
+//      copier_timer.Stop("woo", "hoo", 0);
+
+      blas::copy(*fr, *r);
+
       if(inner_iterations <= 0){
-        blas::copy(*fz, *fr);
+        blas::copy(*z, *fr);
       }else{
-        inner_cg(*fz, *fr);
+        inner_cg(*z, *fr);
       }
  
-      copier_timer.Start("woo", "hoo", 0);
-      copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
-      copier_timer.Stop("woo", "hoo", 0);
+//      copier_timer.Start("woo", "hoo", 0);
+//      copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
+//      copier_timer.Stop("woo", "hoo", 0);
       blas::copy(*p, *z);
 
       k = 0;
@@ -477,19 +491,21 @@ namespace quda {
         if(rr2 < sloppy_solver_stop) break;
 
         // z = M^-1 r
-        copier_timer.Start("woo", "hoo", 0);
-        copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
-        copier_timer.Stop("woo", "hoo", 0);
-        
+//        copier_timer.Start("woo", "hoo", 0);
+//        copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
+//        copier_timer.Stop("woo", "hoo", 0);
+
+        blas::copy(*fr, *r);
+
         if(inner_iterations <= 0){
-          blas::copy(*fz, *fr);
+          blas::copy(*z, *fr);
         }else{
-          inner_cg(*fz, *fr);
+          inner_cg(*z, *fr);
         }
         
-        copier_timer.Start("woo", "hoo", 0);
-        copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
-        copier_timer.Stop("woo", "hoo", 0);
+//        copier_timer.Start("woo", "hoo", 0);
+//        copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
+//        copier_timer.Stop("woo", "hoo", 0);
 
         zkP1rkp1 = reDotProduct(*z, *r);
         beta = zkP1rkp1 / rkzk;
@@ -560,11 +576,13 @@ namespace quda {
     delete tmp;
     
     delete fr;
-    delete fz;
     
     delete immp;
     delete ip;
-    delete itmp;
+ 
+    delete ifmmp;
+    delete ifp;
+    delete iftmp;
 
     delete vct_dr;
     delete vct_dp;

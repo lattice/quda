@@ -48,11 +48,13 @@ namespace quda {
       cudaColorSpinorField* tmp;
 
       cudaColorSpinorField* fr;
-      cudaColorSpinorField* fz;
 
       cudaColorSpinorField* immp;
       cudaColorSpinorField* ip;
-      cudaColorSpinorField* itmp;
+      
+      cudaColorSpinorField* ifmmp;
+      cudaColorSpinorField* ifp;
+      cudaColorSpinorField* iftmp;
 
       Timer copier_timer;
       Timer preconditioner_timer;
