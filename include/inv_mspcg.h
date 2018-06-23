@@ -14,6 +14,9 @@ namespace quda {
   class MSPCG : public Solver { // Multisplitting Preconditioned CG
 
     private:
+      
+      Solver *solver_prec;
+      SolverParam solver_prec_param;
 
       DiracMobiusPC* mat;
       DiracMobiusPC* mat_sloppy;
@@ -29,9 +32,6 @@ namespace quda {
 
       cudaGaugeField* padded_gauge_field;
       cudaGaugeField* padded_gauge_field_precondition;
-
-      Solver *solver_prec;
-      SolverParam solver_prec_param;
 
       std::array<int, 4> R;
       
@@ -61,7 +61,9 @@ namespace quda {
   
     public:
 
-      MSPCG(QudaInvertParam* inv_param, SolverParam& _param, TimeProfile& profile, int ps=1);
+      MSPCG(QudaInvertParam* inv_param, SolverParam& _param, TimeProfile& profile, int ic=6);
+
+      int inner_iterations;
 
       double Gflops;
       double fGflops;

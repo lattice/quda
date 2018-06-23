@@ -102,12 +102,14 @@ namespace quda {
     inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   }
 */
-  MSPCG::MSPCG(QudaInvertParam* inv_param, SolverParam& _param, TimeProfile& profile, int ps) :
+  MSPCG::MSPCG(QudaInvertParam* inv_param, SolverParam& _param, TimeProfile& profile, int ic) :
     Solver(_param, profile), solver_prec(0), solver_prec_param(_param), 
-    mat(NULL), nrm_op(NULL), mat_precondition(NULL), nrm_op_precondition(NULL), mat_sloppy(NULL), nrm_op_sloppy(NULL),
+    mat(NULL),  mat_sloppy(NULL), mat_precondition(NULL),
+    nrm_op(NULL), nrm_op_sloppy(NULL), nrm_op_precondition(NULL), 
+    vct_dr(NULL), vct_dp(NULL), vct_dmmp(NULL), vct_dtmp(NULL),
     r(NULL), p(NULL), z(NULL), mmp(NULL), tmp(NULL), fr(NULL), fz(NULL), 
     immp(NULL), ip(NULL), itmp(NULL),
-    vct_dr(NULL), vct_dp(NULL), vct_dmmp(NULL), vct_dtmp(NULL)
+    inner_iterations(ic)
   { 
 
     printfQuda("MSPCG constructor starts.\n");
@@ -280,6 +282,9 @@ namespace quda {
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib )
   {
+    double dummy=1;
+    reduceDouble(dummy);
+    preconditioner_timer.Start("woo", "hoo", 0);
     commGlobalReductionSet(false);
 
     blas::zero(ix);
@@ -290,22 +295,15 @@ namespace quda {
     printfQuda("inner_cg: before starting: r2 = %8.4e \n", rk2);
     blas::copy(*ip, ib);
 
-    for(int local_loop_count = 0; local_loop_count < 5; local_loop_count++){
-      preconditioner_timer.Start("woo", "hoo", 0);
+    for(int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++){
       (*nrm_op_precondition)(*immp, *ip, *itmp);
-      preconditioner_timer.Stop("woo", "hoo", 0);
-      
       zero_extended_color_spinor_interface( *immp, R, QUDA_CUDA_FIELD_LOCATION, 0);
-      //zero_boundary_fermion(eg, mmp);
-      copier_timer.Start("woo", "hoo", 0);
       Mpk2 = reDotProduct(*ip, *immp);
-      copier_timer.Stop("woo", "hoo", 0);
 
       alpha = rk2 / Mpk2; 
 
       axpy(alpha, *ip, ix);
       rkp12 = axpyNorm(-alpha, *immp, ib);
-
       
       beta = rkp12 / rk2;
       rk2 = rkp12;
@@ -317,7 +315,9 @@ namespace quda {
     }
 
     commGlobalReductionSet(true);
-
+    reduceDouble(dummy);
+    preconditioner_timer.Stop("woo", "hoo", 0);
+    
     return;
   }
 
@@ -449,7 +449,13 @@ namespace quda {
       copier_timer.Start("woo", "hoo", 0);
       copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
       copier_timer.Stop("woo", "hoo", 0);
-      inner_cg(*fz, *fr);
+      
+      if(inner_iterations <= 0){
+        blas::copy(*fz, *fr);
+      }else{
+        inner_cg(*fz, *fr);
+      }
+ 
       copier_timer.Start("woo", "hoo", 0);
       copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
       copier_timer.Stop("woo", "hoo", 0);
@@ -475,7 +481,11 @@ namespace quda {
         copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
         copier_timer.Stop("woo", "hoo", 0);
         
-        inner_cg(*fz, *fr);
+        if(inner_iterations <= 0){
+          blas::copy(*fz, *fr);
+        }else{
+          inner_cg(*fz, *fr);
+        }
         
         copier_timer.Start("woo", "hoo", 0);
         copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
