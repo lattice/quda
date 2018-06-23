@@ -59,10 +59,8 @@ namespace quda {
   private:
     const QudaTwistCloverDslashType dslashType;
     double a, b, c, d;
-    const cFloat *clover;
-    const float *cNorm;
-    const cFloat *cloverInv;
-    const float *cNrm2;
+    const FullClover &clover;
+    const FullClover &cloverInv;
 
   protected:
     unsigned int sharedBytesPerThread() const
@@ -76,14 +74,21 @@ namespace quda {
     }
 
   public:
-    TwistedCloverDslashCuda(cudaColorSpinorField *out, const GaugeField &gauge, const cFloat *clover, const float *cNorm,
-			    const cFloat *cloverInv, const float *cNrm2, int cl_stride, const cudaColorSpinorField *in,
-			    const cudaColorSpinorField *x, const QudaTwistCloverDslashType dslashType, const double kappa,
-			    const double mu, const double epsilon, const double k,
+    TwistedCloverDslashCuda(cudaColorSpinorField *out, const GaugeField &gauge, const FullClover &clover, const FullClover &cloverInv,
+                            //const cFloat *clover, const float *cNorm, const cFloat *cloverInv, const float *cNrm2, int cl_stride,
+                            const cudaColorSpinorField *in, const cudaColorSpinorField *x, const QudaTwistCloverDslashType dslashType,
+                            const double kappa, const double mu, const double epsilon, const double k,
                             const int parity, const int dagger, const int *commOverride)
-      : SharedDslashCuda(out, in, x, gauge, parity, dagger, commOverride),
-        clover(clover), cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2), dslashType(dslashType)
+      : SharedDslashCuda(out, in, x, gauge, parity, dagger, commOverride), clover(clover), cloverInv(cloverInv), dslashType(dslashType)
     { 
+      QudaPrecision clover_prec = bindTwistedCloverTex(clover, cloverInv, parity, dslashParam);
+      if (in->Precision() != clover_prec) errorQuda("Mixing clover and spinor precision not supported");
+
+#ifndef DYNAMIC_CLOVER
+      if (clover.stride != cloverInv.stride)
+        errorQuda("clover and cloverInv must have matching strides (%d != %d)", clover.stride, cloverInv.stride);
+#endif
+
       a = kappa;
       b = mu;
       c = epsilon;
@@ -95,15 +100,14 @@ namespace quda {
       dslashParam.a_f = kappa;
       dslashParam.b = mu;
       dslashParam.b_f = mu;
-      dslashParam.cl_stride = cl_stride;
+      dslashParam.cl_stride = clover.stride;
       dslashParam.fl_stride = in->VolumeCB();
-      dslashParam.clover = (void*)clover;
-      dslashParam.cloverNorm = (float*)cNorm;
-      dslashParam.cloverInv = (void*)cloverInv;
-      dslashParam.cloverInvNorm = (float*)cNrm2;
     }
 
-    virtual ~TwistedCloverDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
+    virtual ~TwistedCloverDslashCuda() {
+      unbindSpinorTex<sFloat>(in, out, x);
+      unbindTwistedCloverTex(clover);
+    }
 
     void apply(const cudaStream_t &stream)
     {
@@ -111,7 +115,7 @@ namespace quda {
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
 #ifndef USE_TEXTURE_OBJECTS
-      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
+      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x, dslashParam);
 #endif // USE_TEXTURE_OBJECTS
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       setParam();
@@ -216,25 +220,16 @@ namespace quda {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
-    void *cloverP=0, *cloverNormP=0, *cloverInvP=0, *cloverInvNormP=0;
-    QudaPrecision clover_prec = bindTwistedCloverTex(*clover, *cloverInv, parity, &cloverP, &cloverNormP, &cloverInvP, &cloverInvNormP);
-
-    if (in->Precision() != clover_prec) errorQuda("Mixing clover and spinor precision not supported");
-	
-#ifndef DYNAMIC_CLOVER
-    if (clover->stride != cloverInv->stride) errorQuda("clover and cloverInv must have matching strides (%d != %d)", clover->stride, cloverInv->stride);
-#endif
-
     DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new TwistedCloverDslashCuda<double2,double2,double2>(out, gauge, (double2*)cloverP, (float*)cloverNormP, (double2*)cloverInvP, (float*)cloverInvNormP,
-                                                                    clover->stride, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
+        dslash = new TwistedCloverDslashCuda<double2,double2,double2>
+          (out, gauge, *clover, *cloverInv, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new TwistedCloverDslashCuda<float4,float4,float4>(out, gauge, (float4*)cloverP, (float*)cloverNormP, (float4*)cloverInvP, (float*)cloverInvNormP,
-                                                                 clover->stride, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
+      dslash = new TwistedCloverDslashCuda<float4,float4,float4>
+          (out, gauge, *clover, *cloverInv, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new TwistedCloverDslashCuda<short4,short4,short4>(out, gauge, (short4*)cloverP, (float*)cloverNormP, (short4*)cloverInvP, (float*)cloverInvNormP,
-                                                                 clover->stride, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
+      dslash = new TwistedCloverDslashCuda<short4,short4,short4>
+          (out, gauge, *clover, *cloverInv, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
     }
 
     int ghost_threads[4] = {0};
@@ -245,7 +240,6 @@ namespace quda {
     dslash_policy.apply(0);
 
     delete dslash;
-    unbindTwistedCloverTex(*clover);
 #else
     errorQuda("Twisted clover dslash has not been built");
 #endif

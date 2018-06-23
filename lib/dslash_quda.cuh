@@ -455,6 +455,8 @@ protected:
   }
 
 public:
+  DslashParam dslashParam;
+
   DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 	     const cudaColorSpinorField *x, const GaugeField &gauge,
              const int parity, const int dagger, const int *commOverride)
@@ -464,14 +466,13 @@ public:
     if (in->Precision() != gauge.Precision())
       errorQuda("Mixing gauge %d and spinor %d precision not supported", gauge.Precision(), in->Precision());
 
-    const int nDimComms = 4;
+    constexpr int nDimComms = 4;
     for (int i=0; i<nDimComms; i++){
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
       dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
-
       dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
       dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-
+      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
     }
 
@@ -493,7 +494,7 @@ public:
 #endif // USE_TEXTURE_OBJECTS
 
     dslashParam.parity = parity;
-    bindGaugeTex(static_cast<const cudaGaugeField&>(gauge), parity, &dslashParam.gauge0, &dslashParam.gauge1);
+    bindGaugeTex(static_cast<const cudaGaugeField&>(gauge), parity, dslashParam);
 
     dslashParam.sp_stride = in->Stride();
 
@@ -517,23 +518,19 @@ public:
     dslashParam.twist_a = 0.0;
     dslashParam.twist_b = 0.0;
 
+    dslashParam.No2 = make_float2(1.0f, 1.0f);
+    dslashParam.Pt0 = (comm_coord(3) == 0) ? true : false;
+    dslashParam.PtNm1 = (comm_coord(3) == comm_dim(3)-1) ? true : false;
+
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
     if (!init) { // these parameters are constant across all dslash instances for a given run
       char ghost[5]; // set the ghost string
-      for (int dim=0; dim<4; dim++) {
-        dslashParam.ghostDim[dim] = comm_dim_partitioned(dim); // determines whether to use regular or ghost indexing at boundary
-        ghost[dim] = (dslashParam.ghostDim[dim] ? '1' : '0');
-      }
+      for (int dim=0; dim<nDimComms; dim++) ghost[dim] = (dslashParam.ghostDim[dim] ? '1' : '0');
       ghost[4] = '\0';
       strcpy(ghost_str,",ghost=");
       strcat(ghost_str,ghost);
-
-      dslashParam.No2 = make_float2(1.0f, 1.0f);
-      dslashParam.Pt0 = (comm_coord(3) == 0) ? true : false;
-      dslashParam.PtNm1 = (comm_coord(3) == comm_dim(3)-1) ? true : false;
-
       init = true;
     }
 

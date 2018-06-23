@@ -66,7 +66,7 @@ inline void setFusedParam(DslashParam& param, DslashCuda &dslash, const int* fac
   for (int i=0; i<4; ++i) {
     param.threadDimMapLower[i] = 0;
     param.threadDimMapUpper[i] = 0;
-    if (!dslashParam.commDim[i]) continue;
+    if (!dslash.dslashParam.commDim[i]) continue;
     param.threadDimMapLower[i] = (prev >= 0 ? param.threadDimMapUpper[prev] : 0);
     param.threadDimMapUpper[i] = param.threadDimMapLower[i] + dslash.Nface()*faceVolumeCB[i];
     param.threads = param.threadDimMapUpper[i];
@@ -145,7 +145,7 @@ namespace {
   */
   inline void issueRecv(cudaColorSpinorField &input, const DslashCuda &dslash, cudaStream_t *stream, bool gdr) {
     for(int i=3; i>=0; i--){
-      if (!dslashParam.commDim[i]) continue;
+      if (!dslash.dslashParam.commDim[i]) continue;
       for(int dir=1; dir>=0; dir--) {
         PROFILE(if (dslash_comms) input.recvStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), stream, gdr), profile, QUDA_PROFILE_COMMS_START);
       }
@@ -170,7 +170,7 @@ namespace {
 
     bool pack = false;
     for (int i=3; i>=0; i--)
-      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
+      if (dslash.dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
         { pack = true; break; }
 
     MemoryLocation pack_dest[2*QUDA_MAX_DIM];
@@ -187,7 +187,7 @@ namespace {
     }
     if (pack) {
       PROFILE(if (dslash_pack_compute) in.pack(dslash.Nface()/2, parity, dslash.Dagger(), packIndex,
-					       pack_dest, location, dslashParam.twist_a, dslashParam.twist_b),
+					       pack_dest, location, dslash.dslashParam.twist_a, dslash.dslashParam.twist_b),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
 
       // Record the end of the packing
@@ -207,7 +207,7 @@ namespace {
     using namespace dslash;
 
     for (int i = 3; i >=0; i--) {
-      if (!dslashParam.commDim[i]) continue;
+      if (!dslash.dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) { // forwards gather
         cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in.bufferIndex] : dslashStart[in.bufferIndex];
@@ -236,7 +236,8 @@ namespace {
      packing kernel to an unused stream.
      @return stream index
   */
-  inline int getStreamIndex() {
+  template <typename T>
+  inline int getStreamIndex(const T &dslashParam) {
     // set index to a stream index not being used for p2p
     int index = -1;
     for (int i = 3; i >=0; i--) {
@@ -326,7 +327,8 @@ namespace {
      updating the local buffers on a subsequent computation before we
      have finished sending.
   */
-  inline void completeDslash(const ColorSpinorField &in) {
+  template <typename T>
+  inline void completeDslash(const ColorSpinorField &in, const T&dslashParam) {
     // this ensures that the p2p sending is completed before any
     // subsequent work is done on the compute stream
     for (int dim=3; dim>=0; dim--) {
@@ -359,13 +361,13 @@ namespace {
       if (set_mapped) errorQuda("set_mapped already set");
       // in the below we switch to the mapped ghost buffer and update the tuneKey to reflect this
       in.bufferIndex += 2;
-      strcpy(aux_copy,dslash.getAux(dslashParam.kernel_type));
-      dslash.augmentAux(dslashParam.kernel_type, ",zero_copy");
+      strcpy(aux_copy,dslash.getAux(dslash.dslashParam.kernel_type));
+      dslash.augmentAux(dslash.dslashParam.kernel_type, ",zero_copy");
       set_mapped = true;
     } else {
       if (!set_mapped) errorQuda("set_mapped not set");
       // reset to default
-      dslash.setAux(dslashParam.kernel_type, aux_copy);
+      dslash.setAux(dslash.dslashParam.kernel_type, aux_copy);
       in.bufferIndex -= 2;
       set_mapped = false;
     }
@@ -389,6 +391,7 @@ struct DslashBasic : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -460,7 +463,7 @@ struct DslashBasic : DslashPolicyImp {
       }
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -474,6 +477,7 @@ struct DslashPthreads : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -619,7 +623,7 @@ struct DslashPthreads : DslashPolicyImp {
 
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
 #endif // MULTI_GPU
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -639,6 +643,7 @@ struct DslashFusedExterior : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -657,7 +662,7 @@ struct DslashFusedExterior : DslashPolicyImp {
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    const int scatterIndex = getStreamIndex();
+    const int scatterIndex = getStreamIndex(dslashParam);
     DslashCommsPattern pattern(dslashParam.commDim);
     while (pattern.completeSum < pattern.commDimTotal) {
       for (int i=3; i>=0; i--) {
@@ -703,7 +708,7 @@ struct DslashFusedExterior : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -720,6 +725,7 @@ struct DslashGDR : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -780,7 +786,7 @@ struct DslashGDR : DslashPolicyImp {
       }
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -797,6 +803,7 @@ struct DslashFusedGDR : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -852,7 +859,7 @@ struct DslashFusedGDR : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -868,6 +875,7 @@ struct DslashGDRRecv : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -928,7 +936,7 @@ struct DslashGDRRecv : DslashPolicyImp {
       }
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -945,6 +953,7 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1000,7 +1009,7 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1033,6 +1042,7 @@ struct DslashAsync : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1112,7 +1122,7 @@ struct DslashAsync : DslashPolicyImp {
 
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1140,6 +1150,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1158,7 +1169,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
-    const int scatterIndex = getStreamIndex();
+    const int scatterIndex = getStreamIndex(dslashParam);
     DslashCommsPattern pattern(dslashParam.commDim);
     while (pattern.completeSum < pattern.commDimTotal) {
       for (int i=3; i>=0; i--) {
@@ -1214,7 +1225,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1241,6 +1252,7 @@ struct DslashZeroCopyPack : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1249,7 +1261,7 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
-    const int packIndex = getStreamIndex();
+    const int packIndex = getStreamIndex(dslashParam);
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
@@ -1316,7 +1328,7 @@ struct DslashZeroCopyPack : DslashPolicyImp {
       }
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1334,13 +1346,14 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
     // record start of the dslash
     PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
-    const int packScatterIndex = getStreamIndex();
+    const int packScatterIndex = getStreamIndex(dslashParam);
     PROFILE(qudaStreamWaitEvent(streams[packScatterIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packScatterIndex);
 
@@ -1405,7 +1418,7 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1421,6 +1434,7 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1429,7 +1443,7 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
 
     issueRecv(*in, dslash, 0, true); // Prepost receives
 
-    const int packIndex = getStreamIndex();
+    const int packIndex = getStreamIndex(dslashParam);
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
@@ -1487,7 +1501,7 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
       }
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1505,13 +1519,14 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
     // record start of the dslash
     PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
-    const int packIndex = getStreamIndex();
+    const int packIndex = getStreamIndex(dslashParam);
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
@@ -1566,7 +1581,7 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1584,6 +1599,7 @@ struct DslashZeroCopy : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1592,7 +1608,7 @@ struct DslashZeroCopy : DslashPolicyImp {
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
-    const int packIndex = getStreamIndex();
+    const int packIndex = getStreamIndex(dslashParam);
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
@@ -1670,6 +1686,7 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1678,7 +1695,7 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
     issueRecv(*in, dslash, 0, false); // Prepost receives
 
-    const int packIndex = getStreamIndex();
+    const int packIndex = getStreamIndex(dslashParam);
     PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
     issuePack(*in, dslash, 1-dslashParam.parity, static_cast<MemoryLocation>(Host | (Remote*dslashParam.remote_write) ), packIndex);
 
@@ -1735,7 +1752,7 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
       setMappedGhost(dslash, *in, false);
     }
 
-    completeDslash(*in);
+    completeDslash(*in,dslashParam);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1748,6 +1765,7 @@ struct DslashNC : DslashPolicyImp {
 
     profile.TPSTART(QUDA_PROFILE_TOTAL);
     
+    auto &dslashParam = dslash.dslashParam;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
@@ -1877,6 +1895,7 @@ struct DslashFactory {
  class DslashPolicyTune : public Tunable {
 
    DslashCuda &dslash;
+   DslashParam &dslashParam;
    cudaColorSpinorField *in;
    const int volume;
    const int *ghostFace;
@@ -1890,7 +1909,7 @@ struct DslashFactory {
  public:
    DslashPolicyTune(DslashCuda &dslash, cudaColorSpinorField *in,
 		    const int volume, const int *ghostFace, TimeProfile &profile)
-     : dslash(dslash), in(in), volume(volume), ghostFace(ghostFace), profile(profile)
+     : dslash(dslash), dslashParam(dslash.dslashParam), in(in), volume(volume), ghostFace(ghostFace), profile(profile)
    {
      in->streamInit(streams);
 

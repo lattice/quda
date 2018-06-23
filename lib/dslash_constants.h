@@ -201,9 +201,6 @@ enum KernelType {
     }
   };
 
-  static DslashParam dslashParam;
-
-
 typedef struct fat_force_stride_s {
   int fat_ga_stride;
   int long_ga_stride;

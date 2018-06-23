@@ -90,10 +90,8 @@ namespace quda {
       }
 #endif
 
-      bindFatGaugeTex(static_cast<const cudaGaugeField&>(fatGauge), parity, &dslashParam.gauge0, &dslashParam.gauge1);
-      bindLongGaugeTex(static_cast<const cudaGaugeField&>(longGauge), parity, &dslashParam.longGauge0, &dslashParam.longGauge1);
-      dslashParam.longPhase0 = static_cast<char*>(dslashParam.longGauge0) + longGauge.PhaseOffset();
-      dslashParam.longPhase1 = static_cast<char*>(dslashParam.longGauge1) + longGauge.PhaseOffset();
+      bindFatGaugeTex(static_cast<const cudaGaugeField&>(fatGauge), parity, dslashParam);
+      bindLongGaugeTex(static_cast<const cudaGaugeField&>(longGauge), parity, dslashParam);
 
       if (in->Precision() != fatGauge.Precision() || in->Precision() != longGauge.Precision()){
         errorQuda("Mixing gauge and spinor precision not supported"
@@ -117,7 +115,7 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
 #ifndef USE_TEXTURE_OBJECTS
-      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
+      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x, dslashParam);
 #endif // USE_TEXTURE_OBJECTS
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       setParam();

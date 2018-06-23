@@ -65,6 +65,8 @@ namespace quda {
   class CloverDslashCuda : public SharedDslashCuda {
 
   protected:
+    const FullClover &cloverInv;
+
     unsigned int sharedBytesPerThread() const
     {
       if (dslashParam.kernel_type == INTERIOR_KERNEL) {
@@ -75,18 +77,21 @@ namespace quda {
       }
     }
   public:
-    CloverDslashCuda(cudaColorSpinorField *out,  const GaugeField &gauge, const cFloat *clover,
-		     const float *cloverNorm, int cl_stride, const cudaColorSpinorField *in, 
+    CloverDslashCuda(cudaColorSpinorField *out,  const GaugeField &gauge, const FullClover &cloverInv, const cudaColorSpinorField *in,
 		     const cudaColorSpinorField *x, const double a, const int parity, const int dagger, const int *commOverride)
-      : SharedDslashCuda(out, in, x, gauge, parity, dagger, commOverride)
+      : SharedDslashCuda(out, in, x, gauge, parity, dagger, commOverride), cloverInv(cloverInv)
     { 
-      dslashParam.clover = (void*)clover;
-      dslashParam.cloverNorm = (float*)cloverNorm;
+      QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, dslashParam);
+      if (in->Precision() != clover_prec) errorQuda("Mixing clover and spinor precision not supported");
       dslashParam.a = a;
       dslashParam.a_f = a;
-      dslashParam.cl_stride = cl_stride;
+      dslashParam.cl_stride = cloverInv.stride;
     }
-    virtual ~CloverDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
+
+    virtual ~CloverDslashCuda() {
+      unbindSpinorTex<sFloat>(in, out, x);
+      unbindCloverTex(cloverInv);
+    }
 
     void apply(const cudaStream_t &stream)
     {
@@ -94,7 +99,7 @@ namespace quda {
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
 #ifndef USE_TEXTURE_OBJECTS
-      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
+      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x, dslashParam);
 #endif // USE_TEXTURE_OBJECTS
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       setParam();
@@ -167,7 +172,7 @@ namespace quda {
 
 #include <dslash_policy.cuh>
 
-  void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover cloverInv,
+  void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover &cloverInv,
 			const cudaColorSpinorField *in, const int parity, const int dagger, 
 			const cudaColorSpinorField *x, const double &a, const int *commOverride,
 			TimeProfile &profile)
@@ -175,29 +180,19 @@ namespace quda {
 #ifdef GPU_CLOVER_DIRAC
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
-    void *cloverP, *cloverNormP;
-    QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, &cloverP, &cloverNormP);
-
-    if (in->Precision() != clover_prec)
-      errorQuda("Mixing clover and spinor precision not supported");
-
     DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new CloverDslashCuda<double2, double2, double2>
-	(out, gauge, (double2*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, parity, dagger, commOverride);
+      dslash = new CloverDslashCuda<double2, double2, double2>(out, gauge, cloverInv, in, x, a, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new CloverDslashCuda<float4, float4, float4>
-	(out, gauge, (float4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, parity, dagger, commOverride);
+      dslash = new CloverDslashCuda<float4, float4, float4>(out, gauge, cloverInv, in, x, a, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new CloverDslashCuda<short4, short4, short4>
-	(out, gauge, (short4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, parity, dagger, commOverride);
+      dslash = new CloverDslashCuda<short4, short4, short4>(out, gauge, cloverInv, in, x, a, parity, dagger, commOverride);
     }
 
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
     dslash_policy.apply(0);
 
     delete dslash;
-    unbindCloverTex(cloverInv);
 #else
     errorQuda("Clover dslash has not been built");
 #endif
