@@ -487,9 +487,12 @@ tau = 10 * sqrt(uro) fails!
 
         mNorm_old2 = mNorm_old;
         mNorm_old  = mNorm;
+
+        commGlobalReductionSet(false);
         gamma = blas::reDotProduct(r_sloppy,u); 
         delta = blas::reDotProduct(w,u);
         mNorm = blas::norm2(r_sloppy);
+        commGlobalReductionSet(true);
       }
 
 #ifdef USE_WORKER
@@ -521,9 +524,9 @@ tau = 10 * sqrt(uro) fails!
 #else
       {
 #ifdef NONBLOCK_REDUCE
-        MPI_CHECK_(MPI_Iallreduce((double*)&local_reduce, recvbuff, 12, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
+        MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 12, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
 #else
-        reduceDoubleArray((double*)&local_reduce, 12);
+        reduceDoubleArray((double*)local_reduce, 12);
 #endif
         if(K) {
           n = r_sloppy;
@@ -543,7 +546,7 @@ tau = 10 * sqrt(uro) fails!
         matSloppy(n, m, tmp_sloppy);
 #ifdef NONBLOCK_REDUCE//sync point
         MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
-        memcpy(&local_reduce, recvbuff, 12*sizeof(double));
+        memcpy(local_reduce, recvbuff, 12*sizeof(double));
 #endif
       }
 #endif //end of USE_WORKER
