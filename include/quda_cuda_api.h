@@ -122,6 +122,7 @@ namespace quda {
    */
   cudaError_t qudaDeviceSynchronize();
 
+#if (CUDA_VERSION >= 9000)
   /**
      @brief Wrapper around cudaFuncSetAttribute
      @param[in] func Function for which we are setting the attribute
@@ -129,6 +130,7 @@ namespace quda {
      @param[in] value Value to set
   */
   cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
+#endif
 
   /**
      @brief Print out the timer profile for CUDA API calls
