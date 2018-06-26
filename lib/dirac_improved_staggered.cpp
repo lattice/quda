@@ -3,24 +3,11 @@
 
 namespace quda {
 
-  namespace improvedstaggered {
-#include <dslash_init.cuh>
-  }
+  DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param)
+    : Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)) { }
 
-  DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param) : 
-    Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge))
-    //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
-  {
-    improvedstaggered::initConstants(*param.gauge, profile);    
-    improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
-  }
-
-  DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac) 
-  : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge)
-  {
-    improvedstaggered::initConstants(*dirac.gauge, profile);
-    improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
-  }
+  DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac)
+    : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge) { }
 
   DiracImprovedStaggered::~DiracImprovedStaggered() { }
 

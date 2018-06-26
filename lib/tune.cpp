@@ -41,6 +41,11 @@ namespace quda {
 #undef STR
 #undef STR_
 
+  /** tuning in progress? */
+  static bool tuning = false;
+
+  bool activeTuning() { return tuning; }
+
   static bool profile_count = true;
 
   void disableProfileCount() { profile_count = false; }
@@ -511,7 +516,6 @@ namespace quda {
     launchTimer.TPSTART(QUDA_PROFILE_PREAMBLE);
 #endif
 
-    static bool tuning = false; // tuning in progress?
     static const Tunable *active_tunable; // for error checking
 
     // first check if we have the tuned value and return if we have it

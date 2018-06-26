@@ -47,6 +47,7 @@ namespace quda {
   class ContractCuda : public Tunable {
 
   private:
+    DslashParam dslashParam;
     const cudaColorSpinorField x;		// Spinor to be contracted
     const cudaColorSpinorField y;		// Spinor to be contracted
     const QudaParity parity;		// Parity of the field, actual kernels act on parity spinors
@@ -99,6 +100,8 @@ namespace quda {
       fillAux(QUDA_CONTRACT_TSLICE_PLUS, "type=tslice-plus");
       fillAux(QUDA_CONTRACT_TSLICE_MINUS, "type=tslice-minus");
 
+      dslashParam.threads = x.Volume();
+      dslashParam.dc = y.getDslashConstant();
       bindSpinorTex<Float2>(&x, &y);
     }
 
@@ -114,7 +117,10 @@ namespace quda {
       fillAux(QUDA_CONTRACT_TSLICE_PLUS, "type=tslice-plus");
       fillAux(QUDA_CONTRACT_TSLICE_MINUS, "type=tslice-minus");
 
-      bindSpinorTex<Float2>(&x, &y);
+      DslashParam dslashParam;
+      dslashParam.threads = x.X(0)*x.X(1)*x.X(2);
+      dslashParam.Vsh = (x.X(0)*x.X(1)*x.X(2)) / x.SiteSubset();
+      dslashParam.dc = y.getDslashConstant();
     }
 
     virtual ~ContractCuda() { unbindSpinorTex<Float2>(&x, &y); } // if (tSlice != NULL) { cudaFreeHost(tSlice); } }
@@ -129,42 +135,42 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      switch	(contract_type)
+      switch (contract_type)
 	{
 	default:
-	case	QUDA_CONTRACT_GAMMA5:		// Calculates the volume contraction (x^+ g5)_\mu y_\nu and stores it in result
-	  contractGamma5Kernel     <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
+	case QUDA_CONTRACT_GAMMA5:		// Calculates the volume contraction (x^+ g5)_\mu y_\nu and stores it in result
+	  contractGamma5Kernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 	  break;
 	
-	case	QUDA_CONTRACT_GAMMA5_PLUS:	// Calculates the volume contraction (x^+ g5)_\mu y_\nu and adds it to result
-	  contractGamma5PlusKernel <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
+	case QUDA_CONTRACT_GAMMA5_PLUS:	// Calculates the volume contraction (x^+ g5)_\mu y_\nu and adds it to result
+	  contractGamma5PlusKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 	  break;
 
-	case	QUDA_CONTRACT_GAMMA5_MINUS:	// Calculates the volume contraction (x^+ g5)_\mu y_\nu and substracts it from result
+	case QUDA_CONTRACT_GAMMA5_MINUS:	// Calculates the volume contraction (x^+ g5)_\mu y_\nu and substracts it from result
 	  contractGamma5MinusKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 	  break;
 
-	case	QUDA_CONTRACT:			// Calculates the volume contraction x^+_\mu y_\nu and stores it in result
-	  contractKernel    	 <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
+	case QUDA_CONTRACT:			// Calculates the volume contraction x^+_\mu y_\nu and stores it in result
+	  contractKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 	  break;                                                  
 	                                                                                
-	case	QUDA_CONTRACT_PLUS:		// Calculates the volume contraction x^+_\mu y_\nu and adds it to result
-	  contractPlusKernel	 <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
+	case QUDA_CONTRACT_PLUS:		// Calculates the volume contraction x^+_\mu y_\nu and adds it to result
+	  contractPlusKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 	  break;                                                  
                                                                                         
-	case	QUDA_CONTRACT_MINUS:		// Calculates the volume contraction x^+_\mu y_\nu and substracts it from result
-	  contractMinusKernel	 <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
+	case QUDA_CONTRACT_MINUS:		// Calculates the volume contraction x^+_\mu y_\nu and substracts it from result
+	  contractMinusKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 	  break;
 
-	case	QUDA_CONTRACT_TSLICE:		// Calculates the time-slice contraction x^+_\mu y_\nu and stores it in result
-	  contractTsliceKernel   	 <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
+	case QUDA_CONTRACT_TSLICE:		// Calculates the time-slice contraction x^+_\mu y_\nu and stores it in result
+	  contractTsliceKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
 	  break;                                                  
 	                                                                                
-	case	QUDA_CONTRACT_TSLICE_PLUS:	// Calculates the time-slice contraction x^+_\mu y_\nu and adds it to result
-	  contractTslicePlusKernel <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
+	case QUDA_CONTRACT_TSLICE_PLUS:	// Calculates the time-slice contraction x^+_\mu y_\nu and adds it to result
+	  contractTslicePlusKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
 	  break;                                                  
                                                                                         
-	case	QUDA_CONTRACT_TSLICE_MINUS:	// Calculates the time-slice contraction x^+_\mu y_\nu and substracts it from result
+	case QUDA_CONTRACT_TSLICE_MINUS:	// Calculates the time-slice contraction x^+_\mu y_\nu and substracts it from result
 	  contractTsliceMinusKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
 	  break;
 	}
@@ -193,7 +199,7 @@ namespace quda {
      parity spinors, and the parity must be specified.
   */
 
-  void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const QudaParity parity, TimeProfile &profile)
+  void contractCuda(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const QudaParity parity, TimeProfile &profile)
   {
 #ifdef GPU_CONTRACT
     if	((contract_type == QUDA_CONTRACT_TSLICE) || (contract_type == QUDA_CONTRACT_TSLICE_PLUS) || (contract_type == QUDA_CONTRACT_TSLICE_MINUS)) {
@@ -203,8 +209,6 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_TOTAL);
     profile.TPSTART(QUDA_PROFILE_INIT);
-
-    dslashParam.threads = x.Volume();
 
     Tunable *contract = 0;
 
@@ -252,8 +256,6 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_TOTAL);
     profile.TPSTART(QUDA_PROFILE_INIT);
-
-    dslashParam.threads = x.X(0)*x.X(1)*x.X(2);
 
     Tunable *contract = 0;
 

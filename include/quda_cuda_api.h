@@ -53,7 +53,7 @@ namespace quda {
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, cudaStream_t stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
                         const char *func, const char *file, const char *line);
 
   /**
@@ -69,22 +69,33 @@ namespace quda {
      @param[in] stream Stream to issue copy
   */
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t hieght, cudaMemcpyKind kind, cudaStream_t stream,
+                          size_t width, size_t hieght, cudaMemcpyKind kind, const cudaStream_t &stream,
                           const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaLaunchKernel
+     @param[in] func Device function symbol
+     @param[in] gridDim Grid dimensions
+     @param[in] blockDim Block dimensions
+     @param[in] args Arguments
+     @param[in] sharedMem Shared memory requested per thread block
+     @param[in] stream Stream identifier
+  */
+  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream);
 
   /**
      @brief Wrapper around cudaEventQuery or cuEventQuery
      @param[in] event Event we are querying
      @return Status of event query
    */
-  cudaError_t qudaEventQuery(cudaEvent_t event);
+  cudaError_t qudaEventQuery(cudaEvent_t &event);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
-  cudaError_t qudaEventRecord(cudaEvent_t event, cudaStream_t stream);
+  cudaError_t qudaEventRecord(cudaEvent_t &event, cudaStream_t stream=0);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
@@ -98,18 +109,28 @@ namespace quda {
      @brief Wrapper around cudaStreamSynchronize or cuStreamSynchronize
      @param[in] stream Stream which we are synchronizing with respect to
    */
-  cudaError_t qudaStreamSynchronize(cudaStream_t stream);
+  cudaError_t qudaStreamSynchronize(cudaStream_t &stream);
 
   /**
      @brief Wrapper around cudaEventSynchronize or cuEventSynchronize
      @param[in] event Event which we are synchronizing with respect to
    */
-  cudaError_t qudaEventSynchronize(cudaEvent_t event);
+  cudaError_t qudaEventSynchronize(cudaEvent_t &event);
   
   /**
      @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
    */
   cudaError_t qudaDeviceSynchronize();
+
+#if (CUDA_VERSION >= 9000)
+  /**
+     @brief Wrapper around cudaFuncSetAttribute
+     @param[in] func Function for which we are setting the attribute
+     @param[in] attr Attribute to set
+     @param[in] value Value to set
+  */
+  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
+#endif
 
   /**
      @brief Print out the timer profile for CUDA API calls

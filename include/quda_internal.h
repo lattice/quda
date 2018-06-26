@@ -181,14 +181,18 @@ namespace quda {
     QUDA_PROFILE_DSLASH_KERNEL, /**< dslash kernel */
     QUDA_PROFILE_GATHER, /**< gather (device -> host) */
     QUDA_PROFILE_SCATTER, /**< scatter (host -> device) */
+
+    QUDA_PROFILE_LAUNCH_KERNEL, /**< cudaLaunchKernel */
     QUDA_PROFILE_EVENT_RECORD, /**< cuda event record  */
     QUDA_PROFILE_EVENT_QUERY, /**< cuda event querying */
     QUDA_PROFILE_STREAM_WAIT_EVENT, /**< stream waiting for event completion */
+    QUDA_PROFILE_FUNC_SET_ATTRIBUTE, /**< set function attribute */
 
     QUDA_PROFILE_EVENT_SYNCHRONIZE, /**< event synchronization */
     QUDA_PROFILE_STREAM_SYNCHRONIZE, /**< stream synchronization */
     QUDA_PROFILE_DEVICE_SYNCHRONIZE, /**< device synchronization */
 
+    QUDA_PROFILE_MEMCPY_D2D_ASYNC, /**< device to device async copy */
     QUDA_PROFILE_MEMCPY_D2H_ASYNC, /**< device to host async copy */
     QUDA_PROFILE_MEMCPY2D_D2H_ASYNC, /**< device to host 2-d memcpy async copy*/
     QUDA_PROFILE_MEMCPY_H2D_ASYNC, /**< host to device async copy */

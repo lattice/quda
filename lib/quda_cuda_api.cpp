@@ -125,7 +125,7 @@ namespace quda {
     checkCudaError();
   }
 
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, cudaStream_t stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
                         const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
@@ -135,6 +135,9 @@ namespace quda {
       break;
     case cudaMemcpyHostToDevice:
       PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+      break;
+    case cudaMemcpyDeviceToDevice:
+      PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
       break;
     default:
       errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
@@ -146,7 +149,7 @@ namespace quda {
   }
 
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream,
+                          size_t width, size_t height, cudaMemcpyKind kind, const cudaStream_t &stream,
                           const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
@@ -176,7 +179,15 @@ namespace quda {
 #endif
   }
 
-  cudaError_t qudaEventQuery(cudaEvent_t event)
+  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
+    if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
+    return error;
+  }
+
+  cudaError_t qudaEventQuery(cudaEvent_t &event)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
@@ -195,7 +206,7 @@ namespace quda {
 #endif
   }
 
-  cudaError_t qudaEventRecord(cudaEvent_t event, cudaStream_t stream)
+  cudaError_t qudaEventRecord(cudaEvent_t &event, cudaStream_t stream)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
@@ -229,7 +240,7 @@ namespace quda {
 #endif
   }
 
-  cudaError_t qudaStreamSynchronize(cudaStream_t stream)
+  cudaError_t qudaStreamSynchronize(cudaStream_t &stream)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
@@ -246,7 +257,7 @@ namespace quda {
 #endif
   }
 
-  cudaError_t qudaEventSynchronize(cudaEvent_t event)
+  cudaError_t qudaEventSynchronize(cudaEvent_t &event)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
@@ -279,6 +290,15 @@ namespace quda {
     return error;
 #endif
   }
+
+#if (CUDA_VERSION >= 9000)
+  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    return error;
+  }
+#endif
 
   void printAPIProfile() {
 #ifdef API_PROFILE
