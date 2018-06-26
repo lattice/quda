@@ -2,6 +2,7 @@
 #include <assert.h>
 
 #include <quda_internal.h>
+#include "quda_env.h"
 #include <comm_quda.h>
 
 
@@ -155,14 +156,16 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
 
-  char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
-
   // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
   // and comm_dim(dim) == 2 (used for perf benchmarking)
   bool disable_peer_to_peer_bidir = false;
 
+  
+  // check whether p2p enable differs from default value
+  bool enable_peer_to_peer_env = quda::QudaEnv::getInstance().get_enable_p2p() != enable_peer_to_peer ? true : false;
+
   if (enable_peer_to_peer_env) {
-    enable_peer_to_peer = atoi(enable_peer_to_peer_env);
+    enable_peer_to_peer = quda::QudaEnv::getInstance().get_enable_p2p();
 
     switch ( std::abs(enable_peer_to_peer) ) {
     case 0: if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling peer-to-peer access\n"); break;
@@ -603,19 +606,7 @@ int comm_partitioned()
 }
 
 bool comm_gdr_enabled() {
-  static bool gdr_enabled = false;
-#ifdef MULTI_GPU
-  static bool gdr_init = false;
-
-  if (!gdr_init) {
-    char *enable_gdr_env = getenv("QUDA_ENABLE_GDR");
-    if (enable_gdr_env && strcmp(enable_gdr_env, "1") == 0) {
-      gdr_enabled = true;
-    }
-    gdr_init = true;
-  }
-#endif
-  return gdr_enabled;
+    return static_cast<bool>(quda::QudaEnv::getInstance().get_enable_gdr());
 }
 
 bool comm_gdr_blacklist() {
