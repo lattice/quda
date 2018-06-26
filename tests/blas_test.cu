@@ -960,6 +960,10 @@ const char *names[] = {
 
 int main(int argc, char** argv)
 {
+  
+  ::testing::InitGoogleTest(&argc, argv);
+  int result = 0;
+
   prec = QUDA_INVALID_PRECISION;
   test_type = -1;
 
