@@ -37,13 +37,13 @@ namespace quda {
 
   // clover Dslash
   void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
-			const FullClover cloverInv, const cudaColorSpinorField *in,
+			const FullClover &cloverInv, const cudaColorSpinorField *in,
 			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
 			const double &k, const int *commDim, TimeProfile &profile);
 
   // clover Dslash
   void asymCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
-			    const FullClover cloverInv, const cudaColorSpinorField *in,
+			    const FullClover &cloverInv, const cudaColorSpinorField *in,
 			    const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
 			    const double &k, const int *commDim, TimeProfile &profile);
 

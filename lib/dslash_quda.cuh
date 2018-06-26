@@ -2,7 +2,7 @@
 
 #if (__COMPUTE_CAPABILITY__ >= 700)
 // for running on Volta we set large shared memory mode to prefer hitting in L2
-#define SET_CACHE(f) cudaFuncSetAttribute(f, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
+#define SET_CACHE(f) qudaFuncSetAttribute( (const void*)f, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
 #else
 #define SET_CACHE(f)
 #endif
@@ -11,7 +11,7 @@
 #define LAUNCH_KERNEL(f, grid, block, shared, stream, param)            \
   void *args[] = { &param };                                            \
   void (*func)( const DslashParam ) = &(f);                             \
-  cudaLaunchKernel( (const void*)func, grid, block, args, shared, stream);
+  qudaLaunchKernel( (const void*)func, grid, block, args, shared, stream);
 #else
 #define LAUNCH_KERNEL(f, grid, block, shared, stream, param) f<<<grid, block, shared, stream>>>(param)
 #endif
@@ -364,10 +364,6 @@
 // allow a simple interface.
 class DslashCuda : public Tunable {
 
-public:
-  double twist_a;
-  double twist_b;
-
 protected:
   cudaColorSpinorField *out;
   const cudaColorSpinorField *in;
@@ -459,10 +455,26 @@ protected:
   }
 
 public:
+  DslashParam dslashParam;
+
   DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-	     const cudaColorSpinorField *x, const GaugeField &gauge, const int dagger)
+	     const cudaColorSpinorField *x, const GaugeField &gauge,
+             const int parity, const int dagger, const int *commOverride)
     : out(out), in(in), x(x), gauge(gauge), reconstruct(gauge.Reconstruct()),
-      dagger(dagger), saveOut(0), saveOutNorm(0), twist_a(0.0), twist_b(0.0)  {
+      dagger(dagger), saveOut(0), saveOutNorm(0) {
+
+    if (in->Precision() != gauge.Precision())
+      errorQuda("Mixing gauge %d and spinor %d precision not supported", gauge.Precision(), in->Precision());
+
+    constexpr int nDimComms = 4;
+    for (int i=0; i<nDimComms; i++){
+      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
+      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
+      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
+      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
+      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
+      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
+    }
 
     // set parameters particular for this instance
     dslashParam.out = (void*)out->V();
@@ -481,42 +493,12 @@ public:
     if (x) dslashParam.xTexNorm = x->TexNorm();
 #endif // USE_TEXTURE_OBJECTS
 
+    dslashParam.parity = parity;
+    bindGaugeTex(static_cast<const cudaGaugeField&>(gauge), parity, dslashParam);
+
     dslashParam.sp_stride = in->Stride();
 
-    auto X = dslashParam.X;
-    X[0] = in->X(0)*2; // this is a c/b field so double the x dimension
-    for (int i=1; i<4; i++) X[i] = in->X(i);
-    dslashParam.Ls = in->X(4); // needed by tuneLaunch()
-    dslashParam.Xh[0] = in->X(0);
-    for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
-    dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
-
-    // FIXME there is redundancy in the parameters below (face vs ghostFace vs LatticeField::surfaceCB member)
-    int face[4];
-    for (int dim=0; dim<4; dim++) {
-      for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
-      face[dim] = Nface()/2;
-      dslashParam.face_X[dim] = face[0];
-      dslashParam.face_Y[dim] = face[1];
-      dslashParam.face_Z[dim] = face[2];
-      dslashParam.face_T[dim] = face[3];
-      dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
-      dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
-      dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
-    }
-
-    dslashParam.Vh = (X[3]*X[2]*X[1]*X[0])/2;
-    dslashParam.ghostFace[0] = (X[1]*X[2]*X[3])/2;
-    dslashParam.ghostFace[1] = (X[0]*X[2]*X[3])/2;
-    dslashParam.ghostFace[2] = (X[0]*X[1]*X[3])/2;
-    dslashParam.ghostFace[3] = (X[0]*X[1]*X[2])/2;
-
-    dslashParam.X2X1 = X[1]*X[0];
-    dslashParam.X3X2X1 = X[2]*X[1]*X[0];
-    dslashParam.X2X1mX1 = (X[1]-1)*X[0];
-    dslashParam.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
-    dslashParam.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
-    dslashParam.X4X3X2X1hmX3X2X1h = dslashParam.X4X3X2X1mX3X2X1/2;
+    dslashParam.dc = in->getDslashConstant(); // get precomputed constants
 
     dslashParam.gauge_stride = gauge.Stride();
     dslashParam.gauge_fixed = gauge.GaugeFixed();
@@ -533,23 +515,22 @@ public:
     dslashParam.coeff = 1.0;
     dslashParam.coeff_f = 1.0f;
 
+    dslashParam.twist_a = 0.0;
+    dslashParam.twist_b = 0.0;
+
+    dslashParam.No2 = make_float2(1.0f, 1.0f);
+    dslashParam.Pt0 = (comm_coord(3) == 0) ? true : false;
+    dslashParam.PtNm1 = (comm_coord(3) == comm_dim(3)-1) ? true : false;
+
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
     if (!init) { // these parameters are constant across all dslash instances for a given run
       char ghost[5]; // set the ghost string
-      for (int dim=0; dim<4; dim++) {
-        dslashParam.ghostDim[dim] = comm_dim_partitioned(dim); // determines whether to use regular or ghost indexing at boundary
-        ghost[dim] = (dslashParam.ghostDim[dim] ? '1' : '0');
-      }
+      for (int dim=0; dim<nDimComms; dim++) ghost[dim] = (dslashParam.ghostDim[dim] ? '1' : '0');
       ghost[4] = '\0';
       strcpy(ghost_str,",ghost=");
       strcat(ghost_str,ghost);
-
-      dslashParam.No2 = make_float2(1.0f, 1.0f);
-      dslashParam.Pt0 = (comm_coord(3) == 0) ? true : false;
-      dslashParam.PtNm1 = (comm_coord(3) == comm_dim(3)-1) ? true : false;
-
       init = true;
     }
 
@@ -568,7 +549,7 @@ public:
 
   }
 
-  virtual ~DslashCuda() { }
+  virtual ~DslashCuda() { unbindGaugeTex(static_cast<const cudaGaugeField&>(gauge)); }
   virtual TuneKey tuneKey() const  
   { return TuneKey(in->VolString(), typeid(*this).name(), aux[dslashParam.kernel_type]); }
 
@@ -836,8 +817,9 @@ protected:
 
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, const GaugeField &gauge, int dagger)
-    : DslashCuda(out, in, x, gauge, dagger) { ; }
+		   const cudaColorSpinorField *x, const GaugeField &gauge,
+                   int parity, int dagger, const int *commOverride)
+    : DslashCuda(out, in, x, gauge, parity, dagger, commOverride) { ; }
   virtual ~SharedDslashCuda() { ; }
 
   virtual void initTuneParam(TuneParam &param) const
@@ -860,8 +842,9 @@ public:
 class SharedDslashCuda : public DslashCuda {
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, const GaugeField &gauge, int dagger)
-    : DslashCuda(out, in, x, gauge, dagger) { }
+		   const cudaColorSpinorField *x, const GaugeField &gauge,
+                   int parity, int dagger, const int *commOverride)
+    : DslashCuda(out, in, x, gauge, parity, dagger, commOverride) { }
   virtual ~SharedDslashCuda() { }
 };
 #endif

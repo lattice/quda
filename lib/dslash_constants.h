@@ -13,42 +13,22 @@ enum KernelType {
 };
 
   struct DslashParam {
-    char do_not_delete; // work around for bug in CUDA 6.5
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
-    int_fastdiv X[4];
-    int_fastdiv Xh[4];
-    int_fastdiv volume4CB;
-    int Ls;
 
     int_fastdiv block[4]; // dslash tile block parameter
     int_fastdiv grid[4]; // dslash tile grid parameter
     int_fastdiv swizzle; // block index swizzle factor
 
-    int_fastdiv face_XYZT[4];
-    int_fastdiv face_XYZ[4];
-    int_fastdiv face_XY[4];
-    int_fastdiv face_X[4];
-    int_fastdiv face_Y[4];
-    int_fastdiv face_Z[4];
-    int_fastdiv face_T[4];
+    DslashConstant dc;
 
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
 
-    int ghostFace[QUDA_MAX_DIM+1]; // number of sites in each ghost
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
     int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
     int ghostOffset[QUDA_MAX_DIM+1][2];
     int ghostNormOffset[QUDA_MAX_DIM+1][2];
     int sp_stride; // spinor stride
-
-    // constants used to accelerate dslash indexing
-    int X2X1;
-    int X3X2X1;
-    int X2X1mX1;
-    int X3X2X1mX2X1;
-    int X4X3X2X1mX3X2X1;
-    int X4X3X2X1hmX3X2X1h;
 
 #ifdef GPU_CLOVER_DIRAC
     int cl_stride; // clover stride
@@ -148,7 +128,6 @@ enum KernelType {
     double twist_a;
     double twist_b;
 
-    int Vh;  // checker-board volume
     int Vsh; // used by contraction kernels
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -178,10 +157,10 @@ enum KernelType {
     void print() {
       printfQuda("threads = %d\n", threads);
       printfQuda("parity = %d\n", parity);
-      printfQuda("X = {%d, %d, %d, %d}\n", (int)X[0], (int)X[1], (int)X[2], (int)X[3]);
-      printfQuda("Xh = {%d, %d, %d, %d}\n", (int)Xh[0], (int)Xh[1], (int)Xh[2], (int)Xh[3]);
-      printfQuda("volume4CB = %d\n", (int)volume4CB);
-      printfQuda("Ls = %d\n", Ls);
+      printfQuda("X = {%d, %d, %d, %d}\n", (int)dc.X[0], (int)dc.X[1], (int)dc.X[2], (int)dc.X[3]);
+      printfQuda("Xh = {%d, %d, %d, %d}\n", (int)dc.Xh[0], (int)dc.Xh[1], (int)dc.Xh[2], (int)dc.Xh[3]);
+      printfQuda("volume4CB = %d\n", (int)dc.volume_4d_cb);
+      printfQuda("Ls = %d\n", dc.Ls);
       printfQuda("kernel_type = %d\n", kernel_type);
       printfQuda("commDim = {%d, %d, %d, %d}\n", commDim[0], commDim[1], commDim[2], commDim[3]);
       printfQuda("ghostDim = {%d, %d, %d, %d}\n", ghostDim[0], ghostDim[1], ghostDim[2], ghostDim[3]);
@@ -221,9 +200,6 @@ enum KernelType {
       printfQuda("twist_b = %e\n", twist_b);
     }
   };
-
-  static DslashParam dslashParam;
-
 
 typedef struct fat_force_stride_s {
   int fat_ga_stride;

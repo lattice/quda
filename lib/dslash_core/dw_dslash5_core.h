@@ -125,17 +125,17 @@ VOLATILE spinorFloat o32_im;
 #include "io_spinor.h"
 
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*param.Ls) return;
+if (sid >= param.threads*param.dc.Ls) return;
 
 
 int X, coord[5], boundaryCrossing;
 
 
 
-boundaryCrossing = sid/param.Xh[0] + sid/(param.X[1]*param.Xh[0]) + sid/(param.X[2]*param.X[1]*param.Xh[0]);
+boundaryCrossing = sid/param.dc.Xh[0] + sid/(param.dc.X[1]*param.dc.Xh[0]) + sid/(param.dc.X[2]*param.dc.X[1]*param.dc.Xh[0]);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-coord[4] = X/(param.X[0]*param.X[1]*param.X[2]*param.X[3]);
+coord[4] = X/(param.dc.X[0]*param.dc.X[1]*param.dc.X[2]*param.dc.X[3]);
 
  o00_re = 0; o00_im = 0;
  o01_re = 0; o01_im = 0;
@@ -155,12 +155,12 @@ coord[4] = X/(param.X[0]*param.X[1]*param.X[2]*param.X[3]);
 {
 // 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
   {
-     int sp_idx = ( coord[4] == param.Ls-1 ? X-(param.Ls-1)*2*param.volume4CB : X+2*param.volume4CB ) / 2;
+     int sp_idx = ( coord[4] == param.dc.Ls-1 ? X-(param.dc.Ls-1)*2*param.dc.volume_4d_cb : X+2*param.dc.volume_4d_cb ) / 2;
 
 // read spinor from device memory
      READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
-     if ( coord[4] != param.Ls-1 )
+     if ( coord[4] != param.dc.Ls-1 )
      {
    o00_re += +i00_re-i20_re;   o00_im += +i00_im-i20_im;
    o01_re += +i01_re-i21_re;   o01_im += +i01_im-i21_im;
@@ -195,12 +195,12 @@ coord[4] = X/(param.X[0]*param.X[1]*param.X[2]*param.X[3]);
    o30_re += -mferm*(-i10_re+i30_re);   o30_im += -mferm*(-i10_im+i30_im);
    o31_re += -mferm*(-i11_re+i31_re);   o31_im += -mferm*(-i11_im+i31_im);
    o32_re += -mferm*(-i12_re+i32_re);   o32_im += -mferm*(-i12_im+i32_im);
-    } // end if ( coord[4] != param.Ls-1 )
+    } // end if ( coord[4] != param.dc.Ls-1 )
   } // end P_L
 
  // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
   {
-    int sp_idx = ( coord[4] == 0 ? X+(param.Ls-1)*2*param.volume4CB : X-2*param.volume4CB ) / 2;
+    int sp_idx = ( coord[4] == 0 ? X+(param.dc.Ls-1)*2*param.dc.volume_4d_cb : X-2*param.dc.volume_4d_cb ) / 2;
 
 // read spinor from device memory
     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
