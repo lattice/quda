@@ -58,7 +58,6 @@ namespace quda {
   class NdegTwistedDslashCuda : public SharedDslashCuda {
 
   private:
-    const gFloat *gauge0, *gauge1;
     const QudaTwistDslashType dslashType;
     double a, b, c, d;
 
@@ -74,18 +73,16 @@ namespace quda {
     }
 
   public:
-    NdegTwistedDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-		      const QudaReconstructType reconstruct, const cudaColorSpinorField *in,  const cudaColorSpinorField *x, 
-		      const QudaTwistDslashType dslashType, const double kappa, const double mu, 
-		      const double epsilon, const double k, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), dslashType(dslashType)
+    NdegTwistedDslashCuda(cudaColorSpinorField *out, const GaugeField &gauge,
+                          const cudaColorSpinorField *in, const cudaColorSpinorField *x,
+                          const QudaTwistDslashType dslashType, const double kappa, const double mu,
+                          const double epsilon, const double k, const int parity, const int dagger, const int *commOverride)
+      : SharedDslashCuda(out, in, x, gauge, parity, dagger, commOverride), dslashType(dslashType)
     { 
       a = kappa;
       b = mu;
       c = epsilon;
       d = k;
-      dslashParam.gauge0 = (void*)gauge0;
-      dslashParam.gauge1 = (void*)gauge1;
       dslashParam.a = kappa;
       dslashParam.a_f = kappa;
       dslashParam.b = mu;
@@ -144,56 +141,31 @@ namespace quda {
 
 #include <dslash_policy.cuh> 
 
-  void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-				 const cudaColorSpinorField *in, const int parity, const int dagger, 
-				 const cudaColorSpinorField *x, const QudaTwistDslashType type, 
-				 const double &kappa, const double &mu, const double &epsilon, 
+  void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
+				 const cudaColorSpinorField *in, const int parity, const int dagger,
+				 const cudaColorSpinorField *x, const QudaTwistDslashType type,
+				 const double &kappa, const double &mu, const double &epsilon,
 				 const double &k,  const int *commOverride, TimeProfile &profile)
   {
-    inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->createComms(1);
-
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
+    const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
-    int ghost_threads[4] = {0};
-    int bulk_threads = in->Volume() / 2;
-
-    for(int i=0;i<4;i++){
-      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
-      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
-      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
-      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
-      ghost_threads[i] = in->GhostFace()[i] / 2;
-    }
-
-    void *gauge0, *gauge1;
-    bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-    if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
-
-    DslashCuda *dslash = 0;
-    size_t regSize = sizeof(float);
-
+    DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new NdegTwistedDslashCuda<double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
-      regSize = sizeof(double);
+      dslash = new NdegTwistedDslashCuda<double2,double2>(out, gauge, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new NdegTwistedDslashCuda<float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
+      dslash = new NdegTwistedDslashCuda<float4,float4>(out, gauge, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new NdegTwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
+      dslash = new NdegTwistedDslashCuda<short4,short4>(out, gauge, in, x, type, kappa, mu, epsilon, k, parity, dagger, commOverride);
     }
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
+    int bulk_threads = in->Volume() / 2;
+    int ghost_threads[4] = {0};
+    for(int i=0;i<4;i++) ghost_threads[i] = in->GhostFace()[i] / 2;
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), bulk_threads, ghost_threads, profile);
     dslash_policy.apply(0);
 
     delete dslash;
-
-    unbindGaugeTex(gauge);
-
-    checkCudaError();
 #else
     errorQuda("Non-degenerate twisted mass dslash has not been built");
 #endif

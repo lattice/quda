@@ -37,13 +37,13 @@ namespace quda {
 
   // clover Dslash
   void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
-			const FullClover cloverInv, const cudaColorSpinorField *in,
+			const FullClover &cloverInv, const cudaColorSpinorField *in,
 			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
 			const double &k, const int *commDim, TimeProfile &profile);
 
   // clover Dslash
   void asymCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
-			    const FullClover cloverInv, const cudaColorSpinorField *in,
+			    const FullClover &cloverInv, const cudaColorSpinorField *in,
 			    const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
 			    const double &k, const int *commDim, TimeProfile &profile);
 
@@ -72,7 +72,8 @@ namespace quda {
   // Added for 4d EO preconditioning in Mobius DWF
   void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 		      const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k,
-		      const int *commDim, const int DS_type, TimeProfile &profile);
+		      const double *b5, const double *c_5, const double &m5,
+                      const int *commDim, const int DS_type, TimeProfile &profile);
 
   // staggered Dslash    
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,

@@ -8,6 +8,7 @@
 
 #include <lattice_field.h>
 #include <random_quda.h>
+#include <fast_intdiv.h>
 
 namespace quda {
 
@@ -235,6 +236,38 @@ namespace quda {
   class cpuColorSpinorField;
   class cudaColorSpinorField;
 
+  /**
+     @brief Constants used by dslash and packing kernels
+  */
+  struct DslashConstant {
+    int Vh;
+    int_fastdiv X[QUDA_MAX_DIM];
+    int_fastdiv Xh[QUDA_MAX_DIM];
+    int Ls;
+
+    int volume_4d;
+    int volume_4d_cb;
+
+    int_fastdiv face_X[4];
+    int_fastdiv face_Y[4];
+    int_fastdiv face_Z[4];
+    int_fastdiv face_T[4];
+    int_fastdiv face_XY[4];
+    int_fastdiv face_XYZ[4];
+    int_fastdiv face_XYZT[4];
+
+    int ghostFace[QUDA_MAX_DIM+1];
+
+    int X2X1;
+    int X3X2X1;
+    int X2X1mX1;
+    int X3X2X1mX2X1;
+    int X4X3X2X1mX3X2X1;
+    int X4X3X2X1hmX3X2X1h;
+
+    int_fastdiv dims[4][3];
+  };
+
   class ColorSpinorField : public LatticeField {
 
   private:
@@ -246,6 +279,7 @@ namespace quda {
 
   protected:
     bool init;
+    mutable bool init_ghost_zone;
 
     int nColor;
     int nSpin;
@@ -279,6 +313,8 @@ namespace quda {
     mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
 
     mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
+
+    mutable DslashConstant dslash_constant; // constants used by dslash and packing kernels
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
@@ -416,6 +452,11 @@ namespace quda {
        Return array of pointers to the ghost zones (ordering dim*2+dir)
      */
     void* const* Ghost() const;
+
+    /**
+       @brief Get the dslash_constant structure from this field
+    */
+    const DslashConstant& getDslashConstant() const { return dslash_constant; }
 
     const ColorSpinorField& Even() const;
     const ColorSpinorField& Odd() const;

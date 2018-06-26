@@ -179,6 +179,14 @@ namespace quda {
 #endif
   }
 
+  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
+    if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
+    return error;
+  }
+
   cudaError_t qudaEventQuery(cudaEvent_t &event)
   {
 #ifdef USE_DRIVER_API
@@ -282,6 +290,15 @@ namespace quda {
     return error;
 #endif
   }
+
+#if (CUDA_VERSION >= 9000)
+  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    return error;
+  }
+#endif
 
   void printAPIProfile() {
 #ifdef API_PROFILE
