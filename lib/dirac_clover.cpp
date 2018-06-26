@@ -5,19 +5,9 @@
 
 namespace quda {
 
-  namespace clover {
-#include <dslash_init.cuh>
-  }
-
-  namespace asym_clover {
-#include <dslash_init.cuh>
-  }
-
   DiracClover::DiracClover(const DiracParam &param)
     : DiracWilson(param), clover(*(param.clover))
   {
-    clover::initConstants(*param.gauge, profile);
-    asym_clover::initConstants(*param.gauge, profile);
 #ifdef DYNAMIC_CLOVER
     warningQuda("Dynamic clover generation/inversion is currently not supported for pure Wilson-Clover dslash.\n");
 #endif
@@ -26,8 +16,6 @@ namespace quda {
   DiracClover::DiracClover(const DiracClover &dirac) 
     : DiracWilson(dirac), clover(dirac.clover)
   {
-    clover::initConstants(*dirac.gauge, profile);
-    asym_clover::initConstants(*dirac.gauge, profile);
 #ifdef DYNAMIC_CLOVER
     warningQuda("Dynamic clover generation/inversion is currently not supported for pure Wilson-Clover dslash.\n");
 #endif
