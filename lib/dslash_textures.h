@@ -161,25 +161,25 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, T &dslashParam)
 #else
   if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
     if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
-      cudaBindTexture(0, gauge0TexDouble2, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, gauge1TexDouble2, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge0TexDouble2, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge1TexDouble2, dslashParam.gauge1, gauge.Bytes()/2);
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
-      cudaBindTexture(0, gauge0TexSingle2, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, gauge1TexSingle2, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge0TexSingle2, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge1TexSingle2, dslashParam.gauge1, gauge.Bytes()/2);
     } else {
-      cudaBindTexture(0, gauge0TexHalf2, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, gauge1TexHalf2, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge0TexHalf2, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge1TexHalf2, dslashParam.gauge1, gauge.Bytes()/2);
     }
   } else {
     if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
-      cudaBindTexture(0, gauge0TexDouble2, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, gauge1TexDouble2, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge0TexDouble2, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge1TexDouble2, dslashParam.gauge1, gauge.Bytes()/2);
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
-      cudaBindTexture(0, gauge0TexSingle4, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, gauge1TexSingle4, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge0TexSingle4, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge1TexSingle4, dslashParam.gauge1, gauge.Bytes()/2);
     } else {
-      cudaBindTexture(0, gauge0TexHalf4, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, gauge1TexHalf4, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge0TexHalf4, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, gauge1TexHalf4, dslashParam.gauge1, gauge.Bytes()/2);
     }
   }
 #endif // USE_TEXTURE_OBJECTS
@@ -231,14 +231,14 @@ void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, T &dslashPar
   dslashParam.gauge1Tex = oddBit ? gauge.EvenTex() : gauge.OddTex();
 #else
   if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
-    cudaBindTexture(0, fatGauge0TexDouble, *gauge0, gauge.Bytes()/2);
-    cudaBindTexture(0, fatGauge1TexDouble, *gauge1, gauge.Bytes()/2);
+    cudaBindTexture(0, fatGauge0TexDouble, dslashParam.gauge0, gauge.Bytes()/2);
+    cudaBindTexture(0, fatGauge1TexDouble, dslashParam.gauge1, gauge.Bytes()/2);
   } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
-    cudaBindTexture(0, fatGauge0TexSingle, *gauge0, gauge.Bytes()/2);
-    cudaBindTexture(0, fatGauge1TexSingle, *gauge1, gauge.Bytes()/2);
+    cudaBindTexture(0, fatGauge0TexSingle, dslashParam.gauge0, gauge.Bytes()/2);
+    cudaBindTexture(0, fatGauge1TexSingle, dslashParam.gauge1, gauge.Bytes()/2);
   } else {
-    cudaBindTexture(0, fatGauge0TexHalf, *gauge0, gauge.Bytes()/2);
-    cudaBindTexture(0, fatGauge1TexHalf, *gauge1, gauge.Bytes()/2);
+    cudaBindTexture(0, fatGauge0TexHalf, dslashParam.gauge0, gauge.Bytes()/2);
+    cudaBindTexture(0, fatGauge1TexHalf, dslashParam.gauge1, gauge.Bytes()/2);
   }
 #endif // USE_TEXTURE_OBJECTS
 
@@ -285,34 +285,34 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, T &dslashPa
   }
 #else
   if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
-    cudaBindTexture(0, longGauge0TexDouble, *gauge0, gauge.Bytes()/2);
-    cudaBindTexture(0, longGauge1TexDouble, *gauge1, gauge.Bytes()/2);
+    cudaBindTexture(0, longGauge0TexDouble, dslashParam.gauge0, gauge.Bytes()/2);
+    cudaBindTexture(0, longGauge1TexDouble, dslashParam.gauge1, gauge.Bytes()/2);
     if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
-      cudaBindTexture(0, longPhase0TexDouble, (char*)(*gauge0) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
-      cudaBindTexture(0, longPhase1TexDouble, (char*)(*gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+      cudaBindTexture(0, longPhase0TexDouble, (char*)(dslashParam.gauge0) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+      cudaBindTexture(0, longPhase1TexDouble, (char*)(dslashParam.gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
     }
   } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
     if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
-      cudaBindTexture(0, longGauge0TexSingle_norecon, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, longGauge1TexSingle_norecon, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, longGauge0TexSingle_norecon, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, longGauge1TexSingle_norecon, dslashParam.gauge1, gauge.Bytes()/2);
     } else {
-      cudaBindTexture(0, longGauge0TexSingle, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, longGauge1TexSingle, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, longGauge0TexSingle, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, longGauge1TexSingle, dslashParam.gauge1, gauge.Bytes()/2);
       if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
-        cudaBindTexture(0, longPhase0TexSingle, (char*)(*gauge0) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
-        cudaBindTexture(0, longPhase1TexSingle, (char*)(*gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+        cudaBindTexture(0, longPhase0TexSingle, (char*)(dslashParam.gauge0) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+        cudaBindTexture(0, longPhase1TexSingle, (char*)(dslashParam.gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
       }
     }
   } else {
     if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
-      cudaBindTexture(0, longGauge0TexHalf_norecon, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, longGauge1TexHalf_norecon, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, longGauge0TexHalf_norecon, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, longGauge1TexHalf_norecon, dslashParam.gauge1, gauge.Bytes()/2);
     } else {
-      cudaBindTexture(0, longGauge0TexHalf, *gauge0, gauge.Bytes()/2);
-      cudaBindTexture(0, longGauge1TexHalf, *gauge1, gauge.Bytes()/2);
+      cudaBindTexture(0, longGauge0TexHalf, dslashParam.gauge0, gauge.Bytes()/2);
+      cudaBindTexture(0, longGauge1TexHalf, dslashParam.gauge1, gauge.Bytes()/2);
       if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
-        cudaBindTexture(0, longPhase0TexHalf, (char*)(*gauge0) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
-	cudaBindTexture(0, longPhase1TexHalf, (char*)(*gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+        cudaBindTexture(0, longPhase0TexHalf, (char*)(dslashParam.gauge0) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+	cudaBindTexture(0, longPhase1TexHalf, (char*)(dslashParam.gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
       }
     }
   }
@@ -480,12 +480,12 @@ QudaPrecision bindCloverTex(const FullClover &clover, const int oddBit, T &dslas
   if (clover.precision == QUDA_HALF_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
 #else
   if (clover.precision == QUDA_DOUBLE_PRECISION) {
-    cudaBindTexture(0, cloverTexDouble, *cloverP, clover.bytes);
+    cudaBindTexture(0, cloverTexDouble, dslashParam.clover, clover.bytes);
   } else if (clover.precision == QUDA_SINGLE_PRECISION) {
-    cudaBindTexture(0, cloverTexSingle, *cloverP, clover.bytes);
+    cudaBindTexture(0, cloverTexSingle, dslashParam.clover, clover.bytes);
   } else {
-    cudaBindTexture(0, cloverTexHalf, *cloverP, clover.bytes);
-    cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
+    cudaBindTexture(0, cloverTexHalf, dslashParam.clover, clover.bytes);
+    cudaBindTexture(0, cloverTexNorm, dslashParam.cloverNorm, clover.norm_bytes);
   }
 #endif // USE_TEXTURE_OBJECTS
 
@@ -514,7 +514,7 @@ QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover clo
     dslashParam.cloverNorm = (float*)clover.oddNorm;
 #ifndef DYNAMIC_CLOVER
     dslashParam.cloverInv = cloverInv.odd;
-    dslashParam.cloverInv = (float*)cloverInv.oddNorm;
+    dslashParam.cloverInvNorm = (float*)cloverInv.oddNorm;
 #endif
   } else {
     dslashParam.clover = clover.even;
@@ -534,21 +534,21 @@ QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover clo
 #endif
 #else
   if (clover.precision == QUDA_DOUBLE_PRECISION) {   //I assume that the clover and cloverInv fields have the same precision
-    cudaBindTexture(0, cloverTexDouble, *cloverP, clover.bytes);
+    cudaBindTexture(0, cloverTexDouble, dslashParam.clover, clover.bytes);
 #ifndef DYNAMIC_CLOVER
-    cudaBindTexture(0, cloverInvTexDouble, *cloverInvP, cloverInv.bytes);
+    cudaBindTexture(0, cloverInvTexDouble, dslashParam.cloverInv, cloverInv.bytes);
 #endif
   } else if (clover.precision == QUDA_SINGLE_PRECISION) {
-    cudaBindTexture(0, cloverTexSingle, *cloverP, clover.bytes);
+    cudaBindTexture(0, cloverTexSingle, dslashParam.clover, clover.bytes);
 #ifndef DYNAMIC_CLOVER
-    cudaBindTexture(0, cloverInvTexSingle, *cloverInvP, cloverInv.bytes);
+    cudaBindTexture(0, cloverInvTexSingle, dslashParam.cloverInv, cloverInv.bytes);
 #endif
   } else {
-    cudaBindTexture(0, cloverTexHalf, *cloverP, clover.bytes);
-    cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
+    cudaBindTexture(0, cloverTexHalf, dslashParam.clover, clover.bytes);
+    cudaBindTexture(0, cloverTexNorm, dslashParam.cloverNorm, clover.norm_bytes);
 #ifndef DYNAMIC_CLOVER
-    cudaBindTexture(0, cloverInvTexHalf, *cloverInvP, cloverInv.bytes);
-    cudaBindTexture(0, cloverInvTexNorm, *cloverInvNormP, cloverInv.norm_bytes);
+    cudaBindTexture(0, cloverInvTexHalf, dslashParam.cloverInv, cloverInv.bytes);
+    cudaBindTexture(0, cloverInvTexNorm, dslashParam.cloverInvNorm, cloverInv.norm_bytes);
 #endif
   }
 #endif // USE_TEXTURE_OBJECTS
