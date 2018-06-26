@@ -1619,6 +1619,7 @@ int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
+char gauge_outfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
@@ -1738,6 +1739,7 @@ void usage(char** argv )
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
+  printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l (default 10)\n");
   printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n");
@@ -2417,6 +2419,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }     
     strcpy(latfile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--save-gauge") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    strcpy(gauge_outfile, argv[i+1]);
     i++;
     ret = 0;
     goto out;
