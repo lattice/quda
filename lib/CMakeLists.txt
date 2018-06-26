@@ -133,7 +133,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     endif()
 endif()
 
-target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
+target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
   target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${QIO_LIB} ${LIME_LIB})
