@@ -127,11 +127,10 @@ endif()
 
 
 
-## dummy test for testing gtest, ctest and jenkins integration
-cuda_add_executable(dummy_gtest dummy_gtest.cpp)
-target_link_libraries(dummy_gtest quda_test)
-include( CTest )
-  
+## enable tests
+if(${qudabuildtests})
+  include( CTest )
+endif()
 
-add_test(dummy_gtest dummy_gtest --gtest_output=xml:dummy_gtest.xml)
+## list tests here
 add_test(blas_test blas_test --gtest_output=xml:blas_test.xml)
