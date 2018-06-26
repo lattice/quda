@@ -181,12 +181,14 @@
 // double-precision spinor fields
 #if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
 #define SPINORTEX param.in
 #define GHOSTSPINORTEX param.ghost
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -230,14 +232,24 @@
 // double-precision clover field
 #if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
 #define CLOVERTEX param.clover
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_DOUBLE_STR
+#else
 #define READ_CLOVER READ_CLOVER_DOUBLE_STR
+#endif
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define CLOVERTEX (param.cloverTex)
 #else
 #define CLOVERTEX cloverTexDouble
 #endif
+
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_DOUBLE_TEX
+#else
 #define READ_CLOVER READ_CLOVER_DOUBLE_TEX
+#endif
+
 #endif
 #define CLOVER_DOUBLE
 
@@ -268,12 +280,14 @@
 // single-precision spinor fields
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_SINGLE
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define SPINORTEX param.in
 #define GHOSTSPINORTEX param.ghost
 #else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -315,14 +329,23 @@
 // single-precision clover field
 #ifdef DIRECT_ACCESS_CLOVER
 #define CLOVERTEX param.clover
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_SINGLE
+#else
 #define READ_CLOVER READ_CLOVER_SINGLE
+#endif
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define CLOVERTEX (param.cloverTex)
 #else
 #define CLOVERTEX cloverTexSingle
 #endif
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_SINGLE_TEX
+#else
 #define READ_CLOVER READ_CLOVER_SINGLE_TEX
+#endif
+
 #endif
 
 #else             // half-precision fields
@@ -352,12 +375,14 @@
 // half-precision spinor fields
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_HALF
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define SPINORTEX param.in
 #define GHOSTSPINORTEX param.ghost
 #else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_HALF_TEX
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -399,7 +424,11 @@
 // half-precision clover field
 #ifdef DIRECT_ACCESS_CLOVER
 #define CLOVERTEX param.clover
+#ifdef (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_HALF
+#else
 #define READ_CLOVER READ_CLOVER_HALF
+#endif
 #define CLOVERTEXNORM (param.cloverNorm)
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -409,7 +438,11 @@
 #define CLOVERTEX cloverTexHalf
 #define CLOVERTEXNORM cloverTexNorm
 #endif
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_HALF_TEX
+#else
 #define READ_CLOVER READ_CLOVER_HALF_TEX
+#endif
 #endif
 
 #endif
@@ -544,6 +577,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<E
 #undef GAUGE0TEX
 #undef GAUGE1TEX
 #undef READ_SPINOR
+#undef READ_SPINOR_GHOST
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX

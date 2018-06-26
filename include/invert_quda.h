@@ -189,9 +189,6 @@ namespace quda {
     int deflation_grid;
     int rhs_idx;
 
-    bool    use_reduced_vector_set;
-    bool    use_cg_updates;
-    double  cg_iterref_tol;
     int     eigcg_max_restarts;
     int     max_restart_num;
     double  inc_tol;
@@ -202,6 +199,9 @@ namespace quda {
     bool is_preconditioner; //! whether the solver acting as a preconditioner for another solver
 
     bool global_reduction; //! whether to use a global or local (node) reduction for this solver
+
+    /** Which external lib to use in the solver */
+    QudaExtLibType extlib_type;
 
     /**
        Default constructor
@@ -232,12 +232,11 @@ namespace quda {
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim),
-      deflation_grid(param.deflation_grid), rhs_idx(0), use_reduced_vector_set(param.use_reduced_vector_set),
-      use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
+      deflation_grid(param.deflation_grid), rhs_idx(0),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(false), global_reduction(true)
+      is_preconditioner(false), global_reduction(true), extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -267,12 +266,11 @@ namespace quda {
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.precision_ritz), nev(param.nev), m(param.m),
-      deflation_grid(param.deflation_grid), rhs_idx(0), use_reduced_vector_set(param.use_reduced_vector_set),
-      use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
+      deflation_grid(param.deflation_grid), rhs_idx(0),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction)
+      is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction), extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -476,41 +474,12 @@ namespace quda {
       Solver *K;
       SolverParam Kparam; // parameters for preconditioner solve
 
-      int nKrylov;//corresponds to m_{max}+1, if nKrylov = 0 , use standard pcg
-      double *pAp;
-  
-      std::vector<ColorSpinorField*> p;  // FCG search vectors
-      std::vector<ColorSpinorField*> Ap; // mat * search vectors
-
-      /**
-       Solver uses lazy allocation: this flag to determine whether we have allocated.
-      */
-      bool init;
-      bool use_ipcg_iters;//which algorithm to use:  (true & K) => ipcg, (false & K) => fcg, !K => regilar CG
-
-      ColorSpinorField *rp;       //! residual vector
-      ColorSpinorField *yp;       //! high precision accumulator
-      ColorSpinorField *tmpp;     //! temporary for mat-vec
-      ColorSpinorField *x_sloppy; //! sloppy solution vector
-      ColorSpinorField *r_sloppy; //! sloppy residual vector
-      ColorSpinorField *r_pre;    //! residual passed to preconditioner
-      ColorSpinorField *p_pre;    //! preconditioner result
-      ColorSpinorField *wp;       //! preconditioner result in sloppy precision
-
     public:
       PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
-      /**
-        @param K Preconditioner
-      */
-      PreconCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
       virtual ~PreconCG();
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
-      //optimization methods:
-      void ComputeBeta(double *beta, int begin, int size);
-      void UpdateP(double *beta, int begin, int j, int size);
-      void orthoDir(int mk, int j, int pipeline); 
   };
 
 

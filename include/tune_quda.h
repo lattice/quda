@@ -78,11 +78,11 @@ namespace quda {
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
-	const unsigned int max_blocks = 2*deviceProp.multiProcessorCount;
+	const unsigned int max_blocks = maxGridSize();
 	const int step = 1;
 	param.grid.x += step;
 	if (param.grid.x > max_blocks) {
-	  param.grid.x = step;
+	  param.grid.x = minGridSize();
 	  return false;
 	} else {
 	  return true;
@@ -93,6 +93,8 @@ namespace quda {
     }
 
     virtual unsigned int maxBlockSize() const { return deviceProp.maxThreadsDim[0]; }
+    virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
+    virtual unsigned int minGridSize() const { return 1; }
 
     virtual int blockStep() const { return deviceProp.warpSize; }
     virtual int blockMin() const { return deviceProp.warpSize; }
@@ -130,17 +132,39 @@ namespace quda {
     }
 
     /**
-     * The goal here is to throttle the number of thread blocks per SM by over-allocating shared memory (in order to improve
-     * L2 utilization, etc.).  Note that:
-     * - On Fermi/Kepler, requesting greater than 16 KB will switch the cache config, so we restrict ourselves to 16 KB for now.
-     *   We thus request the smallest amount of dynamic shared memory that guarantees throttling to a given number of blocks,
-     *   in order to allow some extra leeway.
+     * @brief For reason this can't be queried from the device properties, so
+     * here we set set this.  Based on Table 14 of the CUDA
+     * Programming Guide 9.0 (Technical Specifications per Compute Capability)
+     * @return The maximum number of simultaneously resident blocks per SM
+     */
+    unsigned int maxBlocksPerSM() const {
+      switch (deviceProp.major) {
+      case 2:
+	return 8;
+      case 3:
+	return 16;
+      case 5:
+      case 6:
+      case 7:
+	return 32;
+      default:
+	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
+	return 0;
+      }
+    }
+
+    /**
+     * The goal here is to throttle the number of thread blocks per SM
+     * by over-allocating shared memory (in order to improve L2
+     * utilization, etc.).  We thus request the smallest amount of
+     * dynamic shared memory that guarantees throttling to a given
+     * number of blocks, in order to allow some extra leeway.
      */
     virtual bool advanceSharedBytes(TuneParam &param) const
     {
       if (tuneSharedBytes()) {
 	const int max_shared = deviceProp.sharedMemPerBlock;
-	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), 8u);
+	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), maxBlocksPerSM());
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
@@ -164,13 +188,12 @@ namespace quda {
 
     char aux[TuneKey::aux_n];
 
-    void writeAuxString(const char *format, ...) {
+    int writeAuxString(const char *format, ...) {
       va_list arguments;
       va_start(arguments, format);
       int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
-      //int n = snprintf(aux, QUDA_TUNE_AUX_STR_LENGTH, "threads=%d,prec=%lu,stride=%d,geometery=%d",
-      //	       arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
       if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
+      return n;
     }
 
   public:
@@ -208,12 +231,13 @@ namespace quda {
     {
       const unsigned int max_threads = deviceProp.maxThreadsDim[0];
       const unsigned int max_blocks = deviceProp.maxGridSize[0];
+      const int min_grid_size = minGridSize();
       const int min_block_size = blockMin();
 
       if (tuneGridDim()) {
 	param.block = dim3(min_block_size,1,1);
 
-	param.grid = dim3(1,1,1);
+	param.grid = dim3(min_grid_size,1,1);
       } else {
 	// find the minimum valid blockDim
 	param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1);

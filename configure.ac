@@ -18,7 +18,7 @@ AC_ARG_ENABLE(cpu-arch,
 
 dnl Specify GPU Arch
 AC_ARG_ENABLE(gpu-arch,
- AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60 (default: sm_35)]),
+ AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60, sm_70 (default: sm_35)]),
  [ gpu_arch=${enableval} ],
  [ gpu_arch="sm_35" ]
 )
@@ -207,13 +207,6 @@ AC_ARG_ENABLE(multi-gpu,
   [ multi_gpu="no" ]
 )
 
-dnl enable cuda / nic interop buffer
-AC_ARG_ENABLE(gpu-direct,
-  AC_HELP_STRING([--enable-gpu-direct], [ Enable CUDA/NIC interop pinned memory (default: enabled)]),
-  [ gpu_direct=${enableval}],
-  [ gpu_direct="yes" ]
-)
-
 dnl enable NVTX mark up for the MPI in the visual profiler
 AC_ARG_ENABLE(mpi-nvtx,
   AC_HELP_STRING([--enable-mpi-nvtx], [ Enable NVTX markup for profiling MPI API calls in the visual profiler (default: disabled)]),
@@ -351,9 +344,9 @@ esac
 
 dnl CPU Arch
 case ${gpu_arch} in
-sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52 | sm_60) ;;
+sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52 | sm_60 | sm_70) ;;
 *)
-  AC_MSG_ERROR([ GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60 ])
+  AC_MSG_ERROR([ GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60, sm_70 ])
   ;;
 esac
 
@@ -589,14 +582,6 @@ yes|no);;
   ;;
 esac
 
-dnl Enables CUDA/NIC buffer interop
-case ${gpu_direct} in
-yes|no);;
-*)
-  AC_MSG_ERROR([ invalid value for --enable-gpu-direct ])
-  ;;
-esac
-
 dnl enable NVTX mark up for the MPI in the visual profiler
 case ${mpi_nvtx} in
 yes|no);;
@@ -779,9 +764,6 @@ AC_SUBST( BUILD_MPI, [${build_mpi}])
 
 AC_MSG_NOTICE([Setting POSIX_THREADS = ${posix_threads}])
 AC_SUBST( POSIX_THREADS, [${posix_threads}])
-
-AC_MSG_NOTICE([Setting GPU_DIRECT= ${gpu_direct}])
-AC_SUBST( GPU_DIRECT, [${gpu_direct}])
 
 AC_MSG_NOTICE([Setting MPI_NVTXS= ${mpi_nvtx}])
 AC_SUBST( MPI_NVTX, [${mpi_nvtx}])

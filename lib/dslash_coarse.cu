@@ -343,7 +343,13 @@ namespace quda {
 	// reduce down to the first group of column-split threads
 	constexpr int warp_size = 32; // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
-	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2) out[color_local] += __shfl_down(out[color_local], offset);
+	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2)
+#if (__CUDACC_VER_MAJOR__ >= 9)
+	  out[color_local] += __shfl_down_sync(WARP_CONVERGED, out[color_local], offset);
+#else
+	  out[color_local] += __shfl_down(out[color_local], offset);
+#endif
+
 #endif
 	int c = color_block + color_local; // global color index
 	if (color_offset == 0) {
@@ -947,7 +953,7 @@ namespace quda {
 
   static bool dslash_init = false;
   static std::vector<DslashCoarsePolicy> policy;
-  static int config = 0; // 2-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
+  static int config = 0; // 3-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
 
  class DslashCoarsePolicyTune : public Tunable {
 
@@ -1002,8 +1008,8 @@ namespace quda {
 	  }
 	}
 
-	config += comm_peer2peer_enabled_global();
-	config += comm_gdr_enabled() * 2;
+	config += comm_gdr_enabled();
+	config += 2*comm_peer2peer_enabled_global();
 	dslash_init = true;
       }
 

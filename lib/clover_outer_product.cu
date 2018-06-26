@@ -167,7 +167,7 @@ namespace quda {
 
 
   // Get the  coordinates for the exterior kernels
-  __device__ void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
+  __device__ static void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
   {
     int Xh[2] = {X[0]/2, X[1]/2};
     switch(dir){
@@ -392,11 +392,12 @@ namespace quda {
     setKernelPackT(true);
 
     // first transfer src1
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
-    a.pack(1, 1-parity, dag, Nstream-1, 0);
+    MemoryLocation location[2*QUDA_MAX_DIM] = {Device, Device, Device, Device, Device, Device, Device, Device};
+    a.pack(1, 1-parity, dag, Nstream-1, location, Device);
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
     for(int i=3; i>=0; i--){
       if(commDimPartitioned(i)){
@@ -405,7 +406,7 @@ namespace quda {
       } // commDim(i)
     } // i=3,..,0
 
-    cudaDeviceSynchronize(); comm_barrier();
+    qudaDeviceSynchronize(); comm_barrier();
 
     for (int i=3; i>=0; i--) {
       if(commDimPartitioned(i)) {
@@ -420,7 +421,7 @@ namespace quda {
       }
     }
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     setKernelPackT(pack_old); // restore packing state
 
     a.bufferIndex = (1 - a.bufferIndex);
@@ -433,7 +434,7 @@ namespace quda {
 			      cudaColorSpinorField& src1, cudaColorSpinorField& src2,
 			      const unsigned int parity, const int faceVolumeCB[4], const double coeff)
   {
-      cudaEventRecord(oprodStart, streams[Nstream-1]);
+      qudaEventRecord(oprodStart, streams[Nstream-1]);
 
       unsigned int ghostOffset[4] = {0,0,0,0};
       for (int dir=0; dir<4; ++dir) {

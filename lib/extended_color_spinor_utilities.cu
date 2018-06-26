@@ -4,7 +4,6 @@
 
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <face_quda.h>
 #include <tune_quda.h>
 
 #define PRESERVE_SPINOR_NORM
@@ -43,10 +42,10 @@ namespace quda {
       if(!commDim(dim)) continue;
 
       spinor->packExtended(nFace, R, parity, dagger, dim, stream_p); // packing in the dim dimension complete
-      cudaDeviceSynchronize(); // Need this since packing is performed in stream[Nstream-1]
+      qudaDeviceSynchronize(); // Need this since packing is performed in stream[Nstream-1]
       for(int dir=1; dir<=0; dir--){
         spinor->gather(nFace, dagger, 2*dim + dir);
-        cudaEventRecord(gatherEnd[dir], streams[2*dim+dir]); // gatherEnd[1], gatherEnd[0]
+        qudaEventRecord(gatherEnd[dir], streams[2*dim+dir]); // gatherEnd[1], gatherEnd[0]
       } 
 
       int completeSum = 0;
@@ -74,7 +73,7 @@ namespace quda {
         }
       } 
       commsCompleted[0] = commsCompleted[1] = 0;
-      cudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
+      qudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
     } // loop over dim
 
     for(int dir=0; dir<2; dir++) cudaEventDestroy(gatherEnd[dir]);

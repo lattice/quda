@@ -1,18 +1,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <cstring> // needed for memset
-
-
-
-#include <tune_quda.h>
 #include <typeinfo>
 
+#include <tune_quda.h>
 #include <quda_internal.h>
 #include <float_vector.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <face_quda.h> // this is where the MPI / QMP depdendent code is
 
 #define checkSpinor(a, b)						\
   {									\
@@ -705,7 +701,8 @@ namespace quda {
       const int NYW;
       real a[MAX_MULTI_BLAS_N], b[MAX_MULTI_BLAS_N], c[MAX_MULTI_BLAS_N];
 
-      multi_axpyBzpcx_(const coeff_array<double> &a, const coeff_array<double> &b, const coeff_array<double> &c, int NYW) : NYW(NYW){
+      multi_axpyBzpcx_(const coeff_array<double> &a, const coeff_array<double> &b, const coeff_array<double> &c, int NYW)
+        : NYW(NYW) , a{ }, b{ }, c{ } {
 	// copy arguments into the functor
 	for (int i=0; i<NYW; i++) { this->a[i] = a.data[i]; this->b[i] = b.data[i]; this->c[i] = c.data[i]; }
       }

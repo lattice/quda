@@ -218,7 +218,7 @@ namespace quda {
     for (int i=0; i<n; i++) {
       // check the L2 relative residual norm if necessary
       if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
-	    (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2[i] > r2_tol[i]) )
+	    (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2[i] > r2_tol[i]) && r2_tol[i] != 0.0)
 	return false;
     }
 

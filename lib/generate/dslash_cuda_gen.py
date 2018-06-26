@@ -555,7 +555,7 @@ def gen(dir, pack_only=False):
 
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    load_half += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+    load_half += "READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, "+`dir`+");\n\n"
     load_gauge = "// read gauge matrix from device memory\n"
     load_gauge += "READ_GAUGE_MATRIX(G, GAUGE"+`dir%2`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
 
@@ -1255,12 +1255,12 @@ dslash = False
 pack = False
 
 # generate clover solo term
-clover = True
-cloverSharedFloats = 0
-sharedFloats = cloverSharedFloats
-# for the clover term, only makes sense to use shared memory as pseudo registers
-sharedDslash = False
-print sys.argv[0] + ": generating clover_core.h";
-f = open('dslash_core/clover_core.h', 'w')
-f.write(generate_clover())
-f.close()
+#clover = True
+#cloverSharedFloats = 0
+#sharedFloats = cloverSharedFloats
+## for the clover term, only makes sense to use shared memory as pseudo registers
+#sharedDslash = False
+#print sys.argv[0] + ": generating clover_core.h";
+#f = open('dslash_core/clover_core.h', 'w')
+#f.write(generate_clover())
+#f.close()

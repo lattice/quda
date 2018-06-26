@@ -305,7 +305,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, tp, stream, argQ, Float, Gauge, gauge_dir);
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       if ( comm_size() != 1 ) comm_allreduce_array((double*)argQ.result_h, 2);
       argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
       argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads * comm_size());
@@ -1132,7 +1132,7 @@ namespace quda {
     }
     GaugeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
     ~GaugeFixBorderPoints () {
-      if ( comm_partitioned() ) for ( int i = 0; i < 2; i++ ) cudaFree(arg.borderpoints[i]);
+      if ( comm_partitioned() ) for ( int i = 0; i < 2; i++ ) pool_device_free(arg.borderpoints[i]);
     }
     void setParity(const int par){
       parity = par;
@@ -1378,8 +1378,6 @@ namespace quda {
     double flop = 0;
     double byte = 0;
 
-
-
     printfQuda("\tOverrelaxation boost parameter: %lf\n", (double)relax_boost);
     printfQuda("\tStop criterium: %lf\n", tolerance);
     if ( stopWtheta ) printfQuda("\tStop criterium method: theta\n");
@@ -1399,21 +1397,14 @@ namespace quda {
                                reunit_allow_svd, reunit_svd_only,
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
-    int* num_failures_dev;
-    cudaMalloc((void**)&num_failures_dev, sizeof(int));
+    int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
     cudaMemset(num_failures_dev, 0, sizeof(int));
-    if ( num_failures_dev == NULL ) errorQuda("cudaMalloc failed for dev_pointer\n");
 
     GaugeFixQualityArg<Gauge> argQ(dataOr, data);
     GaugeFixQuality<Float,Gauge, gauge_dir> GaugeFixQuality(argQ);
 
-
     GaugeFixArg<Float, Gauge> arg(dataOr, data, relax_boost);
     GaugeFix<Float,Gauge, gauge_dir> gaugeFix(arg);
-
-
-
-
 
 #ifdef MULTI_GPU
     void *send[4];
@@ -1507,7 +1498,7 @@ namespace quda {
     unitarizeLinks(data, data, num_failures_dev);
     qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
-      cudaFree(num_failures_dev);
+      pool_device_free(num_failures_dev);
       errorQuda("Error in the unitarization\n");
       exit(1);
     }
@@ -1542,7 +1533,7 @@ namespace quda {
             comm_start(mh_recv_fwd[d]);
           }
           //wait for the update to the halo points before start packing...
-          cudaDeviceSynchronize();
+          qudaDeviceSynchronize();
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             //extract top face
@@ -1553,9 +1544,9 @@ namespace quda {
         #ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaStreamSynchronize(GFStream[d]);
+            qudaStreamSynchronize(GFStream[d]);
             comm_start(mh_send_fwd[d]);
-            cudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronize(GFStream[4 + d]);
             comm_start(mh_send_back[d]);
           }
         #else
@@ -1574,9 +1565,9 @@ namespace quda {
         #ifndef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaStreamSynchronize(GFStream[d]);
+            qudaStreamSynchronize(GFStream[d]);
             comm_start(mh_send_fwd[d]);
-            cudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronize(GFStream[4 + d]);
             comm_start(mh_send_back[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
@@ -1608,10 +1599,10 @@ namespace quda {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_send_back[d]);
             comm_wait(mh_send_fwd[d]);
-            cudaStreamSynchronize(GFStream[d]);
-            cudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronize(GFStream[d]);
+            qudaStreamSynchronize(GFStream[4 + d]);
           }
-          cudaStreamSynchronize(GFStream[8]);
+          qudaStreamSynchronize(GFStream[8]);
         }
       #endif
         /*gaugeFix.setParity(p);
@@ -1628,7 +1619,7 @@ namespace quda {
            #ifndef GPU_COMMS
             cudaMemcpy(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost);
            #else
-            cudaDeviceSynchronize();
+            qudaDeviceSynchronize();
            #endif
             comm_start(mh_send_fwd[d]);
             comm_wait(mh_recv_back[d]);
@@ -1647,7 +1638,7 @@ namespace quda {
            #ifndef GPU_COMMS
             cudaMemcpy(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost);
            #else
-            cudaDeviceSynchronize();
+            qudaDeviceSynchronize();
            #endif
             comm_start(mh_send_back[d]);
             comm_wait(mh_recv_fwd[d]);
@@ -1663,11 +1654,7 @@ namespace quda {
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
         unitarizeLinks(data, data, num_failures_dev);
         qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-        if ( num_failures > 0 ) {
-          cudaFree(num_failures_dev);
-          errorQuda("Error in the unitarization\n");
-          exit(1);
-        }
+        if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
         cudaMemset(num_failures_dev, 0, sizeof(int));
         flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
         byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
@@ -1690,11 +1677,7 @@ namespace quda {
     if ((iter % reunit_interval) != 0 )  {
       unitarizeLinks(data, data, num_failures_dev);
       qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-      if ( num_failures > 0 ) {
-        cudaFree(num_failures_dev);
-        errorQuda("Error in the unitarization\n");
-        exit(1);
-      }
+      if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
       cudaMemset(num_failures_dev, 0, sizeof(int));
       flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
       byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
@@ -1707,7 +1690,7 @@ namespace quda {
       double diff = abs(action0 - action);
       printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
-    cudaFree(num_failures_dev);
+    pool_device_free(num_failures_dev);
   #ifdef MULTI_GPU
     if ( comm_partitioned() ) {
       data.exchangeExtendedGhost(data.R(),false);
@@ -1732,7 +1715,7 @@ namespace quda {
     }
   #endif
     checkCudaError();
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){
       double secs = profileInternalGaugeFixOVR.Last(QUDA_PROFILE_COMPUTE);

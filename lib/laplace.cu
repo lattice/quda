@@ -21,7 +21,7 @@ namespace quda {
 
     F out;                // output vector field
     const F in;           // input vector field
-    const F x;            // inpuot vector when doing xpay
+    const F x;            // input vector when doing xpay
     const G U;            // the gauge field
     const Float kappa;    // kappa parameter = 1/(8+m)
     const int parity;     // only use this for single parity fields
@@ -55,7 +55,6 @@ namespace quda {
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
    */
-  extern __shared__ float s[];
   template <typename Float, int nDim, int nColor, typename Vector, typename Arg>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int x_cb, int parity) {
     typedef Matrix<complex<Float>,nColor> Link;
@@ -122,7 +121,7 @@ namespace quda {
       Vector x = arg.x(x_cb, parity);
       out = x + arg.kappa * out;
     }
-    arg.out(x_cb, parity) = out;
+    arg.out(x_cb, arg.nParity == 2 ? parity : 0) = out;
   }
 
   // CPU kernel for applying the Laplace operator to a vector
@@ -148,7 +147,7 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
 
     // for full fields set parity from y thread index else use arg setting
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+    int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
 
     if (x_cb >= arg.volumeCB) return;
     if (parity >= arg.nParity) return;
@@ -285,6 +284,8 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
+
+    in.bufferIndex = (1 - in.bufferIndex);
   }
 
 

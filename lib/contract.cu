@@ -1,6 +1,14 @@
 namespace quda {
-#ifdef GPU_CONTRACT
 
+  namespace dslash_aux {
+    #include <dslash_constants.h>
+    #include <dslash_textures.h>
+    #include <io_spinor.h>
+  }
+
+  using namespace dslash_aux;
+
+#ifdef GPU_CONTRACT
 #ifdef READ_SPINOR_SINGLE
 #undef READ_SPINOR_SINGLE
 #endif
@@ -35,7 +43,6 @@ namespace quda {
      Class for the contract kernels, Float2 is the typename of the spinor components (double2, float4...)
      whereas rFloat is the typename of the precision (double, float...)
   */
-
   template <typename Float2, typename rFloat>
   class ContractCuda : public Tunable {
 
@@ -212,7 +219,7 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
-    cudaStreamSynchronize(streams[Nstream-1]);
+    qudaStreamSynchronize(streams[Nstream-1]);
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -261,7 +268,7 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
-    cudaStreamSynchronize(streams[Nstream-1]);
+    qudaStreamSynchronize(streams[Nstream-1]);
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);

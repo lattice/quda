@@ -9,7 +9,6 @@
 #include <dslash_util.h>
 #include "misc.h"
 
-#include "face_quda.h"
 #include <qio_field.h>
 
 #if defined(QMP_COMMS)

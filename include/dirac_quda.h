@@ -6,7 +6,6 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 #include <dslash_quda.h>
-#include <face_quda.h>
 #include <blas_quda.h>
 
 #include <typeinfo>
@@ -939,6 +938,40 @@ namespace quda {
 		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+  };
+
+  /**
+     @brief Full Covariant Derivative operator.  Although not a Dirac
+     operator per se, it's a linear operator so it's conventient to
+     put in the Dirac operator abstraction.
+  */
+  class GaugeCovDev : public Dirac {
+
+  public:
+    GaugeCovDev(const DiracParam &param);
+    GaugeCovDev(const GaugeCovDev &covDev);
+
+    virtual ~GaugeCovDev();
+    GaugeCovDev& operator=(const GaugeCovDev &covDev);
+
+    virtual void DslashCD(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const int mu) const;
+    virtual void MCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const;
+    virtual void MdagMCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const;
+
+
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+
+
   };
 
 

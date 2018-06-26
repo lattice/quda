@@ -20,7 +20,6 @@
 #include <dslash_quda.h>
 #include <sys/time.h>
 #include <blas_quda.h>
-#include <face_quda.h>
 
 #include <inline_ptx.h>
 
@@ -86,7 +85,6 @@ namespace quda {
       : SharedDslashCuda(out, in, x, reconstruct,dagger),gauge0(gauge0), gauge1(gauge1), clover(clover),
 	cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2), dslashType(dslashType)
     { 
-      bindSpinorTex<sFloat>(in, out, x); 
       a = kappa;
       b = mu;
       c = epsilon;
@@ -192,15 +190,14 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-      // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
-      dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
-      dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
-
 #ifdef SHARED_WILSON_DSLASH
-      if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
-	errorQuda("Shared dslash does not yet support X-dimension partitioning");
+      if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
+#ifndef USE_TEXTURE_OBJECTS
+      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
+#endif // USE_TEXTURE_OBJECTS
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      setParam();
       dslashParam.block[0] = tp.aux.x; dslashParam.block[1] = tp.aux.y; dslashParam.block[2] = tp.aux.z; dslashParam.block[3] = tp.aux.w;
       for (int i=0; i<4; i++) dslashParam.grid[i] = ( (i==0 ? 2 : 1) * in->X(i)) / dslashParam.block[i];
 
@@ -278,19 +275,18 @@ namespace quda {
     int bulk_threads = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->Volume() : in->Volume() / 2;
 
     for(int i=0;i<4;i++){
-      dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
       dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
 
       dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
       dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
+      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
       ghost_threads[i] = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->GhostFace()[i] : in->GhostFace()[i] / 2;
     }
 
 #ifdef MULTI_GPU
-    twist_a	= 0.;
-    twist_b	= 0.;
+    dslashParam.twist_a	= 0.;
+    dslashParam.twist_b	= 0.;
 #endif
 
     void *gauge0, *gauge1;
