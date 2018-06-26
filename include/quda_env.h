@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 
 namespace quda {
-  // forward declaration
+  // forward declaration of class TestEnv for later use
   class TestEnv;
 
   /**
