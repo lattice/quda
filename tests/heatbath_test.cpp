@@ -44,6 +44,13 @@ extern double anisotropy;
 extern char latfile[];
 extern char gauge_outfile[];
 
+extern double heatbath_beta_value;
+extern int heatbath_warmup_steps;
+extern int heatbath_num_steps;
+extern int heatbath_num_heatbath_per_step;
+extern int heatbath_num_overrelax_per_step;
+extern bool heatbath_coldstart;
+
 extern void usage(char** );
 
 
@@ -223,19 +230,19 @@ int main(int argc, char **argv)
     RNG *randstates = new RNG(halfvolume, 1234, gauge_param.X);
     randstates->Init();
 
-    int nsteps = 10;
-    int nhbsteps = 5;
-    int novrsteps = 5;
-    bool  coldstart = false;
-    double beta_value = 6.2;
+    int nsteps = heatbath_num_steps;
+    int nwarm = heatbath_warmup_steps;
+    int nhbsteps = heatbath_num_heatbath_per_step;
+    int novrsteps = heatbath_num_overrelax_per_step;
+    bool  coldstart = heatbath_coldstart;
+    double beta_value = heatbath_beta_value;
 
-    if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *gaugeEx);
-    else{
-      InitGaugeField( *gaugeEx, *randstates );
-    }
+    printfQuda("Starting heatbath for beta = %f from a %s start\n", beta_value, strcmp(latfile,"") ? "loaded" : (coldstart ? "cold" : "hot"));
+    printfQuda("  %d Heatbath hits and %d overrelaxation hits per step\n", nhbsteps, novrsteps);
+    printfQuda("  %d Warmup steps\n", nwarm);
+    printfQuda("  %d Measurement steps\n", nsteps);
 
-    // Copy in loaded gauge field
-    if (strcmp(latfile,"")) { 
+    if (strcmp(latfile,"")) { // Copy in loaded gauge field 
 
       printfQuda("Loading the gauge field in %s\n", latfile);
 
@@ -243,16 +250,14 @@ int main(int argc, char **argv)
       // Get pointer to internal resident gauge field
       cudaGaugeField* extendedGaugeResident = new cudaGaugeField(gParamEx);
       copyResidentGauge((void*)extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
+      InitGaugeField( *gaugeEx);
       copyExtendedGauge(*gaugeEx, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
       delete extendedGaugeResident;
-      /*
-      QudaGaugeParam gauge_param = newQudaGaugeParam();
-      setGaugeParam(gauge_param);
-      GaugeFieldParam gParam(load_gauge, gauge_param, QUDA_WILSON_LINKS);
-      gParam.geometry = QUDA_VECTOR_GEOMETRY;
-      cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
-      gaugeEx->loadCPUField(*cpuGauge);
-      delete cpuGauge;*/
+
+    } else if (link_recon != QUDA_RECONSTRUCT_8 && coldstart) {
+      InitGaugeField( *gaugeEx);
+    } else {
+      InitGaugeField( *gaugeEx, *randstates );
     }
 
     // copy into regular field
@@ -272,7 +277,14 @@ int main(int argc, char **argv)
     setReunitarizationConsts();
     plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
 
-    Monte( *gaugeEx, *randstates, beta_value, 100*nhbsteps, 100*novrsteps);
+    // Do a warmup if requested
+    if (nwarm > 0) {
+      for (int step = 1; step <= nwarm; ++step) {
+        Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);  
+        CallUnitarizeLinks(gaugeEx);
+      }
+    }
+      
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);

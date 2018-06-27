@@ -1694,6 +1694,14 @@ QudaExtLibType deflation_ext_lib  = QUDA_EIGEN_EXTLIB;
 QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
+double heatbath_beta_value = 6.2;
+int heatbath_warmup_steps = 10;
+int heatbath_num_steps = 10;
+int heatbath_num_heatbath_per_step = 5;
+int heatbath_num_overrelax_per_step = 5;
+bool heatbath_coldstart = false;
+
+
 static int dim_partitioned[4] = {0,0,0,0};
 
 int dimPartitioned(int dim)
@@ -1810,6 +1818,12 @@ void usage(char** argv )
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
 
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
+  printf("    --heatbath-beta <beta>                    # Beta value used in heatbath test (default 6.2)\n");
+  printf("    --heatbath-warmup-steps <n>               # Number of warmup steps in heatbath test (default 10)\n");
+  printf("    --heatbath-num-steps <n>                  # Number of measurement steps in heatbath test (default 10)\n");
+  printf("    --heatbath-num-hb-per-step <n>            # Number of heatbath hits per heatbath step (default 5)\n");
+  printf("    --heatbath-num-or-per-step <n>            # Number of overrelaxation hits per heatbath step (default 5)\n");
+  printf("    --heatbath-coldstart <true/false>         # Whether to use a cold or hot start in heatbath test (default false)\n");
   printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv); 
@@ -3202,6 +3216,95 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid solution pipeline length (%d)\n", solution_accumulator_pipeline);
       usage(argv);
     }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-beta") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_beta_value = atof(argv[i+1]);
+    if (heatbath_beta_value <= 0.0){
+      printf("ERROR: invalid beta (%f)\n", heatbath_beta_value);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-warmup-steps") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_warmup_steps = atoi(argv[i+1]);
+    if (heatbath_warmup_steps < 0){
+      printf("ERROR: invalid number of warmup steps (%d)\n", heatbath_warmup_steps);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-num-steps") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_num_steps = atoi(argv[i+1]);
+    if (heatbath_num_steps < 0){
+      printf("ERROR: invalid number of heatbath steps (%d)\n", heatbath_num_steps);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-num-hb-per-step") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_num_heatbath_per_step = atoi(argv[i+1]);
+    if (heatbath_num_heatbath_per_step <= 0){
+      printf("ERROR: invalid number of heatbath hits per step (%d)\n", heatbath_num_heatbath_per_step);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-num-or-per-step") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_num_overrelax_per_step = atoi(argv[i+1]);
+    if (heatbath_num_overrelax_per_step <= 0){
+      printf("ERROR: invalid number of overrelaxation hits per step (%d)\n", heatbath_num_overrelax_per_step);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-coldstart") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      heatbath_coldstart = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      heatbath_coldstart = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for heatbath_coldstart type\n");
+      usage(argv);
+    }
+
     i++;
     ret = 0;
     goto out;
