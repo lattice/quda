@@ -39,7 +39,6 @@ extern QudaReconstructType link_recon;
 extern QudaReconstructType link_recon_sloppy;
 extern double anisotropy;
 extern char latfile[];
-extern char gauge_outfile[];
 
 int num_failures=0;
 int *num_failures_dev;
@@ -199,11 +198,11 @@ class GaugeAlgTest : public ::testing::Test {
     randstates = new RNG(halfvolume, 1234, param.X);
     randstates->Init();
 
-    nsteps = 100;
+    nsteps = 10;
     nhbsteps = 4;
     novrsteps = 4;
     coldstart = false;
-    beta_value = 6.5;
+    beta_value = 6.2;
 
 
 
@@ -233,29 +232,6 @@ class GaugeAlgTest : public ::testing::Test {
     printfQuda("Time Monte -> %.6f s\n", a1.Last());
     plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
     printfQuda("Plaq: %.16e , %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-
-    // Save if output string is specified
-    if (strcmp(gauge_outfile,"")) {
-
-      // Create cpu gauge field
-      QudaGaugeParam gauge_param;
-      cpuSetGaugeParam(gauge_param);
-
-      size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-      void *cpu_gauge[4];
-      for (int dir = 0; dir < 4; dir++) {
-        cpu_gauge[dir] = malloc(V*gaugeSiteSize*gSize);
-      }
-
-      
-
-      saveGaugeFieldQuda((void*)cpu_gauge, (void*)cudaInGauge, &gauge_param);
-
-      write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, param.X, 0, (char**)0);
-
-
-      for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
-    }
   }
 
   virtual void TearDown() {
