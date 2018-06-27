@@ -682,6 +682,141 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, T *x, int &cb_i
   } // else we do not support all odd local dimensions except fifth dimension
 }
 
+/**
+   @brief Compute coordinates from index into the checkerboard (used
+   by the interior Dslash kernels).  This is used by the Wilson-like
+   interior update kernels, and can deal with 4-d or 5-d field and 4-d or
+   5-d preconditioning.
+
+   @param idx[out] The full lattice coordinate
+   @param cb_idx[out] The checkboarded lattice coordinate
+   @param x[out] Coordinates we are computing
+   @param idx[in] Input checkerboarded face index
+   @param[in] param Parameter struct with required meta data
+ */
+template <int nDim, QudaDWFPCType pc_type, IndexType idxType, typename T, typename Param>
+static __device__ __forceinline__ void coordsFromIndexShrinked(int &idx, T *x, int &cb_idx, const Param &param)
+{
+
+  // The full field index is 
+  // idx = x + y*X + z*X*Y + t*X*Y*Z
+  // The parity of lattice site (x,y,z,t) 
+  // is defined to be (x+y+z+t) & 1
+  // 0 => even parity 
+  // 1 => odd parity
+  // cb_idx runs over the half volume
+  // cb_idx = iidx/2 = (x + y*X + z*X*Y + t*X*Y*Z)/2
+  //
+  // We need to obtain idx from cb_idx + parity.
+  // 
+  // 1)  First, consider the case where X is even.
+  // Then, y*X + z*X*Y + t*X*Y*Z is even and
+  // 2*cb_idx = 2*(x/2) + y*X + z*X*Y + t*X*Y*Z
+  // Since, 2*(x/2) is even, if y+z+t is even
+  // (2*(x/2),y,z,t) is an even parity site.
+  // Similarly, if y+z+t is odd
+  // (2*(x/2),y,z,t) is an odd parity site. 
+  // 
+  // Note that (1+y+z+t)&1 = 1 for y+z+t even
+  //      and  (1+y+z+t)&1 = 0 for y+z+t odd
+  // Therefore, 
+  // (2*/(x/2) + (1+y+z+t)&1, y, z, t) is odd.
+  //
+  // 2)  Consider the case where X is odd but Y is even.
+  // Calculate 2*cb_idx
+  // t = 2*cb_idx/XYZ
+  // z = (2*cb_idx/XY) % Z
+  //
+  // Now, we  need to compute (x,y) for different parities.
+  // To select a site with even parity, consider (z+t).
+  // If (z+t) is even, this implies that (x+y) must also 
+  // be even in order that (x+y+z+t) is even. 
+  // Therefore,  x + y*X is even.
+  // Thus, 2*cb_idx = idx 
+  // and y =  (2*cb_idx/X) % Y
+  // and x =  (2*cb_idx) % X;
+  // 
+  // On the other hand, if (z+t) is odd, (x+y) must be 
+  // also be odd in order to get overall even parity. 
+  // Then x + y*X is odd (since X is odd and either x or y is odd)
+  // and 2*cb_idx = 2*(idx/2) = idx-1 =  x + y*X -1 + z*X*Y + t*X*Y*Z
+  // => idx = 2*cb_idx + 1
+  // and y = ((2*cb_idx + 1)/X) % Y
+  // and x = (2*cb_idx + 1) % X
+  //
+  // To select a site with odd parity if (z+t) is even,
+  // (x+y) must be odd, which, following the discussion above, implies that
+  // y = ((2*cb_idx + 1)/X) % Y
+  // x = (2*cb_idx + 1) % X
+  // Finally, if (z+t) is odd (x+y) must be even to get overall odd parity, 
+  // and 
+  // y = ((2*cb_idx)/X) % Y
+  // x = (2*cb_idx) % X
+  // 
+  // The code below covers these cases 
+  // as well as the cases where X, Y are odd and Z is even,
+  // and X,Y,Z are all odd
+
+  const auto *X = param.dc.X;
+  const int *R = param.R;
+  const int_fastdiv Xs[4] = { X[0]-2*R[0], X[1]-2*R[1], X[2]-2*R[2], X[3]-2*R[3] }; // shrinked
+
+  int XYZT = param.dc.Vh << 1; // X[3]*X[2]*X[1]*X[0]
+  int XYZ = param.dc.X3X2X1; // X[2]*X[1]*X[0]
+  int XY = param.dc.X2X1; // X[1]*X[0]
+
+  if (idxType == EVEN_X /*!(X[0] & 1)*/) { // X even
+    //   t = idx / XYZ;
+    //   z = (idx / XY) % Z;
+    //   y = (idx / X) % Y;
+    //   idx += (parity + t + z + y) & 1;
+    //   x = idx % X;
+    // equivalent to the above, but with fewer divisions/mods:
+    int aux[5];
+    aux[0] = cb_idx*2;
+    for (int i=0; i<4; i++) aux[i+1] = aux[i] / Xs[i];
+
+    x[0] = aux[0] - aux[1] * Xs[0];
+    x[1] = aux[1] - aux[2] * Xs[1];
+    x[2] = aux[2] - aux[3] * Xs[2];
+    x[3] = aux[3] - (nDim == 5 ? aux[4] * Xs[3] : 0);
+    x[4] = (nDim == 5) ? aux[4] : 0;
+
+// Find the full coordinate in the shrinked volume. 
+    int oddbit = (pc_type == QUDA_4D_PC ? (param.parity + x[3] + x[2] + x[1]) : (param.parity + x[4] + x[3] + x[2] + x[1])) & 1;
+    x[0] += oddbit;
+
+// Now go back to the extended volume.
+    for(int d = 0; d < 4; d++) x[d] += R[d];
+// TODO: R[0]+R[1]+R[2]+R[3] shoulb be an even number.
+
+    idx = (nDim == 5 ? (((x[4]*X[3]+x[3])*X[2]+x[2])*X[1]+x[1])*X[0]+x[0] : ((x[3]*X[2]+x[2])*X[1]+x[1])*X[0]+x[0]);
+    cb_idx = idx >> 1;
+
+  } else if (idxType == EVEN_Y /*!(X[1] & 1)*/) { // Y even
+    x[4] = idx / XYZT;
+    x[3] = (idx / XYZ) % X[3];
+    x[2] = (idx / XY) % X[2];
+    idx += (param.parity + x[3] + x[2]) & 1;
+    x[1] = (idx / X[0]) % X[1];
+    x[0] = idx % X[0];
+  } else if (idxType == EVEN_Z /*!(X[2] & 1)*/) { // Z even
+    x[4] = idx / XYZT;
+    x[3] = (idx / XYZ) % X[3];
+    idx += (param.parity + x[3]) & 1;
+    x[2] = (idx / XY) % X[2];
+    x[1] = (idx / X[0]) % X[1];
+    x[0] = idx % X[0];
+  } else {
+    x[4] = idx / XYZT;
+    idx += (param.parity + x[4]) & 1;
+    x[3] = idx / XYZ;
+    x[2] = (idx / XY) % X[2];
+    x[1] = (idx / X[0]) % X[1];
+    x[0] = idx % X[0];
+  } // else we do not support all odd local dimensions except fifth dimension
+}
+
 
 /**
   @brief Compute coordinates from index into the checkerboard (used

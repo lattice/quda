@@ -198,11 +198,12 @@ int X, coord[5];
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
 
-
-
-
-  // Assume even dimensions
-  coordsFromIndex<5,QUDA_4D_PC,EVEN_X>(X, coord, sid, param);
+  if( param.partial_length ){
+    coordsFromIndexShrinked<5,QUDA_4D_PC,EVEN_X>(X, coord, sid, param);
+  }else{
+    // Assume even dimensions
+    coordsFromIndex<5,QUDA_4D_PC,EVEN_X>(X, coord, sid, param);
+  }
 
  o00_re = 0; o00_im = 0;
  o01_re = 0; o01_im = 0;

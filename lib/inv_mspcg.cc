@@ -228,7 +228,8 @@ namespace quda {
     if( comm_rank() ){ blas::zero(*tb); }
     b2 = blas::norm2(*tb);
     printfQuda("Test b2 after  = %16.12e.\n", b2);
-    (*nrm_op)(*tx, *tb, *tt);
+//    (*nrm_op)(*tx, *tb, *tt);
+    mat->Dslash4(*tx, *tb, QUDA_EVEN_PARITY);
     double x2 = blas::norm2(*tx);
     printfQuda("Test     x2/b2 = %16.12e/%16.12e.\n", x2, b2);
     if( comm_rank() ){
@@ -259,7 +260,10 @@ namespace quda {
 
     //    quda::pack::initConstants(*dirac_param_precondition.gauge, profile);
     double fb2 = norm2(*fb);
-    (*nrm_op_precondition)(*fx, *fb, *ft);
+    int sp_len = (csParam.x[0]*2-2)*(csParam.x[1]-2)*(csParam.x[2]-2)*(csParam.x[3]-2)/2;
+//    (*nrm_op_precondition)(*fx, *fb, *ft);
+    int RR[4] = {1,1,1,1};
+    mat_precondition->Dslash4Partial(*fx, *fb, QUDA_EVEN_PARITY, sp_len, RR);
     double fx2 = norm2(*fx);
     printfQuda("Test   fx2/fb2 = %16.12e/%16.12e.\n", fx2, fb2);
     zero_extended_color_spinor_interface( *fx, R, QUDA_CUDA_FIELD_LOCATION, 0);
@@ -379,7 +383,7 @@ namespace quda {
   {
 
 //    test_dslash( db ); 
-    int parity = 0;
+//    int parity = 0;
     Gflops = 0.;
     fGflops = 0.;
     
@@ -435,7 +439,7 @@ namespace quda {
 
     int k;
     //    int parity = nrm_op->getMatPCType();
-    double alpha, beta, rkzk, pkApk, zkP1rkp1, zkrk;
+    double alpha, beta, rkzk, pkApk, zkP1rkp1;
 
     double stop = stopping(param.tol, b2, param.residual_type);
 

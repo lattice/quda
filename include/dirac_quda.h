@@ -406,6 +406,8 @@ namespace quda {
     DiracMobius& operator=(const DiracMobius &dirac);
 
     void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in,
+         const QudaParity parity, int sp_idx_length, int R_[4]) const;
     void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
 

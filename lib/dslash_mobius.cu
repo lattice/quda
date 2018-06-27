@@ -145,18 +145,24 @@ namespace quda {
     {
       TuneKey key = DslashCuda::tuneKey();
       switch(DS_type){
-      case 0:
-	strcat(key.aux,",Dslash4");
-	break;
-      case 1:
-	strcat(key.aux,",Dslash4pre");
-	break;
-      case 2:
-	strcat(key.aux,",Dslash5");
-	break;
-      case 3:
-	strcat(key.aux,",Dslash5inv");
-	break;
+        case 0:
+          if(dslashParam.partial_length){
+            char config[128];
+            sprintf(config, ",Dslash4,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            strcat(key.aux,config);
+          }else{
+            strcat(key.aux,",Dslash4");
+          }
+          break;
+        case 1:
+          strcat(key.aux,",Dslash4pre");
+          break;
+        case 2:
+          strcat(key.aux,",Dslash5");
+          break;
+        case 3:
+          strcat(key.aux,",Dslash5inv");
+          break;
       }
       return key;
     }
@@ -214,20 +220,24 @@ namespace quda {
       long long wall = 2*vol4d;
       long long flops = 0;
       switch(DS_type){
-      case 0:
-	flops = DslashCuda::flops();
-	break;
-      case 1:
-	flops = 72ll*in->VolumeCB() + 96ll*bulk + 120ll*wall;
-	break;
-      case 2:
-	flops = (x ? 96ll : 48ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
-	break;
-      case 3:
-	flops = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
-	break;
-      default:
-	errorQuda("invalid Dslash type");
+        case 0:
+          if( dslashParam.partial_length ){
+            flops = 1360ll*dslashParam.partial_length*Ls;
+          }else{
+            flops = DslashCuda::flops();
+          }
+          break;
+        case 1:
+          flops = 72ll*in->VolumeCB() + 96ll*bulk + 120ll*wall;
+          break;
+        case 2:
+          flops = (x ? 96ll : 48ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
+          break;
+        case 3:
+          flops = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
+          break;
+        default:
+          errorQuda("invalid Dslash type");
       }
       return flops;
     }
@@ -308,5 +318,49 @@ namespace quda {
     errorQuda("Domain wall dslash has not been built");
 #endif
   }
+  
+  void mdwf_dslash_cuda_partial(cudaColorSpinorField *out, const cudaGaugeField &gauge,
+		      const cudaColorSpinorField *in, const int parity, const int dagger,
+		      const cudaColorSpinorField *x, const double &m_f, const double &k2,
+                      const double *b_5, const double *c_5, const double &m5,
+		      const int *commOverride, const int DS_type, TimeProfile &profile, int sp_idx_length, int R_[4])
+  {
+#ifdef GPU_DOMAIN_WALL_DIRAC
+    const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
+    DslashCuda *dslash = nullptr;
+    if (in->Precision() == QUDA_DOUBLE_PRECISION) {
+      dslash = new MDWFDslashPCCuda<double2,double2>(out, gauge, in, x, m_f, k2, b_5, c_5, m5, parity, dagger, commOverride, DS_type);
+    } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+      dslash = new MDWFDslashPCCuda<float4,float4>(out, gauge, in, x, m_f, k2, b_5, c_5, m5, parity, dagger, commOverride, DS_type);
+    } else if (in->Precision() == QUDA_HALF_PRECISION) {
+      dslash = new MDWFDslashPCCuda<short4,short4>(out, gauge, in, x, m_f, k2, b_5, c_5, m5, parity, dagger, commOverride, DS_type);
+    }
+
+    dslash->dslashParam.partial_length = sp_idx_length;
+    dslash->dslashParam.R[0] = R_[0];
+    dslash->dslashParam.R[1] = R_[1];
+    dslash->dslashParam.R[2] = R_[2];
+    dslash->dslashParam.R[3] = R_[3];
+  
+    printfQuda("volume: %dx%dx%dx%dx%d; partial_length=%d.\n", int(dslash->dslashParam.dc.X[0]),
+                                                               int(dslash->dslashParam.dc.X[1]),
+                                                               int(dslash->dslashParam.dc.X[2]),
+                                                               int(dslash->dslashParam.dc.X[3]),
+                                                               int(dslash->dslashParam.dc.X[4]), sp_idx_length);
+    
+    // the parameters passed to dslashCuda must be 4-d volume and 3-d
+    // faces because Ls is added as the y-dimension in thread space
+    int ghostFace[QUDA_MAX_DIM];
+    for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
+
+    DslashPolicyImp* dslashImp = new DslashNC;
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), sp_idx_length, ghostFace, profile); // sp_idx_length is the param.threads
+    delete dslashImp;
+
+    delete dslash;
+#else
+    errorQuda("Domain wall dslash has not been built");
+#endif
+  }
 }

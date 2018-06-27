@@ -130,6 +130,9 @@ enum KernelType {
 
     int Vsh; // used by contraction kernels
 
+    int partial_length = 0;
+    int R[4];
+
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
     cudaTextureObject_t inTexNorm;

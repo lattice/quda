@@ -42,6 +42,20 @@ namespace quda {
     flops += 1320LL*(long long)in.Volume();
   }
   
+  void DiracMobius::Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, int sp_idx_length, int R_[4]) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+    
+    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		   &static_cast<const cudaColorSpinorField&>(in),
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 0, profile, sp_idx_length, R_);
+
+    flops += 1320LL*(long long)sp_idx_length;
+  } 
+  
   void DiracMobius::Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");

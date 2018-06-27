@@ -682,7 +682,7 @@ namespace quda {
       cuda_lst_map[key] = cuda_p;
       cudaMemcpy(cuda_p, lst_map[key].data(), lst_map[key].size()*sizeof(size_t), cudaMemcpyHostToDevice);
       printfQuda("PaddingIndexCache:  added X=(%d,%d,%d,%d)/R=(%d,%d,%d,%d).\n", f.X()[0],f.X()[1],f.X()[2],f.X()[3],R[0],R[1],R[2],R[3] );
-      printfQuda("PaddingIndexCache:  allocated %012u bytes of memory.\n", lst_map[key].size()*sizeof(size_t) );
+      printfQuda("PaddingIndexCache:  allocated %012lu bytes of memory.\n", lst_map[key].size()*sizeof(size_t) );
     }
 
     if( not f.isNative() ) {
