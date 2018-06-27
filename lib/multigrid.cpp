@@ -1247,7 +1247,7 @@ namespace quda {
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
     csParam.gammaBasis = (B[0]->Nspin() == 1) ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS : QUDA_UKQCD_GAMMA_BASIS;
 
-#define ESW_MRHS
+//#define ESW_MRHS
 
 #ifdef ESW_MRHS
     // ESW HACK: Hard code naive multi-rhs for now
@@ -1365,6 +1365,7 @@ namespace quda {
 #endif
         ColorSpinorField *out=nullptr, *in=nullptr;
         diracSmoother->prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
+        if (&in == &out) errorQuda("Fields cannot alias");
         (*solve)(*out, *in);
         diracSmoother->reconstruct(*x, *b, QUDA_MAT_SOLUTION);
 
