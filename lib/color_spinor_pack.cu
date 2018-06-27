@@ -14,8 +14,9 @@
 
    Using a different precision of the field and of the halo is
    supported, though only QUDA_SINGLE_PRECISION fields with
-   QUDA_HALF_PRECISION halos are instantiated.  When an integer format
-   is requested for the halos then block-float format is used.
+   QUDA_HALF_PRECISION or QUDA_QUARTER_PRECISION halos are
+   instantiated. When an integer format is requested for the halos
+   then block-float format is used.
 
    As well as tuning basic block sizes, the autotuner also tunes for
    the dimensions to assign to each thread.  E.g., dim_thread=1 means
@@ -370,8 +371,8 @@ namespace quda {
 
     // if we only have short precision for the ghost then this means we have block-float
     constexpr bool block_float = (sizeof(Float) == QUDA_SINGLE_PRECISION &&
-				  sizeof(ghostFloat) == QUDA_HALF_PRECISION && Nc <= MAX_BLOCK_FLOAT_NC) ? true : false;
-    if (sizeof(Float) == QUDA_SINGLE_PRECISION && sizeof(ghostFloat) == QUDA_HALF_PRECISION && Nc > MAX_BLOCK_FLOAT_NC)
+				  (sizeof(ghostFloat) == QUDA_HALF_PRECISION || sizeof(ghostFloat) == QUDA_QUARTER_PRECISION) && Nc <= MAX_BLOCK_FLOAT_NC) ? true : false;
+    if (sizeof(Float) == QUDA_SINGLE_PRECISION && (sizeof(ghostFloat) == QUDA_HALF_PRECISION || sizeof(ghostFloat) == QUDA_QUARTER_PRECISION) && Nc > MAX_BLOCK_FLOAT_NC)
       errorQuda("Block-float format not supported for Nc = %d", Nc);
 
     GenericPackGhostLauncher<RegFloat,block_float,Ns,spins_per_thread,Nc,colors_per_thread,PackGhostArg<Q> >
@@ -499,26 +500,30 @@ namespace quda {
 
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
       if (a.GhostPrecision() == QUDA_DOUBLE_PRECISION) {
-	genericPackGhost<double,double>(ghost, a, parity, nFace, dagger, destination);
+        genericPackGhost<double,double>(ghost, a, parity, nFace, dagger, destination);
       } else {
-	errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
+        errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
       }
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
       if (a.GhostPrecision() == QUDA_SINGLE_PRECISION) {
-	genericPackGhost<float,float>(ghost, a, parity, nFace, dagger, destination);
+        genericPackGhost<float,float>(ghost, a, parity, nFace, dagger, destination);
 #if 0 // ESW COMPILE TIME
       } else if (a.GhostPrecision() == QUDA_HALF_PRECISION) {
-	genericPackGhost<float,short>(ghost, a, parity, nFace, dagger, destination);
+        genericPackGhost<float,short>(ghost, a, parity, nFace, dagger, destination);
+      } else if (a.GhostPrecision() == QUDA_QUARTER_PRECISION) {
+        genericPackGhost<float,char>(ghost, a, parity, nFace, dagger, destination);
 #endif
       } else {
-	errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
+        errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
       }
 #if 0 // ESW COMPILE TIME
     } else if (a.Precision() == QUDA_HALF_PRECISION) {
       if (a.GhostPrecision() == QUDA_HALF_PRECISION) {
-	genericPackGhost<short,short>(ghost, a, parity, nFace, dagger, destination);
+        genericPackGhost<short,short>(ghost, a, parity, nFace, dagger, destination);
+      } else if (a.GhostPrecision() == QUDA_QUARTER_PRECISION) {
+        genericPackGhost<short,char>(ghost, a, parity, nFace, dagger, destination);
       } else {
-	errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
+        errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
       }
 #endif
     } else {

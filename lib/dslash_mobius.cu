@@ -124,7 +124,6 @@ namespace quda {
 		     const double a, const int dagger, const int DS_type)
       : DslashCuda(out, in, x, reconstruct, dagger), DS_type(DS_type)
     { 
-      bindSpinorTex<sFloat>(in, out, x);
       dslashParam.gauge0 = (void*)gauge0;
       dslashParam.gauge1 = (void*)gauge1;
       dslashParam.a = a;
@@ -183,6 +182,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
       dslashParam.ghostTex = in->GhostTex();
       dslashParam.ghostTexNorm = in->GhostTexNorm();
+#else
+      bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
 
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -231,8 +232,8 @@ namespace quda {
     }
 
     long long bytes() const {
-      bool isHalf = in->Precision() == sizeof(short) ? true : false;
-      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+      bool isFixed = (in->Precision() == sizeof(short) || in->Precision() == sizeof(char)) ? true : false;
+      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isFixed ? sizeof(float) : 0);
       long long Ls = in->X(4);
       long long bytes = 0;
 

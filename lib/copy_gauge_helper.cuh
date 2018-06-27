@@ -129,19 +129,19 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
 
       for (int d=0; d<arg.nDim; d++) {
-	for (int x=0; x<arg.faceVolumeCB[d]; x++) {
+        for (int x=0; x<arg.faceVolumeCB[d]; x++) {
 #ifdef FINE_GRAINED_ACCESS
-	  for (int i=0; i<Ncolor(length); i++)
-	    for (int j=0; j<Ncolor(length); j++)
-	      arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
+          for (int i=0; i<Ncolor(length); i++)
+            for (int j=0; j<Ncolor(length); j++)
+              arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
 #else
-	  RegTypeIn in[length];
-	  RegTypeOut out[length];
-	  arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
-	  for (int i=0; i<length; i++) out[i] = in[i];
-	  arg.out.saveGhost(out, x, d+arg.out_offset, parity);
+      	  RegTypeIn in[length];
+      	  RegTypeOut out[length];
+      	  arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
+      	  for (int i=0; i<length; i++) out[i] = in[i];
+      	  arg.out.saveGhost(out, x, d+arg.out_offset, parity);
 #endif
-	}
+        }
       }
 
     }

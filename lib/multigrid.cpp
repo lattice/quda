@@ -285,6 +285,7 @@ namespace quda {
 
       param_postsmooth->maxiter = param.nu_post;
       param_postsmooth->Nkrylov = param_postsmooth->maxiter;
+      param_postsmooth->pipeline = param_postsmooth->maxiter;
 
       // we never need to compute the true residual for a post smoother
       param_postsmooth->compute_true_res = false;
@@ -322,6 +323,7 @@ namespace quda {
 
     // create smoothing operators
     diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
+    diracParam.halo_precision = param.mg_global.smoother_halo_precision[param.level+1];
 
     if (diracCoarseSmoother) delete diracCoarseSmoother;
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
@@ -566,7 +568,10 @@ namespace quda {
 
     QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
       ? param.mg_global.precision_null[param.level]  : csParam.Precision();
-    double tol = prec == QUDA_HALF_PRECISION ? 1e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-10;
+
+    // may want to revisit this---these were relaxed for cases where ghost_precision < precision
+    // these were set while hacking in tests of quarter precision ghosts
+    double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
@@ -850,6 +855,7 @@ namespace quda {
 
     transfer->R(*x_coarse, *tmp2);
     (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
+
 
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("emulated\n");
@@ -1268,6 +1274,10 @@ namespace quda {
         diracSmootherSloppy->setCommDim(commDim);
     }
 
+    // if quarter precision halo, promote for null-space finding to half precision
+    QudaPrecision halo_precision = diracSmootherSloppy->HaloPrecision();
+    if (halo_precision == QUDA_QUARTER_PRECISION) diracSmootherSloppy->setHaloPrecision(QUDA_HALF_PRECISION);
+
     Solver *solve;
     DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
     DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
@@ -1409,6 +1419,8 @@ namespace quda {
     delete solve;
     if (mdagm) delete mdagm;
     if (mdagmSloppy) delete mdagmSloppy;
+
+    diracSmootherSloppy->setHaloPrecision(halo_precision); // restore halo precision
 
     delete x;
     delete b;

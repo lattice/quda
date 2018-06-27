@@ -42,6 +42,8 @@ namespace quda {
 
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
+    QudaPrecision halo_precision; // only does something for DiracCoarse at present
+
     // for multigrid only
     Transfer *transfer; 
     Dirac *dirac;
@@ -49,7 +51,7 @@ namespace quda {
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
       dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), mu_factor(0.0), epsilon(0.0),
-      tmp1(0), tmp2(0)
+      tmp1(0), tmp2(0), halo_precision(QUDA_INVALID_PRECISION)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -65,6 +67,7 @@ namespace quda {
       printfQuda("dagger = %d\n", dagger);
       printfQuda("mu = %g\n", mu);
       printfQuda("epsilon = %g\n", epsilon);
+      printfQuda("halo_precision = %d\n", halo_precision);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
       for (int i=0; i<Ls; i++) printfQuda("b_5[%d] = %e\t c_5[%d] = %e\n", i,b_5[i],i,c_5[i]);
     }
@@ -102,11 +105,10 @@ namespace quda {
     mutable ColorSpinorField *tmp1; // temporary hack
     mutable ColorSpinorField *tmp2; // temporary hack
     QudaDiracType type; 
+    mutable QudaPrecision halo_precision; // only does something for DiracCoarse at present
 
     bool newTmp(ColorSpinorField **, const ColorSpinorField &) const;
     void deleteTmp(ColorSpinorField **, const bool &reset) const;
-
-    QudaTune tune;
 
     mutable int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
@@ -179,6 +181,8 @@ namespace quda {
 				double kappa, double mass=0., double mu=0., double mu_factor=0.) const
     {errorQuda("Not implemented");}
 
+    QudaPrecision HaloPrecision() const { return halo_precision; }
+    void setHaloPrecision(QudaPrecision halo_precision_) const { halo_precision = halo_precision_; }
   };
 
   // Full Wilson

@@ -1682,6 +1682,7 @@ double omega = 0.85;
 QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL] = { };
 double coarse_solver_tol[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL] = { };
+QudaPrecision smoother_halo_prec = QUDA_INVALID_PRECISION;
 double smoother_tol[QUDA_MAX_MG_LEVEL] = { };
 int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL] = { };
 bool generate_nullspace = true;
@@ -1792,6 +1793,7 @@ void usage(char** argv )
   printf("    --mg-coarse-solver-maxiter <level n>      # The coarse solver maxiter for each level (default 100)\n");
   printf("    --mg-smoother <level mr/etc.>             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-smoother-tol <level resid_tol>       # The smoother tolerance to use for each multigrid (default 0.25)\n");
+  printf("    --mg-smoother-halo-prec                   # The smoother halo precision (applies to all levels - defaults to null_precision)\n");
   printf("    --mg-schwarz-type <level false/add/mul>   # Whether to use Schwarz preconditioning (requires MR smoother and GCR setup solver) (default false)\n");
   printf("    --mg-schwarz-cycle <level cycle>          # The number of Schwarz cycles to apply per smoother application (default=1)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
@@ -2840,6 +2842,17 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     coarse_solver_maxiter[level] = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+
+  if( strcmp(argv[i], "--mg-smoother-halo-prec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    smoother_halo_prec =  get_prec(argv[i+1]);
     i++;
     ret = 0;
     goto out;

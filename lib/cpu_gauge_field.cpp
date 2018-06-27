@@ -12,6 +12,9 @@ namespace quda {
     if (precision == QUDA_HALF_PRECISION) {
       errorQuda("CPU fields do not support half precision");
     }
+    if (precision == QUDA_QUARTER_PRECISION) {
+      errorQuda("CPU fields do not support quarter precision");
+    }
     if (pad != 0) {
       errorQuda("CPU fields do not support non-zero padding");
     }
@@ -257,7 +260,7 @@ namespace quda {
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
-      if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0)
+      if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) && fat_link_max == 0.0)
         errorQuda("fat_link_max has not been computed");
     } else {
       fat_link_max = 1.0;

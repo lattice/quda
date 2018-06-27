@@ -35,9 +35,13 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	copy_color_spinor.o copy_color_spinor_dd.o			\
 	copy_color_spinor_ds.o copy_color_spinor_dh.o			\
-	copy_color_spinor_sd.o copy_color_spinor_ss.o			\
-	copy_color_spinor_sh.o copy_color_spinor_hd.o			\
+	copy_color_spinor_dq.o copy_color_spinor_sd.o			\
+	copy_color_spinor_ss.o copy_color_spinor_sh.o			\
+	copy_color_spinor_sq.o copy_color_spinor_hd.o			\
 	copy_color_spinor_hs.o copy_color_spinor_hh.o			\
+	copy_color_spinor_hq.o copy_color_spinor_qd.o			\
+	copy_color_spinor_qs.o copy_color_spinor_qh.o			\
+	copy_color_spinor_qq.o						\
 	extract_gauge_ghost_extended.o copy_gauge_double.o		\
 	copy_gauge_single.o copy_gauge_half.o copy_gauge.o		\
 	copy_clover.o staggered_oprod.o					\
@@ -56,6 +60,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
 	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
 	copy_color_spinor_mg_hs.o copy_color_spinor_mg_sh.o		\
+	copy_color_spinor_mg_qs.o copy_color_spinor_mg_sq.o		\
+	copy_color_spinor_mg_hh.o copy_color_spinor_mg_qq.o		\
 	quda_memcpy.o quda_arpack_interface.o deflation.o ${QIO_UTIL}   \
 	spinor_noise.o gauge_random.o checksum.o
 

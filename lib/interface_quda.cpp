@@ -526,6 +526,35 @@ void initQudaDevice(int dev) {
     errorQuda("Device %d does not support CUDA", dev);
   }
 
+
+// Check GPU and QUDA build compatibiliy
+// 4 cases:
+// a) QUDA and GPU match: great
+// b) QUDA built for higher compute capability: error
+// c) QUDA built for lower major compute capability: warn if QUDA_ALLOW_JIT, else error
+// d) QUDA built for same major compute capability but lower minor: warn
+
+  const int my_major = __COMPUTE_CAPABILITY__ / 100;
+  const int my_minor = (__COMPUTE_CAPABILITY__  - my_major * 100) / 10;
+// b) UDA was compiled for a higher compute capability
+  if (deviceProp.major * 100 + deviceProp.minor * 10 < __COMPUTE_CAPABILITY__)
+    errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. ** \n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
+
+
+// c) QUDA was compiled for a lower compute capability
+  if (deviceProp.major < my_major) {
+    char *allow_jit_env = getenv("QUDA_ALLOW_JIT");
+    if (allow_jit_env && strcmp(allow_jit_env, "1") == 0) {
+      if (getVerbosity() > QUDA_SILENT) warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- Jitting the PTX since QUDA_ALLOW_JIT=1 was set. Note that this will take some time.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
+    } else {
+      errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n If you want the PTX to be jitted for your current GPU arch please set the enviroment variable QUDA_ALLOW_JIT=1.", deviceProp.major, deviceProp.minor, my_major, my_minor);
+    }
+  }
+// d) QUDA built for same major compute capability but lower minor
+  if (deviceProp.major == my_major and deviceProp.minor > my_minor) {
+    warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- This might result in a lower performance. Please consider adjusting QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
+  }
+   
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
@@ -549,7 +578,7 @@ void initQudaDevice(int dev) {
 
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-  cudaGetDeviceProperties(&deviceProp, dev);
+  // cudaGetDeviceProperties(&deviceProp, dev);
 
   { // determine if we will do CPU or GPU data reordering (default is GPU)
     char *reorder_str = getenv("QUDA_REORDER_LOCATION");
@@ -2402,6 +2431,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   bool fine_grid_pc_solve = (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) ||
     (mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
   setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
+  diracSmoothParam.halo_precision = mg_param.smoother_halo_precision[0];
   dSmooth = Dirac::create(diracSmoothParam);
   mSmooth = new DiracM(*dSmooth);
 
@@ -2409,6 +2439,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   DiracParam diracSmoothSloppyParam;
   setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve,
 		   mg_param.smoother_schwarz_type[0] == QUDA_INVALID_SCHWARZ ? true : false);
+  diracSmoothSloppyParam.halo_precision = mg_param.smoother_halo_precision[0];
 
   dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
   mSmoothSloppy = new DiracM(*dSmoothSloppy);

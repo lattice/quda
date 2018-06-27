@@ -147,7 +147,7 @@ namespace quda {
 
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
-      if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
       else texDesc.readMode = cudaReadModeElementType;
 
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
@@ -605,7 +605,7 @@ namespace quda {
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
-      if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0) 
+      if ((precision == QUDA_HALF_PRECISION  || precision == QUDA_QUARTER_PRECISION) && fat_link_max == 0.0) 
         errorQuda("fat_link_max has not been computed");
     } else {
       fat_link_max = 1.0;

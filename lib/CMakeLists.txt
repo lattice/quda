@@ -33,13 +33,20 @@ set (QUDA_OBJS
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
-  copy_color_spinor_dh.cu copy_color_spinor_ss.cu
-  copy_color_spinor_sd.cu copy_color_spinor_sh.cu
+  copy_color_spinor_dh.cu copy_color_spinor_dq.cu
+  copy_color_spinor_ss.cu copy_color_spinor_sd.cu
+  copy_color_spinor_sh.cu copy_color_spinor_sq.cu
   copy_color_spinor_hd.cu copy_color_spinor_hs.cu
-  copy_color_spinor_hh.cu copy_color_spinor_mg_dd.cu
-  copy_color_spinor_mg_ds.cu copy_color_spinor_mg_sd.cu
-  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_sh.cu
-  copy_color_spinor_mg_ss.cu copy_gauge_double.cu copy_gauge_single.cu
+  copy_color_spinor_hh.cu copy_color_spinor_hq.cu
+  copy_color_spinor_qd.cu copy_color_spinor_qs.cu
+  copy_color_spinor_qh.cu copy_color_spinor_qq.cu
+  copy_color_spinor_mg_dd.cu copy_color_spinor_mg_ds.cu
+  copy_color_spinor_mg_sd.cu copy_color_spinor_mg_ss.cu
+  copy_color_spinor_mg_sh.cu copy_color_spinor_mg_sq.cu
+  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
+  copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
+  copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
+  copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu fermion_force_quda.cu
@@ -72,12 +79,15 @@ endif()
 # QUDA_OBJS all c, cpp, fortran sources
 
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
-if(GITVERSION)
-  find_file(QUDA_GITDIR NAMES .git PATHS ${CMAKE_SOURCE_DIR} NO_DEFAULT_PATH)
-  set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${QUDA_GITDIR}/logs/HEAD)
+if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
+  if(GITVERSION)
+    find_path(QUDA_GITDIR NAME HEAD PATHS ${CMAKE_SOURCE_DIR}/.git/logs NO_DEFAULT_PATH)
+    if(QUDA_GITDIR)
+      set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${QUDA_GITDIR}/HEAD)
+    endif()
+  endif()
+  mark_as_advanced(QUDA_GITDIR)
 endif()
-mark_as_advanced(QUDA_GITDIR)
-
 
 # include_directories
 include_directories(dslash_core)
@@ -102,6 +112,26 @@ endif()
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
+# propagate CXX flags to CUDA host compiler
+if(USING_CUDA_LANG_SUPPORT AND ${QUDA_PROPAGATE_CXX_FLAGS})
+  target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
+    $<$<CONFIG:DEVEL>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVEL}>
+    $<$<CONFIG:STRICT>:-Xcompiler ${CMAKE_CXX_FLAGS_STRICT}>
+    $<$<CONFIG:RELEASE>:-Xcompiler ${CMAKE_CXX_FLAGS_RELEASE}>
+    $<$<CONFIG:DEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEBUG}>  
+    $<$<CONFIG:HOSTDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_HOSTDEBUG}>
+    $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> 
+    >)
+endif()
+
+# some clang warnings shouds be warning even when turning warnings into errors
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field>)
+# this is a hack to get colored diagnostics back when using Ninja and clang
+    if(CMAKE_GENERATOR MATCHES "Ninja")
+      target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
+    endif()
+endif()
 
 target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 

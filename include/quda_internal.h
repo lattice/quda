@@ -27,9 +27,6 @@
 #include <pthread.h>
 #endif
 
-#define MAX_SHORT 32767.0f
-#define MAX_CHAR 127.0f
-
 #define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
 #define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
 #include <enum_quda.h>
@@ -45,6 +42,11 @@
 #define USE_TEXTURE_OBJECTS
 #endif
 
+// if not using texture objects then we need to disable multi-blas support since these don't work with texture references
+#ifndef USE_TEXTURE_OBJECTS
+#undef MAX_MULTI_BLAS_N
+#define MAX_MULTI_BLAS_N 1
+#endif
 
 
 #ifdef INTERFACE_NVTX
@@ -94,6 +96,27 @@ extern "C" {
 namespace quda {
 
   typedef std::complex<double> Complex;
+
+  /**
+   * Traits for determining the maximum and inverse maximum
+   * value of a (signed) char and short. Relevant for
+   * fixed precision types. 
+   */
+  template< typename T > struct fixedMaxValue{ static constexpr float value = 0.0f; };
+  template<> struct fixedMaxValue<short>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<char>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
+
+  template< typename T > struct fixedInvMaxValue{ static constexpr double value = 3.402823e+38; };
+  template<> struct fixedInvMaxValue<short>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<short2>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<short4>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<char>{ static constexpr double value = 7.87401574e-3; };
+  template<> struct fixedInvMaxValue<char2>{ static constexpr double value = 7.87401574e-3; };
+  template<> struct fixedInvMaxValue<char4>{ static constexpr double value = 7.87401574e-3; };
 
   /**
    * Use this for recording a fine-grained profile of a QUDA

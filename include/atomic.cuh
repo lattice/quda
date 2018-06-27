@@ -96,4 +96,25 @@ static inline __device__ short2 atomicAdd(short2 *addr, short2 val){
   return old.s;
 }
 
+union uint32_char2 { unsigned short i; char2 s; };
+
+/**
+   @brief Implementation of char2 atomic addition using compare
+   and swap.
+
+   @param addr Address that stores the atomic variable to be updated
+   @param val Value to be added to the atomic
+*/
+static inline __device__ char2 atomicAdd(char2 *addr, char2 val){
+  uint32_char2 old, assumed, incremented;
+  old.s = *addr;
+  do {
+    assumed.s = old.s;
+    incremented.s = make_char2(val.x + assumed.s.x, val.y + assumed.s.y);
+    old.i =  atomicCAS((unsigned int*)addr, assumed.i, incremented.i);
+  } while ( assumed.i != old.i );
+
+  return old.s;
+}
+
 #endif

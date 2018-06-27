@@ -67,8 +67,8 @@ namespace quda {
       if (i==0) {
 	ghostOffset[i][0] = 0;
       } else {
-        if (ghost_precision == QUDA_HALF_PRECISION) {
-          ghostOffset[i][0] = (ghostNormOffset[i-1][1] + num_norm_faces*ghostFace[i-1]/2)*sizeof(float)/sizeof(short);
+        if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
+          ghostOffset[i][0] = (ghostNormOffset[i-1][1] + num_norm_faces*ghostFace[i-1]/2)*sizeof(float)/ghost_precision;
           // Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
           ghostOffset[i][0] = 4*((ghostOffset[i][0] + 3)/4);
         } else {
@@ -76,19 +76,19 @@ namespace quda {
         }
       }
 
-      if (ghost_precision == QUDA_HALF_PRECISION) {
-        ghostNormOffset[i][0] = (ghostOffset[i][0] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*sizeof(short)/sizeof(float);
-        ghostOffset[i][1] = (ghostNormOffset[i][0] + num_norm_faces*ghostFace[i]/2)*sizeof(float)/sizeof(short);
+      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
+        ghostNormOffset[i][0] = (ghostOffset[i][0] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*ghost_precision/sizeof(float);
+        ghostOffset[i][1] = (ghostNormOffset[i][0] + num_norm_faces*ghostFace[i]/2)*sizeof(float)/ghost_precision;
 	// Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
         ghostOffset[i][1] = 4*((ghostOffset[i][1] + 3)/4);
-        ghostNormOffset[i][1] = (ghostOffset[i][1] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*sizeof(short)/sizeof(float);
+        ghostNormOffset[i][1] = (ghostOffset[i][1] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*ghost_precision/sizeof(float);
       } else {
         ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
       }
 
       int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
       ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*ghost_precision;
-      if (ghost_precision == QUDA_HALF_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
+      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
 
     } // dim
 
@@ -96,7 +96,7 @@ namespace quda {
     ghostVolume *= num_faces;
 
     size_t ghost_length = ghostVolume*nColor*nSpin*2;
-    size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
+    size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ? ghostNormVolume : 0;
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
       printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
@@ -104,7 +104,7 @@ namespace quda {
     }
 
     ghost_bytes = (size_t)ghost_length*ghost_precision;
-    if (ghost_precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
+    if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
   } // createGhostZone
@@ -154,7 +154,7 @@ namespace quda {
     bytes = (size_t)length * precision; // includes pads and ghost zones
     if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
-    if (precision == QUDA_HALF_PRECISION) {
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
       if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
@@ -300,7 +300,7 @@ namespace quda {
     bytes = (size_t)length * precision; // includes pads
     if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
-    if (precision == QUDA_HALF_PRECISION) {
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
       if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
@@ -513,7 +513,8 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
     } else if (precision == QUDA_SINGLE_PRECISION ||
-	       (precision == QUDA_HALF_PRECISION && nColor == 3)) {
+	       (precision == QUDA_HALF_PRECISION && nColor == 3) ||
+         (precision == QUDA_QUARTER_PRECISION && nColor == 3)) {
       if (nSpin == 4) {
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
       } else if (nSpin == 2) {

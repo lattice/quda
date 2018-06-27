@@ -119,11 +119,11 @@ public:
   {
     // bytes for low-precision vector
     size_t base_bytes = arg.X.Precision()*vec_length<FloatN>::value*M;
-    if (arg.X.Precision() == QUDA_HALF_PRECISION) base_bytes += sizeof(float);
+    if (arg.X.Precision() == QUDA_HALF_PRECISION || arg.X.Precision() == QUDA_QUARTER_PRECISION) base_bytes += sizeof(float);
 
     // bytes for high precision vector
     size_t extra_bytes = arg.Y.Precision()*vec_length<FloatN>::value*M;
-    if (arg.Y.Precision() == QUDA_HALF_PRECISION) extra_bytes += sizeof(float);
+    if (arg.Y.Precision() == QUDA_HALF_PRECISION || arg.Y.Precision() == QUDA_QUARTER_PRECISION) extra_bytes += sizeof(float);
 
     // the factor two here assumes we are reading and writing to the high precision vector
     return ((arg.f.streams()-2)*base_bytes + 2*extra_bytes)*arg.length*nParity;

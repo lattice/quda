@@ -200,7 +200,7 @@ namespace quda {
       bool native = false;
       if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1 || nSpin==2) &&
 	    (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
-	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION) &&
+	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION || this->precision == QUDA_QUARTER_PRECISION) &&
 	    (nSpin==4) && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
 
       this->precision = precision;
@@ -677,7 +677,13 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
-    const void* Ghost2() const { return ghost_field_tex[bufferIndex]; }
+    const void* Ghost2() const {
+      if (bufferIndex < 2) {
+        return ghost_recv_buffer_d[bufferIndex];
+      } else {
+        return static_cast<char*>(ghost_pinned_buffer_hd[bufferIndex%2])+ghost_bytes;
+      }
+    }
 
     /**
        @brief This is a unified ghost exchange function for doing a complete

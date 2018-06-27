@@ -17,6 +17,10 @@
 #endif
 #endif
 
+// ESW HACK
+//#define ESW_HACK_HALF_EXCHANGE
+//#define ESW_HACK_QUARTER_EXCHANGE
+
 namespace quda {
 
 #ifdef GPU_MULTIGRID
@@ -27,9 +31,9 @@ namespace quda {
     DSLASH_FULL
   };
 
-  template <typename Float, typename yFloat, int coarseSpin, int coarseColor, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
+  template <typename Float, typename yFloat, typename ghostFloat, int coarseSpin, int coarseColor, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
   struct DslashCoarseArg {
-    typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder,Float,yFloat> F;
+    typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder,Float,ghostFloat> F;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> G;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,yFloat> GY;
 
@@ -454,7 +458,7 @@ namespace quda {
     }
   }
 
-  template <typename Float, typename yFloat, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool dagger, DslashType type>
+  template <typename Float, typename yFloat, typename ghostFloat, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool dagger, DslashType type>
   class DslashCoarse : public Tunable {
 
   protected:
@@ -632,9 +636,10 @@ namespace quda {
 
   public:
     inline DslashCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-			const GaugeField &Y, const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location)
+			const GaugeField &Y, const GaugeField &X, double kappa, int parity,
+                        MemoryLocation *halo_location)
       : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
-      nParity(out.SiteSubset()), nSrc(out.Ndim()==5 ? out.X(4) : 1)
+        nParity(out.SiteSubset()), nSrc(out.Ndim()==5 ? out.X(4) : 1)
     {
       strcpy(aux, out.AuxString());
       strcat(aux, comm_dim_partitioned_string());
@@ -670,7 +675,7 @@ namespace quda {
 	if (out.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || Y.FieldOrder() != QUDA_QDP_GAUGE_ORDER)
 	  errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
 
-	DslashCoarseArg<Float,yFloat,Ns,Nc,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,QUDA_QDP_GAUGE_ORDER> arg(out, inA, inB, Y, X, (Float)kappa, parity);
+	DslashCoarseArg<Float,yFloat,ghostFloat,Ns,Nc,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,QUDA_QDP_GAUGE_ORDER> arg(out, inA, inB, Y, X, (Float)kappa, parity);
 	coarseDslash<Float,nDim,Ns,Nc,Mc,dslash,clover,dagger,type>(arg);
       } else {
 
@@ -679,7 +684,7 @@ namespace quda {
 	if (out.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || Y.FieldOrder() != QUDA_FLOAT2_GAUGE_ORDER)
 	  errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
 
-	DslashCoarseArg<Float,yFloat,Ns,Nc,QUDA_FLOAT2_FIELD_ORDER,QUDA_FLOAT2_GAUGE_ORDER> arg(out, inA, inB, Y, X, (Float)kappa, parity);
+	DslashCoarseArg<Float,yFloat,ghostFloat,Ns,Nc,QUDA_FLOAT2_FIELD_ORDER,QUDA_FLOAT2_GAUGE_ORDER> arg(out, inA, inB, Y, X, (Float)kappa, parity);
 
 	switch (tp.aux.y) { // dimension gather parallelisation
 	case 1:
@@ -766,7 +771,7 @@ namespace quda {
   };
 
 
-  template <typename Float, typename yFloat, int coarseColor, int coarseSpin>
+  template <typename Float, typename yFloat, typename ghostFloat, int coarseColor, int coarseSpin>
   inline void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 			  const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash,
 			  bool clover, bool dagger, DslashType type, MemoryLocation *halo_location) {
@@ -779,20 +784,20 @@ namespace quda {
 	if (clover) {
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
 
 	} else { // plain dslash
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
 
@@ -801,7 +806,7 @@ namespace quda {
 
 	if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
 	if (clover) {
-	  DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	  DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	  dslash.apply(0);
 	} else {
 	  errorQuda("Unsupported dslash=false clover=false");
@@ -814,20 +819,20 @@ namespace quda {
 	if (clover) {
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
 
 	} else { // plain dslash
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
 
@@ -835,7 +840,7 @@ namespace quda {
       } else {
 	if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
 	if (clover) {
-	  DslashCoarse<Float,yFloat,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	  DslashCoarse<Float,yFloat,ghostFloat,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	  dslash.apply(0);
 	} else {
 	  errorQuda("Unsupported dslash=false clover=false");
@@ -845,7 +850,7 @@ namespace quda {
   }
 
   // template on the number of coarse colors
-  template <typename Float, typename yFloat>
+  template <typename Float, typename yFloat, typename ghostFloat>
   inline void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 			  const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash,
 			  bool clover, bool dagger, DslashType type, MemoryLocation *halo_location) {
@@ -861,38 +866,38 @@ namespace quda {
 
 #if 0
     } else if (inA.Ncolor() == 4) {
-      ApplyCoarse<Float,yFloat,4,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,4,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
 #if 0 // ESW HACK FOR STAGGERED COMPILE
     if (inA.Ncolor() == 6) { // free field Wilson
-      ApplyCoarse<Float,yFloat,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
 #if 0
     } else if (inA.Ncolor() == 8) {
-      ApplyCoarse<Float,yFloat,8,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,8,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
     } else if (inA.Ncolor() == 12) {
-      ApplyCoarse<Float,yFloat,12,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,12,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
     } else if (inA.Ncolor() == 16) {
-      ApplyCoarse<Float,yFloat,16,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,16,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
     } else if (inA.Ncolor() == 20) {
-      ApplyCoarse<Float,yFloat,20,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,20,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
     } else 
 #endif
     if (inA.Ncolor() == 24) {
-      ApplyCoarse<Float,yFloat,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #if 0
     } else if (inA.Ncolor() == 28) {
-      ApplyCoarse<Float,yFloat,28,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,28,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
 #if 0 // ESW HACK FOR STAGGERED COMPILE
     } else if (inA.Ncolor() == 32) {
-      ApplyCoarse<Float,yFloat,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
 #ifdef GPU_STAGGERED_DIRAC
     } else if (inA.Ncolor() == 96) {
-      ApplyCoarse<Float,yFloat,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
     } else if (inA.Ncolor() == 128) {
-      ApplyCoarse<Float,yFloat,128,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,128,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
@@ -933,12 +938,14 @@ namespace quda {
     bool clover;
     bool dagger;
     const int *commDim;
+    const QudaPrecision halo_precision;
 
     inline DslashCoarseLaunch(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 			      const GaugeField &Y, const GaugeField &X, double kappa, int parity,
-			      bool dslash, bool clover, bool dagger, const int *commDim)
+			      bool dslash, bool clover, bool dagger, const int *commDim, QudaPrecision halo_precision)
       : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
-	dslash(dslash), clover(clover), dagger(dagger), commDim(commDim) { }
+	dslash(dslash), clover(clover), dagger(dagger), commDim(commDim),
+        halo_precision(halo_precision == QUDA_INVALID_PRECISION ? Y.Precision() : halo_precision) { }
 
     /**
        @brief Execute the coarse dslash using the given policy
@@ -980,30 +987,44 @@ namespace quda {
 
       if (dslash && comm_partitioned() && comms) {
 	const int nFace = 1;
-	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, Y.Precision());
+	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision);
       }
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
 
       if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
-	if (Y.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Y Precision %d not supported", Y.Precision());
-	ApplyCoarse<double,double>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-			    dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+	if (Y.Precision() != QUDA_DOUBLE_PRECISION)
+          errorQuda("Y Precision %d not supported", Y.Precision());
+	if (halo_precision != QUDA_DOUBLE_PRECISION)
+          errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
+	ApplyCoarse<double,double,double>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                          dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
 	//if (dslash && comm_partitioned()) ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, true, halo_location);
 #else
 	errorQuda("Double precision multigrid has not been enabled");
 #endif
       } else if (precision == QUDA_SINGLE_PRECISION) {
-	if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-	  ApplyCoarse<float,float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-			     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
-	} else if (Y.Precision() == QUDA_HALF_PRECISION) {
-	  ApplyCoarse<float,short>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-			     dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
-	} else {
-	  errorQuda("Unsupported precision %d\n", Y.Precision());
-	}
+        if (Y.Precision() == QUDA_SINGLE_PRECISION) {
+          if (halo_precision == QUDA_SINGLE_PRECISION) {
+            ApplyCoarse<float,float,float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                           dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+          } else {
+            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
+          }
+        } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+          if (halo_precision == QUDA_HALF_PRECISION) {
+            ApplyCoarse<float,short,short>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                           dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+          } else if (halo_precision == QUDA_QUARTER_PRECISION) {
+            ApplyCoarse<float,short,char>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                          dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+          } else {
+            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
+          }
+        } else {
+          errorQuda("Unsupported precision %d\n", Y.Precision());
+        }
 	//if (dslash && comm_partitioned()) ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, true, halo_location);
       } else {
 	errorQuda("Unsupported precision %d\n", Y.Precision());
@@ -1060,6 +1081,9 @@ namespace quda {
 
       char prec_str[8];
       i32toa(prec_str,dslash.Y.Precision());
+      strcat(aux,prec_str);
+      strcat(aux,",halo_prec=");
+      i32toa(prec_str,dslash.halo_precision);
       strcat(aux,prec_str);
       strcat(aux,comm_dim_partitioned_string());
       strcat(aux,comm_dim_topology_string());
@@ -1194,9 +1218,9 @@ namespace quda {
   //Uses the kappa normalization for the Wilson operator.
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 	           const GaugeField &Y, const GaugeField &X, double kappa, int parity,
-		   bool dslash, bool clover, bool dagger, const int *commDim) {
+		   bool dslash, bool clover, bool dagger, const int *commDim, QudaPrecision halo_precision) {
 
-    DslashCoarseLaunch Dslash(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim);
+    DslashCoarseLaunch Dslash(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision);
 
     DslashCoarsePolicyTune policy(Dslash);
     policy.apply(0);

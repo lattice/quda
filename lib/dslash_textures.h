@@ -45,6 +45,12 @@ texture<short4, 1, cudaReadModeNormalizedFloat> gauge1TexHalf4;
 texture<short2, 1, cudaReadModeNormalizedFloat> gauge0TexHalf2;
 texture<short2, 1, cudaReadModeNormalizedFloat> gauge1TexHalf2;
 
+// Quarter precision gauge field
+texture<char4, 1, cudaReadModeNormalizedFloat> gauge0TexQuarter4;
+texture<char4, 1, cudaReadModeNormalizedFloat> gauge1TexQuarter4;
+texture<char2, 1, cudaReadModeNormalizedFloat> gauge0TexQuarter2;
+texture<char2, 1, cudaReadModeNormalizedFloat> gauge1TexQuarter2;
+
 texture<int4, 1> longGauge0TexDouble;
 texture<int4, 1> longGauge1TexDouble;
 texture<int2, 1> longPhase0TexDouble;
@@ -64,6 +70,13 @@ texture<short2, 1, cudaReadModeNormalizedFloat> longGauge0TexHalf_norecon;
 texture<short2, 1, cudaReadModeNormalizedFloat> longGauge1TexHalf_norecon;
 texture<short, 1, cudaReadModeNormalizedFloat> longPhase0TexHalf;
 texture<short, 1, cudaReadModeNormalizedFloat> longPhase1TexHalf;
+
+texture<char4, 1, cudaReadModeNormalizedFloat> longGauge0TexQuarter;
+texture<char4, 1, cudaReadModeNormalizedFloat> longGauge1TexQuarter;
+texture<char2, 1, cudaReadModeNormalizedFloat> longGauge0TexQuarter_norecon;
+texture<char2, 1, cudaReadModeNormalizedFloat> longGauge1TexQuarter_norecon;
+texture<char, 1, cudaReadModeNormalizedFloat> longPhase0TexQuarter;
+texture<char, 1, cudaReadModeNormalizedFloat> longPhase1TexQuarter;
 
 
 // Double precision input spinor field
@@ -86,6 +99,16 @@ texture<short2, 1, cudaReadModeNormalizedFloat> ghostSpinorTexHalf2;
 texture<float, 1, cudaReadModeElementType> ghostSpinorTexHalfNorm;
 texture<float, 1, cudaReadModeElementType> ghostSpinorTexHalf2Norm;
 
+// Quarter precision input spinor field
+texture<char4, 1, cudaReadModeNormalizedFloat> spinorTexQuarter;
+texture<char2, 1, cudaReadModeNormalizedFloat> spinorTexQuarter2;
+texture<float, 1, cudaReadModeElementType> spinorTexQuarterNorm;
+texture<float, 1, cudaReadModeElementType> spinorTexQuarter2Norm;
+texture<char4, 1, cudaReadModeNormalizedFloat> ghostSpinorTexQuarter;
+texture<char2, 1, cudaReadModeNormalizedFloat> ghostSpinorTexQuarter2;
+texture<float, 1, cudaReadModeElementType> ghostSpinorTexQuarterNorm;
+texture<float, 1, cudaReadModeElementType> ghostSpinorTexQuarter2Norm;
+
 // Double precision accumulate spinor field
 texture<int4, 1> accumTexDouble;
 
@@ -96,6 +119,12 @@ texture<float2, 1, cudaReadModeElementType> accumTexSingle2;
 // Half precision accumulate spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> accumTexHalf;
 texture<short2, 1, cudaReadModeNormalizedFloat> accumTexHalf2;
+texture<float, 1, cudaReadModeElementType> accumTexHalfNorm;
+texture<float, 1, cudaReadModeElementType> accumTexHalf2Norm;
+
+// Quarter precision accumulate spinor field
+texture<char4, 1, cudaReadModeNormalizedFloat> accumTexQuarter;
+texture<char2, 1, cudaReadModeNormalizedFloat> accumTexQuarter2;
 texture<float, 1, cudaReadModeElementType> accumTexHalfNorm;
 texture<float, 1, cudaReadModeElementType> accumTexHalf2Norm;
 
@@ -111,6 +140,12 @@ texture<short4, 1, cudaReadModeNormalizedFloat> interTexHalf;
 texture<short2, 1, cudaReadModeNormalizedFloat> interTexHalf2;
 texture<float, 1, cudaReadModeElementType> interTexHalfNorm;
 texture<float, 1, cudaReadModeElementType> interTexHalf2Norm;
+
+// Quarter precision intermediate spinor field
+texture<char4, 1, cudaReadModeNormalizedFloat> interTexChar;
+texture<char2, 1, cudaReadModeNormalizedFloat> interTexChar2;
+texture<float, 1, cudaReadModeElementType> interTexHalfNorm;
+texture<float, 1, cudaReadModeElementType> interTexHalf2Norm;
 #endif // not defined USE_TEXTURE_OBJECTS
 
 // FIXME update the below textures for texture objects
@@ -122,6 +157,8 @@ texture<float2, 1, cudaReadModeElementType> fatGauge0TexSingle;
 texture<float2, 1, cudaReadModeElementType> fatGauge1TexSingle;
 texture<short2, 1, cudaReadModeNormalizedFloat> fatGauge0TexHalf;
 texture<short2, 1, cudaReadModeNormalizedFloat> fatGauge1TexHalf;
+texture<char2, 1, cudaReadModeNormalizedFloat> fatGauge0TexQuarter;
+texture<char2, 1, cudaReadModeNormalizedFloat> fatGauge1TexQuarter;
 
 //Double precision for site link
 texture<int4, 1> siteLink0TexDouble;
@@ -165,10 +202,16 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, 
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
       cudaBindTexture(0, gauge0TexSingle2, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, gauge1TexSingle2, *gauge1, gauge.Bytes()/2);
-    } else {
+    } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
       cudaBindTexture(0, gauge0TexHalf2, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, gauge1TexHalf2, *gauge1, gauge.Bytes()/2);
+    } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+      cudaBindTexture(0, gauge0TexQuarter2, *gauge0, gauge.Bytes()/2); 
+      cudaBindTexture(0, gauge1TexQuarter2, *gauge1, gauge.Bytes()/2);
+    } else {
+      errorQuda("gauge precision is not supported");
     }
+
   } else {
     if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
       cudaBindTexture(0, gauge0TexDouble2, *gauge0, gauge.Bytes()/2); 
@@ -176,9 +219,14 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, 
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
       cudaBindTexture(0, gauge0TexSingle4, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, gauge1TexSingle4, *gauge1, gauge.Bytes()/2);
-    } else {
+    } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
       cudaBindTexture(0, gauge0TexHalf4, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, gauge1TexHalf4, *gauge1, gauge.Bytes()/2);
+    } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+      cudaBindTexture(0, gauge0TexQuarter4, *gauge0, gauge.Bytes()/2); 
+      cudaBindTexture(0, gauge1TexQuarter4, *gauge1, gauge.Bytes()/2);
+    } else {
+      errorQuda("gauge precision is not supported");
     }
   }
 #endif // USE_TEXTURE_OBJECTS
@@ -195,9 +243,14 @@ void unbindGaugeTex(const cudaGaugeField &gauge)
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
       cudaUnbindTexture(gauge0TexSingle2);
       cudaUnbindTexture(gauge1TexSingle2);
-    } else {
+    } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
       cudaUnbindTexture(gauge0TexHalf2); 
       cudaUnbindTexture(gauge1TexHalf2);
+    } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+      cudaUnbindTexture(gauge0TexQuarter2); 
+      cudaUnbindTexture(gauge1TexQuarter2);
+    } else {
+      errorQuda("gauge precision is not supported");
     }
   } else {
     if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -206,9 +259,14 @@ void unbindGaugeTex(const cudaGaugeField &gauge)
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
       cudaUnbindTexture(gauge0TexSingle4); 
       cudaUnbindTexture(gauge1TexSingle4);
-    } else {
+    } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
       cudaUnbindTexture(gauge0TexHalf4); 
       cudaUnbindTexture(gauge1TexHalf4);
+    } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+      cudaUnbindTexture(gauge0TexQuarter4); 
+      cudaUnbindTexture(gauge1TexQuarter4);
+    } else {
+      errorQuda("gauge precision is not supported");
     }
   }
 #endif
@@ -234,9 +292,14 @@ void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge
   } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
     cudaBindTexture(0, fatGauge0TexSingle, *gauge0, gauge.Bytes()/2); 
     cudaBindTexture(0, fatGauge1TexSingle, *gauge1, gauge.Bytes()/2);
-  } else {
+  } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
     cudaBindTexture(0, fatGauge0TexHalf, *gauge0, gauge.Bytes()/2); 
     cudaBindTexture(0, fatGauge1TexHalf, *gauge1, gauge.Bytes()/2);
+  } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+    cudaBindTexture(0, fatGauge0TexQuarter, *gauge0, gauge.Bytes()/2); 
+    cudaBindTexture(0, fatGauge1TexQuarter, *gauge1, gauge.Bytes()/2);
+  } else {
+    errorQuda("gauge precision is not supported");
   }
 #endif // USE_TEXTURE_OBJECTS
 
@@ -251,9 +314,14 @@ void unbindFatGaugeTex(const cudaGaugeField &gauge)
   } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
     cudaUnbindTexture(fatGauge0TexSingle);
     cudaUnbindTexture(fatGauge1TexSingle);
-  } else {
+  } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
     cudaUnbindTexture(fatGauge0TexHalf);
     cudaUnbindTexture(fatGauge1TexHalf);
+  } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+    cudaUnbindTexture(fatGauge0TexQuarter);
+    cudaUnbindTexture(fatGauge1TexQuarter);
+  } else {
+    errorQuda("gauge precision is not supported");
   }
 #endif
 }
@@ -296,7 +364,7 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
         cudaBindTexture(0, longPhase1TexSingle, (char*)(*gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
       }
     }
-  } else {
+  } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
     if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
       cudaBindTexture(0, longGauge0TexHalf_norecon, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, longGauge1TexHalf_norecon, *gauge1, gauge.Bytes()/2);	
@@ -308,6 +376,20 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
 	cudaBindTexture(0, longPhase1TexHalf, (char*)(*gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
       }
     }
+  } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+    if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
+      cudaBindTexture(0, longGauge0TexQuarter_norecon, *gauge0, gauge.Bytes()/2); 
+      cudaBindTexture(0, longGauge1TexQuarter_norecon, *gauge1, gauge.Bytes()/2);  
+    } else {
+      cudaBindTexture(0, longGauge0TexQuarter, *gauge0, gauge.Bytes()/2); 
+      cudaBindTexture(0, longGauge1TexQuarter, *gauge1, gauge.Bytes()/2);
+      if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
+        cudaBindTexture(0, longPhase0TexQuarter, (char*)(*gauge0) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+  cudaBindTexture(0, longPhase1TexQuarter, (char*)(*gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+      }
+    }
+  } else {
+    errorQuda("gauge precision not supported");
   }
 #endif // USE_TEXTURE_OBJECTS
 }
@@ -334,7 +416,7 @@ void unbindLongGaugeTex(const cudaGaugeField &gauge)
         cudaUnbindTexture(longPhase1TexSingle);
       }
     }
-  } else { // half precision
+  } else if (gauge.Precision() == QUDA_HALF_PRECISION) { // half precision
     if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
       cudaUnbindTexture(longGauge0TexHalf_norecon);
       cudaUnbindTexture(longGauge1TexHalf_norecon);
@@ -346,6 +428,20 @@ void unbindLongGaugeTex(const cudaGaugeField &gauge)
         cudaUnbindTexture(longPhase1TexHalf);
       }
     }
+  } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) { 
+    if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
+      cudaUnbindTexture(longGauge0TexQuarter_norecon);
+      cudaUnbindTexture(longGauge1TexQuarter_norecon);
+    } else {
+      cudaUnbindTexture(longGauge0TexQuarter);
+      cudaUnbindTexture(longGauge1TexQuarter);
+      if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() ==  QUDA_RECONSTRUCT_9){
+        cudaUnbindTexture(longPhase0TexQuarter);
+        cudaUnbindTexture(longPhase1TexQuarter);
+      }
+    }
+  } else {
+    errorQuda("gauge precision not supported");
   }
 #endif
 }
@@ -357,16 +453,7 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
   int size = (sizeof(((spinorFloat*)0)->x) < sizeof(float)) ? sizeof(float) :
     sizeof(((spinorFloat*)0)->x);
 
-#ifdef USE_TEXTURE_OBJECTS
-  dslashParam.inTex = in->Tex();
-  dslashParam.inTexNorm = in->TexNorm();
-  dslashParam.ghostTex = in->GhostTex();
-  dslashParam.ghostTexNorm = in->GhostTexNorm();
-  if (out) dslashParam.outTex = out->Tex();
-  if (out) dslashParam.outTexNorm = out->TexNorm();
-  if (x) dslashParam.xTex = x->Tex();
-  if (x) dslashParam.xTexNorm = x->TexNorm();
-#else
+#ifndef USE_TEXTURE_OBJECTS
   if (typeid(spinorFloat) == typeid(double2)) {
     cudaBindTexture(0, spinorTexDouble, in->V(), in->Bytes()); 
     if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexDouble, in->Ghost2(), in->GhostBytes());
@@ -400,10 +487,28 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
     if (out) cudaBindTexture(0, interTexHalf2Norm, out->Norm(), in->NormBytes());
     if (x) cudaBindTexture(0, accumTexHalf2, x->V(), in->Bytes());
     if (x) cudaBindTexture(0, accumTexHalf2Norm, x->Norm(), in->NormBytes());
-  } else {
+  } else if (typeid(spinorFloat) == typeid(char4)) {
+    cudaBindTexture(0, spinorTexQuarter, in->V(), in->Bytes());
+    cudaBindTexture(0, spinorTexQuarterNorm, in->Norm(), in->NormBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexQuarter, in->Ghost2(), in->GhostBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexQuarterNorm, in->Ghost2(), in->GhostBytes());
+    if (out) cudaBindTexture(0, interTexQuarter, out->V(), in->Bytes());
+    if (out) cudaBindTexture(0, interTexQuarterNorm, out->Norm(), in->NormBytes());
+    if (x) cudaBindTexture(0, accumTexQuarter, x->V(), in->Bytes());
+    if (x) cudaBindTexture(0, accumTexQuarterNorm, x->Norm(), in->NormBytes());
+  } else if (typeid(spinorFloat) == typeid(char2)) {
+    cudaBindTexture(0, spinorTexQuarter2, in->V(), in->Bytes());
+    cudaBindTexture(0, spinorTexQuarter2Norm, in->Norm(), in->NormBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexQuarter2, in->Ghost2(), in->GhostBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexQuarter2Norm, in->Ghost2(), in->GhostBytes());
+    if (out) cudaBindTexture(0, interTexQuarter, out->V(), in->Bytes());
+    if (out) cudaBindTexture(0, interTexQuarter2Norm, out->Norm(), in->NormBytes());
+    if (x) cudaBindTexture(0, accumTexQuarter2, x->V(), in->Bytes());
+    if (x) cudaBindTexture(0, accumTexQuarter2Norm, x->Norm(), in->NormBytes());
+  }else {
     errorQuda("Unsupported precision and short vector type");
   }
-#endif // USE_TEXTURE_OBJECTS
+#endif // !USE_TEXTURE_OBJECTS
 
   return size;
 }
@@ -445,6 +550,24 @@ void unbindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField 
     if (out) cudaUnbindTexture(interTexHalf2Norm);
     if (x) cudaUnbindTexture(accumTexHalf2); 
     if (x) cudaUnbindTexture(accumTexHalf2Norm);
+  } else if (typeid(spinorFloat) == typeid(char4)) {
+    cudaUnbindTexture(spinorTexQuarter); 
+    cudaUnbindTexture(spinorTexQuarterNorm);
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexQuarter);
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexQuarterNorm);
+    if (out) cudaUnbindTexture(interTexQuarter); 
+    if (out) cudaUnbindTexture(interTexQuarterNorm);
+    if (x) cudaUnbindTexture(accumTexQuarter); 
+    if (x) cudaUnbindTexture(accumTexQuarterNorm);
+  } else if (typeid(spinorFloat) == typeid(char2)) {
+    cudaUnbindTexture(spinorTexQuarter2); 
+    cudaUnbindTexture(spinorTexQuarter2Norm);
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexQuarter2);
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexQuarter2Norm);
+    if (out) cudaUnbindTexture(interTexQuarter2); 
+    if (out) cudaUnbindTexture(interTexQuarter2Norm);
+    if (x) cudaUnbindTexture(accumTexQuarter2); 
+    if (x) cudaUnbindTexture(accumTexQuarter2Norm);
   } else {
     errorQuda("Unsupported precision and short vector type");
   }
@@ -459,12 +582,17 @@ texture<int4, 1> cloverInvTexDouble;
 texture<float4, 1, cudaReadModeElementType> cloverTexSingle;
 texture<float4, 1, cudaReadModeElementType> cloverInvTexSingle;
 
+// Norms for half and quarter precision clover terms.
+texture<float, 1, cudaReadModeElementType> cloverTexNorm;
+texture<float, 1, cudaReadModeElementType> cloverInvTexNorm;
+
 // Half precision clover term
 texture<short4, 1, cudaReadModeNormalizedFloat> cloverTexHalf;
-texture<float, 1, cudaReadModeElementType> cloverTexNorm;
-
 texture<short4, 1, cudaReadModeNormalizedFloat> cloverInvTexHalf;
-texture<float, 1, cudaReadModeElementType> cloverInvTexNorm;
+
+// Quarter precision clover term, use norms from half.
+texture<char4, 1, cudaReadModeNormalizedFloat> cloverTexQuarter;
+texture<char4, 1, cudaReadModeNormalizedFloat> cloverInvTexQuarter;
 
 QudaPrecision bindCloverTex(const FullClover clover, const int oddBit, 
 				   void **cloverP, void **cloverNormP)
@@ -480,15 +608,20 @@ QudaPrecision bindCloverTex(const FullClover clover, const int oddBit,
 
 #ifdef USE_TEXTURE_OBJECTS
   dslashParam.cloverTex = oddBit ? clover.OddTex() : clover.EvenTex();
-  if (clover.precision == QUDA_HALF_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
+  if (clover.precision == QUDA_HALF_PRECISION || clover.precision == QUDA_QUARTER_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
 #else
   if (clover.precision == QUDA_DOUBLE_PRECISION) {
     cudaBindTexture(0, cloverTexDouble, *cloverP, clover.bytes); 
   } else if (clover.precision == QUDA_SINGLE_PRECISION) {
     cudaBindTexture(0, cloverTexSingle, *cloverP, clover.bytes); 
-  } else {
+  } else if (clover.precision == QUDA_HALF_PRECISION) {
     cudaBindTexture(0, cloverTexHalf, *cloverP, clover.bytes); 
     cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
+  } else if (clover.precision == QUDA_QUARTER_PRECISION) {
+    cudaBindTexture(0, cloverTexQuarter, *cloverP, clover.bytes); 
+    cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
+  } else {
+    errorQuda("Unsupported precision");
   }
 #endif // USE_TEXTURE_OBJECTS
 
@@ -502,9 +635,14 @@ void unbindCloverTex(const FullClover clover)
     cudaUnbindTexture(cloverTexDouble);
   } else if (clover.precision == QUDA_SINGLE_PRECISION) {
     cudaUnbindTexture(cloverTexSingle);
-  } else {
+  } else if (clover.precision == QUDA_HALF_PRECISION) {
     cudaUnbindTexture(cloverTexHalf);
     cudaUnbindTexture(cloverTexNorm);
+  } else if (clover.precision == QUDA_QUARTER_PRECISION) {
+    cudaUnbindTexture(cloverTexQuarter);
+    cudaUnbindTexture(cloverTexNorm);
+  } else {
+    errorQuda("Unsupported precision");
   }
 #endif // not defined USE_TEXTURE_OBJECTS
 }
@@ -532,10 +670,10 @@ QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover clo
 
 #ifdef USE_TEXTURE_OBJECTS
 	dslashParam.cloverTex   = oddBit ? clover.OddTex() : clover.EvenTex();
-	if (clover.precision == QUDA_HALF_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
+	if (clover.precision == QUDA_HALF_PRECISION || clover.precision == QUDA_QUARTER_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
 #ifndef DYNAMIC_CLOVER
 	dslashParam.cloverInvTex = oddBit ? cloverInv.OddTex() : cloverInv.EvenTex();
-	if (cloverInv.precision == QUDA_HALF_PRECISION) dslashParam.cloverInvNormTex = oddBit ? cloverInv.OddNormTex() : cloverInv.EvenNormTex();
+	if (cloverInv.precision == QUDA_HALF_PRECISION || clover.precision == QUDA_QUARTER_PRECISION) dslashParam.cloverInvNormTex = oddBit ? cloverInv.OddNormTex() : cloverInv.EvenNormTex();
 #endif
 #else
 	if (clover.precision == QUDA_DOUBLE_PRECISION)    //I assume that the clover and cloverInv fields have the same precision
@@ -552,7 +690,7 @@ QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover clo
 	  cudaBindTexture(0, cloverInvTexSingle, *cloverInvP, cloverInv.bytes); 
 #endif
 	}
-	else
+	else if (clover.precision == QUDA_HALF_PRECISION)
 	{
 	  cudaBindTexture(0, cloverTexHalf, *cloverP, clover.bytes); 
 	  cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
@@ -561,6 +699,17 @@ QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover clo
 	  cudaBindTexture(0, cloverInvTexNorm, *cloverInvNormP, cloverInv.norm_bytes);
 #endif
 	}
+  else if (clover.precision == QUDA_QUARTER_PRECISION)
+  {
+    cudaBindTexture(0, cloverTexQuarter, *cloverP, clover.bytes); 
+    cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
+#ifndef DYNAMIC_CLOVER
+    cudaBindTexture(0, cloverInvTexQuarter, *cloverInvP, cloverInv.bytes); 
+    cudaBindTexture(0, cloverInvTexNorm, *cloverInvNormP, cloverInv.norm_bytes);
+#endif
+  } else {
+    errorQuda("Unsupported precision");
+  }
 #endif // USE_TEXTURE_OBJECTS
 
 	return clover.precision;
@@ -583,7 +732,7 @@ void unbindTwistedCloverTex(const FullClover clover)  //We don't really need thi
 		cudaUnbindTexture(cloverInvTexSingle);
 #endif
 	}
-	else
+	else if (clover.precision == QUDA_HALF_PRECISION)
 	{
 		cudaUnbindTexture(cloverTexHalf);
 		cudaUnbindTexture(cloverTexNorm);
@@ -592,6 +741,17 @@ void unbindTwistedCloverTex(const FullClover clover)  //We don't really need thi
 		cudaUnbindTexture(cloverInvTexNorm);
 #endif
 	}
+  else if (clover.precision == QUDA_QUARTER_PRECISION)
+  {
+    cudaUnbindTexture(cloverTexQuarter);
+    cudaUnbindTexture(cloverTexNorm);
+#ifndef DYNAMIC_CLOVER
+    cudaUnbindTexture(cloverInvTexQuarter);
+    cudaUnbindTexture(cloverInvTexNorm);
+#endif
+  } else {
+    errorQuda("Unsupported precision");
+  }
 #endif // not defined USE_TEXTURE_OBJECTS
 }
 
@@ -601,12 +761,13 @@ void unbindTwistedCloverTex(const FullClover clover)  //We don't really need thi
   defined(DIRECT_ACCESS_WILSON_INTER) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
   defined(DIRECT_ACCESS_CLOVER)
 
+  // Half precision
   static inline __device__ float short2float(short a) {
-    return (float)a/MAX_SHORT;
+    return (float)a/fixedMaxValue<short>::value;
   }
 
   static inline __device__ short float2short(float c, float a) {
-    return (short)(a*c*MAX_SHORT);
+    return (short)(a*c*fixedMaxValue<short>::value);
   }
 
   static inline __device__ short4 float42short4(float c, float4 a) {
@@ -619,6 +780,27 @@ void unbindTwistedCloverTex(const FullClover clover)  //We don't really need thi
 
   static inline __device__ float2 short22float2(short2 a) {
     return make_float2(short2float(a.x), short2float(a.y));
+  }
+
+  // Quarter precision
+  static inline __device__ float char2float(char a) {
+    return (float)a/fixedMaxValue<char>::value;
+  }
+
+  static inline __device__ char float2char(float c, float a) {
+    return (char)(a*c*fixedMaxValue<char>::value);
+  }
+
+  static inline __device__ char4 float42char4(float c, float4 a) {
+    return make_char4(float2char(c, a.x), float2char(c, a.y), float2char(c, a.z), float2char(c, a.w));
+  }
+
+  static inline __device__ float4 char42float4(char4 a) {
+    return make_float4(char2float(a.x), char2float(a.y), char2float(a.z), char2float(a.w));
+  }
+
+  static inline __device__ float2 char22float2(char2 a) {
+    return make_float2(char2float(a.x), char2float(a.y));
   }
 #endif // DIRECT_ACCESS inclusions
 

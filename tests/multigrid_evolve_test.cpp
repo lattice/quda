@@ -93,6 +93,7 @@ extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
 extern double smoother_tol[QUDA_MAX_MG_LEVEL];
 extern int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
 
+extern QudaPrecision smoother_halo_prec;
 extern QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL];
 extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
@@ -263,6 +264,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
+    mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre;
     mg_param.nu_post[i] = nu_post;
     mg_param.mu_factor[i] = mu_factor[i];
@@ -487,6 +489,7 @@ int main(int argc, char **argv)
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
   if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
+  if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
   for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {

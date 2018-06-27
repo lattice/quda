@@ -151,6 +151,13 @@ namespace quda {
       { return static_cast<ReduceType>(norm(x)); }
     };
 
+    template<typename ReduceType> struct square_<ReduceType,char> {
+      const ReduceType scale;
+      square_(const ReduceType scale) : scale(scale) { }
+      __host__ __device__ inline ReduceType operator()(const quda::complex<char> &x)
+      { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    };
+
     template<typename ReduceType> struct square_<ReduceType,short> {
       const ReduceType scale;
       square_(const ReduceType scale) : scale(scale) { }
@@ -168,6 +175,13 @@ namespace quda {
     template<typename Float, typename storeFloat> struct abs_ {
       abs_(const Float scale) { }
       __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
+    };
+
+    template<typename Float> struct abs_<Float,char> {
+      Float scale;
+      abs_(const Float scale) : scale(scale) { }
+      __host__ __device__ Float operator()(const quda::complex<char> &x)
+      { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
     template<typename Float> struct abs_<Float,short> {
@@ -1412,7 +1426,7 @@ namespace quda {
 
 	// Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
+	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
 	Complex A(cos_sin[0], cos_sin[1]);
 
 	Out[6] *= A;
@@ -1460,8 +1474,8 @@ namespace quda {
       isLastTimeSlice(recon.isLastTimeSlice), ghostExchange(recon.ghostExchange) { }
 
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
-      out[0] = Trig<isHalf<Float>::value,RegType>::Atan2(in[1], in[0]);
-      out[1] = Trig<isHalf<Float>::value,RegType>::Atan2(in[13], in[12]);
+      out[0] = Trig<isFixed<Float>::value,RegType>::Atan2(in[1], in[0]);
+      out[1] = Trig<isFixed<Float>::value,RegType>::Atan2(in[13], in[12]);
 #pragma unroll
       for (int i=2; i<8; i++) out[i] = in[i];
     }
@@ -1484,7 +1498,7 @@ namespace quda {
       RegType diff = static_cast<RegType>(1.0)/(u0*u0) - row_sum;
       RegType U00_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      Out[0] = U00_mag * Complex(Trig<isHalf<Float>::value,RegType>::Cos(in[0]), Trig<isHalf<Float>::value,RegType>::Sin(in[0]));
+      Out[0] = U00_mag * Complex(Trig<isFixed<Float>::value,RegType>::Cos(in[0]), Trig<isFixed<Float>::value,RegType>::Sin(in[0]));
 
       // Now reconstruct first column
       Out[3] = In[3];
@@ -1493,7 +1507,7 @@ namespace quda {
       diff = static_cast<RegType>(1.0)/(u0*u0) - column_sum;
       RegType U20_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      Out[6] = U20_mag * Complex( Trig<isHalf<Float>::value,RegType>::Cos(in[1]), Trig<isHalf<Float>::value,RegType>::Sin(in[1]));
+      Out[6] = U20_mag * Complex( Trig<isFixed<Float>::value,RegType>::Cos(in[1]), Trig<isFixed<Float>::value,RegType>::Sin(in[1]));
       // First column now restored
 
       // finally reconstruct last elements from SU(2) rotation
@@ -1545,7 +1559,7 @@ namespace quda {
       __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
 	RegType phase = getPhase(in);
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
+	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
 	Complex su3[9];
 #pragma unroll
@@ -1558,7 +1572,7 @@ namespace quda {
 					     const RegType phase, const I *X, const int *R) const {
 	reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, scale);
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
+	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
 #pragma unroll
 	for (int i=0; i<9; i++) reinterpret_cast<Complex*>(out)[i] *= z;
@@ -2666,7 +2680,7 @@ namespace quda {
 	  for (int j=0; j<Nc; j++)
 	    for (int z=0; z<2; z++)
 	      v_.v[(j*Nc+i)*2+z] = (Float)(v[(i*Nc+j)*2+z]) * scale;
-	gauge_[(dir*2+parity)*exVolumeCB + y] = v_;
+  gauge_[(dir*2+parity)*exVolumeCB + y] = v_;
 #else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
@@ -2761,6 +2775,14 @@ namespace quda {
   template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N,stag,huge_alloc> { typedef gauge::FloatNOrder<short, N, 4, 12, stag, huge_alloc> type; };
   template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N,stag,huge_alloc> { typedef gauge::FloatNOrder<short, N, 4, 9, stag, huge_alloc> type; };
   template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N,stag,huge_alloc> { typedef gauge::FloatNOrder<short, N, 4, 8, stag, huge_alloc> type; };
+
+  // quarter precision
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_NO,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 2, N, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_13,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 13, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_12,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 12, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_9,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 9, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_8,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 8, stag, huge_alloc> type; };
+
 
   template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };

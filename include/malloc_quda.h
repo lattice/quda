@@ -2,6 +2,7 @@
 #define _MALLOC_QUDA_H
 
 #include <cstdlib>
+#include <enum_quda.h>
 
 namespace quda {
 
