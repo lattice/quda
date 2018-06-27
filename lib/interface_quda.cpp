@@ -8,6 +8,7 @@
 #include <quda.h>
 #include <quda_fortran.h>
 #include <quda_internal.h>
+#include <quda_env.h>
 #include <comm_quda.h>
 #include <tune_quda.h>
 #include <blas_quda.h>
@@ -386,19 +387,6 @@ void initQudaDevice(int dev) {
 #endif
   }
 
-#if defined(MULTI_GPU) && (CUDA_VERSION == 4000)
-  //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
-  // not needed for CUDA >= 4.1
-  char* cni_str = getenv("CUDA_NIC_INTEROP");
-  if(cni_str == NULL){
-    errorQuda("Environment variable CUDA_NIC_INTEROP is not set");
-  }
-  int cni_int = atoi(cni_str);
-  if (cni_int != 1){
-    errorQuda("Environment variable CUDA_NIC_INTEROP is not set to 1");
-  }
-#endif
-
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
@@ -447,8 +435,7 @@ void initQudaDevice(int dev) {
 
 // c) QUDA was compiled for a lower compute capability
   if (deviceProp.major < my_major) {
-    char *allow_jit_env = getenv("QUDA_ALLOW_JIT");
-    if (allow_jit_env && strcmp(allow_jit_env, "1") == 0) {
+    if (quda::QudaEnv::getInstance().get_allow_jit()) {
       if (getVerbosity() > QUDA_SILENT) warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- Jitting the PTX since QUDA_ALLOW_JIT=1 was set. Note that this will take some time.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
     } else {
       errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n If you want the PTX to be jitted for your current GPU arch please set the enviroment variable QUDA_ALLOW_JIT=1.", deviceProp.major, deviceProp.minor, my_major, my_minor);
@@ -469,8 +456,8 @@ void initQudaDevice(int dev) {
 
 
 #if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
-  char *enable_numa_env = getenv("QUDA_ENABLE_NUMA");
-  if (enable_numa_env && strcmp(enable_numa_env, "0") == 0) {
+
+  if (!quda::QudaEnv::getInstance().get_enable_numa()) {
     if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling numa_affinity\n");
   }
   else{
@@ -485,7 +472,7 @@ void initQudaDevice(int dev) {
   // cudaGetDeviceProperties(&deviceProp, dev);
 
   { // determine if we will do CPU or GPU data reordering (default is GPU)
-    char *reorder_str = getenv("QUDA_REORDER_LOCATION");
+    char *reorder_str = quda::QudaEnv::getInstance().get_reorder_location();
 
     if (!reorder_str || (strcmp(reorder_str,"CPU") && strcmp(reorder_str,"cpu")) ) {
       warningQuda("Data reordering done on GPU (set with QUDA_REORDER_LOCATION=GPU/CPU)");
@@ -535,7 +522,6 @@ void initQudaMemory()
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
   cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
-
   loadTuneCache();
 
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
@@ -1377,8 +1363,8 @@ void endQuda(void)
 
   assertAllMemFree();
 
-  char *device_reset_env = getenv("QUDA_DEVICE_RESET");
-  if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
+
+  if (quda::QudaEnv::getInstance().get_device_reset()) {
     // end this CUDA context
     cudaDeviceReset();
   }

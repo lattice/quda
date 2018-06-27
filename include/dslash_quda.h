@@ -2,6 +2,7 @@
 #define _DSLASH_QUDA_H
 
 #include <quda_internal.h>
+#include <quda_env.h>
 #include <tune_quda.h>
 #include <gauge_field.h>
 
