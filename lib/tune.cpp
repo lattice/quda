@@ -9,6 +9,7 @@
 #include <typeinfo>
 #include <map>
 #include <unistd.h>
+#include <quda_env.h>
 
 #include <deque>
 #include <queue>
@@ -228,7 +229,7 @@ namespace quda {
     std::ifstream cache_file;
     std::stringstream ls;
 
-    path = getenv("QUDA_RESOURCE_PATH");
+    path = quda::QudaEnv::getInstance().get_resource_path();
 
     if (!path) {
       warningQuda("Environment variable QUDA_RESOURCE_PATH is not set.");
@@ -416,7 +417,7 @@ namespace quda {
       // profile counter for writing out unique profiles
       static int count = 0;
 
-      char *profile_fname = getenv("QUDA_PROFILE_OUTPUT_BASE");
+      char *profile_fname = quda::QudaEnv::getInstance().get_profile_output_base();
 
       if (!profile_fname) {
 	warningQuda("Environment variable QUDA_PROFILE_OUTPUT_BASE is not set; writing to profile.tsv and profile_async.tsv");

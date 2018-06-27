@@ -5,6 +5,7 @@
 #include <unistd.h> // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <quda_env.h>
 
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
@@ -416,8 +417,8 @@ namespace quda {
     void init() {
       if (!pool_init) {
 	// device memory pool
-	char *enable_device_pool = getenv("QUDA_ENABLE_DEVICE_MEMORY_POOL");
-	if (!enable_device_pool || strcmp(enable_device_pool,"0")!=0) {
+
+	if (quda::QudaEnv::getInstance().get_enable_device_memory_pool()) {
 	  warningQuda("Using device memory pool allocator");
 	  device_memory_pool = true;
 	} else {
@@ -426,8 +427,7 @@ namespace quda {
 	}
 
 	// pinned memory pool
-	char *enable_pinned_pool = getenv("QUDA_ENABLE_PINNED_MEMORY_POOL");
-	if (!enable_pinned_pool || strcmp(enable_pinned_pool,"0")!=0) {
+  if (quda::QudaEnv::getInstance().get_enable_pinned_memory_pool()) {
 	  warningQuda("Using pinned memory pool allocator");
 	  pinned_memory_pool = true;
 	} else {

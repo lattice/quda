@@ -7,6 +7,7 @@
 #include <enum_quda.h>
 #include <util_quda.h>
 #include <sstream>
+#include <quda_env.h>
 
 static const size_t MAX_PREFIX_SIZE = 100;
 
@@ -29,10 +30,9 @@ void setVerbosity(QudaVerbosity verbosity)
 bool getRankVerbosity() {
   static bool init = false;
   static bool rank_verbosity = false;
-  static char *rank_verbosity_env = getenv("QUDA_RANK_VERBOSITY");
 
-  if (!init && rank_verbosity_env) { // set the policies to tune for explicitly
-    std::stringstream rank_list(rank_verbosity_env);
+  if (!init && quda::QudaEnv::getInstance().get_rank_verbosity()) { // set the policies to tune for explicitly
+    std::stringstream rank_list(quda::QudaEnv::getInstance().get_rank_verbosity());
 
     int rank_;
     while (rank_list >> rank_) {
@@ -53,8 +53,7 @@ QudaTune getTuning() {
   static QudaTune tune = QUDA_TUNE_YES;
 
   if (!init) {
-    char *enable_tuning = getenv("QUDA_ENABLE_TUNING");
-    if (!enable_tuning || strcmp(enable_tuning,"0")!=0) {
+    if (quda::QudaEnv::getInstance().get_enable_tuning()) {
       tune = QUDA_TUNE_YES;
     } else {
       tune = QUDA_TUNE_NO;
