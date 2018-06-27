@@ -5457,6 +5457,26 @@ void plaqQuda (double plq[3])
   return;
 }
 
+/*
+ * Performs a deep copy to the internal extendedGaugeResident field.
+ */
+void copyResidentGauge(void* resident_gauge, QudaFieldLocation loc)
+{
+  //profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (!gaugePrecise) errorQuda("Cannot perform deep copy of resident gauge field as there is no resident gauge field");
+
+  cudaGaugeField *data = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
+  extendedGaugeResident = data;
+
+  cudaGaugeField* io_gauge = (cudaGaugeField*)resident_gauge;
+
+  copyExtendedGauge(*io_gauge, *extendedGaugeResident, loc);
+
+  //profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
+  return;
+}
+
 void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
                            unsigned int nSteps, double alpha)
 {

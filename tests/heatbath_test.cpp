@@ -239,13 +239,20 @@ int main(int argc, char **argv)
 
       printfQuda("Loading the gauge field in %s\n", latfile);
 
+      loadGaugeQuda(load_gauge, &gauge_param);
+      // Get pointer to internal resident gauge field
+      cudaGaugeField* extendedGaugeResident = new cudaGaugeField(gParamEx);
+      copyResidentGauge((void*)extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
+      copyExtendedGauge(*gaugeEx, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
+      delete extendedGaugeResident;
+      /*
       QudaGaugeParam gauge_param = newQudaGaugeParam();
       setGaugeParam(gauge_param);
       GaugeFieldParam gParam(load_gauge, gauge_param, QUDA_WILSON_LINKS);
       gParam.geometry = QUDA_VECTOR_GEOMETRY;
       cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
       gaugeEx->loadCPUField(*cpuGauge);
-      delete cpuGauge;
+      delete cpuGauge;*/
     }
 
     // copy into regular field
@@ -259,7 +266,7 @@ int main(int argc, char **argv)
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     double3 plaq = plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
     double charge = qChargeCuda();
-    printfQuda("starting plaquette = %e topological charge = %e\n", plaq.x, charge);
+    printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", plaq.x, charge);
 
     // Reunitarization setup
     setReunitarizationConsts();
