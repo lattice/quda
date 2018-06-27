@@ -1,6 +1,7 @@
 #include <qmp.h>
 #include <csignal>
 #include <quda_internal.h>
+#include "quda_env.h"
 #include <comm_quda.h>
 
 #define QMP_CHECK(qmp_call) do {                     \
@@ -108,8 +109,8 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
     errorQuda("No CUDA devices found");
   }
   if (gpuid >= device_count) {
-    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
-    if (enable_mps_env && strcmp(enable_mps_env,"1") == 0) {
+
+if (quda::QudaEnv::getInstance().get_enable_mps()) {
       gpuid = gpuid%device_count;
       printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
     } else {

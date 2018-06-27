@@ -606,7 +606,7 @@ int comm_partitioned()
 }
 
 bool comm_gdr_enabled() {
-    return static_cast<bool>(quda::QudaEnv::getInstance().get_enable_gdr());
+    return quda::QudaEnv::getInstance().get_enable_gdr();
 }
 
 bool comm_gdr_blacklist() {
@@ -614,7 +614,7 @@ bool comm_gdr_blacklist() {
   static bool blacklist_init = false;
 
   if (!blacklist_init) {
-    char *blacklist_env = getenv("QUDA_ENABLE_GDR_BLACKLIST");
+    char *blacklist_env = quda::QudaEnv::getInstance().get_enable_gdr_blacklist();
 
     if (blacklist_env) { // set the policies to tune for explicitly
       std::stringstream blacklist_list(blacklist_env);

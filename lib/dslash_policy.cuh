@@ -1927,9 +1927,9 @@ struct DslashFactory {
        p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
        first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT); // first active policy is presently always the default
 
-       static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_POLICY");
-       if (dslash_policy_env) { // set the policies to tune for explicitly
-	 std::stringstream policy_list(dslash_policy_env);
+       
+       if (quda::QudaEnv::getInstance().get_enable_dslash_policy()) { // set the policies to tune for explicitly
+	 std::stringstream policy_list(quda::QudaEnv::getInstance().get_enable_dslash_policy());
 
 	 int policy_;
 	 while (policy_list >> policy_) {
@@ -1994,32 +1994,28 @@ struct DslashFactory {
 #endif
        }
 
-       static char *dslash_pack_env = getenv("QUDA_ENABLE_DSLASH_PACK");
-       if (dslash_pack_env && strcmp(dslash_pack_env, "0") == 0) {
+       
+       if (!quda::QudaEnv::getInstance().get_enable_dslash_pack()) {
 	 if (getVerbosity() > QUDA_SILENT) warningQuda("Disabling Dslash halo packing");
 	 dslash_pack_compute = false;
        }
 
-       static char *dslash_interior_env = getenv("QUDA_ENABLE_DSLASH_INTERIOR");
-       if (dslash_interior_env && strcmp(dslash_interior_env, "0") == 0) {
+       if (!quda::QudaEnv::getInstance().get_enable_dslash_interior()) {
 	 if (getVerbosity() > QUDA_SILENT) warningQuda("Disabling Dslash interior computation");
 	 dslash_interior_compute = false;
        }
 
-       static char *dslash_exterior_env = getenv("QUDA_ENABLE_DSLASH_EXTERIOR");
-       if (dslash_exterior_env && strcmp(dslash_exterior_env, "0") == 0) {
+       if (!quda::QudaEnv::getInstance().get_enable_dslash_exterior()) {
 	 if (getVerbosity() > QUDA_SILENT) warningQuda("Disabling Dslash exterior computation");
 	 dslash_exterior_compute = false;
        }
 
-       static char *dslash_copy_env = getenv("QUDA_ENABLE_DSLASH_COPY");
-       if (dslash_copy_env && strcmp(dslash_copy_env, "0") == 0) {
+       if (!quda::QudaEnv::getInstance().get_enable_dslash_copy()) {
 	 if (getVerbosity() > QUDA_SILENT) warningQuda("Disabling Dslash host-device copying");
 	 dslash_copy = false;
        }
 
-       static char *dslash_comms_env = getenv("QUDA_ENABLE_DSLASH_COMMS");
-       if (dslash_comms_env && strcmp(dslash_comms_env, "0") == 0) {
+       if (!quda::QudaEnv::getInstance().get_enable_dslash_comms()) {
 	 if (getVerbosity() > QUDA_SILENT) warningQuda("Disabling Dslash communication");
 	 dslash_comms = false;
        }
