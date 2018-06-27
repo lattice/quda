@@ -458,6 +458,12 @@ namespace quda {
     void resizeVector(int y, int z) { vector_length_z = z;  TunableVectorY::resizeVector(y); }
   };
 
+  /**
+     @brief query if tuning is in progress
+     @return tuning in progress?
+  */
+  bool activeTuning();
+
   void loadTuneCache();
   void saveTuneCache(bool error = false);
 

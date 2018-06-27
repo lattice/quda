@@ -14,7 +14,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
-    : LatticeField(param), init(false), v(0), norm(0),
+    : LatticeField(param), init(false), init_ghost_zone(false), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ),
       bytes(0), norm_bytes(0), even(0), odd(0),
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
@@ -26,7 +26,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
-    : LatticeField(field), init(false), v(0), norm(0),
+    : LatticeField(field), init(false), init_ghost_zone(false), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ),
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
@@ -42,7 +42,8 @@ namespace quda {
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const {
 
-    if (typeid(*this) == typeid(cpuColorSpinorField)) return;
+    // note need to check for ghost_precision switch when merged into feature/multigrid
+    if (typeid(*this) == typeid(cpuColorSpinorField) || init_ghost_zone) return;
 
     // For Wilson we half the number of effective faces if the fields are spin projected.
     int num_faces = ((nSpin == 4 && spin_project) ? 1 : 2) * nFace;
@@ -90,7 +91,6 @@ namespace quda {
       ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*ghost_precision;
       if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
 
-
       if(GhostOffset(i,0)%FieldOrder()) errorQuda("ghostOffset(%d,0) %d is not a multiple of FloatN\n", i, GhostOffset(i,0));
       if(GhostOffset(i,1)%FieldOrder()) errorQuda("ghostOffset(%d,1) %d is not a multiple of FloatN\n", i, GhostOffset(i,1));
 
@@ -110,6 +110,63 @@ namespace quda {
     ghost_bytes = (size_t)ghost_length*ghost_precision;
     if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
+
+    { // compute temporaries needed by dslash and packing kernels
+      auto &X = dslash_constant.X;
+      for (int dim=0; dim<nDim; dim++) X[dim] = x[dim];
+      for (int dim=nDim; dim<QUDA_MAX_DIM; dim++) X[dim] = 1;
+      if (siteSubset == QUDA_PARITY_SITE_SUBSET) X[0] = 2*X[0];
+
+      for (int i=0; i<nDim; i++) dslash_constant.Xh[i] = X[i]/2;
+
+      dslash_constant.Ls = X[4];
+      dslash_constant.volume_4d_cb = volumeCB / (nDim == 5 ? x[4] : 1);
+      dslash_constant.volume_4d = 2 * dslash_constant.volume_4d_cb;
+
+      int face[4];
+      for (int dim=0; dim<4; dim++) {
+        for (int j=0; j<4; j++) face[j] = X[j];
+        face[dim] = nFace;
+        dslash_constant.face_X[dim] = face[0];
+        dslash_constant.face_Y[dim] = face[1];
+        dslash_constant.face_Z[dim] = face[2];
+        dslash_constant.face_T[dim] = face[3];
+        dslash_constant.face_XY[dim] = dslash_constant.face_X[dim] * face[1];
+        dslash_constant.face_XYZ[dim] = dslash_constant.face_XY[dim] * face[2];
+        dslash_constant.face_XYZT[dim] = dslash_constant.face_XYZ[dim] * face[3];
+      }
+
+      dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
+      dslash_constant.ghostFace[0] = (X[1]*X[2]*X[3])/2;
+      dslash_constant.ghostFace[1] = (X[0]*X[2]*X[3])/2;
+      dslash_constant.ghostFace[2] = (X[0]*X[1]*X[3])/2;
+      dslash_constant.ghostFace[3] = (X[0]*X[1]*X[2])/2;
+
+      dslash_constant.X2X1 = X[1]*X[0];
+      dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
+      dslash_constant.X2X1mX1 = (X[1]-1)*X[0];
+      dslash_constant.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
+      dslash_constant.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
+      dslash_constant.X4X3X2X1hmX3X2X1h = dslash_constant.X4X3X2X1mX3X2X1/2;
+
+      // used by indexFromFaceIndexStaggered
+      dslash_constant.dims[0][0]=X[1];
+      dslash_constant.dims[0][1]=X[2];
+      dslash_constant.dims[0][2]=X[3];
+
+      dslash_constant.dims[1][0]=X[0];
+      dslash_constant.dims[1][1]=X[2];
+      dslash_constant.dims[1][2]=X[3];
+
+      dslash_constant.dims[2][0]=X[0];
+      dslash_constant.dims[2][1]=X[1];
+      dslash_constant.dims[2][2]=X[3];
+
+      dslash_constant.dims[3][0]=X[0];
+      dslash_constant.dims[3][1]=X[1];
+      dslash_constant.dims[3][2]=X[2];
+    }
+    init_ghost_zone = true;
 
   } // createGhostZone
 
