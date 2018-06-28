@@ -706,6 +706,51 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  /**
+     @brief Communication-avoiding GCR solver.  This solver does
+     un-preconditioned GCR, first building up a polynomial in the
+     linear operator of length nKrylov, and then performs a minimum
+     residual extrapolation on the resuling basis vectors.  For use as
+     a multigrid smoother with minimum global synchronization.
+   */
+  class CAGCR : public Solver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    bool init;
+
+    Complex *alpha; // Solution coefficient vectors
+
+    ColorSpinorField *rp;
+    ColorSpinorField *tmpp;
+    ColorSpinorField *tmp_sloppy;
+
+    std::vector<ColorSpinorField*> p;  // GCR direction vectors
+    std::vector<ColorSpinorField*> q;  // mat * direction vectors
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] meta Field used for solver meta data
+    */
+    void create(const ColorSpinorField &meta);
+
+    /**
+       @brief Solve the equation A p_k psi_k = b by minimizing the
+       residual and using Eigen's SVD algorithm for numerical stability
+       @param[out] psi Array of coefficients
+       @param[in] p] Search direction vectors
+       @param[in] q Search direction vectors with the operator applied
+    */
+    void solve(Complex *psi_, std::vector<ColorSpinorField*> &p, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
+
+  public:
+    CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CAGCR();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
   // Steepest descent solver used as a preconditioner
   class SD : public Solver {
     private:
@@ -718,7 +763,6 @@ namespace quda {
     public:
       SD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
       virtual ~SD();
-
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
@@ -801,7 +845,7 @@ namespace quda {
 
 
   /**
-     This computes the optimum guess for the system Ax=b in the L2
+     @brief This computes the optimum guess for the system Ax=b in the L2
      residual norm.  For use in the HMD force calculations using a
      minimal residual chronological method.  This computes the guess
      solution as a linear combination of a given number of previous
