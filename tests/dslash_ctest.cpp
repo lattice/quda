@@ -363,7 +363,7 @@ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOV
       /* Single and half */
       csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
     }
-    
+
     if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
       dslash_type == QUDA_MOBIUS_DWF_DSLASH)
     {
@@ -408,7 +408,7 @@ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOV
     setDiracParam(diracParam, &inv_param, pc);
     diracParam.tmp1 = tmp1;
     diracParam.tmp2 = tmp2;
-    
+
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
       dirac_4dpc = new DiracDomainWall4DPC(diracParam);
       dirac = (Dirac*)dirac_4dpc;
@@ -424,7 +424,7 @@ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOV
     double cpu_norm = blas::norm2(*spinor);
     printfQuda("Source: CPU = %e\n", cpu_norm);
   }
-  
+
 }
 
 void end() {
@@ -632,7 +632,7 @@ void end() {
       if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
     }
   }
-  
+
   cudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;
@@ -720,10 +720,10 @@ void dslashRef() {
 
       void *ref1 = spinorRef->V();
       void *ref2 = (char*)ref1 + tm_offset*cpu_prec;
-      
+
       void *flv1 = spinor->V();
       void *flv2 = (char*)flv1 + tm_offset*cpu_prec;
-      
+
       tm_ndeg_dslash(ref1, ref2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon, 
         parity, dagger, inv_param.matpc_type, inv_param.cpu_prec, gauge_param);	
     }
@@ -753,10 +753,10 @@ void dslashRef() {
 
   void *evenOut = spinorRef->V();
   void *oddOut  = (char*)evenOut + tm_offset*cpu_prec;
-  
+
   void *evenIn = spinor->V();
   void *oddIn  = (char*)evenIn + tm_offset*cpu_prec;
-  
+
   tm_ndeg_mat(evenOut, oddOut, hostGauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger, inv_param.cpu_prec, gauge_param);	
 }
 break;
@@ -956,7 +956,7 @@ void display_test_info(int precision, QudaReconstructType link_recon)
 {
   auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
   printfQuda("running the following test:\n");
-  
+
   printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type    niter\n");
   printfQuda("%6s   %2s       %d           %12s    %d    %3d/%3d/%3d        %3d             %2d   %14s   %d\n", 
     get_prec_str(prec), get_recon_str(link_recon), 
@@ -970,7 +970,7 @@ void display_test_info(int precision, QudaReconstructType link_recon)
     dimPartitioned(3));
 
   return ;
-  
+
 }
 
 
@@ -983,15 +983,15 @@ using ::testing::Combine;
 
 class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>> {
 protected:
-  ::testing::tuple<int, int> param;
+  ::testing::tuple<int, int, int> param;
 
 public:
   virtual ~DslashTest() { }
   virtual void SetUp() {
     int prec = ::testing::get<0>(GetParam());
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
-    
-    
+
+
     int value = ::testing::get<2>(GetParam());
     for(int j=0; j < 4;j++){
       if (value &  (1 << j)){
@@ -1005,15 +1005,26 @@ public:
   }
   virtual void TearDown() { end(); }
 
+  static void SetUpTestCase() {
+    initQuda(device);
+  }
+
+  // Per-test-case tear-down.
+  // Called after the last test in this test case.
+  // Can be omitted if not needed.
+  static void TearDownTestCase() {
+    endQuda();
+  }
+
   virtual void NormalExit() { printf("monkey\n"); }
 
 };
 
 TEST_P(DslashTest, benchmark){
-  
+
   printfQuda("Tuning...\n");
       dslashCUDA(1); // warm-up run
-      
+
       if (!transfer) dirac->Flops();
       auto dslash_time = dslashCUDA(niter);
       printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
@@ -1040,11 +1051,11 @@ TEST_P(DslashTest, benchmark){
 
     TEST_P(DslashTest, verify){
       dslashRef();
-      
+
       printfQuda("Tuning...\n");
   dslashCUDA(1); // warm-up run
   dslashCUDA(2);
-  
+
   if (!transfer) *spinorOut = *cudaSpinorOut;
 
   double norm2_cpu = blas::norm2(*spinorRef);
@@ -1079,14 +1090,9 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-  initQuda(device);
-
-  if (verify_results) {
-    test_rc = RUN_ALL_TESTS();
-  }
   
-  endQuda();
-
+  test_rc = RUN_ALL_TESTS();
+  
   finalizeComms();
   return test_rc;
 }

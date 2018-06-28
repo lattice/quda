@@ -993,39 +993,11 @@ int main(int argc, char** argv)
 
   setVerbosity(QUDA_SILENT);
 
-  // for (int prec = 0; prec < Nprec; prec++) {
-  //   if (Nspin == 2 && prec == 0) continue;
-
-  //   printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
-  //   initFields(prec);
-
-  //   for (int kernel = 0; kernel < Nkernels; kernel++) {
-  //     if (skip_kernel(prec, kernel)) continue;
-
-  //     // do the initial tune
-  //     benchmark(kernel, 1);
-
-  //     // now rerun with more iterations to get accurate speed measurements
-  //     quda::blas::flops = 0;
-  //     quda::blas::bytes = 0;
-
-  //     double secs = benchmark(kernel, niter);
-
-  //     double gflops = (quda::blas::flops*1e-9)/(secs);
-  //     double gbytes = quda::blas::bytes/(secs*1e9);
-
-  //     printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
-  //   }
-  //   freeFields();
-  // }
-
   // clear the error state
   cudaGetLastError();
 
   // lastly check for correctness
-  if (verify_results) {
-    
-    // if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
+  if (verify_results) {    
     result = RUN_ALL_TESTS();
   }
 
@@ -1108,5 +1080,5 @@ std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int>> param
 }
 
 // half precision
-INSTANTIATE_TEST_CASE_P(QUDA, BlasTest, Combine( Range(0,2), Range(0, Nkernels) ), getblasname);
+INSTANTIATE_TEST_CASE_P(QUDA, BlasTest, Combine( Range(0,3), Range(0, Nkernels) ), getblasname);
 
