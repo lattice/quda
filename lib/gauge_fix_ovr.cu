@@ -305,7 +305,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, tp, stream, argQ, Float, Gauge, gauge_dir);
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       if ( comm_size() != 1 ) comm_allreduce_array((double*)argQ.result_h, 2);
       argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
       argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads * comm_size());
@@ -1533,7 +1533,7 @@ namespace quda {
             comm_start(mh_recv_fwd[d]);
           }
           //wait for the update to the halo points before start packing...
-          cudaDeviceSynchronize();
+          qudaDeviceSynchronize();
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             //extract top face
@@ -1544,9 +1544,9 @@ namespace quda {
         #ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaStreamSynchronize(GFStream[d]);
+            qudaStreamSynchronize(GFStream[d]);
             comm_start(mh_send_fwd[d]);
-            cudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronize(GFStream[4 + d]);
             comm_start(mh_send_back[d]);
           }
         #else
@@ -1565,9 +1565,9 @@ namespace quda {
         #ifndef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaStreamSynchronize(GFStream[d]);
+            qudaStreamSynchronize(GFStream[d]);
             comm_start(mh_send_fwd[d]);
-            cudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronize(GFStream[4 + d]);
             comm_start(mh_send_back[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
@@ -1599,10 +1599,10 @@ namespace quda {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_send_back[d]);
             comm_wait(mh_send_fwd[d]);
-            cudaStreamSynchronize(GFStream[d]);
-            cudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronize(GFStream[d]);
+            qudaStreamSynchronize(GFStream[4 + d]);
           }
-          cudaStreamSynchronize(GFStream[8]);
+          qudaStreamSynchronize(GFStream[8]);
         }
       #endif
         /*gaugeFix.setParity(p);
@@ -1619,7 +1619,7 @@ namespace quda {
            #ifndef GPU_COMMS
             cudaMemcpy(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost);
            #else
-            cudaDeviceSynchronize();
+            qudaDeviceSynchronize();
            #endif
             comm_start(mh_send_fwd[d]);
             comm_wait(mh_recv_back[d]);
@@ -1638,7 +1638,7 @@ namespace quda {
            #ifndef GPU_COMMS
             cudaMemcpy(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost);
            #else
-            cudaDeviceSynchronize();
+            qudaDeviceSynchronize();
            #endif
             comm_start(mh_send_back[d]);
             comm_wait(mh_recv_fwd[d]);
@@ -1715,7 +1715,7 @@ namespace quda {
     }
   #endif
     checkCudaError();
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){
       double secs = profileInternalGaugeFixOVR.Last(QUDA_PROFILE_COMPUTE);

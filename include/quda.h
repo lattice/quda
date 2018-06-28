@@ -985,17 +985,6 @@ extern "C" {
 			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
 
   /**
-   * Compute the quark-field outer product needed for gauge generation
-   *
-   * @param oprod The outer product to be computed.
-   * @param quark The input fermion field.
-   * @param num The number of quark fields
-   * @param coeff The coefficient multiplying the fermion fields in the outer product
-   * @param param The parameters of the outer-product field.
-   */
-  void computeStaggeredOprodQuda(void** oprod, void** quark, int num, double** coeff, QudaGaugeParam* param);
-
-  /**
    * Compute the naive staggered force.  All fields must be in the same precision.
    *
    * @param mom Momentum field
@@ -1010,49 +999,31 @@ extern "C" {
 				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
-   * Compute the fermion force for the asqtad quark action.
-   * @param momentum          The momentum contribution from the quark action.
-   * @param act_path_coeff    The coefficients that define the asqtad action.
-   * @param one_link_src      The quark field outer product corresponding to the one-link term in the action.
-   * @param naik_src          The quark field outer product corresponding to the naik term in the action.
-   * @param link              The gauge field.
-   * @param param             The field parameters.
-   */
-  void computeAsqtadForceQuda(void* const momentum,
-	long long* flops,
-        const double act_path_coeff[6],
-        const void* const one_link_src[4],
-        const void* const naik_src[4],
-        const void* const link,
-        const QudaGaugeParam* param);
-
-
-  /**
    * Compute the fermion force for the HISQ quark action.
    * @param momentum        The momentum contribution from the quark action.
    * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
    * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
-   * @param staple_src      Quark outer-product for the staple.
-   * @param one_link_src    Quark outer-product for the one-link term in the action.
-   * @param naik_src        Quark outer-product for the three-hop term in the action.
    * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
    * @param v_link          Fat7 link variables.
    * @param u_link          SU(3) think link variables.
+   * @param quark           The input fermion field.
+   * @param num             The number of quark fields
+   * @param num_naik        The number of naik contributions
+   * @param coeff           The coefficient multiplying the fermion fields in the outer product
    * @param param.          The field parameters.
    */
-
   void computeHISQForceQuda(void* momentum,
-    long long* flops,
-    const double level2_coeff[6],
-    const double fat7_coeff[6],
-    const void* const staple_src[4],
-    const void* const one_link_src[4],
-    const void* const naik_src[4],
-    const void* const w_link,
-    const void* const v_link,
-    const void* const u_link,
-    const QudaGaugeParam* param);
-
+                            long long* flops,
+                            const double level2_coeff[6],
+                            const double fat7_coeff[6],
+                            const void* const w_link,
+                            const void* const v_link,
+                            const void* const u_link,
+                            void** quark,
+                            int num,
+                            int num_naik,
+                            double** coeff,
+                            QudaGaugeParam* param);
 
   /**
    * Generate Gaussian distributed gauge field

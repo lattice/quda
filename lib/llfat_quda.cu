@@ -4,11 +4,7 @@
 
 #include <quda_internal.h>
 #include <gauge_field.h>
-#include <clover_field.h>
 #include <llfat_quda.h>
-#include <read_gauge.h>
-#include <force_common.h>
-#include <dslash_quda.h>
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 #include <fast_intdiv.h>
@@ -572,7 +568,7 @@ namespace quda {
       } //rho
     } //nu
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     checkCudaError();
 #else
     errorQuda("Fat-link computation not enabled");

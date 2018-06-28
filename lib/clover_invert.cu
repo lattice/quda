@@ -157,7 +157,7 @@ namespace quda {
     invert.apply(0);
 
     if (arg.computeTraceLog) {
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       comm_allreduce_array((double*)arg.result_h, 2);
       trlog[0] = arg.result_h[0].x;
       trlog[1] = arg.result_h[0].y;

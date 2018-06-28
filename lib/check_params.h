@@ -340,7 +340,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(gcrNkrylov, INVALID_INT);
 #else
-  if (param->inv_type == QUDA_GCR_INVERTER) {
+  if (param->inv_type == QUDA_GCR_INVERTER || param->inv_type == QUDA_CA_GCR_INVERTER) {
     P(gcrNkrylov, INVALID_INT);
   }
 #endif

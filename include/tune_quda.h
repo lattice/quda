@@ -77,11 +77,11 @@ namespace quda {
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
-	const unsigned int max_blocks = 2*deviceProp.multiProcessorCount;
+	const unsigned int max_blocks = maxGridSize();
 	const int step = 1;
 	param.grid.x += step;
 	if (param.grid.x > max_blocks) {
-	  param.grid.x = step;
+	  param.grid.x = minGridSize();
 	  return false;
 	} else {
 	  return true;
@@ -92,6 +92,8 @@ namespace quda {
     }
 
     virtual unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (param.block.y*param.block.z); }
+    virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
+    virtual unsigned int minGridSize() const { return 1; }
 
     virtual int blockStep() const { return deviceProp.warpSize; }
     virtual int blockMin() const { return deviceProp.warpSize; }
@@ -156,11 +158,11 @@ namespace quda {
     }
 
     /**
-     * The goal here is to throttle the number of thread blocks per SM by over-allocating shared memory (in order to improve
-     * L2 utilization, etc.).  Note that:
-     * - On Fermi/Kepler, requesting greater than 16 KB will switch the cache config, so we restrict ourselves to 16 KB for now.
-     *   We thus request the smallest amount of dynamic shared memory that guarantees throttling to a given number of blocks,
-     *   in order to allow some extra leeway.
+     * The goal here is to throttle the number of thread blocks per SM
+     * by over-allocating shared memory (in order to improve L2
+     * utilization, etc.).  We thus request the smallest amount of
+     * dynamic shared memory that guarantees throttling to a given
+     * number of blocks, in order to allow some extra leeway.
      */
     virtual bool advanceSharedBytes(TuneParam &param) const
     {
@@ -233,12 +235,13 @@ namespace quda {
     {
       const unsigned int max_threads = deviceProp.maxThreadsDim[0];
       const unsigned int max_blocks = deviceProp.maxGridSize[0];
+      const int min_grid_size = minGridSize();
       const int min_block_size = blockMin();
 
       if (tuneGridDim()) {
 	param.block = dim3(min_block_size,1,1);
 
-	param.grid = dim3(1,1,1);
+	param.grid = dim3(min_grid_size,1,1);
       } else {
 	// find the minimum valid blockDim
 	param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1);
@@ -454,6 +457,12 @@ namespace quda {
 
     void resizeVector(int y, int z) { vector_length_z = z;  TunableVectorY::resizeVector(y); }
   };
+
+  /**
+     @brief query if tuning is in progress
+     @return tuning in progress?
+  */
+  bool activeTuning();
 
   void loadTuneCache();
   void saveTuneCache(bool error = false);

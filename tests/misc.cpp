@@ -1184,6 +1184,8 @@ get_solver_type(char* s)
     ret = QUDA_CG3NE_INVERTER;
   } else if (strcmp(s, "cg3nr") == 0){
     ret = QUDA_CG3NR_INVERTER;
+  } else if (strcmp(s, "ca-gcr") == 0){
+    ret = QUDA_CA_GCR_INVERTER;
   } else {
     fprintf(stderr, "Error: invalid solver type %s\n", s);
     exit(1);
@@ -1260,6 +1262,9 @@ get_solver_str(QudaInverterType type)
     break;
   case QUDA_CG3NR_INVERTER:
     ret = "cg3nr";
+    break;
+  case QUDA_CA_GCR_INVERTER:
+    ret = "ca-gcr";
     break;
   default:
     ret = "unknown";

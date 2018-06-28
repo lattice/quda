@@ -1,5 +1,5 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
@@ -85,7 +85,6 @@ set(QUDA_DIRAC_NDEG_TWISTED_MASS OFF CACHE BOOL "build non-degenerate twisted ma
 set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
 set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
-set(QUDA_FORCE_ASQTAD OFF CACHE BOOL "build code for asqtad fermion force")
 set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
 set(QUDA_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
@@ -233,7 +232,7 @@ find_package(Threads REQUIRED)
 
 if(QUDA_MPI OR QUDA_QMP)
   add_definitions(-DMULTI_GPU)
-# if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line check for MPICXX and MPICC environment variables
+  # if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line check for MPICXX and MPICC environment variables
   if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
     set(MPI_CXX_COMPILER $ENV{MPICXX})
     set(mpimessage True)
@@ -419,10 +418,6 @@ if(QUDA_FORCE_GAUGE)
   add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
 endif(QUDA_FORCE_GAUGE)
 
-if(QUDA_FORCE_ASQTAD)
-  add_definitions(-DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_ASQTAD)
-
 if(QUDA_FORCE_HISQ)
   add_definitions(-DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS)
 endif(QUDA_FORCE_HISQ)
@@ -508,7 +503,7 @@ endif(QUDA_CONTRACT)
 
 #define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
-"Flags used by the C++ compiler during regular development builds." FORCE)
+"Flags used by the C++ compiler during regular development builds." )
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
 "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING

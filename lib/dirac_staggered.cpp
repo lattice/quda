@@ -4,20 +4,9 @@
 
 namespace quda {
 
-  namespace staggered {
-#include <dslash_init.cuh>
-  }
+  DiracStaggered::DiracStaggered(const DiracParam &param) : Dirac(param) { }
 
-  DiracStaggered::DiracStaggered(const DiracParam &param) : Dirac(param)
-    //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
-  {
-    staggered::initConstants(*param.gauge, profile);
-  }
-
-  DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac)
-  {
-    staggered::initConstants(*dirac.gauge, profile);
-  }
+  DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac) { }
 
   DiracStaggered::~DiracStaggered() { }
 

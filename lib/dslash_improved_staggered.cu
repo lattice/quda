@@ -59,6 +59,8 @@ namespace quda {
   class StaggeredDslashCuda : public DslashCuda {
 
   private:
+    const GaugeField &fatGauge;
+    const GaugeField &longGauge;
     const unsigned int nSrc;
 
   protected:
@@ -74,35 +76,51 @@ namespace quda {
     }
 
   public:
-    StaggeredDslashCuda(cudaColorSpinorField *out, const fatGFloat *fat0, const fatGFloat *fat1,
-			const longGFloat *long0, const longGFloat *long1,
-			const phaseFloat *phase0, const phaseFloat *phase1, 
-			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
-			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger), nSrc(in->X(4))
+    StaggeredDslashCuda(cudaColorSpinorField *out, const GaugeField &fatGauge, const GaugeField &longGauge,
+                        const cudaColorSpinorField *in, const cudaColorSpinorField *x, const double a,
+                        const int parity, const int dagger, const int *commOverride)
+      : DslashCuda(out, in, x, longGauge, parity, dagger, commOverride),
+        fatGauge(fatGauge), longGauge(longGauge), nSrc(in->X(4))
     { 
-      dslashParam.gauge0 = (void*)fat0;
-      dslashParam.gauge1 = (void*)fat1;
-      dslashParam.longGauge0 = (void*)long0;
-      dslashParam.longGauge1 = (void*)long1;
-      dslashParam.longPhase0 = (void*)phase0;
-      dslashParam.longPhase1 = (void*)phase1;
+#ifdef MULTI_GPU
+      for(int i=0;i < 4; i++){
+        if(comm_dim_partitioned(i) && (fatGauge.X()[i] < 6)){
+          errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in improved staggered dslash\n");
+        }
+      }
+#endif
+
+      bindFatGaugeTex(static_cast<const cudaGaugeField&>(fatGauge), parity, dslashParam);
+      bindLongGaugeTex(static_cast<const cudaGaugeField&>(longGauge), parity, dslashParam);
+
+      if (in->Precision() != fatGauge.Precision() || in->Precision() != longGauge.Precision()){
+        errorQuda("Mixing gauge and spinor precision not supported"
+                  "(precision=%d, fatlinkGauge.precision=%d, longGauge.precision=%d",
+                  in->Precision(), fatGauge.Precision(), longGauge.Precision());
+      }
+
       dslashParam.a = a;
       dslashParam.a_f = a;
+      dslashParam.fat_link_max = fatGauge.LinkMax();
+      dslashParam.coeff = 1.0/longGauge.Scale();
+      dslashParam.coeff_f = (float)dslashParam.coeff;
     }
 
-    virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
+    virtual ~StaggeredDslashCuda() {
+      unbindSpinorTex<sFloat>(in, out, x);
+      unbindFatGaugeTex(static_cast<const cudaGaugeField&>(fatGauge));
+      unbindLongGaugeTex(static_cast<const cudaGaugeField&>(longGauge));
+    }
 
     void apply(const cudaStream_t &stream)
     {
-#ifdef USE_TEXTURE_OBJECTS
-      dslashParam.ghostTex = in->GhostTex();
-      dslashParam.ghostTexNorm = in->GhostTexNorm();
-#else
-      bindSpinorTex<sFloat>(in, out, x);
+#ifndef USE_TEXTURE_OBJECTS
+      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
-
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      setParam();
+      dslashParam.gauge_stride = fatGauge.Stride();
+      dslashParam.long_gauge_stride = longGauge.Stride();
       dslashParam.swizzle = tp.aux.x;
       IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
@@ -256,72 +274,19 @@ namespace quda {
 				   const int parity, const int dagger, const cudaColorSpinorField *x,
 				   const double &k, const int *commOverride, TimeProfile &profile)
   {
-    inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->createComms(3);
-
 #ifdef GPU_STAGGERED_DIRAC
+    const_cast<cudaColorSpinorField*>(in)->createComms(3);
 
-    dslashParam.Ls = out->X(4); // use Ls as the number of sources
-
-#ifdef MULTI_GPU
-    for(int i=0;i < 4; i++){
-      if(comm_dim_partitioned(i) && (fatGauge.X()[i] < 6)){
-	errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in staggered dslash\n");
-      }    
-    }
-#endif
-
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
-
-    dslashParam.parity = parity;
-    dslashParam.gauge_stride = fatGauge.Stride();
-    dslashParam.long_gauge_stride = longGauge.Stride();
-    dslashParam.fat_link_max = fatGauge.LinkMax();
-
-    for(int i=0;i<4;i++){
-      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
-      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
-      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
-      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
-      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
-    }
-
-    void *fatGauge0, *fatGauge1;
-    void* longGauge0, *longGauge1;
-    bindFatGaugeTex(fatGauge, parity, &fatGauge0, &fatGauge1);
-    bindLongGaugeTex(longGauge, parity, &longGauge0, &longGauge1);
-    void *longPhase0 = (char*)longGauge0 + longGauge.PhaseOffset();
-    void *longPhase1 = (char*)longGauge1 + longGauge.PhaseOffset();   
-
-    if (in->Precision() != fatGauge.Precision() || in->Precision() != longGauge.Precision()){
-      errorQuda("Mixing gauge and spinor precision not supported"
-		"(spinor precision=%d, fatlinkGauge precision=%d, longGauge precision=%d",
-		in->Precision(), fatGauge.Precision(), longGauge.Precision());
-    }
-
-    DslashCuda *dslash = 0;
-    size_t regSize = sizeof(float);
-
+    DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new StaggeredDslashCuda<double2, double2, double2, double>
-	(out, (double2*)fatGauge0, (double2*)fatGauge1,
-	 (double2*)longGauge0, (double2*)longGauge1,
-	 (double*)longPhase0, (double*)longPhase1, 
-	 longGauge.Reconstruct(), in, x, k, dagger);
-      regSize = sizeof(double);
+        (out, fatGauge, longGauge, in, x, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new StaggeredDslashCuda<float2, float2, float4, float>
-	(out, (float2*)fatGauge0, (float2*)fatGauge1,
-	 (float4*)longGauge0, (float4*)longGauge1, 
-	 (float*)longPhase0, (float*)longPhase1,
-	 longGauge.Reconstruct(), in, x, k, dagger);
+	(out, fatGauge, longGauge, in, x, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
       dslash = new StaggeredDslashCuda<short2, short2, short4, short>
-	(out, (short2*)fatGauge0, (short2*)fatGauge1,
-	 (short4*)longGauge0, (short4*)longGauge1, 
-	 (short*)longPhase0, (short*)longPhase1,
-	 longGauge.Reconstruct(), in, x, k, dagger);
+	(out, fatGauge, longGauge, in, x, k, parity, dagger, commOverride);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d
@@ -329,15 +294,10 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 
     delete dslash;
-    unbindFatGaugeTex(fatGauge);
-    unbindLongGaugeTex(longGauge);
-
-    checkCudaError();
-
 #else
     errorQuda("Staggered dslash has not been built");
 #endif  // GPU_STAGGERED_DIRAC

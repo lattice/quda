@@ -370,8 +370,7 @@ namespace quda {
       } else {
 	for (int j=0; j<num_offset_now; j++) {
 	  blas::axpy(alpha[j], *p[j], *x_sloppy[j]);
-	  blas::copy(*x[j], *x_sloppy[j]);
-	  blas::xpy(*x[j], *y[j]);
+	  blas::xpy(*x_sloppy[j], *y[j]);
 	}
 
 	mat(*r, *y[0], *x[0], tmp3); // here we can use x as tmp
