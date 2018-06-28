@@ -81,9 +81,9 @@ extern double mu;
 
 QudaVerbosity verbosity = QUDA_VERBOSE;
 
-void init(int argc, char **argv) {
+void init(int precision) {
 
-  cuda_prec = prec;
+  cuda_prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
@@ -305,12 +305,14 @@ void init(int argc, char **argv) {
   
   printfQuda("Randomizing fields... ");
 
-  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
-    read_gauge_field(latfile, hostGauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(hostGauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate a random SU(3) field
-    construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
-  }
+
+//FIXME
+  // if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
+  //   read_gauge_field(latfile, hostGauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+  //   construct_gauge_field(hostGauge, 2, gauge_param.cpu_prec, &gauge_param);
+  // } else { // else generate a random SU(3) field
+  //   construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
+  // }
 
   spinor->Source(QUDA_RANDOM_SOURCE, 0);
 
@@ -323,7 +325,7 @@ void init(int argc, char **argv) {
 
   printfQuda("done.\n"); fflush(stdout);
   
-  initQuda(device);
+
 
   // set verbosity prior to loadGaugeQuda
   setVerbosity(verbosity);
@@ -443,7 +445,6 @@ void end() {
     free(hostClover);
     free(hostCloverInv);
   }
-  endQuda();
 
 }
 
@@ -964,42 +965,40 @@ void display_test_info()
 
 extern void usage(char**);
 
-TEST(dslash, verify) {
-  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
-  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
-}
+// TEST(dslash, verify) {
 
-int main(int argc, char **argv)
-{
-  // initalize google test, includes command line options
-  ::testing::InitGoogleTest(&argc, argv);
-  // return code for google test
-  int test_rc = 0;
-  for (int i =1;i < argc; i++) {
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }  
-    
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
-  }
+// }
 
-  initComms(argc, argv, gridsize_from_cmdline);
 
+using ::testing::TestWithParam;
+using ::testing::Bool;
+using ::testing::Values;
+using ::testing::Range;
+using ::testing::Combine;
+
+class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int>> {
+protected:
+  ::testing::tuple<int, int> param;
+
+public:
+  virtual ~DslashTest() { }
+  virtual void SetUp() {
+  int prec = ::testing::get<0>(GetParam());
+  init(prec);
   display_test_info();
+  }
+  virtual void TearDown() { end(); }
 
-  init(argc, argv);
+  virtual void NormalExit() { printf("monkey\n"); }
 
-  float spinorGiB = (float)Vh*spinorSiteSize*inv_param.cuda_prec / (1 << 30);
-  printfQuda("\nSpinor mem: %.3f GiB\n", spinorGiB);
-  printfQuda("Gauge mem: %.3f GiB\n", gauge_param.gaugeGiB);
-  
-  int attempts = 1;
+};
+
+// TEST_P(Dslash_test, benchmark){
+
+// }
+
+TEST_P(DslashTest, verify){
   dslashRef();
-  for (int i=0; i<attempts; i++) {
-
     {
       printfQuda("Tuning...\n");
       dslashCUDA(1); // warm-up run
@@ -1019,9 +1018,9 @@ int main(int argc, char **argv)
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
 
     printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
-	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
-	       1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
-	       2*cudaSpinor->GhostBytes());
+         1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
+         1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
+         2*cudaSpinor->GhostBytes());
 
     double norm2_cpu = blas::norm2(*spinorRef);
     double norm2_cpu_cuda= blas::norm2(*spinorOut);
@@ -1029,16 +1028,59 @@ int main(int argc, char **argv)
       double norm2_cuda= blas::norm2(*cudaSpinorOut);
       printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
     } else {
-      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
-    }
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);  
+
+
+}
+  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+    (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+}
+
+int main(int argc, char **argv)
+{
+  // initalize google test, includes command line options
+  ::testing::InitGoogleTest(&argc, argv);
+  // return code for google test
+  int test_rc = 0;
+  for (int i =1;i < argc; i++) {
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    }  
+    
+    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
+  }
+
+  initComms(argc, argv, gridsize_from_cmdline);
+  initQuda(device);
+
+
+  // init(argc, argv);
+
+
+  // display_test_info();
+
+  // performance benchmark
+  // float spinorGiB = (float)Vh*spinorSiteSize*inv_param.cuda_prec / (1 << 30);
+  // printfQuda("\nSpinor mem: %.3f GiB\n", spinorGiB);
+  // printfQuda("Gauge mem: %.3f GiB\n", gauge_param.gaugeGiB);
+  
+  // int attempts = 1;
+
+    
 
     if (verify_results) {
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0) warningQuda("Tests failed");
     }
-  }    
-  end();
+     
+  // end();
+  endQuda();
 
   finalizeComms();
   return test_rc;
 }
+
+INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), Range(0, 1) ));
