@@ -497,7 +497,7 @@ endif(QUDA_CONTRACT)
 
 #define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
-"Flags used by the C++ compiler during regular development builds." FORCE)
+"Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
 "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
