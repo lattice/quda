@@ -14,7 +14,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
-    : LatticeField(param), init(false), init_ghost_zone(false), v(0), norm(0),
+    : LatticeField(param), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ),
       bytes(0), norm_bytes(0), even(0), odd(0),
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
@@ -26,7 +26,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
-    : LatticeField(field), init(false), init_ghost_zone(false), v(0), norm(0),
+    : LatticeField(field), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ),
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
@@ -42,8 +42,7 @@ namespace quda {
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const {
 
-    // note need to check for ghost_precision switch when merged into feature/multigrid
-    if (typeid(*this) == typeid(cpuColorSpinorField) || init_ghost_zone) return;
+    if ( typeid(*this) == typeid(cpuColorSpinorField) || ghost_precision_allocated == ghost_precision ) return;
 
     // For Wilson we half the number of effective faces if the fields are spin projected.
     int num_faces = ((nSpin == 4 && spin_project) ? 1 : 2) * nFace;
@@ -166,7 +165,7 @@ namespace quda {
       dslash_constant.dims[3][1]=X[1];
       dslash_constant.dims[3][2]=X[2];
     }
-    init_ghost_zone = true;
+    ghost_precision_allocated = ghost_precision;
 
   } // createGhostZone
 

@@ -283,7 +283,9 @@ namespace quda {
 
   protected:
     bool init;
-    mutable bool init_ghost_zone;
+
+    /** Used to keep local track of allocated ghost_precision in createGhostZone */
+    mutable QudaPrecision ghost_precision_allocated;
 
     int nColor;
     int nSpin;
