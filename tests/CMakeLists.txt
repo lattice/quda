@@ -1,6 +1,9 @@
 
 include_directories(.)
+include( CTest )
 
+
+## enable tests
 #build a common library for all test utilities
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp face_gauge.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
@@ -12,13 +15,21 @@ MACRO (QUDA_CHECKBUILDTEST mytarget qudabuildtests)
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
   ENDIF()
 ENDMACRO()
+
+if(NOT QUDA_BUILD_ALL_TESTS)
+  set(BUILD_TESTING OFF)
+endif()
+
 #define tests
 
 if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_DOMAIN_WALL)
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
+  cuda_add_executable(dslash_ctest dslash_ctest.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )
+  target_link_libraries(dslash_ctest ${TEST_LIBS} )
   QUDA_CHECKBUILDTEST(dslash_test QUDA_BUILD_ALL_TESTS)
-
+  QUDA_CHECKBUILDTEST(dslash_test BUILD_TESTING)
+  
   cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(invert_test QUDA_BUILD_ALL_TESTS)
@@ -126,30 +137,29 @@ if(QUDA_FORCE_HISQ)
 endif()
 
 
-include( CTest )
-## enable tests
+
 
 ## list tests here
 add_test(NAME blas_test COMMAND blas_test --gtest_output=xml:blas_test.xml)
 
 if(QUDA_DIRAC_WILSON)
-  add_test(NAME dslash_wilson COMMAND dslash_test --dslash-type wilson --gtest_output=xml:dslash_wilson_test.xml)
+  add_test(NAME dslash_wilson COMMAND dslash_ctest --dslash-type wilson --gtest_output=xml:dslash_wilson_test.xml)
 endif()
 
 if(QUDA_DIRAC_CLOVER)
-  add_test(NAME dslash_clover COMMAND dslash_test --dslash-type clover --gtest_output=xml:dslash_clover_test.xml)
+  add_test(NAME dslash_clover COMMAND dslash_ctest --dslash-type clover --gtest_output=xml:dslash_clover_test.xml)
 endif()
 
 if(QUDA_DIRAC_TWISTED_MASS)
-  add_test(NAME dslash_twisted-mass COMMAND dslash_test --dslash-type twisted-mass --gtest_output=xml:dslash_twisted-mass_test.xml)
+  add_test(NAME dslash_twisted-mass COMMAND dslash_ctest --dslash-type twisted-mass --gtest_output=xml:dslash_twisted-mass_test.xml)
 endif()
 
 if(QUDA_DIRAC_TWISTED_CLOVER)
-  add_test(NAME dslash_twisted-clover COMMAND dslash_test --dslash-type twisted-clover --gtest_output=xml:dslash_twisted-clover_test.xml)
+  add_test(NAME dslash_twisted-clover COMMAND dslash_ctest --dslash-type twisted-clover --gtest_output=xml:dslash_twisted-clover_test.xml)
 endif()
 
 if(QUDA_DIRAC_DOMAIN_WALL)
-  add_test(NAME dslash_domain-wall COMMAND dslash_test --dslash-type domain-wall --gtest_output=xml:dslash_domain-wall_test.xml)
+  add_test(NAME dslash_domain-wall COMMAND dslash_ctest --dslash-type domain-wall --gtest_output=xml:dslash_domain-wall_test.xml)
 endif()
 
 
