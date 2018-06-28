@@ -5458,9 +5458,9 @@ void plaqQuda (double plq[3])
 }
 
 /*
- * Performs a deep copy to the internal extendedGaugeResident field.
+ * Performs a deep copy from the internal extendedGaugeResident field.
  */
-void copyResidentGauge(void* resident_gauge, QudaFieldLocation loc)
+void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
 {
   //profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
 

@@ -249,7 +249,7 @@ int main(int argc, char **argv)
       loadGaugeQuda(load_gauge, &gauge_param);
       // Get pointer to internal resident gauge field
       cudaGaugeField* extendedGaugeResident = new cudaGaugeField(gParamEx);
-      copyResidentGauge((void*)extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
+      copyExtendedResidentGaugeQuda((void*)extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
       InitGaugeField( *gaugeEx);
       copyExtendedGauge(*gaugeEx, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
       delete extendedGaugeResident;
