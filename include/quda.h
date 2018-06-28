@@ -566,6 +566,8 @@ extern "C" {
    */
   void initQudaMemory();
 
+  void updateR();
+
   /**
    * Initialize the library.  This function is actually a wrapper
    * around calls to initQudaDevice() and initQudaMemory().

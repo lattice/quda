@@ -62,7 +62,6 @@ extern int zdim;
 extern int tdim;
 extern int Lsdim;
 extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
 extern QudaDagType dagger;
 QudaDagType not_dagger;
 
@@ -80,7 +79,14 @@ extern double mu;
 
 QudaVerbosity verbosity = QUDA_VERBOSE;
 
-void init(int precision) {
+const char *prec_str[] = {"half", "single", "double"};
+const char *recon_str[] = {"r18", "r12", "r8"};
+
+// For googletest names must be non-empty, unique, and may only contain ASCII
+// alphanumeric characters or underscore
+
+
+void init(int precision, QudaReconstructType link_recon) {
 
   cuda_prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
 
@@ -439,11 +445,14 @@ void end() {
   delete spinorRef;
   delete spinorTmp;
 
+  freeGaugeQuda();
+
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     free(hostClover);
     free(hostCloverInv);
   }
+  commDimPartitionedReset();
 
 }
 
@@ -942,7 +951,7 @@ void dslashRef() {
 }
 
 
-void display_test_info(int precision)
+void display_test_info(int precision, QudaReconstructType link_recon)
 {
   auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
   printfQuda("running the following test:\n");
@@ -976,7 +985,7 @@ using ::testing::Values;
 using ::testing::Range;
 using ::testing::Combine;
 
-class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int>> {
+class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>> {
 protected:
   ::testing::tuple<int, int> param;
 
@@ -984,8 +993,22 @@ public:
   virtual ~DslashTest() { }
   virtual void SetUp() {
   int prec = ::testing::get<0>(GetParam());
-  init(prec);
-  display_test_info(prec);
+  QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
+ 
+  
+  int value = ::testing::get<2>(GetParam());
+    for(int j=0; j < 4;j++){
+      if (value &  (1 << j)){
+  commDimPartitionedSet(j);
+  // dim_partitioned[j] = 1;
+      }
+      else{
+
+      }
+    }
+  updateR();
+  init(prec, recon);
+  display_test_info(prec, recon);
   }
   virtual void TearDown() { end(); }
 
@@ -1077,6 +1100,8 @@ TEST_P(DslashTest, verify){
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
+std::vector<QudaReconstructType> recon;
+
 int main(int argc, char **argv)
 {
   // initalize google test, includes command line options
@@ -1094,7 +1119,6 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
   initQuda(device);
-
 
   // init(argc, argv);
 
@@ -1120,14 +1144,25 @@ int main(int argc, char **argv)
   finalizeComms();
   return test_rc;
 }
-/**
-std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int>> param){
-   int prec = ::testing::get<0>(param.param);
-   // int kernel = ::testing::get<1>(param.param);
-   std::string str(names[kernel]);
-   str += std::string("_");
-   str += std::string(prec_str[prec]);
-   return str;//names[kernel] + "_" + prec_str[prec];
+
+std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
+   const int prec = ::testing::get<0>(param.param);
+   const int recon = ::testing::get<1>(param.param);
+   const int part = ::testing::get<2>(param.param);
+   std::stringstream ss;
+   // std::cout << prec << " " << recon << std::endl;
+   ss << get_dslash_str(dslash_type) << "_";
+   ss << prec_str[prec];
+   ss << "_r" << recon;
+   ss << "_partition" << part;
+   
+
+   return ss.str();//names[kernel] + "_" + prec_str[prec];
 }
-**/
-INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), Range(0, 1) ));
+
+
+#ifdef MULTI_GPU
+INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,17)),getdslashtestname);
+#else
+INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getdslashtestname);
+#endif

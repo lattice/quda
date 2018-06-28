@@ -268,6 +268,7 @@ extern "C" {
   int commCoords(int);
   int commDimPartitioned(int dir);
   void commDimPartitionedSet(int dir);
+  void commDimPartitionedReset();
   bool commGlobalReduction();
   void commGlobalReductionSet(bool global_reduce);
 
