@@ -63,7 +63,6 @@ extern int tdim;
 extern int Lsdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
 extern QudaDagType dagger;
 QudaDagType not_dagger;
 
@@ -311,7 +310,7 @@ void init(int precision) {
   //   read_gauge_field(latfile, hostGauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
   //   construct_gauge_field(hostGauge, 2, gauge_param.cpu_prec, &gauge_param);
   // } else { // else generate a random SU(3) field
-  //   construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
+    construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
   // }
 
   spinor->Source(QUDA_RANDOM_SOURCE, 0);
@@ -943,8 +942,9 @@ void dslashRef() {
 }
 
 
-void display_test_info()
+void display_test_info(int precision)
 {
+  auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
   printfQuda("running the following test:\n");
  
   printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type    niter\n");
@@ -985,7 +985,7 @@ public:
   virtual void SetUp() {
   int prec = ::testing::get<0>(GetParam());
   init(prec);
-  display_test_info();
+  display_test_info(prec);
   }
   virtual void TearDown() { end(); }
 
@@ -993,20 +993,15 @@ public:
 
 };
 
-// TEST_P(Dslash_test, benchmark){
-
-// }
-
-TEST_P(DslashTest, verify){
-  dslashRef();
-    {
+TEST_P(DslashTest, benchmark){
+    
       printfQuda("Tuning...\n");
       dslashCUDA(1); // warm-up run
-    }
-    printfQuda("Executing %d kernel loops...\n", niter);
+    
+    // printfQuda("Executing %d kernel loops...\n", niter);
     if (!transfer) dirac->Flops();
-    DslashTime dslash_time = dslashCUDA(niter);
-    printfQuda("done.\n\n");
+    auto dslash_time = dslashCUDA(niter);
+    // printfQuda("done.\n\n");
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
@@ -1015,12 +1010,56 @@ TEST_P(DslashTest, verify){
     //FIXME No flops count for twisted-clover yet
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
-    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
+    double gflops=1.0e-9*flops/dslash_time.event_time;
+    printfQuda("GFLOPS = %f\n", gflops );
+    RecordProperty("Gflops", std::to_string(gflops));
 
     printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
          1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
          1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
          2*cudaSpinor->GhostBytes());
+
+    // double norm2_cpu = blas::norm2(*spinorRef);
+    // double norm2_cpu_cuda= blas::norm2(*spinorOut);
+    // if (!transfer) {
+    //   double norm2_cuda= blas::norm2(*cudaSpinorOut);
+    //   printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
+    // } else {
+    //   printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);  
+
+
+// }
+  // double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  // double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+  //   (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  // ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+
+}
+
+TEST_P(DslashTest, verify){
+  dslashRef();
+    
+      printfQuda("Tuning...\n");
+      dslashCUDA(1); // warm-up run
+    
+    // printfQuda("Executing %d kernel loops...\n", niter);
+    if (!transfer) dirac->Flops();
+    dslashCUDA(2);
+    // printfQuda("done.\n\n");
+
+    if (!transfer) *spinorOut = *cudaSpinorOut;
+
+    // print timing information
+    // printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
+    //FIXME No flops count for twisted-clover yet
+    unsigned long long flops = 0;
+    if (!transfer) flops = dirac->Flops();
+    // printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
+
+    // printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
+    //      1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
+    //      1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
+    //      2*cudaSpinor->GhostBytes());
 
     double norm2_cpu = blas::norm2(*spinorRef);
     double norm2_cpu_cuda= blas::norm2(*spinorOut);
@@ -1073,7 +1112,6 @@ int main(int argc, char **argv)
 
     if (verify_results) {
       test_rc = RUN_ALL_TESTS();
-      if (test_rc != 0) warningQuda("Tests failed");
     }
      
   // end();
@@ -1082,5 +1120,14 @@ int main(int argc, char **argv)
   finalizeComms();
   return test_rc;
 }
-
+/**
+std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int>> param){
+   int prec = ::testing::get<0>(param.param);
+   // int kernel = ::testing::get<1>(param.param);
+   std::string str(names[kernel]);
+   str += std::string("_");
+   str += std::string(prec_str[prec]);
+   return str;//names[kernel] + "_" + prec_str[prec];
+}
+**/
 INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), Range(0, 1) ));
