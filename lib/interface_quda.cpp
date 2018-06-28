@@ -2748,6 +2748,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   profileInvert.TPSTOP(QUDA_PROFILE_H2D);
+  profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   double nb = blas::norm2(*b);
   if (nb==0.0) errorQuda("Source has zero norm");
@@ -2822,6 +2823,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->chrono_use_resident && ( norm_error_solve) ){
     errorQuda("Chronological forcasting only presently supported for M^dagger M solver");
   }
+
+  profileInvert.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
   if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
@@ -2919,7 +2922,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (getVerbosity() >= QUDA_VERBOSE){
     double nx = blas::norm2(*x);
-   printfQuda("Solution = %g\n",nx);
+    printfQuda("Solution = %g\n",nx);
   }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -2969,8 +2972,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
-
-
 
   if (param->compute_action) {
     Complex action = blas::cDotProduct(*b, *x);
