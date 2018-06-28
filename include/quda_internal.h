@@ -193,6 +193,7 @@ namespace quda {
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
     QUDA_PROFILE_IO, /**< time spent on file i/o */
+    QUDA_PROFILE_EIGEN, /**< time spent on host-side Eigen */
 
     // lower level counters used in the dslash and api profiling
     QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers which do not count towrads global time */
