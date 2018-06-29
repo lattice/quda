@@ -78,7 +78,7 @@ extern double mass; // mass of Dirac operator
 extern double mu;
 extern void usage(char**);
 
-QudaVerbosity verbosity = QUDA_VERBOSE;
+QudaVerbosity verbosity = QUDA_SUMMARIZE;
 
 const char *prec_str[] = {"half", "single", "double"};
 const char *recon_str[] = {"r18", "r12", "r8"};
@@ -309,7 +309,7 @@ spinorTmp = new cpuColorSpinorField(csParam);
 
 csParam.x[0] = gauge_param.X[0];
 
-printfQuda("Randomizing fields... ");
+// printfQuda("Randomizing fields... ");
 
 
 //FIXME
@@ -329,7 +329,7 @@ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOV
     memcpy(hostCloverInv, hostClover, (size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
   }
 
-  printfQuda("done.\n"); fflush(stdout);
+  // printfQuda("done.\n"); fflush(stdout);
   
 
 
@@ -337,7 +337,7 @@ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOV
   setVerbosity(verbosity);
   inv_param.verbosity = verbosity;
 
-  printfQuda("Sending gauge field to GPU\n");
+  // printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(hostGauge, &gauge_param);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -377,9 +377,9 @@ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOV
       }
     }
 
-    printfQuda("Creating cudaSpinor\n");
+    // printfQuda("Creating cudaSpinor\n");
     cudaSpinor = new cudaColorSpinorField(csParam);
-    printfQuda("Creating cudaSpinorOut\n");
+    // printfQuda("Creating cudaSpinorOut\n");
     cudaSpinorOut = new cudaColorSpinorField(csParam);
 
     tmp1 = new cudaColorSpinorField(csParam);
@@ -391,12 +391,12 @@ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOV
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     tmp2 = new cudaColorSpinorField(csParam);
 
-    printfQuda("Sending spinor field to GPU\n");
+    // printfQuda("Sending spinor field to GPU\n");
     *cudaSpinor = *spinor;
     
-    double cpu_norm = blas::norm2(*spinor);
-    double cuda_norm = blas::norm2(*cudaSpinor);
-    printfQuda("Source: CPU = %e, CUDA = %e\n", cpu_norm, cuda_norm);
+    // double cpu_norm = blas::norm2(*spinor);
+    // double cuda_norm = blas::norm2(*cudaSpinor);
+    // printfQuda("Source: CPU = %e, CUDA = %e\n", cpu_norm, cuda_norm);
 
     bool pc;
     if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
@@ -421,8 +421,8 @@ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOV
       dirac = Dirac::create(diracParam);
     }
   } else {
-    double cpu_norm = blas::norm2(*spinor);
-    printfQuda("Source: CPU = %e\n", cpu_norm);
+    // double cpu_norm = blas::norm2(*spinor);
+    // printfQuda("Source: CPU = %e\n", cpu_norm);
   }
 
 }
@@ -653,7 +653,7 @@ void end() {
 void dslashRef() {
 
   // compare to dslash reference implementation
-  printfQuda("Calculating reference implementation...");
+  // printfQuda("Calculating reference implementation...");
   fflush(stdout);
 
   if (dslash_type == QUDA_WILSON_DSLASH) {
@@ -948,26 +948,26 @@ exit(-1);
   exit(-1);
 }
 
-printfQuda("done.\n");
+// printfQuda("done.\n");
 }
 
 
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
   auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
-  printfQuda("running the following test:\n");
+  // printfQuda("running the following test:\n");
 
   printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type    niter\n");
   printfQuda("%6s   %2s       %d           %12s    %d    %3d/%3d/%3d        %3d             %2d   %14s   %d\n", 
     get_prec_str(prec), get_recon_str(link_recon), 
     test_type, get_matpc_str(matpc_type), dagger, xdim, ydim, zdim, tdim, Lsdim,
     get_dslash_str(dslash_type), niter);
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
-    dimPartitioned(0),
-    dimPartitioned(1),
-    dimPartitioned(2),
-    dimPartitioned(3));
+  // printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  // printfQuda("                         %d  %d  %d  %d\n", 
+  //   dimPartitioned(0),
+  //   dimPartitioned(1),
+  //   dimPartitioned(2),
+  //   dimPartitioned(3));
 
   return ;
 
@@ -1020,9 +1020,34 @@ public:
 
 };
 
+
+
+TEST_P(DslashTest, verify){
+  dslashRef();
+
+  // printfQuda("Tuning...\n");
+  dslashCUDA(1); // warm-up run
+  dslashCUDA(2);
+
+  if (!transfer) *spinorOut = *cudaSpinorOut;
+
+  double norm2_cpu = blas::norm2(*spinorRef);
+  double norm2_cpu_cuda= blas::norm2(*spinorOut);
+  if (!transfer) {
+    double norm2_cuda= blas::norm2(*cudaSpinorOut);
+    printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
+  } else {
+    printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);  
+  }
+  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+    (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+}
+
 TEST_P(DslashTest, benchmark){
 
-  printfQuda("Tuning...\n");
+  // printfQuda("Tuning...\n");
       dslashCUDA(1); // warm-up run
 
       if (!transfer) dirac->Flops();
@@ -1044,74 +1069,46 @@ TEST_P(DslashTest, benchmark){
        1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
        1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
        2*cudaSpinor->GhostBytes());
-
-
-
     }
 
-    TEST_P(DslashTest, verify){
-      dslashRef();
-
-      printfQuda("Tuning...\n");
-  dslashCUDA(1); // warm-up run
-  dslashCUDA(2);
-
-  if (!transfer) *spinorOut = *cudaSpinorOut;
-
-  double norm2_cpu = blas::norm2(*spinorRef);
-  double norm2_cpu_cuda= blas::norm2(*spinorOut);
-  if (!transfer) {
-    double norm2_cuda= blas::norm2(*cudaSpinorOut);
-    printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
-  } else {
-    printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);  
-  }
-  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-    (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
-  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
-}
-
-std::vector<QudaReconstructType> recon;
-
-int main(int argc, char **argv)
-{
+    int main(int argc, char **argv)
+    {
   // initalize google test, includes command line options
-  ::testing::InitGoogleTest(&argc, argv);
+      ::testing::InitGoogleTest(&argc, argv);
   // return code for google test
-  int test_rc = 0;
-  for (int i =1;i < argc; i++) {
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }  
-    
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
-  }
+      int test_rc = 0;
+      for (int i =1;i < argc; i++) {
+        if(process_command_line_option(argc, argv, &i) == 0){
+          continue;
+        }  
 
-  initComms(argc, argv, gridsize_from_cmdline);
-  
-  test_rc = RUN_ALL_TESTS();
-  
-  finalizeComms();
-  return test_rc;
-}
+        fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+        usage(argv);
+      }
 
-std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
- const int prec = ::testing::get<0>(param.param);
- const int recon = ::testing::get<1>(param.param);
- const int part = ::testing::get<2>(param.param);
- std::stringstream ss;
- ss << get_dslash_str(dslash_type) << "_";
- ss << prec_str[prec];
- ss << "_r" << recon;
- ss << "_partition" << part;
- return ss.str();
-}
+      initComms(argc, argv, gridsize_from_cmdline);
+
+      test_rc = RUN_ALL_TESTS();
+
+      finalizeComms();
+      return test_rc;
+    }
+
+    std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
+     const int prec = ::testing::get<0>(param.param);
+     const int recon = ::testing::get<1>(param.param);
+     const int part = ::testing::get<2>(param.param);
+     std::stringstream ss;
+     ss << get_dslash_str(dslash_type) << "_";
+     ss << prec_str[prec];
+     ss << "_r" << recon;
+     ss << "_partition" << part;
+     return ss.str();
+   }
 
 
 #ifdef MULTI_GPU
-INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getdslashtestname);
+   INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getdslashtestname);
 #else
-INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getdslashtestname);
+   INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getdslashtestname);
 #endif

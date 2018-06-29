@@ -1064,11 +1064,6 @@ TEST_P(BlasTest, benchmark) {
       printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);  
 }
 
-// The optional last argument to INSTANTIATE_TEST_CASE_P allows the user
-// to specify a function or functor that generates custom test name suffixes
-// based on the test parameters. The function should accept one argument of
-// type testing::TestParamInfo<class ParamType>, and return std::string.
-
 
 std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int>> param){
    int prec = ::testing::get<0>(param.param);

@@ -28,8 +28,8 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
   target_link_libraries(dslash_test ${TEST_LIBS} )
   target_link_libraries(dslash_ctest ${TEST_LIBS} )
   QUDA_CHECKBUILDTEST(dslash_test QUDA_BUILD_ALL_TESTS)
-  QUDA_CHECKBUILDTEST(dslash_test BUILD_TESTING)
-  
+  QUDA_CHECKBUILDTEST(dslash_ctest BUILD_TESTING)
+
   cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(invert_test QUDA_BUILD_ALL_TESTS)
@@ -50,7 +50,10 @@ endif()
 if(QUDA_DIRAC_STAGGERED)
   cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
+  cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp staggered_dslash_reference.cpp blas_reference.cpp)
+  target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
+  QUDA_CHECKBUILDTEST(staggered_dslash_ctest BUILD_TESTING)
 
   cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
@@ -163,5 +166,8 @@ if(QUDA_DIRAC_DOMAIN_WALL)
 endif()
 
 
+if(QUDA_DIRAC_STAGGERED)
+  add_test(NAME dslash_staggered COMMAND staggered_dslash_ctest  --gtest_output=xml:dslash_staggered_test.xml)
+endif()
 
 
