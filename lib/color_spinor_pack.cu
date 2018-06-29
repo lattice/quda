@@ -393,9 +393,16 @@ namespace quda {
   template<typename T, typename G, int nSpin, int nColor_> struct precision_spin_color_mapper { static constexpr int nColor = nColor_; };
   template<typename T, typename G, int nColor_> struct precision_spin_color_mapper<T,G,1,nColor_> { static constexpr int nColor = 3; };
 
+
   // never need block-float format with nSpin=4 fields for arbitrary colors
   template<int nColor_> struct precision_spin_color_mapper<float,short,4,nColor_> { static constexpr int nColor = 3; };
   template<int nColor_> struct precision_spin_color_mapper<float,char,4,nColor_> { static constexpr int nColor = 3; };
+
+#ifdef GPU_STAGGERED_DIRAC
+  // never need block-float format with nSpin=1 fields for arbitrary colors
+  template<int nColor_> struct precision_spin_color_mapper<float,short,1,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<float,char,1,nColor_> { static constexpr int nColor = 3; };
+#endif
 
 #ifndef GPU_MULTIGRID_DOUBLE
   template<int nColor_> struct precision_spin_color_mapper<double,double,1,nColor_> { static constexpr int nColor = 3; };
@@ -406,9 +413,11 @@ namespace quda {
   template <typename Float, typename ghostFloat, QudaFieldOrder order, int Ns>
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			       int nFace, int dagger, MemoryLocation *destination) {
-    
+
+#ifndef GPU_STAGGERED_DIRAC
     if (a.Ncolor() != 3 && a.Nspin() == 1)
       errorQuda("Ncolor = %d not supported for Nspin = %d fields", a.Ncolor(), a.Nspin());
+#endif
     if (a.Ncolor() != 3 && a.Nspin() == 4 && a.Precision() == QUDA_SINGLE_PRECISION &&
         (a.GhostPrecision() == QUDA_HALF_PRECISION || a.GhostPrecision() == QUDA_QUARTER_PRECISION) )
       errorQuda("Ncolor = %d not supported for Nspin = %d fields with precision = %d and ghost_precision = %d",

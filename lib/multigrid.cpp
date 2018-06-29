@@ -857,13 +857,30 @@ namespace quda {
     (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
 
-#if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("emulated\n");
-    for (int x=0; x<x_coarse->Volume(); x++) tmp1->PrintVector(x);
+//#if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
+    /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("emulated vs actual\n");
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("actual\n");
-    for (int x=0; x<r_coarse->Volume(); x++) tmp2->PrintVector(x);
-#endif
+    setOutputPrefix("");
+    deviation = sqrt(xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse));
+    printfQuda("deviation %e\n", deviation);
+    const int* latDimCoarse = x_coarse->X();
+
+    int source[4] = { 0, 0, 0, 0 };
+    for (int tc = 0; tc < latDimCoarse[3]; tc++) {
+      for (int zc = 0; zc < latDimCoarse[2]; zc++) {
+        for (int yc = 0; yc < latDimCoarse[1]; yc++) {
+          for (int xc = 0; xc < latDimCoarse[0]; xc++) {
+            source[0] = xc; source[1] = yc; source[2] = zc; source[3] = tc;
+            printfQuda("(%d, %d, %d, %d)\n", xc, yc, zc, tc);
+            r_coarse->PrintVector(getPrintVectorIndex(latDimCoarse, source));
+          }
+        }
+      }
+    }
+
+//#endif
+
+    errorQuda("meh!\n");
 
     /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
 
