@@ -1027,8 +1027,6 @@ public:
   }
   virtual void TearDown() { freeFields(); }
 
-  virtual void NormalExit() { printf("monkey\n"); }
-
 };
 
 

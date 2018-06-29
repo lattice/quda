@@ -145,29 +145,30 @@ endif()
 ## list tests here
 add_test(NAME blas_test COMMAND blas_test --gtest_output=xml:blas_test.xml)
 
+
 if(QUDA_DIRAC_WILSON)
-  add_test(NAME dslash_wilson COMMAND dslash_ctest --dslash-type wilson --gtest_output=xml:dslash_wilson_test.xml)
+  add_test(NAME dslash_wilson COMMAND dslash_ctest --dslash-type wilson --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_wilson_test.xml)
 endif()
 
 if(QUDA_DIRAC_CLOVER)
-  add_test(NAME dslash_clover COMMAND dslash_ctest --dslash-type clover --gtest_output=xml:dslash_clover_test.xml)
+  add_test(NAME dslash_clover COMMAND dslash_ctest --dslash-type clover --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_clover_test.xml)
 endif()
 
 if(QUDA_DIRAC_TWISTED_MASS)
-  add_test(NAME dslash_twisted-mass COMMAND dslash_ctest --dslash-type twisted-mass --gtest_output=xml:dslash_twisted-mass_test.xml)
+  add_test(NAME dslash_twisted-mass COMMAND dslash_ctest --dslash-type twisted-mass --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_twisted-mass_test.xml)
 endif()
 
 if(QUDA_DIRAC_TWISTED_CLOVER)
-  add_test(NAME dslash_twisted-clover COMMAND dslash_ctest --dslash-type twisted-clover --gtest_output=xml:dslash_twisted-clover_test.xml)
+  add_test(NAME dslash_twisted-clover COMMAND dslash_ctest --dslash-type twisted-clover --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_twisted-clover_test.xml)
 endif()
 
 if(QUDA_DIRAC_DOMAIN_WALL)
-  add_test(NAME dslash_domain-wall COMMAND dslash_ctest --dslash-type domain-wall --gtest_output=xml:dslash_domain-wall_test.xml)
+  add_test(NAME dslash_domain-wall COMMAND dslash_ctest --dslash-type domain-wall --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_domain-wall_test.xml)
 endif()
 
 
 if(QUDA_DIRAC_STAGGERED)
-  add_test(NAME dslash_staggered COMMAND staggered_dslash_ctest  --gtest_output=xml:dslash_staggered_test.xml)
+  add_test(NAME dslash_staggered COMMAND staggered_dslash_ctest --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_staggered_test.xml)
 endif()
 
 

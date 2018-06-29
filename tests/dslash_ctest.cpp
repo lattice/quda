@@ -1016,8 +1016,6 @@ public:
     endQuda();
   }
 
-  virtual void NormalExit() { printf("monkey\n"); }
-
 };
 
 

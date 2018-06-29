@@ -271,8 +271,8 @@ extern "C" {
   
   /**
    * @brief Reset the comm dim partioned array to zero,
-   * @details This should only be needed for automated testing where 
-   * differrent where different partioning is applied within a single run.
+   * @details This should only be needed for automated testing 
+   * when different partitioning is applied within a single run.
    */
   void commDimPartitionedReset();
   bool commGlobalReduction();
