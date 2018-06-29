@@ -857,7 +857,7 @@ namespace quda {
     (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
 
-//#if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
+#if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
     /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("emulated vs actual\n");
 
     setOutputPrefix("");
@@ -878,9 +878,8 @@ namespace quda {
       }
     }
 
-//#endif
+#endif
 
-    errorQuda("meh!\n");
 
     /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
 

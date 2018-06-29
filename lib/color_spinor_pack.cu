@@ -391,15 +391,16 @@ namespace quda {
 
   // traits used to ensure we only instantiate arbitrary colors for nSpin=2,4 fields, and only 3 colors otherwise
   template<typename T, typename G, int nSpin, int nColor_> struct precision_spin_color_mapper { static constexpr int nColor = nColor_; };
+#ifndef GPU_STAGGERED_DIRAC
   template<typename T, typename G, int nColor_> struct precision_spin_color_mapper<T,G,1,nColor_> { static constexpr int nColor = 3; };
-
+#endif
 
   // never need block-float format with nSpin=4 fields for arbitrary colors
   template<int nColor_> struct precision_spin_color_mapper<float,short,4,nColor_> { static constexpr int nColor = 3; };
   template<int nColor_> struct precision_spin_color_mapper<float,char,4,nColor_> { static constexpr int nColor = 3; };
 
 #ifdef GPU_STAGGERED_DIRAC
-  // never need block-float format with nSpin=1 fields for arbitrary colors
+  // never need block-float format with nSpin=4 fields for arbitrary colors
   template<int nColor_> struct precision_spin_color_mapper<float,short,1,nColor_> { static constexpr int nColor = 3; };
   template<int nColor_> struct precision_spin_color_mapper<float,char,1,nColor_> { static constexpr int nColor = 3; };
 #endif
