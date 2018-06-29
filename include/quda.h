@@ -566,8 +566,6 @@ extern "C" {
    */
   void initQudaMemory();
 
-  void updateR();
-
   /**
    * Initialize the library.  This function is actually a wrapper
    * around calls to initQudaDevice() and initQudaMemory().
@@ -583,6 +581,13 @@ extern "C" {
    * Finalize the library.
    */
   void endQuda(void);
+
+/**
+ * @brief update the radius for halos. 
+ * @details This should only be needed for automated testing where 
+ * differrent where different partioning is applied within a single run.
+ */
+  void updateR();
 
   /**
    * A new QudaGaugeParam should always be initialized immediately

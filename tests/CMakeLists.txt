@@ -1,6 +1,6 @@
 
 include_directories(.)
-include( CTest )
+
 
 
 ## enable tests

@@ -268,6 +268,12 @@ extern "C" {
   int commCoords(int);
   int commDimPartitioned(int dir);
   void commDimPartitionedSet(int dir);
+  
+  /**
+   * @brief Reset the comm dim partioned array to zero,
+   * @details This should only be needed for automated testing where 
+   * differrent where different partioning is applied within a single run.
+   */
   void commDimPartitionedReset();
   bool commGlobalReduction();
   void commGlobalReductionSet(bool global_reduce);
