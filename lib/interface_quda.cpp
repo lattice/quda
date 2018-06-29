@@ -38,6 +38,8 @@
 
 #include <cuda.h>
 
+#include <inv_mspcg.h>
+
 #ifdef MULTI_GPU
 extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
     QudaPrecision gPrecision, int optflag, int geom);
@@ -2746,10 +2748,18 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       mre(*out, tmp, basis);
     }
 
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
-    solverParam.updateInvertParam(*param);
-    delete solve;
+    // MSPCG here.
+    if(param->inv_type == QUDA_MSPCG_INVERTER){
+      MSPCG* mspcg = new MSPCG(param, solverParam, profileInvert, 6);
+      (*mspcg)(*out, *in);
+      solverParam.updateInvertParam(*param);
+      delete mspcg;
+    }else{
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      (*solve)(*out, *in);
+      solverParam.updateInvertParam(*param);
+      delete solve;
+    }
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     cudaColorSpinorField tmp(*out);
