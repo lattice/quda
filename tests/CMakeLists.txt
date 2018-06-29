@@ -116,6 +116,10 @@ if(QUDA_GAUGE_ALG)
   cuda_add_executable(gauge_alg_test gauge_alg_test.cpp)
   target_link_libraries(gauge_alg_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(gauge_alg_test QUDA_BUILD_ALL_TESTS)
+
+  cuda_add_executable(heatbath_test heatbath_test.cpp)
+  target_link_libraries(heatbath_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(heatbath_test QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_FORCE_HISQ)
