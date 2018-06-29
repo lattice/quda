@@ -132,6 +132,8 @@ enum KernelType {
 
     int partial_length = 0;
     int R[4];
+    
+    int_fastdiv Xs[4];
 
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;

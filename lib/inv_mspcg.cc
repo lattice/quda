@@ -228,8 +228,8 @@ namespace quda {
     if( comm_rank() ){ blas::zero(*tb); }
     b2 = blas::norm2(*tb);
     printfQuda("Test b2 after  = %16.12e.\n", b2);
-//    (*nrm_op)(*tx, *tb, *tt);
-    mat->Dslash4(*tx, *tb, QUDA_EVEN_PARITY);
+    (*nrm_op)(*tx, *tb, *tt);
+//    mat->Dslash4(*tx, *tb, QUDA_EVEN_PARITY);
     double x2 = blas::norm2(*tx);
     printfQuda("Test     x2/b2 = %16.12e/%16.12e.\n", x2, b2);
     if( comm_rank() ){
@@ -239,6 +239,7 @@ namespace quda {
     printfQuda("Chopping x2/b2 = %16.12e/%16.12e.\n", x2, b2);
     
     cudaColorSpinorField* fx = NULL;
+    cudaColorSpinorField* fy = NULL;
     cudaColorSpinorField* fb = NULL;
     cudaColorSpinorField* ft = NULL;
 
@@ -251,6 +252,7 @@ namespace quda {
 
     // TODO: def
     fx  = new cudaColorSpinorField(csParam);
+    fy  = new cudaColorSpinorField(csParam);
     fb  = new cudaColorSpinorField(csParam);
     ft  = new cudaColorSpinorField(csParam);
     blas::zero(*fb);
@@ -260,10 +262,39 @@ namespace quda {
 
     //    quda::pack::initConstants(*dirac_param_precondition.gauge, profile);
     double fb2 = norm2(*fb);
-    int sp_len = (csParam.x[0]*2-2)*(csParam.x[1]-2)*(csParam.x[2]-2)*(csParam.x[3]-2)/2;
+
 //    (*nrm_op_precondition)(*fx, *fb, *ft);
-    int RR[4] = {1,1,1,1};
-    mat_precondition->Dslash4Partial(*fx, *fb, QUDA_EVEN_PARITY, sp_len, RR);
+    
+    int sp_len1 = (csParam.x[0]*2-2)*(csParam.x[1]-2)*(csParam.x[2]-2)*(csParam.x[3]-2)/2;
+    int RR1[4] = {1,1,1,1};
+    int sp_len0 = (csParam.x[0]*2-4)*(csParam.x[1]-4)*(csParam.x[2]-4)*(csParam.x[3]-4)/2;
+    int RR0[4] = {2,2,2,2};
+
+    int odd_bit = 0;
+    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+
+    mat_precondition->Dagger(QUDA_DAG_NO);
+    
+    mat_precondition->Dslash4pre(*ft, *fb, parity[1]);                   // +0
+    mat_precondition->Dslash4Partial(*fy, *ft, parity[0], sp_len1, RR1, Xs1); // +1
+    mat_precondition->Dslash5inv(*ft, *fy, parity[0]);                   // +1
+    mat_precondition->Dslash4pre(*fy, *ft, parity[0]);                   // +1
+    mat_precondition->Dslash4(*ft, *fy, parity[1]);                      // +2
+    mat_precondition->Dslash5invXpay(*fy, *ft, parity[1], *fb, -1.0);      // +2
+
+    mat_precondition->Dagger(QUDA_DAG_YES);
+    
+    mat_precondition->Dslash5inv(*ft, *fy, parity[1]);                  // +2
+    mat_precondition->Dslash4Partial(*fx, *ft, parity[0], sp_len1, RR1, Xs1); // +1
+//    mat_precondition->Dslash4(*fx, *ft, parity[0]);
+    mat_precondition->Dslash4pre(*ft, *fx, parity[0]);                 // +1
+    mat_precondition->Dslash5inv(*fx, *ft, parity[0]);                 // +1
+    mat_precondition->Dslash4Partial(*ft, *fx, parity[1], sp_len0, RR0, Xs0); // +0
+//    mat_precondition->Dslash4(*ft, *fx, parity[1]);
+    mat_precondition->Dslash4preXpay(*fx, *ft, parity[1], *fy, -1.0);   // +0
+    
+    mat_precondition->Dagger(QUDA_DAG_NO);
+
     double fx2 = norm2(*fx);
     printfQuda("Test   fx2/fb2 = %16.12e/%16.12e.\n", fx2, fb2);
     zero_extended_color_spinor_interface( *fx, R, QUDA_CUDA_FIELD_LOCATION, 0);
@@ -283,6 +314,38 @@ namespace quda {
     delete ft;
 
     printfQuda("dslash test completed.\n");
+  }
+
+  void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in ){
+    
+    
+    int odd_bit = 0; // Even-Even
+    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+
+    mat_precondition->Dagger(QUDA_DAG_NO);
+    
+    mat_precondition->Dslash4pre(*iftmp, in, parity[1]);                   // +0
+//    mat_precondition->Dslash4(*ifset, *iftmp, parity[0]); // +1
+    mat_precondition->Dslash4Partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1); // +1
+    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[0]);                   // +1
+    mat_precondition->Dslash4pre(*ifset, *iftmp, parity[0]);                   // +1
+    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
+//    mat_precondition->Dslash4Partial(*iftmp, *ifset, parity[1], sp_len2, RR2, Xs2);                      // +2
+    mat_precondition->Dslash5invXpay(*ifset, *iftmp, parity[1], in, -1.0);      // +2
+
+    mat_precondition->Dagger(QUDA_DAG_YES);
+    
+    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
+//    mat_precondition->Dslash4(out, *iftmp, parity[0]);
+    mat_precondition->Dslash4Partial(out, *iftmp, parity[0], sp_len1, RR1, Xs1); // +1
+    mat_precondition->Dslash4pre(*iftmp, out, parity[0]);                 // +1
+    mat_precondition->Dslash5inv(out, *iftmp, parity[0]);                 // +1
+//    mat_precondition->Dslash4(*iftmp, out, parity[1]);
+    mat_precondition->Dslash4Partial(*iftmp, out, parity[1], sp_len0, RR0, Xs0); // +0
+    mat_precondition->Dslash4preXpay(out, *iftmp, parity[1], *ifset, -1.0);   // +0
+    
+    mat_precondition->Dagger(QUDA_DAG_NO);
+ 
   }
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib )
@@ -306,7 +369,8 @@ namespace quda {
       copyExtendedColorSpinor(*ifp, *ip, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
       copier_timer.Stop("woo", "hoo", 0);
 //      zero_extended_color_spinor_interface( *ifp, R, QUDA_CUDA_FIELD_LOCATION, 0);
-      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
+      inner_dslash(*ifmmp, *ifp);
+//      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
       copier_timer.Start("woo", "hoo", 0);
       copyExtendedColorSpinor(*immp, *ifmmp, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
       copier_timer.Stop("woo", "hoo", 0);
@@ -434,6 +498,7 @@ namespace quda {
     ifmmp=  new cudaColorSpinorField(csParam);
     ifp  =  new cudaColorSpinorField(csParam);
     iftmp=  new cudaColorSpinorField(csParam);
+    ifset=  new cudaColorSpinorField(csParam);
 
     blas::zero(*fr);
 
@@ -442,6 +507,31 @@ namespace quda {
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
 
     double stop = stopping(param.tol, b2, param.residual_type);
+
+    // numbers to enable faster preconditioner dslash
+    for(int d = 0; d < 4; d++){
+      RR2[d] = 0;
+      RR1[d] = 1;
+      RR0[d] = 2;
+    }
+    Xs2[0] = csParam.x[0]*2 - RR2[0]*2;
+    Xs2[1] = csParam.x[1]   - RR2[1]*2;
+    Xs2[2] = csParam.x[2]   - RR2[2]*2;
+    Xs2[3] = csParam.x[3]   - RR2[3]*2;
+ 
+    Xs1[0] = csParam.x[0]*2 - RR1[0]*2;
+    Xs1[1] = csParam.x[1]   - RR1[1]*2;
+    Xs1[2] = csParam.x[2]   - RR1[2]*2;
+    Xs1[3] = csParam.x[3]   - RR1[3]*2;
+    
+    Xs0[0] = csParam.x[0]*2 - RR0[0]*2;
+    Xs0[1] = csParam.x[1]   - RR0[1]*2;
+    Xs0[2] = csParam.x[2]   - RR0[2]*2;
+    Xs0[3] = csParam.x[3]   - RR0[3]*2;   
+   
+    sp_len2 = Xs2[0]*Xs2[1]*Xs2[2]*Xs2[3]/2;
+    sp_len1 = Xs1[0]*Xs1[1]*Xs1[2]*Xs1[3]/2;
+    sp_len0 = Xs0[0]*Xs0[1]*Xs0[2]*Xs0[3]/2;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
@@ -587,6 +677,7 @@ namespace quda {
     delete ifmmp;
     delete ifp;
     delete iftmp;
+    delete ifset;
 
     delete vct_dr;
     delete vct_dp;

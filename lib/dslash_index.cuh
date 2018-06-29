@@ -757,9 +757,9 @@ static __device__ __forceinline__ void coordsFromIndexShrinked(int &idx, T *x, i
   // as well as the cases where X, Y are odd and Z is even,
   // and X,Y,Z are all odd
 
-  const auto *X = param.dc.X;
+  const auto *X  = param.dc.X;
+  const auto *Xs = param.Xs; // shrinked
   const int *R = param.R;
-  const int_fastdiv Xs[4] = { X[0]-2*R[0], X[1]-2*R[1], X[2]-2*R[2], X[3]-2*R[3] }; // shrinked
 
   int XYZT = param.dc.Vh << 1; // X[3]*X[2]*X[1]*X[0]
   int XYZ = param.dc.X3X2X1; // X[2]*X[1]*X[0]

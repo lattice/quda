@@ -196,20 +196,20 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       setParam();
       switch(DS_type){
-      case 0:
-	DSLASH(MDWFDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	break;
-      case 1:
-	DSLASH(MDWFDslash4pre, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	break;
-      case 2:
-	DSLASH(MDWFDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	break;
-      case 3:
-	DSLASH(MDWFDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	break;
-      default:
-	errorQuda("invalid Dslash type");
+        case 0:
+          DSLASH(MDWFDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+          break;
+        case 1:
+          DSLASH(MDWFDslash4pre, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+          break;
+        case 2:
+          DSLASH(MDWFDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+          break;
+        case 3:
+          DSLASH(MDWFDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+          break;
+        default:
+          errorQuda("invalid Dslash type");
       }
     }
 
@@ -222,7 +222,7 @@ namespace quda {
       switch(DS_type){
         case 0:
           if( dslashParam.partial_length ){
-            flops = 1360ll*dslashParam.partial_length*Ls;
+            flops = 1320ll*dslashParam.partial_length*Ls;
           }else{
             flops = DslashCuda::flops();
           }
@@ -249,18 +249,22 @@ namespace quda {
       long long bytes = 0;
 
       switch(DS_type){
-      case 0:
-	bytes = DslashCuda::bytes();
-	break;
-      case 1:
-      case 2:
-	bytes = (x ? 5ll : 4ll) * spinor_bytes * in->VolumeCB();
-	break;
-      case 3:
-	bytes = (x ? Ls + 2 : Ls + 1) * spinor_bytes * in->VolumeCB();
-	break;
-      default:
-	errorQuda("invalid Dslash type");
+        case 0:
+          if( dslashParam.partial_length ){
+            bytes = 15ll * spinor_bytes * in->VolumeCB();
+          }else{
+            bytes = DslashCuda::bytes();
+          }
+          break;
+        case 1:
+        case 2:
+          bytes = (x ? 5ll : 4ll) * spinor_bytes * in->VolumeCB();
+          break;
+        case 3:
+          bytes = (x ? Ls + 2 : Ls + 1) * spinor_bytes * in->VolumeCB();
+          break;
+        default:
+          errorQuda("invalid Dslash type");
       }
       return bytes;
     }
@@ -323,7 +327,7 @@ namespace quda {
 		      const cudaColorSpinorField *in, const int parity, const int dagger,
 		      const cudaColorSpinorField *x, const double &m_f, const double &k2,
                       const double *b_5, const double *c_5, const double &m5,
-		      const int *commOverride, const int DS_type, TimeProfile &profile, int sp_idx_length, int R_[4])
+		      const int *commOverride, const int DS_type, TimeProfile &profile, int sp_idx_length, int R_[4], int_fastdiv Xs_[4])
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
@@ -342,21 +346,38 @@ namespace quda {
     dslash->dslashParam.R[1] = R_[1];
     dslash->dslashParam.R[2] = R_[2];
     dslash->dslashParam.R[3] = R_[3];
-  
-    printfQuda("volume: %dx%dx%dx%dx%d; partial_length=%d.\n", int(dslash->dslashParam.dc.X[0]),
-                                                               int(dslash->dslashParam.dc.X[1]),
-                                                               int(dslash->dslashParam.dc.X[2]),
-                                                               int(dslash->dslashParam.dc.X[3]),
-                                                               int(dslash->dslashParam.dc.X[4]), sp_idx_length);
+
+    dslash->dslashParam.Xs[0] = Xs_[0];
+    dslash->dslashParam.Xs[1] = Xs_[1];
+    dslash->dslashParam.Xs[2] = Xs_[2];
+    dslash->dslashParam.Xs[3] = Xs_[3];
+
+    printfQuda("volume: %dx%dx%dx%d; R: %dx%dx%dx%d; partial_length=%d.\n", 
+                                                               int(dslash->dslashParam.Xs[0]),
+                                                               int(dslash->dslashParam.Xs[1]),
+                                                               int(dslash->dslashParam.Xs[2]),
+                                                               int(dslash->dslashParam.Xs[3]), 
+                                                               int(dslash->dslashParam.R[0]), 
+                                                               int(dslash->dslashParam.R[1]), 
+                                                               int(dslash->dslashParam.R[2]), 
+                                                               int(dslash->dslashParam.R[3]), 
+                                                               sp_idx_length);
     
     // the parameters passed to dslashCuda must be 4-d volume and 3-d
     // faces because Ls is added as the y-dimension in thread space
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyImp* dslashImp = new DslashNC;
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), sp_idx_length, ghostFace, profile); // sp_idx_length is the param.threads
-    delete dslashImp;
+    DslashPolicyImp* dslashImp = nullptr;
+    if (DS_type != 0) {
+      dslashImp = DslashFactory::create(QudaDslashPolicy::QUDA_DSLASH_NC);
+      (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), sp_idx_length, ghostFace, profile);
+      delete dslashImp;
+    } else {
+      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), sp_idx_length, ghostFace, profile);
+      dslash_policy.apply(0);
+    }
+    // sp_idx_length is the param.threads
 
     delete dslash;
 #else

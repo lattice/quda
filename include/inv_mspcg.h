@@ -55,12 +55,17 @@ namespace quda {
       cudaColorSpinorField* ifmmp;
       cudaColorSpinorField* ifp;
       cudaColorSpinorField* iftmp;
+      cudaColorSpinorField* ifset;
 
       Timer copier_timer;
       Timer preconditioner_timer;
       Timer sloppy_timer;
       Timer precise_timer;
-  
+ 
+      int sp_len2, sp_len1, sp_len0;
+      int RR2[4], RR1[4], RR0[4];
+      int_fastdiv Xs2[4], Xs1[4], Xs0[4];
+
     public:
 
       MSPCG(QudaInvertParam* inv_param, SolverParam& _param, TimeProfile& profile, int ic=6);
@@ -75,6 +80,7 @@ namespace quda {
       virtual ~MSPCG();
 
       void operator()(ColorSpinorField& out, ColorSpinorField& in);
+      void inner_dslash( ColorSpinorField& out, const ColorSpinorField& in );
       void inner_cg( ColorSpinorField& ix, ColorSpinorField& ib );
       int  outer_cg( ColorSpinorField& dx, ColorSpinorField& db, double quit );
   };
