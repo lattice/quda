@@ -261,8 +261,8 @@ void init(int precision, QudaReconstructType link_recon) {
     cudaDeviceSynchronize();
     checkCudaError();
 
-    double spinor_norm2 = blas::norm2(*spinor);
-    double cuda_spinor_norm2=  blas::norm2(*cudaSpinor);
+    // double spinor_norm2 = blas::norm2(*spinor);
+    // double cuda_spinor_norm2=  blas::norm2(*cudaSpinor);
     // printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 
     if(test_type == 2) csParam.x[0] /=2;
