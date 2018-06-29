@@ -70,7 +70,6 @@ namespace quda {
       xp = ColorSpinorField::Create(x, csParam);
 
       init = true;
-
     } else if(param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       warningQuda("Initial guess may not work as expected with CGNE\n");
       *xp = x;
@@ -109,26 +108,27 @@ namespace quda {
       bp = ColorSpinorField::Create(csParam);
 
       init = true;
+    }
 
+    double b2 = blas::norm2(b);
+    if (b2 == 0.0) { // compute initial residual vector
+      mdagm.Expose()->M(*bp,x);
+      b2 = blas::norm2(*bp);
     }
 
     mdagm.Expose()->Mdag(*bp,b);
     CG::operator()(x,*bp);
 
-    if (param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+    if ( param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO ) {
+
       // compute the true residuals
-      const double b2 = blas::norm2(b);
-      double r2;
       mdagm.Expose()->M(*bp, x);
-      if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-	blas::axpby(-1.0, *bp, 1.0, b);
-	r2 = blas::norm2(b) / b2;
-        param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, b).z);
-      } else {
-	r2 = blas::xmyNorm(b, *bp) / b2;
-        param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, *bp).z);
-      }
-      param.true_res = sqrt(r2);
+
+      ColorSpinorField &A = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? b : *bp;
+      ColorSpinorField &B = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? *bp : b;
+      double r2 = blas::xmyNorm(A, B);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, B).z);
+      param.true_res = sqrt(r2 / b2);
 
       PrintSummary("CGNR", param.iter - iter0, r2, b2);
     } else if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
