@@ -392,7 +392,7 @@ namespace quda {
 	// recalculate residual in high precision
 	blas::xpy(ySloppy, x);
 
-	if (r2 < stop && param.sloppy_converge) break;
+	if ( (r2 < stop || total_iter==param.maxiter) && param.sloppy_converge) break;
 	mat(r, x, y);
 	r2 = blas::xmyNorm(b, r);  
 

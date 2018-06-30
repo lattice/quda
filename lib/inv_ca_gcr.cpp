@@ -247,7 +247,7 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       if (1 || total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
-	if (r2 < stop && param.sloppy_converge) break;
+	if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
 	mat(r, x, tmp);
 	r2 = blas::xmyNorm(b, r);  
 	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
