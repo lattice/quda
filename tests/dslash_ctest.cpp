@@ -1097,7 +1097,8 @@ TEST_P(DslashTest, benchmark){
      const int recon = ::testing::get<1>(param.param);
      const int part = ::testing::get<2>(param.param);
      std::stringstream ss;
-     ss << get_dslash_str(dslash_type) << "_";
+     // std::cout << "getdslashtestname" << get_dslash_str(dslash_type) << "_" << prec_str[prec] << "_r" << recon << "_partition" << part << std::endl;
+     // ss << get_dslash_str(dslash_type) << "_";
      ss << prec_str[prec];
      ss << "_r" << recon;
      ss << "_partition" << part;

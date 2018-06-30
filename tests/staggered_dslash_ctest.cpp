@@ -599,7 +599,7 @@ TEST_P(StaggeredDslashTest, benchmark) {
    const int recon = ::testing::get<1>(param.param);
    const int part = ::testing::get<2>(param.param);
    std::stringstream ss;
-   ss << "staggered" << "_";
+   // ss << get_dslash_str(dslash_type) << "_";
    ss << prec_str[prec];
    ss << "_r" << recon;
    ss << "_partition" << part;

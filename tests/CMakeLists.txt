@@ -158,17 +158,23 @@ if(QUDA_DIRAC_TWISTED_MASS)
   add_test(NAME dslash_twisted-mass COMMAND dslash_ctest --dslash-type twisted-mass --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_twisted-mass_test.xml)
 endif()
 
+if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+  add_test(NAME dslash_ndeg-twisted-mass COMMAND dslash_ctest --dslash-type twisted-mass --flavor nondeg-doublet --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_ndeg-twisted-mass_test.xml)
+endif()
 if(QUDA_DIRAC_TWISTED_CLOVER)
   add_test(NAME dslash_twisted-clover COMMAND dslash_ctest --dslash-type twisted-clover --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_twisted-clover_test.xml)
 endif()
 
 if(QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME dslash_domain-wall COMMAND dslash_ctest --dslash-type domain-wall --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_domain-wall_test.xml)
+  add_test(NAME dslash_domain-wall-4d COMMAND dslash_ctest --dslash-type domain-wall-4d --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_domain-wall-4d_test.xml)
+  add_test(NAME dslash_mobius COMMAND dslash_ctest --dslash-type mobius --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_mobius_test.xml)
 endif()
 
 
 if(QUDA_DIRAC_STAGGERED)
-  add_test(NAME dslash_staggered COMMAND staggered_dslash_ctest --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_staggered_test.xml)
+  add_test(NAME dslash_improved_staggered COMMAND staggered_dslash_ctest --dslash-type asqtad --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_improved_staggered_test.xml)
+  add_test(NAME dslash_naive_staggered COMMAND staggered_dslash_ctest --dslash-type staggered --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_naive_staggered_test.xml)
 endif()
 
 
