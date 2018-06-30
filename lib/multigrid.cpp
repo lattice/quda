@@ -233,8 +233,6 @@ namespace quda {
       if (param_postsmooth) delete param_postsmooth;
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      // At the moment CGNE doesn't hold well an initial guess
-      if(param.smoother == QUDA_CGNE_INVERTER) param_presmooth->inv_type = QUDA_MR_INVERTER;
 
       param_postsmooth->maxiter = param.nu_post;
       param_postsmooth->Nkrylov = param_postsmooth->maxiter;

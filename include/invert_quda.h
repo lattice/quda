@@ -470,6 +470,7 @@ namespace quda {
     DiracMMdag mmdag;
     DiracMMdag mmdagSloppy;
     ColorSpinorField *xp;
+    ColorSpinorField *yp;
     bool init;
 
   public:
