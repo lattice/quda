@@ -264,6 +264,7 @@ namespace quda {
 
     diracParam.dagger = QUDA_DAG_NO;
     diracParam.matpcType = matpc_type;
+    diracParam.type = QUDA_COARSE_DIRAC;
     diracParam.tmp1 = tmp_coarse;
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;
