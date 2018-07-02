@@ -317,6 +317,8 @@ namespace quda {
     diracParam.dagger = QUDA_DAG_NO;
     diracParam.matpcType = matpc_type;
     diracParam.tmp1 = tmp_coarse;
+    diracParam.type = QUDA_COARSE_DIRAC;
+    
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;
     diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
@@ -857,33 +859,31 @@ namespace quda {
     (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
 
-#if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
     /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("emulated vs actual\n");
 
-    setOutputPrefix("");
-    deviation = sqrt(xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse));
-    printfQuda("deviation %e\n", deviation);
-    const int* latDimCoarse = x_coarse->X();
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      setOutputPrefix("");
+      deviation = sqrt(xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse));
+      printfQuda("deviation %e\n", deviation);
+      const int* latDimCoarse = x_coarse->X();
 
-    int source[4] = { 0, 0, 0, 0 };
-    for (int tc = 0; tc < latDimCoarse[3]; tc++) {
-      for (int zc = 0; zc < latDimCoarse[2]; zc++) {
-        for (int yc = 0; yc < latDimCoarse[1]; yc++) {
-          for (int xc = 0; xc < latDimCoarse[0]; xc++) {
-            source[0] = xc; source[1] = yc; source[2] = zc; source[3] = tc;
-            printfQuda("(%d, %d, %d, %d)\n", xc, yc, zc, tc);
-            r_coarse->PrintVector(getPrintVectorIndex(latDimCoarse, source));
+      int source[4] = { 0, 0, 0, 0 };
+      for (int tc = 0; tc < latDimCoarse[3]; tc++) {
+        for (int zc = 0; zc < latDimCoarse[2]; zc++) {
+          for (int yc = 0; yc < latDimCoarse[1]; yc++) {
+            for (int xc = 0; xc < latDimCoarse[0]; xc++) {
+              source[0] = xc; source[1] = yc; source[2] = zc; source[3] = tc;
+              printfQuda("(%d, %d, %d, %d)\n", xc, yc, zc, tc);
+              r_coarse->PrintVector(getPrintVectorIndex(latDimCoarse, source));
+            }
           }
         }
       }
+    } else {
+      /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
+
+      deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
     }
-
-#endif
-
-
-    /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
-
-    deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
 
     // When the mu is shifted on the coarse level; we can compute exxactly the error we introduce in the check:
     //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test

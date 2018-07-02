@@ -20,7 +20,10 @@ namespace quda {
   // For coarsening un-preconditioned operators we use uni-directional
   // coarsening to reduce the set up code.  For debugging we can force
   // bi-directional coarsening.
-  static bool bidirectional_debug = false;
+  // ESW hack for now: need to add logic so bi-directional coarsening
+  // is triggered if ANY previous level is preconditioned, not just
+  // the current level.
+  static bool bidirectional_debug = true;
 
   template <typename Float, int fineSpin, int coarseSpin,
 	    typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor,

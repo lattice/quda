@@ -1720,6 +1720,9 @@ namespace quda {
     }
     else if (field.Ncolor() == 32 && field.Nspin() == 2) {
       genericCudaPrintVector<Float,2,32>(field,i);
+    }
+    else if (field.Ncolor() == 96 && field.Nspin() == 2) {
+      genericCudaPrintVector<Float,2,96>(field,i);
     } else {
       errorQuda("Not supported Ncolor = %d, Nspin = %d", field.Ncolor(), field.Nspin());
     }
