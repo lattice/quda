@@ -73,7 +73,7 @@ extern int Nsrc; // number of spinors to apply to simultaneously
 Dirac* dirac;
 
 const char *prec_str[] = {"half", "single", "double"};
-const char *recon_str[] = {"r18", "r12", "r8"};
+const char *recon_str[] = {"r18", "r13", "r9"};
 
 void init(int precision, QudaReconstructType link_recon) {
 
@@ -231,7 +231,8 @@ void init(int precision, QudaReconstructType link_recon) {
 #endif
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
+
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
     // printfQuda("Long links sending..."); 
     loadGaugeQuda(longlink, &gaugeParam);
     // printfQuda("Long links sent...\n");
@@ -433,7 +434,7 @@ void display_test_info(int precision, QudaReconstructType link_recon)
 {
   auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
   // printfQuda("running the following test:\n");
-
+  // auto linkrecon = dslash_type == QUDA_ASQTAD_DSLASH ? (link_recon == QUDA_RECONSTRUCT_12 ?  QUDA_RECONSTRUCT_13 : (link_recon == QUDA_RECONSTRUCT_8 ? QUDA_RECONSTRUCT_9: link_recon)) : link_recon;
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
   printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", 
     get_prec_str(prec), get_recon_str(link_recon), 
