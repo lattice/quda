@@ -3198,7 +3198,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     pipeline = atoi(argv[i+1]);
-    if (pipeline < 0 || pipeline > 8){
+    if (pipeline < 0 || pipeline > 16){
       printf("ERROR: invalid pipeline length (%d)\n", pipeline);
       usage(argv);
     }
