@@ -582,6 +582,13 @@ extern "C" {
    */
   void endQuda(void);
 
+/**
+ * @brief update the radius for halos. 
+ * @details This should only be needed for automated testing when
+ * different partitioning is applied within a single run.
+ */
+  void updateR();
+
   /**
    * A new QudaGaugeParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)

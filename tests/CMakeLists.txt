@@ -1,6 +1,9 @@
 
 include_directories(.)
 
+
+
+## enable tests
 #build a common library for all test utilities
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp face_gauge.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
@@ -12,12 +15,20 @@ MACRO (QUDA_CHECKBUILDTEST mytarget qudabuildtests)
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
   ENDIF()
 ENDMACRO()
+
+if(NOT QUDA_BUILD_ALL_TESTS)
+  set(BUILD_TESTING OFF)
+endif()
+
 #define tests
 
 if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_DOMAIN_WALL)
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
+  cuda_add_executable(dslash_ctest dslash_ctest.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )
+  target_link_libraries(dslash_ctest ${TEST_LIBS} )
   QUDA_CHECKBUILDTEST(dslash_test QUDA_BUILD_ALL_TESTS)
+  QUDA_CHECKBUILDTEST(dslash_ctest BUILD_TESTING)
 
   cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
@@ -39,7 +50,10 @@ endif()
 if(QUDA_DIRAC_STAGGERED)
   cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
+  cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp staggered_dslash_reference.cpp blas_reference.cpp)
+  target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
+  QUDA_CHECKBUILDTEST(staggered_dslash_ctest BUILD_TESTING)
 
   cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
@@ -118,3 +132,84 @@ if(QUDA_FORCE_HISQ)
   target_link_libraries(hisq_unitarize_force_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
 endif()
+
+
+
+
+## BLAS test
+add_test(NAME blas_test COMMAND blas_test --sdim 16 --tdim 16 --gtest_output=xml:blas_test.xml)
+
+
+# loop over Dslash policies
+if(QUDA_CTEST_SEP_DSLASH_POLICIES)
+  set(DSLASH_POLICIES 0 1 6 7 8 9 10 11 -1)
+else()
+  set(DSLASH_POLICIES -1)
+endif()
+
+foreach(pol IN LISTS DSLASH_POLICIES)
+
+if(${pol} LESS 0)
+  set(pol2 "tune")
+  set(polenv OFF)
+else()
+  set(pol2 ${pol})
+  set(polenv ON)
+endif()
+
+  if(QUDA_DIRAC_WILSON)
+    add_test(NAME dslash_wilson-policy${pol2} COMMAND dslash_ctest --dslash-type wilson --test 3 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_wilson_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_wilson-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
+
+  if(QUDA_DIRAC_CLOVER)
+    add_test(NAME dslash_clover-policy${pol2} COMMAND dslash_ctest --dslash-type clover --test 3 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_clover-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
+
+  if(QUDA_DIRAC_TWISTED_MASS)
+    add_test(NAME dslash_twisted-mass-policy${pol2} COMMAND dslash_ctest --dslash-type twisted-mass --test 3 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_twisted-mass-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
+
+  if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+    add_test(NAME dslash_ndeg-twisted-mass-policy${pol2} COMMAND dslash_ctest --dslash-type twisted-mass --test 3 --flavor nondeg-doublet --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_ndeg-twisted-mass-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
+  if(QUDA_DIRAC_TWISTED_CLOVER)
+    add_test(NAME dslash_twisted-clover-policy${pol2} COMMAND dslash_ctest --dslash-type twisted-clover --test 3 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_twisted-clover-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
+
+  if(QUDA_DIRAC_DOMAIN_WALL)
+    add_test(NAME dslash_domain-wall-policy${pol2} COMMAND dslash_ctest --dslash-type domain-wall --test 3 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_domain-wall_test_pol${pol2}.xml)
+    add_test(NAME dslash_domain-wall-4d-policy${pol2} COMMAND dslash_ctest --dslash-type domain-wall-4d --test 4 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
+    add_test(NAME dslash_mobius-policy${pol2} COMMAND dslash_ctest --dslash-type mobius --test 5 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_domain-wall-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_domain-wall-4d-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_mobius-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
+
+  if(QUDA_DIRAC_STAGGERED)
+    add_test(NAME dslash_improved_staggered-policy${pol2} COMMAND staggered_dslash_ctest --dslash-type asqtad --test 1 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}.xml)
+    add_test(NAME dslash_naive_staggered-policy${pol2} COMMAND staggered_dslash_ctest --dslash-type staggered --test 1 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_naive_staggered_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_improved_staggered-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+      set_tests_properties(dslash_naive_staggered-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+  endif()
+
+endforeach(pol)
+
