@@ -162,13 +162,21 @@ namespace quda {
 
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    double b2 = blas::norm2(b);  //Save norm of b
+    // compute b2, but only if we need to
+    bool fixed_iteration = param.sloppy_converge && nKrylov==param.maxiter && !param.compute_true_res;
+    double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
 
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, tmp);
-      r2 = blas::xmyNorm(b, r);   //r = b - Ax0
+      //r = b - Ax0
+      if (!fixed_iteration) {
+        r2 = blas::xmyNorm(b, r);
+      } else {
+        blas::xpay(b, -1.0, r);
+        r2 = b2; // dummy setting
+      }
     } else {
       r2 = b2;
       blas::copy(r, b);
@@ -188,7 +196,7 @@ namespace quda {
       }
     }
 
-    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    double stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) : 0.0; // stopping condition of solver
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
@@ -238,14 +246,17 @@ namespace quda {
       for (int i=0; i<nKrylov; i++) alpha[i] = -alpha[i];
       blas::caxpy(alpha, q, R);
 
-      r2 = blas::norm2(*p[0]);
       total_iter+=nKrylov;
+      if ( !fixed_iteration || getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        // only compute the residual norm if we need to
+        r2 = blas::norm2(*p[0]);
+      }
 
       PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
 
       // update since nKrylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
-      if (1 || total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
+      if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
 	if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
 	mat(r, x, tmp);
