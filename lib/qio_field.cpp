@@ -279,6 +279,38 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   return 0;
 }
 
+int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
+    QudaPrecision file_prec, QudaPrecision cpu_prec, const char* type)
+{
+  return write_field<18>(outfile, count, field_out, file_prec, cpu_prec, 1, 9, type); 
+}
+
+void write_gauge_field(const char *filename, void* gauge[], QudaPrecision precision, const int *X,
+    int argc, char* argv[]) {
+  this_node = mynode();
+
+  set_layout(X);
+
+  QudaPrecision file_prec = precision;
+
+  char type[128];
+  sprintf(type, "QUDA_%sNc%d_GaugeField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", 3);
+
+  /* Open the test file for writing */
+  QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, QIO_PARALLEL, QIO_ILDGNO);
+  if (outfile == NULL) { printfQuda("Open file failed\n"); exit(0); }
+
+  /* Write the gauge field record */
+  printfQuda("%s: writing the gauge field\n", __func__); fflush(stdout);
+  int status = write_su3_field(outfile, 4, gauge, precision, precision, type);
+  if (status) { errorQuda("write_gauge_field failed %d\n", status); }
+
+  /* Close the file */
+  QIO_close_write(outfile);
+  printfQuda("%s: Closed file for writing\n", __func__);
+}
+
+
 // count is the number of vectors
 // Ninternal is the size of the "inner struct" (24 for Wilson spinor)
 int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[],
