@@ -3772,6 +3772,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.setPrecision(param->cuda_prec);
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
@@ -4237,8 +4238,8 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.link_type = QUDA_GENERAL_LINKS;
-  param.setPrecision(gParam->cpu_prec);
   param.order = QUDA_FLOAT2_GAUGE_ORDER;
+  
 
   int R[4] = { 2*comm_dim_partitioned(0), 2*comm_dim_partitioned(1), 2*comm_dim_partitioned(2), 2*comm_dim_partitioned(3) };
   for (int dir=0; dir<4; ++dir) {
@@ -4248,6 +4249,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   param.reconstruct = QUDA_RECONSTRUCT_NO;
   param.create = QUDA_ZERO_FIELD_CREATE;
+  param.setPrecision(gParam->cpu_prec);
   param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
 
   profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
@@ -4259,7 +4261,7 @@ void computeHISQForceQuda(void* const milc_momentum,
     qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     qParam.nDim = 4;
-    qParam.precision = oParam.precision;
+    qParam.setPrecision(oParam.Precision());
     qParam.pad = 0;
     for (int dir=0; dir<4; ++dir) qParam.x[dir] = oParam.x[dir];
 
