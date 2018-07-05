@@ -272,7 +272,7 @@ namespace quda {
     // inner solver should recompute the true residual after each cycle if using Schwarz preconditioning
     param_presmooth->compute_true_res = (param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) ? true : false;
 
-    presmoother = ( (param.level < param.Nlevel-1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) &&  param_presmooth->inv_type != QUDA_INVALID_INVERTER) ?
+    presmoother = ( (param.level < param.Nlevel-1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) && param_presmooth->inv_type != QUDA_INVALID_INVERTER) ?
       Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
@@ -1368,6 +1368,7 @@ namespace quda {
           }
 #else
           *x = *B[i];
+          zero(*b);
 #endif
         }
 
