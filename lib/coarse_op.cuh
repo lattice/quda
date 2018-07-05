@@ -1675,7 +1675,7 @@ namespace quda {
 	break;
       }
       // do not tune spatial block size for VUV or COARSE_CLOVER
-      tune_block_x = (type == COMPUTE_VUV || type ==  COMPUTE_COARSE_CLOVER) ? false : true;
+      tune_block_x = (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) ? false : true;
     }
 
     bool advanceAux(TuneParam &param) const
@@ -1706,7 +1706,7 @@ namespace quda {
     }
 
     bool advanceSharedBytes(TuneParam &param) const {
-      return type == COMPUTE_VUV ? false : Tunable::advanceSharedBytes(param);
+      return (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
     }
 
     bool advanceTuneParam(TuneParam &param) const {
