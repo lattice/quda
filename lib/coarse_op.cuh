@@ -1060,7 +1060,7 @@ namespace quda {
   }
 
   template<bool from_coarse, typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ void computeCoarseClover(Arg &arg, int parity, int x_cb, int ic_c) {
+  __device__ __host__ void computeCoarseClover(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
 
     const int nDim = 4;
 
@@ -1078,8 +1078,8 @@ namespace quda {
 
     coord[0] /= 2;
 
-    complex<Float> X[coarseSpin*coarseSpin*coarseColor];
-    for (int i=0; i<coarseSpin*coarseSpin*coarseColor; i++) X[i] = 0.0;
+    complex<Float> X[coarseSpin*coarseSpin];
+    for (int i=0; i<coarseSpin*coarseSpin; i++) X[i] = 0.0;
 
     if (!from_coarse) {
       //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
@@ -1089,14 +1089,14 @@ namespace quda {
 	//in the same chiral block.
 	for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
 	  //for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Coarse Color row
-	    for(int jc_c = 0; jc_c < coarseColor; jc_c++) { //Coarse Color column
+          //for(int jc_c = 0; jc_c < coarseColor; jc_c++) { //Coarse Color column
 	      for(int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
 		for(int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
-		  X[ (s_c*coarseSpin + s_c)*coarseColor + jc_c] +=
+		  X[s_c*coarseSpin + s_c] +=
 		    conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
 		} //Fine color column
 	      }  //Fine color row
-	    } //Coarse Color column
+              //} //Coarse Color column
 	    //} //Coarse Color row
 	}  //Fine spin column
       } //Fine spin
@@ -1106,14 +1106,14 @@ namespace quda {
       for(int s = 0; s < fineSpin; s++) { //Loop over spin row
 	for(int s_col = 0; s_col < fineSpin; s_col++) { //Loop over spin column
 	  //for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Coarse Color row
-	    for(int jc_c = 0; jc_c <coarseColor; jc_c++) { //Coarse Color column
+          //for(int jc_c = 0; jc_c <coarseColor; jc_c++) { //Coarse Color column
 	      for(int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
 		for(int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
-		  X[ (s*coarseSpin + s_col)*coarseColor + jc_c] +=
+		  X[s*coarseSpin + s_col] +=
 		    conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
 		} //Fine color column
 	      }  //Fine color row
-	    } //Coarse Color column
+              //} //Coarse Color column
 	    //} //Coarse Color row
 	}  //Fine spin column
       } //Fine spin
@@ -1122,9 +1122,9 @@ namespace quda {
     for (int si = 0; si < coarseSpin; si++) {
       for (int sj = 0; sj < coarseSpin; sj++) {
 	//for (int ic = 0; ic < coarseColor; ic++) {
-	  for (int jc = 0; jc < coarseColor; jc++) {
-	    arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc,X[(si*coarseSpin+sj)*coarseColor+jc]);
-	  }
+        //for (int jc = 0; jc < coarseColor; jc++) {
+	    arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc_c,X[si*coarseSpin+sj]);
+            //}
 	  //}
       }
     }
@@ -1136,9 +1136,11 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-	for (int ic_c=0; ic_c<coarseColor; ic_c++) {
-	  computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c);
-	}
+        for (int jc_c=0; jc_c<coarseColor; jc_c++) {
+          for (int ic_c=0; ic_c<coarseColor; ic_c++) {
+            computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
+          }
+        }
       } // c/b volume
     } // parity
   }
@@ -1147,10 +1149,15 @@ namespace quda {
   __global__ void ComputeCoarseCloverGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+
+    int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y; // parity and color column
+    if (parity_c_col >= 2*coarseColor) return;
+    int jc_c = parity_c_col % coarseColor; // coarse color col index
+    int parity = parity_c_col / coarseColor;
+
     int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
     if (ic_c >= coarseColor) return;
-    computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c);
+    computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
   }
 
 
@@ -1651,13 +1658,15 @@ namespace quda {
 	resizeVector(2*coarseColor,coarseColor);
 #endif
 	break;
+      case COMPUTE_COARSE_CLOVER: // no shared atomic version so keep separate from above
+	resizeVector(2*coarseColor,coarseColor);
+        break;
       case COMPUTE_CONVERT:
 	resizeVector(1,coarseColor);
 	break;
       case COMPUTE_UV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
-      case COMPUTE_COARSE_CLOVER:
       case COMPUTE_REVERSE_Y:
 	resizeVector(2,coarseColor);
 	break;
@@ -1665,8 +1674,8 @@ namespace quda {
 	resizeVector(2,1);
 	break;
       }
-      // do not tune spatial block size for VUV
-      tune_block_x = type == COMPUTE_VUV ? false : true;
+      // do not tune spatial block size for VUV or COARSE_CLOVER
+      tune_block_x = (type == COMPUTE_VUV || type ==  COMPUTE_COARSE_CLOVER) ? false : true;
     }
 
     bool advanceAux(TuneParam &param) const
