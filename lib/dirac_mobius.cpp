@@ -41,21 +41,7 @@ namespace quda {
 
     flops += 1320LL*(long long)in.Volume();
   }
-  
-  void DiracMobius::Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in,
-			    const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
-  {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-    
-    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
-		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 0, profile, sp_idx_length, R_, Xs_);
-
-    flops += 1320LL*(long long)sp_idx_length*(long long)in.X(4);
-  } 
-  
+   
   void DiracMobius::Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
@@ -380,6 +366,75 @@ namespace quda {
     }
 
     deleteTmp(&tmp1, reset1);
+  }
+
+// All the partial kernel implementations
+ 
+  void DiracMobius::Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+    
+    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		   &static_cast<const cudaColorSpinorField&>(in),
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 0, profile, sp_idx_length, R_, Xs_);
+
+    flops += 1320LL*(long long)sp_idx_length*(long long)in.X(4);
+  } 
+  
+  void DiracMobius::Dslash4prePartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+    int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+ 
+    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		   &static_cast<const cudaColorSpinorField&>(in),
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 1, profile, sp_idx_length, R_, Xs_);
+
+    long long Ls = in.X(4);
+    long long bulk = (Ls-2)*sp_idx_length;
+    long long wall = 2*sp_idx_length;
+    flops += 72LL*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
+  }
+
+  void DiracMobiusPC::Dslash5invPartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+    int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+    
+    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		   &static_cast<const cudaColorSpinorField&>(in),
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 3, profile, sp_idx_length, R_, Xs_);
+
+    long long Ls = in.X(4);
+    flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+  }
+
+  void DiracMobius::Dslash4preXpayPartial(ColorSpinorField &out, const ColorSpinorField &in,
+				   const QudaParity parity, const ColorSpinorField &x, const double &k,
+           int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		   &static_cast<const cudaColorSpinorField&>(in),
+		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
+		   mass, k, b_5, c_5, m5, commDim, 1, profile, sp_idx_length, R_, Xs_);
+
+    long long Ls = in.X(4);
+    long long bulk = (Ls-2)*sp_idx_length;
+    long long wall = 2*sp_idx_length;
+    flops += (72LL+48LL)*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
   }
 
 } // namespace quda

@@ -264,36 +264,40 @@ namespace quda {
     double fb2 = norm2(*fb);
 
 //    (*nrm_op_precondition)(*fx, *fb, *ft);
-    
-    int sp_len1 = (csParam.x[0]*2-2)*(csParam.x[1]-2)*(csParam.x[2]-2)*(csParam.x[3]-2)/2;
-    int RR1[4] = {1,1,1,1};
-    int sp_len0 = (csParam.x[0]*2-4)*(csParam.x[1]-4)*(csParam.x[2]-4)*(csParam.x[3]-4)/2;
-    int RR0[4] = {2,2,2,2};
-
+/*    
     int odd_bit = 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
     mat_precondition->Dagger(QUDA_DAG_NO);
     
     mat_precondition->Dslash4pre(*ft, *fb, parity[1]);                   // +0
+//    mat_precondition->Dslash4prePartial(*ft, *fb, parity[1], sp_len0, RR0, Xs0);                   // +0
     mat_precondition->Dslash4Partial(*fy, *ft, parity[0], sp_len1, RR1, Xs1); // +1
-    mat_precondition->Dslash5inv(*ft, *fy, parity[0]);                   // +1
+//    mat_precondition->Dslash5inv(*ft, *fy, parity[0]);                   // +1
+    mat_precondition->Dslash5invPartial(*ft, *fy, parity[0], sp_len1, RR1, Xs1);                   // +1
     mat_precondition->Dslash4pre(*fy, *ft, parity[0]);                   // +1
+//    mat_precondition->Dslash4prePartial(*fy, *ft, parity[0], sp_len1, RR1, Xs1);                   // +1
     mat_precondition->Dslash4(*ft, *fy, parity[1]);                      // +2
     mat_precondition->Dslash5invXpay(*fy, *ft, parity[1], *fb, -1.0);      // +2
 
     mat_precondition->Dagger(QUDA_DAG_YES);
     
     mat_precondition->Dslash5inv(*ft, *fy, parity[1]);                  // +2
-    mat_precondition->Dslash4Partial(*fx, *ft, parity[0], sp_len1, RR1, Xs1); // +1
-//    mat_precondition->Dslash4(*fx, *ft, parity[0]);
+//    mat_precondition->Dslash4Partial(*fx, *ft, parity[0], sp_len1, RR1, Xs1); // +1
+    mat_precondition->Dslash4(*fx, *ft, parity[0]);
     mat_precondition->Dslash4pre(*ft, *fx, parity[0]);                 // +1
-    mat_precondition->Dslash5inv(*fx, *ft, parity[0]);                 // +1
-    mat_precondition->Dslash4Partial(*ft, *fx, parity[1], sp_len0, RR0, Xs0); // +0
+//    mat_precondition->Dslash4prePartial(*ft, *fx, parity[0], sp_len1, RR1, Xs1);                 // +1
+//    mat_precondition->Dslash5inv(*fx, *ft, parity[0]);                 // +1
+    mat_precondition->Dslash5invPartial(*fx, *ft, parity[0], sp_len1, RR1, Xs1);                 // +1
 //    mat_precondition->Dslash4(*ft, *fx, parity[1]);
+    mat_precondition->Dslash4Partial(*ft, *fx, parity[1], sp_len0, RR0, Xs0); // +0
     mat_precondition->Dslash4preXpay(*fx, *ft, parity[1], *fy, -1.0);   // +0
+//    mat_precondition->Dslash4preXpayPartial(*fx, *ft, parity[1], *fy, -1.0, sp_len0, RR0, Xs0);   // +0
     
     mat_precondition->Dagger(QUDA_DAG_NO);
+*/
+
+    inner_dslash(*fx, *fb);
 
     double fx2 = norm2(*fx);
     printfQuda("Test   fx2/fb2 = %16.12e/%16.12e.\n", fx2, fb2);
@@ -310,6 +314,7 @@ namespace quda {
     delete tt;
     delete tb;
     delete fx;
+    delete fy;
     delete fb;
     delete ft;
 
@@ -324,25 +329,34 @@ namespace quda {
 
     mat_precondition->Dagger(QUDA_DAG_NO);
     
-    mat_precondition->Dslash4pre(*iftmp, in, parity[1]);                   // +0
-//    mat_precondition->Dslash4(*ifset, *iftmp, parity[0]); // +1
-    mat_precondition->Dslash4Partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1); // +1
-    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[0]);                   // +1
-    mat_precondition->Dslash4pre(*ifset, *iftmp, parity[0]);                   // +1
+    blas::zero(*iftmp);
+//    mat_precondition->Dslash4pre(*iftmp, in, parity[1]);                                // +0
+    mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);        // +0
+//    mat_precondition->Dslash4(*ifset, *iftmp, parity[0]);                               // +1
+    mat_precondition->Dslash4Partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1);       // +1
+//    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[0]);                            // +1
+    mat_precondition->Dslash5invPartial(*iftmp, *ifset, parity[0], sp_len1, RR1, Xs1);    // +1
+//    mat_precondition->Dslash4pre(*ifset, *iftmp, parity[0]);                            // +1
+    mat_precondition->Dslash4prePartial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1);    // +1
+//    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
     mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
 //    mat_precondition->Dslash4Partial(*iftmp, *ifset, parity[1], sp_len2, RR2, Xs2);                      // +2
     mat_precondition->Dslash5invXpay(*ifset, *iftmp, parity[1], in, -1.0);      // +2
 
     mat_precondition->Dagger(QUDA_DAG_YES);
     
+//    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
     mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
 //    mat_precondition->Dslash4(out, *iftmp, parity[0]);
     mat_precondition->Dslash4Partial(out, *iftmp, parity[0], sp_len1, RR1, Xs1); // +1
-    mat_precondition->Dslash4pre(*iftmp, out, parity[0]);                 // +1
-    mat_precondition->Dslash5inv(out, *iftmp, parity[0]);                 // +1
+//    mat_precondition->Dslash4pre(*iftmp, out, parity[0]);                 // +1
+    mat_precondition->Dslash4prePartial(*iftmp, out, parity[0], sp_len1, RR1, Xs1);                 // +1
+//    mat_precondition->Dslash5inv(out, *iftmp, parity[0]);                 // +1
+    mat_precondition->Dslash5invPartial(out, *iftmp, parity[0], sp_len1, RR1, Xs1);                 // +1
 //    mat_precondition->Dslash4(*iftmp, out, parity[1]);
     mat_precondition->Dslash4Partial(*iftmp, out, parity[1], sp_len0, RR0, Xs0); // +0
-    mat_precondition->Dslash4preXpay(out, *iftmp, parity[1], *ifset, -1.0);   // +0
+//    mat_precondition->Dslash4preXpay(out, *iftmp, parity[1], *ifset, -1.0);   // +0
+    mat_precondition->Dslash4preXpayPartial(out, *iftmp, parity[1], *ifset, -1.0, sp_len0, RR0, Xs0);   // +0
     
     mat_precondition->Dagger(QUDA_DAG_NO);
  
@@ -350,9 +364,6 @@ namespace quda {
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib )
   {
-    double dummy=1;
-    reduceDouble(dummy);
-    preconditioner_timer.Start("woo", "hoo", 0);
     commGlobalReductionSet(false);
 
     blas::zero(ix);
@@ -365,15 +376,15 @@ namespace quda {
 
     for(int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++){
       
-      copier_timer.Start("woo", "hoo", 0);
+//      copier_timer.Start("woo", "hoo", 0);
       copyExtendedColorSpinor(*ifp, *ip, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
-      copier_timer.Stop("woo", "hoo", 0);
+//      copier_timer.Stop("woo", "hoo", 0);
 //      zero_extended_color_spinor_interface( *ifp, R, QUDA_CUDA_FIELD_LOCATION, 0);
       inner_dslash(*ifmmp, *ifp);
 //      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
-      copier_timer.Start("woo", "hoo", 0);
+//      copier_timer.Start("woo", "hoo", 0);
       copyExtendedColorSpinor(*immp, *ifmmp, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
-      copier_timer.Stop("woo", "hoo", 0);
+//      copier_timer.Stop("woo", "hoo", 0);
       
       Mpk2 = reDotProduct(*ip, *immp);
 
@@ -392,8 +403,6 @@ namespace quda {
     }
 
     commGlobalReductionSet(true);
-    reduceDouble(dummy);
-    preconditioner_timer.Stop("woo", "hoo", 0);
     
     return;
   }
@@ -401,9 +410,7 @@ namespace quda {
   int MSPCG::outer_cg( ColorSpinorField& dx, ColorSpinorField& db, double quit )
   {
     double Mpk2, alpha, beta, rkp12;
-    precise_timer.Start("woo", "hoo", 0);
     (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = nrm_op * x
-    precise_timer.Stop("woo", "hoo", 0);
     double rk2 = xmyNorm(db, *vct_dr); // r = b - nrm_op * x
     
     printfQuda("outer_cg: before starting: r2 = %8.4e \n", rk2);
@@ -417,9 +424,7 @@ namespace quda {
     int loop_count;
     for(loop_count = 0; loop_count < param.maxiter; loop_count++){
       
-      precise_timer.Start("woo", "hoo", 0);
       (*nrm_op)(*vct_dmmp, *vct_dp, *vct_dtmp);
-      precise_timer.Stop("woo", "hoo", 0);
       Mpk2 = reDotProduct(*vct_dp, *vct_dmmp);
 
       alpha = rk2 / Mpk2; 
@@ -445,6 +450,8 @@ namespace quda {
 
   void MSPCG::operator()(ColorSpinorField& dx, ColorSpinorField& db)
   {
+
+    double dummy=2;
 
 //    test_dslash( db ); 
 //    int parity = 0;
@@ -481,7 +488,10 @@ namespace quda {
     p  =   new cudaColorSpinorField(csParam);
     mmp  = new cudaColorSpinorField(csParam);
     tmp  = new cudaColorSpinorField(csParam);
-    
+
+// TODO: test
+//    cudaColorSpinorField* r_old = new cudaColorSpinorField(csParam);
+
     csParam.setPrecision(dirac_param_precondition.gauge->Precision());
 
 // f* means fine/preconditioning
@@ -533,16 +543,17 @@ namespace quda {
     sp_len1 = Xs1[0]*Xs1[1]*Xs1[2]*Xs1[3]/2;
     sp_len0 = Xs0[0]*Xs0[1]*Xs0[2]*Xs0[3]/2;
 
+    test_dslash(db);
+
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     // end of initializing.
 
+    precise_timer.Start("woo", "hoo", 0);
     for(int cycle=0; cycle<5; cycle++){
       
-      precise_timer.Start("woo", "hoo", 0);
       (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = MdagM * x
-      precise_timer.Stop("woo", "hoo", 0);
       double r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
       printfQuda("Cycle #%02d.\n", cycle);
       printfQuda("True precise residual is %8.4e\n", r2);
@@ -558,11 +569,15 @@ namespace quda {
 
       blas::copy(*fr, *r);
 
+      sloppy_timer.Start("woo", "hoo", 0);
+      
+      preconditioner_timer.Start("woo", "hoo", 0);
       if(inner_iterations <= 0){
         blas::copy(*z, *fr);
       }else{
         inner_cg(*z, *fr);
       }
+      preconditioner_timer.Stop("woo", "hoo", 0);
  
 //      copier_timer.Start("woo", "hoo", 0);
 //      copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
@@ -573,11 +588,13 @@ namespace quda {
       while( k < param.maxiter ){
         rkzk = reDotProduct(*r, *z);
 
-        sloppy_timer.Start("woo", "hoo", 0);
         (*nrm_op_sloppy)(*mmp, *p, *tmp);
-        sloppy_timer.Stop("woo", "hoo", 0);
         pkApk = reDotProduct(*p, *mmp);
         alpha = rkzk / pkApk;
+
+// TODO: For test only
+//        blas::copy(*r_old, *r);
+// TODO
 
         axpy(alpha, *p, *x); // x_k+1 = x_k + alpha * p_k
         double rr2 = axpyNorm(-alpha, *mmp, *r); // r_k+1 = r_k - alpha * Ap_k
@@ -591,18 +608,26 @@ namespace quda {
 
         blas::copy(*fr, *r);
 
+        preconditioner_timer.Start("woo", "hoo", 0);
         if(inner_iterations <= 0){
           blas::copy(*z, *fr);
         }else{
           inner_cg(*z, *fr);
         }
+        preconditioner_timer.Stop("woo", "hoo", 0);
         
 //        copier_timer.Start("woo", "hoo", 0);
 //        copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
 //        copier_timer.Stop("woo", "hoo", 0);
-
+// TODO: test
+//        double diff_real =  cDotProduct(*z, *r_old).real();
+//        double diff_imag =  cDotProduct(*z, *r_old).imag();
+//        printfQuda("MSPCG/iter.count/diff: %05d %8.4e +i %8.4e\n", k, diff_real, diff_imag);
+// TODO:
+        
         zkP1rkp1 = reDotProduct(*z, *r);
         beta = zkP1rkp1 / rkzk;
+//        beta = (zkP1rkp1-diff_real) / rkzk;
         xpay(*z, beta, *p);
 
         double zz2 = blas::norm2(*z);
@@ -613,13 +638,18 @@ namespace quda {
 
       }
 
+      sloppy_timer.Stop("woo", "hoo", 0);
+      
       blas::copy(*vct_dtmp, *x);
       xpy(*vct_dtmp, dx);
 
     }
     
+    
     k = outer_cg(dx, db, stop);
 
+    precise_timer.Stop("woo", "hoo", 0);
+    
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -629,14 +659,14 @@ namespace quda {
 
     double precise_tflops = nrm_op->flops()*1e-12;
     double sloppy_tflops = nrm_op_sloppy->flops()*1e-12;
-    double preconditioner_tflops = nrm_op_precondition->flops()*1e-12;
+    double preconditioner_tflops = (nrm_op_precondition->flops()+blas::flops)*1e-12;
     reduceDouble(precise_tflops);
     reduceDouble(sloppy_tflops);
     reduceDouble(preconditioner_tflops);
-    param.gflops = sloppy_tflops;
+    param.gflops = (preconditioner_tflops+sloppy_tflops+precise_tflops)*1e3;
 
     double prec_time = preconditioner_timer.time; 
-    reduceMaxDouble(prec_time);
+//    reduceMaxDouble(prec_time);
 
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
@@ -648,9 +678,9 @@ namespace quda {
 
     printfQuda("True residual/target_r2: %8.4e/%8.4e.\n", true_res, stop);
     printfQuda("Performance precise:        %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
-      precise_tflops/precise_timer.time, precise_timer.time, precise_timer.count);
+      (preconditioner_tflops+sloppy_tflops+precise_tflops)/precise_timer.time, precise_timer.time, precise_timer.count);
     printfQuda("Performance sloppy:         %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
-      sloppy_tflops/sloppy_timer.time, sloppy_timer.time, sloppy_timer.count);
+      (preconditioner_tflops+sloppy_tflops)/sloppy_timer.time, sloppy_timer.time, sloppy_timer.count);
     printfQuda("Performance preconditioner: %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
       preconditioner_tflops/prec_time, prec_time, preconditioner_timer.count);
     printfQuda("Performance copier:                         in %8.4f secs with %05d calls.\n",
@@ -668,7 +698,10 @@ namespace quda {
     delete p;
     delete mmp;
     delete tmp;
-    
+
+// TODO: test
+//    delete r_old;
+
     delete fr;
     
     delete immp;

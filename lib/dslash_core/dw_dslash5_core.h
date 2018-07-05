@@ -131,11 +131,16 @@ if (sid >= param.threads*param.dc.Ls) return;
 int X, coord[5], boundaryCrossing;
 
 
-
-boundaryCrossing = sid/param.dc.Xh[0] + sid/(param.dc.X[1]*param.dc.Xh[0]) + sid/(param.dc.X[2]*param.dc.X[1]*param.dc.Xh[0]);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
-coord[4] = X/(param.dc.X[0]*param.dc.X[1]*param.dc.X[2]*param.dc.X[3]);
+  if( param.partial_length ){
+    coordsFromIndexShrinked<5,QUDA_4D_PC,EVEN_X>(X, coord, sid, param);
+  }else{
+  
+    boundaryCrossing = sid/param.dc.Xh[0] + sid/(param.dc.X[1]*param.dc.Xh[0]) + sid/(param.dc.X[2]*param.dc.X[1]*param.dc.Xh[0]);
+  
+    X = 2*sid + (boundaryCrossing + param.parity) % 2;
+    coord[4] = X/(param.dc.X[0]*param.dc.X[1]*param.dc.X[2]*param.dc.X[3]);
+  
+  }
 
  o00_re = 0; o00_im = 0;
  o01_re = 0; o01_im = 0;

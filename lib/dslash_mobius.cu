@@ -144,25 +144,45 @@ namespace quda {
     TuneKey tuneKey() const
     {
       TuneKey key = DslashCuda::tuneKey();
-      switch(DS_type){
-        case 0:
-          if(dslashParam.partial_length){
-            char config[128];
+      if(dslashParam.partial_length){
+        
+        char config[256];
+        switch(DS_type){
+          case 0:
             sprintf(config, ",Dslash4,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
             strcat(key.aux,config);
-          }else{
+            break;
+          case 1:
+            sprintf(config, ",Dslash4pre,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            strcat(key.aux,config);
+            break;
+          case 2:
+            sprintf(config, ",Dslash5,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            strcat(key.aux,config);
+            break;
+          case 3:
+            sprintf(config, ",Dslash5inv,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            strcat(key.aux,config);
+            break;
+        }
+      
+      }else{
+
+        switch(DS_type){
+          case 0:
             strcat(key.aux,",Dslash4");
-          }
-          break;
-        case 1:
-          strcat(key.aux,",Dslash4pre");
-          break;
-        case 2:
-          strcat(key.aux,",Dslash5");
-          break;
-        case 3:
-          strcat(key.aux,",Dslash5inv");
-          break;
+            break;
+          case 1:
+            strcat(key.aux,",Dslash4pre");
+            break;
+          case 2:
+            strcat(key.aux,",Dslash5");
+            break;
+          case 3:
+            strcat(key.aux,",Dslash5inv");
+            break;
+        }
+      
       }
       return key;
     }

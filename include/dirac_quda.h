@@ -406,8 +406,6 @@ namespace quda {
     DiracMobius& operator=(const DiracMobius &dirac);
 
     void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in,
-         const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
     void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
 
@@ -417,6 +415,14 @@ namespace quda {
 			const ColorSpinorField &x, const double &k) const;
     void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
 		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    
+    void Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in,
+         const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+    void Dslash4prePartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+          int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+    void Dslash4preXpayPartial(ColorSpinorField &out, const ColorSpinorField &in,
+				  const QudaParity parity, const ColorSpinorField &x, const double &k,
+          int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -442,6 +448,8 @@ namespace quda {
     DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
 
     void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5invPartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+          int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
 
     void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
