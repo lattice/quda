@@ -683,6 +683,7 @@ mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 
 mark_as_advanced(CMAKE_F_FLAGS)
 
+set(BUILDNAME ${HASH})
 include( CTest )
 ### add tests and quda library
 add_subdirectory(lib)
