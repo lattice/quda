@@ -1653,12 +1653,13 @@ int mg_levels = 2;
 QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL] = { };
 QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL] = { };
 
-int nu_pre = 2;
-int nu_post = 2;
+int nu_pre[QUDA_MAX_MG_LEVEL] = { };
+int nu_post[QUDA_MAX_MG_LEVEL] = { };
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
-QudaSolveType mg_solve_type[QUDA_MAX_MG_LEVEL] = { };
+QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL] = { };
+QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL] = { };
 int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
 double setup_tol[QUDA_MAX_MG_LEVEL] = { };
 int setup_maxiter[QUDA_MAX_MG_LEVEL] = { };
@@ -1771,9 +1772,10 @@ void usage(char** argv )
   printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
-  printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
-  printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
-  printf("    --mg-solve-type <level solve>             # The type of solve to do (direct, direct-pc) (default direct-pc) \n");
+  printf("    --mg-nu-pre <level 1-20>                  # The number of pre-smoother applications to do at a given multigrid level (default 2)\n");
+  printf("    --mg-nu-post <level 1-20>                 # The number of post-smoother applications to do at a given multigrid level (default 2)\n");
+  printf("    --mg-coarse-solve-type <level solve>      # The type of solve to do on each level (direct, direct-pc) (default = solve_type)\n");
+  printf("    --mg-smoother-solve-type <level solve>    # The type of solve to do in smoother (direct, direct-pc (default) )\n");
   printf("    --mg-solve-location <level cpu/cuda>      # The location where the multigrid solver will run (default cuda)\n");
   printf("    --mg-setup-location <level cpu/cuda>      # The location where the multigrid setup will be computed (default cuda)\n");
   printf("    --mg-setup-inv <level inv>                # The inverter to use for the setup of multigrid (default bicgstab)\n");
@@ -2525,9 +2527,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    nu_pre= atoi(argv[i+1]);
-    if (nu_pre < 0 || nu_pre > 20){
-      printf("ERROR: invalid pre-smoother applications value (nu_pre=%d)\n", nu_pre);
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    nu_pre[level] = atoi(argv[i+1]);
+    if (nu_pre[level] < 0 || nu_pre[level] > 20){
+      printf("ERROR: invalid pre-smoother applications value (nu_pre=%d)\n", nu_pre[level]);
       usage(argv);
     }
     i++;
@@ -2539,9 +2548,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    nu_post= atoi(argv[i+1]);
-    if (nu_post < 0 || nu_post > 20){
-      printf("ERROR: invalid pre-smoother applications value (nu_pist=%d)\n", nu_post);
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    nu_post[level] = atoi(argv[i+1]);
+    if (nu_post[level] < 0 || nu_post[level] > 20){
+      printf("ERROR: invalid pre-smoother applications value (nu_post=%d)\n", nu_post[level]);
       usage(argv);
     }
     i++;
@@ -2549,7 +2565,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--mg-solve-type") == 0){
+  if( strcmp(argv[i], "--mg-coarse-solve-type") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
@@ -2560,7 +2576,24 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }
     i++;
 
-    mg_solve_type[level] = get_solve_type(argv[i+1]);
+    coarse_solve_type[level] = get_solve_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-smoother-solve-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    smoother_solve_type[level] = get_solve_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

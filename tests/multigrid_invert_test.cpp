@@ -57,9 +57,10 @@ extern int mg_levels;
 
 extern bool generate_nullspace;
 extern bool generate_all_levels;
-extern int nu_pre;
-extern int nu_post;
-extern QudaSolveType mg_solve_type[QUDA_MAX_MG_LEVEL];
+extern int nu_pre[QUDA_MAX_MG_LEVEL];
+extern int nu_post[QUDA_MAX_MG_LEVEL];
+extern QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
+extern QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
@@ -119,9 +120,11 @@ display_test_info()
 
   printfQuda("MG parameters\n");
   printfQuda(" - number of levels %d\n", mg_levels);
-  for (int i=0; i<mg_levels-1; i++) printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
-  printfQuda(" - number of pre-smoother applications %d\n", nu_pre);
-  printfQuda(" - number of post-smoother applications %d\n", nu_post);
+  for (int i=0; i<mg_levels-1; i++) {
+    printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
+    printfQuda(" - level %d number of pre-smoother applications %d\n", i+1, nu_pre[i]);
+    printfQuda(" - level %d number of post-smoother applications %d\n", i+1, nu_post[i]);
+  }
 
   printfQuda("Outer solver paramers\n");
   printfQuda(" - pipeline = %d\n", pipeline);
@@ -251,8 +254,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
-    mg_param.nu_pre[i] = nu_pre;
-    mg_param.nu_post[i] = nu_post;
+    mg_param.nu_pre[i] = nu_pre[i];
+    mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
@@ -269,7 +272,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-    mg_param.smoother_solve_type[i] = mg_solve_type[i]; // EVEN-ODD
+    mg_param.smoother_solve_type[i] = smoother_solve_type[i];
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
     mg_param.smoother_schwarz_type[i] = schwarz_type[i];
@@ -280,12 +283,73 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
 
-    // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
-    // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
+    // Set set coarse_grid_solution_type: this defines which linear
+    // system we are solving on a given level
+    // * QUDA_MAT_SOLUTION - we are solving the full system and inject
+    //   a full field into coarse grid
+    // * QUDA_MATPC_SOLUTION - we are solving the e/o-preconditioned
+    //   system, and only inject single parity field into coarse grid
+    //
+    // Multiple possible scenarios here
+    //
+    // 1. **Direct outer solver and direct smoother**: here we use
+    // full-field residual coarsening, and everything involves the
+    // full system so coarse_grid_solution_type = QUDA_MAT_SOLUTION
+    //
+    // 2. **Direct outer solver and preconditioned smoother**: here,
+    // only the smoothing uses e/o preconditioning, so
+    // coarse_grid_solution_type = QUDA_MAT_SOLUTION_TYPE.
+    // We reconstruct the full residual prior to coarsening after the
+    // pre-smoother, and then need to project the solution for post
+    // smoothing.
+    //
+    // 3. **Preconditioned outer solver and preconditioned smoother**:
+    // here we use single-parity residual coarsening throughout, so
+    // coarse_grid_solution_type = QUDA_MATPC_SOLUTION.  This is a bit
+    // questionable from a theoretical point of view, since we don't
+    // coarsen the preconditioned operator directly, rather we coarsen
+    // the full operator and preconditioned that, but it just works.
+    // This is the optimal combination in general for Wilson-type
+    // operators: although there is an occasional increase in
+    // iteration or two), by working completely in the preconditioned
+    // space, we save the cost of reconstructing the full residual
+    // from the preconditioned smoother, and re-projecting for the
+    // subsequent smoother, as well as reducing the cost of the
+    // ancillary blas operations in the coarse-grid solve.
+    //
+    // Note, we cannot use preconditioned outer solve with direct
+    // smoother
+    //
+    // Finally, we have to treat the top level carefully: for all
+    // other levels the entry into and out of the grid will be a
+    // full-field, which we can then work in Schur complement space or
+    // not (e.g., freedom to choose coarse_grid_solution_type).  For
+    // the top level, if the outer solver is for the preconditioned
+    // system, then we must use preconditoning, e.g., option 3.) above.
 
-    // if we are using an outer even-odd preconditioned solve, then we
-    // use single parity injection into the coarse grid
-    mg_param.coarse_grid_solution_type[i] = solve_type == mg_solve_type[i] ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    if (i == 0) { // top-level treatment
+      if (coarse_solve_type[0] != solve_type)
+        errorQuda("Mismatch between top-level MG solve type %d and outer solve type %d", coarse_solve_type[0], solve_type);
+
+      if (solve_type == QUDA_DIRECT_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+      } else if (solve_type == QUDA_DIRECT_PC_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      } else {
+        errorQuda("Unexpected solve_type = %d\n", solve_type);
+      }
+
+    } else {
+
+      if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+      } else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      } else {
+        errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
+      }
+
+    }
 
     mg_param.omega[i] = omega; // over/under relaxation factor
 
@@ -416,14 +480,15 @@ void setInvertParam(QudaInvertParam &inv_param) {
 int main(int argc, char **argv)
 {
   // We give here the default values to some of the array
-  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+  for(int i=0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SUMMARIZE;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;
     setup_tol[i] = 5e-6;
     setup_maxiter[i] = 500;
     mu_factor[i] = 1.;
-    mg_solve_type[i] = QUDA_INVALID_SOLVE;
+    coarse_solve_type[i] = QUDA_INVALID_SOLVE;
+    smoother_solve_type[i] = QUDA_INVALID_SOLVE;
     schwarz_type[i] = QUDA_INVALID_SCHWARZ;
     schwarz_cycle[i] = 1;
     smoother_type[i] = QUDA_MR_INVERTER;
@@ -433,6 +498,8 @@ int main(int argc, char **argv)
     coarse_solver_maxiter[i] = 100;
     solver_location[i] = QUDA_CUDA_FIELD_LOCATION;
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
+    nu_pre[i] = 2;
+    nu_post[i] = 2;
   }
 
   for (int i = 1; i < argc; i++){
@@ -449,8 +516,9 @@ int main(int argc, char **argv)
   if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
-  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
-    if (mg_solve_type[i] == QUDA_INVALID_SOLVE) mg_solve_type[i] = solve_type;
+  for (int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+    if (coarse_solve_type[i] == QUDA_INVALID_SOLVE) coarse_solve_type[i] = solve_type;
+    if (smoother_solve_type[i] == QUDA_INVALID_SOLVE) smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
   }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
