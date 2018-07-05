@@ -213,7 +213,7 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
   for (int i=0; i<NXZ; i++) {
     for (int j=0; j<arg.NYW; j++) {
       result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[j*NXZ+i]);
-      if (tp.grid.z==2) result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+j*NXZ+i]);
+      if (tp.grid.z==2) sum(result[i*arg.NYW+j], ((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+j*NXZ+i]);
     }
   }
 }
