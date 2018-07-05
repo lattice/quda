@@ -294,16 +294,74 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
 
-    // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
-    // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
+    // Set set coarse_grid_solution_type: this defines which linear
+    // system we are solving on a given level
+    // * QUDA_MAT_SOLUTION - we are solving the full system and inject
+    //   a full field into coarse grid
+    // * QUDA_MATPC_SOLUTION - we are solving the e/o-preconditioned
+    //   system, and only inject single parity field into coarse grid
+    //
+    // Multiple possible scenarios here
+    //
+    // 1. **Direct outer solver and direct smoother**: here we use
+    // full-field residual coarsening, and everything involves the
+    // full system so coarse_grid_solution_type = QUDA_MAT_SOLUTION
+    //
+    // 2. **Direct outer solver and preconditioned smoother**: here,
+    // only the smoothing uses e/o preconditioning, so
+    // coarse_grid_solution_type = QUDA_MAT_SOLUTION_TYPE.
+    // We reconstruct the full residual prior to coarsening after the
+    // pre-smoother, and then need to project the solution for post
+    // smoothing.
+    //
+    // 3. **Preconditioned outer solver and preconditioned smoother**:
+    // here we use single-parity residual coarsening throughout, so
+    // coarse_grid_solution_type = QUDA_MATPC_SOLUTION.  This is a bit
+    // questionable from a theoretical point of view, since we don't
+    // coarsen the preconditioned operator directly, rather we coarsen
+    // the full operator and preconditioned that, but it just works.
+    // This is the optimal combination in general for Wilson-type
+    // operators: although there is an occasional increase in
+    // iteration or two), by working completely in the preconditioned
+    // space, we save the cost of reconstructing the full residual
+    // from the preconditioned smoother, and re-projecting for the
+    // subsequent smoother, as well as reducing the cost of the
+    // ancillary blas operations in the coarse-grid solve.
+    //
+    // Note, we cannot use preconditioned outer solve with direct
+    // smoother
+    //
+    // Finally, we have to treat the top level carefully: for all
+    // other levels the entry into and out of the grid will be a
+    // full-field, which we can then work in Schur complement space or
+    // not (e.g., freedom to choose coarse_grid_solution_type).  For
+    // the top level, if the outer solver is for the preconditioned
+    // system, then we must use preconditoning, e.g., option 3.) above.
 
-    // if we are using an outer even-odd preconditioned solve, then we
-    // use single parity injection into the coarse grid
-    mg_param.coarse_grid_solution_type[i] = mg_solve_type[i] == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    if (i == 0) { // top-level treatment
+      if (coarse_solve_type[0] != solve_type)
+        errorQuda("Mismatch between top-level MG solve type %d and outer solve type %d", coarse_solve_type[0], solve_type);
 
-    // ESW HACK
-    //mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+      if (solve_type == QUDA_DIRECT_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+      } else if (solve_type == QUDA_DIRECT_PC_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      } else {
+        errorQuda("Unexpected solve_type = %d\n", solve_type);
+      }
 
+    } else {
+
+      if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+      } else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      } else {
+        errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
+      }
+
+    }
+    
     mg_param.omega[i] = omega; // over/under relaxation factor
 
     mg_param.location[i] = solver_location[i];
