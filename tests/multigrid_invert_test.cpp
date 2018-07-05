@@ -57,8 +57,8 @@ extern int mg_levels;
 
 extern bool generate_nullspace;
 extern bool generate_all_levels;
-extern int nu_pre;
-extern int nu_post;
+extern int nu_pre[QUDA_MAX_MG_LEVEL];
+extern int nu_post[QUDA_MAX_MG_LEVEL];
 extern QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
 extern QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
@@ -120,9 +120,11 @@ display_test_info()
 
   printfQuda("MG parameters\n");
   printfQuda(" - number of levels %d\n", mg_levels);
-  for (int i=0; i<mg_levels-1; i++) printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
-  printfQuda(" - number of pre-smoother applications %d\n", nu_pre);
-  printfQuda(" - number of post-smoother applications %d\n", nu_post);
+  for (int i=0; i<mg_levels-1; i++) {
+    printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
+    printfQuda(" - level %d number of pre-smoother applications %d\n", i+1, nu_pre[i]);
+    printfQuda(" - level %d number of post-smoother applications %d\n", i+1, nu_post[i]);
+  }
 
   printfQuda("Outer solver paramers\n");
   printfQuda(" - pipeline = %d\n", pipeline);
@@ -252,8 +254,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
-    mg_param.nu_pre[i] = nu_pre;
-    mg_param.nu_post[i] = nu_post;
+    mg_param.nu_pre[i] = nu_pre[i];
+    mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
@@ -496,6 +498,8 @@ int main(int argc, char **argv)
     coarse_solver_maxiter[i] = 100;
     solver_location[i] = QUDA_CUDA_FIELD_LOCATION;
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
+    nu_pre[i] = 2;
+    nu_post[i] = 2;
   }
 
   for (int i = 1; i < argc; i++){
