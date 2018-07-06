@@ -148,11 +148,10 @@ add_test(NAME blas_test COMMAND blas_test --sdim 16 --tdim 16 --gtest_output=xml
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
+  set(DSLASH_POLICIES 0 1 6 7 8 9 10 11 -1)
   if(DEFINED ENV{QUDA_ENABLE_GDR})
     if($ENV{QUDA_ENABLE_GDR} EQUAL 1)
       set(DSLASH_POLICIES 0 1 2 3 4 5 6 7 8 9 10 11 -1)
-    else()
-      set(DSLASH_POLICIES 0 1 6 7 8 9 10 11 -1)
     endif()
   endif()
 else()
