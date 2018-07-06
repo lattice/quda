@@ -244,12 +244,21 @@ namespace quda {
 
       TuneKey &key = it->key;
 
+      // special case kernel members of a policy
+      char tmp[14] = { };
+      strncpy(tmp, key.aux, 13);
+      bool is_policy_kernel = strcmp(tmp, "policy_kernel") == 0 ? true : false;
+
       out << std::setw(12) << it->time << "\t";
       out << std::setw(12) << it->device_bytes << "\t";
       out << std::setw(12) << it->pinned_bytes << "\t";
       out << std::setw(12) << it->mapped_bytes << "\t";
       out << std::setw(12) << it->host_bytes << "\t";
-      out << std::setw(16) << key.volume << "\t" << key.name << "\t" << key.aux << std::endl;
+      out << std::setw(16) << key.volume << "\t";
+      if (is_policy_kernel) out << "\t";
+      out << key.name << "\t";
+      if (!is_policy_kernel) out << "\t";
+      out << key.aux << std::endl;
 
     }
   }
@@ -557,7 +566,7 @@ namespace quda {
       async_profile_file.close();
 
       if (traceEnabled()) {
-        trace_file << Label << "\t" << quda_version;
+        trace_file << "trace" << "\t" << quda_version;
 #ifdef GITVERSION
         trace_file << "\t" << gitversion;
 #else
