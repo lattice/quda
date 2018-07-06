@@ -3760,12 +3760,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-<<<<<<< HEAD
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam.setPrecision(param->cuda_prec);
-=======
   gParam.setPrecision(param->cuda_prec, true);
->>>>>>> feature/multigrid
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaUnitarizedLink = ulink ? new cudaGaugeField(gParam) : nullptr;
@@ -4229,12 +4224,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.link_type = QUDA_GENERAL_LINKS;
-<<<<<<< HEAD
-  param.order = QUDA_FLOAT2_GAUGE_ORDER;
-  
-=======
   param.setPrecision(gParam->cpu_prec, true);
->>>>>>> feature/multigrid
 
   int R[4] = { 2*comm_dim_partitioned(0), 2*comm_dim_partitioned(1), 2*comm_dim_partitioned(2), 2*comm_dim_partitioned(3) };
   for (int dir=0; dir<4; ++dir) {
