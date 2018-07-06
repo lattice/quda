@@ -759,13 +759,10 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   // switch the parameters for creating the mirror precise cuda gauge field
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
-  gauge_param.setPrecision(param->cuda_prec);
   gauge_param.reconstruct = param->reconstruct;
+  gauge_param.setPrecision(param->cuda_prec, true);
   gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   gauge_param.pad = param->ga_pad;
-  gauge_param.order = (gauge_param.Precision() == QUDA_DOUBLE_PRECISION ||
-		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
 
   precise = new cudaGaugeField(gauge_param);
 
@@ -801,11 +798,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge.TPSTART(QUDA_PROFILE_COMPUTE);
 
   // switch the parameters for creating the mirror sloppy cuda gauge field
-  gauge_param.setPrecision(param->cuda_prec_sloppy);
   gauge_param.reconstruct = param->reconstruct_sloppy;
-  gauge_param.order = (gauge_param.Precision() == QUDA_DOUBLE_PRECISION ||
-      gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  gauge_param.setPrecision(param->cuda_prec_sloppy, true);
   cudaGaugeField *sloppy = NULL;
   if (param->cuda_prec != param->cuda_prec_sloppy ||
       param->reconstruct != param->reconstruct_sloppy) {
@@ -816,11 +810,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   }
 
   // switch the parameters for creating the mirror preconditioner cuda gauge field
-  gauge_param.setPrecision(param->cuda_prec_precondition);
   gauge_param.reconstruct = param->reconstruct_precondition;
-  gauge_param.order = (gauge_param.Precision() == QUDA_DOUBLE_PRECISION ||
-      gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  gauge_param.setPrecision(param->cuda_prec_precondition, true);
   cudaGaugeField *precondition = NULL;
   if (param->cuda_prec_sloppy != param->cuda_prec_precondition ||
       param->reconstruct_sloppy != param->reconstruct_precondition) {
@@ -915,13 +906,10 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       break;
     case QUDA_SMEARED_LINKS:
       gauge_param.create = QUDA_NULL_FIELD_CREATE;
-      gauge_param.setPrecision(param->cuda_prec);
       gauge_param.reconstruct = param->reconstruct;
+      gauge_param.setPrecision(param->cuda_prec, true);
       gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
       gauge_param.pad = param->ga_pad;
-      gauge_param.order = (gauge_param.Precision() == QUDA_DOUBLE_PRECISION ||
-                           gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-        QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
       cudaGauge = new cudaGaugeField(gauge_param);
       copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
       break;
@@ -3753,7 +3741,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
 
   // create the device fields
   gParam.reconstruct = param->reconstruct;
-  gParam.setPrecision(param->cuda_prec);
+  gParam.setPrecision(param->cuda_prec, true);
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   cudaGaugeField *cudaInLink = new cudaGaugeField(gParam);
 
@@ -3772,8 +3760,12 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+<<<<<<< HEAD
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.setPrecision(param->cuda_prec);
+=======
+  gParam.setPrecision(param->cuda_prec, true);
+>>>>>>> feature/multigrid
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaUnitarizedLink = ulink ? new cudaGaugeField(gParam) : nullptr;
@@ -3879,10 +3871,9 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
   } else {
     gParamMom.create = qudaGaugeParam->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
-    gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
     gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
     gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
-    gParamMom.setPrecision(qudaGaugeParam->cuda_prec);
+    gParamMom.setPrecision(qudaGaugeParam->cuda_prec, true);
     gParamMom.create = QUDA_ZERO_FIELD_CREATE;
     cudaMom = new cudaGaugeField(gParamMom);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
@@ -4238,8 +4229,12 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.link_type = QUDA_GENERAL_LINKS;
+<<<<<<< HEAD
   param.order = QUDA_FLOAT2_GAUGE_ORDER;
   
+=======
+  param.setPrecision(gParam->cpu_prec, true);
+>>>>>>> feature/multigrid
 
   int R[4] = { 2*comm_dim_partitioned(0), 2*comm_dim_partitioned(1), 2*comm_dim_partitioned(2), 2*comm_dim_partitioned(3) };
   for (int dir=0; dir<4; ++dir) {
