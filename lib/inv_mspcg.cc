@@ -333,14 +333,14 @@ namespace quda {
 //    mat_precondition->Dslash4pre(*iftmp, in, parity[1]);                                // +0
     mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);        // +0
 //    mat_precondition->Dslash4(*ifset, *iftmp, parity[0]);                               // +1
-    mat_precondition->Dslash4Partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1);       // +1
+    mat_precondition->Dslash4Partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});       // +1
 //    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[0]);                            // +1
     mat_precondition->Dslash5invPartial(*iftmp, *ifset, parity[0], sp_len1, RR1, Xs1);    // +1
 //    mat_precondition->Dslash4pre(*ifset, *iftmp, parity[0]);                            // +1
     mat_precondition->Dslash4prePartial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1);    // +1
 //    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
-    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
-//    mat_precondition->Dslash4Partial(*iftmp, *ifset, parity[1], sp_len2, RR2, Xs2);                      // +2
+//    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
+    mat_precondition->Dslash4Partial(*iftmp, *ifset, parity[1], sp_len2, RR2, Xs2, true, {1,1,1,1});                      // +2
     mat_precondition->Dslash5invXpay(*ifset, *iftmp, parity[1], in, -1.0);      // +2
 
     mat_precondition->Dagger(QUDA_DAG_YES);
@@ -451,10 +451,6 @@ namespace quda {
   void MSPCG::operator()(ColorSpinorField& dx, ColorSpinorField& db)
   {
 
-    double dummy=2;
-
-//    test_dslash( db ); 
-//    int parity = 0;
     Gflops = 0.;
     fGflops = 0.;
     
@@ -678,9 +674,9 @@ namespace quda {
 
     printfQuda("True residual/target_r2: %8.4e/%8.4e.\n", true_res, stop);
     printfQuda("Performance precise:        %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
-      (preconditioner_tflops+sloppy_tflops+precise_tflops)/precise_timer.time, precise_timer.time, precise_timer.count);
+      precise_tflops/(precise_timer.time-sloppy_timer.time), precise_timer.time-sloppy_timer.time, precise_timer.count);
     printfQuda("Performance sloppy:         %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
-      (preconditioner_tflops+sloppy_tflops)/sloppy_timer.time, sloppy_timer.time, sloppy_timer.count);
+      sloppy_tflops/(sloppy_timer.time-prec_time), sloppy_timer.time-prec_time, sloppy_timer.count);
     printfQuda("Performance preconditioner: %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
       preconditioner_tflops/prec_time, prec_time, preconditioner_timer.count);
     printfQuda("Performance copier:                         in %8.4f secs with %05d calls.\n",

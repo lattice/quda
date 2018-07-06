@@ -149,7 +149,12 @@ namespace quda {
         char config[256];
         switch(DS_type){
           case 0:
-            sprintf(config, ",Dslash4,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            if(dslashParam.expanding){
+              sprintf(config, ",Dslash4,partial%d,%d,%d,%d,expand%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3],
+                dslashParam.Rz[0], dslashParam.Rz[1], dslashParam.Rz[2], dslashParam.Rz[3]);
+            }else{
+              sprintf(config, ",Dslash4,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            }
             strcat(key.aux,config);
             break;
           case 1:
@@ -347,7 +352,8 @@ namespace quda {
 		      const cudaColorSpinorField *in, const int parity, const int dagger,
 		      const cudaColorSpinorField *x, const double &m_f, const double &k2,
                       const double *b_5, const double *c_5, const double &m5,
-		      const int *commOverride, const int DS_type, TimeProfile &profile, int sp_idx_length, int R_[4], int_fastdiv Xs_[4])
+		      const int *commOverride, const int DS_type, TimeProfile &profile, int sp_idx_length, int R_[4], int_fastdiv Xs_[4],
+          bool expanding_, std::array<int,4> Rz_)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
@@ -383,6 +389,14 @@ namespace quda {
                                                                int(dslash->dslashParam.R[3]), 
                                                                sp_idx_length);
     
+    if(expanding_){
+      dslash->dslashParam.expanding = true;
+      dslash->dslashParam.Rz[0] = Rz_[0];
+      dslash->dslashParam.Rz[1] = Rz_[1];
+      dslash->dslashParam.Rz[2] = Rz_[2];
+      dslash->dslashParam.Rz[3] = Rz_[3];
+    } 
+
     // the parameters passed to dslashCuda must be 4-d volume and 3-d
     // faces because Ls is added as the y-dimension in thread space
     int ghostFace[QUDA_MAX_DIM];

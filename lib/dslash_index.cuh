@@ -817,6 +817,21 @@ static __device__ __forceinline__ void coordsFromIndexShrinked(int &idx, T *x, i
   } // else we do not support all odd local dimensions except fifth dimension
 }
 
+template<int dir, int pm, class T, class Param> // pm = +-1 dir = 0,1,2,3
+static __device__ __forceinline__ bool do_skip(T* coord, const Param& param){
+  
+  if(!param.expanding) return false;
+  
+  const auto *X = param.dc.X;
+  const int *Rz = param.Rz;
+  
+  bool rtn = false;
+  for(int d = 0; d < 4; d++){
+    rtn = rtn || coord[d]+(d==dir?pm:0) >= X[d]-Rz[d] || coord[d]+(d==dir?pm:0) < Rz[d];
+  }
+  return rtn;
+  
+}
 
 /**
   @brief Compute coordinates from index into the checkerboard (used

@@ -417,7 +417,8 @@ namespace quda {
 		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
     
     void Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in,
-         const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+         const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4],
+         bool expanding_=false, std::array<int,4> Rz_={0,0,0,0}) const;
     void Dslash4prePartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
           int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
     void Dslash4preXpayPartial(ColorSpinorField &out, const ColorSpinorField &in,

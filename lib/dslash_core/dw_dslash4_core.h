@@ -277,9 +277,8 @@ float4 G4;
 #endif
 
 
-
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]<(param.dc.X[0]-1))) ||
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]<(param.dc.X[0]-1)) && !do_skip<0,+1>(coord, param) ) ||
  (kernel_type == EXTERIOR_KERNEL_X && coord[0]==(param.dc.X[0]-1)) )
 #endif
 {
@@ -472,7 +471,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]<(param.d
 }
 
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]>0)) ||
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]>0) && !do_skip<0,-1>(coord, param) ) ||
  (kernel_type == EXTERIOR_KERNEL_X && coord[0]==0) )
 #endif
 {
@@ -669,7 +668,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]>0)) ||
 }
 
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]<(param.dc.X[1]-1))) ||
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]<(param.dc.X[1]-1)) && !do_skip<1,+1>(coord, param) ) ||
  (kernel_type == EXTERIOR_KERNEL_Y && coord[1]==(param.dc.X[1]-1)) )
 #endif
 {
@@ -862,7 +861,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]<(param.d
 }
 
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]>0)) ||
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]>0) && !do_skip<1,-1>(coord, param) ) ||
  (kernel_type == EXTERIOR_KERNEL_Y && coord[1]==0) )
 #endif
 {
@@ -1059,7 +1058,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]>0)) ||
 }
 
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]<(param.dc.X[2]-1))) ||
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]<(param.dc.X[2]-1)) && !do_skip<2,+1>(coord, param) ) ||
  (kernel_type == EXTERIOR_KERNEL_Z && coord[2]==(param.dc.X[2]-1)) )
 #endif
 {
@@ -1252,7 +1251,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]<(param.d
 }
 
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]>0)) ||
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]>0) && !do_skip<2,-1>(coord, param) ) ||
  (kernel_type == EXTERIOR_KERNEL_Z && coord[2]==0) )
 #endif
 {
@@ -1449,7 +1448,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]>0)) ||
 }
 
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]<(param.dc.X[3]-1))) ||
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]<(param.dc.X[3]-1)) && !do_skip<3,+1>(coord, param) ) ||
  (kernel_type == EXTERIOR_KERNEL_T && coord[3]==(param.dc.X[3]-1)) )
 #endif
 {
@@ -1704,7 +1703,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]<(param.d
 }
 
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]>0)) ||
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]>0) && !do_skip<3,-1>(coord, param) ) ||
  (kernel_type == EXTERIOR_KERNEL_T && coord[3]==0) )
 #endif
 {
