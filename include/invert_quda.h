@@ -737,13 +737,12 @@ namespace quda {
     void create(const ColorSpinorField &meta);
 
     /**
-       @brief Solve the equation A p_k psi_k = b by minimizing the
+       @brief Solve the equation A p_k psi_k = q_k psi_k = b by minimizing the
        residual and using Eigen's SVD algorithm for numerical stability
        @param[out] psi Array of coefficients
-       @param[in] p] Search direction vectors
        @param[in] q Search direction vectors with the operator applied
     */
-    void solve(Complex *psi_, std::vector<ColorSpinorField*> &p, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
+    void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
 
   public:
     CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);

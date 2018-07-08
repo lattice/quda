@@ -5,6 +5,13 @@
 
 namespace quda {
 
+  enum Basis {
+    POWER_BASIS,
+    INVALID_BASIS
+  };
+
+  const static Basis basis = POWER_BASIS;
+
   CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
     : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
       alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
@@ -14,8 +21,12 @@ namespace quda {
 
     if (init) {
       if (alpha) delete []alpha;
-      for (int i=0; i<param.Nkrylov; i++) delete p[i];
-      for (int i=0; i<param.Nkrylov; i++) delete q[i];
+      if (basis == POWER_BASIS) {
+        for (int i=0; i<param.Nkrylov+1; i++) delete p[i];
+      } else {
+        for (int i=0; i<param.Nkrylov; i++) delete p[i];
+        for (int i=0; i<param.Nkrylov; i++) delete q[i];
+      }
       if (tmp_sloppy) delete tmp_sloppy;
       if (tmpp) delete tmpp;
       if (rp) delete rp;
@@ -46,11 +57,21 @@ namespace quda {
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
 
-      p.resize(param.Nkrylov);
-      q.resize(param.Nkrylov);
-      for (int i=0; i<param.Nkrylov; i++) {
-        p[i] = ColorSpinorField::Create(csParam);
-        q[i] = ColorSpinorField::Create(csParam);
+      if (basis == POWER_BASIS) {
+        // in power basis q[k] = p[k+1], so we don't need a separate q array
+        p.resize(param.Nkrylov+1);
+        q.resize(param.Nkrylov);
+        for (int i=0; i<param.Nkrylov+1; i++) {
+          p[i] = ColorSpinorField::Create(csParam);
+          if (i>0) q[i-1] = p[i];
+        }
+      } else {
+        p.resize(param.Nkrylov);
+        q.resize(param.Nkrylov);
+        for (int i=0; i<param.Nkrylov; i++) {
+          p[i] = ColorSpinorField::Create(csParam);
+          q[i] = ColorSpinorField::Create(csParam);
+        }
       }
 
       //sloppy temporary for mat-vec
@@ -62,24 +83,24 @@ namespace quda {
     } // init
   }
 
-  void CAGCR::solve(Complex *psi_, std::vector<ColorSpinorField*> &p, std::vector<ColorSpinorField*> &q, ColorSpinorField &b)
+  void CAGCR::solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b)
   {
     using namespace Eigen;
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
 
-    const int N = p.size();
+    const int N = q.size();
     vector phi(N), psi(N);
     matrix A(N,N);
 
 #if 1
     // only a single reduction but requires using the full dot product 
-    // compute rhs vector phi = P* b = (p_i, b)
+    // compute rhs vector phi = Q* b = (q_i, b)
     std::vector<ColorSpinorField*> Q;
     for (int i=0; i<N; i++) Q.push_back(q[i]);
     Q.push_back(&b);
 
-    // Construct the matrix P A P = (p_i, A p_j) = (p_i, q_j)
+    // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     Complex *A_ = new Complex[N*(N+1)];
     blas::cDotProduct(A_, q, Q);
     for (int i=0; i<N; i++) {
@@ -90,7 +111,7 @@ namespace quda {
     }
 #else
     // two reductions but uses the Hermitian block dot product
-    // compute rhs vector phi = P* b = (p_i, b)
+    // compute rhs vector phi = Q* b = (q_i, b)
     std::vector<ColorSpinorField*> B;
     B.push_back(&b);
     Complex *phi_ = new Complex[N];
@@ -98,7 +119,7 @@ namespace quda {
     for (int i=0; i<N; i++) phi(i) = phi_[i];
     delete phi_;
 
-    // Construct the matrix AP AP = (A p_i, A p_j) = (q_i, q_j)
+    // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     Complex *A_ = new Complex[N*N];
     blas::hDotProduct(A_, q, q);
     for (int i=0; i<N; i++)
@@ -230,15 +251,18 @@ namespace quda {
       // build up a space of size nKrylov
       for (int k=0; k<nKrylov; k++) {
         matSloppy(*q[k], *p[k], tmpSloppy);
-        if (k<nKrylov-1) blas::copy(*p[k+1], *q[k]);
+        if (k<nKrylov-1 && basis != POWER_BASIS) blas::copy(*p[k+1], *q[k]);
       }
 
-      solve(alpha, p, q, *p[0]);
+      solve(alpha, q, *p[0]);
 
       // update the solution vector
       std::vector<ColorSpinorField*> X;
       X.push_back(&x);
-      blas::caxpy(alpha, p, X);
+      // need to make sure P is only length nKrylov
+      std::vector<ColorSpinorField*> P;
+      for (int i=0; i<nKrylov; i++) P.push_back(p[i]);
+      blas::caxpy(alpha, P, X);
 
       // update the residual vector
       std::vector<ColorSpinorField*> R;
