@@ -536,14 +536,14 @@ public:
 
     fillAuxBase();
 #ifdef MULTI_GPU
-    fillAux(INTERIOR_KERNEL, "type=interior");
-    fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all");
-    fillAux(EXTERIOR_KERNEL_X, "type=exterior_x");
-    fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y");
-    fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z");
-    fillAux(EXTERIOR_KERNEL_T, "type=exterior_t");
+    fillAux(INTERIOR_KERNEL, "policy_kernel=interior");
+    fillAux(EXTERIOR_KERNEL_ALL, "policy_kernel=exterior_all");
+    fillAux(EXTERIOR_KERNEL_X, "policy_kernel=exterior_x");
+    fillAux(EXTERIOR_KERNEL_Y, "policy_kernel=exterior_y");
+    fillAux(EXTERIOR_KERNEL_Z, "policy_kernel=exterior_z");
+    fillAux(EXTERIOR_KERNEL_T, "policy_kernel=exterior_t");
 #else
-    fillAux(INTERIOR_KERNEL, "type=single-GPU");
+    fillAux(INTERIOR_KERNEL, "policy_kernel=single-GPU");
 #endif // MULTI_GPU
     fillAux(KERNEL_POLICY, "policy");
 

@@ -137,7 +137,9 @@ endif()
 
 
 ## BLAS test
-add_test(NAME blas_test COMMAND blas_test --sdim 16 --tdim 16 --gtest_output=xml:blas_test.xml)
+
+add_test(NAME blas_test_parity COMMAND blas_test --sdim 16 --tdim 16 --solve-type direct-pc --gtest_output=xml:blas_test_parity.xml)
+add_test(NAME blas_test_full COMMAND blas_test --sdim 16 --tdim 16 --solve-type direct --gtest_output=xml:blas_test_full.xml)
 
 
 # loop over Dslash policies

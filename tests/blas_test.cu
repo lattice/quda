@@ -29,6 +29,7 @@ extern int niter;
 extern bool verify_results;
 extern int Nsrc;
 extern int Msrc;
+extern QudaSolveType solve_type;
 
 extern void usage(char** );
 
@@ -108,7 +109,15 @@ void initFields(int prec)
   param.nDim = 4; // number of spacetime dimensions
 
   param.pad = 0; // padding must be zero for cpu fields
-  param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+
+  if (solve_type == QUDA_DIRECT_PC_SOLVE) {
+    param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  } else if (solve_type == QUDA_DIRECT_SOLVE) {
+    param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  } else {
+    errorQuda("Unexpected solve_type=%d\n", solve_type);
+  }
+
   if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) param.x[0] = xdim/2;
   else param.x[0] = xdim;
   param.x[1] = ydim;
