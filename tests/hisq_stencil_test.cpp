@@ -44,6 +44,7 @@ static size_t gSize;
 // within MILC is the ultimate reference for what's going on here.
 
 // HISQ specific: how many Naiks?
+// Can be set to 1 for the case where there's no epsilon correction
 const int n_naiks = 2;
 const double eps_naik = -0.1;
 
@@ -132,18 +133,60 @@ static void hisq_test()
   qudaGaugeParam.gauge_order = gauge_order;
   qudaGaugeParam.type = QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = qudaGaugeParam.reconstruct_sloppy = link_recon;
-  qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
-  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO; //QUDA_STAGGERED_PHASE_MILC;
+  qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.ga_pad = 0;
 
+  // Needed for unitarization, following "unitarize_link_test.cpp"
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
   gParam.link_type   = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = gauge_order;
 
-  // Set unitarization coefficients early on...
+  ///////////////////////////////////////////////////////////////
+  // Set up the coefficients for each part of the HISQ stencil //
+  ///////////////////////////////////////////////////////////////
+  
+  // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
+
+  // First path: create V, W links 
+  double act_path_coeff_1[6] = {
+    ( 1.0/8.0),                 /* one link */
+      0.0,                      /* Naik */
+    (-1.0/8.0)*0.5,             /* simple staple */
+    ( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
+    (-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
+      0.0                       /* Lepage term */
+  };
+
+  // Second path: create X, long links
+  double act_path_coeff_2[6] = {
+    (( 1.0/8.0)+(2.0*6.0/16.0)+(1.0/8.0)),   /* one link */
+        /* One link is 1/8 as in fat7 + 2*3/8 for Lepage + 1/8 for Naik */
+    (-1.0/24.0),                             /* Naik */
+    (-1.0/8.0)*0.5,                          /* simple staple */
+    ( 1.0/8.0)*0.25*0.5,                     /* displace link in two directions */
+    (-1.0/8.0)*0.125*(1.0/6.0),              /* displace link in three directions */
+    (-2.0/16.0)                              /* Lepage term, correct O(a^2) 2x ASQTAD */
+  };
+
+  // Paths for epsilon corrections
+  double act_path_coeff_3[6] = {
+    ( 1.0/8.0),    /* one link b/c of Naik */
+    (-1.0/24.0),   /* Naik */
+      0.0,         /* simple staple */
+      0.0,         /* displace link in two directions */
+      0.0,         /* displace link in three directions */
+      0.0          /* Lepage term */
+  };
+
+
+  ////////////////////////////////////
+  // Set unitarization coefficients //
+  ////////////////////////////////////
+
   setUnitarizeLinksConstants(unitarize_eps,
            max_allowed_error,
            reunit_allow_svd,
@@ -151,7 +194,9 @@ static void hisq_test()
            svd_rel_error,
            svd_abs_error);
 
-  // Input links
+  /////////////////
+  // Input links //
+  /////////////////
 
   void* sitelink[4];
   for(int i=0;i < 4;i++) sitelink[i] = pinned_malloc(V*gaugeSiteSize*gSize);
@@ -169,7 +214,18 @@ static void hisq_test()
   void* ghost_wlink_diag[16];
 #endif
 
-  // Links for GPU compute
+  // Note: this could be replaced with loading a gauge field
+  createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 0); // 0 -> no phases
+  for(int i=0; i<V; ++i){
+    for(int dir=0; dir<4; ++dir){
+      char* src = (char*)sitelink[dir];
+      memcpy((char*)milc_sitelink + (i*4 + dir)*gaugeSiteSize*gSize, src+i*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
+    }	
+  }
+
+  //////////////////////
+  // Perform GPU test //
+  //////////////////////
 
   // Paths for step 1:
   void* vlink  = pinned_malloc(4*V*gaugeSiteSize*gSize); // V links
@@ -184,16 +240,48 @@ static void hisq_test()
   void* longlink_eps = pinned_malloc(4*V*gaugeSiteSize*gSize); // final long links
 
   
-
-  createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 0); // 0 -> no phases
-
-  for(int i=0; i<V; ++i){
-    for(int dir=0; dir<4; ++dir){
-      char* src = (char*)sitelink[dir];
-      memcpy((char*)milc_sitelink + (i*4 + dir)*gaugeSiteSize*gSize, src+i*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
-    }	
+  // Tuning run...
+  {
+    printfQuda("Tuning...\n");
+    computeKSLinkQuda(vlink , longlink, wlink, milc_sitelink, act_path_coeff_2, &qudaGaugeParam);
   }
 
+  struct timeval t0, t1;
+  printfQuda("Running %d iterations of computation\n", niter);
+  gettimeofday(&t0, NULL);
+  for (int n = 0; n < niter; n++) {
+
+    // If we create cudaGaugeField objs, we can do this 100% on the GPU, no copying!
+
+    // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
+    computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_path_coeff_1, &qudaGaugeParam);
+
+    // Create Naiks, 3rd path table set
+    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path_coeff_3, &qudaGaugeParam);
+
+    // Rescale+copy Naiks into Naik field
+    cpu_axy(prec, eps_naik, fatlink, fatlink_eps, V*4*gaugeSiteSize);
+    cpu_axy(prec, eps_naik, longlink, longlink_eps, V*4*gaugeSiteSize);
+
+    // Create X and long links, 2nd path table set
+    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path_coeff_2, &qudaGaugeParam);
+
+    // Add into Naik field
+    cpu_xpy(prec, fatlink, fatlink_eps, V*4*gaugeSiteSize);
+    cpu_xpy(prec, longlink, longlink_eps, V*4*gaugeSiteSize);
+  }
+  gettimeofday(&t1, NULL);
+
+  double secs = TDIFF(t0,t1);
+
+  ////////////////////
+  // Begin CPU test //
+  ////////////////////
+
+
+  ///////////////////////////////
+  // Create extended CPU field //
+  ///////////////////////////////
   int X1=Z[0];
   int X2=Z[1];
   int X3=Z[2];
@@ -244,83 +332,17 @@ static void hisq_test()
     }//dir
   }//i
 
+  /////////////////////////////////////
+  // Allocate all CPU intermediaries //
+  /////////////////////////////////////
 
-  // Set up the action paths for each step.
-  // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
-
-  // First path: create V, W links 
-  double act_path_coeff_1[6] = {
-    ( 1.0/8.0),                 /* one link */
-      0.0,                      /* Naik */
-    (-1.0/8.0)*0.5,             /* simple staple */
-    ( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
-    (-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
-      0.0                       /* Lepage term */
-  };
-
-  // Second path: create X, long links
-  double act_path_coeff_2[6] = {
-    (( 1.0/8.0)+(2.0*6.0/16.0)+(1.0/8.0)),   /* one link */
-        /* One link is 1/8 as in fat7 + 2*3/8 for Lepage + 1/8 for Naik */
-    (-1.0/24.0),                             /* Naik */
-    (-1.0/8.0)*0.5,                          /* simple staple */
-    ( 1.0/8.0)*0.25*0.5,                     /* displace link in two directions */
-    (-1.0/8.0)*0.125*(1.0/6.0),              /* displace link in three directions */
-    (-2.0/16.0)                              /* Lepage term, correct O(a^2) 2x ASQTAD */
-  };
-
-  // Paths for epsilon corrections
-  double act_path_coeff_3[6] = {
-    ( 1.0/8.0),    /* one link b/c of Naik */
-    (-1.0/24.0),   /* Naik */
-      0.0,         /* simple staple */
-      0.0,         /* displace link in two directions */
-      0.0,         /* displace link in three directions */
-      0.0          /* Lepage term */
-  };
-
-  // Tuning run...
-  {
-    printfQuda("Tuning...\n");
-    computeKSLinkQuda(vlink , longlink, wlink, milc_sitelink, act_path_coeff_2, &qudaGaugeParam);
-  }
-
-  struct timeval t0, t1;
-  printfQuda("Running %d iterations of computation\n", niter);
-  gettimeofday(&t0, NULL);
-  for (int n = 0; n < niter; n++) {
-
-    // If we create cudaGaugeField objs, we can do this 100% on the GPU, no copying!
-    // Look at the unitarize test as a (starting) reference
-
-    // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
-    computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_path_coeff_1, &qudaGaugeParam);
-
-    // Create Naiks, 3rd path table set
-    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path_coeff_3, &qudaGaugeParam);
-
-    // Rescale+copy Naiks into Naik field
-    cpu_axy(prec, eps_naik, fatlink, fatlink_eps, V*4*gaugeSiteSize);
-    cpu_axy(prec, eps_naik, longlink, longlink_eps, V*4*gaugeSiteSize);
-
-    // Create X and long links, 2nd path table set
-    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path_coeff_2, &qudaGaugeParam);
-
-    // Add into Naik field
-    cpu_xpy(prec, fatlink, fatlink_eps, V*4*gaugeSiteSize);
-    cpu_xpy(prec, longlink, longlink_eps, V*4*gaugeSiteSize);
-  }
-  gettimeofday(&t1, NULL);
-
-  double secs = TDIFF(t0,t1);
-
-  void* v_reflink[4];
-  void* w_reflink[4];
-  void* w_reflink_ex[4];
-  void* long_reflink[4];
-  void* fat_reflink[4];
-  void* long_reflink_eps[4];
-  void* fat_reflink_eps[4];
+  void* v_reflink[4];         // V link -- fat7 smeared link
+  void* w_reflink[4];         // unitarized V link
+  void* w_reflink_ex[4];      // extended W link
+  void* long_reflink[4];      // Final long link
+  void* fat_reflink[4];       // Final fat link
+  void* long_reflink_eps[4];  // Long link for fermion with non-zero epsilon
+  void* fat_reflink_eps[4];   // Fat link for fermion with non-zero epsilon
   for(int i=0;i < 4;i++){
     v_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
     w_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
@@ -331,6 +353,7 @@ static void hisq_test()
     fat_reflink_eps[i] = safe_malloc(V*gaugeSiteSize*gSize);
   }
 
+  // Copy of V link needed for CPU unitarization routines
   void* v_sitelink = pinned_malloc(4*V*gaugeSiteSize*gSize);
 
 
@@ -342,7 +365,10 @@ static void hisq_test()
     double coeff_dp[6];
     float  coeff_sp[6];
 
-    // Create V links (fat7 links), 1st path table set
+    /////////////////////////////////////////////////////
+    // Create V links (fat7 links), 1st path table set //
+    /////////////////////////////////////////////////////
+
     for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeff_1[i];
     coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
 
@@ -389,14 +415,11 @@ static void hisq_test()
     llfat_reference(v_reflink, sitelink, qudaGaugeParam.cpu_prec, coeff);
 #endif
 
-    // v_reflink can be compared against vlink.
-    double* tmp = (double*)vlink;
-    double* tmp2 = (double*)v_reflink[0];
-    printf("%f %f, %f %f\n", tmp[0], tmp[1], tmp2[0], tmp2[1]);
+    /////////////////////////////////////////
+    // Create W links (unitarized V links) //
+    /////////////////////////////////////////
 
-
-    // Create W links (unitarized V links)
-    // We need to create a few "cpuGaugeField"s for this, and we need a format change...
+    // This is based on "unitarize_link_test.cpp"
 
     // Format change
     if (prec == QUDA_DOUBLE_PRECISION){
@@ -429,9 +452,10 @@ static void hisq_test()
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     cpuGaugeField* cpuWLink = new cpuGaugeField(gParam);
 
+    // unitarize
     unitarizeLinksCPU(*cpuWLink, *cpuVLink);
 
-    // Copy back
+    // Copy back into "w_reflink"
     if (prec == QUDA_DOUBLE_PRECISION){
       double* link = reinterpret_cast<double*>(cpuWLink->Gauge_p());
       for(int dir=0; dir<4; ++dir){
@@ -460,13 +484,10 @@ static void hisq_test()
     delete cpuVLink;
     delete cpuWLink;
 
-    // w_reflink can be compared against wlink.
-    tmp = (double*)wlink;
-    tmp2 = (double*)w_reflink[0];
-    printf("%f %f, %f %f\n", tmp[0], tmp[1], tmp2[0], tmp2[1]);
+    ///////////////////////////////////
+    // Prepare for extended W fields //
+    ///////////////////////////////////
 
-
-    // Create extended W fields.
     for(int i=0; i < V_ex; i++) {
       int sid = i;
       int oddBit=0;
@@ -512,7 +533,10 @@ static void hisq_test()
       }//dir
     }//i
 
-    // Prepare to create Naiks, 3rd table set.
+    ////////////////////////////////////////////
+    // Prepare to create Naiks, 3rd table set //
+    ////////////////////////////////////////////
+
     for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeff_3[i];
     coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
 
@@ -571,7 +595,10 @@ static void hisq_test()
       cpu_axy(prec, eps_naik, long_reflink[i], long_reflink_eps[i], V*gaugeSiteSize);
     }
 
-    // Prepare to create X links and long links, 2nd table set
+    /////////////////////////////////////////////////////////////
+    // Prepare to create X links and long links, 2nd table set //
+    /////////////////////////////////////////////////////////////
+
     for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeff_2[i];
     coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
 
@@ -599,26 +626,12 @@ static void hisq_test()
       cpu_xpy(prec, long_reflink[i], long_reflink_eps[i], V*gaugeSiteSize);
     }
 
-    // Check all the things!
-    tmp = (double*)fatlink;
-    tmp2 = (double*)fat_reflink[0];
-    printf("%f %f, %f %f\n", tmp[0], tmp[1], tmp2[0], tmp2[1]);
-
-    tmp = (double*)fatlink_eps;
-    tmp2 = (double*)fat_reflink_eps[0];
-    printf("%f %f, %f %f\n", tmp[0], tmp[1], tmp2[0], tmp2[1]);
-
-    tmp = (double*)longlink;
-    tmp2 = (double*)long_reflink[0];
-    printf("%f %f, %f %f\n", tmp[0], tmp[1], tmp2[0], tmp2[1]);
-
-    tmp = (double*)longlink_eps;
-    tmp2 = (double*)long_reflink_eps[0];
-    printf("%f %f, %f %f\n", tmp[0], tmp[1], tmp2[0], tmp2[1]);
-
   }//verify_results
 
-  //format change for fatlink, fatlink_eps, longlink, longlink_eps
+  ////////////////////////////////////////////////////////////////////
+  // Layout change for fatlink, fatlink_eps, longlink, longlink_eps //
+  ////////////////////////////////////////////////////////////////////
+
   void* myfatlink [4];
   void* myfatlink_eps [4];
   void* mylonglink [4];
@@ -653,6 +666,10 @@ static void hisq_test()
       memcpy(dst, src, gaugeSiteSize*gSize);
     }
   }
+
+  //////////////////////////////
+  // Perform the verification //
+  //////////////////////////////
 
   if (verify_results) {
     printfQuda("Checking fat links...\n");
@@ -706,8 +723,12 @@ static void hisq_test()
     printfQuda("Long-link eps_naik test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
   }
 
+  // FIXME: does not include unitarization, extra naiks
   int volume = qudaGaugeParam.X[0]*qudaGaugeParam.X[1]*qudaGaugeParam.X[2]*qudaGaugeParam.X[3];
-  long long flops= 61632 * (long long)niter;
+  long long flops = 61632 * (long long)niter; // Constructing V field
+  // Constructing W field?
+  // Constructing separate Naiks
+  flops += 61632 * (long long)niter; // Constructing X field
   flops += (252*4)*(long long)niter; // long-link contribution
 
   double perf = flops*volume/(secs*1024*1024*1024);
@@ -750,6 +771,7 @@ static void hisq_test()
 
   // Clean up GPU compute links
   host_free(vlink);
+  host_free(v_sitelink);
   host_free(wlink);
   host_free(fatlink);
   host_free(longlink);
@@ -796,7 +818,7 @@ int main(int argc, char **argv)
   cpu_prec = prec = QUDA_DOUBLE_PRECISION;
 
   // For now:
-  niter = 2;
+  niter = 100;
 
   for (int i = 1; i < argc; i++){
 
