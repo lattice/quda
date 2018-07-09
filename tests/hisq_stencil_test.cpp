@@ -35,6 +35,12 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern int niter;
 
+// relativistic correction for naik term
+extern double eps_naik;
+// Number of naiks. If eps_naik is 0.0, we only need
+// to construct one naik.
+static int n_naiks = 1;
+
 static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
@@ -43,11 +49,6 @@ static size_t gSize;
 // The file "generic_ks/fermion_links_hisq_load_milc.c" 
 // within MILC is the ultimate reference for what's going on here.
 
-// HISQ specific: how many Naiks?
-// Can be set to 1 for the case where there's no epsilon correction
-const int n_naiks = 2;
-const double eps_naik = -0.1;
-
 // Unitarization coefficients
 static double unitarize_eps  = 1e-6;
 static bool reunit_allow_svd = true;
@@ -55,6 +56,8 @@ static bool reunit_svd_only  = false;
 static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
+
+
 
 // CPU-style BLAS routines
 void cpu_axy(QudaPrecision prec, double a, void* x, void* y, int size)
@@ -172,7 +175,7 @@ static void hisq_test()
     (-2.0/16.0)                              /* Lepage term, correct O(a^2) 2x ASQTAD */
   };
 
-  // Paths for epsilon corrections
+  // Paths for epsilon corrections. Not used if n_naiks = 1.
   double act_path_coeff_3[6] = {
     ( 1.0/8.0),    /* one link b/c of Naik */
     (-1.0/24.0),   /* Naik */
@@ -236,9 +239,12 @@ static void hisq_test()
   void* longlink = pinned_malloc(4*V*gaugeSiteSize*gSize); // final long links
 
   // Place to accumulate Naiks
-  void* fatlink_eps = pinned_malloc(4*V*gaugeSiteSize*gSize); // final fat ("X") links
-  void* longlink_eps = pinned_malloc(4*V*gaugeSiteSize*gSize); // final long links
-
+  void* fatlink_eps = nullptr;
+  void* longlink_eps = nullptr;
+  if (n_naiks > 1) {
+    fatlink_eps = pinned_malloc(4*V*gaugeSiteSize*gSize); // epsilon fat links
+    longlink_eps = pinned_malloc(4*V*gaugeSiteSize*gSize); // epsilon long naiks
+  }
   
   // Tuning run...
   {
@@ -256,19 +262,26 @@ static void hisq_test()
     // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
     computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_path_coeff_1, &qudaGaugeParam);
 
-    // Create Naiks, 3rd path table set
-    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path_coeff_3, &qudaGaugeParam);
+    if (n_naiks > 1) {
+      // Create Naiks, 3rd path table set
+      computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path_coeff_3, &qudaGaugeParam);
 
-    // Rescale+copy Naiks into Naik field
-    cpu_axy(prec, eps_naik, fatlink, fatlink_eps, V*4*gaugeSiteSize);
-    cpu_axy(prec, eps_naik, longlink, longlink_eps, V*4*gaugeSiteSize);
+      // Rescale+copy Naiks into Naik field
+      cpu_axy(prec, eps_naik, fatlink, fatlink_eps, V*4*gaugeSiteSize);
+      cpu_axy(prec, eps_naik, longlink, longlink_eps, V*4*gaugeSiteSize);
+    } else {
+      memset(fatlink, 0, V*4*gaugeSiteSize*gSize);
+      memset(longlink, 0, V*4*gaugeSiteSize*gSize);
+    }
 
     // Create X and long links, 2nd path table set
     computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path_coeff_2, &qudaGaugeParam);
 
-    // Add into Naik field
-    cpu_xpy(prec, fatlink, fatlink_eps, V*4*gaugeSiteSize);
-    cpu_xpy(prec, longlink, longlink_eps, V*4*gaugeSiteSize);
+    if (n_naiks > 1) {
+      // Add into Naik field
+      cpu_xpy(prec, fatlink, fatlink_eps, V*4*gaugeSiteSize);
+      cpu_xpy(prec, longlink, longlink_eps, V*4*gaugeSiteSize);
+    }
   }
   gettimeofday(&t1, NULL);
 
@@ -349,8 +362,10 @@ static void hisq_test()
     w_reflink_ex[i] = safe_malloc(V_ex*gaugeSiteSize*gSize);
     long_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
     fat_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    long_reflink_eps[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    fat_reflink_eps[i] = safe_malloc(V*gaugeSiteSize*gSize);
+    if (n_naiks > 1) {
+      long_reflink_eps[i] = safe_malloc(V*gaugeSiteSize*gSize);
+      fat_reflink_eps[i] = safe_malloc(V*gaugeSiteSize*gSize);
+    }
   }
 
   // Copy of V link needed for CPU unitarization routines
@@ -533,12 +548,9 @@ static void hisq_test()
       }//dir
     }//i
 
-    ////////////////////////////////////////////
-    // Prepare to create Naiks, 3rd table set //
-    ////////////////////////////////////////////
-
-    for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeff_3[i];
-    coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
+    //////////////////////////////
+    // Create extended W fields //
+    //////////////////////////////
 
 #ifdef MULTI_GPU
     optflag = 0;
@@ -575,24 +587,37 @@ static void hisq_test()
 
       }
     }
-
-    exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
-    llfat_reference_mg(fat_reflink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
-  
-    {
-      int R[4] = {2,2,2,2};
-      exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
-      computeLongLinkCPU(long_reflink, w_reflink_ex, qudaGaugeParam.cpu_prec, coeff);
-    }
-#else
-    llfat_reference(fat_reflink, w_reflink, qudaGaugeParam.cpu_prec, coeff);
-    computeLongLinkCPU(long_reflink, w_reflink, qudaGaugeParam.cpu_prec, coeff);
 #endif
 
-    // Rescale fat and long links into eps links
-    for (int i = 0; i < 4; i++) {
-      cpu_axy(prec, eps_naik, fat_reflink[i], fat_reflink_eps[i], V*gaugeSiteSize);
-      cpu_axy(prec, eps_naik, long_reflink[i], long_reflink_eps[i], V*gaugeSiteSize);
+    ////////////////////////////////////////////
+    // Prepare to create Naiks, 3rd table set //
+    ////////////////////////////////////////////
+
+    if (n_naiks > 1) {
+
+      for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeff_3[i];
+      coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
+
+  #ifdef MULTI_GPU
+
+      exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
+      llfat_reference_mg(fat_reflink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
+    
+      {
+        int R[4] = {2,2,2,2};
+        exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
+        computeLongLinkCPU(long_reflink, w_reflink_ex, qudaGaugeParam.cpu_prec, coeff);
+      }
+  #else
+      llfat_reference(fat_reflink, w_reflink, qudaGaugeParam.cpu_prec, coeff);
+      computeLongLinkCPU(long_reflink, w_reflink, qudaGaugeParam.cpu_prec, coeff);
+  #endif
+
+      // Rescale fat and long links into eps links
+      for (int i = 0; i < 4; i++) {
+        cpu_axy(prec, eps_naik, fat_reflink[i], fat_reflink_eps[i], V*gaugeSiteSize);
+        cpu_axy(prec, eps_naik, long_reflink[i], long_reflink_eps[i], V*gaugeSiteSize);
+      }
     }
 
     /////////////////////////////////////////////////////////////
@@ -620,10 +645,12 @@ static void hisq_test()
     computeLongLinkCPU(long_reflink, w_reflink, qudaGaugeParam.cpu_prec, coeff);
 #endif
 
-    // Accumulate into eps links.
-    for (int i = 0; i < 4; i++) {
-      cpu_xpy(prec, fat_reflink[i], fat_reflink_eps[i], V*gaugeSiteSize);
-      cpu_xpy(prec, long_reflink[i], long_reflink_eps[i], V*gaugeSiteSize);
+    if (n_naiks > 1) {
+      // Accumulate into eps links.
+      for (int i = 0; i < 4; i++) {
+        cpu_xpy(prec, fat_reflink[i], fat_reflink_eps[i], V*gaugeSiteSize);
+        cpu_xpy(prec, long_reflink[i], long_reflink_eps[i], V*gaugeSiteSize);
+      }
     }
 
   }//verify_results
@@ -633,18 +660,22 @@ static void hisq_test()
   ////////////////////////////////////////////////////////////////////
 
   void* myfatlink [4];
-  void* myfatlink_eps [4];
   void* mylonglink [4];
+  void* myfatlink_eps [4];
   void* mylonglink_eps [4];
-  for(int i=0; i < 4; i++){
+  for(int i=0; i < 4; i++) {
+
     myfatlink [i] = safe_malloc(V*gaugeSiteSize*gSize);
-    myfatlink_eps [i] = safe_malloc(V*gaugeSiteSize*gSize);
     mylonglink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    mylonglink_eps[i] = safe_malloc(V*gaugeSiteSize*gSize);
     memset(myfatlink [i], 0, V*gaugeSiteSize*gSize);
-    memset(myfatlink_eps [i], 0, V*gaugeSiteSize*gSize);
     memset(mylonglink[i], 0, V*gaugeSiteSize*gSize);
-    memset(mylonglink_eps[i], 0, V*gaugeSiteSize*gSize);
+    
+    if (n_naiks > 1) {
+      myfatlink_eps [i] = safe_malloc(V*gaugeSiteSize*gSize);
+      mylonglink_eps[i] = safe_malloc(V*gaugeSiteSize*gSize);
+      memset(myfatlink_eps [i], 0, V*gaugeSiteSize*gSize);
+      memset(mylonglink_eps[i], 0, V*gaugeSiteSize*gSize);
+    }
   }
 
   for(int i=0; i < V; i++){
@@ -653,17 +684,19 @@ static void hisq_test()
       char* dst = ((char*)myfatlink [dir]) + i*gaugeSiteSize*gSize;
       memcpy(dst, src, gaugeSiteSize*gSize);
 
-      src = ((char*)fatlink_eps )+ (4*i+dir)*gaugeSiteSize*gSize;
-      dst = ((char*)myfatlink_eps [dir]) + i*gaugeSiteSize*gSize;
-      memcpy(dst, src, gaugeSiteSize*gSize);
-
       src = ((char*)longlink)+ (4*i+dir)*gaugeSiteSize*gSize;
       dst = ((char*)mylonglink[dir]) + i*gaugeSiteSize*gSize;
       memcpy(dst, src, gaugeSiteSize*gSize);
 
-      src = ((char*)longlink_eps)+ (4*i+dir)*gaugeSiteSize*gSize;
-      dst = ((char*)mylonglink_eps[dir]) + i*gaugeSiteSize*gSize;
-      memcpy(dst, src, gaugeSiteSize*gSize);
+      if (n_naiks > 1) {
+        src = ((char*)fatlink_eps )+ (4*i+dir)*gaugeSiteSize*gSize;
+        dst = ((char*)myfatlink_eps [dir]) + i*gaugeSiteSize*gSize;
+        memcpy(dst, src, gaugeSiteSize*gSize);
+
+        src = ((char*)longlink_eps)+ (4*i+dir)*gaugeSiteSize*gSize;
+        dst = ((char*)mylonglink_eps[dir]) + i*gaugeSiteSize*gSize;
+        memcpy(dst, src, gaugeSiteSize*gSize);
+      }
     }
   }
 
@@ -685,18 +718,6 @@ static void hisq_test()
     printfQuda("Fat-link test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
 
 
-    printfQuda("Checking fat eps_naik links...\n");
-    res=1;
-    for(int dir=0; dir<4; dir++){
-      res &= compare_floats(fat_reflink_eps[dir], myfatlink_eps [dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
-    }
-    
-    strong_check_link(myfatlink_eps , "GPU results: ",
-          fat_reflink_eps, "CPU reference results:",
-          V, qudaGaugeParam.cpu_prec);
-    
-    printfQuda("Fat-link eps_naik test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
-
 
     printfQuda("Checking long links...\n");
     res = 1;
@@ -710,17 +731,33 @@ static void hisq_test()
       
     printfQuda("Long-link test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
 
-    printfQuda("Checking long eps_naik links...\n");
-    res = 1;
-    for(int dir=0; dir<4; ++dir){
-      res &= compare_floats(long_reflink_eps[dir], mylonglink_eps[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
+    if (n_naiks > 1) {
+
+      printfQuda("Checking fat eps_naik links...\n");
+      res=1;
+      for(int dir=0; dir<4; dir++){
+        res &= compare_floats(fat_reflink_eps[dir], myfatlink_eps [dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
+      }
+      
+      strong_check_link(myfatlink_eps , "GPU results: ",
+            fat_reflink_eps, "CPU reference results:",
+            V, qudaGaugeParam.cpu_prec);
+      
+      printfQuda("Fat-link eps_naik test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
+
+
+      printfQuda("Checking long eps_naik links...\n");
+      res = 1;
+      for(int dir=0; dir<4; ++dir){
+        res &= compare_floats(long_reflink_eps[dir], mylonglink_eps[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
+      }
+        
+      strong_check_link(mylonglink_eps, "GPU results: ",
+            long_reflink_eps, "CPU reference results:",
+            V, qudaGaugeParam.cpu_prec);
+        
+      printfQuda("Long-link eps_naik test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
     }
-      
-    strong_check_link(mylonglink_eps, "GPU results: ",
-          long_reflink_eps, "CPU reference results:",
-          V, qudaGaugeParam.cpu_prec);
-      
-    printfQuda("Long-link eps_naik test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
   }
 
   // FIXME: does not include unitarization, extra naiks
@@ -736,9 +773,11 @@ static void hisq_test()
 
   for (int i=0; i < 4; i++) {
     host_free(myfatlink [i]);
-    host_free(myfatlink_eps [i]);
     host_free(mylonglink[i]);
-    host_free(mylonglink_eps[i]);
+    if (n_naiks > 1) {
+      host_free(myfatlink_eps [i]);
+      host_free(mylonglink_eps[i]);
+    }
   }
 
 #ifdef MULTI_GPU
@@ -765,8 +804,10 @@ static void hisq_test()
     host_free(fat_reflink[i]);
     host_free(long_reflink[i]);
 
-    host_free(fat_reflink_eps[i]);
-    host_free(long_reflink_eps[i]);
+    if (n_naiks > 1) {
+      host_free(fat_reflink_eps[i]);
+      host_free(long_reflink_eps[i]);
+    }
   }
 
   // Clean up GPU compute links
@@ -775,8 +816,11 @@ static void hisq_test()
   host_free(wlink);
   host_free(fatlink);
   host_free(longlink);
-  host_free(fatlink_eps);
-  host_free(longlink_eps);
+  
+  if (n_naiks > 1) {
+    host_free(fatlink_eps);
+    host_free(longlink_eps);
+  }
 
   if(milc_sitelink) host_free(milc_sitelink);
 #ifdef MULTI_GPU
@@ -828,6 +872,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
+
+  if (eps_naik != 0.0) { n_naiks = 2; }
 
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
