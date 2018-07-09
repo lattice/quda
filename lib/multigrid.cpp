@@ -202,6 +202,7 @@ namespace quda {
 
     param_presmooth->is_preconditioner = false;
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
+    param_presmooth->return_residual = true; // pre-smoother returns the residual vector for subsequent coarsening
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
 
     param_presmooth->precision = param.mg_global.invert_param->cuda_prec_sloppy;
@@ -233,6 +234,7 @@ namespace quda {
       if (postsmoother) delete postsmoother;
       if (param_postsmooth) delete param_postsmooth;
       param_postsmooth = new SolverParam(*param_presmooth);
+      param_postsmooth->return_residual = false;  // post smoother does not need to return the residual vector
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
       param_postsmooth->maxiter = param.nu_post;
@@ -322,7 +324,8 @@ namespace quda {
       param_coarse_solver->is_preconditioner = false;
       param_coarse_solver->sloppy_converge = true; // this means we don't check the true residual before declaring convergence
 
-      param_coarse_solver->preserve_source = QUDA_PRESERVE_SOURCE_YES;  // or can this be no
+      param_coarse_solver->preserve_source = QUDA_PRESERVE_SOURCE_NO;  // or can this be no
+      param_coarse_solver->return_residual = false; // coarse solver does need to return residual vector
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
       param_coarse_solver->Nkrylov = 20;
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];

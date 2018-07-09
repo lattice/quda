@@ -21,10 +21,13 @@ namespace quda {
 
     if (init) {
       if (alpha) delete []alpha;
+      bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
+                         param.precision == param.precision_sloppy &&
+                         param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
       if (basis == POWER_BASIS) {
-        for (int i=0; i<param.Nkrylov+1; i++) delete p[i];
+        for (int i=0; i<param.Nkrylov+1; i++) if (i>0 || !use_source) delete p[i];
       } else {
-        for (int i=0; i<param.Nkrylov; i++) delete p[i];
+        for (int i=0; i<param.Nkrylov; i++) if (i>0 || !use_source) delete p[i];
         for (int i=0; i<param.Nkrylov; i++) delete q[i];
       }
       if (tmp_sloppy) delete tmp_sloppy;
@@ -35,7 +38,7 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void CAGCR::create(const ColorSpinorField &meta)
+  void CAGCR::create(ColorSpinorField &b)
   {
     if (!init) {
       if (!param.is_preconditioner) {
@@ -46,12 +49,14 @@ namespace quda {
       alpha = new Complex[param.Nkrylov];
 
       bool mixed = param.precision != param.precision_sloppy;
+      bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO && !mixed &&
+                         param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
 
-      ColorSpinorParam csParam(meta);
+      ColorSpinorParam csParam(b);
       csParam.create = QUDA_NULL_FIELD_CREATE;
 
       // Source needs to be preserved if we're computing the true residual
-      rp = mixed ? ColorSpinorField::Create(csParam) : nullptr;
+      rp = (mixed && !use_source) ? ColorSpinorField::Create(csParam) : nullptr;
       tmpp = ColorSpinorField::Create(csParam);
 
       // now allocate sloppy fields
@@ -62,14 +67,14 @@ namespace quda {
         p.resize(param.Nkrylov+1);
         q.resize(param.Nkrylov);
         for (int i=0; i<param.Nkrylov+1; i++) {
-          p[i] = ColorSpinorField::Create(csParam);
+          p[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
           if (i>0) q[i-1] = p[i];
         }
       } else {
         p.resize(param.Nkrylov);
         q.resize(param.Nkrylov);
         for (int i=0; i<param.Nkrylov; i++) {
-          p[i] = ColorSpinorField::Create(csParam);
+          p[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
           q[i] = ColorSpinorField::Create(csParam);
         }
       }
@@ -135,13 +140,8 @@ namespace quda {
     }
 
     // use partial pivoted LU since this seems plenty stable
-#if 1
     PartialPivLU<matrix> lu(A);
     psi = lu.solve(phi);
-#else
-    JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
-    psi = svd.solve(phi);
-#endif
 
     for (int i=0; i<N; i++) psi_[i] = psi(i);
 
@@ -169,13 +169,14 @@ namespace quda {
     const int nKrylov = param.Nkrylov;
 
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
+    if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES) errorQuda("Cannot preserve source and return the residual");
 
     if (param.maxiter == 0 || nKrylov == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
     }
 
-    create(x);
+    create(b);
 
     ColorSpinorField &r = rp ? *rp : *p[0];
     ColorSpinorField &tmp = *tmpp;
@@ -264,11 +265,15 @@ namespace quda {
       for (int i=0; i<nKrylov; i++) P.push_back(p[i]);
       blas::caxpy(alpha, P, X);
 
-      // update the residual vector
-      std::vector<ColorSpinorField*> R;
-      R.push_back(p[0]);
-      for (int i=0; i<nKrylov; i++) alpha[i] = -alpha[i];
-      blas::caxpy(alpha, q, R);
+      // no need to compute residual vector if not returning
+      // residual vector and only doing a single fixed iteration
+      if (!fixed_iteration || param.return_residual) {
+        // update the residual vector
+        std::vector<ColorSpinorField*> R;
+        R.push_back(p[0]);
+        for (int i=0; i<nKrylov; i++) alpha[i] = -alpha[i];
+        blas::caxpy(alpha, q, R);
+      }
 
       total_iter+=nKrylov;
       if ( !fixed_iteration || getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -305,7 +310,7 @@ namespace quda {
 	  restart++; // restarting if residual is still too great
 
 	  PrintStats("CA-GCR (restart)", restart, r2, b2, heavy_quark_res);
-	  blas::copy(*p[0], r);
+          blas::copy(*p[0], r);
 
 	  r2_old = r2;
 
@@ -329,9 +334,9 @@ namespace quda {
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       param.true_res_hq = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
-      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
+      if (param.return_residual) blas::copy(b, r);
     } else {
-      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, *p[0]);
+      if (param.return_residual) blas::copy(b, *p[0]);
     }
 
     if (!param.is_preconditioner) {
