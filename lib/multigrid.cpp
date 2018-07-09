@@ -225,7 +225,8 @@ namespace quda {
     // inner solver should recompute the true residual after each cycle if using Schwarz preconditioning
     param_presmooth->compute_true_res = (param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) ? true : false;
 
-    presmoother = ( (param.level < param.Nlevel-1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) && param_presmooth->inv_type != QUDA_INVALID_INVERTER) ?
+    presmoother = ( (param.level < param.Nlevel-1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) &&
+                    param_presmooth->inv_type != QUDA_INVALID_INVERTER && param_presmooth->maxiter > 0) ?
       Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
@@ -241,7 +242,7 @@ namespace quda {
       // we never need to compute the true residual for a post smoother
       param_postsmooth->compute_true_res = false;
 
-      postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER) ?
+      postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER && param_postsmooth->maxiter > 0) ?
 	Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother done\n");
@@ -670,7 +671,7 @@ namespace quda {
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) *b_tilde = *in;
       else b_tilde = &b;
 
-      (*presmoother)(*out, *in);
+      if (presmoother) (*presmoother)(*out, *in); else zero(*out);
 
       ColorSpinorField &solution = inner_solution_type == outer_solution_type ? x : x.Even();
       diracSmoother->reconstruct(solution, b, inner_solution_type);
@@ -711,6 +712,7 @@ namespace quda {
         transfer->P(x_coarse_2_fine, *x_coarse); // repurpose residual storage
 
         xpy(x_coarse_2_fine, solution); // sum to solution FIXME - sum should be done inside the transfer operator
+
         if ( debug ) {
           printfQuda("Prolongated coarse solution y2 = %e\n", norm2(*r));
           printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
@@ -730,7 +732,7 @@ namespace quda {
       // we should keep a copy of the prepared right hand side as we've already destroyed it
       //dirac.prepare(in, out, solution, residual, inner_solution_type);
 
-      (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
+      if (postsmoother) (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
 
       diracSmoother->reconstruct(x, b, outer_solution_type);
 
@@ -740,7 +742,7 @@ namespace quda {
 
       diracSmoother->prepare(in, out, x, b, outer_solution_type);
 
-      (*presmoother)(*out, *in);
+      if (presmoother) (*presmoother)(*out, *in);
       diracSmoother->reconstruct(x, b, outer_solution_type);
     }
 
