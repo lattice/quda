@@ -847,6 +847,8 @@ static void display_test_info()
       dimPartitioned(2),
       dimPartitioned(3));
 
+  printfQuda("Number of Naiks: %d\n", n_naiks);
+
   return ;
 
 }
@@ -860,9 +862,6 @@ int main(int argc, char **argv)
   //default to 18 reconstruct
   link_recon = QUDA_RECONSTRUCT_NO;
   cpu_prec = prec = QUDA_DOUBLE_PRECISION;
-
-  // For now:
-  niter = 100;
 
   for (int i = 1; i < argc; i++){
 
