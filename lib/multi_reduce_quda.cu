@@ -518,7 +518,14 @@ namespace quda {
 		(result, x, y, z, w, 0, 0, hermitian, tile_size);
 	    }
 
-	  }
+            // also test case using a single kernel if both dimensions
+            // are less than MAX_MULTI_BLAS_N
+            if (x.size() <= MAX_MULTI_BLAS_N && y.size() <= MAX_MULTI_BLAS_N) {
+	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+		(result, x, y, z, w, 0, 0, hermitian, MAX_MULTI_BLAS_N);
+            }
+
+          }
 
       	  enableProfileCount();
       	  setPolicyTuning(true);
@@ -554,12 +561,17 @@ namespace quda {
 
 	} else { // 2-d reduction
 
-	  param.aux.x *= 2; // only tune powers of two (FIXME)
-
-	  if ( (unsigned int)param.aux.x <= max_tile_size && param.aux.x <= (int)x.size() &&
-	       param.aux.x <= (int)y.size() ) {
+	  if ( (unsigned int)(2*param.aux.x) <= max_tile_size &&
+               (unsigned int)(2*param.aux.x) <= x.size() &&
+	       (unsigned int)(2*param.aux.x) <= y.size() ) {
+            param.aux.x *= 2; // only tune powers of two
 	    return true;
-	  } else {
+	  } else if (x.size() <= MAX_MULTI_BLAS_N && y.size() <= MAX_MULTI_BLAS_N && param.aux.x < MAX_MULTI_BLAS_N) {
+            // we've run out of power of two tiles to try, but before
+            // we finish, try a single kernel if it fits
+            param.aux.x = MAX_MULTI_BLAS_N;
+            return true;
+          } else {
 	    param.aux.x = 1; // reset to the beginning (which we'd need for multi-dimensional tuning)
 	    return false;
 	  }
