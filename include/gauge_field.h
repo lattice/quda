@@ -108,9 +108,9 @@ namespace quda {
        field order for QUDA internal fields.
        @param precision The precision to use 
      */
-    void setPrecision(QudaPrecision precision) {
+    void setPrecision(QudaPrecision precision, bool force_native=false) {
       // is the current status in native field order?
-      bool native = false;
+      bool native = force_native ? true : false;
       if (precision == QUDA_DOUBLE_PRECISION) {
 	if (order  == QUDA_FLOAT2_GAUGE_ORDER) native = true;
       } else if (precision == QUDA_SINGLE_PRECISION ||
