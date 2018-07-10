@@ -1,6 +1,5 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
-
 #include <Eigen/Dense>
 
 namespace quda {
@@ -140,8 +139,8 @@ namespace quda {
     }
 
     // use partial pivoted LU since this seems plenty stable
-    PartialPivLU<matrix> lu(A);
-    psi = lu.solve(phi);
+    LDLT<matrix> cholesky(A);
+    psi = cholesky.solve(phi);
 
     for (int i=0; i<N; i++) psi_[i] = psi(i);
 

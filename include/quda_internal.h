@@ -193,6 +193,7 @@ namespace quda {
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
     QUDA_PROFILE_IO, /**< time spent on file i/o */
+    QUDA_PROFILE_CHRONO, /**< time spent on chronology */
     QUDA_PROFILE_EIGEN, /**< time spent on host-side Eigen */
 
     // lower level counters used in the dslash and api profiling
@@ -334,6 +335,8 @@ namespace quda {
     }
 
     static void PrintGlobal();
+
+    bool isRunning(QudaProfileType idx) { return profile[idx].running; }
 
   };
 

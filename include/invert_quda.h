@@ -872,6 +872,17 @@ namespace quda {
     bool hermitian; //! whether A is hermitian ot not
     TimeProfile &profile;
 
+    /**
+       @brief Solve the equation A p_k psi_k = q_k psi_k = b by minimizing the
+       residual and using Eigen's SVD algorithm for numerical stability
+       @param[out] psi Array of coefficients
+       @param[in] p Search direction vectors
+       @param[in] q Search direction vectors with the operator applied
+       @param[in] hermitian Whether the linear system is Hermitian or not
+    */
+    void solve(Complex *psi_, std::vector<ColorSpinorField*> &p,
+               std::vector<ColorSpinorField*> &q, ColorSpinorField &b, bool hermitian);
+
   public:
     /**
        @param mat The operator for the linear system we wish to solve
