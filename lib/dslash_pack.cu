@@ -938,7 +938,8 @@ namespace quda {
     unsigned int minThreads() const { return threads(); }
 
     void fillAux() {
-      strcpy(aux, in->AuxString());
+      strcpy(aux,"policy_kernel,");
+      strcat(aux, in->AuxString());
       char comm[5];
       comm[0] = (commDim[0] ? '1' : '0');
       comm[1] = (commDim[1] ? '1' : '0');

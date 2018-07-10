@@ -303,7 +303,10 @@ public:
     strcpy(name, num_to_string<NXZ>::value);
     strcat(name, std::to_string(NYW).c_str());
     strcat(name, typeid(arg.r).name());
-    return TuneKey(blasStrings.vol_str, name, blasStrings.aux_tmp);
+    char aux[TuneKey::aux_n];
+    strcpy(aux, "policy_kernel,");
+    strcat(aux,blasStrings.aux_tmp);
+    return TuneKey(blasStrings.vol_str, name, aux);
   }
 
   void apply(const cudaStream_t &stream){

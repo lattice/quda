@@ -597,6 +597,12 @@ void comm_dim_partitioned_set(int dim)
 #endif
 }
 
+void comm_dim_partitioned_reset(){
+  for (int i=0; i<QUDA_MAX_DIM; i++)
+   manual_set_partition[i] = 0;
+   
+}
+
 
 int comm_dim_partitioned(int dim)
 {
@@ -678,6 +684,8 @@ int commCoords(int dir) { return comm_coord(dir); }
 int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
 
 void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
+
+void commDimPartitionedReset(){ comm_dim_partitioned_reset();}
 
 bool commGlobalReduction() { return globalReduce; }
 
