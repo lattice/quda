@@ -22,7 +22,7 @@ endif()
 
 #define tests
 
-if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_DOMAIN_WALL)
+if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_MASS OR QUDA_DIRAC_DOMAIN_WALL)
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   cuda_add_executable(dslash_ctest dslash_ctest.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )
@@ -42,9 +42,9 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
 endif()
 
 if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_DOMAIN_WALL OR QUDA_DIRAC_STAGGERED)
-    cuda_add_executable(deflated_invert_test deflated_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
-    target_link_libraries(deflated_invert_test ${TEST_LIBS})
-    QUDA_CHECKBUILDTEST(deflated_invert_test QUDA_BUILD_ALL_TESTS)
+  cuda_add_executable(deflated_invert_test deflated_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+  target_link_libraries(deflated_invert_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(deflated_invert_test QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
@@ -79,7 +79,7 @@ if(QUDA_MULTIGRID)
     cuda_add_executable(multigrid_evolve_test multigrid_evolve_test.cpp wilson_dslash_reference.cpp clover_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
     target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
     QUDA_CHECKBUILDTEST(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
-endif()
+  endif()
 
 endif()
 
@@ -145,19 +145,24 @@ add_test(NAME blas_test_full COMMAND blas_test --sdim 16 --tdim 16 --solve-type 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
   set(DSLASH_POLICIES 0 1 6 7 8 9 10 11 -1)
+  if(DEFINED ENV{QUDA_ENABLE_GDR})
+    if($ENV{QUDA_ENABLE_GDR} EQUAL 1)
+      set(DSLASH_POLICIES 0 1 2 3 4 5 6 7 8 9 10 11 -1)
+    endif()
+  endif()
 else()
   set(DSLASH_POLICIES -1)
 endif()
 
 foreach(pol IN LISTS DSLASH_POLICIES)
 
-if(${pol} LESS 0)
-  set(pol2 "tune")
-  set(polenv OFF)
-else()
-  set(pol2 ${pol})
-  set(polenv ON)
-endif()
+  if(${pol} LESS 0)
+    set(pol2 "tune")
+    set(polenv OFF)
+  else()
+    set(pol2 ${pol})
+    set(polenv ON)
+  endif()
 
   if(QUDA_DIRAC_WILSON)
     add_test(NAME dslash_wilson-policy${pol2} COMMAND dslash_ctest --dslash-type wilson --test 3 --xdim 6 --ydim 8 --zdim 12 --tdim 16 --gtest_output=xml:dslash_wilson_test_pol${pol2}.xml)
