@@ -118,6 +118,10 @@ if(QUDA_LINK_HISQ)
   cuda_add_executable(unitarize_link_test unitarize_link_test.cpp)
   target_link_libraries(unitarize_link_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(unitarize_link_test QUDA_BUILD_ALL_TESTS)
+
+  cuda_add_executable(hisq_stencil_test hisq_stencil_test.cpp llfat_reference.cpp)
+  target_link_libraries(hisq_stencil_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(hisq_stencil_test QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_FORCE_GAUGE)

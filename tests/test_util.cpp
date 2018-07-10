@@ -1638,6 +1638,7 @@ double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
 double anisotropy = 1.0;
+double eps_naik = 0.0;
 double clover_coeff = 0.1;
 bool compute_clover = false;
 double tol = 1e-7;
@@ -1759,6 +1760,7 @@ void usage(char** argv )
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
+  printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
   printf("    --clover-coeff                            # Clover coefficient (default 1.0)\n");
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
@@ -2365,6 +2367,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mu = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--epsilon-naik") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eps_naik = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;
