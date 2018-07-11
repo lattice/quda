@@ -57,7 +57,6 @@ namespace quda {
 
     createV(B[0]->Location()); // allocate V field
     createTmp(QUDA_CPU_FIELD_LOCATION); // allocate temporaries
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) createTmp(QUDA_CUDA_FIELD_LOCATION);
 
     // allocate and compute the fine-to-coarse and coarse-to-fine site maps
     fine_to_coarse_h = static_cast<int*>(pool_pinned_malloc(B[0]->Volume()*sizeof(int)));
@@ -117,6 +116,7 @@ namespace quda {
     param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
+      if (fine_tmp_d && coarse_tmp_d) return;
       fine_tmp_d = ColorSpinorField::Create(param);
       coarse_tmp_d = fine_tmp_d->CreateCoarse(geo_bs, spin_bs, Nvec);
     } else {
@@ -128,6 +128,9 @@ namespace quda {
   void Transfer::initializeLazy(QudaFieldLocation location) const
   {
     if (!enable_cpu && !enable_gpu) errorQuda("Neither CPU or GPU coarse fields initialized");
+
+    // delayed allocating this temporary until we need it
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) createTmp(QUDA_CUDA_FIELD_LOCATION);
 
     switch (location) {
     case QUDA_CUDA_FIELD_LOCATION:
