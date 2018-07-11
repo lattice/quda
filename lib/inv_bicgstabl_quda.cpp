@@ -34,7 +34,7 @@ namespace quda {
     {
       tau[begin+k][j] = Tau[k]/sigma[begin+k];
     }
-
+    delete []Tau;
   }
   
   void BiCGstabL::updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j)

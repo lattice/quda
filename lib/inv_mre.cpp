@@ -53,6 +53,8 @@ namespace quda {
       }
     }
 
+    delete []A_;
+
     profile.TPSTOP(QUDA_PROFILE_CHRONO);
     profile.TPSTART(QUDA_PROFILE_EIGEN);
 
