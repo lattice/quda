@@ -10,6 +10,7 @@
 #include <map>
 #include <list>
 #include <unistd.h>
+#include <uint_to_char.h>
 
 #include <deque>
 #include <queue>
@@ -70,19 +71,39 @@ namespace quda {
 
   // linked list that is augmented each time we call a kernel
   static std::list<TraceKey> trace_list;
-  static bool enable_trace = false;
+  static int enable_trace = 0;
 
-  bool traceEnabled() {
+  int traceEnabled() {
     static bool init = false;
 
     if (!init) {
       char *enable_trace_env = getenv("QUDA_ENABLE_TRACE");
-      if (enable_trace_env && strcmp(enable_trace_env, "1") == 0) {
-        enable_trace = true;
+      if (enable_trace_env) {
+        if (strcmp(enable_trace_env, "1") == 0) {
+          // only explicitly posted trace events are included
+          enable_trace = 1;
+        } else if (strcmp(enable_trace_env, "2") == 0) {
+          // enable full kernel trace and posted trace events
+          enable_trace = 2;
+        }
       }
       init = true;
     }
     return enable_trace;
+  }
+
+  void postTrace_(const char *func, const char *file, int line) {
+    if (traceEnabled() >= 1) {
+      char aux[TuneKey::aux_n];
+      strcpy(aux,file);
+      strcat(aux,":");
+      char tmp[TuneKey::aux_n];
+      i32toa(tmp,line);
+      strcat(aux,tmp);
+      TuneKey key("", func, aux);
+      TraceKey trace_entry(key, 0.0);
+      trace_list.push_back(trace_entry);
+    }
   }
 
   static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
@@ -660,7 +681,7 @@ namespace quda {
       launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
 #endif
 
-      if (traceEnabled()) {
+      if (traceEnabled() >= 2) {
         TraceKey trace_entry(key, param.time);
         trace_list.push_back(trace_entry);
       }
@@ -778,7 +799,7 @@ namespace quda {
       }
       param = tunecache[key]; // read this now for all processes
 
-      if (traceEnabled()) {
+      if (traceEnabled() >= 2) {
         TraceKey trace_entry(key, param.time);
         trace_list.push_back(trace_entry);
       }

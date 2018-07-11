@@ -479,6 +479,13 @@ namespace quda {
 
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
+  /**
+   * @brief Post an event in the trace, recording where it was posted
+   */
+  void postTrace_(const char *func, const char *file, int line);
+
 } // namespace quda
+
+#define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)
 
 #endif // _TUNE_QUDA_H
