@@ -1,6 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <limits>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>

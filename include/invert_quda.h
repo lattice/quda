@@ -428,8 +428,14 @@ namespace quda {
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in){
+      (*this)(out, in, nullptr, 0.0);
+    };
+    void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *pin, double r2_old_in);
     void solve(ColorSpinorField& out, ColorSpinorField& in);
+    // void refine(ColorSpinorField& out, ColorSpinorField& in, ColorSpinorField *pin, double r2_old_in){
+    //   *this(out, in, pin, r2_old_in);
+    // };
   };
 
 
