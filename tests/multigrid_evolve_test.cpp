@@ -729,6 +729,7 @@ int main(int argc, char **argv)
     inv_param2.chrono_make_resident = true;
     inv_param2.chrono_index = 0 ;
     inv_param2.chrono_max_dim = 7;
+    inv_param2.chrono_precision = inv_param2.cuda_prec_sloppy; // use sloppy precision for chrono basis
     inv_param2.use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
     invertQuda(spinorOut, spinorIn, &inv_param2);

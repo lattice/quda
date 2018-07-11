@@ -81,7 +81,6 @@ namespace quda {
 			     std::vector<ColorSpinorField*> p, std::vector<ColorSpinorField*> q) {
 
     bool running = profile.isRunning(QUDA_PROFILE_CHRONO);
-    printfQuda("timer = %d\n", running);
     if (!running) profile.TPSTART(QUDA_PROFILE_CHRONO);
 
     const int N = p.size();

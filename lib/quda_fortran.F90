@@ -264,7 +264,10 @@ module quda_fortran
      ! The index to indeicate which chrono history we are augmenting */
      integer(4)::chrono_index
 
-     ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     ! Precision to store the chronological basis in
+     integer(4)::chrono_precision;
+
+    ! Which external library to use in the linear solvers (MAGMA or Eigen) */
      QudaExtLibType::extlib_type
 
   end type quda_invert_param
