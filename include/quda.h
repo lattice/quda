@@ -45,6 +45,9 @@ extern "C" {
     QudaPrecision cuda_prec_sloppy; /**< The precision of the sloppy gauge field */
     QudaReconstructType reconstruct_sloppy; /**< The recontruction type of the sloppy gauge field */
 
+    QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
+    QudaReconstructType reconstruct_refinement_sloppy; /**< The recontruction type of the sloppy gauge field for the refinement step in multishift*/
+
     QudaPrecision cuda_prec_precondition; /**< The precision of the preconditioner gauge field */
     QudaReconstructType reconstruct_precondition; /**< The recontruction type of the preconditioner gauge field */
 
@@ -189,6 +192,7 @@ extern "C" {
     QudaPrecision cpu_prec;                /**< The precision used by the input fermion fields */
     QudaPrecision cuda_prec;               /**< The precision used by the QUDA solver */
     QudaPrecision cuda_prec_sloppy;        /**< The precision used by the QUDA sloppy operator */
+    QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
     QudaPrecision cuda_prec_precondition;  /**< The precision used by the QUDA preconditioner */
 
     QudaDiracFieldOrder dirac_order;       /**< The order of the input and output fermion fields */
@@ -199,6 +203,7 @@ extern "C" {
     QudaPrecision clover_cpu_prec;         /**< The precision used for the input clover field */
     QudaPrecision clover_cuda_prec;        /**< The precision used for the clover field in the QUDA solver */
     QudaPrecision clover_cuda_prec_sloppy; /**< The precision used for the clover field in the QUDA sloppy operator */
+    QudaPrecision clover_cuda_prec_refinement_sloppy; /**< The precision of the sloppy clover field for the refinement step in multishift */
     QudaPrecision clover_cuda_prec_precondition; /**< The precision used for the clover field in the QUDA preconditioner */
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */

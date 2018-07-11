@@ -37,6 +37,8 @@ module quda_fortran
      QudaReconstructType :: reconstruct
      QudaPrecision :: cuda_prec_sloppy
      QudaReconstructType :: reconstruct_sloppy
+     QudaPrecision :: cuda_prec_refinement_sloppy
+     QudaReconstructType :: reconstruct_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
      QudaReconstructType :: reconstruct_precondition
      QudaGaugeFixed :: gauge_fix
@@ -153,6 +155,7 @@ module quda_fortran
      QudaPrecision :: cpu_prec
      QudaPrecision :: cuda_prec
      QudaPrecision :: cuda_prec_sloppy
+     QudaPrecision :: cuda_prec_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
 
      QudaDiracFieldOrder :: dirac_order
@@ -164,6 +167,7 @@ module quda_fortran
      QudaPrecision :: clover_cpu_prec
      QudaPrecision :: clover_cuda_prec
      QudaPrecision :: clover_cuda_prec_sloppy
+     QudaPrecision :: clover_cuda_prec_refinement_sloppy
      QudaPrecision :: clover_cuda_prec_precondition
 
      QudaCloverFieldOrder :: clover_order

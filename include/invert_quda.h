@@ -116,6 +116,9 @@ namespace quda {
 
     /**< The precision used by the QUDA sloppy operator */
     QudaPrecision precision_sloppy;
+    
+    /**< The precision used by the QUDA sloppy operator for multishift refinement */
+    QudaPrecision precision_refinement_sloppy;
 
     /**< The precision used by the QUDA preconditioner */
     QudaPrecision precision_precondition;
@@ -236,7 +239,7 @@ namespace quda {
       compute_true_res(param.compute_true_res), sloppy_converge(false), true_res(param.true_res),
       true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
-      precision_precondition(param.cuda_prec_precondition),
+      precision_refinement_sloppy(param.cuda_prec_refinement_sloppy), precision_precondition(param.cuda_prec_precondition),
       preserve_source(param.preserve_source),
       return_residual(preserve_source == QUDA_PRESERVE_SOURCE_NO ? true : false),
       num_src(param.num_src), num_offset(param.num_offset),
@@ -273,7 +276,7 @@ namespace quda {
       compute_true_res(param.compute_true_res), sloppy_converge(param.sloppy_converge), true_res(param.true_res),
       true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.precision), precision_sloppy(param.precision_sloppy),
-      precision_precondition(param.precision_precondition),
+      precision_refinement_sloppy(param.precision_refinement_sloppy), precision_precondition(param.precision_precondition),
       preserve_source(param.preserve_source), return_residual(param.return_residual),
       num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.Nkrylov), precondition_cycle(param.precondition_cycle),
@@ -853,6 +856,7 @@ namespace quda {
     virtual ~MultiShiftCG();
 
     void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in);
+    void solve(std::vector<ColorSpinorField*> out, ColorSpinorField &in, std::vector<ColorSpinorField*>  &p, double* r2_old );
   };
 
 
