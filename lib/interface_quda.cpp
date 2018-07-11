@@ -2841,7 +2841,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
       ColorSpinorParam cs_param(*basis[0]);
       ColorSpinorField *tmp = ColorSpinorField::Create(cs_param);
-      ColorSpinorField *tmp2 = ColorSpinorField::Create(cs_param);
+      ColorSpinorField *tmp2 = (param->chrono_precision == out->Precision()) ? out : ColorSpinorField::Create(cs_param);
       std::vector<ColorSpinorField*> Ap;
       for (unsigned int k=0; k < basis.size(); k++) {
         Ap.emplace_back((ColorSpinorField::Create(cs_param)));
@@ -2862,14 +2862,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
 
       blas::copy(*tmp, *in);
-      mre(*tmp2, *tmp, basis, Ap);
-      blas::copy(*out, *tmp2);
+      mre(*out, *tmp, basis, Ap);
       
       for (auto ap: Ap) {
         if (ap) delete(ap);
       }
       delete tmp;
-      delete tmp2;
+      if (tmp2 != out) delete tmp2;
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
@@ -2891,7 +2890,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       ColorSpinorParam cs_param(*basis[0]);
       std::vector<ColorSpinorField*> Ap;
       ColorSpinorField *tmp = ColorSpinorField::Create(cs_param);
-      ColorSpinorField *tmp2 = ColorSpinorField::Create(cs_param);
+      ColorSpinorField *tmp2 = (param->chrono_precision == out->Precision()) ? out : ColorSpinorField::Create(cs_param);
       for (unsigned int k=0; k < basis.size(); k++) {
         Ap.emplace_back((ColorSpinorField::Create(cs_param)));
       }
@@ -2911,14 +2910,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
 
       blas::copy(*tmp, *in);
-      mre(*tmp2, *tmp, basis, Ap);
-      blas::copy(*out, *tmp2);
+      mre(*out, *tmp, basis, Ap);
 
       for (auto ap: Ap) {
         if (ap) delete(ap);
       }
       delete tmp;
-      delete tmp2;
+      if (tmp2 != out) delete tmp2;
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }

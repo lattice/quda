@@ -102,7 +102,6 @@ namespace quda {
 
     // Solution coefficient vectors
     Complex *alpha = new Complex[N];
-    Complex *minus_alpha = new Complex[N];
 
     double b2 = getVerbosity() >= QUDA_SUMMARIZE ? blas::norm2(b) : 0.0;
 
@@ -139,20 +138,22 @@ namespace quda {
 
     solve(alpha, p, q, b, hermitian);
 
-    for (int i=0; i<N; i++) minus_alpha[i] = -alpha[i];
-
     blas::zero(x);
-    std::vector<ColorSpinorField*> X, B;
-    X.push_back(&x); B.push_back(&b);
+    std::vector<ColorSpinorField*> X;
+    X.push_back(&x);
     blas::caxpy(alpha, p, X);
-    blas::caxpy(minus_alpha, q, B);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
+      // compute the residual only if we're going to print it
+      for (int i=0; i<N; i++) alpha[i] = -alpha[i];
+      std::vector<ColorSpinorField*> B;
+      B.push_back(&b);
+      blas::caxpy(alpha, q, B);
+
       double rsd = sqrt(blas::norm2(b) / b2 );
       printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, rsd);
     }
 
-    delete [] minus_alpha;
     delete [] alpha;
 
     if (!running) profile.TPSTOP(QUDA_PROFILE_CHRONO);
