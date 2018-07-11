@@ -358,7 +358,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   }
 
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_YES;
+  mg_param.setup_minimize_memory = QUDA_BOOLEAN_NO;
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
