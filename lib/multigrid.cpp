@@ -11,7 +11,7 @@ namespace quda {
   static bool debug = false;
 
   MG::MG(MGParam &param, TimeProfile &profile_global)
-    : Solver(param, profile), param(param), transfer(0), resetTransfer(false), presmoother(0), postsmoother(0),
+    : Solver(param, profile), param(param), transfer(0), resetTransfer(false), presmoother(nullptr), postsmoother(nullptr),
       profile_global(profile_global),
       profile( "MG level " + std::to_string(param.level+1), false ),
       coarse(nullptr), fine(param.fine), coarse_solver(nullptr),
@@ -100,6 +100,11 @@ namespace quda {
 
     destroySmoother();
     destroyCoarseSolver();
+
+    // reset the Dirac operator pointers since these may have changed
+    diracResidual = param.matResidual->Expose();
+    diracSmoother = param.matSmooth->Expose();
+    diracSmootherSloppy = param.matSmoothSloppy->Expose();
 
     // Refresh the null-space vectors if we need to
     if (refresh && param.level < param.Nlevel-1) {
@@ -231,10 +236,6 @@ namespace quda {
 
     // create the smoother for this level
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating smoother\n");
-    diracResidual = param.matResidual->Expose();
-    diracSmoother = param.matSmooth->Expose();
-    diracSmootherSloppy = param.matSmoothSloppy->Expose();
-
     destroySmoother();
     param_presmooth = new SolverParam(param);
 

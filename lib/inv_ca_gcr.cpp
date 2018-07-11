@@ -113,6 +113,7 @@ namespace quda {
         A(i,j) = A_[i*(N+1)+j];
       }
     }
+    delete[] A_;
 #else
     // two reductions but uses the Hermitian block dot product
     // compute rhs vector phi = Q* b = (q_i, b)
@@ -129,8 +130,8 @@ namespace quda {
     for (int i=0; i<N; i++)
       for (int j=0; j<N; j++)
         A(i,j) = A_[i*N+j];
+    delete[] A_;
 #endif
-    delete A_;
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
