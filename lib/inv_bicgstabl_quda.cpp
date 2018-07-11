@@ -78,13 +78,7 @@ namespace quda {
         }
         blas::caxpy(-tau[j-1][j], *r[j-1], *r[j]);
         break;
-      case 2: // two-way pipelining
-      case 3: // three-way pipelining
-      case 4: // four-way pipelining
-      case 5: // five-way pipelining
-      case 6: // six-way pipelining
-      case 7: // seven-way pipelining
-      case 8: // eight-way pipelining
+    default:
         {
           const int N = pipeline;
           // We're orthogonalizing r[j] against r[1], ..., r[j-1].
@@ -107,8 +101,6 @@ namespace quda {
           }
         }
         break;
-      default:
-        errorQuda("Pipeline length %d type not defined", pipeline);
     }
 
   }
