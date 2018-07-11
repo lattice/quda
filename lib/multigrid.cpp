@@ -22,6 +22,8 @@ namespace quda {
       matCoarseResidual(nullptr), matCoarseSmoother(nullptr), matCoarseSmootherSloppy(nullptr),
       rng(nullptr)
   {
+    postTrace();
+
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
     setVerbosity(param.mg_global.verbosity[param.level]);
@@ -85,15 +87,19 @@ namespace quda {
     if (!transfer) reset();
 
     setOutputPrefix("");
+    postTrace();
   }
 
   void MG::reset(bool refresh) {
 
+    postTrace();
     setVerbosity(param.mg_global.verbosity[param.level]);
     setOutputPrefix(prefix);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d of %d levels\n", transfer ? "Resetting":"Creating", param.level+1, param.Nlevel);
-    createSmoother();
+
+    destroySmoother();
+    destroyCoarseSolver();
 
     // Refresh the null-space vectors if we need to
     if (refresh && param.level < param.Nlevel-1) {
@@ -117,14 +123,14 @@ namespace quda {
                                 param.mg_global.precision_null[param.level], profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
+        // create coarse temporary vector
+        tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
+
         // create coarse residual vector
         r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
 
         // create coarse solution vector
         x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
-
-        // create coarse temporary vector
-        tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
 
         B_coarse = new std::vector<ColorSpinorField*>();
         int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level+1]);
@@ -145,7 +151,12 @@ namespace quda {
       }
 
       createCoarseDirac();
+    }
 
+    // delay allocating smoother until after coarse-links have been created
+    createSmoother();
+
+    if (param.level < param.Nlevel-1) {
       // creating or resetting the coarse level
       if (coarse) {
         coarse->param.updateInvertParam(*param.mg_global.invert_param);
@@ -187,17 +198,44 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
     // Reset the profile for accurate solver timing
     profile.TPRESET();
+
+    postTrace();
+  }
+
+  void MG::destroySmoother() {
+    postTrace();
+    if (presmoother) {
+      delete presmoother;
+      presmoother = nullptr;
+    }
+
+    if (param_presmooth) {
+      delete param_presmooth;
+      param_presmooth = nullptr;
+    }
+
+    if (postsmoother) {
+      delete postsmoother;
+      postsmoother = nullptr;
+    }
+
+    if (param_postsmooth) {
+      delete param_postsmooth;
+      param_postsmooth = nullptr;
+    }
+    postTrace();
   }
 
   void MG::createSmoother() {
+    postTrace();
+
     // create the smoother for this level
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating smoother\n");
     diracResidual = param.matResidual->Expose();
     diracSmoother = param.matSmooth->Expose();
     diracSmootherSloppy = param.matSmoothSloppy->Expose();
 
-    if (presmoother) delete presmoother;
-    if (param_presmooth) delete param_presmooth;
+    destroySmoother();
     param_presmooth = new SolverParam(param);
 
     param_presmooth->is_preconditioner = false;
@@ -231,8 +269,6 @@ namespace quda {
       Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
-      if (postsmoother) delete postsmoother;
-      if (param_postsmooth) delete param_postsmooth;
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->return_residual = false;  // post smoother does not need to return the residual vector
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
@@ -248,9 +284,11 @@ namespace quda {
 	Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother done\n");
+    postTrace();
   }
 
   void MG::createCoarseDirac() {
+    postTrace();
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating coarse Dirac operator\n");
     // check if we are coarsening the preconditioned system then
     bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
@@ -308,17 +346,37 @@ namespace quda {
     matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse Dirac operator done\n");
+    postTrace();
+  }
+
+  void MG::destroyCoarseSolver() {
+    postTrace();
+    if (param.cycle_type == QUDA_MG_CYCLE_VCYCLE && param.level < param.Nlevel-2) {
+      // nothing to do
+    } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
+      if (coarse_solver) {
+        delete coarse_solver;
+        coarse_solver = nullptr;
+      }
+      if (param_coarse_solver) {
+        delete param_coarse_solver;
+        param_coarse_solver = nullptr;
+      }
+    } else {
+      errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
+    }
+    postTrace();
   }
 
   void MG::createCoarseSolver() {
+    postTrace();
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating coarse solver wrapper\n");
+    destroyCoarseSolver();
     if (param.cycle_type == QUDA_MG_CYCLE_VCYCLE && param.level < param.Nlevel-2) {
       // if coarse solver is not a bottom solver and on the second to bottom level then we can just use the coarse solver as is
       coarse_solver = coarse;
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to coarse MG operator\n");
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
-      if (coarse_solver) delete coarse_solver;
-      if (param_coarse_solver) delete param_coarse_solver;
       param_coarse_solver = new SolverParam(param);
 
       param_coarse_solver->inv_type = param.mg_global.coarse_solver[param.level+1];
@@ -361,6 +419,7 @@ namespace quda {
       errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse solver wrapper done\n");
+    postTrace();
   }
 
   MG::~MG() {
