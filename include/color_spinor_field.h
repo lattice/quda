@@ -501,10 +501,30 @@ namespace quda {
 
     static ColorSpinorField* Create(const ColorSpinorParam &param);
     static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
-    ColorSpinorField* CreateCoarse(const int *geoblockSize, int spinBlockSize, int Nvec,
-				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION);
+
+    /**
+       @brief Create a coarse color-spinor field, using this field to set the meta data
+       @param[in] geoBlockSize Geometric block size that defines the coarse grid dimensions
+       @param[in] spinlockSize Geometric block size that defines the coarse spin dimension
+       @param[in] Nvec Number of coarse color degrees of freedom per grid point
+       @param[in] location Optionally set the location of the coarse field
+       @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
+    */
+    ColorSpinorField* CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
+                                   QudaMemoryType mem_Type=QUDA_MEMORY_INVALID);
+
+    /**
+       @brief Create a fine color-spinor field, using this field to set the meta data
+       @param[in] geoBlockSize Geometric block size that defines the fine grid dimensions
+       @param[in] spinlockSize Geometric block size that defines the fine spin dimension
+       @param[in] Nvec Number of fine color degrees of freedom per grid point
+       @param[in] location Optionally set the location of the fine field
+       @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
+    */
     ColorSpinorField* CreateFine(const int *geoblockSize, int spinBlockSize, int Nvec,
-				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION);
+				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
+                                 QudaMemoryType mem_type=QUDA_MEMORY_INVALID);
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;

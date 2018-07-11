@@ -1710,7 +1710,8 @@ namespace quda {
     }
 
     bool advanceTuneParam(TuneParam &param) const {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) return Tunable::advanceTuneParam(param);
+      // only do autotuning if we have device fields
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
       else return false;
     }
 
@@ -1772,11 +1773,13 @@ namespace quda {
 			     || type == COMPUTE_TMDIAGONAL || type == COMPUTE_CONVERT) ? X.VolString () : meta.VolString();
 
       if (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) {
-	strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU," : ",CPU,");
+	strcat(Aux, (meta.Location()==QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
+               meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU-device," : ",CPU,");
 	strcat(Aux,"coarse_vol=");
 	strcat(Aux,X.VolString());
       } else {
-	strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
+	strcat(Aux, (meta.Location()==QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped" :
+               meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU-device" : ",CPU");
       }
 
       return TuneKey(vol_str, typeid(*this).name(), Aux);

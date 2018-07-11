@@ -618,6 +618,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
   }
 
+#ifdef INIT_PARAM
+  P(setup_minimize_memory, QUDA_BOOLEAN_NO);
+#else
+  P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
+#endif
+
   P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(generate_all_levels, QUDA_BOOLEAN_INVALID);
 

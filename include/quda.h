@@ -488,6 +488,11 @@ extern "C" {
     /** Location where the coarse-operator construction will be computedn */
     QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
 
+    /** Minimize device memory allocations during the adaptive setup,
+        placing temporary fields in mapped memory instad of device
+        memory */
+    QudaBoolean setup_minimize_memory;
+
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
  
