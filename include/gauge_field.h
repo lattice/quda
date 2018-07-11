@@ -318,6 +318,7 @@ namespace quda {
 
   private:
     void *gauge;
+    void *gauge_h; // mapped-memory pointer when allocating on the host
     void *even;
     void *odd;
 
