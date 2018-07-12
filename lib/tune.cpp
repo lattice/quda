@@ -227,9 +227,10 @@ namespace quda {
       TuneKey key = q.top().first;
       TuneParam param = q.top().second;
 
-      char tmp[7] = { };
-      strncpy(tmp, key.aux, 6);
-      bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+      char tmp[14] = { };
+      strncpy(tmp, key.aux, 13);
+      bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
+      bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
 
       // synchronous profile
       if (param.n_calls > 0 && !is_policy) {
