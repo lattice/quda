@@ -378,16 +378,16 @@ namespace quda {
     dslash->dslashParam.Xs[2] = Xs_[2];
     dslash->dslashParam.Xs[3] = Xs_[3];
 
-    printfQuda("volume: %dx%dx%dx%d; R: %dx%dx%dx%d; partial_length=%d.\n", 
-                                                               int(dslash->dslashParam.Xs[0]),
-                                                               int(dslash->dslashParam.Xs[1]),
-                                                               int(dslash->dslashParam.Xs[2]),
-                                                               int(dslash->dslashParam.Xs[3]), 
-                                                               int(dslash->dslashParam.R[0]), 
-                                                               int(dslash->dslashParam.R[1]), 
-                                                               int(dslash->dslashParam.R[2]), 
-                                                               int(dslash->dslashParam.R[3]), 
-                                                               sp_idx_length);
+//    printfQuda("volume: %dx%dx%dx%d; R: %dx%dx%dx%d; partial_length=%d.\n", 
+//                                                               int(dslash->dslashParam.Xs[0]),
+//                                                               int(dslash->dslashParam.Xs[1]),
+//                                                               int(dslash->dslashParam.Xs[2]),
+//                                                               int(dslash->dslashParam.Xs[3]), 
+//                                                               int(dslash->dslashParam.R[0]), 
+//                                                               int(dslash->dslashParam.R[1]), 
+//                                                               int(dslash->dslashParam.R[2]), 
+//                                                               int(dslash->dslashParam.R[3]), 
+//                                                               sp_idx_length);
     
     if(expanding_){
       dslash->dslashParam.expanding = true;
