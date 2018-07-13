@@ -382,7 +382,12 @@ namespace quda {
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 0, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
 
-    flops += 1320LL*(long long)sp_idx_length*(long long)in.X(4);
+    if(expanding_){
+      long long vol = (Xs[0]+R_[0]-Rz_[0])*(Xs[1]+R_[1]-Rz_[1])*(Xs[2]+R_[2]-Rz_[2])*(Xs[3]+R_[3]-Rz_[3])/2;
+      flops += 1320LL*vol*(long long)in.X(4);
+    }else{
+      flops += 1320LL*(long long)sp_idx_length*(long long)in.X(4);
+    }
   } 
   
   void DiracMobius::Dslash4prePartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
