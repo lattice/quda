@@ -66,7 +66,7 @@ extern char latfile[];
 
 extern void usage(char** );
 
-
+extern int maxiter_prec;
 
 void
 display_test_info()
@@ -88,7 +88,10 @@ display_test_info()
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3)); 
-  
+ 	
+	printfQuda("preconditioner precision = %6s.\n", get_prec_str(prec_precondition));
+	printfQuda("maxiter_prec = 					        %02d.\n", maxiter_prec);
+
   return ;
   
 }
@@ -256,6 +259,8 @@ int main(int argc, char **argv)
   inv_param.verbosity_precondition = QUDA_SILENT;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
+  
+	inv_param.maxiter_precondition = maxiter_prec;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;

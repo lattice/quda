@@ -2750,7 +2750,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
     // MSPCG here.
     if(param->inv_type == QUDA_MSPCG_INVERTER){
-      MSPCG* mspcg = new MSPCG(param, solverParam, profileInvert, 6);
+      MSPCG* mspcg = new MSPCG(param, solverParam, profileInvert, param->maxiter_precondition);
       (*mspcg)(*out, *in);
       solverParam.updateInvertParam(*param);
       delete mspcg;
