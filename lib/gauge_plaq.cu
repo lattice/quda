@@ -10,8 +10,6 @@
 
 namespace quda {
 
-#ifdef GPU_GAUGE_TOOLS
-
   template <typename Gauge>
   struct GaugePlaqArg : public ReduceArg<double2> {
     int threads; // number of active threads required
@@ -133,18 +131,12 @@ namespace quda {
   void plaquette(const GaugeField& data, double2 &plq, QudaFieldLocation location) {
     INSTANTIATE_RECONSTRUCT(plaquette<Float>, data, plq, location);
   }
-#endif
 
   double3 plaquette(const GaugeField& data, QudaFieldLocation location) {
 
-#ifdef GPU_GAUGE_TOOLS
     double2 plq;
     INSTANTIATE_PRECISION(plaquette, data, plq, location);
     double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
-#else
-    errorQuda("Gauge tools are not build");
-    double3 plaq = make_double3(0., 0., 0.);
-#endif
     return plaq;
   }
 
