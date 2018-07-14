@@ -137,8 +137,8 @@ namespace quda {
     }
 
     int gR[4] = {2*R[0], R[1], R[2], R[3]}; 
-    padded_gauge_field = createExtendedGauge(*gaugePrecise, gR, profile, true, QUDA_RECONSTRUCT_NO);
-    padded_gauge_field_precondition = createExtendedGauge(*gaugePrecondition, gR, profile, true, QUDA_RECONSTRUCT_NO);
+    padded_gauge_field = createExtendedGauge(*gaugePrecise, gR, profile, true);
+    padded_gauge_field_precondition = createExtendedGauge(*gaugePrecondition, gR, profile, true);
 
     set_mobius_dirac_param(dirac_param, inv_param, true); // pc = true
 
