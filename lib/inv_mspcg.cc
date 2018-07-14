@@ -371,7 +371,7 @@ namespace quda {
     double rk2 = blas::norm2(ib);
     double Mpk2, alpha, beta, rkp12;
 
-    printfQuda("inner_cg: before starting: r2 = %8.4e \n", rk2);
+//    printfQuda("inner_cg: before starting: r2 = %8.4e \n", rk2);
     blas::copy(*ip, ib);
 
     for(int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++){
@@ -398,8 +398,8 @@ namespace quda {
 
       xpay(ib, beta, *ip);
       
-      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
-          local_loop_count, rk2, alpha, beta, Mpk2);
+//      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
+//          local_loop_count, rk2, alpha, beta, Mpk2);
     }
 
     commGlobalReductionSet(true);
@@ -726,5 +726,204 @@ namespace quda {
     return;
   }
 
+  void MSPCG::reliable_update(ColorSpinorField& dx, ColorSpinorField& db)
+  {
+
+    Gflops = 0.;
+    fGflops = 0.;
+    
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    // Check to see that we're not trying to invert on a zero-field source
+    double b2 = norm2(db);
+    if(b2 == 0.){
+      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+      printfQuda("Warning: inverting on zero-field source\n");
+      dx = db;
+      param.true_res = 0.;
+      param.true_res_hq = 0.;
+    }
+    
+    this->allocate( db );
+
+    int k;
+    //    int parity = nrm_op->getMatPCType();
+    double alpha, beta, rkzk, pkApk, zkP1rkp1;
+
+    double stop = stopping(param.tol, b2, param.residual_type);
+
+//    test_dslash(db);
+
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    // end of initializing.
+
+
+// START of the main loop
+
+    (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = MdagM * x
+    double r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
+    printfQuda("True precise residual is %8.4e\n", r2);
+
+    double r2_max = r2;
+    int num_reliable_updates = 0;
+
+    blas::copy(*r, *vct_dr); // throw true residual into the sloppy solver.
+    blas::zero(*x);
+    //      copier_timer.Start("woo", "hoo", 0);
+    //      copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
+    //      copier_timer.Stop("woo", "hoo", 0);
+
+    blas::copy(*fr, *r);
+
+    sloppy_timer.Start("woo", "hoo", 0);
+
+    preconditioner_timer.Start("woo", "hoo", 0);
+    if(inner_iterations <= 0){
+      blas::copy(*z, *fr);
+    }else{
+      inner_cg(*z, *fr);
+    }
+    preconditioner_timer.Stop("woo", "hoo", 0);
+
+    //      copier_timer.Start("woo", "hoo", 0);
+    //      copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
+    //      copier_timer.Stop("woo", "hoo", 0);
+    blas::copy(*p, *z);
+
+    k = 0;
+    while( k < param.maxiter ){
+      rkzk = reDotProduct(*r, *z);
+
+      (*nrm_op_sloppy)(*mmp, *p, *tmp);
+      pkApk = reDotProduct(*p, *mmp);
+      alpha = rkzk / pkApk;
+
+      // TODO: For test only
+      //        blas::copy(*r_old, *r);
+      // TODO
+
+      axpy(alpha, *p, *x); // x_k+1 = x_k + alpha * p_k
+      double rr2 = axpyNorm(-alpha, *mmp, *r); // r_k+1 = r_k - alpha * Ap_k
+
+      // reliable update
+    
+      
+      if( rr2 > r2_max ) r2_max = rr2;
+      if( rr2 < 1e-3*r2_max || rr2 < stop ){
+        precise_timer.Start("woo", "hoo", 0);
+        
+        blas::copy(*vct_dtmp, *x);
+        xpy(*vct_dtmp, dx);
+        
+        (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = MdagM * x
+        r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
+        
+        blas::copy(*r, *vct_dr);
+        blas::zero(*x);
+        
+        r2_max = r2;
+
+        num_reliable_updates++;
+        printfQuda( "reliable update: sloppy r2 = %8.4e; precise r2 = %8.4e.\n", rr2, r2 );
+        
+        precise_timer.Stop("woo", "hoo", 0);
+      }
+      
+      
+      if(rr2 < stop) break;
+
+      // z = M^-1 r
+      //        copier_timer.Start("woo", "hoo", 0);
+      //        copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
+      //        copier_timer.Stop("woo", "hoo", 0);
+
+      blas::copy(*fr, *r);
+
+      preconditioner_timer.Start("woo", "hoo", 0);
+      if(inner_iterations <= 0){
+        blas::copy(*z, *fr);
+      }else{
+        inner_cg(*z, *fr);
+      }
+      preconditioner_timer.Stop("woo", "hoo", 0);
+
+      //        copier_timer.Start("woo", "hoo", 0);
+      //        copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
+      //        copier_timer.Stop("woo", "hoo", 0);
+      // TODO: test
+      //        double diff_real =  cDotProduct(*z, *r_old).real();
+      //        double diff_imag =  cDotProduct(*z, *r_old).imag();
+      //        printfQuda("MSPCG/iter.count/diff: %05d %8.4e +i %8.4e\n", k, diff_real, diff_imag);
+      // TODO:
+
+      zkP1rkp1 = reDotProduct(*z, *r);
+      beta = zkP1rkp1 / rkzk;
+      //        beta = (zkP1rkp1-diff_real) / rkzk;
+      xpay(*z, beta, *p);
+
+//      double zz2 = blas::norm2(*z);
+//      printfQuda("z2/r2: %8.4e/%8.4e.\n", zz2, rr2);
+
+      ++k;
+      printfQuda("MSPCG/iter.count/r2/target_r2/%%/target_%%: %05d %8.4e %8.4e %8.4e %8.4e\n", k, rr2, stop, std::sqrt(rr2/b2), param.tol);
+
+    }
+
+    sloppy_timer.Stop("woo", "hoo", 0);
+
+// END of main loop 
+    
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+
+    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+    param.iter += k;
+
+    double precise_tflops = nrm_op->flops()*1e-12;
+    double sloppy_tflops = nrm_op_sloppy->flops()*1e-12;
+    double preconditioner_tflops = (nrm_op_precondition->flops()+blas::flops)*1e-12;
+    
+    param.gflops = (preconditioner_tflops+sloppy_tflops+precise_tflops)*1e3;
+    
+    reduceDouble(precise_tflops);
+    reduceDouble(sloppy_tflops);
+    reduceDouble(preconditioner_tflops);
+
+    double prec_time = preconditioner_timer.time; 
+//    reduceMaxDouble(prec_time);
+
+    if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
+
+    // compute the true residual 
+
+    (*nrm_op)(*vct_dr, dx, *vct_dtmp);
+    double true_res = xmyNorm(db, *vct_dr);
+    param.true_res = sqrt(true_res/b2);
+
+    printfQuda("-------- END --------\n");
+    printfQuda("MSPCG CONVERGED in %05d iterations with %03d reliable updates.\n", k, num_reliable_updates);
+    printfQuda("True residual/target_r2: %8.4e/%8.4e.\n", true_res, stop);
+    printfQuda("Performance precise:        %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
+      precise_tflops/precise_timer.time, precise_timer.time, precise_timer.count);
+    printfQuda("Performance sloppy:         %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
+      sloppy_tflops/(sloppy_timer.time-prec_time-precise_timer.time), sloppy_timer.time-prec_time-precise_timer.time, sloppy_timer.count);
+    printfQuda("Performance preconditioner: %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
+      preconditioner_tflops/prec_time, prec_time, preconditioner_timer.count);
+    printfQuda("Performance copier:                         in %8.4f secs with %05d calls.\n",
+      copier_timer.time, copier_timer.count);
+
+    // reset the flops counters
+    blas::flops = 0;
+
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+
+    profile.TPSTART(QUDA_PROFILE_FREE);
+    deallocate();
+    profile.TPSTOP(QUDA_PROFILE_FREE);
+
+    return;
+  }
 
 } // namespace quda
