@@ -46,6 +46,8 @@ namespace quda {
       cudaColorSpinorField* z;
       cudaColorSpinorField* mmp;
       cudaColorSpinorField* tmp;
+      
+      cudaColorSpinorField* r_old;
 
       cudaColorSpinorField* fr;
 

@@ -459,19 +459,19 @@ namespace quda {
     vct_dp  =  new cudaColorSpinorField(csParam);
     vct_dmmp = new cudaColorSpinorField(csParam);
     vct_dtmp = new cudaColorSpinorField(csParam);
+    x  =   new cudaColorSpinorField(csParam);
 
 // sloppy
     csParam.setPrecision(dirac_param_sloppy.gauge->Precision());
     
     r  =   new cudaColorSpinorField(csParam);
-    x  =   new cudaColorSpinorField(csParam);
     z  =   new cudaColorSpinorField(csParam);
     p  =   new cudaColorSpinorField(csParam);
     mmp  = new cudaColorSpinorField(csParam);
     tmp  = new cudaColorSpinorField(csParam);
 
 // TODO: test
-//    cudaColorSpinorField* r_old = new cudaColorSpinorField(csParam);
+    r_old = new cudaColorSpinorField(csParam);
 
     csParam.setPrecision(dirac_param_precondition.gauge->Precision());
 
@@ -620,9 +620,6 @@ namespace quda {
         pkApk = reDotProduct(*p, *mmp);
         alpha = rkzk / pkApk;
 
-// TODO: For test only
-//        blas::copy(*r_old, *r);
-// TODO
 
         axpy(alpha, *p, *x); // x_k+1 = x_k + alpha * p_k
         double rr2 = axpyNorm(-alpha, *mmp, *r); // r_k+1 = r_k - alpha * Ap_k
@@ -799,9 +796,7 @@ namespace quda {
       pkApk = reDotProduct(*p, *mmp);
       alpha = rkzk / pkApk;
 
-      // TODO: For test only
-      //        blas::copy(*r_old, *r);
-      // TODO
+      blas::copy(*r_old, *r);
 
       axpy(alpha, *p, *x); // x_k+1 = x_k + alpha * p_k
       double rr2 = axpyNorm(-alpha, *mmp, *r); // r_k+1 = r_k - alpha * Ap_k
@@ -857,7 +852,9 @@ namespace quda {
       //        printfQuda("MSPCG/iter.count/diff: %05d %8.4e +i %8.4e\n", k, diff_real, diff_imag);
       // TODO:
 
-      zkP1rkp1 = reDotProduct(*z, *r);
+      xpay(*r, -1., *r_old);
+      
+      zkP1rkp1 = reDotProduct(*z, *r_old);
       beta = zkP1rkp1 / rkzk;
       //        beta = (zkP1rkp1-diff_real) / rkzk;
       xpay(*z, beta, *p);
