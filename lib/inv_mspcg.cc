@@ -448,24 +448,9 @@ namespace quda {
     return loop_count;
   }
 
-  void MSPCG::operator()(ColorSpinorField& dx, ColorSpinorField& db)
-  {
-
-    Gflops = 0.;
-    fGflops = 0.;
-    
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-    // Check to see that we're not trying to invert on a zero-field source
-    double b2 = norm2(db);
-    if(b2 == 0.){
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-      printfQuda("Warning: inverting on zero-field source\n");
-      dx = db;
-      param.true_res = 0.;
-      param.true_res_hq = 0.;
-    }
-
-    // initializing the fermion vectors.
+  void MSPCG::allocate(ColorSpinorField& db){
+ 
+// initializing the fermion vectors.
     ColorSpinorParam csParam(db);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
@@ -492,6 +477,7 @@ namespace quda {
 
 // f* means fine/preconditioning
     fr  =  new cudaColorSpinorField(csParam);
+    blas::zero(*fr);
 
 // i* means inner preconditioning
     immp=  new cudaColorSpinorField(csParam);
@@ -506,13 +492,6 @@ namespace quda {
     iftmp=  new cudaColorSpinorField(csParam);
     ifset=  new cudaColorSpinorField(csParam);
 
-    blas::zero(*fr);
-
-    int k;
-    //    int parity = nrm_op->getMatPCType();
-    double alpha, beta, rkzk, pkApk, zkP1rkp1;
-
-    double stop = stopping(param.tol, b2, param.residual_type);
 
     // numbers to enable faster preconditioner dslash
     for(int d = 0; d < 4; d++){
@@ -538,8 +517,61 @@ namespace quda {
     sp_len2 = Xs2[0]*Xs2[1]*Xs2[2]*Xs2[3]/2;
     sp_len1 = Xs1[0]*Xs1[1]*Xs1[2]*Xs1[3]/2;
     sp_len0 = Xs0[0]*Xs0[1]*Xs0[2]*Xs0[3]/2;
+   
+  }
 
-    test_dslash(db);
+  void MSPCG::deallocate(){
+    
+    delete r;
+    delete x;
+    delete z;
+    delete p;
+    delete mmp;
+    delete tmp;
+
+    delete fr;
+    
+    delete immp;
+    delete ip;
+ 
+    delete ifmmp;
+    delete ifp;
+    delete iftmp;
+    delete ifset;
+
+    delete vct_dr;
+    delete vct_dp;
+    delete vct_dmmp;
+    delete vct_dtmp;
+   
+  }
+
+  void MSPCG::operator()(ColorSpinorField& dx, ColorSpinorField& db)
+  {
+
+    Gflops = 0.;
+    fGflops = 0.;
+    
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    // Check to see that we're not trying to invert on a zero-field source
+    double b2 = norm2(db);
+    if(b2 == 0.){
+      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+      printfQuda("Warning: inverting on zero-field source\n");
+      dx = db;
+      param.true_res = 0.;
+      param.true_res_hq = 0.;
+    }
+    
+    this->allocate( db );
+
+    int k;
+    //    int parity = nrm_op->getMatPCType();
+    double alpha, beta, rkzk, pkApk, zkP1rkp1;
+
+    double stop = stopping(param.tol, b2, param.residual_type);
+
+//    test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
@@ -688,30 +720,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     profile.TPSTART(QUDA_PROFILE_FREE);
-    delete r;
-    delete x;
-    delete z;
-    delete p;
-    delete mmp;
-    delete tmp;
-
-// TODO: test
-//    delete r_old;
-
-    delete fr;
-    
-    delete immp;
-    delete ip;
- 
-    delete ifmmp;
-    delete ifp;
-    delete iftmp;
-    delete ifset;
-
-    delete vct_dr;
-    delete vct_dp;
-    delete vct_dmmp;
-    delete vct_dtmp;
+    deallocate();
     profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;

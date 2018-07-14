@@ -75,6 +75,9 @@ namespace quda {
       double Gflops;
       double fGflops;
 
+      void allocate(ColorSpinorField& db);
+      void deallocate();
+
       void test_dslash( const ColorSpinorField& tb );
 
       virtual ~MSPCG();
