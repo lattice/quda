@@ -132,7 +132,7 @@ void SU3test(int argc, char **argv) {
 
   double plaq[3];
   plaqQuda(plaq);
-  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
   // Topological charge
@@ -143,7 +143,7 @@ void SU3test(int argc, char **argv) {
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-  printf("Computed topological charge is %.16e Done in %g secs\n", qCharge, time0);
+  printfQuda("Computed topological charge is %.16e Done in %g secs\n", qCharge, time0);
 
   // Stout smearing should be equivalent to APE smearing
   // on D dimensional lattices for rho = alpha/2*(D-1). 
@@ -163,7 +163,7 @@ void SU3test(int argc, char **argv) {
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for STOUT = %g secs\n", time0);
   qCharge = qChargeCuda();
-  printf("Computed topological charge after is %.16e \n", qCharge);
+  printfQuda("Computed topological charge after is %.16e \n", qCharge);
 
   //APE
   // start the timer
@@ -174,7 +174,7 @@ void SU3test(int argc, char **argv) {
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for APE = %g secs\n", time0);
   qCharge = qChargeCuda();
-  printf("Computed topological charge after is %.16e \n", qCharge);
+  printfQuda("Computed topological charge after is %.16e \n", qCharge);
 
   //Over Improved STOUT
   double epsilon = -0.25;
@@ -188,10 +188,10 @@ void SU3test(int argc, char **argv) {
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
   qCharge = qChargeCuda();
-  printf("Computed topological charge after is %.16e \n", qCharge);
+  printfQuda("Computed topological charge after is %.16e \n", qCharge);
 
 #else
-  printf("Skipping gauge tests since gauge tools have not been compiled\n");
+  printfQuda("Skipping gauge tests since gauge tools have not been compiled\n");
 #endif
   
   check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
