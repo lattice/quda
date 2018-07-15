@@ -77,6 +77,8 @@ namespace quda {
       double Gflops;
       double fGflops;
 
+      double reliable_update_delta;
+
       void allocate(ColorSpinorField& db);
       void deallocate();
 

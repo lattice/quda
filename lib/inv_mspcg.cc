@@ -110,7 +110,7 @@ namespace quda {
     r(NULL), p(NULL), z(NULL), mmp(NULL), tmp(NULL), fr(NULL), 
     immp(NULL), ip(NULL), 
     ifmmp(NULL), ifp(NULL), iftmp(NULL), 
-    inner_iterations(ic)
+    inner_iterations(ic), reliable_update_delta(inv_param->reliable_delta)
   { 
 
     printfQuda("MSPCG constructor starts.\n");
@@ -807,7 +807,7 @@ namespace quda {
     
       
       if( rr2 > r2_max ) r2_max = rr2;
-      if( rr2 < 1e-3*r2_max || rr2 < stop ){
+      if( rr2 < reliable_update_delta*reliable_update_delta*r2_max || rr2 < stop ){
         precise_timer.Start("woo", "hoo", 0);
         
         blas::copy(*vct_dtmp, *x);
@@ -857,6 +857,7 @@ namespace quda {
       xpay(*r, -1., *r_old);
       
       zkP1rkp1 = reDotProduct(*z, *r_old);
+//      zkP1rkp1 = reDotProduct(*z, *r);
       beta = zkP1rkp1 / rkzk;
       //        beta = (zkP1rkp1-diff_real) / rkzk;
       xpay(*z, beta, *p);
