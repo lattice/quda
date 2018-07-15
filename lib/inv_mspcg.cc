@@ -529,6 +529,8 @@ namespace quda {
     delete mmp;
     delete tmp;
 
+    delete r_old;
+
     delete fr;
     
     delete immp;
