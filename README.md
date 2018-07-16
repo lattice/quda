@@ -9,7 +9,7 @@ QUDA is a library for performing calculations in lattice QCD on graphics process
 * Staggered fermions
 * Improved staggered (asqtad or HISQ)
 * Domain wall (4-d or 5-d preconditioned)
-*Mobius fermions
+* Mobius fermions
 
 Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned GCR are provided, including robust mixed-precision variants supporting combinations of double, single, and half (16-bit "block floating point") precision. The library also includes auxiliary routines necessary for Hybrid Monte Carlo, such as HISQ link fattening, force terms and clover-field construction. Use of many GPUs in parallel is supported throughout, with communication handled by QMP or MPI.
 Several commonly-used packages integrate support for QUDA as a compile-time option, including Chroma, MILC, CPS, and BQCD (in a specific branch available here).
@@ -26,7 +26,7 @@ Current documentation is minimal, consisting mainly of the README file and the e
 
 The preferred method for requesting help is to submit an issue, but this currently requires a (free) GitHub account. An alternative is to simply email the developers at quda-developers[at]googlegroups[dot]com. If reporting a bug, please be sure to specify which version of QUDA you're using.
 
-## Achknowldegment
+## Acknowledgment
 
 If you find this code useful in your work, please cite (arXiv, INSPIRE):
 
@@ -35,4 +35,5 @@ When taking advantage of multi-GPU support, please also cite (arXiv, INSPIRE):
 
 R. Babich, M. A. Clark, B. Joo, G. Shi, R. C. Brower, and S. Gottlieb, "Scaling lattice QCD beyond 100 GPUs," International Conference for High Performance Computing, Networking, Storage and Analysis (SC), 2011 [arXiv:1109.2935 [hep-lat]].
 
-*Acknowledgment*: This material is based upon work supported in part by the U.S. Department of Energy under grants DE-FC02-06ER41440, DE-FC02-06ER41449, and DE-AC05-06OR23177; the National Science Foundation under grants DGE-0221680, PHY-0427646, PHY-0835713, OCI-0946441, and OCI-1060067; as well as the PRACE project funded in part by the EUs 7th Framework Programme (FP7/2007-2013) under grants RI-211528 and FP7-261557. Any opinions, findings, and conclusions or recommendations expressed in this material are those of the authors and do not necessarily reflect the views of the Department of Energy, the National Science Foundation, or the PRACE project.
+***
+> *Acknowledgment*: This material is based upon work supported in part by the U.S. Department of Energy under grants DE-FC02-06ER41440, DE-FC02-06ER41449, and DE-AC05-06OR23177; the National Science Foundation under grants DGE-0221680, PHY-0427646, PHY-0835713, OCI-0946441, and OCI-1060067; as well as the PRACE project funded in part by the EUs 7th Framework Programme (FP7/2007-2013) under grants RI-211528 and FP7-261557. Any opinions, findings, and conclusions or recommendations expressed in this material are those of the authors and do not necessarily reflect the views of the Department of Energy, the National Science Foundation, or the PRACE project.

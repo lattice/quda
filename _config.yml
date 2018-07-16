@@ -1,1 +1,4 @@
 theme: jekyll-theme-minimal
+show_downloads: "true"
+title: [QUDA]
+description: [A library for QCD on GPUs]
