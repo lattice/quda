@@ -383,8 +383,8 @@ namespace quda {
 		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 0, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
 
     if(expanding_){
-      long long vol = (Xs_[0]+R_[0]-Rz_[0])*(Xs_[1]+R_[1]-Rz_[1])*(Xs_[2]+R_[2]-Rz_[2])*(Xs_[3]+R_[3]-Rz_[3])/2;
-      flops += 1320LL*vol*(long long)in.X(4);
+      long long vol = (Xs_[0]+2*(R_[0]-Rz_[0]))*(Xs_[1]+2*(R_[1]-Rz_[1]))*(Xs_[2]+2*(R_[2]-Rz_[2]))*(Xs_[3]+2*(R_[3]-Rz_[3]))/2;
+			flops += 1320LL*vol*(long long)in.X(4);
     }else{
       flops += 1320LL*(long long)sp_idx_length*(long long)in.X(4);
     }
