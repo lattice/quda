@@ -131,15 +131,19 @@ namespace quda {
     bool advanceSharedBytes(TuneParam &param) const { return false; }
 
     bool advanceTuneParam(TuneParam &param) const {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) return Tunable::advanceTuneParam(param);
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && meta.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
       else return false;
     }
 
     TuneKey tuneKey() const {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
-      strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(Aux, getOmpThreadStr());
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+        strcat(Aux, meta.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
+      } else if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+        strcat(Aux, ",CPU");
+        strcat(Aux, getOmpThreadStr());
+      }
       return TuneKey(meta.VolString(), typeid(*this).name(), Aux);
     }
   };

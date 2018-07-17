@@ -1,9 +1,15 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
-
 #include <Eigen/Dense>
 
 namespace quda {
+
+  enum Basis {
+    POWER_BASIS,
+    INVALID_BASIS
+  };
+
+  const static Basis basis = POWER_BASIS;
 
   CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
     : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
@@ -14,8 +20,15 @@ namespace quda {
 
     if (init) {
       if (alpha) delete []alpha;
-      for (int i=0; i<param.Nkrylov; i++) delete p[i];
-      for (int i=0; i<param.Nkrylov; i++) delete q[i];
+      bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
+                         param.precision == param.precision_sloppy &&
+                         param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
+      if (basis == POWER_BASIS) {
+        for (int i=0; i<param.Nkrylov+1; i++) if (i>0 || !use_source) delete p[i];
+      } else {
+        for (int i=0; i<param.Nkrylov; i++) if (i>0 || !use_source) delete p[i];
+        for (int i=0; i<param.Nkrylov; i++) delete q[i];
+      }
       if (tmp_sloppy) delete tmp_sloppy;
       if (tmpp) delete tmpp;
       if (rp) delete rp;
@@ -24,7 +37,7 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void CAGCR::create(const ColorSpinorField &meta)
+  void CAGCR::create(ColorSpinorField &b)
   {
     if (!init) {
       if (!param.is_preconditioner) {
@@ -35,22 +48,34 @@ namespace quda {
       alpha = new Complex[param.Nkrylov];
 
       bool mixed = param.precision != param.precision_sloppy;
+      bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO && !mixed &&
+                         param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
 
-      ColorSpinorParam csParam(meta);
+      ColorSpinorParam csParam(b);
       csParam.create = QUDA_NULL_FIELD_CREATE;
 
       // Source needs to be preserved if we're computing the true residual
-      rp = mixed ? ColorSpinorField::Create(csParam) : nullptr;
+      rp = (mixed && !use_source) ? ColorSpinorField::Create(csParam) : nullptr;
       tmpp = ColorSpinorField::Create(csParam);
 
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
 
-      p.resize(param.Nkrylov);
-      q.resize(param.Nkrylov);
-      for (int i=0; i<param.Nkrylov; i++) {
-        p[i] = ColorSpinorField::Create(csParam);
-        q[i] = ColorSpinorField::Create(csParam);
+      if (basis == POWER_BASIS) {
+        // in power basis q[k] = p[k+1], so we don't need a separate q array
+        p.resize(param.Nkrylov+1);
+        q.resize(param.Nkrylov);
+        for (int i=0; i<param.Nkrylov+1; i++) {
+          p[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
+          if (i>0) q[i-1] = p[i];
+        }
+      } else {
+        p.resize(param.Nkrylov);
+        q.resize(param.Nkrylov);
+        for (int i=0; i<param.Nkrylov; i++) {
+          p[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
+          q[i] = ColorSpinorField::Create(csParam);
+        }
       }
 
       //sloppy temporary for mat-vec
@@ -62,24 +87,24 @@ namespace quda {
     } // init
   }
 
-  void CAGCR::solve(Complex *psi_, std::vector<ColorSpinorField*> &p, std::vector<ColorSpinorField*> &q, ColorSpinorField &b)
+  void CAGCR::solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b)
   {
     using namespace Eigen;
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
 
-    const int N = p.size();
+    const int N = q.size();
     vector phi(N), psi(N);
     matrix A(N,N);
 
 #if 1
     // only a single reduction but requires using the full dot product 
-    // compute rhs vector phi = P* b = (p_i, b)
+    // compute rhs vector phi = Q* b = (q_i, b)
     std::vector<ColorSpinorField*> Q;
     for (int i=0; i<N; i++) Q.push_back(q[i]);
     Q.push_back(&b);
 
-    // Construct the matrix P A P = (p_i, A p_j) = (p_i, q_j)
+    // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     Complex *A_ = new Complex[N*(N+1)];
     blas::cDotProduct(A_, q, Q);
     for (int i=0; i<N; i++) {
@@ -88,9 +113,10 @@ namespace quda {
         A(i,j) = A_[i*(N+1)+j];
       }
     }
+    delete[] A_;
 #else
     // two reductions but uses the Hermitian block dot product
-    // compute rhs vector phi = P* b = (p_i, b)
+    // compute rhs vector phi = Q* b = (q_i, b)
     std::vector<ColorSpinorField*> B;
     B.push_back(&b);
     Complex *phi_ = new Complex[N];
@@ -98,14 +124,14 @@ namespace quda {
     for (int i=0; i<N; i++) phi(i) = phi_[i];
     delete phi_;
 
-    // Construct the matrix AP AP = (A p_i, A p_j) = (q_i, q_j)
+    // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     Complex *A_ = new Complex[N*N];
     blas::hDotProduct(A_, q, q);
     for (int i=0; i<N; i++)
       for (int j=0; j<N; j++)
         A(i,j) = A_[i*N+j];
+    delete[] A_;
 #endif
-    delete A_;
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -114,13 +140,8 @@ namespace quda {
     }
 
     // use partial pivoted LU since this seems plenty stable
-#if 1
-    PartialPivLU<matrix> lu(A);
-    psi = lu.solve(phi);
-#else
-    JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
-    psi = svd.solve(phi);
-#endif
+    LDLT<matrix> cholesky(A);
+    psi = cholesky.solve(phi);
 
     for (int i=0; i<N; i++) psi_[i] = psi(i);
 
@@ -148,13 +169,14 @@ namespace quda {
     const int nKrylov = param.Nkrylov;
 
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
+    if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES) errorQuda("Cannot preserve source and return the residual");
 
     if (param.maxiter == 0 || nKrylov == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
     }
 
-    create(x);
+    create(b);
 
     ColorSpinorField &r = rp ? *rp : *p[0];
     ColorSpinorField &tmp = *tmpp;
@@ -230,21 +252,28 @@ namespace quda {
       // build up a space of size nKrylov
       for (int k=0; k<nKrylov; k++) {
         matSloppy(*q[k], *p[k], tmpSloppy);
-        if (k<nKrylov-1) blas::copy(*p[k+1], *q[k]);
+        if (k<nKrylov-1 && basis != POWER_BASIS) blas::copy(*p[k+1], *q[k]);
       }
 
-      solve(alpha, p, q, *p[0]);
+      solve(alpha, q, *p[0]);
 
       // update the solution vector
       std::vector<ColorSpinorField*> X;
       X.push_back(&x);
-      blas::caxpy(alpha, p, X);
+      // need to make sure P is only length nKrylov
+      std::vector<ColorSpinorField*> P;
+      for (int i=0; i<nKrylov; i++) P.push_back(p[i]);
+      blas::caxpy(alpha, P, X);
 
-      // update the residual vector
-      std::vector<ColorSpinorField*> R;
-      R.push_back(p[0]);
-      for (int i=0; i<nKrylov; i++) alpha[i] = -alpha[i];
-      blas::caxpy(alpha, q, R);
+      // no need to compute residual vector if not returning
+      // residual vector and only doing a single fixed iteration
+      if (!fixed_iteration || param.return_residual) {
+        // update the residual vector
+        std::vector<ColorSpinorField*> R;
+        R.push_back(p[0]);
+        for (int i=0; i<nKrylov; i++) alpha[i] = -alpha[i];
+        blas::caxpy(alpha, q, R);
+      }
 
       total_iter+=nKrylov;
       if ( !fixed_iteration || getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -281,7 +310,7 @@ namespace quda {
 	  restart++; // restarting if residual is still too great
 
 	  PrintStats("CA-GCR (restart)", restart, r2, b2, heavy_quark_res);
-	  blas::copy(*p[0], r);
+          blas::copy(*p[0], r);
 
 	  r2_old = r2;
 
@@ -305,9 +334,9 @@ namespace quda {
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       param.true_res_hq = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
-      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
+      if (param.return_residual) blas::copy(b, r);
     } else {
-      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, *p[0]);
+      if (param.return_residual) blas::copy(b, *p[0]);
     }
 
     if (!param.is_preconditioner) {

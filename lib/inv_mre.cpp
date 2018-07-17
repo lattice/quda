@@ -1,6 +1,5 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
-
 #include <Eigen/Dense>
 
 namespace quda {
@@ -14,115 +13,59 @@ namespace quda {
 
   }
 
-#if 1
-
-  /**
-     @brief Solve the equation A p_k psi_k = b by minimizing the
-     residual and using Eigen's SVD algorithm for numerical stability
-
-     @param psi[out] Array of coefficients
-     @param p[in] Search direction vectors
-     @param q[in] Search direction vectors with the operator applied
-  */
-  template<bool hermitian>
-  void solve(Complex *psi_, std::vector<ColorSpinorField*> &p, std::vector<ColorSpinorField*> &q, ColorSpinorField &b) {
-
+  /* Solve the equation A p_k psi_k = b by minimizing the residual and
+     using Eigen's SVD algorithm for numerical stability */
+  void MinResExt::solve(Complex *psi_, std::vector<ColorSpinorField*> &p,
+                        std::vector<ColorSpinorField*> &q, ColorSpinorField &b, bool hermitian)
+  {
     using namespace Eigen;
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
 
-    vector phi(p.size()), psi(p.size());
-    matrix A(p.size(),p.size());
+    const int N = q.size();
+    vector phi(N), psi(N);
+    matrix A(N,N);
 
-    for (unsigned int i=0; i<p.size(); i++) phi(i) = blas::cDotProduct(*p[i], b);
+    // form the a Nx(N+1) matrix using only a single reduction - this
+    // presently requires forgoing the matrix symmetry, but the improvement is well worth it
+    std::vector<ColorSpinorField*> Q;
+    for (int i=0; i<N; i++) Q.push_back(q[i]);
+    Q.push_back(&b);
 
-    // Construct the matrix
-    //MW us block blas here 
-    for (unsigned int j=0; j<p.size(); j++) {
-      if(hermitian){
-        A(j,j) = blas::cDotProduct(*q[j], *p[j]);
-        for (unsigned int k=j+1; k<p.size(); k++) {
-          A(j,k) = blas::cDotProduct(*p[j], *q[k]);
-          A(k,j) = conj(A(j,k));
-        }
-      } else {
-        for (unsigned int k=0; k<p.size(); k++) {
-          A(j,k) = blas::cDotProduct(*p[j], *q[k]);
-        } 
-      }
-    }
-    JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
-    psi = svd.solve(phi);
+    Complex *A_ = new Complex[N*(N+1)];
 
-    for (unsigned int i=0; i<p.size(); i++) psi_[i] = psi(i);
-  }
-
-#else //old stuff
-
-  /**
-     @brief Solve the equation A p_k psi_k = b by minimizing the
-     residual and using Gaussian elimination
-
-     @param psi[out] Array of coefficients
-     @param p[in] Search direction vectors
-     @param q[in] Search direction vectors with the operator applied
-  */
-  void solve(Complex *psi, std::vector<ColorSpinorField*> &p, std::vector<ColorSpinorField*> &q, ColorSpinorField &b) {
-
-    const int N = p.size();
-
-    // Array to hold the matrix elements
-    Complex **A = new Complex*[N];
-    for (int i=0; i<N; i++) A[i] = new Complex[N];
-
-    // Solution and source vectors
-    Complex *phi = new Complex[N];
-
-    // construct right hand side
-    for (unsigned int i=0; i<p.size(); i++) phi[i] = blas::cDotProduct(*p[i], b);
-
-    // Construct the matrix
-    for (unsigned int j=0; j<p.size(); j++) {
-      A[j][j] = blas::cDotProduct(*q[j], *p[j]);
-      for (unsigned int k=j+1; k<p.size(); k++) {
-	A[j][k] = blas::cDotProduct(*p[j], *q[k]);
-	A[k][j] = conj(A[j][k]);
-      }
+    if (hermitian) {
+      // linear system is Hermitian, solve directly
+      // compute rhs vector phi = P* b = (q_i, b) and construct the matrix
+      // P* Q = P* A P = (p_i, q_j) = (p_i, A p_j)
+      blas::cDotProduct(A_, p, Q);
+    } else {
+      // linear system is not Hermitian, solve the normal system
+      // compute rhs vector phi = Q* b = (q_i, b) and construct the matrix
+      // Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
+      blas::cDotProduct(A_, q, Q);
     }
 
-    // Gauss-Jordan elimination with partial pivoting
     for (int i=0; i<N; i++) {
-
-      // Perform partial pivoting
-      int k = i;
-      for (int j=i+1; j<N; j++) if (abs(A[j][j]) > abs(A[k][k])) k = j;
-      if (k != i) {
-	std::swap<Complex>(phi[k], phi[i]);
-	for (int j=0; j<N; j++) std::swap<Complex>(A[k][j], A[i][j]);
-      }
-
-      // Convert matrix to upper triangular form
-      for (int j=i+1; j<N; j++) {
-	Complex xp = A[j][i]/A[i][i];
-	phi[j] -= xp * phi[i];
-	for (int k=0; k<N; k++) A[j][k] -= xp * A[i][k];
+      phi(i) = A_[i*(N+1)+N];
+      for (int j=0; j<N; j++) {
+        A(i,j) = A_[i*(N+1)+j];
       }
     }
 
-    // Use Gaussian Elimination to solve equations and calculate initial guess
-    for (int i=N-1; i>=0; i--) {
-      psi[i] = 0.0;
-      for (int j=i+1; j<N; j++) psi[i] += A[i][j] * psi[j];
-      psi[i] = (phi[i]-psi[i])/A[i][i];
-    }
+    delete []A_;
 
-    for (int j=0; j<N; j++) delete [] A[j];
-    delete [] A;
+    profile.TPSTOP(QUDA_PROFILE_CHRONO);
+    profile.TPSTART(QUDA_PROFILE_EIGEN);
 
-    delete [] phi;
+    LDLT<matrix> cholesky(A);
+    psi = cholesky.solve(phi);
+
+    profile.TPSTOP(QUDA_PROFILE_EIGEN);
+    profile.TPSTART(QUDA_PROFILE_CHRONO);
+
+    for (int i=0; i<N; i++) psi_[i] = psi(i);
   }
-
-#endif // old stuff
 
 
   /*
@@ -139,8 +82,8 @@ namespace quda {
   void MinResExt::operator()(ColorSpinorField &x, ColorSpinorField &b, 
 			     std::vector<ColorSpinorField*> p, std::vector<ColorSpinorField*> q) {
 
-
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    bool running = profile.isRunning(QUDA_PROFILE_CHRONO);
+    if (!running) profile.TPSTART(QUDA_PROFILE_CHRONO);
 
     const int N = p.size();
 
@@ -149,24 +92,20 @@ namespace quda {
     // if no guess is required, then set initial guess = 0
     if (N == 0) {
       blas::zero(x);
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      if (!running) profile.TPSTOP(QUDA_PROFILE_CHRONO);
       return;
     }
 
     if (N == 1) {
       blas::copy(x, *p[0]);
-      profile.TPSTOP(QUDA_PROFILE_INIT);    
+      if (!running) profile.TPSTOP(QUDA_PROFILE_CHRONO);
       return;
     }
 
     // Solution coefficient vectors
     Complex *alpha = new Complex[N];
-    Complex *minus_alpha = new Complex[N];
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-
-    double b2 = blas::norm2(b);
+    double b2 = getVerbosity() >= QUDA_SUMMARIZE ? blas::norm2(b) : 0.0;
 
     // Orthonormalise the vector basis
     if (orthogonal) {
@@ -174,47 +113,52 @@ namespace quda {
         double p2 = blas::norm2(*p[i]);
         blas::ax(1 / sqrt(p2), *p[i]);
         if (!apply_mat) blas::ax(1 / sqrt(p2), *q[i]);
-        for (int j=i+1; j<N; j++) {
-          Complex xp = blas::cDotProduct(*p[i], *p[j]);
-          blas::caxpy(-xp, *p[i], *p[j]);
-          // if not applying the matrix below then orthongonalize q
-          if (!apply_mat) blas::caxpy(-xp, *q[i], *q[j]);
+
+        if (i+1<N) {
+          std::vector<ColorSpinorField*> Pi;
+          Pi.push_back(p[i]);
+          std::vector<ColorSpinorField*> P;
+          for (int j=i+1; j<N; j++) P.push_back(p[j]);
+          blas::cDotProduct(alpha+i+1, Pi, P); // single multi reduction
+          for (int j=i+1; j<N; j++) alpha[j] = -alpha[j];
+          blas::caxpy(alpha+i+1, Pi, P); // single block Pj update
+
+          if (!apply_mat) {
+            // if not applying the matrix below then orthongonalize q
+            std::vector<ColorSpinorField*> X;
+            X.push_back(q[i]);
+            std::vector<ColorSpinorField*> Y;
+            for (int j=i+1; j<N; j++) { Y.push_back(q[j]); }
+            blas::caxpy(alpha+i+1, X, Y); // single block Qj update
+          }
         }
       }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-
-
     // if operator hasn't already been applied then apply
     if (apply_mat) for (int i=0; i<N; i++) mat(*q[i], *p[i]);
 
-    if (hermitian) {
-      solve<true>(alpha, p, q, b);
-    } else {
-      solve<false>(alpha, p, q, b);
-    }
-
-    for (int i=0; i<N; i++) minus_alpha[i] = -alpha[i];
+    solve(alpha, p, q, b, hermitian);
 
     blas::zero(x);
-    std::vector<ColorSpinorField*> X, B;
-    X.push_back(&x); B.push_back(&b);
+    std::vector<ColorSpinorField*> X;
+    X.push_back(&x);
     blas::caxpy(alpha, p, X);
-    blas::caxpy(minus_alpha, q, B);
 
-    double rsd = sqrt(blas::norm2(b) / b2 );
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, rsd);
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      // compute the residual only if we're going to print it
+      for (int i=0; i<N; i++) alpha[i] = -alpha[i];
+      std::vector<ColorSpinorField*> B;
+      B.push_back(&b);
+      blas::caxpy(alpha, q, B);
 
+      double rsd = sqrt(blas::norm2(b) / b2 );
+      printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, rsd);
+    }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_FREE);
-
-    delete [] minus_alpha;
     delete [] alpha;
 
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    if (!running) profile.TPSTOP(QUDA_PROFILE_CHRONO);
   }
 
   // Wrapper for the above

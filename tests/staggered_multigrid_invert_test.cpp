@@ -373,11 +373,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     nu_post[i] = 2;
   }
 
-  // ESW hack
-  /*mg_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;
-  mg_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
-  mg_param.coarse_grid_solution_type[2] = QUDA_MAT_SOLUTION;
-  mg_param.coarse_grid_solution_type[3] = QUDA_MAT_SOLUTION;*/
+  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
+  mg_param.setup_minimize_memory = QUDA_BOOLEAN_NO;
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;

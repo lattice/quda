@@ -805,12 +805,14 @@ namespace quda {
     const bool gpu_setup; /** Where to do the coarse-operator construction*/
     mutable bool init_gpu; /** Whether this instance did the GPU allocation or not */
     mutable bool init_cpu; /** Whether this instance did the CPU allocation or not */
+    const bool mapped; /** Whether we allocate Y and X GPU fields in mapped memory or not */
 
     /**
        @brief Allocate the Y and X fields
        @param[in] gpu Whether to allocate on gpu (true) or cpu (false)
+       @param[in] mapped whether to put gpu allocations into mapped memory
      */
-    void createY(bool gpu = true) const;
+    void createY(bool gpu = true, bool mapped = false) const;
 
     /**
        @brief Allocate the Yhat and Xinv fields
@@ -826,8 +828,9 @@ namespace quda {
     /**
        @param[in] param Parameters defining this operator
        @param[in] gpu_setup Whether to do the setup on GPU or CPU
+       @param[in] mapped Set to true to put Y and X fields in mapped memory
      */
-    DiracCoarse(const DiracParam &param, bool gpu_setup=true);
+    DiracCoarse(const DiracParam &param, bool gpu_setup=true, bool mapped=false);
 
     /**
        @param[in] param Parameters defining this operator

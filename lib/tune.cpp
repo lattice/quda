@@ -8,7 +8,9 @@
 #include <fstream>
 #include <typeinfo>
 #include <map>
+#include <list>
 #include <unistd.h>
+#include <uint_to_char.h>
 
 #include <deque>
 #include <queue>
@@ -28,12 +30,87 @@ quda::TuneKey getLastTuneKey() { return quda::last_key; }
 namespace quda {
   typedef std::map<TuneKey, TuneParam> map;
 
+  struct TraceKey {
+
+    TuneKey key;
+    float time;
+
+    long device_bytes;
+    long pinned_bytes;
+    long mapped_bytes;
+    long host_bytes;
+
+    TraceKey() { }
+
+    TraceKey(const TuneKey &key, float time)
+      : key(key), time(time),
+        device_bytes(device_allocated_peak()),
+        pinned_bytes(pinned_allocated_peak()),
+        mapped_bytes(mapped_allocated_peak()),
+        host_bytes(host_allocated_peak()) { }
+
+    TraceKey(const TraceKey &trace)
+      : key(trace.key), time(trace.time),
+        device_bytes(trace.device_bytes),
+        pinned_bytes(trace.pinned_bytes),
+        mapped_bytes(trace.mapped_bytes),
+        host_bytes(trace.host_bytes) { }
+
+    TraceKey& operator=(const TraceKey &trace) {
+      if (&trace != this) {
+        key = trace.key;
+        time = trace.time;
+        device_bytes = trace.device_bytes;
+        pinned_bytes = trace.pinned_bytes;
+        mapped_bytes = trace.mapped_bytes;
+        host_bytes = trace.host_bytes;
+      }
+      return *this;
+    }
+  };
+
+  // linked list that is augmented each time we call a kernel
+  static std::list<TraceKey> trace_list;
+  static int enable_trace = 0;
+
+  int traceEnabled() {
+    static bool init = false;
+
+    if (!init) {
+      char *enable_trace_env = getenv("QUDA_ENABLE_TRACE");
+      if (enable_trace_env) {
+        if (strcmp(enable_trace_env, "1") == 0) {
+          // only explicitly posted trace events are included
+          enable_trace = 1;
+        } else if (strcmp(enable_trace_env, "2") == 0) {
+          // enable full kernel trace and posted trace events
+          enable_trace = 2;
+        }
+      }
+      init = true;
+    }
+    return enable_trace;
+  }
+
+  void postTrace_(const char *func, const char *file, int line) {
+    if (traceEnabled() >= 1) {
+      char aux[TuneKey::aux_n];
+      strcpy(aux,file);
+      strcat(aux,":");
+      char tmp[TuneKey::aux_n];
+      i32toa(tmp,line);
+      strcat(aux,tmp);
+      TuneKey key("", func, aux);
+      TraceKey trace_entry(key, 0.0);
+      trace_list.push_back(trace_entry);
+    }
+  }
+
   static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
   static std::string resource_path;
   static map tunecache;
   static map::iterator it;
   static size_t initial_cache_size = 0;
-
 
 #define STR_(x) #x
 #define STR(x) STR_(x)
@@ -150,9 +227,10 @@ namespace quda {
       TuneKey key = q.top().first;
       TuneParam param = q.top().second;
 
-      char tmp[7] = { };
-      strncpy(tmp, key.aux, 6);
-      bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+      char tmp[14] = { };
+      strncpy(tmp, key.aux, 13);
+      bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
+      bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
 
       // synchronous profile
       if (param.n_calls > 0 && !is_policy) {
@@ -177,6 +255,34 @@ namespace quda {
 
     out << std::endl << "# Total time spent in kernels = " << total_time << " seconds" << std::endl;
     async_out << std::endl << "# Total time spent in asynchronous execution = " << async_total_time << " seconds" << std::endl;
+  }
+
+  /**
+   * Serialize trace to an ostream, useful for writing to a file or sending to other nodes.
+   */
+  static void serializeTrace(std::ostream &out)
+  {
+    for (auto it = trace_list.begin(); it != trace_list.end(); it++) {
+
+      TuneKey &key = it->key;
+
+      // special case kernel members of a policy
+      char tmp[14] = { };
+      strncpy(tmp, key.aux, 13);
+      bool is_policy_kernel = strcmp(tmp, "policy_kernel") == 0 ? true : false;
+
+      out << std::setw(12) << it->time << "\t";
+      out << std::setw(12) << it->device_bytes << "\t";
+      out << std::setw(12) << it->pinned_bytes << "\t";
+      out << std::setw(12) << it->mapped_bytes << "\t";
+      out << std::setw(12) << it->host_bytes << "\t";
+      out << std::setw(16) << key.volume << "\t";
+      if (is_policy_kernel) out << "\t";
+      out << key.name << "\t";
+      if (!is_policy_kernel) out << "\t";
+      out << key.aux << std::endl;
+
+    }
   }
 
 
@@ -393,8 +499,8 @@ namespace quda {
   {
     time_t now;
     int lock_handle;
-    std::string lock_path, profile_path, async_profile_path;
-    std::ofstream profile_file, async_profile_file;
+    std::string lock_path, profile_path, async_profile_path, trace_path;
+    std::ofstream profile_file, async_profile_file, trace_file;
 
     if (resource_path.empty()) return;
 
@@ -423,18 +529,21 @@ namespace quda {
       char *profile_fname = getenv("QUDA_PROFILE_OUTPUT_BASE");
 
       if (!profile_fname) {
-	warningQuda("Environment variable QUDA_PROFILE_OUTPUT_BASE is not set; writing to profile.tsv and profile_async.tsv");
+        warningQuda("Environment variable QUDA_PROFILE_OUTPUT_BASE not set; writing to profile.tsv and profile_async.tsv");
 	profile_path = resource_path + "/profile_" + std::to_string(count) + ".tsv";
 	async_profile_path = resource_path + "/profile_async_" + std::to_string(count) + ".tsv";
+        if (traceEnabled()) trace_path = resource_path + "/trace_" + std::to_string(count) + ".tsv";
       } else {
 	profile_path = resource_path + "/" + profile_fname + "_" + std::to_string(count) + ".tsv";
 	async_profile_path = resource_path + "/" + profile_fname + "_" + std::to_string(count) + "_async.tsv";
+	if (traceEnabled()) trace_path = resource_path + "/" + profile_fname + "_trace_" + std::to_string(count) + ".tsv";
       }
 
       count++;
 
       profile_file.open(profile_path.c_str());
       async_profile_file.open(async_profile_path.c_str());
+      if (traceEnabled()) trace_file.open(trace_path.c_str());
 
       if (getVerbosity() >= QUDA_SUMMARIZE) {
 	// compute number of non-zero entries that will be output in the profile
@@ -452,6 +561,7 @@ namespace quda {
 
 	printfQuda("Saving %d sets of cached parameters to %s\n", n_entry, profile_path.c_str());
 	printfQuda("Saving %d sets of cached profiles to %s\n", n_policy, async_profile_path.c_str());
+	if (traceEnabled()) printfQuda("Saving trace list with %lu entries to %s\n", trace_list.size(), trace_path.c_str());
       }
 
       time(&now);
@@ -481,6 +591,24 @@ namespace quda {
       profile_file.close();
       async_profile_file.close();
 
+      if (traceEnabled()) {
+        trace_file << "trace" << "\t" << quda_version;
+#ifdef GITVERSION
+        trace_file << "\t" << gitversion;
+#else
+        trace_file << "\t" << quda_version;
+#endif
+        trace_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
+
+        trace_file << std::setw(12) << "time\t" << std::setw(12) << "device-mem\t" << std::setw(12) << "pinned-mem\t";
+        trace_file << std::setw(12) << "mapped-mem\t" << std::setw(12) << "host-mem\t";
+        trace_file << std::setw(16) << "volume" << "\tname\taux" << std::endl;
+
+        serializeTrace(trace_file);
+
+        trace_file.close();
+      }
+
       // Release lock.
       close(lock_handle);
       remove(lock_path.c_str());
@@ -489,7 +617,6 @@ namespace quda {
     }
 #endif
   }
-
 
   static TimeProfile launchTimer("tuneLaunch");
 
@@ -554,6 +681,12 @@ namespace quda {
       launchTimer.TPSTOP(QUDA_PROFILE_EPILOGUE);
       launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
 #endif
+
+      if (traceEnabled() >= 2) {
+        TraceKey trace_entry(key, param.time);
+        trace_list.push_back(trace_entry);
+      }
+
       return param;
     }
 
@@ -666,6 +799,11 @@ namespace quda {
 	errorQuda("Failed to find key entry (%s:%s:%s)", key.name, key.volume, key.aux);
       }
       param = tunecache[key]; // read this now for all processes
+
+      if (traceEnabled() >= 2) {
+        TraceKey trace_entry(key, param.time);
+        trace_list.push_back(trace_entry);
+      }
 
     } else if (&tunable != active_tunable) {
       errorQuda("Unexpected call to tuneLaunch() in %s::apply()", typeid(tunable).name());

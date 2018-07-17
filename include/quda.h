@@ -324,8 +324,11 @@ extern "C" {
     /** The maximum length of the chronological history to store */
     int chrono_max_dim;
 
-    /** The index to indeicate which chrono history we are augmenting */
+    /** The index to indicate which chrono history we are augmenting */
     int chrono_index;
+
+    /** Precision to store the chronological basis in */
+    QudaPrecision chrono_precision;
 
     /** Which external library to use in the linear solvers (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
@@ -488,6 +491,11 @@ extern "C" {
     /** Location where the coarse-operator construction will be computedn */
     QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
 
+    /** Minimize device memory allocations during the adaptive setup,
+        placing temporary fields in mapped memory instad of device
+        memory */
+    QudaBoolean setup_minimize_memory;
+
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
  
@@ -627,6 +635,13 @@ extern "C" {
    * Finalize the library.
    */
   void endQuda(void);
+
+/**
+ * @brief update the radius for halos. 
+ * @details This should only be needed for automated testing when
+ * different partitioning is applied within a single run.
+ */
+  void updateR();
 
   /**
    * A new QudaGaugeParam should always be initialized immediately

@@ -782,7 +782,7 @@ namespace quda {
   }
 
   ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
-						   QudaFieldLocation new_location) {
+						   QudaFieldLocation new_location, QudaMemoryType new_mem_type) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
     coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
@@ -797,6 +797,10 @@ namespace quda {
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
 
+    // set where we allocate the field
+    coarseParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
+      (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
+
     ColorSpinorField *coarse = NULL;
     if (new_location == QUDA_CPU_FIELD_LOCATION) {
       coarse = new cpuColorSpinorField(coarseParam);
@@ -810,7 +814,7 @@ namespace quda {
   }
 
   ColorSpinorField* ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec,
-						 QudaFieldLocation new_location) {
+						 QudaFieldLocation new_location, QudaMemoryType new_mem_type) {
     ColorSpinorParam fineParam(*this);
     for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
     fineParam.nSpin = nSpin * spinBlockSize;
@@ -826,6 +830,10 @@ namespace quda {
       fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.Precision()!= QUDA_DOUBLE_PRECISION) ?
 	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
     }
+
+    // set where we allocate the field
+    fineParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
+      (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
 
     ColorSpinorField *fine = NULL;
     if (new_location == QUDA_CPU_FIELD_LOCATION) {

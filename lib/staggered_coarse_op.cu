@@ -209,6 +209,7 @@ namespace quda {
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
     UVparam.setPrecision(T.Vectors(location).Precision());
+    UVparam.mem_type = Y.MemType(); // allocate temporaries to match coarse-grid link field
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 

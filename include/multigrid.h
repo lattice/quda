@@ -328,6 +328,11 @@ namespace quda {
     void createSmoother();
 
     /**
+       @brief Destroy the smoothers
+    */
+    void destroySmoother();
+
+    /**
        @brief Create the coarse dirac operator
     */
     void createCoarseDirac();
@@ -336,6 +341,11 @@ namespace quda {
        @brief Create the solver wrapper
     */
     void createCoarseSolver();
+
+    /**
+       @brief Destroy the solver wrapper
+    */
+    void destroyCoarseSolver();
 
     /**
        This method verifies the correctness of the MG method.  It checks:

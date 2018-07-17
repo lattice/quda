@@ -484,6 +484,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(chrono_index, INVALID_INT);
 #endif
 
+#if !defined CHECK_PARAM
+  P(chrono_precision, QUDA_INVALID_PRECISION);
+#else
+  // default the chrono precision to using outer precision
+  if (param->chrono_precision == QUDA_INVALID_PRECISION) param->chrono_precision = param->cuda_prec;
+#endif
+
 #if defined INIT_PARAM
   P(extlib_type, QUDA_EIGEN_EXTLIB);
 #else
@@ -617,6 +624,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_location[i], QUDA_INVALID_FIELD_LOCATION);
 #endif
   }
+
+#ifdef INIT_PARAM
+  P(setup_minimize_memory, QUDA_BOOLEAN_NO);
+#else
+  P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
+#endif
 
   P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(generate_all_levels, QUDA_BOOLEAN_INVALID);

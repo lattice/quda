@@ -56,6 +56,14 @@ namespace quda {
   static long total_host_bytes, max_total_host_bytes;
   static long total_pinned_bytes, max_total_pinned_bytes;
 
+  long device_allocated_peak() { return max_total_bytes[DEVICE]; }
+
+  long pinned_allocated_peak() { return max_total_bytes[PINNED]; }
+
+  long mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+
+  long host_allocated_peak() { return max_total_bytes[HOST]; }
+
   static void print_trace (void) {
     void *array[10];
     size_t size;

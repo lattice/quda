@@ -641,7 +641,8 @@ namespace quda {
       : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
         nParity(out.SiteSubset()), nSrc(out.Ndim()==5 ? out.X(4) : 1)
     {
-      strcpy(aux, out.AuxString());
+      strcpy(aux, "policy_kernel,");
+      strcat(aux, out.AuxString());
       strcat(aux, comm_dim_partitioned_string());
 
       // record the location of where each pack buffer is in [2*dim+dir] ordering

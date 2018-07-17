@@ -40,7 +40,17 @@ namespace quda {
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      gauge = pool_device_malloc(bytes);
+      switch(mem_type) {
+      case QUDA_MEMORY_DEVICE:
+	gauge = pool_device_malloc(bytes);
+	break;
+      case QUDA_MEMORY_MAPPED:
+        gauge_h = mapped_malloc(bytes);
+	cudaHostGetDevicePointer(&gauge, gauge_h, 0); // set the matching device pointer
+	break;
+      default:
+	errorQuda("Unsupported memory type %d", mem_type);
+      }
       if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
     } else {
       gauge = param.gauge;
@@ -179,7 +189,16 @@ namespace quda {
     destroyComms();
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      if (gauge) pool_device_free(gauge);
+      switch(mem_type) {
+      case QUDA_MEMORY_DEVICE:
+        if (gauge) pool_device_free(gauge);
+        break;
+      case QUDA_MEMORY_MAPPED:
+        if (gauge_h) host_free(gauge_h);
+        break;
+      default:
+        errorQuda("Unsupported memory type %d", mem_type);
+      }
     }
 
     if ( !isNative() ) {

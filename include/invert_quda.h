@@ -123,9 +123,12 @@ namespace quda {
     /**< Preserve the source or not in the linear solver (deprecated?) */
     QudaPreserveSource preserve_source;
 
+    /**< Whether the source vector should contain the residual vector
+       when the solver returns */
+    bool return_residual;
+
     /**< Domain overlap to use in the preconditioning */
     int overlap_precondition;
-
 
     /**< Number of sources in the multi-src solver */
     int num_src;
@@ -152,7 +155,6 @@ namespace quda {
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT];
-
 
     /** Number of steps in s-step algorithms */
     int Nsteps;
@@ -235,7 +237,9 @@ namespace quda {
       true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
       precision_precondition(param.cuda_prec_precondition),
-      preserve_source(param.preserve_source), num_src(param.num_src), num_offset(param.num_offset),
+      preserve_source(param.preserve_source),
+      return_residual(preserve_source == QUDA_PRESERVE_SOURCE_NO ? true : false),
+      num_src(param.num_src), num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle),
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
@@ -270,7 +274,8 @@ namespace quda {
       true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.precision), precision_sloppy(param.precision_sloppy),
       precision_precondition(param.precision_precondition),
-      preserve_source(param.preserve_source), num_offset(param.num_offset),
+      preserve_source(param.preserve_source), return_residual(param.return_residual),
+      num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.Nkrylov), precondition_cycle(param.precondition_cycle),
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
@@ -732,18 +737,19 @@ namespace quda {
 
     /**
        @brief Initiate the fields needed by the solver
-       @param[in] meta Field used for solver meta data
+       @param[in] b Source vector used for solver meta data.  If we're
+       not preserving the source vector and we have a uni-precision
+       solver, we set p[0] = b to save memory and memory copying.
     */
-    void create(const ColorSpinorField &meta);
+    void create(ColorSpinorField &b);
 
     /**
-       @brief Solve the equation A p_k psi_k = b by minimizing the
+       @brief Solve the equation A p_k psi_k = q_k psi_k = b by minimizing the
        residual and using Eigen's SVD algorithm for numerical stability
        @param[out] psi Array of coefficients
-       @param[in] p] Search direction vectors
        @param[in] q Search direction vectors with the operator applied
     */
-    void solve(Complex *psi_, std::vector<ColorSpinorField*> &p, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
+    void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
 
   public:
     CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
@@ -865,6 +871,17 @@ namespace quda {
     bool apply_mat; //! Whether to compute q = Ap or assume it is provided
     bool hermitian; //! whether A is hermitian ot not
     TimeProfile &profile;
+
+    /**
+       @brief Solve the equation A p_k psi_k = q_k psi_k = b by minimizing the
+       residual and using Eigen's SVD algorithm for numerical stability
+       @param[out] psi Array of coefficients
+       @param[in] p Search direction vectors
+       @param[in] q Search direction vectors with the operator applied
+       @param[in] hermitian Whether the linear system is Hermitian or not
+    */
+    void solve(Complex *psi_, std::vector<ColorSpinorField*> &p,
+               std::vector<ColorSpinorField*> &q, ColorSpinorField &b, bool hermitian);
 
   public:
     /**
