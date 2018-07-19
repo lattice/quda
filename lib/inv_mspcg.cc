@@ -10,6 +10,8 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 
+#include <limits>
+
 #include <inv_mspcg.h>
 
 extern quda::cudaGaugeField* gaugePrecondition;
@@ -754,7 +756,6 @@ namespace quda {
     int k;
     //    int parity = nrm_op->getMatPCType();
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
-
     double stop = stopping(param.tol, b2, param.residual_type);
 
     test_dslash(db);
@@ -773,6 +774,32 @@ namespace quda {
 
     double r2_max = r2;
     int num_reliable_updates = 0;
+// reliable update
+		
+		const double u = param.precision_sloppy==8?std::numeric_limits<double>::epsilon()/2.:((param.precision_sloppy==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
+		const double uhigh = param.precision==8?std::numeric_limits<double>::epsilon()/2.:((param.precision==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
+		const double deps = sqrt(u);
+		const double dfac = 1.1;
+		double d_new = 0.;
+		double d = 0.;
+		double dinit = 0.;
+
+		double xnorm = 0.;
+		double pnorm = 0.;
+		double ppnorm = 0.;
+
+		double rNorm = sqrt(r2);
+		double r2_old;
+		double r0Norm = rNorm;
+
+		(*nrm_op)(*vct_dp, db, *vct_dtmp);
+		double Anorm = sqrt( blas::norm2(*vct_dp)/b2 ); // the matrix norm
+
+		dinit = uhigh * rNorm;
+		d = dinit;
+
+// reliable update
+
 
     blas::copy(*r, *vct_dr); // throw true residual into the sloppy solver.
     blas::zero(*x);
@@ -783,6 +810,8 @@ namespace quda {
     blas::copy(*fr, *r);
 
     sloppy_timer.Start("woo", "hoo", 0);
+
+		double rr2 = r2;
 
     preconditioner_timer.Start("woo", "hoo", 0);
     if(inner_iterations <= 0){
@@ -802,37 +831,61 @@ namespace quda {
       rkzk = reDotProduct(*r, *z);
 
       (*nrm_op_sloppy)(*mmp, *p, *tmp);
-      pkApk = reDotProduct(*p, *mmp);
-      alpha = rkzk / pkApk;
+      
+			r2_old = rr2;
+			double3 pAppp = blas::cDotProductNormA(*p, *mmp);
+//			pkApk = reDotProduct(*p, *mmp);
+			pkApk = pAppp.x;
+			ppnorm = pAppp.z;
+
+			alpha = rkzk / pkApk;
 
       blas::copy(*r_old, *r);
 
       axpy(alpha, *p, *x); // x_k+1 = x_k + alpha * p_k
-      double rr2 = axpyNorm(-alpha, *mmp, *r); // r_k+1 = r_k - alpha * Ap_k
+      rr2 = axpyNorm(-alpha, *mmp, *r); // r_k+1 = r_k - alpha * Ap_k
+			rNorm = sqrt(rr2);
 
       // reliable update
-    
+   
       
       if( rr2 > r2_max ) r2_max = rr2;
-      if( rr2 < reliable_update_delta*reliable_update_delta*r2_max || rr2 < stop ){
+//      if( rr2 < reliable_update_delta*reliable_update_delta*r2_max || rr2 < stop ){
+      if( rr2 < stop or ( ( (d <= deps*sqrt(r2_old)) or (dfac*dinit > deps*r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac*dinit) ) ){
+				
+				printfQuda("Reliable update conditions: \n    d_n-1 < eps*r2_old: %8.4e < %8.4e,\n    dn    > eps*r_n: %8.4e    > %8.4e,\n    dnew  > 1.1*dinit: %8.4e  > (1.1*)%8.4e.\n",
+	   			d, deps*sqrt(r2_old), d_new,deps*rNorm, d_new, dinit);
+
         precise_timer.Start("woo", "hoo", 0);
         
         blas::copy(*vct_dtmp, *x);
         xpy(*vct_dtmp, dx);
         
         (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = MdagM * x
-        r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
+        rr2 = r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
         
         blas::copy(*r, *vct_dr);
         blas::zero(*x);
         
+				dinit = uhigh*( sqrt(r2) + Anorm*sqrt(blas::norm2(dx)) );
+				d = d_new;
+				xnorm = 0.;
+				pnorm = 0.;
+
         r2_max = r2;
 
         num_reliable_updates++;
         printfQuda( "reliable update: sloppy r2 = %8.4e; precise r2 = %8.4e.\n", rr2, r2 );
         
+				d_new = dinit;
+
         precise_timer.Stop("woo", "hoo", 0);
-      }
+      }else{
+				d = d_new;
+				pnorm = pnorm + alpha*alpha*ppnorm;
+				xnorm = sqrt(pnorm);
+				d_new = d + u*rNorm + uhigh*Anorm*xnorm;
+			}
       
       
       if(rr2 < stop) break;
@@ -920,6 +973,7 @@ namespace quda {
       preconditioner_tflops/prec_time, prec_time, preconditioner_timer.count);
     printfQuda("Performance copier:                         in %8.4f secs with %05d calls.\n",
       copier_timer.time, copier_timer.count);
+    printfQuda("Flops ratio sloppy/preconditioner: %.2f.\n", preconditioner_tflops/sloppy_tflops/(double)inner_iterations);
 
     // reset the flops counters
     blas::flops = 0;
