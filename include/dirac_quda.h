@@ -455,6 +455,9 @@ namespace quda {
     void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
+		void dslash4_dslash5inv_dslash4pre_partial(ColorSpinorField &out, const ColorSpinorField &in,
+          const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4],
+          bool expanding_, std::array<int,4> Rz_) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;

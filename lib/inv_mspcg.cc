@@ -334,10 +334,17 @@ namespace quda {
     blas::zero(*iftmp);
 //    mat_precondition->Dslash4pre(*iftmp, in, parity[1]);                                // +0
     mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);        // +0
+    
+    // TODO: Test
 //    mat_precondition->Dslash4(*ifset, *iftmp, parity[0]);                               // +1
-    mat_precondition->Dslash4Partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});       // +1
+//    mat_precondition->Dslash4Partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});       // +1
+    mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});
+//    mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len2, RR2, Xs2, false, {2,2,2,2});
 //    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[0]);                            // +1
-    mat_precondition->Dslash5invPartial(*iftmp, *ifset, parity[0], sp_len1, RR1, Xs1);    // +1
+//    mat_precondition->Dslash5invPartial(*iftmp, *ifset, parity[0], sp_len1, RR1, Xs1);    // +1
+    blas::copy(*iftmp, *ifset);
+    // TODO: Test
+
 //    mat_precondition->Dslash4pre(*ifset, *iftmp, parity[0]);                            // +1
     mat_precondition->Dslash4prePartial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1);    // +1
 //    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
@@ -751,7 +758,7 @@ namespace quda {
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
     double stop = stopping(param.tol, b2, param.residual_type);
 
-//    test_dslash(db);
+    test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
