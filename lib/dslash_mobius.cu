@@ -94,7 +94,7 @@ namespace quda {
   protected:
     bool advanceBlockDim(TuneParam &param) const
     {
-      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
+      const unsigned int max_shared = deviceProp.sharedMemPerBlock; // The number 2 is a guess.
       const int step[2] = { deviceProp.warpSize, 1 };
       bool advance[2] = { false, false };
 
@@ -317,8 +317,7 @@ namespace quda {
           break;
         case 4:
           if( dslashParam.partial_length ){
-//            flops = 1320ll*dslashParam.partial_length*Ls + 144ll*dslashParam.partial_length*Ls*Ls + 3ll*Ls*(Ls-1ll);
-            flops = 1320ll*dslashParam.partial_length*Ls;
+            flops = 1320ll*dslashParam.partial_length*Ls + 144ll*dslashParam.partial_length*Ls*Ls + 3ll*Ls*(Ls-1ll);
           }else{
             flops = DslashCuda::flops() + 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
           }
@@ -418,8 +417,17 @@ namespace quda {
 		      const int *commOverride, const int DS_type, TimeProfile &profile, int sp_idx_length, int R_[4], int_fastdiv Xs_[4],
           bool expanding_, std::array<int,4> Rz_)
   {
+		static bool init = false;
 #ifdef GPU_DOMAIN_WALL_DIRAC
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
+
+		if(!init){
+			cudaFuncSetCacheConfig( MDWFDslash4Dslash5invDslash4preS8Kernel<INTERIOR_KERNEL>, cudaFuncCachePreferShared);
+			cudaFuncSetCacheConfig( MDWFDslash4Dslash5invDslash4preS12Kernel<INTERIOR_KERNEL>, cudaFuncCachePreferShared);
+			auto found = cudaFuncSetCacheConfig( MDWFDslash4Dslash5invDslash4preS18Kernel<INTERIOR_KERNEL>, cudaFuncCachePreferShared);
+			printfQuda("found?: %d\n", found);
+			init = true;
+		}
 
     DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {

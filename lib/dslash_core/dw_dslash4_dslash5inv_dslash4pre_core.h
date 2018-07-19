@@ -2227,30 +2227,350 @@ VOLATILE spinorFloat kappa;
   }
 } // end of M5inv dimension
 
-//o00_re = p00_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o00_im = p00_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o01_re = p01_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o01_im = p01_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o02_re = p02_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o02_im = p02_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o10_re = p10_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o10_im = p10_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o11_re = p11_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o11_im = p11_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o12_re = p12_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o12_im = p12_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o20_re = p20_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o20_im = p20_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o21_re = p21_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o21_im = p21_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o22_re = p22_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o22_im = p22_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o30_re = p30_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o30_im = p30_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o31_re = p31_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o31_im = p31_im[ coord[4]*blockDim.x+threadIdx.x ];
-//o32_re = p32_re[ coord[4]*blockDim.x+threadIdx.x ];
-//o32_im = p32_im[ coord[4]*blockDim.x+threadIdx.x ];
+// Again store the fermions and zero.
+
+p00_re[ coord[4]*blockDim.x+threadIdx.x ] = o00_re;
+p00_im[ coord[4]*blockDim.x+threadIdx.x ] = o00_im;
+p01_re[ coord[4]*blockDim.x+threadIdx.x ] = o01_re;
+p01_im[ coord[4]*blockDim.x+threadIdx.x ] = o01_im;
+p02_re[ coord[4]*blockDim.x+threadIdx.x ] = o02_re;
+p02_im[ coord[4]*blockDim.x+threadIdx.x ] = o02_im;
+p10_re[ coord[4]*blockDim.x+threadIdx.x ] = o10_re;
+p10_im[ coord[4]*blockDim.x+threadIdx.x ] = o10_im;
+p11_re[ coord[4]*blockDim.x+threadIdx.x ] = o11_re;
+p11_im[ coord[4]*blockDim.x+threadIdx.x ] = o11_im;
+p12_re[ coord[4]*blockDim.x+threadIdx.x ] = o12_re;
+p12_im[ coord[4]*blockDim.x+threadIdx.x ] = o12_im;
+p20_re[ coord[4]*blockDim.x+threadIdx.x ] = o20_re;
+p20_im[ coord[4]*blockDim.x+threadIdx.x ] = o20_im;
+p21_re[ coord[4]*blockDim.x+threadIdx.x ] = o21_re;
+p21_im[ coord[4]*blockDim.x+threadIdx.x ] = o21_im;
+p22_re[ coord[4]*blockDim.x+threadIdx.x ] = o22_re;
+p22_im[ coord[4]*blockDim.x+threadIdx.x ] = o22_im;
+p30_re[ coord[4]*blockDim.x+threadIdx.x ] = o30_re;
+p30_im[ coord[4]*blockDim.x+threadIdx.x ] = o30_im;
+p31_re[ coord[4]*blockDim.x+threadIdx.x ] = o31_re;
+p31_im[ coord[4]*blockDim.x+threadIdx.x ] = o31_im;
+p32_re[ coord[4]*blockDim.x+threadIdx.x ] = o32_re;
+p32_im[ coord[4]*blockDim.x+threadIdx.x ] = o32_im;
+
+o00_re = 0.;
+o00_im = 0.;
+o01_re = 0.;
+o01_im = 0.;
+o02_re = 0.;
+o02_im = 0.;
+o10_re = 0.;
+o10_im = 0.;
+o11_re = 0.;
+o11_im = 0.;
+o12_re = 0.;
+o12_im = 0.;
+o20_re = 0.;
+o20_im = 0.;
+o21_re = 0.;
+o21_im = 0.;
+o22_re = 0.;
+o22_im = 0.;
+o30_re = 0.;
+o30_im = 0.;
+o31_re = 0.;
+o31_im = 0.;
+o32_re = 0.;
+o32_im = 0.;
+
+__syncthreads();
+
+{
+// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
+  {
+//     int sp_idx = ( coord[4] == param.dc.Ls-1 ? X-(param.dc.Ls-1)*2*param.dc.volume_4d_cb : X+2*param.dc.volume_4d_cb ) / 2;
+     int s = ( coord[4] == param.dc.Ls-1 ? 0 : coord[4]+1 );
+
+// read spinor from device memory
+//     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
+
+     if ( coord[4] != param.dc.Ls-1 )
+     {
+	o00_re += +p00_re[s*blockDim.x+threadIdx.x]-p20_re[s*blockDim.x+threadIdx.x];   o00_im += +p00_im[s*blockDim.x+threadIdx.x]-p20_im[s*blockDim.x+threadIdx.x];
+	o01_re += +p01_re[s*blockDim.x+threadIdx.x]-p21_re[s*blockDim.x+threadIdx.x];   o01_im += +p01_im[s*blockDim.x+threadIdx.x]-p21_im[s*blockDim.x+threadIdx.x];
+	o02_re += +p02_re[s*blockDim.x+threadIdx.x]-p22_re[s*blockDim.x+threadIdx.x];   o02_im += +p02_im[s*blockDim.x+threadIdx.x]-p22_im[s*blockDim.x+threadIdx.x];
+	
+	o10_re += +p10_re[s*blockDim.x+threadIdx.x]-p30_re[s*blockDim.x+threadIdx.x];   o10_im += +p10_im[s*blockDim.x+threadIdx.x]-p30_im[s*blockDim.x+threadIdx.x];
+	o11_re += +p11_re[s*blockDim.x+threadIdx.x]-p31_re[s*blockDim.x+threadIdx.x];   o11_im += +p11_im[s*blockDim.x+threadIdx.x]-p31_im[s*blockDim.x+threadIdx.x];
+	o12_re += +p12_re[s*blockDim.x+threadIdx.x]-p32_re[s*blockDim.x+threadIdx.x];   o12_im += +p12_im[s*blockDim.x+threadIdx.x]-p32_im[s*blockDim.x+threadIdx.x];
+	
+	o20_re += -p00_re[s*blockDim.x+threadIdx.x]+p20_re[s*blockDim.x+threadIdx.x];   o20_im += -p00_im[s*blockDim.x+threadIdx.x]+p20_im[s*blockDim.x+threadIdx.x];
+	o21_re += -p01_re[s*blockDim.x+threadIdx.x]+p21_re[s*blockDim.x+threadIdx.x];   o21_im += -p01_im[s*blockDim.x+threadIdx.x]+p21_im[s*blockDim.x+threadIdx.x];
+	o22_re += -p02_re[s*blockDim.x+threadIdx.x]+p22_re[s*blockDim.x+threadIdx.x];   o22_im += -p02_im[s*blockDim.x+threadIdx.x]+p22_im[s*blockDim.x+threadIdx.x];
+	
+	o30_re += -p10_re[s*blockDim.x+threadIdx.x]+p30_re[s*blockDim.x+threadIdx.x];   o30_im += -p10_im[s*blockDim.x+threadIdx.x]+p30_im[s*blockDim.x+threadIdx.x];
+	o31_re += -p11_re[s*blockDim.x+threadIdx.x]+p31_re[s*blockDim.x+threadIdx.x];   o31_im += -p11_im[s*blockDim.x+threadIdx.x]+p31_im[s*blockDim.x+threadIdx.x];
+	o32_re += -p12_re[s*blockDim.x+threadIdx.x]+p32_re[s*blockDim.x+threadIdx.x];   o32_im += -p12_im[s*blockDim.x+threadIdx.x]+p32_im[s*blockDim.x+threadIdx.x];
+    }
+    else
+    {
+  o00_re += -mferm*(+p00_re[s*blockDim.x+threadIdx.x]-p20_re[s*blockDim.x+threadIdx.x]);   o00_im += -mferm*(+p00_im[s*blockDim.x+threadIdx.x]-p20_im[s*blockDim.x+threadIdx.x]);
+  o01_re += -mferm*(+p01_re[s*blockDim.x+threadIdx.x]-p21_re[s*blockDim.x+threadIdx.x]);   o01_im += -mferm*(+p01_im[s*blockDim.x+threadIdx.x]-p21_im[s*blockDim.x+threadIdx.x]);
+  o02_re += -mferm*(+p02_re[s*blockDim.x+threadIdx.x]-p22_re[s*blockDim.x+threadIdx.x]);   o02_im += -mferm*(+p02_im[s*blockDim.x+threadIdx.x]-p22_im[s*blockDim.x+threadIdx.x]);
+
+  o10_re += -mferm*(+p10_re[s*blockDim.x+threadIdx.x]-p30_re[s*blockDim.x+threadIdx.x]);   o10_im += -mferm*(+p10_im[s*blockDim.x+threadIdx.x]-p30_im[s*blockDim.x+threadIdx.x]);
+  o11_re += -mferm*(+p11_re[s*blockDim.x+threadIdx.x]-p31_re[s*blockDim.x+threadIdx.x]);   o11_im += -mferm*(+p11_im[s*blockDim.x+threadIdx.x]-p31_im[s*blockDim.x+threadIdx.x]);
+  o12_re += -mferm*(+p12_re[s*blockDim.x+threadIdx.x]-p32_re[s*blockDim.x+threadIdx.x]);   o12_im += -mferm*(+p12_im[s*blockDim.x+threadIdx.x]-p32_im[s*blockDim.x+threadIdx.x]);
+
+  o20_re += -mferm*(-p00_re[s*blockDim.x+threadIdx.x]+p20_re[s*blockDim.x+threadIdx.x]);   o20_im += -mferm*(-p00_im[s*blockDim.x+threadIdx.x]+p20_im[s*blockDim.x+threadIdx.x]);
+  o21_re += -mferm*(-p01_re[s*blockDim.x+threadIdx.x]+p21_re[s*blockDim.x+threadIdx.x]);   o21_im += -mferm*(-p01_im[s*blockDim.x+threadIdx.x]+p21_im[s*blockDim.x+threadIdx.x]);
+  o22_re += -mferm*(-p02_re[s*blockDim.x+threadIdx.x]+p22_re[s*blockDim.x+threadIdx.x]);   o22_im += -mferm*(-p02_im[s*blockDim.x+threadIdx.x]+p22_im[s*blockDim.x+threadIdx.x]);
+
+  o30_re += -mferm*(-p10_re[s*blockDim.x+threadIdx.x]+p30_re[s*blockDim.x+threadIdx.x]);   o30_im += -mferm*(-p10_im[s*blockDim.x+threadIdx.x]+p30_im[s*blockDim.x+threadIdx.x]);
+  o31_re += -mferm*(-p11_re[s*blockDim.x+threadIdx.x]+p31_re[s*blockDim.x+threadIdx.x]);   o31_im += -mferm*(-p11_im[s*blockDim.x+threadIdx.x]+p31_im[s*blockDim.x+threadIdx.x]);
+  o32_re += -mferm*(-p12_re[s*blockDim.x+threadIdx.x]+p32_re[s*blockDim.x+threadIdx.x]);   o32_im += -mferm*(-p12_im[s*blockDim.x+threadIdx.x]+p32_im[s*blockDim.x+threadIdx.x]);
+    } // end if ( coord[4] != param.dc.Ls-1 )
+  } // end P_L
+
+ // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
+  {
+//    int sp_idx = ( coord[4] == 0 ? X+(param.dc.Ls-1)*2*param.dc.volume_4d_cb : X-2*param.dc.volume_4d_cb ) / 2;
+    int s = ( coord[4] == 0 ? (param.dc.Ls-1) : coord[4]-1 );
+
+// read spinor from device memory
+//    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
+
+    if ( coord[4] != 0 )
+    {
+   o00_re += +p00_re[s*blockDim.x+threadIdx.x]+p20_re[s*blockDim.x+threadIdx.x];   o00_im += +p00_im[s*blockDim.x+threadIdx.x]+p20_im[s*blockDim.x+threadIdx.x];
+   o01_re += +p01_re[s*blockDim.x+threadIdx.x]+p21_re[s*blockDim.x+threadIdx.x];   o01_im += +p01_im[s*blockDim.x+threadIdx.x]+p21_im[s*blockDim.x+threadIdx.x];
+   o02_re += +p02_re[s*blockDim.x+threadIdx.x]+p22_re[s*blockDim.x+threadIdx.x];   o02_im += +p02_im[s*blockDim.x+threadIdx.x]+p22_im[s*blockDim.x+threadIdx.x];
+
+   o10_re += +p10_re[s*blockDim.x+threadIdx.x]+p30_re[s*blockDim.x+threadIdx.x];   o10_im += +p10_im[s*blockDim.x+threadIdx.x]+p30_im[s*blockDim.x+threadIdx.x];
+   o11_re += +p11_re[s*blockDim.x+threadIdx.x]+p31_re[s*blockDim.x+threadIdx.x];   o11_im += +p11_im[s*blockDim.x+threadIdx.x]+p31_im[s*blockDim.x+threadIdx.x];
+   o12_re += +p12_re[s*blockDim.x+threadIdx.x]+p32_re[s*blockDim.x+threadIdx.x];   o12_im += +p12_im[s*blockDim.x+threadIdx.x]+p32_im[s*blockDim.x+threadIdx.x];
+
+   o20_re += +p00_re[s*blockDim.x+threadIdx.x]+p20_re[s*blockDim.x+threadIdx.x];   o20_im += +p00_im[s*blockDim.x+threadIdx.x]+p20_im[s*blockDim.x+threadIdx.x];
+   o21_re += +p01_re[s*blockDim.x+threadIdx.x]+p21_re[s*blockDim.x+threadIdx.x];   o21_im += +p01_im[s*blockDim.x+threadIdx.x]+p21_im[s*blockDim.x+threadIdx.x];
+   o22_re += +p02_re[s*blockDim.x+threadIdx.x]+p22_re[s*blockDim.x+threadIdx.x];   o22_im += +p02_im[s*blockDim.x+threadIdx.x]+p22_im[s*blockDim.x+threadIdx.x];
+
+   o30_re += +p10_re[s*blockDim.x+threadIdx.x]+p30_re[s*blockDim.x+threadIdx.x];   o30_im += +p10_im[s*blockDim.x+threadIdx.x]+p30_im[s*blockDim.x+threadIdx.x];
+   o31_re += +p11_re[s*blockDim.x+threadIdx.x]+p31_re[s*blockDim.x+threadIdx.x];   o31_im += +p11_im[s*blockDim.x+threadIdx.x]+p31_im[s*blockDim.x+threadIdx.x];
+   o32_re += +p12_re[s*blockDim.x+threadIdx.x]+p32_re[s*blockDim.x+threadIdx.x];   o32_im += +p12_im[s*blockDim.x+threadIdx.x]+p32_im[s*blockDim.x+threadIdx.x];
+    }
+    else
+    {
+   o00_re += -mferm*(+p00_re[s*blockDim.x+threadIdx.x]+p20_re[s*blockDim.x+threadIdx.x]);   o00_im += -mferm*(+p00_im[s*blockDim.x+threadIdx.x]+p20_im[s*blockDim.x+threadIdx.x]);
+   o01_re += -mferm*(+p01_re[s*blockDim.x+threadIdx.x]+p21_re[s*blockDim.x+threadIdx.x]);   o01_im += -mferm*(+p01_im[s*blockDim.x+threadIdx.x]+p21_im[s*blockDim.x+threadIdx.x]);
+   o02_re += -mferm*(+p02_re[s*blockDim.x+threadIdx.x]+p22_re[s*blockDim.x+threadIdx.x]);   o02_im += -mferm*(+p02_im[s*blockDim.x+threadIdx.x]+p22_im[s*blockDim.x+threadIdx.x]);
+
+   o10_re += -mferm*(+p10_re[s*blockDim.x+threadIdx.x]+p30_re[s*blockDim.x+threadIdx.x]);   o10_im += -mferm*(+p10_im[s*blockDim.x+threadIdx.x]+p30_im[s*blockDim.x+threadIdx.x]);
+   o11_re += -mferm*(+p11_re[s*blockDim.x+threadIdx.x]+p31_re[s*blockDim.x+threadIdx.x]);   o11_im += -mferm*(+p11_im[s*blockDim.x+threadIdx.x]+p31_im[s*blockDim.x+threadIdx.x]);
+   o12_re += -mferm*(+p12_re[s*blockDim.x+threadIdx.x]+p32_re[s*blockDim.x+threadIdx.x]);   o12_im += -mferm*(+p12_im[s*blockDim.x+threadIdx.x]+p32_im[s*blockDim.x+threadIdx.x]);
+
+   o20_re += -mferm*(+p00_re[s*blockDim.x+threadIdx.x]+p20_re[s*blockDim.x+threadIdx.x]);   o20_im += -mferm*(+p00_im[s*blockDim.x+threadIdx.x]+p20_im[s*blockDim.x+threadIdx.x]);
+   o21_re += -mferm*(+p01_re[s*blockDim.x+threadIdx.x]+p21_re[s*blockDim.x+threadIdx.x]);   o21_im += -mferm*(+p01_im[s*blockDim.x+threadIdx.x]+p21_im[s*blockDim.x+threadIdx.x]);
+   o22_re += -mferm*(+p02_re[s*blockDim.x+threadIdx.x]+p22_re[s*blockDim.x+threadIdx.x]);   o22_im += -mferm*(+p02_im[s*blockDim.x+threadIdx.x]+p22_im[s*blockDim.x+threadIdx.x]);
+
+   o30_re += -mferm*(+p10_re[s*blockDim.x+threadIdx.x]+p30_re[s*blockDim.x+threadIdx.x]);   o30_im += -mferm*(+p10_im[s*blockDim.x+threadIdx.x]+p30_im[s*blockDim.x+threadIdx.x]);
+   o31_re += -mferm*(+p11_re[s*blockDim.x+threadIdx.x]+p31_re[s*blockDim.x+threadIdx.x]);   o31_im += -mferm*(+p11_im[s*blockDim.x+threadIdx.x]+p31_im[s*blockDim.x+threadIdx.x]);
+   o32_re += -mferm*(+p12_re[s*blockDim.x+threadIdx.x]+p32_re[s*blockDim.x+threadIdx.x]);   o32_im += -mferm*(+p12_im[s*blockDim.x+threadIdx.x]+p32_im[s*blockDim.x+threadIdx.x]);
+    } // end if ( coord[4] != 0 )
+  } // end P_R
+
+  // MDWF Dslash_5 operator is given as follow
+  // Dslash4pre = [c_5(s)(P_+\delta_{s,s`+1} - mP_+\delta_{s,0}\delta_{s`,L_s-1}
+  //         + P_-\delta_{s,s`-1}-mP_-\delta_{s,L_s-1}\delta_{s`,0})
+  //         + b_5(s)\delta_{s,s`}]\delta_{x,x`}
+  // For Dslash4pre
+  // C_5 \equiv c_5(s)*0.5
+  // B_5 \equiv b_5(s)
+  // For Dslash5
+  // C_5 \equiv 0.5*{c_5(s)(4+M_5)-1}/{b_5(s)(4+M_5)+1}
+  // B_5 \equiv 1.0
+#ifdef MDWF_mode   // Check whether MDWF option is enabled
+//#if (MDWF_mode==1)
+  VOLATILE spinorFloat C_5;
+  VOLATILE spinorFloat B_5;
+  C_5 = mdwf_c5[ coord[4] ]*static_cast<spinorFloat>(0.5);
+  B_5 = mdwf_b5[ coord[4] ];
+
+//  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
+  o00_re = C_5*o00_re + B_5*p00_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o00_im = C_5*o00_im + B_5*p00_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o01_re = C_5*o01_re + B_5*p01_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o01_im = C_5*o01_im + B_5*p01_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o02_re = C_5*o02_re + B_5*p02_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o02_im = C_5*o02_im + B_5*p02_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o10_re = C_5*o10_re + B_5*p10_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o10_im = C_5*o10_im + B_5*p10_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o11_re = C_5*o11_re + B_5*p11_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o11_im = C_5*o11_im + B_5*p11_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o12_re = C_5*o12_re + B_5*p12_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o12_im = C_5*o12_im + B_5*p12_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o20_re = C_5*o20_re + B_5*p20_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o20_im = C_5*o20_im + B_5*p20_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o21_re = C_5*o21_re + B_5*p21_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o21_im = C_5*o21_im + B_5*p21_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o22_re = C_5*o22_re + B_5*p22_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o22_im = C_5*o22_im + B_5*p22_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o30_re = C_5*o30_re + B_5*p30_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o30_im = C_5*o30_im + B_5*p30_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o31_re = C_5*o31_re + B_5*p31_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o31_im = C_5*o31_im + B_5*p31_im[ coord[4]*blockDim.x+threadIdx.x ];
+  o32_re = C_5*o32_re + B_5*p32_re[ coord[4]*blockDim.x+threadIdx.x ];
+  o32_im = C_5*o32_im + B_5*p32_im[ coord[4]*blockDim.x+threadIdx.x ];
+//#elif (MDWF_mode==2)
+//  VOLATILE spinorFloat C_5;
+//  C_5 = static_cast<spinorFloat>(0.5)*(mdwf_c5[ coord[4] ]*(m5+static_cast<spinorFloat>(4.0)) - static_cast<spinorFloat>(1.0))/(mdwf_b5[ coord[4] ]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
+//
+//  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
+//  o00_re = C_5*o00_re + i00_re;
+//  o00_im = C_5*o00_im + i00_im;
+//  o01_re = C_5*o01_re + i01_re;
+//  o01_im = C_5*o01_im + i01_im;
+//  o02_re = C_5*o02_re + i02_re;
+//  o02_im = C_5*o02_im + i02_im;
+//  o10_re = C_5*o10_re + i10_re;
+//  o10_im = C_5*o10_im + i10_im;
+//  o11_re = C_5*o11_re + i11_re;
+//  o11_im = C_5*o11_im + i11_im;
+//  o12_re = C_5*o12_re + i12_re;
+//  o12_im = C_5*o12_im + i12_im;
+//  o20_re = C_5*o20_re + i20_re;
+//  o20_im = C_5*o20_im + i20_im;
+//  o21_re = C_5*o21_re + i21_re;
+//  o21_im = C_5*o21_im + i21_im;
+//  o22_re = C_5*o22_re + i22_re;
+//  o22_im = C_5*o22_im + i22_im;
+//  o30_re = C_5*o30_re + i30_re;
+//  o30_im = C_5*o30_im + i30_im;
+//  o31_re = C_5*o31_re + i31_re;
+//  o31_im = C_5*o31_im + i31_im;
+//  o32_re = C_5*o32_re + i32_re;
+//  o32_im = C_5*o32_im + i32_im;
+//#endif  // select MDWF mode
+#endif  // check MDWF on/off
+} // end 5th dimension
+
+{ // Again ignore the XPAY for now.
+/*
+#ifdef DSLASH_XPAY
+ READ_ACCUM(ACCUMTEX, param.sp_stride)
+ VOLATILE spinorFloat coeff;
+
+#ifdef MDWF_mode
+ coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[coord[4]]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
+ coeff *= coeff;
+ coeff *= a;
+#else
+ coeff = a;
+#endif
+
+#ifdef YPAX
+#ifdef SPINOR_DOUBLE
+ o00_re = o00_re + coeff*accum0.x;
+ o00_im = o00_im + coeff*accum0.y;
+ o01_re = o01_re + coeff*accum1.x;
+ o01_im = o01_im + coeff*accum1.y;
+ o02_re = o02_re + coeff*accum2.x;
+ o02_im = o02_im + coeff*accum2.y;
+ o10_re = o10_re + coeff*accum3.x;
+ o10_im = o10_im + coeff*accum3.y;
+ o11_re = o11_re + coeff*accum4.x;
+ o11_im = o11_im + coeff*accum4.y;
+ o12_re = o12_re + coeff*accum5.x;
+ o12_im = o12_im + coeff*accum5.y;
+ o20_re = o20_re + coeff*accum6.x;
+ o20_im = o20_im + coeff*accum6.y;
+ o21_re = o21_re + coeff*accum7.x;
+ o21_im = o21_im + coeff*accum7.y;
+ o22_re = o22_re + coeff*accum8.x;
+ o22_im = o22_im + coeff*accum8.y;
+ o30_re = o30_re + coeff*accum9.x;
+ o30_im = o30_im + coeff*accum9.y;
+ o31_re = o31_re + coeff*accum10.x;
+ o31_im = o31_im + coeff*accum10.y;
+ o32_re = o32_re + coeff*accum11.x;
+ o32_im = o32_im + coeff*accum11.y;
+#else
+ o00_re = o00_re + coeff*accum0.x;
+ o00_im = o00_im + coeff*accum0.y;
+ o01_re = o01_re + coeff*accum0.z;
+ o01_im = o01_im + coeff*accum0.w;
+ o02_re = o02_re + coeff*accum1.x;
+ o02_im = o02_im + coeff*accum1.y;
+ o10_re = o10_re + coeff*accum1.z;
+ o10_im = o10_im + coeff*accum1.w;
+ o11_re = o11_re + coeff*accum2.x;
+ o11_im = o11_im + coeff*accum2.y;
+ o12_re = o12_re + coeff*accum2.z;
+ o12_im = o12_im + coeff*accum2.w;
+ o20_re = o20_re + coeff*accum3.x;
+ o20_im = o20_im + coeff*accum3.y;
+ o21_re = o21_re + coeff*accum3.z;
+ o21_im = o21_im + coeff*accum3.w;
+ o22_re = o22_re + coeff*accum4.x;
+ o22_im = o22_im + coeff*accum4.y;
+ o30_re = o30_re + coeff*accum4.z;
+ o30_im = o30_im + coeff*accum4.w;
+ o31_re = o31_re + coeff*accum5.x;
+ o31_im = o31_im + coeff*accum5.y;
+ o32_re = o32_re + coeff*accum5.z;
+ o32_im = o32_im + coeff*accum5.w;
+#endif // SPINOR_DOUBLE
+#else
+#ifdef SPINOR_DOUBLE
+ o00_re = coeff*o00_re + accum0.x;
+ o00_im = coeff*o00_im + accum0.y;
+ o01_re = coeff*o01_re + accum1.x;
+ o01_im = coeff*o01_im + accum1.y;
+ o02_re = coeff*o02_re + accum2.x;
+ o02_im = coeff*o02_im + accum2.y;
+ o10_re = coeff*o10_re + accum3.x;
+ o10_im = coeff*o10_im + accum3.y;
+ o11_re = coeff*o11_re + accum4.x;
+ o11_im = coeff*o11_im + accum4.y;
+ o12_re = coeff*o12_re + accum5.x;
+ o12_im = coeff*o12_im + accum5.y;
+ o20_re = coeff*o20_re + accum6.x;
+ o20_im = coeff*o20_im + accum6.y;
+ o21_re = coeff*o21_re + accum7.x;
+ o21_im = coeff*o21_im + accum7.y;
+ o22_re = coeff*o22_re + accum8.x;
+ o22_im = coeff*o22_im + accum8.y;
+ o30_re = coeff*o30_re + accum9.x;
+ o30_im = coeff*o30_im + accum9.y;
+ o31_re = coeff*o31_re + accum10.x;
+ o31_im = coeff*o31_im + accum10.y;
+ o32_re = coeff*o32_re + accum11.x;
+ o32_im = coeff*o32_im + accum11.y;
+#else
+ o00_re = coeff*o00_re + accum0.x;
+ o00_im = coeff*o00_im + accum0.y;
+ o01_re = coeff*o01_re + accum0.z;
+ o01_im = coeff*o01_im + accum0.w;
+ o02_re = coeff*o02_re + accum1.x;
+ o02_im = coeff*o02_im + accum1.y;
+ o10_re = coeff*o10_re + accum1.z;
+ o10_im = coeff*o10_im + accum1.w;
+ o11_re = coeff*o11_re + accum2.x;
+ o11_im = coeff*o11_im + accum2.y;
+ o12_re = coeff*o12_re + accum2.z;
+ o12_im = coeff*o12_im + accum2.w;
+ o20_re = coeff*o20_re + accum3.x;
+ o20_im = coeff*o20_im + accum3.y;
+ o21_re = coeff*o21_re + accum3.z;
+ o21_im = coeff*o21_im + accum3.w;
+ o22_re = coeff*o22_re + accum4.x;
+ o22_im = coeff*o22_im + accum4.y;
+ o30_re = coeff*o30_re + accum4.z;
+ o30_im = coeff*o30_im + accum4.w;
+ o31_re = coeff*o31_re + accum5.x;
+ o31_im = coeff*o31_im + accum5.y;
+ o32_re = coeff*o32_re + accum5.z;
+ o32_im = coeff*o32_im + accum5.w;
+#endif // SPINOR_DOUBLE
+#endif // YPAX
+#endif // DSLASH_XPAY
+*/
+}
 
 __syncthreads();
 

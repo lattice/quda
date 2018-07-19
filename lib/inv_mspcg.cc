@@ -342,11 +342,11 @@ namespace quda {
 //    mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len2, RR2, Xs2, false, {2,2,2,2});
 //    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[0]);                            // +1
 //    mat_precondition->Dslash5invPartial(*iftmp, *ifset, parity[0], sp_len1, RR1, Xs1);    // +1
-    blas::copy(*iftmp, *ifset);
+//    blas::copy(*iftmp, *ifset);
     // TODO: Test
 
 //    mat_precondition->Dslash4pre(*ifset, *iftmp, parity[0]);                            // +1
-    mat_precondition->Dslash4prePartial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1);    // +1
+//    mat_precondition->Dslash4prePartial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1);    // +1
 //    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
 //    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
     mat_precondition->Dslash4Partial(*iftmp, *ifset, parity[1], sp_len2, RR2, Xs2, true, {1,1,1,1});                      // +2
