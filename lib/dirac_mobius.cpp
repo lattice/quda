@@ -442,5 +442,24 @@ namespace quda {
     long long wall = 2*sp_idx_length;
     flops += (72LL+48LL)*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
   }
+ 
+  void DiracMobiusPC::dslash4_dslash5inv_dslash4pre_partial(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4],
+          bool expanding_, std::array<int,4> Rz_) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+    
+    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		   &static_cast<const cudaColorSpinorField&>(in),
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 4, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
 
+    if(expanding_){
+      long long vol = (Xs_[0]+R_[0]-Rz_[0])*(Xs_[1]+R_[1]-Rz_[1])*(Xs_[2]+R_[2]-Rz_[2])*(Xs_[3]+R_[3]-Rz_[3])/2;
+      flops += 1320LL*vol*(long long)in.X(4);
+    }else{
+      flops += 1320LL*(long long)sp_idx_length*(long long)in.X(4);
+    }
+  } 
 } // namespace quda

@@ -27,6 +27,22 @@ namespace quda {
 
   namespace mobius {
 
+    template<class T>
+    struct MDWFSharedMemory
+    {
+      __device__ inline operator T*()
+      {
+        extern __shared__ int __smem[];
+        return (T*)__smem;
+      }
+
+      __device__ inline operator const T*() const
+      {
+        extern __shared__ int __smem[];
+        return (T*)__smem;
+      }
+    };
+
 #undef GPU_STAGGERED_DIRAC
 #include <dslash_constants.h>
 #include <dslash_textures.h>
@@ -41,6 +57,7 @@ namespace quda {
 #include <mdw_dslash4pre_def.h>   // Dslash4pre, intermediate operator for Mobius Mat_4 kernels
 #include <mdw_dslash5_def.h>      // Dslash5 Mobius Domain Wall kernels
 #include <mdw_dslash5inv_def.h>   // Dslash5inv Mobius Domain Wall kernels
+#include <mdw_dslash4_dslash5inv_dslash4pre_def.h>   // Dslash5inv Mobius Domain Wall kernels
 #endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
@@ -77,7 +94,7 @@ namespace quda {
   protected:
     bool advanceBlockDim(TuneParam &param) const
     {
-      const unsigned int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
+      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       const int step[2] = { deviceProp.warpSize, 1 };
       bool advance[2] = { false, false };
 
@@ -90,7 +107,8 @@ namespace quda {
       } else {
         advance[0] = true; // successfully advanced block.x
       }
-
+      
+      if(DS_type < 4){
       if (!advance[0]) {  // if failed to advance block.x, now try block.y
         param.block.y += step[1];
 
@@ -101,6 +119,7 @@ namespace quda {
         } else {
           advance[1] = true; // successfully advanced block.y
         }
+      }
       }
 
       if (advance[0] || advance[1]) {
@@ -115,7 +134,13 @@ namespace quda {
       }
     }
 
-    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerThread() const { 
+      if(DS_type >= 4){
+        return 24*(in->Precision()==8?8:4);
+      }else{
+        return 0;
+      }
+    }
   
   public:
     MDWFDslashPCCuda(cudaColorSpinorField *out, const GaugeField &gauge, const cudaColorSpinorField *in,
@@ -168,6 +193,14 @@ namespace quda {
           case 3:
             sprintf(config, ",Dslash5inv,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
             strcat(key.aux,config);
+          case 4:
+            if(dslashParam.expanding){
+              sprintf(config, ",Dslash4Dslash5invDslash4pre,partial%d,%d,%d,%d,expand%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3],
+                dslashParam.Rz[0], dslashParam.Rz[1], dslashParam.Rz[2], dslashParam.Rz[3]);
+            }else{
+              sprintf(config, ",Dslash4Dslash5invDslash4pre,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            }
+            strcat(key.aux,config);
             break;
         }
       
@@ -186,6 +219,9 @@ namespace quda {
           case 3:
             strcat(key.aux,",Dslash5inv");
             break;
+          case 4:
+            strcat(key.aux,",Dslash4Dslash5invDslash4pre");
+            break;
         }
       
       }
@@ -195,6 +231,14 @@ namespace quda {
     virtual void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
+      if(DS_type >= 4){ 
+        // For these kernels, for one 4D-site all corresponding 5D-sites have to be within the same block,
+        // since shared memory is used.
+        param.block = dim3( param.block.x, in->X(4), 1);
+      }
+      param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y;
+        printfQuda("Shared memory %08lu is larger than limit %08lu.\n", (size_t)param.shared_bytes, (size_t)deviceProp.sharedMemPerBlock);
+//      if( (size_t)param.shared_bytes > (size_t)deviceProp.sharedMemPerBlock ) 
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			 (in->X(4)+param.block.y-1) / param.block.y, 1);
       bool ok = true;
@@ -206,6 +250,12 @@ namespace quda {
     virtual void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
+      if(DS_type >= 4){ 
+        // For these kernels, for one 4D-site all corresponding 5D-sites have to be within the same block,
+        // since shared memory is used.
+        param.block = dim3( param.block.x, in->X(4), 1);
+      }
+      param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y;
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			 (in->X(4)+param.block.y-1) / param.block.y, 1);
       bool ok = true;
@@ -232,6 +282,9 @@ namespace quda {
           break;
         case 3:
           DSLASH(MDWFDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+          break;
+        case 4:
+          DSLASH(MDWFDslash4Dslash5invDslash4pre, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
           break;
         default:
           errorQuda("invalid Dslash type");
@@ -261,6 +314,14 @@ namespace quda {
         case 3:
           flops = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
           break;
+        case 4:
+          if( dslashParam.partial_length ){
+            flops = 1320ll*dslashParam.partial_length*Ls;+144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
+//            flops = 1320ll*dslashParam.partial_length*Ls;
+          }else{
+            flops = DslashCuda::flops();
+          }
+          break;
         default:
           errorQuda("invalid Dslash type");
       }
@@ -275,6 +336,7 @@ namespace quda {
 
       switch(DS_type){
         case 0:
+        case 4:
           if( dslashParam.partial_length ){
             bytes = 15ll * spinor_bytes * in->VolumeCB();
           }else{
