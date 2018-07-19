@@ -112,7 +112,6 @@ void init(int precision, QudaReconstructType link_recon) {
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gaugeParam.gaugeGiB = 0;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = prec;
@@ -148,7 +147,7 @@ void init(int precision, QudaReconstructType link_recon) {
   }
   csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
-  csParam.precision = inv_param.cpu_prec;
+  csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
   if (test_type < 2) {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
@@ -244,7 +243,7 @@ void init(int precision, QudaReconstructType link_recon) {
 
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     csParam.pad = inv_param.sp_pad;
-    csParam.precision = inv_param.cuda_prec;
+    csParam.setPrecision(inv_param.cuda_prec);
     if (test_type < 2){
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /=2;
