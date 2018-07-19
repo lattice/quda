@@ -193,7 +193,8 @@ namespace quda {
           case 3:
             sprintf(config, ",Dslash5inv,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
             strcat(key.aux,config);
-          case 4:
+          	break;
+					case 4:
             if(dslashParam.expanding){
               sprintf(config, ",Dslash4Dslash5invDslash4pre,partial%d,%d,%d,%d,expand%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3],
                 dslashParam.Rz[0], dslashParam.Rz[1], dslashParam.Rz[2], dslashParam.Rz[3]);
@@ -316,10 +317,10 @@ namespace quda {
           break;
         case 4:
           if( dslashParam.partial_length ){
-            flops = 1320ll*dslashParam.partial_length*Ls;+144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
-//            flops = 1320ll*dslashParam.partial_length*Ls;
+//            flops = 1320ll*dslashParam.partial_length*Ls + 144ll*dslashParam.partial_length*Ls*Ls + 3ll*Ls*(Ls-1ll);
+            flops = 1320ll*dslashParam.partial_length*Ls;
           }else{
-            flops = DslashCuda::flops();
+            flops = DslashCuda::flops() + 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
           }
           break;
         default:

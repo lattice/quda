@@ -389,8 +389,8 @@ namespace quda {
       copyExtendedColorSpinor(*ifp, *ip, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
 //      copier_timer.Stop("woo", "hoo", 0);
 //      zero_extended_color_spinor_interface( *ifp, R, QUDA_CUDA_FIELD_LOCATION, 0);
-//      inner_dslash(*ifmmp, *ifp);
-      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
+      inner_dslash(*ifmmp, *ifp);
+//      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
 //      copier_timer.Start("woo", "hoo", 0);
       copyExtendedColorSpinor(*immp, *ifmmp, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
 //      copier_timer.Stop("woo", "hoo", 0);
