@@ -855,7 +855,7 @@ namespace quda {
         xpy(*vct_dtmp, dx);
         
         (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = MdagM * x
-        rr2 = r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
+        r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
         
         blas::copy(*r, *vct_dr);
         blas::zero(*x);
@@ -870,6 +870,8 @@ namespace quda {
         num_reliable_updates++;
         printfQuda( "reliable update: sloppy r2 = %8.4e; precise r2 = %8.4e.\n", rr2, r2 );
         
+        rr2 = r2;
+
 				d_new = dinit;
 
         precise_timer.Stop("woo", "hoo", 0);
