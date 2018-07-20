@@ -1980,7 +1980,7 @@ case EXTERIOR_KERNEL_Y:
 if (!incomplete)
 #endif // MULTI_GPU
 {
-
+/*
 #ifdef DSLASH_XPAY
  READ_ACCUM(ACCUMTEX, param.sp_stride)
  VOLATILE spinorFloat coeff;
@@ -2043,6 +2043,7 @@ if (!incomplete)
  o32_im = coeff*o32_im + accum5.w;
 #endif // SPINOR_DOUBLE
 #endif // DSLASH_XPAY
+*/
 }
 
 // So now the Dslash4 is done. Instead of writing the results to global memory 
