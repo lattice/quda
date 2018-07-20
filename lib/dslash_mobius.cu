@@ -58,6 +58,8 @@ namespace quda {
 #include <mdw_dslash5_def.h>      // Dslash5 Mobius Domain Wall kernels
 #include <mdw_dslash5inv_def.h>   // Dslash5inv Mobius Domain Wall kernels
 #include <mdw_dslash4_dslash5inv_dslash4pre_def.h>   // Dslash5inv Mobius Domain Wall kernels
+#include <mdw_dslash4_dslash5inv_xpay_dslash5inv_dagger_def.h>   // Dslash5inv Mobius Domain Wall kernels
+#include <mdw_dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_def.h>
 #endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
@@ -203,6 +205,27 @@ namespace quda {
             }
             strcat(key.aux,config);
             break;
+					case 5:
+            if(dslashParam.expanding){
+              sprintf(config, ",Dslash4Dslash5invXpayDslash5invDagger,partial%d,%d,%d,%d,expand%d,%d,%d,%d", 
+								dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3],
+                dslashParam.Rz[0], dslashParam.Rz[1], dslashParam.Rz[2], dslashParam.Rz[3]);
+            }else{
+              sprintf(config, ",Dslash4Dslash5invXpayDslash5invDagger,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            }
+            strcat(key.aux,config);
+            break;
+					case 6:
+            if(dslashParam.expanding){
+              sprintf(config, ",Dslash4DaggerDslash4preDaggerDslash5invDagger,partial%d,%d,%d,%d,expand%d,%d,%d,%d", 
+								dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3],
+                dslashParam.Rz[0], dslashParam.Rz[1], dslashParam.Rz[2], dslashParam.Rz[3]);
+            }else{
+              sprintf(config, ",Dslash4DaggerDslash4preDaggerDslash5invDagger,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            }
+            strcat(key.aux,config);
+            break;
+
         }
       
       }else{
@@ -222,6 +245,12 @@ namespace quda {
             break;
           case 4:
             strcat(key.aux,",Dslash4Dslash5invDslash4pre");
+            break;
+					case 5:
+            strcat(key.aux,",Dslash4Dslash5invXpayDslash5invDagger");
+            break;
+					case 6:
+            strcat(key.aux,",Dslash4DaggerDslash4preDaggerDslash5invDagger");
             break;
         }
       
@@ -287,6 +316,12 @@ namespace quda {
         case 4:
           DSLASH(MDWFDslash4Dslash5invDslash4pre, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
           break;
+				case 5:
+          DSLASH(MDWFDslash4Dslash5invXpayDslash5invDagger, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+          break;
+				case 6:
+          DSLASH(MDWFDslash4DaggerDslash4preDaggerDslash5invDagger, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+          break;
         default:
           errorQuda("invalid Dslash type");
       }
@@ -316,6 +351,14 @@ namespace quda {
           flops = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
           break;
         case 4:
+				case 6:
+          if( dslashParam.partial_length ){
+            flops = 1320ll*dslashParam.partial_length*Ls + 144ll*dslashParam.partial_length*Ls*Ls + 3ll*Ls*(Ls-1ll);
+          }else{
+            flops = DslashCuda::flops() + 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
+          }
+					break;
+				case 5:
           if( dslashParam.partial_length ){
             flops = 1320ll*dslashParam.partial_length*Ls + 144ll*dslashParam.partial_length*Ls*Ls + 3ll*Ls*(Ls-1ll);
           }else{
@@ -337,6 +380,8 @@ namespace quda {
       switch(DS_type){
         case 0:
         case 4:
+				case 5:
+				case 6:
           if( dslashParam.partial_length ){
             bytes = 15ll * spinor_bytes * in->VolumeCB();
           }else{

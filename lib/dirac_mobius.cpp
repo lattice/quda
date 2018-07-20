@@ -467,5 +467,49 @@ namespace quda {
     }else{
       flops += 1320LL*(long long)sp_idx_length*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL) + 72LL*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
     }
+  }
+	
+	void DiracMobiusPC::dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+    
+    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		   &static_cast<const cudaColorSpinorField&>(in),
+		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 6, profile, sp_idx_length, R_, Xs_);
+    
+    long long Ls = in.X(4);
+		long long bulk = (Ls-2)*sp_idx_length;
+    long long wall = 2*sp_idx_length;
+    flops += 1320LL*(long long)sp_idx_length*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL) + 72LL*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
+  }
+
+	void DiracMobiusPC::dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, const ColorSpinorField &x, const double &k, int sp_idx_length, int R_[4], int_fastdiv Xs_[4],
+          bool expanding_, std::array<int,4> Rz_) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+    
+    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		   &static_cast<const cudaColorSpinorField&>(in),
+		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
+			 mass, k,b_5, c_5, m5, commDim, 5, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
+    
+    long long Ls = in.X(4);
+		long long bulk = (Ls-2)*sp_idx_length;
+    long long wall = 2*sp_idx_length;
+
+    if(expanding_){
+      long long vol = (Xs_[0]+R_[0]-Rz_[0])*(Xs_[1]+R_[1]-Rz_[1])*(Xs_[2]+R_[2]-Rz_[2])*(Xs_[3]+R_[3]-Rz_[3])/2;
+//      flops += 1320LL*vol*(long long)in.X(4) + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+      flops += 1320LL*vol*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+//			printfQuda("ddd flops: %lld, this: %lld,\n", flops, 1320LL*vol*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL) );
+    }else{
+      flops += 1320LL*(long long)sp_idx_length*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+    }
   } 
 } // namespace quda
