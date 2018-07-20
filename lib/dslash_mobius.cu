@@ -97,7 +97,8 @@ namespace quda {
   protected:
     bool advanceBlockDim(TuneParam &param) const
     {
-      const unsigned int max_shared = deviceProp.sharedMemPerBlock; // The number 2 is a guess.
+//      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
+      const unsigned int max_shared = deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock;
       const int step[2] = { deviceProp.warpSize, 1 };
       bool advance[2] = { false, false };
 
@@ -134,6 +135,31 @@ namespace quda {
         return advance;
       } else {
         return false;
+      }
+    }
+
+		bool advanceSharedBytes(TuneParam &param) const
+    {
+      if (tuneSharedBytes()) {
+//				const int max_shared = deviceProp.sharedMemPerBlock;
+				const unsigned int max_shared = deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock;
+				const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), maxBlocksPerSM());
+				int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
+				if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
+				param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
+			
+				if (param.shared_bytes > max_shared) {
+				  TuneParam next(param);
+				  advanceBlockDim(next); // to get next blockDim
+				  int nthreads = next.block.x * next.block.y * next.block.z;
+				  param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
+				    sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+				  return false;
+				} else {
+				  return true;
+				}
+      } else {
+				return false;
       }
     }
 
@@ -280,7 +306,7 @@ namespace quda {
         param.block = dim3( param.block.x, in->X(4), 1);
       }
       param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y;
-        printfQuda("Shared memory %08lu is larger than limit %08lu.\n", (size_t)param.shared_bytes, (size_t)deviceProp.sharedMemPerBlock);
+        printfQuda( "Shared memory %08lu is larger than limit %08lu.\n", (size_t)param.shared_bytes, (size_t)(deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock) );
 //      if( (size_t)param.shared_bytes > (size_t)deviceProp.sharedMemPerBlock ) 
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			 (in->X(4)+param.block.y-1) / param.block.y, 1);
@@ -311,7 +337,8 @@ namespace quda {
 #ifndef USE_TEXTURE_OBJECTS
       if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+//      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
       setParam();
       switch(DS_type){
         case 0:
@@ -472,7 +499,26 @@ namespace quda {
     errorQuda("Domain wall dslash has not been built");
 #endif
   }
-  
+ 
+	void set_shared_memory_on_volta(const void* f, const char* name){
+			cudaDeviceProp device_prop;
+			cudaGetDeviceProperties( &device_prop, 0 );
+			if(device_prop.major < 7) return;
+			
+			auto found = qudaFuncSetAttribute(f, cudaFuncAttributeMaxDynamicSharedMemorySize, 96*1024);
+			printfQuda("Found %s: %s\n", name, cudaGetErrorString(found));
+			
+			found = qudaFuncSetAttribute(f, cudaFuncAttributePreferredSharedMemoryCarveout, 100);
+			printfQuda("Found %s: %s\n", name, cudaGetErrorString(found));
+			
+			cudaFuncAttributes cfa;
+			found = cudaFuncGetAttributes(&cfa, f);
+			printfQuda("Found %s: %s\n", name, cudaGetErrorString(found));
+			
+			printfQuda("Actual maximum:         %d\n", (int)cfa.maxDynamicSharedSizeBytes);
+			printfQuda("Actual maximum percent: %d\n", (int)cfa.preferredShmemCarveout);
+	}
+
   void mdwf_dslash_cuda_partial(cudaColorSpinorField *out, const cudaGaugeField &gauge,
 		      const cudaColorSpinorField *in, const int parity, const int dagger,
 		      const cudaColorSpinorField *x, const double &m_f, const double &k2,
@@ -485,10 +531,14 @@ namespace quda {
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
 		if(!init){
-			cudaFuncSetCacheConfig( MDWFDslash4Dslash5invDslash4preS8Kernel<INTERIOR_KERNEL>, cudaFuncCachePreferShared);
-			cudaFuncSetCacheConfig( MDWFDslash4Dslash5invDslash4preS12Kernel<INTERIOR_KERNEL>, cudaFuncCachePreferShared);
-			auto found = cudaFuncSetCacheConfig( MDWFDslash4Dslash5invDslash4preS18Kernel<INTERIOR_KERNEL>, cudaFuncCachePreferShared);
-			printfQuda("found?: %d\n", found);
+			set_shared_memory_on_volta((const void*)MDWFDslash4Dslash5invDslash4preH18Kernel<INTERIOR_KERNEL>, 
+				"MDWFDslash4Dslash5invDslash4preH18Kernel<INTERIOR_KERNEL>");
+			set_shared_memory_on_volta((const void*)MDWFDslash4Dslash5invXpayDslash5invDaggerH18XpayKernel<INTERIOR_KERNEL>, 
+				"MDWFDslash4Dslash5invXpayDslash5invDaggerH18XpayKernel<INTERIOR_KERNEL>");
+			set_shared_memory_on_volta((const void*)MDWFDslash4DaggerDslash4preDaggerDslash5invDaggerH18Kernel<INTERIOR_KERNEL>, 
+				"MDWFDslash4DaggerDslash4preDaggerDslash5invDaggerH18Kernel<INTERIOR_KERNEL>");
+			set_shared_memory_on_volta((const void*)MDWFDslash4DaggerDslash4preDaggerXpayH18XpayKernel<INTERIOR_KERNEL>, 
+				"MDWFDslash4DaggerDslash4preDaggerXpayH18XpayKernel<INTERIOR_KERNEL>");
 			init = true;
 		}
 

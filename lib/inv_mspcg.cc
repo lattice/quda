@@ -762,14 +762,14 @@ namespace quda {
       param.true_res_hq = 0.;
     }
     
-    this->allocate( db );
+		this->allocate( db );
 
     int k;
     //    int parity = nrm_op->getMatPCType();
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
     double stop = stopping(param.tol, b2, param.residual_type);
 
-    test_dslash(db);
+//    test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
