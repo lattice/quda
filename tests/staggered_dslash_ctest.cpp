@@ -82,6 +82,8 @@ extern bool kernel_pack_t;
 
 extern double mass; // the mass of the Dirac operator
 
+extern bool compute_fatlong; // build the true fat/long links or use random numbers
+
 // relativistic correction for naik term
 extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
@@ -112,7 +114,7 @@ static double max_allowed_error = 1e-11;
 int argc_copy;
 char** argv_copy;
 
-// matrix element debugging function
+// wrong, but it does what I want
 int getPrintVectorIndex(const int X[4], const int coord[4])
 {
   //x[4] = cb_index/(X[3]*X[2]*X[1]*X[0]/2);
@@ -159,11 +161,11 @@ void init(int precision, QudaReconstructType link_recon) {
     dslash_type = QUDA_ASQTAD_DSLASH;
 
   gaugeParam.anisotropy = 1.0;
-  gaugeParam.tadpole_coeff = 0.8;
-  gaugeParam.scale = (dslash_type == QUDA_ASQTAD_DSLASH) ? -1.0/(24.0*gaugeParam.tadpole_coeff*gaugeParam.tadpole_coeff) : 1.0;
+  gaugeParam.tadpole_coeff = 1.0; //0.8;
+  gaugeParam.scale = 0.0;//(dslash_type == QUDA_ASQTAD_DSLASH) ? -1.0/(24.0*gaugeParam.tadpole_coeff*gaugeParam.tadpole_coeff) : 1.0;
   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  //gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gaugeParam.type = QUDA_WILSON_LINKS;
 
@@ -228,12 +230,14 @@ void init(int precision, QudaReconstructType link_recon) {
 
   // printfQuda("Randomizing fields ...\n");
 
+  // Want to place an 
+
   spinor->Source(QUDA_RANDOM_SOURCE);
   /*int latDim[4] = {xdim,ydim,zdim,tdim};
-  int coord[4] = {1,1,1,1};
+  int coord[4] = {7,7,6,6}; // actually places it at (2,3,3,3)
   spinor->zero(); // zero before dropping a point source
-  spinor->Source(QUDA_POINT_SOURCE, getPrintVectorIndex(latDim, coord), 0, 0);
-  */
+  spinor->Source(QUDA_POINT_SOURCE, getPrintVectorIndex(latDim, coord), 0, 0);*/
+  
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
@@ -266,14 +270,23 @@ void init(int precision, QudaReconstructType link_recon) {
   // load a field WITHOUT PHASES
   if (strcmp(latfile,"")) {
     read_gauge_field(latfile, inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
+
+    // The "QUDA_STAGGERED_DSLASH" part seems strange, but it's necessary
+    // for both staggered and ASQTAD---it forces correct phasing 
+    applyGaugeFieldScaling_long(inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
+
+    //construct_fat_long_gauge_field(inlink, nullptr, 3, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
   } else {
-    //construct_fat_long_gauge_field(inlink, longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
-    createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
+    construct_fat_long_gauge_field(inlink, longlink_cpu, 2, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
+    //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
   }
+  
+  printfQuda("Loaded single links\n");
 
   // If we're doing HISQ fields, we build links both on the CPU and the GPU.
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
 
+    
     ///////////////////////////
     // Set path coefficients //
     ///////////////////////////
@@ -282,33 +295,33 @@ void init(int precision, QudaReconstructType link_recon) {
 
     // First path: create V, W links 
     double act_path_coeff_1[6] = {
-      ( 1.0/8.0),                 /* one link */
-        0.0,                      /* Naik */
-      (-1.0/8.0)*0.5,             /* simple staple */
-      ( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
-      (-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
-        0.0                       /* Lepage term */
+      ( 1.0/8.0),                 // one link 
+        0.0,                      // Naik 
+      (-1.0/8.0)*0.5,             // simple staple 
+      ( 1.0/8.0)*0.25*0.5,        // displace link in two directions 
+      (-1.0/8.0)*0.125*(1.0/6.0), // displace link in three directions 
+        0.0                       // Lepage term 
     };
 
     // Second path: create X, long links
     double act_path_coeff_2[6] = {
-      (( 1.0/8.0)+(2.0*6.0/16.0)+(1.0/8.0)),   /* one link */
-          /* One link is 1/8 as in fat7 + 2*3/8 for Lepage + 1/8 for Naik */
-      (-1.0/24.0),                             /* Naik */
-      (-1.0/8.0)*0.5,                          /* simple staple */
-      ( 1.0/8.0)*0.25*0.5,                     /* displace link in two directions */
-      (-1.0/8.0)*0.125*(1.0/6.0),              /* displace link in three directions */
-      (-2.0/16.0)                              /* Lepage term, correct O(a^2) 2x ASQTAD */
+      (( 1.0/8.0)+(2.0*6.0/16.0)+(1.0/8.0)),   // one link 
+          // One link is 1/8 as in fat7 + 2*3/8 for Lepage + 1/8 for Naik 
+      (-1.0/24.0),                             // Naik 
+      (-1.0/8.0)*0.5,                          // simple staple 
+      ( 1.0/8.0)*0.25*0.5,                     // displace link in two directions 
+      (-1.0/8.0)*0.125*(1.0/6.0),              // displace link in three directions 
+      (-2.0/16.0)                              // Lepage term, correct O(a^2) 2x ASQTAD 
     };
 
     // Paths for epsilon corrections. Not used if n_naiks = 1.
     double act_path_coeff_3[6] = {
-      ( 1.0/8.0),    /* one link b/c of Naik */
-      (-1.0/24.0),   /* Naik */
-        0.0,         /* simple staple */
-        0.0,         /* displace link in two directions */
-        0.0,         /* displace link in three directions */
-        0.0          /* Lepage term */
+      ( 1.0/8.0),    // one link b/c of Naik 
+      (-1.0/24.0),   // Naik 
+        0.0,         // simple staple 
+        0.0,         // displace link in two directions 
+        0.0,         // displace link in three directions 
+        0.0          // Lepage term 
     };
 
     // silence some Naik complaining
@@ -397,7 +410,7 @@ void init(int precision, QudaReconstructType link_recon) {
       }
     }
 
-  } else {
+  } else { //DSLASH_TYPE == QUDA_STAGGERED_DSLASH
     // we apply phases then copy it over
     applyGaugeFieldScaling_long(inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
 
@@ -654,10 +667,47 @@ DslashTime dslashCUDA(int niter) {
   if (stat != cudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
-  //printfQuda("CUDA Test\n");
-  /*int latDim[4] = {xdim,ydim,zdim,tdim};
+  /*
+  ColorSpinorParam param(*cudaSpinorOut);
+  param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  param.location = QUDA_CPU_FIELD_LOCATION;
+  param.create = QUDA_NULL_FIELD_CREATE;
+  param.pad = 0;
+
+  cpuColorSpinorField tmp(param);
+  tmp = *cudaSpinorOut;
+
+  printfQuda("CUDA Test\n");
+  int latDim[4] = {xdim,ydim,zdim,tdim};
   int coord[4];
-  for (int t = 0; t < 2; t++)
+
+  printfQuda("\nFat links:\n\n");
+
+  for (int i = 0; i < 8; i++) {
+    int dir = i/2; int pm = 2*(i%2)-1;
+    coord[0] = coord[1] = 7;
+    coord[2] = coord[3] = 6;
+    coord[dir] += pm;
+    coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
+    printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
+    // wrong, but whatever, it grabs the right neighbor of (2,3,3,3)
+    tmp.PrintVector(((((coord[3]*latDim[2]+coord[2])*latDim[1]+coord[1])*latDim[0]+coord[0])>>1)-(dir==0?1:0));
+  }
+
+  printfQuda("\nLong links:\n\n");
+
+  for (int i = 0; i < 8; i++) {
+    int dir = i/2; int pm = 2*(i%2)-1;
+    coord[0] = coord[1] = 7;
+    coord[2] = coord[3] = 6;
+    coord[dir] += 3*pm;
+    coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
+    printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
+    // wrong, but whatever, it grabs the right neighbor of (2,3,3,3)
+    tmp.PrintVector(((((coord[3]*latDim[2]+coord[2])*latDim[1]+coord[1])*latDim[0]+coord[0])>>1)-(dir==0?1:0));
+  }*/
+
+  /*for (int t = 2; t < 2; t++)
     for (int z = 0; z < 2; z++)
       for (int y = 0; y < 2; y++)
         for (int x = 0; x < 2; x++) {
@@ -673,7 +723,7 @@ DslashTime dslashCUDA(int niter) {
 
 void staggeredDslashRef()
 {
-
+  
   // compare to dslash reference implementation
   // printfQuda("Calculating reference implementation...");
   fflush(stdout);
@@ -702,17 +752,38 @@ void staggeredDslashRef()
     errorQuda("Test type not defined");
   }
 
-  //printfQuda("CPU Test\n");
-  //int latDim[4] = {xdim,ydim,zdim,tdim};
-  /*int coord[4];
-  for (int t = 0; t < 2; t++)
-    for (int z = 0; z < 2; z++)
-      for (int y = 0; y < 2; y++)
-        for (int x = 0; x < 2; x++) {
-          coord[0] = x, coord[1] = y; coord[2] = z; coord[3] = t;
-          spinorRef->PrintVector(getPrintVectorIndex(latDim,coord));
-        }
-  */
+  /*printfQuda("CPU Test\n");
+  int latDim[4] = {xdim,ydim,zdim,tdim};
+  int coord[4];
+
+  printfQuda("\nFat links:\n\n");
+
+  for (int i = 0; i < 8; i++) {
+    int dir = i/2; int pm = 2*(i%2)-1;
+    coord[0] = coord[1] = 7;
+    coord[2] = coord[3] = 6;
+    coord[dir] += pm;
+    coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
+    printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
+    // wrong, but whatever
+    spinorRef->PrintVector(((((coord[3]*latDim[2]+coord[2])*latDim[1]+coord[1])*latDim[0]+coord[0])>>1)-(dir==0?1:0));
+  }
+
+  printfQuda("\nLong links:\n\n");
+
+  for (int i = 0; i < 8; i++) {
+    int dir = i/2; int pm = 2*(i%2)-1;
+    coord[0] = coord[1] = 7;
+    coord[2] = coord[3] = 6;
+    coord[dir] += 3*pm;
+    coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
+    printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
+    // wrong, but whatever, it grabs the right neighbor of (2,3,3,3)
+    spinorRef->PrintVector(((((coord[3]*latDim[2]+coord[2])*latDim[1]+coord[1])*latDim[0]+coord[0])>>1)-(dir==0?1:0));
+  }
+
+  errorQuda("Meh\n");*/
+
   //for (int i = 0; i < Vh; i++)    
   //  spinorRef->PrintVector(i);
 

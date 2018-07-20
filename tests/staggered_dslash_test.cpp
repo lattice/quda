@@ -50,7 +50,7 @@ void *fatlink[4], *longlink[4];
 void **ghost_fatlink, **ghost_longlink;
 #endif
 
-QudaParity parity = QUDA_EVEN_PARITY;
+QudaParity parity = QUDA_EVEN_PARITY; // TEST 0: y = D x, x is odd parity, y is even parity
 extern QudaDagType dagger;
 int transfer = 0; // include transfer time in the benchmark?
 extern int xdim;
