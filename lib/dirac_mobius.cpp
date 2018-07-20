@@ -511,5 +511,25 @@ namespace quda {
     }else{
       flops += 1320LL*(long long)sp_idx_length*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
     }
+  }
+  
+  void DiracMobiusPC::dslash4_dagger_dslash4pre_dagger_xpay_partial(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, const ColorSpinorField &x, const double &k, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+    
+    mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		   &static_cast<const cudaColorSpinorField&>(in),
+		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
+			 mass, k,b_5, c_5, m5, commDim, 7, profile, sp_idx_length, R_, Xs_);
+    
+    long long Ls = in.X(4);
+		long long bulk = (Ls-2)*sp_idx_length;
+    long long wall = 2*sp_idx_length;
+    
+    flops += 1320LL*(long long)sp_idx_length*Ls + 72LL*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
   } 
+ 
 } // namespace quda

@@ -358,12 +358,11 @@ namespace quda {
 		mat_precondition->Dagger(QUDA_DAG_YES);
     
 //    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
-    mat_precondition->Dslash5inv(*ifset, *iftmp, parity[1]);                  // +2
+    mat_precondition->Dslash5inv(out, *iftmp, parity[1]);                  // +2
     
 		mat_precondition->Dagger(QUDA_DAG_NO);
-	  mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(out, *ifset, parity[0], sp_len1, RR1, Xs1);
+	  mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
 
-		mat_precondition->Dagger(QUDA_DAG_YES);
 //    mat_precondition->Dslash4(out, *iftmp, parity[0]);
 //    mat_precondition->Dslash4Partial(out, *ifset, parity[0], sp_len1, RR1, Xs1); // +1
 //    mat_precondition->Dslash4pre(*iftmp, out, parity[0]);                 // +1
@@ -373,11 +372,10 @@ namespace quda {
 
 		
 //    mat_precondition->Dslash4(*iftmp, out, parity[1]);
-    mat_precondition->Dslash4Partial(*ifset, out, parity[1], sp_len0, RR0, Xs0); // +0
+//    mat_precondition->Dslash4Partial(*ifset, out, parity[1], sp_len0, RR0, Xs0); // +0
 //    mat_precondition->Dslash4preXpay(out, *iftmp, parity[1], *ifset, -1.0);   // +0
-    mat_precondition->Dslash4preXpayPartial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   // +0
-    
-    mat_precondition->Dagger(QUDA_DAG_NO);
+//    mat_precondition->Dslash4preXpayPartial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   // +0
+    mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   
  
   }
 
