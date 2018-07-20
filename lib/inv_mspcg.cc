@@ -307,10 +307,11 @@ namespace quda {
     fx2 = norm2(*fx);
     printfQuda("Chopping   fx2 = %16.12e.\n", fx2);
 
-    copyExtendedColorSpinor(*tx, *fx, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
-    double x2_ = blas::norm2(*tx);
+    copyExtendedColorSpinor(*tt, *fx, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
+    double x2_ = blas::norm2(*tt);
     printfQuda("Rebuild     x2 = %16.12e.\n", x2_);
-    printfQuda("%% diff      x2 = %16.12e (This number is SUPPOSED to be tiny).\n", (x2-x2_)/x2);
+    double dd = xmyNorm(*tt, *tx);
+    printfQuda("%% diff      x2 = %16.12e (This number is SUPPOSED to be tiny).\n", dd);
 
     delete tx;
     delete tt;
@@ -358,17 +359,19 @@ namespace quda {
     
 //    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
     mat_precondition->Dslash5inv(*ifset, *iftmp, parity[1]);                  // +2
-//    mat_precondition->Dslash4(out, *iftmp, parity[0]);
-//    mat_precondition->Dslash4Partial(out, *iftmp, parity[0], sp_len1, RR1, Xs1); // +1
-//    mat_precondition->Dslash4pre(*iftmp, out, parity[0]);                 // +1
-//    mat_precondition->Dslash4prePartial(*iftmp, out, parity[0], sp_len1, RR1, Xs1);                 // +1
-//    mat_precondition->Dslash5inv(out, *iftmp, parity[0]);                 // +1
-//    mat_precondition->Dslash5invPartial(out, *iftmp, parity[0], sp_len1, RR1, Xs1);                 // +1
-
+    
 		mat_precondition->Dagger(QUDA_DAG_NO);
 	  mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(out, *ifset, parity[0], sp_len1, RR1, Xs1);
-		
+
 		mat_precondition->Dagger(QUDA_DAG_YES);
+//    mat_precondition->Dslash4(out, *iftmp, parity[0]);
+//    mat_precondition->Dslash4Partial(out, *ifset, parity[0], sp_len1, RR1, Xs1); // +1
+//    mat_precondition->Dslash4pre(*iftmp, out, parity[0]);                 // +1
+//    mat_precondition->Dslash4prePartial(*ifset, out, parity[0], sp_len1, RR1, Xs1);                 // +1
+//    mat_precondition->Dslash5inv(out, *iftmp, parity[0]);                 // +1
+//    mat_precondition->Dslash5invPartial(out, *ifset, parity[0], sp_len1, RR1, Xs1);                 // +1
+
+		
 //    mat_precondition->Dslash4(*iftmp, out, parity[1]);
     mat_precondition->Dslash4Partial(*ifset, out, parity[1], sp_len0, RR0, Xs0); // +0
 //    mat_precondition->Dslash4preXpay(out, *iftmp, parity[1], *ifset, -1.0);   // +0

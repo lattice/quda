@@ -2646,7 +2646,6 @@ __syncthreads();
 }
 */
 
-
 // write spinor field back to device memory
 WRITE_SPINOR(param.sp_stride);
 
