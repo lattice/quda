@@ -358,7 +358,8 @@ namespace quda {
 		mat_precondition->Dagger(QUDA_DAG_YES);
     
 //    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
-    mat_precondition->Dslash5inv(out, *iftmp, parity[1]);                  // +2
+//    mat_precondition->Dslash5inv(out, *iftmp, parity[1]);                  // +2
+    mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
     
 		mat_precondition->Dagger(QUDA_DAG_NO);
 	  mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
@@ -593,7 +594,7 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type);
 
-//    test_dslash(db);
+    test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 

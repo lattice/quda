@@ -172,6 +172,33 @@ VOLATILE spinorFloat o31_im;
 VOLATILE spinorFloat o32_re;
 VOLATILE spinorFloat o32_im;
 
+MDWFSharedMemory<spinorFloat> s_data;
+
+spinorFloat* p00_re = s_data +  0*param.dc.Ls*blockDim.x ;
+spinorFloat* p00_im = s_data +  1*param.dc.Ls*blockDim.x ;
+spinorFloat* p01_re = s_data +  2*param.dc.Ls*blockDim.x ;
+spinorFloat* p01_im = s_data +  3*param.dc.Ls*blockDim.x ;
+spinorFloat* p02_re = s_data +  4*param.dc.Ls*blockDim.x ;
+spinorFloat* p02_im = s_data +  5*param.dc.Ls*blockDim.x ;
+spinorFloat* p10_re = s_data +  6*param.dc.Ls*blockDim.x ;
+spinorFloat* p10_im = s_data +  7*param.dc.Ls*blockDim.x ;
+spinorFloat* p11_re = s_data +  8*param.dc.Ls*blockDim.x ;
+spinorFloat* p11_im = s_data +  9*param.dc.Ls*blockDim.x ;
+spinorFloat* p12_re = s_data + 10*param.dc.Ls*blockDim.x ;
+spinorFloat* p12_im = s_data + 11*param.dc.Ls*blockDim.x ;
+spinorFloat* p20_re = s_data + 12*param.dc.Ls*blockDim.x ;
+spinorFloat* p20_im = s_data + 13*param.dc.Ls*blockDim.x ;
+spinorFloat* p21_re = s_data + 14*param.dc.Ls*blockDim.x ;
+spinorFloat* p21_im = s_data + 15*param.dc.Ls*blockDim.x ;
+spinorFloat* p22_re = s_data + 16*param.dc.Ls*blockDim.x ;
+spinorFloat* p22_im = s_data + 17*param.dc.Ls*blockDim.x ;
+spinorFloat* p30_re = s_data + 18*param.dc.Ls*blockDim.x ;
+spinorFloat* p30_im = s_data + 19*param.dc.Ls*blockDim.x ;
+spinorFloat* p31_re = s_data + 20*param.dc.Ls*blockDim.x ;
+spinorFloat* p31_im = s_data + 21*param.dc.Ls*blockDim.x ;
+spinorFloat* p32_re = s_data + 22*param.dc.Ls*blockDim.x ;
+spinorFloat* p32_im = s_data + 23*param.dc.Ls*blockDim.x ;
+
 #ifdef SPINOR_DOUBLE
 #if (__COMPUTE_CAPABILITY__ >= 200)
 #define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
@@ -189,14 +216,18 @@ VOLATILE spinorFloat o32_im;
 #include "read_gauge.h"
 #include "io_spinor.h"
 
+bool idle = false;
 int sid = (blockIdx.y*blockDim.y + threadIdx.y)*param.threads + blockIdx.x*blockDim.x+threadIdx.x;
-//if (sid >= param.threads*param.dc.Ls) return;
-if ( blockIdx.x*blockDim.x+threadIdx.x >= param.threads ) return;
-
+if ( blockIdx.x*blockDim.x+threadIdx.x >= param.threads ){
+	idle = true;
+}
 
 int X, coord[5];
 
 int face_idx;
+
+if(!idle){
+
 if (kernel_type == INTERIOR_KERNEL) {
 
   if( param.partial_length ){
@@ -2052,33 +2083,6 @@ if (!incomplete)
 
 // A total of blockDim.x*Ls*24*sizeof(float/double) bytes needed.
 //extern __shared__ spinorFloat s_data[];
-MDWFSharedMemory<spinorFloat> s_data;
-
-
-spinorFloat* p00_re = s_data +  0*param.dc.Ls*blockDim.x ;
-spinorFloat* p00_im = s_data +  1*param.dc.Ls*blockDim.x ;
-spinorFloat* p01_re = s_data +  2*param.dc.Ls*blockDim.x ;
-spinorFloat* p01_im = s_data +  3*param.dc.Ls*blockDim.x ;
-spinorFloat* p02_re = s_data +  4*param.dc.Ls*blockDim.x ;
-spinorFloat* p02_im = s_data +  5*param.dc.Ls*blockDim.x ;
-spinorFloat* p10_re = s_data +  6*param.dc.Ls*blockDim.x ;
-spinorFloat* p10_im = s_data +  7*param.dc.Ls*blockDim.x ;
-spinorFloat* p11_re = s_data +  8*param.dc.Ls*blockDim.x ;
-spinorFloat* p11_im = s_data +  9*param.dc.Ls*blockDim.x ;
-spinorFloat* p12_re = s_data + 10*param.dc.Ls*blockDim.x ;
-spinorFloat* p12_im = s_data + 11*param.dc.Ls*blockDim.x ;
-spinorFloat* p20_re = s_data + 12*param.dc.Ls*blockDim.x ;
-spinorFloat* p20_im = s_data + 13*param.dc.Ls*blockDim.x ;
-spinorFloat* p21_re = s_data + 14*param.dc.Ls*blockDim.x ;
-spinorFloat* p21_im = s_data + 15*param.dc.Ls*blockDim.x ;
-spinorFloat* p22_re = s_data + 16*param.dc.Ls*blockDim.x ;
-spinorFloat* p22_im = s_data + 17*param.dc.Ls*blockDim.x ;
-spinorFloat* p30_re = s_data + 18*param.dc.Ls*blockDim.x ;
-spinorFloat* p30_im = s_data + 19*param.dc.Ls*blockDim.x ;
-spinorFloat* p31_re = s_data + 20*param.dc.Ls*blockDim.x ;
-spinorFloat* p31_im = s_data + 21*param.dc.Ls*blockDim.x ;
-spinorFloat* p32_re = s_data + 22*param.dc.Ls*blockDim.x ;
-spinorFloat* p32_im = s_data + 23*param.dc.Ls*blockDim.x ;
 
 p00_re[ coord[4]*blockDim.x+threadIdx.x ] = o00_re;
 p00_im[ coord[4]*blockDim.x+threadIdx.x ] = o00_im;
@@ -2131,7 +2135,7 @@ o32_re = 0.;
 o32_im = 0.;
 
 // sync all threads
-__syncthreads();
+}__syncthreads();if(!idle){
 
 // Now perform the D5inv calculation
 
@@ -2448,7 +2452,7 @@ __syncthreads();
 */
 #undef POW
 // write spinor field back to device memory
-WRITE_SPINOR(param.sp_stride);
+WRITE_SPINOR(param.sp_stride);}
 
 // undefine to prevent warning when precision is changed
 #undef m5

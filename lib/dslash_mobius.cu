@@ -61,6 +61,7 @@ namespace quda {
 #include <mdw_dslash4_dslash5inv_xpay_dslash5inv_dagger_def.h>   // Dslash5inv Mobius Domain Wall kernels
 #include <mdw_dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_def.h>
 #include <mdw_dslash4_dagger_dslash4pre_dagger_xpay_def.h>
+#include <mdw_dslash5inv_def_sm.h>
 #endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
@@ -99,7 +100,8 @@ namespace quda {
     {
 //      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       const unsigned int max_shared = deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock;
-      const int step[2] = { deviceProp.warpSize, 1 };
+//      const int step[2] = { deviceProp.warpSize, 1 };
+      const int step[2] = { 8, 1 };
       bool advance[2] = { false, false };
 
       // first try to advance block.x
@@ -262,6 +264,17 @@ namespace quda {
             }
             strcat(key.aux,config);
             break;
+					case 8:
+            if(dslashParam.expanding){
+              sprintf(config, ",Dslash5invSm,partial%d,%d,%d,%d,expand%d,%d,%d,%d", 
+								dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3],
+                dslashParam.Rz[0], dslashParam.Rz[1], dslashParam.Rz[2], dslashParam.Rz[3]);
+            }else{
+              sprintf(config, ",Dslash5invSm,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            }
+            strcat(key.aux,config);
+            break;
+
         }
       
       }else{
@@ -291,6 +304,10 @@ namespace quda {
           case 7:
             strcat(key.aux,",Dslash4DaggerDslash4preDaggerXpay");
             break;
+					case 8:
+            strcat(key.aux,",Dslash5invSm");
+            break;
+
         }
       
       }
@@ -303,7 +320,8 @@ namespace quda {
       if(DS_type >= 4){ 
         // For these kernels, for one 4D-site all corresponding 5D-sites have to be within the same block,
         // since shared memory is used.
-        param.block = dim3( param.block.x, in->X(4), 1);
+//        param.block = dim3( param.block.x, in->X(4), 1);
+        param.block = dim3( 8, in->X(4), 1);
       }
       param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y;
         printfQuda( "Shared memory %08lu is larger than limit %08lu.\n", (size_t)param.shared_bytes, (size_t)(deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock) );
@@ -322,7 +340,8 @@ namespace quda {
       if(DS_type >= 4){ 
         // For these kernels, for one 4D-site all corresponding 5D-sites have to be within the same block,
         // since shared memory is used.
-        param.block = dim3( param.block.x, in->X(4), 1);
+//        param.block = dim3( param.block.x, in->X(4), 1);
+        param.block = dim3( 8, in->X(4), 1);
       }
       param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y;
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
@@ -365,6 +384,9 @@ namespace quda {
         case 7:
           DSLASH(MDWFDslash4DaggerDslash4preDaggerXpay, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
           break;
+				case 8:
+          DSLASH(MDWFDslash5invSm, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+          break;
         default:
           errorQuda("invalid Dslash type");
       }
@@ -391,6 +413,7 @@ namespace quda {
           flops = (x ? 96ll : 48ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
           break;
         case 3:
+				case 8:
           flops = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
           break;
         case 4:
@@ -438,6 +461,7 @@ namespace quda {
           bytes = (x ? 5ll : 4ll) * spinor_bytes * in->VolumeCB();
           break;
         case 3:
+				case 8: 
           bytes = (x ? Ls + 2 : Ls + 1) * spinor_bytes * in->VolumeCB();
           break;
         default:
