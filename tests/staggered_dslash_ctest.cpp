@@ -96,7 +96,7 @@ extern int Nsrc; // number of spinors to apply to simultaneously
 Dirac* dirac;
 
 const char *prec_str[] = {"half", "single", "double"};
-const char *recon_str[] = {"r18", "r13", "r9"};
+const char *recon_str[] = {"r18"}; //{"r18", "r13", "r9"};
 
 // Unitarization coefficients
 static double unitarize_eps  = 1e-6;
@@ -314,7 +314,9 @@ void init(int precision, QudaReconstructType link_recon) {
 
   // Want to place an 
 
-  spinor->Source(QUDA_RANDOM_SOURCE);
+  //spinor->Source(QUDA_RANDOM_SOURCE);
+  spinor->zero();
+  for (int i = 0; i < Vh; i++) { spinor->Source(QUDA_POINT_SOURCE,i,0,0); } 
   /*int latDim[4] = {xdim,ydim,zdim,tdim};
   int coord[4] = {7,7,6,6}; // actually places it at (2,3,3,3)
   spinor->zero(); // zero before dropping a point source
@@ -1034,6 +1036,12 @@ TEST_P(StaggeredDslashTest, benchmark) {
 
     initComms(argc, argv, gridsize_from_cmdline);
 
+    // Sanity checkL: if you pass in a gauge field, want to test the asqtad/hisq dslash, and don't
+    // ask to build the fat/long links... it doesn't make sense.
+    if (strcmp(latfile,"") && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
+      errorQuda("Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".\n");
+      compute_fatlong = true;
+    }
 
   // return result of RUN_ALL_TESTS
     int test_rc = RUN_ALL_TESTS();
