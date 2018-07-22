@@ -18,6 +18,11 @@ extern "C"{
   void computeHISQLinksCPU(void** fatlink, void** longlink, void** fatlink_eps, void** longlink_eps,
         void** sitelink, void* qudaGaugeParamPtr, 
         double** act_path_coeffs, double eps_naik);
+
+    // data reordering routines
+  void reorderQDPtoMILC(void* milc_out, void** qdp_in, int V, int siteSize, QudaPrecision out_precision, QudaPrecision in_precision);
+  void reorderMILCtoQDP(void** qdp_out, void* milc_in, int V, int siteSize, QudaPrecision out_precision, QudaPrecision in_precision);
+
 #ifdef __cplusplus
 }
 #endif

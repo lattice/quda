@@ -848,6 +848,61 @@ void cpu_xpy(QudaPrecision prec, void* x, void* y, int size)
   }
 }
 
+  // data reordering routines
+  template <typename Out, typename In>
+  void reorderQDPtoMILC(Out* milc_out, In** qdp_in, int V, int siteSize) {
+    for (int i = 0; i < V; i++) {
+      for (int dir = 0; dir < 4; dir++) {
+        for (int j = 0; j < siteSize; j++) {
+          milc_out[(i*4+dir)*siteSize+j] = static_cast<Out>(qdp_in[dir][i*siteSize+j]);
+        }
+      }
+    }
+  }
+
+  void reorderQDPtoMILC(void* milc_out, void** qdp_in, int V, int siteSize, QudaPrecision out_precision, QudaPrecision in_precision) {
+    if (out_precision == QUDA_SINGLE_PRECISION) {
+      if (in_precision == QUDA_SINGLE_PRECISION) {
+        reorderQDPtoMILC<float,float>((float*)milc_out, (float**)qdp_in, V, siteSize);
+      } else if (in_precision == QUDA_DOUBLE_PRECISION) {
+        reorderQDPtoMILC<float,double>((float*)milc_out, (double**)qdp_in, V, siteSize);
+      }
+    } else if (out_precision == QUDA_DOUBLE_PRECISION) {
+      if (in_precision == QUDA_SINGLE_PRECISION) {
+        reorderQDPtoMILC<double,float>((double*)milc_out, (float**)qdp_in, V, siteSize);
+      } else if (in_precision == QUDA_DOUBLE_PRECISION) {
+        reorderQDPtoMILC<double,double>((double*)milc_out, (double**)qdp_in, V, siteSize);
+      }
+    }
+  }
+
+  template <typename Out, typename In>
+  void reorderMILCtoQDP(Out** qdp_out, In* milc_in, int V, int siteSize) {
+    for (int i = 0; i < V; i++) {
+      for (int dir = 0; dir < 4; dir++) {
+        for (int j = 0; j < siteSize; j++) {
+           qdp_out[dir][i*siteSize+j] = static_cast<Out>(milc_in[(i*4+dir)*siteSize+j]);
+        }
+      }
+    }
+  }
+
+  void reorderMILCtoQDP(void** qdp_out, void* milc_in, int V, int siteSize, QudaPrecision out_precision, QudaPrecision in_precision) {
+    if (out_precision == QUDA_SINGLE_PRECISION) {
+      if (in_precision == QUDA_SINGLE_PRECISION) {
+        reorderMILCtoQDP<float,float>((float**)qdp_out, (float*)milc_in, V, siteSize);
+      } else if (in_precision == QUDA_DOUBLE_PRECISION) {
+        reorderMILCtoQDP<float,double>((float**)qdp_out, (double*)milc_in, V, siteSize);
+      }
+    } else if (out_precision == QUDA_DOUBLE_PRECISION) {
+      if (in_precision == QUDA_SINGLE_PRECISION) {
+        reorderMILCtoQDP<double,float>((double**)qdp_out, (float*)milc_in, V, siteSize);
+      } else if (in_precision == QUDA_DOUBLE_PRECISION) {
+        reorderMILCtoQDP<double,double>((double**)qdp_out, (double*)milc_in, V, siteSize);
+      }
+    }
+  }
+
 // Compute the full HISQ stencil on the CPU. 
 // If "eps_naik" is 0, there's no naik correction,
 // and this routine skips building the paths in "act_path_coeffs[2]"
@@ -1019,7 +1074,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   // This is based on "unitarize_link_test.cpp"
 
   // Format change
-  if (prec == QUDA_DOUBLE_PRECISION){
+  reorderQDPtoMILC(v_sitelink,v_reflink,V,gaugeSiteSize,prec,prec);
+  /*if (prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(v_sitelink);
     for(int dir=0; dir<4; ++dir){
       double* slink = reinterpret_cast<double*>(v_reflink[dir]);
@@ -1039,7 +1095,7 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
         }
       }
     }
-  }
+  }*/
 
   // Prepare cpuGaugeFields for unitarization
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -1053,7 +1109,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   unitarizeLinksCPU(*cpuWLink, *cpuVLink);
 
   // Copy back into "w_reflink"
-  if (prec == QUDA_DOUBLE_PRECISION){
+  reorderMILCtoQDP(w_reflink,cpuWLink->Gauge_p(),V,gaugeSiteSize,prec,prec);
+  /*if (prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(cpuWLink->Gauge_p());
     for(int dir=0; dir<4; ++dir){
       double* slink = reinterpret_cast<double*>(w_reflink[dir]);
@@ -1073,7 +1130,7 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
         }
       }
     }
-  }
+  }*/
 
 
   // Clean up cpuGaugeFields, we don't need them anymore.
