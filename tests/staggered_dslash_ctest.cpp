@@ -57,7 +57,7 @@ void *hostGauge[4];
 
 // In the HISQ case, we include building fat/long links in this unit test
 
-void *fatlink_cpu[4], *longlink_cpu[4];
+void *qdp_fatlink_cpu[4], *qdp_longlink_cpu[4];
 #ifdef MULTI_GPU
 void **ghost_fatlink_cpu, **ghost_longlink_cpu;
 #endif
@@ -126,41 +126,41 @@ int getPrintVectorIndex(const int X[4], const int coord[4])
 */
 
 // Wrap everything for the GPU construction of fat/long links here
-void computeHISQLinksGPU(void** fatlink, void** longlink,
-        void** fatlink_eps, void** longlink_eps,
-        void** inlink, void* qudaGaugeParamPtr,
+void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
+        void** qdp_fatlink_eps, void** qdp_longlink_eps,
+        void** qdp_inlink, void* qudaGaugeParamPtr,
         double** act_path_coeffs, double eps_naik) {
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   // inlink in different format
-  void *inlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize);
-  reorderQDPtoMILC(inlink_milc,inlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  void *milc_inlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
+  reorderQDPtoMILC(milc_inlink,qdp_inlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
 
   // Paths for step 1:
-  void* vlink_milc  = pinned_malloc(4*V*gaugeSiteSize*gSize); // V links
-  void* wlink_milc  = pinned_malloc(4*V*gaugeSiteSize*gSize); // W links
+  void* milc_vlink  = pinned_malloc(4*V*gaugeSiteSize*gSize); // V links
+  void* milc_wlink  = pinned_malloc(4*V*gaugeSiteSize*gSize); // W links
   
   // Paths for step 2:
-  void* fatlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize); // final fat ("X") links
-  void* longlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize); // final long links
+  void* milc_fatlink = pinned_malloc(4*V*gaugeSiteSize*gSize); // final fat ("X") links
+  void* milc_longlink = pinned_malloc(4*V*gaugeSiteSize*gSize); // final long links
   
   // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
-  computeKSLinkQuda(vlink_milc, nullptr, wlink_milc, inlink_milc, act_path_coeffs[0], &gaugeParam);
+  computeKSLinkQuda(milc_vlink, nullptr, milc_wlink, milc_inlink, act_path_coeffs[0], &gaugeParam);
 
   // Create X and long links, 2nd path table set
-  computeKSLinkQuda(fatlink_milc, longlink_milc, nullptr, wlink_milc, act_path_coeffs[1], &gaugeParam);
+  computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[1], &gaugeParam);
 
   // Copy back
-  reorderMILCtoQDP(fatlink,fatlink_milc,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-  reorderMILCtoQDP(longlink,longlink_milc,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderMILCtoQDP(qdp_fatlink,milc_fatlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderMILCtoQDP(qdp_longlink,milc_longlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
 
   // Clean up GPU compute links
-  host_free(inlink_milc);
-  host_free(vlink_milc);
-  host_free(wlink_milc);
-  host_free(fatlink_milc);
-  host_free(longlink_milc);
+  host_free(milc_inlink);
+  host_free(milc_vlink);
+  host_free(milc_wlink);
+  host_free(milc_fatlink);
+  host_free(milc_longlink);
 
 }
 
@@ -300,9 +300,9 @@ void init(int precision, QudaReconstructType link_recon) {
 
   // Want to place an 
 
-  //spinor->Source(QUDA_RANDOM_SOURCE);
-  spinor->zero();
-  for (int i = 0; i < Vh; i++) { spinor->Source(QUDA_POINT_SOURCE,i,0,0); } 
+  spinor->Source(QUDA_RANDOM_SOURCE);
+  //spinor->zero();
+  //for (int i = 0; i < Vh; i++) { spinor->Source(QUDA_POINT_SOURCE,i,0,0); } 
   /*int latDim[4] = {xdim,ydim,zdim,tdim};
   int coord[4] = {7,7,6,6}; // actually places it at (2,3,3,3)
   spinor->zero(); // zero before dropping a point source
@@ -312,46 +312,46 @@ void init(int precision, QudaReconstructType link_recon) {
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   // Allocate a lot of memory because I'm very confused
-  void* fatlink_cpu_milc = malloc(4*V*gaugeSiteSize*gSize);
-  void* longlink_cpu_milc = malloc(4*V*gaugeSiteSize*gSize);
+  void* milc_fatlink_cpu = malloc(4*V*gaugeSiteSize*gSize);
+  void* milc_longlink_cpu = malloc(4*V*gaugeSiteSize*gSize);
 
-  void* fatlink_gpu_milc = malloc(4*V*gaugeSiteSize*gSize);
-  void* longlink_gpu_milc = malloc(4*V*gaugeSiteSize*gSize);
+  void* milc_fatlink_gpu = malloc(4*V*gaugeSiteSize*gSize);
+  void* milc_longlink_gpu = malloc(4*V*gaugeSiteSize*gSize);
 
-  void* fatlink_gpu[4];
-  void* longlink_gpu[4];
+  void* qdp_fatlink_gpu[4];
+  void* qdp_longlink_gpu[4];
 
   for (int dir = 0; dir < 4; dir++) {
-    fatlink_gpu[dir] = malloc(V*gaugeSiteSize*gSize);
-    longlink_gpu[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_fatlink_gpu[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_longlink_gpu[dir] = malloc(V*gaugeSiteSize*gSize);
 
-    fatlink_cpu[dir] = malloc(V*gaugeSiteSize*gSize);
-    longlink_cpu[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_fatlink_cpu[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_longlink_cpu[dir] = malloc(V*gaugeSiteSize*gSize);
 
-    if (fatlink_gpu[dir] == NULL || longlink_gpu[dir] == NULL ||
-          fatlink_cpu[dir] == NULL || longlink_cpu[dir] == NULL) {
+    if (qdp_fatlink_gpu[dir] == NULL || qdp_longlink_gpu[dir] == NULL ||
+          qdp_fatlink_cpu[dir] == NULL || qdp_longlink_cpu[dir] == NULL) {
       errorQuda("ERROR: malloc failed for fatlink/longlink");
     }  
   }
 
   // create a base field
-  void *inlink[4];
+  void *qdp_inlink[4];
   for (int dir = 0; dir < 4; dir++) {
-    inlink[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_inlink[dir] = malloc(V*gaugeSiteSize*gSize);
   }
 
   if (compute_fatlong) {
 
     // load a field WITHOUT PHASES
     if (strcmp(latfile,"")) {
-      read_gauge_field(latfile, inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
+      read_gauge_field(latfile, qdp_inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
 
       // The "QUDA_STAGGERED_DSLASH" part seems strange, but it's necessary
       // for both staggered and ASQTAD---it forces correct phasing 
-      applyGaugeFieldScaling_long(inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
+      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
 
     } else {
-      construct_fat_long_gauge_field(inlink, longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
+      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
       //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
     }
 
@@ -419,9 +419,9 @@ void init(int precision, QudaReconstructType link_recon) {
       double* act_paths[3] = { act_path_coeff_1, act_path_coeff_2, act_path_coeff_3 };
 
       // defined in "llfat_reference.cpp"
-      computeHISQLinksCPU(fatlink_cpu, longlink_cpu, 
+      computeHISQLinksCPU(qdp_fatlink_cpu, qdp_longlink_cpu, 
                           nullptr, nullptr,
-                          inlink, &gaugeParam, act_paths, 0.0 /*eps_naik*/);
+                          qdp_inlink, &gaugeParam, act_paths, 0.0 /*eps_naik*/);
 
       //////////////////////////
       // Create the GPU links //
@@ -430,63 +430,52 @@ void init(int precision, QudaReconstructType link_recon) {
       // Skip eps field for now
 
       // Note: GPU link creation only works for single and double precision
-      computeHISQLinksGPU(fatlink_gpu, longlink_gpu,
+      computeHISQLinksGPU(qdp_fatlink_gpu, qdp_longlink_gpu,
                           nullptr, nullptr,
-                          inlink, &gaugeParam, act_paths, 0.0 /* eps_naik */);
+                          qdp_inlink, &gaugeParam, act_paths, 0.0 /* eps_naik */);
 
       
 
 
     } else { //DSLASH_TYPE == QUDA_STAGGERED_DSLASH
       // we apply phases then copy it over
-      applyGaugeFieldScaling_long(inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
+      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
 
       for (int dir = 0; dir < 4; dir++) {
-        memcpy(fatlink_gpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
-        memcpy(fatlink_cpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
-        memset(longlink_gpu[dir],0,V*gaugeSiteSize*gSize);
-        memset(longlink_cpu[dir],0,V*gaugeSiteSize*gSize);
+        memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+        memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+        memset(qdp_longlink_gpu[dir],0,V*gaugeSiteSize*gSize);
+        memset(qdp_longlink_cpu[dir],0,V*gaugeSiteSize*gSize);
       }
     }
 
-    printfQuda("Ready to copy into milc pointers\n");
-
-    // Alright, we've created all the void** links.
-    // Create the void* pointers
-    reorderQDPtoMILC(fatlink_gpu_milc,fatlink_gpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-    reorderQDPtoMILC(fatlink_cpu_milc,fatlink_cpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-    reorderQDPtoMILC(longlink_gpu_milc,longlink_gpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-    reorderQDPtoMILC(longlink_cpu_milc,longlink_cpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-
-    printfQuda("Copied into milc pointers\n");
   } else { // don't compute fat/long link
 
-    construct_fat_long_gauge_field(inlink, longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
+    construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
 
     if (dslash_type == QUDA_STAGGERED_DSLASH) {
       for (int dir = 0; dir < 4; dir++) {
-        memcpy(fatlink_gpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
-        memcpy(fatlink_cpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
-        memset(longlink_gpu[dir],0,V*gaugeSiteSize*gSize);
-        memset(longlink_cpu[dir],0,V*gaugeSiteSize*gSize);
+        memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+        memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+        memset(qdp_longlink_gpu[dir],0,V*gaugeSiteSize*gSize);
+        memset(qdp_longlink_cpu[dir],0,V*gaugeSiteSize*gSize);
       }
     } else {
       for (int dir = 0; dir < 4; dir++) {
-        memcpy(fatlink_gpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
-        memcpy(fatlink_cpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
-        memcpy(longlink_gpu[dir],longlink_cpu[dir],V*gaugeSiteSize*gSize);
+        memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+        memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+        memcpy(qdp_longlink_gpu[dir],qdp_longlink_cpu[dir],V*gaugeSiteSize*gSize);
       }
     }
 
-    // Alright, we've created all the void** links.
-    // Create the void* pointers
-    reorderQDPtoMILC(fatlink_gpu_milc,fatlink_gpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-    reorderQDPtoMILC(fatlink_cpu_milc,fatlink_cpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-    reorderQDPtoMILC(longlink_gpu_milc,longlink_gpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-    reorderQDPtoMILC(longlink_cpu_milc,longlink_cpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-
-
   }
+
+  // Alright, we've created all the void** links.
+  // Create the void* pointers
+  reorderQDPtoMILC(milc_fatlink_gpu,qdp_fatlink_gpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderQDPtoMILC(milc_fatlink_cpu,qdp_fatlink_cpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderQDPtoMILC(milc_longlink_gpu,qdp_longlink_gpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderQDPtoMILC(milc_longlink_cpu,qdp_longlink_cpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
   // Create ghost zones for CPU fields,
   // prepare and load the GPU fields
 
@@ -494,13 +483,13 @@ void init(int precision, QudaReconstructType link_recon) {
 
   gaugeParam.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  GaugeFieldParam cpuFatParam(fatlink_cpu_milc, gaugeParam);
+  GaugeFieldParam cpuFatParam(milc_fatlink_cpu, gaugeParam);
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink_cpu = cpuFat->Ghost();
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-  GaugeFieldParam cpuLongParam(longlink_cpu_milc, gaugeParam);
+  GaugeFieldParam cpuLongParam(milc_longlink_cpu, gaugeParam);
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink_cpu = cpuLong->Ghost();
@@ -525,7 +514,7 @@ void init(int precision, QudaReconstructType link_recon) {
   
   
   // printfQuda("Fat links sending..."); 
-  loadGaugeQuda(fatlink_gpu_milc, &gaugeParam);
+  loadGaugeQuda(milc_fatlink_gpu, &gaugeParam);
   // printfQuda("Fat links sent\n"); 
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
@@ -538,7 +527,7 @@ void init(int precision, QudaReconstructType link_recon) {
 
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
     // printfQuda("Long links sending..."); 
-    loadGaugeQuda(longlink_gpu_milc, &gaugeParam);
+    loadGaugeQuda(milc_longlink_gpu, &gaugeParam);
     // printfQuda("Long links sent...\n");
 
   }
@@ -589,14 +578,14 @@ void init(int precision, QudaReconstructType link_recon) {
   }
 
   for (int dir = 0; dir < 4; dir++) {
-    free(inlink[dir]); inlink[dir] = nullptr;
-    free(fatlink_gpu[dir]); fatlink_gpu[dir] = nullptr;
-    free(longlink_gpu[dir]); longlink_gpu[dir] = nullptr;
+    free(qdp_inlink[dir]); qdp_inlink[dir] = nullptr;
+    free(qdp_fatlink_gpu[dir]); qdp_fatlink_gpu[dir] = nullptr;
+    free(qdp_longlink_gpu[dir]); qdp_longlink_gpu[dir] = nullptr;
   }
-  free(fatlink_gpu_milc); fatlink_gpu_milc = nullptr;
-  free(longlink_gpu_milc); longlink_gpu_milc = nullptr;
-  free(fatlink_cpu_milc); fatlink_cpu_milc = nullptr;
-  free(longlink_cpu_milc); longlink_cpu_milc = nullptr;
+  free(milc_fatlink_gpu); milc_fatlink_gpu = nullptr;
+  free(milc_longlink_gpu); milc_longlink_gpu = nullptr;
+  free(milc_fatlink_cpu); milc_fatlink_cpu = nullptr;
+  free(milc_longlink_cpu); milc_longlink_cpu = nullptr;
 
   gaugeParam.reconstruct = link_recon;
 
@@ -606,8 +595,8 @@ void init(int precision, QudaReconstructType link_recon) {
 void end(void) 
 {
   for (int dir = 0; dir < 4; dir++) {
-    if (fatlink_cpu[dir] != nullptr) free(fatlink_cpu[dir]);
-    if (longlink_cpu[dir] != nullptr) free(longlink_cpu[dir]);
+    if (qdp_fatlink_cpu[dir] != nullptr) free(qdp_fatlink_cpu[dir]);
+    if (qdp_longlink_cpu[dir] != nullptr) free(qdp_longlink_cpu[dir]);
   }
 
   if (!transfer){
@@ -773,7 +762,7 @@ void staggeredDslashRef()
   switch (test_type) {
     case 0:
 #ifdef MULTI_GPU
-    staggered_dslash_mg4dir(spinorRef, fatlink_cpu, longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+    staggered_dslash_mg4dir(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
     staggered_dslash(spinorRef->V(), fatlink_cpu, longlink_cpu, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
@@ -781,10 +770,10 @@ void staggeredDslashRef()
     break;
     case 1:
 #ifdef MULTI_GPU
-    matdagmat_mg4dir(spinorRef, fatlink_cpu, longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+    matdagmat_mg4dir(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
      spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu, parity);
 #else
-    matdagmat(spinorRef->V(), fatlink_cpu, longlink_cpu, spinor->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu->V(), parity);
+    matdagmat(spinorRef->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu->V(), parity);
 #endif
     break;
     case 2:

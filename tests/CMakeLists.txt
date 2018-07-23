@@ -60,7 +60,7 @@ if(QUDA_DIRAC_STAGGERED)
   QUDA_CHECKBUILDTEST(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
   QUDA_CHECKBUILDTEST(staggered_dslash_ctest BUILD_TESTING)
 
-  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(staggered_invert_test QUDA_BUILD_ALL_TESTS)
 
