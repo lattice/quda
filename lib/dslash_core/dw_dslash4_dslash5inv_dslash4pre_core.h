@@ -2230,6 +2230,8 @@ VOLATILE spinorFloat kappa;
   }
 } // end of M5inv dimension
 
+
+ }__syncthreads();if(!idle){
 // Again store the fermions and zero.
 
 p00_re[ coord[4]*blockDim.x+threadIdx.x ] = o00_re;
