@@ -587,11 +587,8 @@ int main(int argc, char **argv)
 
   // *** QUDA parameters begin here.
 
-  // Need to add support for ASQTAD, LAPLACE
-  if (dslash_type != QUDA_STAGGERED_DSLASH) { // &&
-      //dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
-      //dslash_type != QUDA_TWISTED_MASS_DSLASH &&
-      //dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
+  // Need to add support for LAPLACE
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }

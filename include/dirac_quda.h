@@ -741,6 +741,20 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse staggered operator.  Unlike the Wilson operator,
+     *        we assume a mass normalization, not a kappa normalization. Thus kappa
+     *        gets ignored. 
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+      double kappa, double mass, double mu=0., double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned staggered
