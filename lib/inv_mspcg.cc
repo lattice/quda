@@ -108,8 +108,8 @@ namespace quda {
     Solver(_param, profile), solver_prec(0), solver_prec_param(_param), 
     mat(NULL),  mat_sloppy(NULL), mat_precondition(NULL),
     nrm_op(NULL), nrm_op_sloppy(NULL), nrm_op_precondition(NULL), 
-    vct_dr(NULL), vct_dp(NULL), vct_dmmp(NULL), vct_dtmp(NULL),
-    r(NULL), p(NULL), z(NULL), mmp(NULL), tmp(NULL), fr(NULL), 
+    vct_dr(NULL), vct_dp(NULL), vct_dmmp(NULL), vct_dtmp(NULL), vct_dtmp2(NULL),
+    r(NULL), p(NULL), z(NULL), mmp(NULL), tmp(NULL), tmp2(NULL), fr(NULL),
     immp(NULL), ip(NULL), 
     ifmmp(NULL), ifp(NULL), iftmp(NULL), 
     inner_iterations(ic), reliable_update_delta(inv_param->reliable_delta)
@@ -380,7 +380,6 @@ namespace quda {
 //    mat_precondition->Dslash4preXpay(out, *iftmp, parity[1], *ifset, -1.0);   // +0
 //		mat_precondition->Dagger(QUDA_DAG_YES);
 //    mat_precondition->Dslash4preXpayPartial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   // +0
- 
   }
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib )
@@ -411,14 +410,15 @@ namespace quda {
 
       alpha = rk2 / Mpk2; 
 
-      axpy(alpha, *ip, ix);
       rkp12 = axpyNorm(-alpha, *immp, ib);
       
       beta = rkp12 / rk2;
       rk2 = rkp12;
 
-      xpay(ib, beta, *ip);
-      
+      //axpy(alpha, *ip, ix);
+      //xpay(ib, beta, *ip);
+      axpyZpbx(alpha, *ip, ix, ib, beta);
+
 //      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
 //          local_loop_count, rk2, alpha, beta, Mpk2);
     }
@@ -431,7 +431,7 @@ namespace quda {
   int MSPCG::outer_cg( ColorSpinorField& dx, ColorSpinorField& db, double quit )
   {
     double Mpk2, alpha, beta, rkp12;
-    (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = nrm_op * x
+    (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2); // r = nrm_op * x
     double rk2 = xmyNorm(db, *vct_dr); // r = b - nrm_op * x
     
     printfQuda("outer_cg: before starting: r2 = %8.4e \n", rk2);
@@ -445,7 +445,7 @@ namespace quda {
     int loop_count;
     for(loop_count = 0; loop_count < param.maxiter; loop_count++){
       
-      (*nrm_op)(*vct_dmmp, *vct_dp, *vct_dtmp);
+      (*nrm_op)(*vct_dmmp, *vct_dp, *vct_dtmp, *vct_dtmp2);
       Mpk2 = reDotProduct(*vct_dp, *vct_dmmp);
 
       alpha = rk2 / Mpk2; 
@@ -480,6 +480,7 @@ namespace quda {
     vct_dp  =  new cudaColorSpinorField(csParam);
     vct_dmmp = new cudaColorSpinorField(csParam);
     vct_dtmp = new cudaColorSpinorField(csParam);
+    vct_dtmp2 = new cudaColorSpinorField(csParam);
     x  =   new cudaColorSpinorField(csParam);
 
 // sloppy
@@ -490,6 +491,7 @@ namespace quda {
     p  =   new cudaColorSpinorField(csParam);
     mmp  = new cudaColorSpinorField(csParam);
     tmp  = new cudaColorSpinorField(csParam);
+    tmp2  = new cudaColorSpinorField(csParam);
 
 // TODO: test
     r_old = new cudaColorSpinorField(csParam);
@@ -549,6 +551,7 @@ namespace quda {
     delete p;
     delete mmp;
     delete tmp;
+    delete tmp2;
 
     delete r_old;
 
@@ -566,6 +569,7 @@ namespace quda {
     delete vct_dp;
     delete vct_dmmp;
     delete vct_dtmp;
+    delete vct_dtmp2;
    
   }
 
@@ -604,7 +608,7 @@ namespace quda {
     precise_timer.Start("woo", "hoo", 0);
     for(int cycle=0; cycle<5; cycle++){
       
-      (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = MdagM * x
+      (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2); // r = MdagM * x
       double r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
       printfQuda("Cycle #%02d.\n", cycle);
       printfQuda("True precise residual is %8.4e\n", r2);
@@ -639,7 +643,7 @@ namespace quda {
       while( k < param.maxiter ){
         rkzk = reDotProduct(*r, *z);
 
-        (*nrm_op_sloppy)(*mmp, *p, *tmp);
+        (*nrm_op_sloppy)(*mmp, *p, *tmp, *tmp2);
         pkApk = reDotProduct(*p, *mmp);
         alpha = rkzk / pkApk;
 
@@ -720,7 +724,7 @@ namespace quda {
 
     // compute the true residual 
 
-    (*nrm_op)(*vct_dr, dx, *vct_dtmp);
+    (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2);
     double true_res = xmyNorm(db, *vct_dr);
     param.true_res = sqrt(true_res/b2);
 
@@ -780,7 +784,7 @@ namespace quda {
 
 // START of the main loop
 
-    (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = MdagM * x
+    (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2); // r = MdagM * x
     double r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
     printfQuda("True precise residual is %8.4e\n", r2);
 
@@ -788,30 +792,29 @@ namespace quda {
     int num_reliable_updates = 0;
 // reliable update
 		
-		const double u = param.precision_sloppy==8?std::numeric_limits<double>::epsilon()/2.:((param.precision_sloppy==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
-		const double uhigh = param.precision==8?std::numeric_limits<double>::epsilon()/2.:((param.precision==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
-		const double deps = sqrt(u);
-		const double dfac = 1.1;
-		double d_new = 0.;
-		double d = 0.;
-		double dinit = 0.;
+    const double u = param.precision_sloppy==8?std::numeric_limits<double>::epsilon()/2.:((param.precision_sloppy==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
+    const double uhigh = param.precision==8?std::numeric_limits<double>::epsilon()/2.:((param.precision==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
+    const double deps = sqrt(u);
+    const double dfac = 1.1;
+    double d_new = 0.;
+    double d = 0.;
+    double dinit = 0.;
 
-		double xnorm = 0.;
-		double pnorm = 0.;
-		double ppnorm = 0.;
+    double xnorm = 0.;
+    double pnorm = 0.;
+    double ppnorm = 0.;
 
-		double rNorm = sqrt(r2);
-		double r2_old;
-		double r0Norm = rNorm;
+    double rNorm = sqrt(r2);
+    double r2_old;
+    double r0Norm = rNorm;
 
-		(*nrm_op)(*vct_dp, db, *vct_dtmp);
-		double Anorm = sqrt( blas::norm2(*vct_dp)/b2 ); // the matrix norm
+    (*nrm_op)(*vct_dp, db, *vct_dtmp, *vct_dtmp2);
+    double Anorm = sqrt( blas::norm2(*vct_dp)/b2 ); // the matrix norm
 
-		dinit = uhigh * rNorm;
-		d = dinit;
+    dinit = uhigh * rNorm;
+    d = dinit;
 
-// reliable update
-
+    // reliable update
 
     blas::copy(*r, *vct_dr); // throw true residual into the sloppy solver.
     blas::zero(*x);
@@ -823,7 +826,7 @@ namespace quda {
 
     sloppy_timer.Start("woo", "hoo", 0);
 
-		double rr2 = r2;
+    double rr2 = r2;
 
     preconditioner_timer.Start("woo", "hoo", 0);
     if(inner_iterations <= 0){
@@ -840,49 +843,63 @@ namespace quda {
 
     k = 0;
     while( k < param.maxiter ){
-      rkzk = reDotProduct(*r, *z);
 
-      (*nrm_op_sloppy)(*mmp, *p, *tmp);
+      (*nrm_op_sloppy)(*mmp, *p, *tmp, *tmp2);
       
-			r2_old = rr2;
-			double3 pAppp = blas::cDotProductNormA(*p, *mmp);
-//			pkApk = reDotProduct(*p, *mmp);
-			pkApk = pAppp.x;
-			ppnorm = pAppp.z;
+      r2_old = rr2;
+#if 0
+      rkzk = reDotProduct(*r, *z);
+      double3 pAppp = blas::cDotProductNormA(*p, *mmp);
+#else
+      // single multi-reduction that computes all the required inner products
+      // ||p||^2, (r, z), ||M p||^2 (note that tmp2 contains M*p vector)
+      std::vector<ColorSpinorField*> lhs{p, tmp2, r};
+      std::vector<ColorSpinorField*> rhs{p, tmp2, z};
+      Complex dot[9];
+      cDotProduct(dot, lhs, rhs);
+      double3 pAppp = make_double3(dot[4].real(), 0.0, dot[0].real());
+      rkzk = dot[8].real();
+#endif
+      //printfQuda("rkzk = %e\n", rkzk);
+      //printfQuda("pApp = %e %e %e\n", pAppp.x, pAppp.y, pAppp.z);
+      //for (int i=0; i<6; i++) printfQuda("%d %e %e\n", i, dot[i].real(), dot[i].imag());
 
-			alpha = rkzk / pkApk;
+      //			pkApk = reDotProduct(*p, *mmp);
+      pkApk = pAppp.x;
+      ppnorm = pAppp.z;
+
+      alpha = rkzk / pkApk;
 
       blas::copy(*r_old, *r);
 
       axpy(alpha, *p, *x); // x_k+1 = x_k + alpha * p_k
       rr2 = axpyNorm(-alpha, *mmp, *r); // r_k+1 = r_k - alpha * Ap_k
-			rNorm = sqrt(rr2);
+      rNorm = sqrt(rr2);
 
       // reliable update
-   
       
       if( rr2 > r2_max ) r2_max = rr2;
 //      if( rr2 < reliable_update_delta*reliable_update_delta*r2_max || rr2 < stop ){
       if( rr2 < stop or ( ( (d <= deps*sqrt(r2_old)) or (dfac*dinit > deps*r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac*dinit) ) ){
 				
-				printfQuda("Reliable update conditions: \n    d_n-1 < eps*r2_old: %8.4e < %8.4e,\n    dn    > eps*r_n: %8.4e    > %8.4e,\n    dnew  > 1.1*dinit: %8.4e  > (1.1*)%8.4e.\n",
-	   			d, deps*sqrt(r2_old), d_new,deps*rNorm, d_new, dinit);
+        printfQuda("Reliable update conditions: \n    d_n-1 < eps*r2_old: %8.4e < %8.4e,\n    dn    > eps*r_n: %8.4e    > %8.4e,\n    dnew  > 1.1*dinit: %8.4e  > (1.1*)%8.4e.\n",
+                   d, deps*sqrt(r2_old), d_new,deps*rNorm, d_new, dinit);
 
         precise_timer.Start("woo", "hoo", 0);
         
         blas::copy(*vct_dtmp, *x);
         xpy(*vct_dtmp, dx);
         
-        (*nrm_op)(*vct_dr, dx, *vct_dtmp); // r = MdagM * x
+        (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2); // r = MdagM * x
         r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
         
         blas::copy(*r, *vct_dr);
         blas::zero(*x);
         
-				dinit = uhigh*( sqrt(r2) + Anorm*sqrt(blas::norm2(dx)) );
-				d = d_new;
-				xnorm = 0.;
-				pnorm = 0.;
+        dinit = uhigh*( sqrt(r2) + Anorm*sqrt(blas::norm2(dx)) );
+        d = d_new;
+        xnorm = 0.;
+        pnorm = 0.;
 
         r2_max = r2;
 
@@ -891,16 +908,15 @@ namespace quda {
         
         rr2 = r2;
 
-				d_new = dinit;
+        d_new = dinit;
 
         precise_timer.Stop("woo", "hoo", 0);
       }else{
-				d = d_new;
-				pnorm = pnorm + alpha*alpha*ppnorm;
-				xnorm = sqrt(pnorm);
-				d_new = d + u*rNorm + uhigh*Anorm*xnorm;
-			}
-      
+        d = d_new;
+        pnorm = pnorm + alpha*alpha*ppnorm;
+        xnorm = sqrt(pnorm);
+        d_new = d + u*rNorm + uhigh*Anorm*xnorm;
+      }
       
       if(rr2 < stop) break;
 
@@ -928,10 +944,13 @@ namespace quda {
       //        printfQuda("MSPCG/iter.count/diff: %05d %8.4e +i %8.4e\n", k, diff_real, diff_imag);
       // TODO:
 
-      xpay(*r, -1., *r_old);
-      
-      zkP1rkp1 = reDotProduct(*z, *r_old);
-//      zkP1rkp1 = reDotProduct(*z, *r);
+      //xpay(*r, -1., *r_old);
+      //zkP1rkp1 = reDotProduct(*z, *r_old);
+      // replace with fused kernel
+      Complex ztmp = xpaycDotzy(*r, -1., *r_old, *z);
+      zkP1rkp1 = ztmp.real();
+
+      //      zkP1rkp1 = reDotProduct(*z, *r);
       beta = zkP1rkp1 / rkzk;
       //        beta = (zkP1rkp1-diff_real) / rkzk;
       xpay(*z, beta, *p);
@@ -972,7 +991,7 @@ namespace quda {
 
     // compute the true residual 
 
-    (*nrm_op)(*vct_dr, dx, *vct_dtmp);
+    (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2);
     double true_res = xmyNorm(db, *vct_dr);
     param.true_res = sqrt(true_res/b2);
 
