@@ -91,10 +91,6 @@ static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
-// For loading the gauge fields
-int argc_copy;
-char** argv_copy;
-
 static void end();
 
 template<typename Float>
@@ -291,7 +287,7 @@ invert_test(int argc, char** argv)
   } else {
     // load a field WITHOUT PHASES
     if (strcmp(latfile,"")) {
-      read_gauge_field(latfile, qdp_inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
+      read_gauge_field(latfile, qdp_inlink, gaugeParam.cpu_prec, gaugeParam.X, argc, argv);
 
       if (dslash_type != QUDA_LAPLACE_DSLASH) {
         // The "QUDA_STAGGERED_DSLASH" part seems strange, but it's necessary
@@ -761,10 +757,7 @@ int main(int argc, char** argv)
   
   printfQuda("dslash_type = %d\n", dslash_type);
 
-  argc_copy = argc;
-  argv_copy = argv;
-
-  int ret = invert_test();
+  int ret = invert_test(argc,argv);
 
   // finalize the communications layer
   finalizeComms();

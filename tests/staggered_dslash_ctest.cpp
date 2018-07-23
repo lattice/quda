@@ -185,8 +185,8 @@ void init(int precision, QudaReconstructType link_recon) {
   gaugeParam.reconstruct = link_recon;
 
   for (int dir = 0; dir < 4; dir++) {
-    fatlink_cpu[dir] = nullptr;
-    longlink_cpu[dir] = nullptr;
+    qdp_fatlink_cpu[dir] = nullptr;
+    qdp_longlink_cpu[dir] = nullptr;
   }
 
   dirac = nullptr;
