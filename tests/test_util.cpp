@@ -1056,6 +1056,14 @@ void constructUnitaryGaugeField(Float **res)
   }
 }
 
+template <typename Float> 
+static void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type) {
+
+  if(type == 3)  applyGaugeFieldScaling_long((Float**)res, Vh, param, QUDA_STAGGERED_DSLASH);
+
+  return;
+}
+
 
 void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
   if (type == 0) {
@@ -1088,14 +1096,25 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
     if (precision == QUDA_DOUBLE_PRECISION) {
       // if doing naive staggered then set to long links so that the staggered phase is applied
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((double**)fatlink, param, dslash_type);
+      if(type != 3) constructGaugeField((double**)fatlink, param, dslash_type);
+      else applyStaggeredScaling((double**)fatlink, param, type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((double**)longlink, param, dslash_type);
+      if (dslash_type == QUDA_ASQTAD_DSLASH)
+      {
+        if(type != 3) constructGaugeField((double**)fatlink, param, dslash_type);
+        else applyStaggeredScaling((double**)fatlink, param, type);
+      }
     }else {
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((float**)fatlink, param, dslash_type);
+      if(type != 3) constructGaugeField((float**)fatlink, param, dslash_type);
+      else applyStaggeredScaling((float**)fatlink, param, type);
+
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((float**)longlink, param, dslash_type);
+      if (dslash_type == QUDA_ASQTAD_DSLASH) 
+      {
+        if(type != 3) constructGaugeField((float**)fatlink, param, dslash_type);
+        else applyStaggeredScaling((float**)fatlink, param, type);
+      }
     }
   }
 
@@ -1118,6 +1137,8 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
       }
     }
   }
+
+  if (type==3) return;
 
   // set all links to zero to emulate the 1-link operator (needed for host comparison)
   if (dslash_type == QUDA_STAGGERED_DSLASH) { 
@@ -1654,6 +1675,7 @@ double anisotropy = 1.0;
 double eps_naik = 0.0;
 double clover_coeff = 0.1;
 bool compute_clover = false;
+bool compute_fatlong = false; 
 double tol = 1e-7;
 double tol_hq = 0.;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
@@ -1661,6 +1683,7 @@ bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
+
 
 int mg_levels = 2;
 
@@ -1775,6 +1798,7 @@ void usage(char** argv )
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
   printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
+  printf("    --compute-fat-long                        # Compute the fat/long field or use random numbers (default false)\n");
   printf("    --clover-coeff                            # Clover coefficient (default 1.0)\n");
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
@@ -2384,6 +2408,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
+
+  if( strcmp(argv[i], "--compute-fat-long") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    if (strcmp(argv[i+1], "true") == 0){
+      compute_fatlong = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      compute_fatlong = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid compute_fatlong type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
 
   if( strcmp(argv[i], "--epsilon-naik") == 0){
     if (i+1 >= argc){
