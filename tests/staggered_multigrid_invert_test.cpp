@@ -603,7 +603,7 @@ int main(int argc, char **argv)
 
   } else {
 
-    const int gen_type = 1; // free field.
+    const int gen_type = 1; // 0 for free field
     warningQuda("Gen type = %d", gen_type);
 
     construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, gen_type, gauge_param.cpu_prec, 
