@@ -461,7 +461,22 @@ void init(int precision, QudaReconstructType link_recon) {
     printfQuda("Copied into milc pointers\n");
   } else { // don't compute fat/long link
 
-    construct_fat_long_gauge_field(fatlink_cpu, longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
+    construct_fat_long_gauge_field(inlink, longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
+
+    if (dslash_type == QUDA_STAGGERED_DSLASH) {
+      for (int dir = 0; dir < 4; dir++) {
+        memcpy(fatlink_gpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
+        memcpy(fatlink_cpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
+        memset(longlink_gpu[dir],0,V*gaugeSiteSize*gSize);
+        memset(longlink_cpu[dir],0,V*gaugeSiteSize*gSize);
+      }
+    } else {
+      for (int dir = 0; dir < 4; dir++) {
+        memcpy(fatlink_gpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
+        memcpy(fatlink_cpu[dir],inlink[dir], V*gaugeSiteSize*gSize);
+        memcpy(longlink_gpu[dir],longlink_cpu[dir],V*gaugeSiteSize*gSize);
+      }
+    }
 
     // Alright, we've created all the void** links.
     // Create the void* pointers
