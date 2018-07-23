@@ -1096,8 +1096,8 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
       param->type = QUDA_ASQTAD_LONG_LINKS;
       if (dslash_type == QUDA_ASQTAD_DSLASH)
       {
-        if(type != 3) constructGaugeField((double**)fatlink, param, dslash_type);
-        else applyStaggeredScaling((double**)fatlink, param, type);
+        if(type != 3) constructGaugeField((double**)longlink, param, dslash_type);
+        else applyStaggeredScaling((double**)longlink, param, type);
       }
     }else {
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
@@ -1107,8 +1107,8 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
       param->type = QUDA_ASQTAD_LONG_LINKS;
       if (dslash_type == QUDA_ASQTAD_DSLASH) 
       {
-        if(type != 3) constructGaugeField((float**)fatlink, param, dslash_type);
-        else applyStaggeredScaling((float**)fatlink, param, type);
+        if(type != 3) constructGaugeField((float**)longlink, param, dslash_type);
+        else applyStaggeredScaling((float**)longlink, param, type);
       }
     }
   }

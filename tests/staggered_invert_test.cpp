@@ -278,38 +278,32 @@ invert_test(void)
   milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_longlink = malloc(4*V*gaugeSiteSize*gSize);
 
-  if (!compute_fatlong) {
+  // load a field WITHOUT PHASES
+  if (strcmp(latfile,"")) {
+    read_gauge_field(latfile, qdp_inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
+    if (dslash_type != QUDA_LAPLACE_DSLASH) {
+      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
+    }
+  } else {
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       construct_gauge_field(qdp_fatlink, 0, gaugeParam.cpu_prec, &gaugeParam);
     } else {
-      construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec,
-  				   &gaugeParam, dslash_type);
+      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
     }
-  } else {
-    // load a field WITHOUT PHASES
-    if (strcmp(latfile,"")) {
-      read_gauge_field(latfile, qdp_inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
+    //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
+  }
 
-      if (dslash_type != QUDA_LAPLACE_DSLASH) {
-        // The "QUDA_STAGGERED_DSLASH" part seems strange, but it's necessary
-        // for both staggered and ASQTAD---it forces correct phasing 
-        applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
-      }
-
-    } else {
-      if (dslash_type == QUDA_LAPLACE_DSLASH) {
-        construct_gauge_field(qdp_inlink, 0, gaugeParam.cpu_prec, &gaugeParam);
-      } else {
-        construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gaugeParam.cpu_prec,
-               &gaugeParam, dslash_type);
-      }
+  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
+  // "compute" the fat/long links or not.
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
+    for (int dir = 0; dir < 4; dir++) {
+      memcpy(qdp_fatlink[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+      memset(qdp_longlink[dir],0,V*gaugeSiteSize*gSize);
     }
+  } else { // QUDA_ASQTAD_DSLASH
 
+    if (compute_fatlong) {
 
-    // If we're doing HISQ fields, build links on the GPU
-    if (dslash_type == QUDA_ASQTAD_DSLASH) {
-
-      
       ///////////////////////////
       // Set path coefficients //
       ///////////////////////////
@@ -347,6 +341,8 @@ invert_test(void)
           0.0          // Lepage term 
       };
 
+      double* act_paths[3] = { act_path_coeff_1, act_path_coeff_2, act_path_coeff_3 };
+
       // silence some Naik complaining
       (void)n_naiks;
 
@@ -366,8 +362,6 @@ invert_test(void)
       // Create the GPU links //
       //////////////////////////
 
-      double* act_paths[3] = { act_path_coeff_1, act_path_coeff_2, act_path_coeff_3 };
-
       // Skip eps field for now
 
       // Note: GPU link creation only works for single and double precision
@@ -378,21 +372,13 @@ invert_test(void)
       
 
 
-    } else if (dslash_type == QUDA_STAGGERED_DSLASH) { 
-      // we apply phases then copy it over
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
+    } else { //
 
       for (int dir = 0; dir < 4; dir++) {
         memcpy(qdp_fatlink[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-        memset(qdp_longlink[dir],0,V*gaugeSiteSize*gSize);
       }
-    } else { // dslash_type == QUDA_LAPLACE_DSLASH
-      for (int dir = 0; dir < 4; dir++) {
-        memcpy(qdp_fatlink[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-        memset(qdp_longlink[dir],0,V*gaugeSiteSize*gSize);
-      }
-
     }
+
   }
 
   // Alright, we've created all the void** links.

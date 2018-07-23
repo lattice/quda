@@ -110,7 +110,7 @@ static double max_allowed_error = 1e-11;
 int argc_copy;
 char** argv_copy;
 
-/*
+
 // wrong, but it does what I want
 int getPrintVectorIndex(const int X[4], const int coord[4])
 {
@@ -123,7 +123,7 @@ int getPrintVectorIndex(const int X[4], const int coord[4])
   int phase = (coord[0]+coord[1]+coord[2]+coord[3])%2;
   return 2*idx+phase;
 }
-*/
+
 
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
@@ -165,13 +165,13 @@ void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
 }
 
 
-bool skip_kernel(QudaPrecision precision, QudaReconstructType link_recon) {
+bool skip_kernel(int prec, QudaReconstructType link_recon) {
   // If we're building fat/long links, there are some
   // tests we have to skip.
   // For example, the fat/long build doesn't support reconstruct 8.
   if (compute_fatlong) {
     if (link_recon == QUDA_RECONSTRUCT_8 || link_recon == QUDA_RECONSTRUCT_13) { return true; }
-    if (precision == QUDA_HALF_PRECISION) { return true; }
+    if (prec == 0 /* half */) { return true; }
   }
 
   return false;
@@ -183,23 +183,6 @@ void init(int precision, QudaReconstructType link_recon) {
 
   inv_param.cuda_prec = prec;
   gaugeParam.reconstruct = link_recon;
-
-  for (int dir = 0; dir < 4; dir++) {
-    fatlink_cpu[dir] = nullptr;
-    longlink_cpu[dir] = nullptr;
-  }
-
-  dirac = nullptr;
-  cudaSpinor = nullptr;
-  cudaSpinorOut = nullptr;
-  tmp = nullptr;
-
-  spinor = nullptr;
-  spinorOut = nullptr;
-  spinorRef = nullptr;
-  tmpCpu = nullptr;
-
-  if (skip_kernel(prec, link_recon)) { return; }
 
   setKernelPackT(kernel_pack_t);
 
@@ -301,10 +284,11 @@ void init(int precision, QudaReconstructType link_recon) {
   // Want to place an 
 
   spinor->Source(QUDA_RANDOM_SOURCE);
-  //spinor->zero();
-  //for (int i = 0; i < Vh; i++) { spinor->Source(QUDA_POINT_SOURCE,i,0,0); } 
-  /*int latDim[4] = {xdim,ydim,zdim,tdim};
-  int coord[4] = {7,7,6,6}; // actually places it at (2,3,3,3)
+  /*spinor->zero();
+  for (int i = 0; i < Vh; i++) { spinor->Source(QUDA_POINT_SOURCE,i,0,0); } */
+  /*spinor->zero();
+  int latDim[4] = {xdim,ydim,zdim,tdim};
+  int coord[4] = {3,3,3,3}; // actually places it at (2,3,3,3)
   spinor->zero(); // zero before dropping a point source
   spinor->Source(QUDA_POINT_SOURCE, getPrintVectorIndex(latDim, coord), 0, 0);*/
   
@@ -340,26 +324,28 @@ void init(int precision, QudaReconstructType link_recon) {
     qdp_inlink[dir] = malloc(V*gaugeSiteSize*gSize);
   }
 
-  if (compute_fatlong) {
+  // load a field WITHOUT PHASES
+  if (strcmp(latfile,"")) {
+    read_gauge_field(latfile, qdp_inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
+    applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
+  } else {
+    construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
+    //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
+  }
 
-    // load a field WITHOUT PHASES
-    if (strcmp(latfile,"")) {
-      read_gauge_field(latfile, qdp_inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
-
-      // The "QUDA_STAGGERED_DSLASH" part seems strange, but it's necessary
-      // for both staggered and ASQTAD---it forces correct phasing 
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
-
-    } else {
-      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
-      //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
+  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
+  // "compute" the fat/long links or not.
+  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+    for (int dir = 0; dir < 4; dir++) {
+      memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+      memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+      memset(qdp_longlink_gpu[dir],0,V*gaugeSiteSize*gSize);
+      memset(qdp_longlink_cpu[dir],0,V*gaugeSiteSize*gSize);
     }
+  } else { // QUDA_ASQTAD_DSLASH
 
+    if (compute_fatlong) {
 
-    // If we're doing HISQ fields, we build links both on the CPU and the GPU.
-    if (dslash_type == QUDA_ASQTAD_DSLASH) {
-
-      
       ///////////////////////////
       // Set path coefficients //
       ///////////////////////////
@@ -437,30 +423,8 @@ void init(int precision, QudaReconstructType link_recon) {
       
 
 
-    } else { //DSLASH_TYPE == QUDA_STAGGERED_DSLASH
-      // we apply phases then copy it over
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
+    } else { //
 
-      for (int dir = 0; dir < 4; dir++) {
-        memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-        memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-        memset(qdp_longlink_gpu[dir],0,V*gaugeSiteSize*gSize);
-        memset(qdp_longlink_cpu[dir],0,V*gaugeSiteSize*gSize);
-      }
-    }
-
-  } else { // don't compute fat/long link
-
-    construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
-
-    if (dslash_type == QUDA_STAGGERED_DSLASH) {
-      for (int dir = 0; dir < 4; dir++) {
-        memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-        memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-        memset(qdp_longlink_gpu[dir],0,V*gaugeSiteSize*gSize);
-        memset(qdp_longlink_cpu[dir],0,V*gaugeSiteSize*gSize);
-      }
-    } else {
       for (int dir = 0; dir < 4; dir++) {
         memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
         memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
@@ -595,26 +559,26 @@ void init(int precision, QudaReconstructType link_recon) {
 void end(void) 
 {
   for (int dir = 0; dir < 4; dir++) {
-    if (qdp_fatlink_cpu[dir] != nullptr) free(qdp_fatlink_cpu[dir]);
-    if (qdp_longlink_cpu[dir] != nullptr) free(qdp_longlink_cpu[dir]);
+    if (qdp_fatlink_cpu[dir] != nullptr) { free(qdp_fatlink_cpu[dir]); qdp_fatlink_cpu[dir] = nullptr; }
+    if (qdp_longlink_cpu[dir] != nullptr) { free(qdp_longlink_cpu[dir]); qdp_longlink_cpu[dir] = nullptr; }
   }
 
   if (!transfer){
-    if (dirac !=nullptr) delete dirac;
-    if (cudaSpinor != nullptr) delete cudaSpinor;
-    if (cudaSpinorOut != nullptr) delete cudaSpinorOut;
-    if (tmp != nullptr) delete tmp;
+    if (dirac !=nullptr) { delete dirac; dirac = nullptr; }
+    if (cudaSpinor != nullptr) { delete cudaSpinor; cudaSpinor = nullptr; }
+    if (cudaSpinorOut != nullptr) { delete cudaSpinorOut; cudaSpinorOut = nullptr; }
+    if (tmp != nullptr) { delete tmp; tmp = nullptr; }
   }
 
-  if (spinor != nullptr) delete spinor;
-  if (spinorOut != nullptr) delete spinorOut;
-  if (spinorRef != nullptr) delete spinorRef;
+  if (spinor != nullptr) { delete spinor; spinor = nullptr; }
+  if (spinorOut != nullptr) { delete spinorOut; spinorOut = nullptr; }
+  if (spinorRef != nullptr) { delete spinorRef; spinorRef = nullptr; }
   if (tmpCpu != nullptr) { delete tmpCpu; tmpCpu = nullptr; }
 
   freeGaugeQuda();
 
-  if (cpuFat) delete cpuFat;
-  if (cpuLong) delete cpuLong;
+  if (cpuFat) { delete cpuFat; cpuFat = nullptr; }
+  if (cpuLong) { delete cpuLong; cpuLong = nullptr; }
   commDimPartitionedReset();
   
 }
@@ -699,12 +663,13 @@ DslashTime dslashCUDA(int niter) {
   if (stat != cudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
-  /*
-  ColorSpinorParam param(*cudaSpinorOut);
+  
+  /*ColorSpinorParam param(*cudaSpinorOut);
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION;
   param.create = QUDA_NULL_FIELD_CREATE;
   param.pad = 0;
+  param.setPrecision(QUDA_DOUBLE_PRECISION);
 
   cpuColorSpinorField tmp(param);
   tmp = *cudaSpinorOut;
@@ -717,8 +682,8 @@ DslashTime dslashCUDA(int niter) {
 
   for (int i = 0; i < 8; i++) {
     int dir = i/2; int pm = 2*(i%2)-1;
-    coord[0] = coord[1] = 7;
-    coord[2] = coord[3] = 6;
+    coord[0] = coord[1] = 3;
+    coord[2] = coord[3] = 3;
     coord[dir] += pm;
     coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
     printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
@@ -730,8 +695,8 @@ DslashTime dslashCUDA(int niter) {
 
   for (int i = 0; i < 8; i++) {
     int dir = i/2; int pm = 2*(i%2)-1;
-    coord[0] = coord[1] = 7;
-    coord[2] = coord[3] = 6;
+    coord[0] = coord[1] = 3;
+    coord[2] = coord[3] = 3;
     coord[dir] += 3*pm;
     coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
     printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
@@ -792,8 +757,8 @@ void staggeredDslashRef()
 
   for (int i = 0; i < 8; i++) {
     int dir = i/2; int pm = 2*(i%2)-1;
-    coord[0] = coord[1] = 7;
-    coord[2] = coord[3] = 6;
+    coord[0] = coord[1] = 3;
+    coord[2] = coord[3] = 3;
     coord[dir] += pm;
     coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
     printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
@@ -805,16 +770,16 @@ void staggeredDslashRef()
 
   for (int i = 0; i < 8; i++) {
     int dir = i/2; int pm = 2*(i%2)-1;
-    coord[0] = coord[1] = 7;
-    coord[2] = coord[3] = 6;
+    coord[0] = coord[1] = 3;
+    coord[2] = coord[3] = 3;
     coord[dir] += 3*pm;
     coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
     printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
     // wrong, but whatever, it grabs the right neighbor of (2,3,3,3)
     spinorRef->PrintVector(((((coord[3]*latDim[2]+coord[2])*latDim[1]+coord[1])*latDim[0]+coord[0])>>1)-(dir==0?1:0));
-  }
+  }*/
 
-  errorQuda("Meh\n");*/
+  //errorQuda("Meh\n");
 
   //for (int i = 0; i < Vh; i++)    
   //  spinorRef->PrintVector(i);
@@ -887,7 +852,25 @@ public:
 
     }
     updateR();
-    init(prec, recon);
+
+    for (int dir = 0; dir < 4; dir++) {
+      qdp_fatlink_cpu[dir] = nullptr;
+      qdp_longlink_cpu[dir] = nullptr;
+    }
+
+    dirac = nullptr;
+    cudaSpinor = nullptr;
+    cudaSpinorOut = nullptr;
+    tmp = nullptr;
+
+    spinor = nullptr;
+    spinorOut = nullptr;
+    spinorRef = nullptr;
+    tmpCpu = nullptr;
+
+    if (!skip_kernel(prec,recon)) {
+      init(prec, recon);
+    }
     display_test_info(prec, recon);
   }
   virtual void TearDown() { end(); }
@@ -912,7 +895,8 @@ public:
       (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
     bool failed = false; // for the nan catch
 
-    if (!skip_kernel(inv_param.cuda_prec,gaugeParam.reconstruct)) {
+    // check for skip_kernel
+    if (spinorRef != nullptr) {
 
 
       { // warm-up run
@@ -925,12 +909,13 @@ public:
       if (!transfer) *spinorOut = *cudaSpinorOut;
 
       staggeredDslashRef();
+
       double spinor_ref_norm2 = blas::norm2(*spinorRef);
-      double spinor_out_norm2 =  blas::norm2(*spinorOut);
+      double spinor_out_norm2 = blas::norm2(*spinorOut);
 
       // Catching nans is weird.
-      if (spinor_ref_norm2 != spinor_ref_norm2) { failed = true; }
-      if (spinor_out_norm2 != spinor_out_norm2) { failed = true; }
+      if (std::isnan(spinor_ref_norm2)) { failed = true; }
+      if (std::isnan(spinor_out_norm2)) { failed = true; }
 
       if (!transfer) {
         double cuda_spinor_out_norm2 =  blas::norm2(*cudaSpinorOut);
@@ -947,7 +932,9 @@ public:
 
 TEST_P(StaggeredDslashTest, benchmark) {
     
-    if (!skip_kernel(inv_param.cuda_prec,gaugeParam.reconstruct)) {
+    // check for skip_kernel
+    if (spinorRef != nullptr) {
+
       { // warm-up run
         // printfQuda("Tuning...\n");
         dslashCUDA(1);
