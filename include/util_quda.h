@@ -7,12 +7,11 @@
 #include <comm_quda.h>
 #include <tune_key.h>
 
-QudaTune getTuning();
-
 /**
-   @param tune Sets the whether to tune the cuda kernels or not
-*/
-void setTuning(QudaTune tune);
+   @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
+   @return If autotuning is enabled
+ */
+QudaTune getTuning();
 
 QudaVerbosity getVerbosity();
 char *getOutputPrefix();
@@ -25,13 +24,23 @@ void setOutputFile(FILE *outfile);
 void pushVerbosity(QudaVerbosity verbosity);
 void popVerbosity();
 
+/**
+   @brief This function returns true if the calling rank is enabled
+   for verbosity (e.g., whether printQuda and warningQuda will print
+   out from this rank).
+   @return Return whether this rank will print
+ */
+bool getRankVerbosity();
+
 char *getPrintBuffer();
 
-// Note that __func__ is part of C++11 and has long been supported by GCC.
 
-#define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0)
+#define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0 &&		\
+		    threadIdx.y + blockDim.y*blockIdx.y==0 &&		\
+		    threadIdx.z + blockDim.z*blockIdx.z==0)
+
 #define printfZero(...)	do {						\
-    if (threadIdx.x + blockDim.x*blockIdx.x==0) printf(__VA_ARGS__);	\
+    if (zeroThread) printf(__VA_ARGS__);				\
   } while (0)
 
 
@@ -39,7 +48,7 @@ char *getPrintBuffer();
 
 #define printfQuda(...) do {                           \
   sprintf(getPrintBuffer(), __VA_ARGS__);	       \
-  if (comm_rank() == 0) {	                       \
+  if (getRankVerbosity()) {			       \
     fprintf(getOutputFile(), "%s", getOutputPrefix()); \
     fprintf(getOutputFile(), "%s", getPrintBuffer());  \
     fflush(getOutputFile());                           \
@@ -61,7 +70,7 @@ char *getPrintBuffer();
 #define warningQuda(...) do {                                   \
   if (getVerbosity() > QUDA_SILENT) {				\
     sprintf(getPrintBuffer(), __VA_ARGS__);			\
-    if (comm_rank() == 0) {					\
+    if (getRankVerbosity()) {						\
       fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix());	\
       fprintf(getOutputFile(), "%s", getPrintBuffer());			\
       fprintf(getOutputFile(), "\n");					\
@@ -86,7 +95,7 @@ char *getPrintBuffer();
   fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
 	  getOutputPrefix(), getLastTuneKey().name,			     \
 	  getLastTuneKey().volume, getLastTuneKey().aux);		     \
-  exit(1);								     \
+  comm_abort(1);								     \
 } while (0)
 
 #define warningQuda(...) do {                                 \

@@ -162,7 +162,7 @@ namespace quda {
     @return 4 real numbers
  */
   template < class T>
-  __host__ __device__ static inline Matrix<T,2> get_block_su2( Matrix<typename ComplexTypeId<T>::Type,3> tmp1, int block ){
+  __host__ __device__ static inline Matrix<T,2> get_block_su2( Matrix<complex<T>,3> tmp1, int block ){
     Matrix<T,2> r;
     switch ( block ) {
     case 0:
@@ -194,7 +194,7 @@ namespace quda {
     @return 4 real numbers
  */
   template <class T, int NCOLORS>
-  __host__ __device__ static inline Matrix<T,2> get_block_su2( Matrix<typename ComplexTypeId<T>::Type,NCOLORS> tmp1, int2 id ){
+  __host__ __device__ static inline Matrix<T,2> get_block_su2( Matrix<complex<T>,NCOLORS> tmp1, int2 id ){
     Matrix<T,2> r;
     r(0,0) = tmp1(id.x,id.x).x + tmp1(id.y,id.y).x;
     r(0,1) = tmp1(id.x,id.y).y + tmp1(id.y,id.x).y;
@@ -210,13 +210,13 @@ namespace quda {
     @return SU(Nc) matrix
  */
   template <class T, int NCOLORS>
-  __host__ __device__ static inline Matrix<typename ComplexTypeId<T>::Type,NCOLORS> block_su2_to_sun( Matrix<T,2> rr, int2 id ){
-    Matrix<typename ComplexTypeId<T>::Type,NCOLORS> tmp1;
+  __host__ __device__ static inline Matrix<complex<T>,NCOLORS> block_su2_to_sun( Matrix<T,2> rr, int2 id ){
+    Matrix<complex<T>,NCOLORS> tmp1;
     setIdentity(&tmp1);
-    tmp1(id.x,id.x) = makeComplex( rr(0,0), rr(1,1) );
-    tmp1(id.x,id.y) = makeComplex( rr(1,0), rr(0,1) );
-    tmp1(id.y,id.x) = makeComplex(-rr(1,0), rr(0,1) );
-    tmp1(id.y,id.y) = makeComplex( rr(0,0),-rr(1,1) );
+    tmp1(id.x,id.x) = complex<T>( rr(0,0), rr(1,1) );
+    tmp1(id.x,id.y) = complex<T>( rr(1,0), rr(0,1) );
+    tmp1(id.y,id.x) = complex<T>(-rr(1,0), rr(0,1) );
+    tmp1(id.y,id.y) = complex<T>( rr(0,0),-rr(1,1) );
     return tmp1;
   }
 /**
@@ -226,11 +226,10 @@ namespace quda {
     @param id indices
  */
   template <class T, int NCOLORS>
-  __host__ __device__ static inline void mul_block_sun( Matrix<T,2> u, Matrix<typename ComplexTypeId<T>::Type,NCOLORS> &link, int2 id ){
-    typename ComplexTypeId<T>::Type tmp;
+  __host__ __device__ static inline void mul_block_sun( Matrix<T,2> u, Matrix<complex<T>,NCOLORS> &link, int2 id ){
     for ( int j = 0; j < NCOLORS; j++ ) {
-      tmp = makeComplex( u(0,0), u(1,1) ) * link(id.x, j) + makeComplex( u(1,0), u(0,1) ) * link(id.y, j);
-      link(id.y, j) = makeComplex(-u(1,0), u(0,1) ) * link(id.x, j) + makeComplex( u(0,0),-u(1,1) ) * link(id.y, j);
+      complex<T> tmp = complex<T>( u(0,0), u(1,1) ) * link(id.x, j) + complex<T>( u(1,0), u(0,1) ) * link(id.y, j);
+      link(id.y, j) = complex<T>(-u(1,0), u(0,1) ) * link(id.x, j) + complex<T>( u(0,0),-u(1,1) ) * link(id.y, j);
       link(id.x, j) = tmp;
     }
   }
@@ -304,15 +303,14 @@ namespace quda {
     @param localstate CURAND rng state
  */
   template <class Float, int NCOLORS>
-  __device__ inline void heatBathSUN( Matrix<typename ComplexTypeId<Float>::Type,NCOLORS>& U, Matrix<typename ComplexTypeId<Float>::Type,NCOLORS> F, \
+  __device__ inline void heatBathSUN( Matrix<complex<Float>,NCOLORS>& U, Matrix<complex<Float>,NCOLORS> F,
                                       cuRNGState& localState, Float BetaOverNc ){
 
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
     if ( NCOLORS == 3 ) {
       //////////////////////////////////////////////////////////////////
       /*
          for( int block = 0; block < NCOLORS; block++ ) {
-         Matrix<typename ComplexTypeId<T>::Type,3> tmp1 = U * F;
+         Matrix<complex<T>,3> tmp1 = U * F;
          Matrix<T,2> r = get_block_su2<T>(tmp1, block);
          T k = sqrt(r(0,0)*r(0,0)+r(0,1)*r(0,1)+r(1,0)*r(1,0)+r(1,1)*r(1,1));
          T ap = BetaOverNc * k;
@@ -330,10 +328,10 @@ namespace quda {
       for ( int block = 0; block < NCOLORS; block++ ) {
         int p,q;
         IndexBlock<NCOLORS>(block, p, q);
-        Cmplx a0 = makeComplex((Float)0.0, (Float)0.0);
-        Cmplx a1 = a0;
-        Cmplx a2 = a0;
-        Cmplx a3 = a0;
+        complex<Float> a0((Float)0.0, (Float)0.0);
+        complex<Float> a1 = a0;
+        complex<Float> a2 = a0;
+        complex<Float> a3 = a0;
 
         for ( int j = 0; j < NCOLORS; j++ ) {
           a0 += U(p,j) * F(j,p);
@@ -353,11 +351,11 @@ namespace quda {
         Matrix<Float,2> a = generate_su2_matrix_milc<Float>(ap, localState);
         r = mulsu2UVDagger<Float>( a, r);
         ///////////////////////////////////////
-        a0 = makeComplex( r(0,0), r(1,1) );
-        a1 = makeComplex( r(1,0), r(0,1) );
-        a2 = makeComplex(-r(1,0), r(0,1) );
-        a3 = makeComplex( r(0,0),-r(1,1) );
-        Cmplx tmp0;
+        a0 = complex<Float>( r(0,0), r(1,1) );
+        a1 = complex<Float>( r(1,0), r(0,1) );
+        a2 = complex<Float>(-r(1,0), r(0,1) );
+        a3 = complex<Float>( r(0,0),-r(1,1) );
+        complex<Float> tmp0;
 
         for ( int j = 0; j < NCOLORS; j++ ) {
           tmp0 = a0 * U(p,j) + a1 * U(q,j);
@@ -371,7 +369,7 @@ namespace quda {
     else if ( NCOLORS > 3 ) {
       //////////////////////////////////////////////////////////////////
       //TESTED IN SU(4) SP THIS IS WORST
-      Matrix<typename ComplexTypeId<Float>::Type,NCOLORS> M = U * F;
+      Matrix<complex<Float>,NCOLORS> M = U * F;
       for ( int block = 0; block < NCOLORS * ( NCOLORS - 1) / 2; block++ ) {
         int2 id = IndexBlock<NCOLORS>( block );
         Matrix<Float,2> r = get_block_su2<Float>(M, id);
@@ -412,7 +410,7 @@ namespace quda {
          //Matrix<T,2> a = generate_su2_matrix<T4, T>(ap, localState);
          Matrix<T,2> a = generate_su2_matrix_milc<T>(ap, localState);
          r = mulsu2UVDagger<T>( a, r);
-         mul_block_sun<T>( r, U, id); * /
+         mul_block_sun<T>( r, U, id); */
          /*
            a0 = complex( r(0,0), r(1,1) );
            a1 = complex( r(1,0), r(0,1) );
@@ -438,14 +436,13 @@ namespace quda {
      @param F staple
    */
   template <class Float, int NCOLORS>
-  __device__ inline void overrelaxationSUN( Matrix<typename ComplexTypeId<Float>::Type,NCOLORS>& U, Matrix<typename ComplexTypeId<Float>::Type,NCOLORS> F ){
+  __device__ inline void overrelaxationSUN( Matrix<complex<Float>,NCOLORS>& U, Matrix<complex<Float>,NCOLORS> F ){
 
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
     if ( NCOLORS == 3 ) {
       //////////////////////////////////////////////////////////////////
       /*
          for( int block = 0; block < 3; block++ ) {
-         Matrix<typename ComplexTypeId<T>::Type,3> tmp1 = U * F;
+         Matrix<complex<T>,3> tmp1 = U * F;
          Matrix<T,2> r = get_block_su2<T>(tmp1, block);
          //normalize and conjugate
          Float norm = 1.0 / sqrt(r(0,0)*r(0,0)+r(0,1)*r(0,1)+r(1,0)*r(1,0)+r(1,1)*r(1,1));;
@@ -470,10 +467,10 @@ namespace quda {
       for ( int block = 0; block < 3; block++ ) {
         int p,q;
         IndexBlock<NCOLORS>(block, p, q);
-        Cmplx a0 = makeComplex((Float)0., (Float)0.);
-        Cmplx a1 = a0;
-        Cmplx a2 = a0;
-        Cmplx a3 = a0;
+        complex<Float> a0((Float)0., (Float)0.);
+        complex<Float> a1 = a0;
+        complex<Float> a2 = a0;
+        complex<Float> a3 = a0;
 
         for ( int j = 0; j < NCOLORS; j++ ) {
           a0 += U(p,j) * F(j,p);
@@ -496,11 +493,11 @@ namespace quda {
 
 
         ///////////////////////////////////////
-        a0 = makeComplex( r(0,0), r(1,1) );
-        a1 = makeComplex( r(1,0), r(0,1) );
-        a2 = makeComplex(-r(1,0), r(0,1) );
-        a3 = makeComplex( r(0,0),-r(1,1) );
-        Cmplx tmp0, tmp1;
+        a0 = complex<Float>( r(0,0), r(1,1) );
+        a1 = complex<Float>( r(1,0), r(0,1) );
+        a2 = complex<Float>(-r(1,0), r(0,1) );
+        a3 = complex<Float>( r(0,0),-r(1,1) );
+        complex<Float> tmp0, tmp1;
 
         for ( int j = 0; j < NCOLORS; j++ ) {
           tmp0 = a0 * U(p,j) + a1 * U(q,j);
@@ -514,7 +511,7 @@ namespace quda {
     }
     else if ( NCOLORS > 3 ) {
       ///////////////////////////////////////////////////////////////////
-      Matrix<typename ComplexTypeId<Float>::Type,NCOLORS> M = U * F;
+      Matrix<complex<Float>,NCOLORS> M = U * F;
       for ( int block = 0; block < NCOLORS * ( NCOLORS - 1) / 2; block++ ) {
         int2 id = IndexBlock<NCOLORS>( block );
         Matrix<Float,2> r = get_block_su2<Float, NCOLORS>(M, id);
@@ -607,7 +604,6 @@ namespace quda {
   __global__ void compute_heatBath(MonteArg<Gauge, Float, NCOLORS> arg, int mu, int parity){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if ( idx >= arg.threads ) return;
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
     int id = idx;
     int X[4];
     #pragma unroll
@@ -624,13 +620,13 @@ namespace quda {
     idx = linkIndex(x,X);
 #endif
 
-    Matrix<Cmplx,NCOLORS> staple;
+    Matrix<complex<Float>,NCOLORS> staple;
     setZero(&staple);
 
-    Matrix<Cmplx,NCOLORS> U;
+    Matrix<complex<Float>,NCOLORS> U;
     for ( int nu = 0; nu < 4; nu++ ) if ( mu != nu ) {
         int dx[4] = { 0, 0, 0, 0 };
-        Matrix<Cmplx,NCOLORS> link;
+        Matrix<complex<Float>,NCOLORS> link;
         arg.dataOr.load((Float*)(link.data), idx, nu, parity);
         dx[nu]++;
         arg.dataOr.load((Float*)(U.data), linkIndexShift(x,dx,X), mu, 1 - parity);
@@ -705,15 +701,10 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+      sprintf(aux_string,"threads=%d,prec=%lu",arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     void preTune() {
       arg.data.backup();
       if(HeatbathOrRelax) arg.rngstate.backup();
@@ -774,7 +765,7 @@ namespace quda {
 
 
   template<typename Float, int NElems, int NCOLORS, typename Gauge>
-  void Monte( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
+  void Monte( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover) {
 
     TimeProfile profileHBOVR("HeatBath_OR_Relax", false);
     MonteArg<Gauge, Float, NCOLORS> montearg(dataOr, data, Beta, rngstate);
@@ -792,7 +783,7 @@ namespace quda {
       }
     }
     if ( getVerbosity() >= QUDA_SUMMARIZE ) {
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (hb.flops() * 8 * nhb * 1e-9) / (secs);
@@ -818,7 +809,7 @@ namespace quda {
       }
     }
     if ( getVerbosity() >= QUDA_SUMMARIZE ) {
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (relax.flops() * 8 * nover * 1e-9) / (secs);
@@ -834,7 +825,7 @@ namespace quda {
 
 
   template<typename Float>
-  void Monte( cudaGaugeField& data, RNG &rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
+  void Monte( cudaGaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover) {
 
     if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
@@ -863,7 +854,7 @@ namespace quda {
  * @param[in] nhb number of heatbath steps
  * @param[in] nover number of overrelaxation steps
  */
-  void Monte( cudaGaugeField& data, RNG &rngstate, double Beta, unsigned int nhb, unsigned int nover) {
+  void Monte( cudaGaugeField& data, RNG &rngstate, double Beta, int nhb, int nover) {
 #ifdef GPU_GAUGE_ALG
     if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
       Monte<float> (data, rngstate, (float)Beta, nhb, nover);

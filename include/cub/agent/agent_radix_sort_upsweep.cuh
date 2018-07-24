@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -186,8 +186,8 @@ struct AgentRadixSortUpsweep
     {
         // BucketKeys
         static __device__ __forceinline__ void BucketKeys(
-            AgentRadixSortUpsweep     &cta,
-            UnsignedBits                    keys[KEYS_PER_THREAD])
+            AgentRadixSortUpsweep       &cta,
+            UnsignedBits                keys[KEYS_PER_THREAD])
         {
             cta.Bucket(keys[COUNT]);
 
@@ -201,7 +201,7 @@ struct AgentRadixSortUpsweep
     struct Iterate<MAX, MAX>
     {
         // BucketKeys
-        static __device__ __forceinline__ void BucketKeys(AgentRadixSortUpsweep &cta, UnsignedBits keys[KEYS_PER_THREAD]) {}
+        static __device__ __forceinline__ void BucketKeys(AgentRadixSortUpsweep &/*cta*/, UnsignedBits /*keys*/[KEYS_PER_THREAD]) {}
     };
 
 
@@ -317,7 +317,7 @@ struct AgentRadixSortUpsweep
             }
         }
 
-        __syncthreads();
+        CTA_SYNC();
 
         // Rake-reduce bin_count reductions
         if (threadIdx.x < RADIX_DIGITS)
@@ -340,7 +340,7 @@ struct AgentRadixSortUpsweep
         LoadDirectStriped<BLOCK_THREADS>(threadIdx.x, d_keys_in + block_offset, keys);
 
         // Prevent hoisting
-        __syncthreads();
+        CTA_SYNC();
 
         // Bucket tile of keys
         Iterate<0, KEYS_PER_THREAD>::BucketKeys(*this, keys);
@@ -375,12 +375,12 @@ struct AgentRadixSortUpsweep
      */
     __device__ __forceinline__ AgentRadixSortUpsweep(
         TempStorage &temp_storage,
-        KeyT        *d_keys_in,
+        const KeyT  *d_keys_in,
         int         current_bit,
         int         num_bits)
     :
         temp_storage(temp_storage.Alias()),
-        d_keys_in(reinterpret_cast<UnsignedBits*>(d_keys_in)),
+        d_keys_in(reinterpret_cast<const UnsignedBits*>(d_keys_in)),
         current_bit(current_bit),
         num_bits(num_bits)
     {}
@@ -407,12 +407,12 @@ struct AgentRadixSortUpsweep
                 block_offset += TILE_ITEMS;
             }
 
-            __syncthreads();
+            CTA_SYNC();
 
             // Aggregate back into local_count registers to prevent overflow
             UnpackDigitCounts();
 
-            __syncthreads();
+            CTA_SYNC();
 
             // Reset composite counters in lanes
             ResetDigitCounters();
@@ -430,12 +430,12 @@ struct AgentRadixSortUpsweep
             block_offset,
             block_end);
 
-        __syncthreads();
+        CTA_SYNC();
 
         // Aggregate back into local_count registers
         UnpackDigitCounts();
 
-        __syncthreads();
+        CTA_SYNC();
 
         // Final raking reduction of counts by bin
         ReduceUnpackedCounts(bin_count);

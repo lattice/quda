@@ -1,3 +1,4 @@
+#include <random_quda.h>
 namespace quda {
   /**
      Compute the plaquette of the gauge field
@@ -11,6 +12,14 @@ namespace quda {
   double3 plaquette(const GaugeField& U,
 		    QudaFieldLocation location);
 
+
+
+  /** Generate Gaussian distributed GaugeField
+   * @param dataDs The GaugeField
+   * @param rngstate random states
+   */
+
+  void gaugeGauss(GaugeField &dataDs, RNG &rngstate);
   
   /**
      Apply APE smearing to the gauge field
@@ -18,12 +27,33 @@ namespace quda {
      @param dataDs Output smeared field
      @param dataOr Input gauge field
      @param alpha smearing parameter
-     @param location Location of the computation
   */
   void APEStep (GaugeField &dataDs,
 		const GaugeField& dataOr,
-		double alpha,
-		QudaFieldLocation location);
+		double alpha);
+
+  /**
+     Apply STOUT smearing to the gauge field
+
+     @param dataDs Output smeared field
+     @param dataOr Input gauge field
+     @param rho smearing parameter
+  */
+  void STOUTStep (GaugeField &dataDs,
+		  const GaugeField& dataOr,
+		  double rho);
+
+  /**
+     Apply Over Improved STOUT smearing to the gauge field
+
+     @param dataDs Output smeared field
+     @param dataOr Input gauge field
+     @param rho smearing parameter
+     @param epsilon smearing parameter
+  */
+  void OvrImpSTOUTStep (GaugeField &dataDs,
+			const GaugeField& dataOr,
+			double rho, double epsilon);
 
 
   /**
@@ -40,13 +70,13 @@ namespace quda {
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
   void gaugefixingOVR( cudaGaugeField& data,
-		       const unsigned int gauge_dir,
-                       const unsigned int Nsteps,
-		       const unsigned int verbose_interval,
+		       const int gauge_dir,
+                       const int Nsteps,
+		       const int verbose_interval,
 		       const double relax_boost,
                        const double tolerance,
-		       const unsigned int reunit_interval,
-		       const unsigned int stopWtheta);
+		       const int reunit_interval,
+		       const int stopWtheta);
 
 
   /**
@@ -62,13 +92,13 @@ namespace quda {
    * maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir,
-		       const unsigned int Nsteps,
-		       const unsigned int verbose_interval,
+  void gaugefixingFFT( cudaGaugeField& data, const int gauge_dir,
+		       const int Nsteps,
+		       const int verbose_interval,
 		       const double alpha,
-		       const unsigned int autotune,
+		       const int autotune,
                        const double tolerance,
-		       const unsigned int stopWtheta);
+		       const int stopWtheta);
   /**
      Compute the Fmunu tensor
      @param Fmunu The Fmunu tensor

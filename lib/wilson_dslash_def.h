@@ -68,18 +68,17 @@
 #endif
 
 #if (DD_PREC == 0)
-#define DD_PARAM_XPAY const double2 *x, const float *xNorm, const double a,
-#elif (DD_PREC == 1) 
-#define DD_PARAM_XPAY const float4 *x, const float *xNorm, const float a,
+#define DD_PREC_F D
+#elif (DD_PREC == 1)
+#define DD_PREC_F S
 #else
-#define DD_PARAM_XPAY const short4 *x, const float *xNorm, const float a,
+#define DD_PREC_F H
 #endif
 
 #if (DD_RECON==0) // reconstruct from 8 reals
 #define DD_RECON_F 8
 
 #if (DD_PREC==0)
-#define DD_PARAM_GAUGE const double2 *gauge0, const double2 *gauge1,
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_DOUBLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_DOUBLE2
@@ -88,7 +87,6 @@
 #endif // DIRECT_ACCESS_LINK
 
 #elif (DD_PREC==1)
-#define DD_PARAM_GAUGE const float4 *gauge0, const float4 *gauge1,
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_FLOAT4
@@ -97,7 +95,6 @@
 #endif // DIRECT_ACCESS_LINK
 
 #else
-#define DD_PARAM_GAUGE const short4 *gauge0, const short4* gauge1,
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_SHORT4
@@ -115,10 +112,8 @@
 #else
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_DOUBLE2_TEX
 #endif // DIRECT_ACCESS_LINK
-#define DD_PARAM_GAUGE const double2 *gauge0, const double2 *gauge1,
 
 #elif (DD_PREC==1)
-#define DD_PARAM_GAUGE const float4 *gauge0, const float4 *gauge1,
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_FLOAT4
@@ -127,7 +122,6 @@
 #endif // DIRECT_ACCESS_LINK
 
 #else
-#define DD_PARAM_GAUGE const short4 *gauge0, const short4 *gauge1,
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SHORT4
@@ -145,10 +139,8 @@
 #else
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_DOUBLE2_TEX
 #endif // DIRECT_ACCESS_LINK
-#define DD_PARAM_GAUGE const double2 *gauge0, const double2 *gauge1,
 
 #elif (DD_PREC==1)
-#define DD_PARAM_GAUGE const float4 *gauge0, const float4 *gauge1, // FIXME for direct reading, really float2
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_FLOAT2
@@ -157,7 +149,6 @@
 #endif // DIRECT_ACCESS_LINK
 
 #else
-#define DD_PARAM_GAUGE const short4 *gauge0, const short4 *gauge1, // FIXME for direct reading, really short2
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_SHORT2
@@ -169,12 +160,12 @@
 
 #if (DD_PREC==0) // double-precision fields
 
-#define TPROJSCALE tProjScale
+#define TPROJSCALE param.tProjScale
 
 // double-precision gauge field
 #if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
-#define GAUGE0TEX gauge0
-#define GAUGE1TEX gauge1
+#define GAUGE0TEX param.gauge0
+#define GAUGE1TEX param.gauge1
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define GAUGE0TEX param.gauge0Tex
@@ -188,27 +179,29 @@
 #define GAUGE_FLOAT2
 
 // double-precision spinor fields
-#define DD_PARAM_OUT double2* out, float *null1,
-#define DD_PARAM_IN const double2* in, const float *null4,
-
 #if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
-#define SPINORTEX in
+#define SPINORTEX param.in
+#define GHOSTSPINORTEX param.ghost
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexDouble
+#define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE
-#define INTERTEX out
+#define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -221,7 +214,7 @@
 #define SPINOR_DOUBLE
 #if (DD_XPAY==1)
 #if (defined DIRECT_ACCESS_WILSON_ACCUM) || (defined FERMI_NO_DBLE_TEX)
-#define ACCUMTEX x
+#define ACCUMTEX param.x
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -237,32 +230,37 @@
 #define SPINOR_HOP 12
 
 // double-precision clover field
-#if (DD_CLOVER==0)
-#define DD_PARAM_CLOVER
-#else
-#define DD_PARAM_CLOVER const double2 *clover, const float *null3,
-#endif
 #if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
-#define CLOVERTEX clover
+#define CLOVERTEX param.clover
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_DOUBLE_STR
+#else
 #define READ_CLOVER READ_CLOVER_DOUBLE_STR
+#endif
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define CLOVERTEX (param.cloverTex)
 #else
 #define CLOVERTEX cloverTexDouble
 #endif
+
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_DOUBLE_TEX
+#else
 #define READ_CLOVER READ_CLOVER_DOUBLE_TEX
+#endif
+
 #endif
 #define CLOVER_DOUBLE
 
 #elif (DD_PREC==1) // single-precision fields
 
-#define TPROJSCALE tProjScale_f
+#define TPROJSCALE param.tProjScale_f
 
 // single-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
-#define GAUGE0TEX gauge0
-#define GAUGE1TEX gauge1
+#define GAUGE0TEX param.gauge0
+#define GAUGE1TEX param.gauge1
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define GAUGE0TEX param.gauge0Tex
@@ -280,26 +278,29 @@
 
 
 // single-precision spinor fields
-#define DD_PARAM_OUT float4* out, float *null1,
-#define DD_PARAM_IN const float4* in, const float *null4,
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_SINGLE
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
-#define SPINORTEX in
+#define SPINORTEX param.in
+#define GHOSTSPINORTEX param.ghost
 #else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexSingle
+#define GHOSTSPINORTEX ghostSpinorTexSingle
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE
-#define INTERTEX out
+#define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -311,7 +312,7 @@
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4_STR
 #if (DD_XPAY==1)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
-#define ACCUMTEX x
+#define ACCUMTEX param.x
 #define READ_ACCUM READ_ACCUM_SINGLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -326,31 +327,35 @@
 #define SPINOR_HOP 6
 
 // single-precision clover field
-#if (DD_CLOVER==0)
-#define DD_PARAM_CLOVER
-#else
-#define DD_PARAM_CLOVER const float4 *clover, const float *null3,
-#endif
 #ifdef DIRECT_ACCESS_CLOVER
-#define CLOVERTEX clover
+#define CLOVERTEX param.clover
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_SINGLE
+#else
 #define READ_CLOVER READ_CLOVER_SINGLE
+#endif
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define CLOVERTEX (param.cloverTex)
 #else
 #define CLOVERTEX cloverTexSingle
 #endif
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_SINGLE_TEX
+#else
 #define READ_CLOVER READ_CLOVER_SINGLE_TEX
+#endif
+
 #endif
 
 #else             // half-precision fields
 
-#define TPROJSCALE tProjScale_f
+#define TPROJSCALE param.tProjScale_f
 
 // half-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
-#define GAUGE0TEX gauge0
-#define GAUGE1TEX gauge1
+#define GAUGE0TEX param.gauge0
+#define GAUGE1TEX param.gauge1
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define GAUGE0TEX param.gauge0Tex
@@ -370,22 +375,27 @@
 // half-precision spinor fields
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_HALF
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
-#define SPINORTEX in
+#define SPINORTEX param.in
+#define GHOSTSPINORTEX param.ghost
 #else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
+#define READ_SPINOR_GHOST READ_SPINOR_GHOST_HALF_TEX
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexHalf
+#define GHOSTSPINORTEX ghostSpinorTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF
-#define INTERTEX out
+#define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -394,12 +404,10 @@
 #define INTERTEX interTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
-#define DD_PARAM_OUT short4* out, float *outNorm,
-#define DD_PARAM_IN const short4* in, const float *inNorm,
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4_STR
 #if (DD_XPAY==1)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
-#define ACCUMTEX x
+#define ACCUMTEX param.x
 #define READ_ACCUM READ_ACCUM_HALF
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -414,14 +422,14 @@
 #define SPINOR_HOP 6
 
 // half-precision clover field
-#if (DD_CLOVER==0)
-#define DD_PARAM_CLOVER 
-#else
-#define DD_PARAM_CLOVER const short4 *clover, const float *cloverNorm,
-#endif
 #ifdef DIRECT_ACCESS_CLOVER
-#define CLOVERTEX clover
+#define CLOVERTEX param.clover
+#ifdef (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_HALF
+#else
 #define READ_CLOVER READ_CLOVER_HALF
+#endif
+#define CLOVERTEXNORM (param.cloverNorm)
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define CLOVERTEX (param.cloverTex)
@@ -430,19 +438,22 @@
 #define CLOVERTEX cloverTexHalf
 #define CLOVERTEXNORM cloverTexNorm
 #endif
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_HALF_TEX
+#else
 #define READ_CLOVER READ_CLOVER_HALF_TEX
 #endif
+#endif
 
 #endif
 
-#define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
-#define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
+#define DD_CONCAT(n,p,r,d,x) n ## p ## r ## d ## x ## Kernel
+#define DD_FUNC(n,p,r,d,x) DD_CONCAT(n,p,r,d,x)
 
 // define the kernel
 
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-  (DD_PARAM_OUT DD_PARAM_GAUGE DD_PARAM_CLOVER DD_PARAM_IN DD_PARAM_XPAY const DslashParam param) {
+  __global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
   // build Wilson or clover as appropriate
 #if ((DD_CLOVER==0 && defined(GPU_WILSON_DIRAC)) || ((DD_CLOVER==1 || DD_CLOVER==2) && defined(GPU_CLOVER_DIRAC)))
@@ -496,8 +507,8 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #ifdef MULTI_GPU
 template <>
-__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
-  (DD_PARAM_OUT DD_PARAM_GAUGE DD_PARAM_CLOVER DD_PARAM_IN DD_PARAM_XPAY const DslashParam param) {
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+  (const DslashParam param) {
 
   // build Wilson or clover as appropriate
 #if ((DD_CLOVER==0 && defined(GPU_WILSON_DIRAC)) || ((DD_CLOVER==1 || DD_CLOVER==2) && defined(GPU_CLOVER_DIRAC)))
@@ -552,15 +563,11 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 
 // clean up
 
+#undef DD_PREC_F
 #undef DD_NAME_F
 #undef DD_RECON_F
 #undef DD_DAG_F
 #undef DD_XPAY_F
-#undef DD_PARAM_OUT
-#undef DD_PARAM_GAUGE
-#undef DD_PARAM_CLOVER
-#undef DD_PARAM_IN
-#undef DD_PARAM_XPAY
 #undef DD_CONCAT
 #undef DD_FUNC
 
@@ -570,9 +577,11 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #undef GAUGE0TEX
 #undef GAUGE1TEX
 #undef READ_SPINOR
+#undef READ_SPINOR_GHOST
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX
+#undef GHOSTSPINORTEX
 #undef READ_INTERMEDIATE_SPINOR
 #undef INTERTEX
 #undef WRITE_SPINOR

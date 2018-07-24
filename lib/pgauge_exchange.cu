@@ -8,15 +8,12 @@
 
 #include <device_functions.h>
 
-
 #include <comm_quda.h>
 
 
 namespace quda {
 
 #ifdef GPU_GAUGE_ALG
-
-  static int numParams = 18;
 
 #define LAUNCH_KERNEL_GAUGEFIX(kernel, tp, stream, arg, parity, ...)     \
   if ( tp.block.z == 0 ) { \
@@ -65,11 +62,6 @@ namespace quda {
   }
 
 
-
-
-
-
-
   template <typename Gauge>
   struct GaugeFixUnPackArg {
     int X[4]; // grid dimensions
@@ -86,7 +78,7 @@ namespace quda {
 
   template<int NElems, typename Float, typename Gauge, bool pack>
   __global__ void Kernel_UnPack(int size, GaugeFixUnPackArg<Gauge> arg, \
-                                typename ComplexTypeId<Float>::Type *array, int parity, int face, int dir, int borderid){
+                                complex<Float> *array, int parity, int face, int dir, int borderid){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if ( idx >= size ) return;
     int X[4];
@@ -128,22 +120,23 @@ namespace quda {
       break;
     }
     int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    typedef complex<Float> Complex;
     typedef typename mapper<Float>::type RegType;
     RegType tmp[NElems];
     RegType data[18];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = ((Cmplx*)tmp)[i];
+      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = ((Complex*)tmp)[i];
     }
     else{
-      for ( int i = 0; i < NElems / 2; ++i ) ((Cmplx*)tmp)[i] = array[idx + size * i];
-      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0);
+      for ( int i = 0; i < NElems / 2; ++i ) ((Complex*)tmp)[i] = array[idx + size * i];
+      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
       arg.dataOr.save(data, id, dir, parity);
     }
   }
 
+#ifdef MULTI_GPU
   static void *send[4];
   static void *recv[4];
   static void *sendg[4];
@@ -167,8 +160,7 @@ namespace quda {
   static dim3 block[4];
   static dim3 grid[4];
   static bool notinitialized = true;
-
-
+#endif // MULTI_GPU
 
   /**
    * @brief Release all allocated memory used to exchange data between nodes
@@ -275,20 +267,20 @@ namespace quda {
       comm_start(mh_recv_fwd[d]);
 
       //extract top face
-      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[0] >> > ( \
-        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(send_d[d]), parity, d, dir, X[d] -  data.R()[d] - 1);
+      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[0] >> >
+	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), parity, d, dir, X[d] -  data.R()[d] - 1);
       //extract bottom
-      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[1] >> > ( \
-        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(sendg_d[d]), parity, d, dir, data.R()[d]);
+      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[1] >> >
+	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), parity, d, dir, data.R()[d]);
 
     #ifndef GPU_COMMS
       cudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[0]);
       cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[1]);
     #endif
-      cudaStreamSynchronize(GFStream[0]);
+      qudaStreamSynchronize(GFStream[0]);
       comm_start(mh_send_fwd[d]);
 
-      cudaStreamSynchronize(GFStream[1]);
+      qudaStreamSynchronize(GFStream[1]);
       comm_start(mh_send_back[d]);
 
     #ifndef GPU_COMMS
@@ -298,8 +290,8 @@ namespace quda {
       #ifdef GPU_COMMS
       comm_wait(mh_recv_back[d]);
       #endif
-      Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[0] >> > ( \
-        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(recv_d[d]), parity, d, dir, data.R()[d] - 1);
+      Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[0] >> >
+	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), parity, d, dir, data.R()[d] - 1);
 
     #ifndef GPU_COMMS
       comm_wait(mh_recv_fwd[d]);
@@ -309,16 +301,16 @@ namespace quda {
       #ifdef GPU_COMMS
       comm_wait(mh_recv_fwd[d]);
       #endif
-      Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[1] >> > ( \
-        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(recvg_d[d]), parity, d, dir, X[d] - data.R()[d]);
+      Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[1] >> >
+	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), parity, d, dir, X[d] - data.R()[d]);
 
       comm_wait(mh_send_back[d]);
       comm_wait(mh_send_fwd[d]);
-      cudaStreamSynchronize(GFStream[0]);
-      cudaStreamSynchronize(GFStream[1]);
+      qudaStreamSynchronize(GFStream[0]);
+      qudaStreamSynchronize(GFStream[1]);
     }
     checkCudaError();
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   #endif
 
   }
@@ -332,22 +324,14 @@ namespace quda {
     // Need to fix this!!
     if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        numParams = 18;
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
 	PGaugeExchange<Float, 18>(G(data), data, dir, parity);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        numParams = 12;
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
         PGaugeExchange<Float, 12>(G(data), data, dir, parity);
-
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        numParams = 8;
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
         PGaugeExchange<Float, 8>(G(data), data, dir, parity);
-
       } else {
         errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }

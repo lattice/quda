@@ -13,13 +13,23 @@ namespace quda {
   /**
      Update the momentum field from the force field
 
-     mom = mom - [force]_TA
+     mom = mom - coeff * [force]_TA
 
      where [A]_TA means the traceless anti-hermitian projection of A
 
      @param mom Momentum field
      @param force Force field
    */
-  void updateMomentum(cudaGaugeField &mom, double coeff, cudaGaugeField &force);
+  void updateMomentum(GaugeField &mom, double coeff, GaugeField &force);
+
+  /**
+     Left multiply the force field by the gauge field
+
+     force = U * force
+
+     @param force Force field
+     @param U Gauge field
+   */
+  void applyU(GaugeField &force, GaugeField &U);
 
 } // namespace quda

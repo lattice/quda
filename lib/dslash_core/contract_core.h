@@ -1,3 +1,7 @@
+#ifdef READ_SPINOR
+#undef READ_SPINOR
+#endif
+
 #ifndef _TWIST_QUDA_CONTRACT
 #define _TWIST_QUDA_CONTRACT
 
@@ -51,6 +55,9 @@
 		#define INTERTEX interTexDouble
 	#endif	// USE_TEXTURE_OBJECTS
 
+#ifdef SPINOR_HOP
+#undef SPINOR_HOP
+#endif
 #define	SPINOR_HOP	12
 
 #endif
@@ -71,16 +78,16 @@ __global__ void contractGamma5Kernel(double2 *out, double2 *in1, double2 *in2, i
 	volatile double			*accum_im = accum_re + TOTAL_COMPONENTS*blockDim.x;
 
 	eutId		 = 2*sid;
-	auxCoord1	 = eutId / X1;
-	xCoord1		 = eutId - auxCoord1 * X1;
-	auxCoord2	 = auxCoord1 / X2;
-	xCoord2		 = auxCoord1 - auxCoord2 * X2;
-	xCoord4		 = auxCoord2 / X3;
-	xCoord3		 = auxCoord2 - xCoord4 * X3;
+	auxCoord1	 = eutId / param.dc.X[0];;
+	xCoord1		 = eutId - auxCoord1 * param.dc.X[0];
+	auxCoord2	 = auxCoord1 / param.dc.X[1];
+	xCoord2		 = auxCoord1 - auxCoord2 * param.dc.X[1];
+	xCoord4		 = auxCoord2 / param.dc.X[2];
+	xCoord3		 = auxCoord2 - xCoord4 * param.dc.X[2];
 
 	auxCoord1	 = (Parity + xCoord4 + xCoord3 + xCoord2) & 1;
 	xCoord1		+= auxCoord1;
-	outId		 = xCoord1 + X1*(xCoord2 + X2*(xCoord3 + X3*xCoord4));			//AQUI
+	outId		 = xCoord1 + param.dc.X[0]*(xCoord2 + param.dc.X[1]*(xCoord3 + param.dc.X[2]*xCoord4));			//AQUI
 
 	READ_SPINOR			(SPINORTEX, myStride, sid, sid);
 	READ_INTERMEDIATE_SPINOR	(INTERTEX,  myStride, sid, sid);
@@ -337,7 +344,7 @@ __global__ void contractTsliceKernel(double2 *out, double2 *in1, double2 *in2, i
 {
 	int	sid	 = blockIdx.x*blockDim.x + threadIdx.x;					//number of threads is equal to Tslice volume
 												//Adjust sid to correct tslice (exe domain must be Tslice volume!)
-	int	inId	 = sid + Vsh*Tslice;							//Vsh - 3d space volume for the parity spinor (equale to exe domain!)
+	int	inId	 = sid + param.Vsh*Tslice;							//Vsh - 3d space volume for the parity spinor (equale to exe domain!)
 	int	outId; 
 	int	eutId, xCoord1, xCoord2, xCoord3, xCoord4, auxCoord1, auxCoord2;
 
@@ -353,16 +360,16 @@ __global__ void contractTsliceKernel(double2 *out, double2 *in1, double2 *in2, i
 //The output only for a given tslice (for the full tslice content, i.e., both parities!):
 
 	eutId		 = 2*inId;
-	auxCoord1	 = eutId / X1;
-	xCoord1		 = eutId - auxCoord1 * X1;
-	auxCoord2	 = auxCoord1 / X2;
-	xCoord2		 = auxCoord1 - auxCoord2 * X2;
-	xCoord4		 = auxCoord2 / X3;
-	xCoord3		 = auxCoord2 - xCoord4 * X3;
+	auxCoord1	 = eutId / param.dc.X[0];
+	xCoord1		 = eutId - auxCoord1 * param.dc.X[0];
+	auxCoord2	 = auxCoord1 / param.dc.X[1];
+	xCoord2		 = auxCoord1 - auxCoord2 * param.dc.X[1];
+	xCoord4		 = auxCoord2 / param.dc.X[2];
+	xCoord3		 = auxCoord2 - xCoord4 * param.dc.X[2];
 
 	auxCoord1	 = (Parity + xCoord4 + xCoord3 + xCoord2) & 1;
 	xCoord1		+= auxCoord1;
-	outId		 = xCoord1 + X1*(xCoord2 + X2*xCoord3);					//AQUI
+	outId		 = xCoord1 + param.dc.X[0]*(xCoord2 + param.dc.X[1]*(xCoord3 + param.dc.X[2]*xCoord4));			//AQUI
 
 	READ_SPINOR			(SPINORTEX, myStride, sid, sid);
 	READ_INTERMEDIATE_SPINOR	(INTERTEX,  myStride, sid, sid);
@@ -600,16 +607,16 @@ __global__ void contractKernel		(double2 *out, double2 *in1, double2 *in2, int m
 	volatile double			*accum_im	 = accum_re + TOTAL_COMPONENTS*blockDim.x;
 
 	eutId		 = 2*sid;
-	auxCoord1	 = eutId / X1;
-	xCoord1		 = eutId - auxCoord1 * X1;
-	auxCoord2	 = auxCoord1 / X2;
-	xCoord2		 = auxCoord1 - auxCoord2 * X2;
-	xCoord4		 = auxCoord2 / X3;
-	xCoord3		 = auxCoord2 - xCoord4 * X3;
+	auxCoord1	 = eutId / param.dc.X[0];
+	xCoord1		 = eutId - auxCoord1 * param.dc.X[0];
+	auxCoord2	 = auxCoord1 / param.dc.X[1];
+	xCoord2		 = auxCoord1 - auxCoord2 * param.dc.X[1];
+	xCoord4		 = auxCoord2 / param.dc.X[2];
+	xCoord3		 = auxCoord2 - xCoord4 * param.dc.X[2];
 
 	auxCoord1	 = (Parity + xCoord4 + xCoord3 + xCoord2) & 1;
 	xCoord1		+= auxCoord1;
-	outId		 = xCoord1 + X1*(xCoord2 + X2*(xCoord3 + X3*xCoord4));				//AQUI
+	outId		 = xCoord1 + param.dc.X[0]*(xCoord2 + param.dc.X[1]*(xCoord3 + param.dc.X[2]*xCoord4));			//AQUI
 
 	READ_SPINOR			(SPINORTEX, myStride, sid, sid);
 	READ_INTERMEDIATE_SPINOR	(INTERTEX,  myStride, sid, sid);
@@ -916,16 +923,16 @@ __global__ void contractGamma5Kernel	(float2 *out, float4 *in1, float4 *in2, int
 	volatile float		*accum_im = accum_re + TOTAL_COMPONENTS*blockDim.x;
 
 	eutId		 = 2*sid;
-	auxCoord1	 = eutId / X1;
-	xCoord1		 = eutId - auxCoord1 * X1;
-	auxCoord2	 = auxCoord1 / X2;
-	xCoord2		 = auxCoord1 - auxCoord2 * X2;
-	xCoord4		 = auxCoord2 / X3;
-	xCoord3		 = auxCoord2 - xCoord4 * X3;
+	auxCoord1	 = eutId / param.dc.X[0];
+	xCoord1		 = eutId - auxCoord1 * param.dc.X[0];
+	auxCoord2	 = auxCoord1 / param.dc.X[1];
+	xCoord2		 = auxCoord1 - auxCoord2 * param.dc.X[1];
+	xCoord4		 = auxCoord2 / param.dc.X[2];
+	xCoord3		 = auxCoord2 - xCoord4 * param.dc.X[2];
 
 	auxCoord1	 = (Parity + xCoord4 + xCoord3 + xCoord2) & 1;
 	xCoord1		+= auxCoord1;
-	outId		 = xCoord1 + X1*(xCoord2 + X2*(xCoord3 + X3*xCoord4));			//AQUI
+	outId		 = xCoord1 + param.dc.X[0]*(xCoord2 + param.dc.X[1]*(xCoord3 + param.dc.X[2]*xCoord4));			//AQUI
 
 	//Load the full input spinors:
 
@@ -1194,7 +1201,7 @@ __global__ void contractTsliceKernel	(float2 *out, float4 *in1, float4 *in2, int
 {
 	int	sid	 = blockIdx.x*blockDim.x + threadIdx.x;					//number of threads is equal to Tslice volume
 												//Adjust sid to correct tslice (exe domain must be Tslice volume!)
-	int	inId	 = sid + Vsh*Tslice;							//Vsh - 3d space volume for the parity spinor (equale to exe domain!)
+	int	inId	 = sid + param.Vsh*Tslice;							//Vsh - 3d space volume for the parity spinor (equale to exe domain!)
 	int	outId; 
 	int	eutId, xCoord1, xCoord2, xCoord3, xCoord4, auxCoord1, auxCoord2;
 
@@ -1210,20 +1217,16 @@ __global__ void contractTsliceKernel	(float2 *out, float4 *in1, float4 *in2, int
 //The output only for a given tslice (for the full tslice content, i.e., both parities!):
 
 	eutId		 = 2*inId;
-	auxCoord1	 = eutId / X1;
-	xCoord1		 = eutId - auxCoord1 * X1;
-	auxCoord2	 = auxCoord1 / X2;
-	xCoord2		 = auxCoord1 - auxCoord2 * X2;
-	xCoord4		 = auxCoord2 / X3;
-
-//	if	(Tslice != xCoord4)
-//		return;
-
-	xCoord3		 = auxCoord2 - xCoord4 * X3;
+	auxCoord1	 = eutId / param.dc.X[0];
+	xCoord1		 = eutId - auxCoord1 * param.dc.X[0];
+	auxCoord2	 = auxCoord1 / param.dc.X[1];
+	xCoord2		 = auxCoord1 - auxCoord2 * param.dc.X[1];
+	xCoord4		 = auxCoord2 / param.dc.X[2];
+	xCoord3		 = auxCoord2 - xCoord4 * param.dc.X[2];
 
 	auxCoord1	 = (Parity + xCoord4 + xCoord3 + xCoord2) & 1;
 	xCoord1		+= auxCoord1;
-	outId		 = xCoord1 + X1*(xCoord2 + X2*xCoord3);					//AQUI
+	outId		 = xCoord1 + param.dc.X[0]*(xCoord2 + param.dc.X[1]*(xCoord3 + param.dc.X[2]*xCoord4));			//AQUI
 
 	//Load the full input spinors:
 
@@ -1464,16 +1467,16 @@ __global__ void contractKernel		(float2 *out, float4 *in1, float4 *in2, int mySt
 	volatile float			*accum_im	 = accum_re + TOTAL_COMPONENTS*blockDim.x;
 
 	eutId		 = 2*sid;
-	auxCoord1	 = eutId / X1;
-	xCoord1		 = eutId - auxCoord1 * X1;
-	auxCoord2	 = auxCoord1 / X2;
-	xCoord2		 = auxCoord1 - auxCoord2 * X2;
-	xCoord4		 = auxCoord2 / X3;
-	xCoord3		 = auxCoord2 - xCoord4 * X3;
+	auxCoord1	 = eutId / param.dc.X[0];
+	xCoord1		 = eutId - auxCoord1 * param.dc.X[0];
+	auxCoord2	 = auxCoord1 / param.dc.X[1];
+	xCoord2		 = auxCoord1 - auxCoord2 * param.dc.X[1];
+	xCoord4		 = auxCoord2 / param.dc.X[2];
+	xCoord3		 = auxCoord2 - xCoord4 * param.dc.X[2];
 
 	auxCoord1	 = (Parity + xCoord4 + xCoord3 + xCoord2) & 1;
 	xCoord1		+= auxCoord1;
-	outId		 = xCoord1 + X1*(xCoord2 + X2*(xCoord3 + X3*xCoord4));				//AQUI
+	outId		 = xCoord1 + param.dc.X[0]*(xCoord2 + param.dc.X[1]*(xCoord3 + param.dc.X[2]*xCoord4));			//AQUI
 
 	//Load the full input spinors:
 

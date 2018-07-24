@@ -1,14 +1,25 @@
+#include <complex_quda.h>
+
 /**
    @file float_vector.h
-   @author M Clark
 
-   @section DESCRIPTION 
-   Inline device functions for elementary operations on short vectors, e.g., float4, etc. 
+   @section DESCRIPTION
+   Inline device functions for elementary operations on short vectors, e.g., float4, etc.
 */
 
 #pragma once
 
 namespace quda {
+
+  __device__ __host__ inline void zero(double &a) { a = 0.0; }
+  __device__ __host__ inline void zero(double2 &a) { a.x = 0.0; a.y = 0.0; }
+  __device__ __host__ inline void zero(double3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
+  __device__ __host__ inline void zero(double4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
+
+  __device__ __host__ inline void zero(float &a) { a = 0.0; }
+  __device__ __host__ inline void zero(float2 &a) { a.x = 0.0; a.y = 0.0; }
+  __device__ __host__ inline void zero(float3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
+  __device__ __host__ inline void zero(float4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
 
   __host__ __device__ inline double2 operator+(const double2& x, const double2 &y) {
     return make_double2(x.x + y.x, x.y + y.y);
@@ -27,9 +38,11 @@ namespace quda {
   }
 
   __host__ __device__ inline double3 operator+(const double3& x, const double3 &y) {
-    double3 z;
-    z.x = x.x + y.x; z.y = x.y + y.y; z.z = x.z + y.z;
-    return z;
+    return make_double3(x.x + y.x, x.y + y.y, x.z + y.z);
+  }
+
+  __host__ __device__ inline double4 operator+(const double4& x, const double4 &y) {
+    return make_double4(x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w);
   }
 
   __host__ __device__ inline float4 operator*(const float a, const float4 x) {
@@ -104,6 +117,14 @@ namespace quda {
     x.x += y.x;
     x.y += y.y;
     x.z += y.z;
+    return x;
+  }
+
+  __host__ __device__ inline double4 operator+=(double4 &x, const double4 y) {
+    x.x += y.x;
+    x.y += y.y;
+    x.z += y.z;
+    x.w += y.w;
     return x;
   }
 
@@ -185,13 +206,13 @@ namespace quda {
   };
 
   __forceinline__ __host__ __device__ double max_fabs(const double4 &c) {
-    double a = fmaxf(fabsf(c.x), fabsf(c.y));
-    double b = fmaxf(fabsf(c.z), fabsf(c.w));
-    return fmaxf(a, b);
+    double a = fmax(fabs(c.x), fabs(c.y));
+    double b = fmax(fabs(c.z), fabs(c.w));
+    return fmax(a, b);
   };
 
   __forceinline__ __host__ __device__ double max_fabs(const double2 &b) {
-    return fmaxf(fabsf(b.x), fabsf(b.y));
+    return fmax(fabs(b.x), fabs(b.y));
   };
 
   /*
@@ -200,7 +221,7 @@ namespace quda {
 
   __forceinline__ __host__ __device__ float2 make_FloatN(const double2 &a) {
     return make_float2(a.x, a.y);
-  }
+}
 
   __forceinline__ __host__ __device__ float4 make_FloatN(const double4 &a) {
     return make_float4(a.x, a.y, a.z, a.w);
@@ -229,5 +250,45 @@ namespace quda {
   __forceinline__ __host__ __device__ short2 make_shortN(const double2 &a) {
     return make_short2(a.x, a.y);
   }
+
+
+  /* Helper functions for converting between float2/double2 and complex */
+  template<typename Float2, typename Complex>
+    inline Float2 make_Float2(const Complex &a) { return (Float2)0; }
+
+  template<>
+    inline double2 make_Float2(const complex<double> &a) { return make_double2( a.real(), a.imag() ); }
+  template<>
+    inline double2 make_Float2(const complex<float> &a) { return make_double2( a.real(), a.imag() ); }
+  template<>
+    inline float2 make_Float2(const complex<double> &a) { return make_float2( a.real(), a.imag() ); }
+  template<>
+    inline float2 make_Float2(const complex<float> &a) { return make_float2( a.real(), a.imag() ); }
+
+    template<>
+      inline double2 make_Float2(const std::complex<double> &a) { return make_double2( a.real(), a.imag() ); }
+    template<>
+      inline double2 make_Float2(const std::complex<float> &a) { return make_double2( a.real(), a.imag() ); }
+    template<>
+      inline float2 make_Float2(const std::complex<double> &a) { return make_float2( a.real(), a.imag() ); }
+    template<>
+      inline float2 make_Float2(const std::complex<float> &a) { return make_float2( a.real(), a.imag() ); }
+
+
+  inline complex<double> make_Complex(const double2 &a) { return complex<double>(a.x, a.y); }
+  inline complex<float> make_Complex(const float2 &a) { return complex<float>(a.x, a.y); }
+
+  template<typename T> struct RealType {};
+  template<> struct RealType<double> { typedef double type; };
+  template<> struct RealType<double2> { typedef double type; };
+  template<> struct RealType<complex<double> > { typedef double type; };
+  template<> struct RealType<float> { typedef float type; };
+  template<> struct RealType<float2> { typedef float type; };
+  template<> struct RealType<complex<float> > { typedef float type; };
+  template<> struct RealType<float4> { typedef float type; };
+  template<> struct RealType<short> { typedef short type; };
+  template<> struct RealType<short2> { typedef short type; };
+  template<> struct RealType<complex<short> > { typedef short type; };
+  template<> struct RealType<short4> { typedef short type; };
 
 }

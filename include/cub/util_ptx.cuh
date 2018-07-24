@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -128,7 +128,7 @@ __device__ __forceinline__ unsigned int BFE(
     UnsignedBits            source,
     unsigned int            bit_start,
     unsigned int            num_bits,
-    Int2Type<BYTE_LEN>      byte_len)
+    Int2Type<BYTE_LEN>      /*byte_len*/)
 {
     unsigned int bits;
 #if CUB_PTX_ARCH >= 200
@@ -149,7 +149,7 @@ __device__ __forceinline__ unsigned int BFE(
     UnsignedBits            source,
     unsigned int            bit_start,
     unsigned int            num_bits,
-    Int2Type<8>             byte_len)
+    Int2Type<8>             /*byte_len*/)
 {
     const unsigned long long MASK = (1ull << num_bits) - 1;
     return (source >> bit_start) & MASK;
@@ -249,6 +249,124 @@ __device__ __forceinline__ void BAR(int count)
     asm volatile("bar.sync 1, %0;" : : "r"(count));
 }
 
+/**
+ * CTA barrier
+ */
+__device__  __forceinline__ void CTA_SYNC()
+{
+#ifdef CUB_USE_COOPERATIVE_GROUPS
+    __barrier_sync(0);
+#else
+    __syncthreads();
+#endif
+}
+
+
+/**
+ * CTA barrier with predicate
+ */
+__device__  __forceinline__ int CTA_SYNC_AND(int p)
+{
+    return __syncthreads_and(p);
+}
+
+
+/**
+ * Warp barrier
+ */
+__device__  __forceinline__ void WARP_SYNC(unsigned int member_mask)
+{
+#ifdef CUB_USE_COOPERATIVE_GROUPS
+    __syncwarp(member_mask);
+#endif
+}
+
+
+/**
+ * Warp any
+ */
+__device__  __forceinline__ int WARP_ANY(int predicate, unsigned int member_mask)
+{
+#ifdef CUB_USE_COOPERATIVE_GROUPS
+    return __any_sync(member_mask, predicate);
+#else
+    return ::__any(predicate);
+#endif
+}
+
+
+/**
+ * Warp any
+ */
+__device__  __forceinline__ int WARP_ALL(int predicate, unsigned int member_mask)
+{
+#ifdef CUB_USE_COOPERATIVE_GROUPS
+    return __all_sync(member_mask, predicate);
+#else
+    return ::__all(predicate);
+#endif
+}
+
+
+/**
+ * Warp ballot
+ */
+__device__  __forceinline__ int WARP_BALLOT(int predicate, unsigned int member_mask)
+{
+#ifdef CUB_USE_COOPERATIVE_GROUPS
+    return __ballot_sync(member_mask, predicate);
+#else
+    return __ballot(predicate);
+#endif
+}
+
+/**
+ * Warp synchronous shfl_up
+ */
+__device__ __forceinline__ 
+unsigned int SHFL_UP_SYNC(unsigned int word, int src_offset, int first_lane, unsigned int member_mask)
+{
+#ifdef CUB_USE_COOPERATIVE_GROUPS
+    asm volatile("shfl.sync.up.b32 %0, %1, %2, %3, %4;"
+        : "=r"(word) : "r"(word), "r"(src_offset), "r"(first_lane), "r"(member_mask));
+#else
+    asm volatile("shfl.up.b32 %0, %1, %2, %3;"
+        : "=r"(word) : "r"(word), "r"(src_offset), "r"(first_lane));
+#endif
+    return word;
+}
+
+/**
+ * Warp synchronous shfl_down
+ */
+__device__ __forceinline__ 
+unsigned int SHFL_DOWN_SYNC(unsigned int word, int src_offset, int last_lane, unsigned int member_mask)
+{
+#ifdef CUB_USE_COOPERATIVE_GROUPS
+    asm volatile("shfl.sync.down.b32 %0, %1, %2, %3, %4;"
+        : "=r"(word) : "r"(word), "r"(src_offset), "r"(last_lane), "r"(member_mask));
+#else
+    asm volatile("shfl.down.b32 %0, %1, %2, %3;"
+        : "=r"(word) : "r"(word), "r"(src_offset), "r"(last_lane));
+#endif
+    return word;
+}
+
+/**
+ * Warp synchronous shfl_idx
+ */
+__device__ __forceinline__ 
+unsigned int SHFL_IDX_SYNC(unsigned int word, int src_lane, int last_lane, unsigned int member_mask)
+{
+#ifdef CUB_USE_COOPERATIVE_GROUPS
+    asm volatile("shfl.sync.idx.b32 %0, %1, %2, %3, %4;"
+        : "=r"(word) : "r"(word), "r"(src_lane), "r"(last_lane), "r"(member_mask));
+#else
+    asm volatile("shfl.idx.b32 %0, %1, %2, %3;"
+        : "=r"(word) : "r"(word), "r"(src_lane), "r"(last_lane));
+#endif
+    return word;
+}
 
 /**
  * Floating point multiply. (Mantissa LSB rounds towards zero.)
@@ -282,6 +400,14 @@ __device__ __forceinline__ void ThreadExit() {
 
 
 /**
+ * \brief  Abort execution and generate an interrupt to the host CPU
+ */
+__device__ __forceinline__ void ThreadTrap() {
+    asm volatile("trap;");
+}
+
+
+/**
  * \brief Returns the row-major linear thread identifier for a multidimensional threadblock
  */
 __device__ __forceinline__ int RowMajorTid(int block_dim_x, int block_dim_y, int block_dim_z)
@@ -298,7 +424,7 @@ __device__ __forceinline__ int RowMajorTid(int block_dim_x, int block_dim_y, int
 __device__ __forceinline__ unsigned int LaneId()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %laneid;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%laneid;" : "=r"(ret) );
     return ret;
 }
 
@@ -309,7 +435,7 @@ __device__ __forceinline__ unsigned int LaneId()
 __device__ __forceinline__ unsigned int WarpId()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %warpid;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%warpid;" : "=r"(ret) );
     return ret;
 }
 
@@ -319,7 +445,7 @@ __device__ __forceinline__ unsigned int WarpId()
 __device__ __forceinline__ unsigned int LaneMaskLt()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %lanemask_lt;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%lanemask_lt;" : "=r"(ret) );
     return ret;
 }
 
@@ -329,7 +455,7 @@ __device__ __forceinline__ unsigned int LaneMaskLt()
 __device__ __forceinline__ unsigned int LaneMaskLe()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %lanemask_le;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%lanemask_le;" : "=r"(ret) );
     return ret;
 }
 
@@ -339,7 +465,7 @@ __device__ __forceinline__ unsigned int LaneMaskLe()
 __device__ __forceinline__ unsigned int LaneMaskGt()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %lanemask_gt;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%lanemask_gt;" : "=r"(ret) );
     return ret;
 }
 
@@ -349,120 +475,11 @@ __device__ __forceinline__ unsigned int LaneMaskGt()
 __device__ __forceinline__ unsigned int LaneMaskGe()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %lanemask_ge;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%lanemask_ge;" : "=r"(ret) );
     return ret;
 }
 
 /** @} */       // end group UtilPtx
-
-
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
-
-
-/**
- * Shuffle word up
- */
-template <typename ShuffleWordT, int STEP>
-__device__ __forceinline__ void ShuffleUp(
-    ShuffleWordT*   input, 
-    ShuffleWordT*   output,
-    int             src_offset,
-    int             first_lane,
-    Int2Type<STEP>  step)
-{
-    unsigned int word = input[STEP];
-    asm volatile("shfl.up.b32 %0, %1, %2, %3;"
-        : "=r"(word) : "r"(word), "r"(src_offset), "r"(first_lane));
-    output[STEP] = (ShuffleWordT) word;
-
-    ShuffleUp(input, output, src_offset, first_lane, Int2Type<STEP - 1>());
-}
-
-
-/**
- * Shuffle word up
- */
-template <typename ShuffleWordT>
-__device__ __forceinline__ void ShuffleUp(
-    ShuffleWordT*   input, 
-    ShuffleWordT*   output,
-    int             src_offset,
-    int             first_lane,
-    Int2Type<-1>    step)
-{}
-
-
-
-/**
- * Shuffle word down
- */
-template <typename ShuffleWordT, int STEP>
-__device__ __forceinline__ void ShuffleDown(
-    ShuffleWordT*   input, 
-    ShuffleWordT*   output,
-    int             src_offset,
-    int             last_lane,
-    Int2Type<STEP>  step)
-{
-    unsigned int word = input[STEP];
-    asm volatile("shfl.down.b32 %0, %1, %2, %3;"
-        : "=r"(word) : "r"(word), "r"(src_offset), "r"(last_lane));
-    output[STEP] = (ShuffleWordT) word;
-
-    ShuffleDown(input, output, src_offset, last_lane, Int2Type<STEP - 1>());
-}
-
-
-/**
- * Shuffle word down
- */
-template <typename ShuffleWordT>
-__device__ __forceinline__ void ShuffleDown(
-    ShuffleWordT*   input, 
-    ShuffleWordT*   output,
-    int             src_offset,
-    int             last_lane,
-    Int2Type<-1>    step)
-{}
-
-
-/**
- * Shuffle index
- */
-template <typename ShuffleWordT, int STEP>
-__device__ __forceinline__ void ShuffleIdx(
-    ShuffleWordT*   input, 
-    ShuffleWordT*   output,
-    int             src_lane,
-    int             last_lane,
-    Int2Type<STEP>  step)
-{
-    unsigned int word = input[STEP];
-    asm volatile("shfl.idx.b32 %0, %1, %2, %3;"
-        : "=r"(word) : "r"(word), "r"(src_lane), "r"(last_lane));
-    output[STEP] = (ShuffleWordT) word;
-
-    ShuffleIdx(input, output, src_lane, last_lane, Int2Type<STEP - 1>());
-}
-
-
-/**
- * Shuffle index
- */
-template <typename ShuffleWordT>
-__device__ __forceinline__ void ShuffleIdx(
-    ShuffleWordT*   input, 
-    ShuffleWordT*   output,
-    int             src_lane,
-    int             last_lane,
-    Int2Type<-1>    step)
-{}
-
-
-
-
-#endif  // DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
 
 
@@ -486,7 +503,7 @@ __device__ __forceinline__ void ShuffleIdx(
  *     double thread_data = ...
  *
  *     // Obtain item from two ranks below
- *     double peer_data = ShuffleUp(thread_data, 2);
+ *     double peer_data = ShuffleUp(thread_data, 2, 0, 0xffffffff);
  *
  * \endcode
  * \par
@@ -498,7 +515,8 @@ template <typename T>
 __device__ __forceinline__ T ShuffleUp(
     T               input,              ///< [in] The value to broadcast
     int             src_offset,         ///< [in] The relative down-offset of the peer to read from
-    int             first_lane = 0)     ///< [in] Index of first lane in segment
+    int             first_lane,         ///< [in] Index of first lane in segment (typically 0)
+    unsigned int    member_mask)        ///< [in] 32-bit mask of participating warp lanes
 {
     typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
 
@@ -509,19 +527,15 @@ __device__ __forceinline__ T ShuffleUp(
     ShuffleWord     *input_alias    = reinterpret_cast<ShuffleWord *>(&input);
 
     unsigned int shuffle_word;
-    asm volatile("shfl.up.b32 %0, %1, %2, %3;"
-        : "=r"(shuffle_word) : "r"((unsigned int) input_alias[0]), "r"(src_offset), "r"(first_lane));
+    shuffle_word = SHFL_UP_SYNC((unsigned int)input_alias[0], src_offset, first_lane, member_mask);
     output_alias[0] = shuffle_word;
 
     #pragma unroll
     for (int WORD = 1; WORD < WORDS; ++WORD)
     {
-        asm volatile("shfl.up.b32 %0, %1, %2, %3;"
-            : "=r"(shuffle_word) : "r"((unsigned int) input_alias[WORD]), "r"(src_offset), "r"(first_lane));
+        shuffle_word       = SHFL_UP_SYNC((unsigned int)input_alias[WORD], src_offset, first_lane, member_mask);
         output_alias[WORD] = shuffle_word;
     }
-
-//    ShuffleUp(input_alias, output_alias, src_offset, first_lane, Int2Type<WORDS - 1>());
 
     return output;
 }
@@ -547,7 +561,7 @@ __device__ __forceinline__ T ShuffleUp(
  *     double thread_data = ...
  *
  *     // Obtain item from two ranks below
- *     double peer_data = ShuffleDown(thread_data, 2);
+ *     double peer_data = ShuffleDown(thread_data, 2, 31, 0xffffffff);
  *
  * \endcode
  * \par
@@ -557,9 +571,10 @@ __device__ __forceinline__ T ShuffleUp(
  */
 template <typename T>
 __device__ __forceinline__ T ShuffleDown(
-    T               input,                                  ///< [in] The value to broadcast
-    int             src_offset,                             ///< [in] The relative up-offset of the peer to read from
-    int             last_lane = CUB_PTX_WARP_THREADS - 1)   ///< [in] Index of first lane in segment
+    T               input,              ///< [in] The value to broadcast
+    int             src_offset,         ///< [in] The relative up-offset of the peer to read from
+    int             last_lane,          ///< [in] Index of first lane in segment (typically 31)
+    unsigned int    member_mask)        ///< [in] 32-bit mask of participating warp lanes
 {
     typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
 
@@ -570,69 +585,25 @@ __device__ __forceinline__ T ShuffleDown(
     ShuffleWord     *input_alias    = reinterpret_cast<ShuffleWord *>(&input);
 
     unsigned int shuffle_word;
-    asm volatile("shfl.down.b32 %0, %1, %2, %3;"
-        : "=r"(shuffle_word) : "r"((unsigned int) input_alias[0]), "r"(src_offset), "r"(last_lane));
+    shuffle_word    = SHFL_DOWN_SYNC((unsigned int)input_alias[0], src_offset, last_lane, member_mask);
     output_alias[0] = shuffle_word;
 
     #pragma unroll
     for (int WORD = 1; WORD < WORDS; ++WORD)
     {
-        asm volatile("shfl.down.b32 %0, %1, %2, %3;"
-            : "=r"(shuffle_word) : "r"((unsigned int) input_alias[WORD]), "r"(src_offset), "r"(last_lane));
+        shuffle_word       = SHFL_DOWN_SYNC((unsigned int)input_alias[WORD], src_offset, last_lane, member_mask);
         output_alias[WORD] = shuffle_word;
     }
-
-//    ShuffleDown(input_alias, output_alias, src_offset, last_lane, Int2Type<WORDS - 1>());
 
     return output;
 }
 
-#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
 /**
- * \brief Shuffle-index for any data type.  Each <em>warp-lane<sub>i</sub></em> obtains the value \p input contributed by <em>warp-lane</em><sub><tt>src_lane</tt></sub>.  For \p src_lane < 0 or \p src_lane >= WARP_THREADS, then the thread's own \p input is returned to the thread.  ![](shfl_broadcast_logo.png)
- * \ingroup WarpModule
+ * \brief Shuffle-broadcast for any data type.  Each <em>warp-lane<sub>i</sub></em> obtains the value \p input
+ * contributed by <em>warp-lane</em><sub><tt>src_lane</tt></sub>.  For \p src_lane < 0 or \p src_lane >= WARP_THREADS,
+ * then the thread's own \p input is returned to the thread. ![](shfl_broadcast_logo.png)
  *
- * \par
- * - Available only for SM3.0 or newer
- */
-template <typename T>
-__device__ __forceinline__ T ShuffleIndex(
-    T               input,                                          ///< [in] The value to broadcast
-    int             src_lane,                                       ///< [in] Which warp lane is to do the broadcasting
-    int             logical_warp_threads)                           ///< [in] Number of threads per logical warp
-{
-    typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
-
-    const int       WORDS           = (sizeof(T) + sizeof(ShuffleWord) - 1) / sizeof(ShuffleWord);
-
-    T               output;
-    ShuffleWord     *output_alias   = reinterpret_cast<ShuffleWord *>(&output);
-    ShuffleWord     *input_alias    = reinterpret_cast<ShuffleWord *>(&input);
-
-    unsigned int shuffle_word;
-    asm volatile("shfl.idx.b32 %0, %1, %2, %3;"
-        : "=r"(shuffle_word) : "r"((unsigned int) input_alias[0]), "r"(src_lane), "r"(logical_warp_threads - 1));
-    output_alias[0] = shuffle_word;
-
-    #pragma unroll
-    for (int WORD = 1; WORD < WORDS; ++WORD)
-    {
-        asm volatile("shfl.idx.b32 %0, %1, %2, %3;"
-            : "=r"(shuffle_word) : "r"((unsigned int) input_alias[WORD]), "r"(src_lane), "r"(logical_warp_threads - 1));
-        output_alias[WORD] = shuffle_word;
-    }
-
-//    ShuffleIdx(input_alias, output_alias, src_lane, logical_warp_threads - 1, Int2Type<WORDS - 1>());
-
-    return output;
-}
-
-#endif // DOXYGEN_SHOULD_SKIP_THIS
-
-
- /**
- * \brief Shuffle-broadcast for any data type.  Each <em>warp-lane<sub>i</sub></em> obtains the value \p input contributed by <em>warp-lane</em><sub><tt>src_lane</tt></sub>.  For \p src_lane < 0 or \p src_lane >= WARP_THREADS, then the thread's own \p input is returned to the thread. ![](shfl_broadcast_logo.png)
  * \ingroup WarpModule
  *
  * \par
@@ -651,7 +622,7 @@ __device__ __forceinline__ T ShuffleIndex(
  *     double thread_data = ...
  *
  *     // Obtain item from thread 0
- *     double peer_data = ShuffleIndex(thread_data, 0);
+ *     double peer_data = ShuffleIndex(thread_data, 0, 32, 0xffffffff);
  *
  * \endcode
  * \par
@@ -661,66 +632,41 @@ __device__ __forceinline__ T ShuffleIndex(
  */
 template <typename T>
 __device__ __forceinline__ T ShuffleIndex(
-    T               input,              ///< [in] The value to broadcast
-    int             src_lane)           ///< [in] Which warp lane is to do the broadcasting
+    T               input,                  ///< [in] The value to broadcast
+    int             src_lane,               ///< [in] Which warp lane is to do the broadcasting
+    int             logical_warp_threads,   ///< [in] Number of threads per logical warp
+    unsigned int    member_mask)            ///< [in] 32-bit mask of participating warp lanes
 {
-    return ShuffleIndex(input, src_lane, CUB_PTX_WARP_THREADS);
+    typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
+
+    const int       WORDS           = (sizeof(T) + sizeof(ShuffleWord) - 1) / sizeof(ShuffleWord);
+
+    T               output;
+    ShuffleWord     *output_alias   = reinterpret_cast<ShuffleWord *>(&output);
+    ShuffleWord     *input_alias    = reinterpret_cast<ShuffleWord *>(&input);
+
+    unsigned int shuffle_word;
+    shuffle_word = SHFL_IDX_SYNC((unsigned int)input_alias[0],
+                                 src_lane,
+                                 logical_warp_threads - 1,
+                                 member_mask);
+
+    output_alias[0] = shuffle_word;
+
+    #pragma unroll
+    for (int WORD = 1; WORD < WORDS; ++WORD)
+    {
+        shuffle_word = SHFL_IDX_SYNC((unsigned int)input_alias[WORD],
+                                     src_lane,
+                                     logical_warp_threads - 1,
+                                     member_mask);
+
+        output_alias[WORD] = shuffle_word;
+    }
+
+    return output;
 }
 
-
-
-
-
-/**
- * \brief Portable implementation of __all
- * \ingroup WarpModule
- */
-__device__ __forceinline__ int WarpAll(int cond)
-{
-#if CUB_PTX_ARCH < 120
-
-    __shared__ volatile int warp_signals[CUB_PTX_MAX_SM_THREADS / CUB_PTX_WARP_THREADS];
-
-    if (LaneId() == 0)
-        warp_signals[WarpId()] = 1;
-
-    if (cond == 0)
-        warp_signals[WarpId()] = 0;
-
-    return warp_signals[WarpId()];
-
-#else
-
-    return __all(cond);
-
-#endif
-}
-
-
-/**
- * \brief Portable implementation of __any
- * \ingroup WarpModule
- */
-__device__ __forceinline__ int WarpAny(int cond)
-{
-#if CUB_PTX_ARCH < 120
-
-    __shared__ volatile int warp_signals[CUB_PTX_MAX_SM_THREADS / CUB_PTX_WARP_THREADS];
-
-    if (LaneId() == 0)
-        warp_signals[WarpId()] = 0;
-
-    if (cond)
-        warp_signals[WarpId()] = 1;
-
-    return warp_signals[WarpId()];
-
-#else
-
-    return __any(cond);
-
-#endif
-}
 
 
 }               // CUB namespace

@@ -18,10 +18,12 @@ namespace quda {
       report("Lanczos solver");
       eig_solver = new Lanczos(ritz_mat, param, profile);
       break;
+#if 0
     case QUDA_IMP_RST_LANCZOS:
-      report("BiCGstab");
+      report("Implicitly restarted Lanczos");
       eig_solver = new ImpRstLanczos(ritz_mat, param, profile);
       break;
+#endif
     default:
       errorQuda("Invalid eig solver type");
     }
@@ -46,7 +48,7 @@ namespace quda {
     Complex xp(0.0,0.0);
     for(int i = 0; i<Nvec; ++i)
     {
-      xp =cDotProductCuda(*(Eig_Vec[i]), psi);
+      xp = blas::cDotProduct(*(Eig_Vec[i]), psi);
 
       if (getVerbosity() >= QUDA_VERBOSE) {
         if(fabs(xp.real()) > 1e-13 || fabs(xp.imag()) > 1e-13)
@@ -54,7 +56,7 @@ namespace quda {
       }
 
       xp *= -1.0;
-      caxpyCuda(xp, *(Eig_Vec[i]), psi);
+      blas::caxpy(xp, *(Eig_Vec[i]), psi);
 
       if(i==Nvec-1 && delta)  *delta = xp.real();   //  Re ( vec[Nvec-1],  psi ) needed for Lanczos' delta
     }

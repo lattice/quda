@@ -30,11 +30,11 @@ BUILD_NDEG_TWISTED_MASS_DIRAC = @BUILD_NDEG_TWISTED_MASS_DIRAC@	# build non-dege
 BUILD_FATLINK = @BUILD_FATLINK@					# build code for computing asqtad fat links?
 BUILD_HISQLINK = @BUILD_HISQLINK@				# build code for computing hisq fat links?
 BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@				# build code for (1-loop Symanzik) gauge force?
-BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@			# build code for asqtad fermion force?
 BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
 BUILD_GAUGE_TOOLS = @BUILD_GAUGE_TOOLS@				# build auxilary gauge-field tools?
 BUILD_GAUGE_ALG = @BUILD_GAUGE_ALG@				# build gauge-fixing and pure-gauge algorithms?
 BUILD_SSTEP = @BUILD_SSTEP@                                     # build s-step linear solvers?
+BUILD_MULTIGRID = @BUILD_MULTIGRID@                                 # build multigrid linear solvers?
 
 #Dynamically invert the clover term for twisted-clover?
 DYNAMIC_CLOVER = @DYNAMIC_CLOVER@	# Dynamic inversion saves memory but decreases the flops
@@ -45,13 +45,12 @@ BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU c
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
 POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dslash
 
-
 #BLAS library
 BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
-
-# GPUdirect options
-GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
-GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
+BUILD_MAGMA_VARS = @BUILD_MAGMA_VARS@ # build magma using env vars MAGMA_INC and MAGMA_LIB
+#ARPACK library
+BUILD_ARPACK = @BUILD_ARPACK@     # build arpack interface
+BUILD_ARPACK_VARS = @BUILD_ARPACK_VARS@ # build arpack using env vars ARPACK_LIB
 
 # Profiling options
 MPI_NVTX = @MPI_NVTX@              # set to 'yes' to add nvtx markup to MPI API calls for the visual profiler
@@ -64,9 +63,6 @@ BUILD_CPS_INTERFACE = @BUILD_CPS_INTERFACE@                     # build cps inte
 BUILD_QDPJIT_INTERFACE = @BUILD_QDPJIT_INTERFACE@               # build qdpjit interface
 BUILD_BQCD_INTERFACE = @BUILD_BQCD_INTERFACE@                   # build bqcd interface
 BUILD_TIFR_INTERFACE = @BUILD_TIFR_INTERFACE@                   # build tifr interface
-
-# Packing option
-DEVICE_PACK = @DEVICE_PACK@	     # set to 'yes' to enable packing and unpacking on the device
 
 # GPU contractions of spinors
 BUILD_CONTRACT = @BUILD_CONTRACT@    # build code for bilinear contraction?
@@ -84,23 +80,21 @@ QMP_HOME=@QMP_HOME@
 QIO_HOME=@QIO_HOME@
 
 
-NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
-
 ######
 
 INC = -I$(CUDA_INSTALL_PATH)/include
 
 ifeq ($(strip $(CPU_ARCH)), x86_64)
   ifeq ($(strip $(OS)), osx)
-    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
+    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -lcuda
     NVCCOPT = -m64
   else
-    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
+    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart -lcuda
   endif
 else
-  LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -m32
-  COPT = -malign-double -m32
-  NVCCOPT = -m32
+  LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -lcuda -m32
+  COPT += -malign-double -m32
+  NVCCOPT += -m32
 endif
 
 COMP_CAP = $(GPU_ARCH:sm_%=%0)
@@ -139,12 +133,6 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   COMM_OBJS = comm_mpi.o
 endif
 
-ifeq ($(strip $(BUILD_QIO)), yes)
-  INC += -DHAVE_QIO -I$(QIO_HOME)/include
-  LIB += -L$(QIO_HOME)/lib -lqio -llime
-  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
-endif
-
 ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
   QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
@@ -152,6 +140,12 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   INC += -DQMP_COMMS $(QMP_CFLAGS)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   COMM_OBJS = comm_qmp.o
+endif
+
+ifeq ($(strip $(BUILD_QIO)), yes)
+  INC += -DHAVE_QIO -I$(QIO_HOME)/include
+  LIB += -L$(QIO_HOME)/lib -lqio -llime
+  QIO_UTIL = qio_field.o qio_util.o layout_hyper.o
 endif
 
 ifeq ($(strip $(MPI_NVTX)), yes)
@@ -168,18 +162,47 @@ ifeq ($(strip $(INTERFACE_NVTX)), yes)
 endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
-  MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
+  ifeq ($(strip $(BUILD_MAGMA_VARS)),yes)
+     MAGMA_INCLUDE = ${MAGMA_INC}
+     LIB += ${MAGMA_LIB}
+  else
+     MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
+     LIB += $(shell pkg-config --libs magma)
+  endif
+
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -fopenmp  -DMAGMA_LIB
-  LIB += $(shell pkg-config --libs magma)
 else
   MAGMA_INCLUDE =
   MAGMA_FLAGS   =
 endif
 
+ifeq ($(strip $(BUILD_ARPACK)), yes)
+  ifeq ($(strip $(BUILD_ARPACK_VARS)),yes)
+     LIB += ${ARPACK_LIB}
+  else
+    ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
+        LIB += $(shell pkg-config --libs parpack)
+     else
+        LIB += $(shell pkg-config --libs arpack)
+     endif
+  endif
+
+  ARPACK_FLAGS   = -DARPACK_LIB
+  COPT += -fopenmp  -DARPACK_LIB
+else
+  ARPACK_FLAGS   =
+endif
+
 ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
   NVCCOPT += -DDYNAMIC_CLOVER
   COPT += -DDYNAMIC_CLOVER
+endif
+
+ifeq ($(strip $(BUILD_MULTIGRID)), yes)
+  NVCCOPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  COPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  LIB += -lcublas
 endif
 
 ifeq ($(strip $(BUILD_SSTEP)), yes)
@@ -193,6 +216,7 @@ ifeq ($(strip $(POSIX_THREADS)), yes)
 endif
 
 LIB += -lpthread
+
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
@@ -248,11 +272,6 @@ ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
   COPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
 endif
 
-ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
-  NVCCOPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
-  COPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
-endif
-
 ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
   NVCCOPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
   COPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
@@ -286,6 +305,7 @@ ifeq ($(strip $(VERBOSE)), yes)
   NVCCOPT += --ptxas-options=-v
 endif
 
+NVCCOPT += -DMAX_MULTI_BLAS_N=4
 ifeq ($(strip $(BLAS_TEX)), no)
   NVCCOPT += -DDIRECT_ACCESS_BLAS
   COPT += -DDIRECT_ACCESS_BLAS
@@ -294,16 +314,6 @@ endif
 ifeq ($(strip $(FERMI_DBLE_TEX)), no)
   NVCCOPT += -DFERMI_NO_DBLE_TEX
   COPT += -DFERMI_NO_DBLE_TEX
-endif
-
-ifeq ($(strip $(GPU_DIRECT)), yes)
-  NVCCOPT += -DGPU_DIRECT
-  COPT += -DGPU_DIRECT
-endif
-
-ifeq ($(strip $(GPU_COMMS)), yes)
-  NVCCOPT += -DGPU_COMMS
-  COPT += -DGPU_COMMS
 endif
 
 ifeq ($(strip $(BUILD_QDP_INTERFACE)), yes)
@@ -336,21 +346,6 @@ ifeq ($(strip $(BUILD_TIFR_INTERFACE)), yes)
   COPT += -DBUILD_TIFR_INTERFACE
 endif
 
-ifeq ($(strip $(DEVICE_PACK)), yes)
-  NVCCOPT += -DDEVICE_PACK
-  COPT += -DDEVICE_PACK
-endif
-
-ifeq ($(strip $(OS)), osx)
-  NUMA_AFFINITY = no
-endif
-
-ifeq ($(strip $(NUMA_AFFINITY)), yes)
-  NVCCOPT += -DNUMA_AFFINITY
-  COPT += -DNUMA_AFFINITY
-  NUMA_AFFINITY_OBJS=numa_affinity.o
-endif
-
 ifeq ($(strip $(BUILD_CONTRACT)), yes)
   NVCCOPT += -DGPU_CONTRACT
   COPT += -DGPU_CONTRACT
@@ -368,15 +363,15 @@ ifeq ($(strip $(USE_QDPJIT)), yes)
   INC += -I$(QDP_INSTALL_PATH)/include
 
   CFLAGS = -Wall -std=c99 $(COPT) $(INC)
-  CXXFLAGS = -Wall $(COPT) $(INC) $(QDPXX_CXXFLAGS)
+  CXXFLAGS = -Wall -std=c++11 $(COPT) $(INC) $(QDPXX_CXXFLAGS)
   NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
-  NVCCFLAGS = $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  NVCCFLAGS = -std=c++11 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 else
   CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
-  CXXFLAGS = -Wall -O3 $(COPT) $(INC)
+  CXXFLAGS = -Wall -std=c++11 -O3 $(COPT) $(INC)
   NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
-  NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  NVCCFLAGS = -std=c++11 -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 endif
 

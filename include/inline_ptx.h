@@ -1,3 +1,5 @@
+#pragma once
+
 /*
   Inline ptx instructions for low-level control of code generation.
   Primarily these are for doing stores avoiding L1 cache and minimal
@@ -60,6 +62,3 @@ namespace quda {
   }
 
 } // namespace quda
-
-
-

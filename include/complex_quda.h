@@ -1,22 +1,22 @@
 /*
-* Copyright 2008-2009 NVIDIA Corporation
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ *  Copyright 2008-2009 NVIDIA Corporation
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 
 /*! \file complex.h
-* \brief Complex number class, designed to provide std::complex functionality to quda.
-*/
+ *  \brief Complex number class, designed to provide std::complex functionality to quda.
+ */
 
 #pragma once
 
@@ -139,6 +139,7 @@ namespace quda
   __host__ __device__
   complex<ValueType> conj(const complex<ValueType>& z);
   /// Returns the complex with magnitude m and angle theta in radians.
+
   template<typename ValueType>
   __host__ __device__
   complex<ValueType> polar(const ValueType& m, const ValueType& theta = 0);
@@ -187,10 +188,10 @@ namespace quda
     inline complex<ValueType> operator-(const ValueType& lhs, const complex<ValueType>& rhs);
 
   // Unary plus and minus
-  template <typename ValueType>
+  template <typename ValueType> 
     __host__ __device__
     inline complex<ValueType> operator+(const complex<ValueType>& rhs);
-  template <typename ValueType>
+  template <typename ValueType> 
     __host__ __device__
     inline complex<ValueType> operator-(const complex<ValueType>& rhs);
 
@@ -226,8 +227,7 @@ namespace quda
   // Returns z to the z2'th power.
   template <typename ValueType>
     __host__ __device__
-  complex<ValueType> pow(const complex<ValueType>&z,
-const complex<ValueType>&z2);
+  complex<ValueType> pow(const complex<ValueType>&z, const complex<ValueType>&z2);
   // Returns x to the z'th power.
   template <typename ValueType>
     __host__ __device__
@@ -418,6 +418,14 @@ public:
       return *this;
     }
 
+  __host__ __device__
+    inline complex<ValueType>& operator*=(const ValueType z)
+    {
+      this->x *= z;
+      this->y *= z;
+      return *this;
+    }
+
   __host__ __device__ inline ValueType real() const volatile;
   __host__ __device__ inline ValueType imag() const volatile;
   __host__ __device__ inline ValueType real() const;
@@ -460,7 +468,7 @@ public:
     {
       real(z.real());
       imag(z.imag());
-    }
+    }  
 
   // Member operators
   template <typename T>
@@ -511,6 +519,14 @@ public:
       return *this;
     }
 
+  __host__ __device__
+    inline complex<float>& operator*=(const float z)
+    {
+      this->x *= z;
+      this->y *= z;
+      return *this;
+    }
+
   // Let the compiler synthesize the copy and assignment operators.
   __host__ __device__ inline complex<float>(const volatile complex<float> & z)
   {
@@ -529,6 +545,8 @@ public:
 
   // cast operators
   inline operator std::complex<float>() const { return std::complex<float>(real(),imag()); }
+  template <typename T>
+  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
   // inline operator float() const { return real(); }
 };
 
@@ -561,7 +579,7 @@ public:
     {
       real(z.real());
       imag(z.imag());
-    }
+    }  
 
   // Member operators
   template <typename T>
@@ -591,6 +609,14 @@ public:
     }
 
   __host__ __device__
+    inline complex<double>& operator+=(const complex<float> z)
+    {
+      real(real()+z.real());
+      imag(imag()+z.imag());
+      return *this;
+    }
+
+  __host__ __device__
     inline complex<double>& operator-=(const complex<double> z)
     {
       real(real()-z.real());
@@ -612,6 +638,14 @@ public:
       return *this;
     }
 
+  __host__ __device__
+    inline complex<double>& operator*=(const double z)
+    {
+      this->x *= z;
+      this->y *= z;
+      return *this;
+    }
+
   __host__ __device__ inline complex<double>(const volatile complex<double> & z)
   {
     real(z.real());
@@ -630,10 +664,11 @@ public:
 
   // cast operators
   inline operator std::complex<double>() const { return std::complex<double>(real(),imag()); }
+
+  template <typename T>
+  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
   // inline operator double() { return real(); }
 };
-
-
 
   // Binary arithmetic operations
   // At the moment I'm implementing the basic functions, and the
@@ -780,6 +815,7 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     }
     return false;
   }
+
   template <typename ValueType>
     __host__ __device__
     inline bool operator==(const ValueType & lhs, const complex<ValueType>& rhs){
@@ -796,6 +832,7 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     }
     return false;
   }
+
 
   template <typename ValueType>
     __host__ __device__
@@ -1061,7 +1098,7 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     __host__ __device__
     inline complex<ValueType> acosh(const complex<ValueType>& z){
     quda::complex<ValueType> ret((z.real() - z.imag()) * (z.real() + z.imag()) - ValueType(1.0),
-ValueType(2.0) * z.real() * z.imag());
+				 ValueType(2.0) * z.real() * z.imag());
     ret = sqrt(ret);
     if (z.real() < ValueType(0.0)){
       ret = -ret;
@@ -1074,12 +1111,12 @@ ValueType(2.0) * z.real() * z.imag());
     return ret;
 
     /*
-quda::complex<ValueType> ret = log(sqrt(z*z-ValueType(1))+z);
-if(ret.real() < 0){
-ret.real(-ret.real());
-}
-return ret;
-*/
+      quda::complex<ValueType> ret = log(sqrt(z*z-ValueType(1))+z);
+      if(ret.real() < 0){
+      ret.real(-ret.real());
+      }
+      return ret;
+    */
   }
 
   template <typename ValueType>
@@ -1109,7 +1146,7 @@ return ret;
   template <typename ValueType>
     __host__ __device__
     inline complex<float> atanh(const complex<float>& z){
-        float imag2 = z.imag() * z.imag();
+    float imag2 = z.imag() * z.imag();
     float n = float(1.0) + z.real();
     n = imag2 + n * n;
 

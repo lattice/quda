@@ -148,24 +148,37 @@ def def_input_spinor():
     str += "// input spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
     str += "#define spinorFloat double\n"
+    str += "// workaround for C++11 bug in CUDA 6.5/7.0\n"
+    str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
+    str += "#define POW(a, b) pow(a, static_cast<spinorFloat>(b))\n"
+    str += "#else\n"
+    str += "#define POW(a, b) pow(a, b)\n"
+    str += "#endif\n\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
-    str += "#define m5 m5_d\n"
-    str += "#define mdwf_b5 mdwf_b5_d\n"
-    str += "#define mdwf_c5 mdwf_c5_d\n"
+    str += "#define m5 param.m5_d\n"
+    str += "#define mdwf_b5 param.mdwf_b5_d\n"
+    str += "#define mdwf_c5 param.mdwf_c5_d\n"
+    str += "#define mferm param.mferm\n"
+    str += "#define a param.a\n"
+    str += "#define b param.b\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
+    str += "#define POW(a, b) __fast_pow(a, b)\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n"
-    str += "#define m5 m5_f\n"
-    str += "#define mdwf_b5 mdwf_b5_f\n"
-    str += "#define mdwf_c5 mdwf_c5_f\n"
+    str += "#define m5 param.m5_f\n"
+    str += "#define mdwf_b5 param.mdwf_b5_f\n"
+    str += "#define mdwf_c5 param.mdwf_c5_f\n"
+    str += "#define mferm param.mferm_f\n"
+    str += "#define a param.a\n"
+    str += "#define b param.b\n"
     str += "#endif // SPINOR_DOUBLE\n\n"
     return str
 # end def def_input_spinor
@@ -291,8 +304,6 @@ def prolog():
         print "Undefined prolog"
         exit
 
-    if domain_wall: prolog_str += "// NB! Don't trust any MULTI_GPU code\n"
-
     prolog_str+= (
 """
 #if (CUDA_VERSION >= 4010)
@@ -352,70 +363,54 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
         if not domain_wall:
             prolog_str += "#include \"read_clover.h\"\n"
         prolog_str += "#include \"io_spinor.h\"\n"
-        if dslash4 == True:
-            prolog_str += (
-"""
-#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
-int sp_norm_idx;
-#endif // MULTI_GPU half precision
-""")
         prolog_str += (
 """
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*param.Ls) return;
+if (sid >= param.threads*param.dc.Ls) return;
 
-int boundaryCrossing;
 """)
         if domain_wall:
           if dslash4 == True:
             prolog_str+=(
 """
-int X, x1, x2, x3, x4, xs;
+int X, coord[5];
 """)
           else:
             prolog_str+=(
 """
-int X, xs;
+int X, coord[5], boundaryCrossing;
 """)
         else:
           prolog_str+=(
 """
-int X, x1, x2, x3, x4, xs;
+int X, coord[5];
 """)
         if dslash4 == True:
             prolog_str += (
 """
-#ifdef MULTI_GPU
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
-#endif
 """)
         prolog_str += (
 """
-// Inline by hand for the moment and assume even dimensions
-//coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+
 """)
         if domain_wall:
           if dslash4 == True:
             prolog_str+=(
 """
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
-x1 = X % X1;
-x2 = (X/X1) % X2;
-x3 = (X/(X1*X2)) % X3;
-x4 = (X/(X1*X2*X3)) % X4;
-xs = X/(X1*X2*X3*X4);
+  // Assume even dimensions
+  coordsFromIndex<5,QUDA_4D_PC,EVEN_X>(X, coord, sid, param);
 
 """)
           else:
             prolog_str+=(
 """
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
+boundaryCrossing = sid/param.dc.Xh[0] + sid/(param.dc.X[1]*param.dc.Xh[0]) + sid/(param.dc.X[2]*param.dc.X[1]*param.dc.Xh[0]);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-xs = X/(X1*X2*X3*X4);
+coord[4] = X/(param.dc.X[0]*param.dc.X[1]*param.dc.X[2]*param.dc.X[3]);
 
 """)
 
@@ -423,12 +418,12 @@ xs = X/(X1*X2*X3*X4);
           prolog_str+=(
 """
 X = 2*sid;
-int aux1 = X / X1;
-x1 = X - aux1 * X1;
-int aux2 = aux1 / X2;
-x2 = aux1 - aux2 * X2;
-x4 = aux2 / X3;
-x3 = aux2 - x4 * X3;
+int aux1 = X / param.dc.X[0];
+x1 = X - aux1 * param.dc.X[0];
+int aux2 = aux1 / param.dc.X[1];
+x2 = aux1 - aux2 * param.dc.X[1];
+x4 = aux2 / param.dc.X[2];
+x3 = aux2 - x4 * param.dc.X[2];
 aux1 = (param.parity + x4 + x3 + x2) & 1;
 x1 += aux1;
 X += aux1;
@@ -444,11 +439,9 @@ X += aux1;
         if dslash4 == True:
           prolog_str+= (
 """
-#ifdef MULTI_GPU
 } else { // exterior kernel
 
-const int dim = static_cast<int>(kernel_type);
-const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
+const int face_volume = (param.threads*param.dc.Ls >> 1); // volume of one face
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
 
@@ -456,16 +449,7 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
 
-#if (DD_PREC==2) // half precision
-sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
-
-const int dims[] = {X1, X2, X3, X4};
-coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
-
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
+coordsFromFaceIndex<5,QUDA_4D_PC,kernel_type,1>(X, sid, coord, face_idx, face_num, param);
 
 READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
 """)
@@ -475,7 +459,6 @@ READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
               out += out_re(s,c)+" = "+in_re(s,c)+"; "+out_im(s,c)+" = "+in_im(s,c)+";\n"
           prolog_str+= indent(out)
           prolog_str+= "}\n"
-          prolog_str+= "#endif // MULTI_GPU\n"
 
           if domain_wall:
             if dslash4 == True:
@@ -548,18 +531,16 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-# boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-# interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
-    boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-    interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
+    boundary = ["coord[0]==(param.dc.X[0]-1)", "coord[0]==0", "coord[1]==(param.dc.X[1]-1)", "coord[1]==0", "coord[2]==(param.dc.X[2]-1)", "coord[2]==0", "coord[3]==(param.dc.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.dc.X[0]-1)", "coord[0]>0", "coord[1]<(param.dc.X[1]-1)", "coord[1]>0", "coord[2]<(param.dc.X[2]-1)", "coord[2]>0", "coord[3]<(param.dc.X[3]-1)", "coord[3]>0"]
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+X1", "X-X1", "X+X2X1", "X-X2X1", "X+X3X2X1", "X-X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.dc.X[0]", "X-param.dc.X[0]", "X+param.dc.X2X1", "X-param.dc.X2X1", "X+param.dc.X3X2X1", "X-param.dc.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-X1m1", "X+X1m1", "X-X2X1mX1", "X+X2X1mX1", "X-X3X2X1mX2X1", "X+X3X2X1mX2X1",
-                   "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.dc.X[0]-1)", "X+(param.dc.X[0]-1)", "X-param.dc.X2X1mX1", "X+param.dc.X2X1mX1", "X-param.dc.X3X2X1mX2X1", "X+param.dc.X3X2X1mX2X1",
+                   "X-param.dc.X4X3X2X1mX3X2X1", "X+param.dc.X4X3X2X1mX3X2X1"]
 
     cond = ""
     cond += "#ifdef MULTI_GPU\n"
@@ -577,21 +558,24 @@ def gen(dir, pack_only=False):
 
     str += "#ifdef MULTI_GPU\n"
     str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
-    str += " face_idx + param.ghostOffset[static_cast<int>(kernel_type)];\n"
+    str += " face_idx + param.ghostOffset[static_cast<int>(kernel_type)][" + `(dir+1)%2` + "];\n"
+    str += "#if (DD_PREC==2) // half precision\n"
+    str += "const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][" + `(dir+1)%2` + "];\n"
+    str += "#endif\n"
     str += "#else\n"
     str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#endif\n"
 
     str += "\n"
     if dir % 2 == 0:
-        if domain_wall: str += "const int ga_idx = sid % Vh;\n"
+        if domain_wall: str += "const int ga_idx = sid % param.dc.volume_4d_cb;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));\n"
-        else: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
+        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.dc.volume_4d_cb : param.dc.volume_4d_cb+(face_idx % param.dc.ghostFace[static_cast<int>(kernel_type)]));\n"
+        else: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : param.dc.volume_4d_cb+face_idx);\n"
         str += "#else\n"
-        if domain_wall: str += "const int ga_idx = sp_idx % Vh;\n"
+        if domain_wall: str += "const int ga_idx = sp_idx % param.dc.volume_4d_cb;\n"
         else: str += "const int ga_idx = sp_idx;\n"
         str += "#endif\n"
     str += "\n"
@@ -624,9 +608,9 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     if domain_wall : 
-        load_half += "const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];\n"
+        load_half += "const int sp_stride_pad = param.dc.Ls*param.dc.ghostFace[static_cast<int>(kernel_type)];\n"
     else :
-        load_half += "const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];\n" 
+        load_half += "const int sp_stride_pad = param.dc.ghostFace[static_cast<int>(kernel_type)];\n" 
     #load_half += "#if (DD_PREC==2) // half precision\n"
     #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
     #load_half += "#endif\n"
@@ -637,10 +621,11 @@ def gen(dir, pack_only=False):
 
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    if (dir+1) % 2 == 0: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
-    else: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
+    load_half += "READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, "+`dir`+");\n\n"
+#    if (dir+1) % 2 == 0: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+#    else: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
     load_gauge = "// read gauge matrix from device memory\n"
-    load_gauge += "ASSN_GAUGE_MATRIX(G, GAUGE"+`( dir%2)`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
+    load_gauge += "ASSN_GAUGE_MATRIX(G, GAUGE"+`( dir%2)`+"TEX, "+`dir`+", ga_idx, param.gauge_stride);\n\n"
 
     reconstruct_gauge = "// reconstruct gauge matrix\n"
     reconstruct_gauge += "RECONSTRUCT_GAUGE_MATRIX("+`dir`+");\n\n"
@@ -746,7 +731,7 @@ def gen(dir, pack_only=False):
         if ( m < 2 ): reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.dc.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(load_gauge + decl_half + prep_half + reconstruct_gauge + mult + reconstruct)
@@ -762,8 +747,8 @@ def gen(dir, pack_only=False):
 # end def gen
 
 def gen_dw():
-    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='param.Ls-1'
-    else: lsign='+'; ledge = 'param.Ls-1'; rsign='-'; redge='0'
+    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='param.dc.Ls-1'
+    else: lsign='+'; ledge = 'param.dc.Ls-1'; rsign='-'; redge='0'
 
     str = "\n\n"
     str += "// 5th dimension -- NB: not partitionable!\n"
@@ -771,12 +756,12 @@ def gen_dw():
       str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n"
     str += "{\n// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
     str += "  {\n"
-    str += "     int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
+    str += "     int sp_idx = ( coord[4] == %s ? X%s(param.dc.Ls-1)*2*param.dc.volume_4d_cb : X%s2*param.dc.volume_4d_cb ) / 2;\n" % (ledge, rsign, lsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
     str += "\n"
-    str += "     if ( xs != %s )\n" % ledge
+    str += "     if ( coord[4] != %s )\n" % ledge
     str += "     {\n"
     
     def proj(i,j):
@@ -810,16 +795,16 @@ def gen_dw():
     # xs == 0:
     str += out_L.replace(" += "," += -mferm*(").replace(";",");")
 
-    str += "    } // end if ( xs != %s )\n" % ledge
+    str += "    } // end if ( coord[4] != %s )\n" % ledge
     str += "  } // end P_L\n\n"
     str += " // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )\n"
     str += "  {\n"
-    str += "    int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
+    str += "    int sp_idx = ( coord[4] == %s ? X%s(param.dc.Ls-1)*2*param.dc.volume_4d_cb : X%s2*param.dc.volume_4d_cb ) / 2;\n" % (redge, lsign, rsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
     str += "\n"
-    str += "    if ( xs != %s )\n" % redge
+    str += "    if ( coord[4] != %s )\n" % redge
     str += "    {\n"
     
     # xs != Ls-1
@@ -832,7 +817,7 @@ def gen_dw():
     # xs == Ls-1
     str += out_L.replace("-","+").replace(" += "," += -mferm*(").replace(";",");")
 
-    str += "    } // end if ( xs != %s )\n" % redge
+    str += "    } // end if ( coord[4] != %s )\n" % redge
     str += "  } // end P_R\n\n"
 
     if dslash5:
@@ -850,8 +835,8 @@ def gen_dw():
       str += "#if (MDWF_mode==1)\n"
       str += "  VOLATILE spinorFloat C_5;\n"
       str += "  VOLATILE spinorFloat B_5;\n"
-      str += "  C_5 = (spinorFloat)mdwf_c5[xs]*0.5;\n"
-      str += "  B_5 = (spinorFloat)mdwf_b5[xs];\n\n"
+      str += "  C_5 = mdwf_c5[ coord[4] ]*static_cast<spinorFloat>(0.5);\n"
+      str += "  B_5 = mdwf_b5[ coord[4] ];\n\n"
       str += "  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );\n"
       str += "  o00_re = C_5*o00_re + B_5*i00_re;\n" 
       str += "  o00_im = C_5*o00_im + B_5*i00_im;\n"
@@ -879,7 +864,7 @@ def gen_dw():
       str += "  o32_im = C_5*o32_im + B_5*i32_im;\n"
       str += "#elif (MDWF_mode==2)\n"
       str += "  VOLATILE spinorFloat C_5;\n"
-      str += "  C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n\n"
+      str += "  C_5 = static_cast<spinorFloat>(0.5)*(mdwf_c5[ coord[4] ]*(m5+static_cast<spinorFloat>(4.0)) - static_cast<spinorFloat>(1.0))/(mdwf_b5[ coord[4] ]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));\n\n"
       str += "  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );\n"
       str += "  o00_re = C_5*o00_re + i00_re;\n"
       str += "  o00_im = C_5*o00_im + i00_im;\n"
@@ -917,9 +902,9 @@ def gen_dw_inv():
     str = "\n"
     str += "VOLATILE spinorFloat kappa;\n\n"
     str += "#ifdef MDWF_mode   // Check whether MDWF option is enabled\n" 
-    str += "  kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));\n"
+    str += "  kappa = -(mdwf_c5[ coord[4] ]*(static_cast<spinorFloat>(4.0) + m5) - static_cast<spinorFloat>(1.0))/(mdwf_b5[ coord[4] ]*(static_cast<spinorFloat>(4.0) + m5) + static_cast<spinorFloat>(1.0));\n"
     str += "#else\n" 
-    str += "  kappa = 2.0*a;\n"
+    str += "  kappa = static_cast<spinorFloat>(2.0)*a;\n"
     str += "#endif  // select MDWF mode\n\n"
     str += "// M5_inv operation -- NB: not partitionable!\n\n"
     str += "// In this part, we will do the following operation in parallel way.\n\n"
@@ -927,23 +912,25 @@ def gen_dw_inv():
     str += "// 'w' means output vector\n"
     str += "// 'v' means input vector\n"
     str += "{\n"
-    str += "  int base_idx = sid%Vh;\n"
+    str += "  int base_idx = sid%param.dc.volume_4d_cb;\n"
     str += "  int sp_idx;\n\n"
     str += "// let's assume the index,\n"
     str += "// s = output vector index,\n"
     str += "// s' = input vector index and\n"
     str += "// 'a'= kappa5\n"
     str += "\n"
-    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,param.Ls)*mferm);\n"
+    str += "  spinorFloat inv_d_n = static_cast<spinorFloat>(0.5) / ( static_cast<spinorFloat>(1.0) + POW(kappa,param.dc.Ls)*mferm );\n"
     str += "  spinorFloat factorR;\n"
     str += "  spinorFloat factorL;\n"
     str += "\n"
-    str += "  for(int s = 0; s < param.Ls; s++)\n  {\n"
+    str += "  for(int s = 0; s < param.dc.Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    factorR = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    int exponent = coord[4]  > s ? param.dc.Ls-coord[4]+s : s-coord[4];\n"
+        str += "    factorR = inv_d_n * POW(kappa,exponent) * ( coord[4] > s ? -mferm : static_cast<spinorFloat>(1.0) );\n\n"
     else : 
-        str += "    factorR = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
-    str += "    sp_idx = base_idx + s*Vh;\n"
+        str += "    int exponent = coord[4] < s ? param.dc.Ls-s+coord[4] : coord[4]-s;\n"
+        str += "    factorR = inv_d_n * POW(kappa,exponent) * ( coord[4] < s ? -mferm : static_cast<spinorFloat>(1.0) );\n\n"
+    str += "    sp_idx = base_idx + s*param.dc.volume_4d_cb;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
     str += "    o00_re += factorR*(i00_re + i20_re);\n" 
@@ -972,9 +959,11 @@ def gen_dw_inv():
     str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
     if dagger == True :  
-        str += "    factorL = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
+        str += "    int exponent2 = coord[4] < s ? param.dc.Ls-s+coord[4] : coord[4]-s;\n"
+        str += "    factorL = inv_d_n * POW(kappa,exponent2) * ( coord[4] < s ? -mferm : static_cast<spinorFloat>(1.0));\n\n"
     else : 
-        str += "    factorL = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    int exponent2 = coord[4] > s ? param.dc.Ls-coord[4]+s : s-coord[4];\n"
+        str += "    factorL = inv_d_n * POW(kappa,exponent2) * ( coord[4] > s ? -mferm : static_cast<spinorFloat>(1.0));\n\n"
 
     str += "    o00_re += factorL*(i00_re - i20_re);\n"
     str += "    o00_im += factorL*(i00_im - i20_im);\n"
@@ -1002,6 +991,7 @@ def gen_dw_inv():
     str += "    o32_im += factorL*(i32_im - i12_im);\n"
     str += "  }\n"
     str += "} // end of M5inv dimension\n\n"
+    str += "#undef POW\n"
 
     return str
 # end def gen_dw_inv
@@ -1106,68 +1096,10 @@ def apply_clover():
 # end def clover
 
 
-def twisted_rotate(x):
-    str = "// apply twisted mass rotation\n"
-
-    for h in range(0, 4):
-        for c in range(0, 3):
-            strRe = ""
-            strIm = ""
-            for s in range(0, 4):
-                # identity
-                re = id[4*h+s].real
-                im = id[4*h+s].imag
-                if re==0 and im==0: ()
-                elif im==0:
-                    strRe += sign(re)+out_re(s,c)
-                    strIm += sign(re)+out_im(s,c)
-                elif re==0:
-                    strRe += sign(-im)+out_im(s,c)
-                    strIm += sign(im)+out_re(s,c)
-                
-                # sign(x)*i*mu*gamma_5
-                re = igamma5[4*h+s].real
-                im = igamma5[4*h+s].imag
-                if re==0 and im==0: ()
-                elif im==0:
-                    strRe += sign(re*x)+out_re(s,c) + "*a"
-                    strIm += sign(re*x)+out_im(s,c) + "*a"
-                elif re==0:
-                    strRe += sign(-im*x)+out_im(s,c) + "*a"
-                    strIm += sign(im*x)+out_re(s,c) + "*a"
-
-            str += "VOLATILE spinorFloat "+tmp_re(h,c)+" = " + strRe + ";\n"
-            str += "VOLATILE spinorFloat "+tmp_im(h,c)+" = " + strIm + ";\n"
-        str += "\n"
-    
-    return str+"\n"
-
-
-def twisted():
-    str = ""
-    str += twisted_rotate(+1)
-
-    str += "#ifndef DSLASH_XPAY\n"
-    str += "//scale by b = 1/(1 + a*a) \n"
-    for s in range(0,4):
-        for c in range(0,3):
-            str += out_re(s,c) + " = b*" + tmp_re(s,c) + ";\n"
-            str += out_im(s,c) + " = b*" + tmp_im(s,c) + ";\n"
-    str += "#else\n"
-    for s in range(0,4):
-        for c in range(0,3):
-            str += out_re(s,c) + " = " + tmp_re(s,c) + ";\n"
-            str += out_im(s,c) + " = " + tmp_im(s,c) + ";\n"
-    str += "#endif // DSLASH_XPAY\n"
-    str += "\n"
-
-    return block(str)+"\n"
-# end def twisted
-
 def coeff():
   if dslash4:
     str = "coeff"
-  elif dslash5:
+  elif dslash5 or dslash5inv:
     str = "coeff"
   else :
     str = "a" 
@@ -1181,18 +1113,16 @@ def ypax():
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat2(2*i+1)+";\n"
+            str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat2(2*i+0)+";\n"
+            str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat2(2*i+1)+";\n"
 
     str += "#else\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat4(2*i+1)+";\n"
+            str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat4(2*i+0)+";\n"
+            str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat4(2*i+1)+";\n"
 
     str += "#endif // SPINOR_DOUBLE\n"
     return str
@@ -1202,48 +1132,46 @@ def xpay():
     str = ""
     str += "#ifdef DSLASH_XPAY\n"
     str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n"
+
     if dslash4:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
-      str += "coeff = (spinorFloat)(0.5*a/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
+      str += "coeff = static_cast<spinorFloat>(0.5)*a/(mdwf_b5[coord[4]]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));\n"
       str += "#else\n"
       str += "coeff = a;\n"
       str += "#endif\n\n"
-    elif dslash5:
+    elif dslash5 or dslash5inv:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
-      str += "coeff = (spinorFloat)(0.5/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
-      str += "coeff *= -coeff;\n"
+      str += "coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[coord[4]]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));\n"
+      str += "coeff *= coeff;\n"
+      str += "coeff *= a;\n"
       str += "#else\n"
-      str += "coeff = a;\n"
+      if dslash5:
+          str += "coeff = a;\n"
+      elif dslash5inv:
+          str += "coeff = b;\n"
       str += "#endif\n\n"
-      str += "#ifdef YPAX\n"
-      str += ypax()
-      str += "#else\n"
+      if dslash5:
+          str += "#ifdef YPAX\n"
+          str += ypax()
+          str += "#else\n"
     
     str += "#ifdef SPINOR_DOUBLE\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
-            else:
-                str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
+            str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
+            str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
 
     str += "#else\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
-            else:
-                str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
+            str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
+            str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
 
     str += "#endif // SPINOR_DOUBLE\n"
     if dslash5:
@@ -1257,14 +1185,11 @@ def xpay():
 def epilog():
     str = ""
     if dslash:
-        if twist:
-            str += "#ifdef MULTI_GPU\n"
-        else:
-            if domain_wall:
-              if dslash4:
+        if domain_wall:
+            if dslash4:
                 str += "#if defined MULTI_GPU && defined DSLASH_XPAY\n"
-            else:
-                str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"
+        else:
+            str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"
         if dslash4:
           str += (
 """
@@ -1272,20 +1197,20 @@ int incomplete = 0; // Have all 8 contributions been computed for this site?
 
 switch(kernel_type) { // intentional fall-through
 case INTERIOR_KERNEL:
-incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
+  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==(param.dc.X[3]-1)));
 case EXTERIOR_KERNEL_T:
-incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
+  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==(param.dc.X[2]-1)));
 case EXTERIOR_KERNEL_Z:
-incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
+  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==(param.dc.X[1]-1)));
 case EXTERIOR_KERNEL_Y:
-incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
+  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==(param.dc.X[0]-1)));
 }
 
 """)
           str += "if (!incomplete)\n"
           str += "#endif // MULTI_GPU\n"
     
-    str += block( "\n" + (twisted() if twist else apply_clover()) + xpay() )
+    str += block( "\n" + (apply_clover()) + xpay() )
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
@@ -1295,7 +1220,11 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
     str += "#undef m5\n"
     str += "#undef mdwf_b5\n"
     str += "#undef mdwf_c5\n"
+    str += "#undef mferm\n"
+    str += "#undef a\n"
+    str += "#undef b\n"
     str += "#undef spinorFloat\n"
+    str += "#undef POW\n"
     str += "#undef SHARED_STRIDE\n\n"
 
     if dslash:
@@ -1415,7 +1344,6 @@ def generate_dslash5D_inv():
 def generate_clover():
     return prolog() + epilog()
 
-
 # To fit 192 threads/SM (single precision) with 16K shared memory, set sharedFloats to 19 or smaller
 
 sharedFloats = 0
@@ -1427,10 +1355,10 @@ print "Shared floats set to " + str(sharedFloats);
 
 # generate Domain Wall Dslash kernels
 domain_wall = True
-twist = False
 clover = False
 dslash4 = True
 dslash5 = False
+dslash5inv = False
 normalDWF = False
 
 print sys.argv[0] + ": generating dw_dslash4_core.h";
@@ -1465,6 +1393,7 @@ f.write(generate_dslash5D())
 f.close()
 
 dslash5 = False
+dslash5inv = True
 
 print sys.argv[0] + ": generating dw_dslash5inv_core.h";
 dslash = True
@@ -1479,4 +1408,3 @@ dagger = True
 f = open('dslash_core/dw_dslash5inv_dagger_core.h', 'w')
 f.write(generate_dslash5D_inv())
 f.close()
-

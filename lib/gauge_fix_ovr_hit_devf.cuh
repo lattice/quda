@@ -65,8 +65,8 @@ namespace quda {
    * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd 
    */
-  template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<Float2,NCOLORS> &link, const Float relax_boost, const int tid){
+  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
+  __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, const int tid){
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4];
@@ -115,27 +115,27 @@ namespace quda {
       __syncthreads();
       //_____________
       if ( threadIdx.x < blockSize * 4 ) {
-        Float2 m0;
+        complex<Float> m0;
         //Do SU(2) hit on all upward links
         //left multiply an su3_matrix by an su2 matrix
         //link <- u * link
         //#pragma unroll
         for ( int j = 0; j < NCOLORS; j++ ) {
           m0 = link(p,j);
-          link(p,j) = makeComplex( elems[tid], elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
-          link(q,j) = makeComplex(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + makeComplex( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
+          link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
+          link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
         }
       }
       else{
-        Float2 m0;
+        complex<Float> m0;
         //Do SU(2) hit on all downward links
         //right multiply an su3_matrix by an su2 matrix
         //link <- link * u_adj
         //#pragma unroll
         for ( int j = 0; j < NCOLORS; j++ ) {
           m0 = link(j,p);
-          link(j,p) = makeComplex( elems[tid], -elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
-          link(j,q) = makeComplex(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + makeComplex( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
+          link(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
+          link(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
         }
       }
       //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
@@ -155,8 +155,8 @@ namespace quda {
    * Device function to perform gauge fixing with overrelxation.
    * Uses 4 treads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<Float2,NCOLORS> &link, const Float relax_boost, const int tid){
+  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
+  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, const int tid){
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4 * 8];
@@ -214,27 +214,27 @@ namespace quda {
       __syncthreads();
       //_____________
       if ( threadIdx.x < blockSize * 4 ) {
-        Float2 m0;
+        complex<Float> m0;
         //Do SU(2) hit on all upward links
         //left multiply an su3_matrix by an su2 matrix
         //link <- u * link
         //#pragma unroll
         for ( int j = 0; j < NCOLORS; j++ ) {
           m0 = link(p,j);
-          link(p,j) = makeComplex( elems[tid], elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
-          link(q,j) = makeComplex(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + makeComplex( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
+          link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
+          link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
         }
       }
       else{
-        Float2 m0;
+        complex<Float> m0;
         //Do SU(2) hit on all downward links
         //right multiply an su3_matrix by an su2 matrix
         //link <- link * u_adj
         //#pragma unroll
         for ( int j = 0; j < NCOLORS; j++ ) {
           m0 = link(j,p);
-          link(j,p) = makeComplex( elems[tid], -elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
-          link(j,q) = makeComplex(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + makeComplex( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
+          link(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
+          link(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + complex<Float>(elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
         }
       }
       //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
@@ -250,8 +250,8 @@ namespace quda {
    * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<Float2,NCOLORS> &link, const Float relax_boost, const int tid){
+  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
+  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, const int tid){
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4 * 8];
@@ -340,27 +340,27 @@ namespace quda {
       __syncthreads();
       //_____________
       if ( threadIdx.x < blockSize * 4 ) {
-        Float2 m0;
+        complex<Float> m0;
         //Do SU(2) hit on all upward links
         //left multiply an su3_matrix by an su2 matrix
         //link <- u * link
         //#pragma unroll
         for ( int j = 0; j < NCOLORS; j++ ) {
           m0 = link(p,j);
-          link(p,j) = makeComplex( elems[tid], elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
-          link(q,j) = makeComplex(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + makeComplex( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
+          link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
+          link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
         }
       }
       else{
-        Float2 m0;
+        complex<Float> m0;
         //Do SU(2) hit on all downward links
         //right multiply an su3_matrix by an su2 matrix
         //link <- link * u_adj
         //#pragma unroll
         for ( int j = 0; j < NCOLORS; j++ ) {
           m0 = link(j,p);
-          link(j,p) = makeComplex( elems[tid], -elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
-          link(j,q) = makeComplex(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + makeComplex( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
+          link(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
+          link(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
         }
       }
       //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
@@ -388,8 +388,9 @@ namespace quda {
    * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd 
    */
-  template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<Float2,NCOLORS> &link, Matrix<Float2,NCOLORS> &link1, const Float relax_boost, const int tid){
+  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
+  __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
+							const Float relax_boost, const int tid){
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4];
@@ -431,17 +432,17 @@ namespace quda {
         elems[threadIdx.x + blockSize * 3] *= x * r;
       } //FLOP per lattice site = 22CUB: "Collective" Software Primitives for CUDA Kernel Development
       __syncthreads();
-      Float2 m0;
+      complex<Float> m0;
       //Do SU(2) hit on all upward links
       //left multiply an su3_matrix by an su2 matrix
       //link <- u * link
       //#pragma unroll
       for ( int j = 0; j < NCOLORS; j++ ) {
         m0 = link(p,j);
-        link(p,j) = makeComplex( elems[tid], elems[tid + blockSize * 3] ) * m0 + \
-                    makeComplex( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
-        link(q,j) = makeComplex(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + \
-                    makeComplex( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
+        link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 +
+	  complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
+        link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 +
+	  complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
       }
       //Do SU(2) hit on all downward links
       //right multiply an su3_matrix by an su2 matrix
@@ -449,10 +450,10 @@ namespace quda {
       //#pragma unroll
       for ( int j = 0; j < NCOLORS; j++ ) {
         m0 = link1(j,p);
-        link1(j,p) = makeComplex( elems[tid], -elems[tid + blockSize * 3] ) * m0 + \
-                     makeComplex( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link1(j,q);
-        link1(j,q) = makeComplex(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + \
-                     makeComplex( elems[tid],elems[tid + blockSize * 3] ) * link1(j,q);
+        link1(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 +
+	  complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link1(j,q);
+        link1(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 +
+	  complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link1(j,q);
       }
       if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) {
         __syncthreads();
@@ -481,8 +482,9 @@ namespace quda {
    * Device function to perform gauge fixing with overrelxation.
    * Uses 4 treads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<Float2,NCOLORS> &link, Matrix<Float2,NCOLORS> &link1, const Float relax_boost, const int tid){
+  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
+  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
+							  const Float relax_boost, const int tid){
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4 * 8];
@@ -521,17 +523,17 @@ namespace quda {
         elems[threadIdx.x + blockSize * 3] = a3 * x * r;
       } //FLOP per lattice site = 22 + 8 * 4
       __syncthreads();
-      Float2 m0;
+      complex<Float> m0;
       //Do SU(2) hit on all upward links
       //left multiply an su3_matrix by an su2 matrix
       //link <- u * link
       //#pragma unroll
       for ( int j = 0; j < NCOLORS; j++ ) {
         m0 = link(p,j);
-        link(p,j) = makeComplex( elems[tid], elems[tid + blockSize * 3] ) * m0 + \
-                    makeComplex( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
-        link(q,j) = makeComplex(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + \
-                    makeComplex( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
+        link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 +
+	  complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
+        link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 +
+	  complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
       }
       //Do SU(2) hit on all downward links
       //right multiply an su3_matrix by an su2 matrix
@@ -539,10 +541,10 @@ namespace quda {
       //#pragma unroll
       for ( int j = 0; j < NCOLORS; j++ ) {
         m0 = link1(j,p);
-        link1(j,p) = makeComplex( elems[tid], -elems[tid + blockSize * 3] ) * m0 + \
-                     makeComplex( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link1(j,q);
-        link1(j,q) = makeComplex(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + \
-                     makeComplex( elems[tid],elems[tid + blockSize * 3] ) * link1(j,q);
+        link1(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 +
+	  complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link1(j,q);
+        link1(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 +
+	  complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link1(j,q);
       }
       if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) { __syncthreads(); }
     }
@@ -557,8 +559,8 @@ namespace quda {
    * Uses 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
-  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<Float2,NCOLORS> &link, Matrix<Float2,NCOLORS> &link1, const Float relax_boost, const int tid){
+  template<int blockSize, typename Float, int gauge_dir, int NCOLORS>
+  __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1, const Float relax_boost, const int tid){
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //__shared__ Float elems[blockSize * 4 * 8];
@@ -613,17 +615,17 @@ namespace quda {
         elems[tid + blockSize * 3] *= x * r;
       }
       __syncthreads();
-      Float2 m0;
+      complex<Float> m0;
       //Do SU(2) hit on all upward links
       //left multiply an su3_matrix by an su2 matrix
       //link <- u * link
       //#pragma unroll
       for ( int j = 0; j < NCOLORS; j++ ) {
         m0 = link(p,j);
-        link(p,j) = makeComplex( elems[tid], elems[tid + blockSize * 3] ) * m0 + \
-                    makeComplex( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
-        link(q,j) = makeComplex(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + \
-                    makeComplex( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
+        link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 +
+	  complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
+        link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 +
+	  complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
       }
       //Do SU(2) hit on all downward links
       //right multiply an su3_matrix by an su2 matrix
@@ -631,10 +633,10 @@ namespace quda {
       //#pragma unroll
       for ( int j = 0; j < NCOLORS; j++ ) {
         m0 = link1(j,p);
-        link1(j,p) = makeComplex( elems[tid], -elems[tid + blockSize * 3] ) * m0 + \
-                     makeComplex( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link1(j,q);
-        link1(j,q) = makeComplex(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + \
-                     makeComplex( elems[tid],elems[tid + blockSize * 3] ) * link1(j,q);
+        link1(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 +
+	  complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link1(j,q);
+        link1(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 +
+	  complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link1(j,q);
       }
       if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) { __syncthreads(); }
     }

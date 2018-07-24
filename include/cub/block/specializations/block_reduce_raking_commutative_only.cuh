@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -113,7 +113,7 @@ struct BlockReduceRakingCommutativeOnly
 
     // Thread fields
     _TempStorage &temp_storage;
-    int linear_tid;
+    unsigned int linear_tid;
 
 
     /// Constructor
@@ -141,7 +141,7 @@ struct BlockReduceRakingCommutativeOnly
             if (linear_tid >= RAKING_THREADS)
                 *BlockRakingLayout::PlacementPtr(temp_storage.raking_grid, linear_tid - RAKING_THREADS) = partial;
 
-            __syncthreads();
+            CTA_SYNC();
 
             // Reduce parallelism to one warp
             if (linear_tid < RAKING_THREADS)
@@ -178,7 +178,7 @@ struct BlockReduceRakingCommutativeOnly
             if (linear_tid >= RAKING_THREADS)
                 *BlockRakingLayout::PlacementPtr(temp_storage.raking_grid, linear_tid - RAKING_THREADS) = partial;
 
-            __syncthreads();
+            CTA_SYNC();
 
             // Reduce parallelism to one warp
             if (linear_tid < RAKING_THREADS)

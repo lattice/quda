@@ -142,6 +142,163 @@ void comm_destroy_topology(Topology *topo)
 }
 
 
+static bool peer2peer_enabled[2][4] = { {false,false,false,false},
+                                        {false,false,false,false} };
+static bool peer2peer_init = false;
+
+static bool intranode_enabled[2][4] = { {false,false,false,false},
+					{false,false,false,false} };
+
+static int enable_peer_to_peer = 3; // by default enable both copy engines and load/store access
+
+void comm_peer2peer_init(const char* hostname_recv_buf)
+{
+  if (peer2peer_init) return;
+
+  char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
+
+  // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
+  // and comm_dim(dim) == 2 (used for perf benchmarking)
+  bool disable_peer_to_peer_bidir = false;
+
+  if (enable_peer_to_peer_env) {
+    enable_peer_to_peer = atoi(enable_peer_to_peer_env);
+
+    switch ( std::abs(enable_peer_to_peer) ) {
+    case 0: if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling peer-to-peer access\n"); break;
+    case 1: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store)\n"); break;
+    case 2: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines)\n"); break;
+    case 3: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n"); break;
+    default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
+    }
+
+    if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
+      if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling bi-directional peer-to-peer access\n");
+      disable_peer_to_peer_bidir = true;
+    }
+
+    enable_peer_to_peer = abs(enable_peer_to_peer);
+
+  } else { // !enable_peer_to_peer_env
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n");
+  }
+
+  if (!peer2peer_init && enable_peer_to_peer) {
+
+    // first check that the local GPU supports UVA
+    const int gpuid = comm_gpuid();
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, gpuid);
+    if(!prop.unifiedAddressing) return;
+
+    comm_set_neighbor_ranks();
+
+    char *hostname = comm_hostname();
+    int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*comm_size());
+
+    comm_gather_gpuid(gpuid_recv_buf);
+
+    for(int dir=0; dir<2; ++dir){ // forward/backward directions
+      for(int dim=0; dim<4; ++dim){
+	int neighbor_rank = comm_neighbor_rank(dir,dim);
+	if(neighbor_rank == comm_rank()) continue;
+
+	// disable peer-to-peer comms in one direction
+	if ( ((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1)) &&
+	     disable_peer_to_peer_bidir && comm_dim(dim) == 2 ) continue;
+
+	// if the neighbors are on the same
+	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
+	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+	  int canAccessPeer[2];
+	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+
+	  int accessRank[2] = { };
+#if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
+	  if (canAccessPeer[0]*canAccessPeer[1]) {
+	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
+	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
+	  }
+#endif
+
+	  // enable P2P if we can access the peer or if peer is self
+	  if (canAccessPeer[0]*canAccessPeer[1] || gpuid == neighbor_gpuid) {
+	    peer2peer_enabled[dir][dim] = true;
+	    if (getVerbosity() > QUDA_SILENT) {
+	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, performance rank = (%d, %d)\n",
+		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
+	    }
+	  } else {
+	    intranode_enabled[dir][dim] = true;
+	    if (getVerbosity() > QUDA_SILENT) {
+	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
+		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+	    }
+	  }
+
+	} // on the same node
+      } // different dimensions - x, y, z, t
+    } // different directions - forward/backward
+
+    host_free(gpuid_recv_buf);
+  }
+
+  peer2peer_init = true;
+
+  comm_barrier();
+
+  // set gdr enablement
+  if (comm_gdr_enabled()) {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
+    comm_gdr_blacklist(); // set GDR blacklist
+  } else {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
+  }
+
+  checkCudaErrorNoSync();
+  return;
+}
+
+static bool enable_p2p = true;
+
+bool comm_peer2peer_enabled(int dir, int dim){
+  return enable_p2p ? peer2peer_enabled[dir][dim] : false;
+}
+
+int comm_peer2peer_enabled_global() {
+  if (!enable_p2p) return false;
+
+  static bool init = false;
+  static bool p2p_global = false;
+
+  if (!init) {
+    int p2p = 0;
+    for (int dim=0; dim<4; dim++)
+      for (int dir=0; dir<2; dir++)
+	p2p += (int)comm_peer2peer_enabled(dir,dim);
+
+    comm_allreduce_int(&p2p);
+    init = true;
+    p2p_global = p2p > 0 ? true : false;
+  }
+  return p2p_global * enable_peer_to_peer;
+}
+
+void comm_enable_peer2peer(bool enable) {
+  enable_p2p = enable;
+}
+
+static bool enable_intranode = true;
+
+bool comm_intranode_enabled(int dir, int dim){
+  return enable_intranode ? intranode_enabled[dir][dim] : false;
+}
+
+void comm_enable_intranode(bool enable) {
+  enable_intranode = enable;
+}
+
 int comm_ndim(const Topology *topo)
 {
   return topo->ndim;
@@ -209,6 +366,40 @@ Topology *comm_default_topology(void)
   return default_topo;
 }
 
+static int neighbor_rank[2][4] = { {-1,-1,-1,-1},
+                                          {-1,-1,-1,-1} };
+
+static bool neighbors_cached = false;
+
+void comm_set_neighbor_ranks(Topology *topo){
+
+  if(neighbors_cached) return;
+
+  Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
+  if(!topology){
+    errorQuda("Topology not specified");
+    return;
+  }
+     
+  for(int d=0; d<4; ++d){
+    int pos_displacement[4] = {0,0,0,0};
+    int neg_displacement[4] = {0,0,0,0};
+    pos_displacement[d] = +1;
+    neg_displacement[d] = -1;
+    neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
+    neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
+  }
+  neighbors_cached = true;
+  return;
+}
+
+int comm_neighbor_rank(int dir, int dim){
+  if(!neighbors_cached){
+    comm_set_neighbor_ranks();
+  }
+  return neighbor_rank[dir][dim];
+}
+
 
 int comm_dim(int dim)
 {
@@ -231,6 +422,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 				       void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
+  checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
   if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
@@ -269,6 +461,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 					  void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
+  checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
   if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
@@ -303,6 +496,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
+  checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
   if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
@@ -345,6 +539,7 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
 						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
+  checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
   if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
@@ -387,7 +582,15 @@ static int manual_set_partition[QUDA_MAX_DIM] = {0};
 
 void comm_dim_partitioned_set(int dim)
 { 
+#ifdef MULTI_GPU
   manual_set_partition[dim] = 1;
+#endif
+}
+
+void comm_dim_partitioned_reset(){
+  for (int i=0; i<QUDA_MAX_DIM; i++)
+   manual_set_partition[i] = 0;
+   
 }
 
 
@@ -395,3 +598,89 @@ int comm_dim_partitioned(int dim)
 {
   return (manual_set_partition[dim] || (comm_dim(dim) > 1));
 }
+
+int comm_partitioned()
+{
+  int partitioned = 0;
+  for (int i=0; i<4; i++) {
+    partitioned = partitioned || comm_dim_partitioned(i);
+  }
+  return partitioned;
+}
+
+bool comm_gdr_enabled() {
+  static bool gdr_enabled = false;
+#ifdef MULTI_GPU
+  static bool gdr_init = false;
+
+  if (!gdr_init) {
+    char *enable_gdr_env = getenv("QUDA_ENABLE_GDR");
+    if (enable_gdr_env && strcmp(enable_gdr_env, "1") == 0) {
+      gdr_enabled = true;
+    }
+    gdr_init = true;
+  }
+#endif
+  return gdr_enabled;
+}
+
+bool comm_gdr_blacklist() {
+  static bool blacklist = false;
+  static bool blacklist_init = false;
+
+  if (!blacklist_init) {
+    char *blacklist_env = getenv("QUDA_ENABLE_GDR_BLACKLIST");
+
+    if (blacklist_env) { // set the policies to tune for explicitly
+      std::stringstream blacklist_list(blacklist_env);
+
+      int device_count;
+      cudaGetDeviceCount(&device_count);
+
+      int excluded_device;
+      while (blacklist_list >> excluded_device) {
+	// check this is a valid device
+	if ( excluded_device < 0 || excluded_device >= device_count ) {
+	  errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
+	}
+
+	if (blacklist_list.peek() == ',') blacklist_list.ignore();
+	if (excluded_device == comm_gpuid()) blacklist = true;
+      }
+      comm_barrier();
+      if (getVerbosity() > QUDA_SILENT && blacklist) printf("Blacklisting GPU-Direct RDMA for rank %d (GPU %d)\n", comm_rank(), comm_gpuid());
+    }
+    blacklist_init = true;
+
+  }
+
+  return blacklist;
+}
+
+static bool globalReduce = true;
+static bool asyncReduce = false;
+
+void reduceMaxDouble(double &max) { comm_allreduce_max(&max); }
+
+void reduceDouble(double &sum) { if (globalReduce) comm_allreduce(&sum); }
+
+void reduceDoubleArray(double *sum, const int len)
+{ if (globalReduce) comm_allreduce_array(sum, len); }
+
+int commDim(int dir) { return comm_dim(dir); }
+
+int commCoords(int dir) { return comm_coord(dir); }
+
+int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
+
+void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
+
+void commDimPartitionedReset(){ comm_dim_partitioned_reset();}
+
+bool commGlobalReduction() { return globalReduce; }
+
+void commGlobalReductionSet(bool global_reduction) { globalReduce = global_reduction; }
+
+bool commAsyncReduction() { return asyncReduce; }
+
+void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }

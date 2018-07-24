@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
+#include <csignal>
 #include <quda_internal.h>
 #include <comm_quda.h>
 
@@ -42,6 +43,20 @@ static int rank = -1;
 static int size = -1;
 static int gpuid = -1;
 
+static char partition_string[16];
+static char topology_string[16];
+
+
+void comm_gather_hostname(char *hostname_recv_buf) {
+  // determine which GPU this rank will use
+  char *hostname = comm_hostname();
+  MPI_CHECK( MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD) );
+}
+
+void comm_gather_gpuid(int *gpuid_recv_buf) {
+  MPI_CHECK(MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_WORLD));
+}
+
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
@@ -68,18 +83,16 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   comm_set_default_topology(topo);
 
   // determine which GPU this MPI rank will use
-  char *hostname = comm_hostname();
   char *hostname_recv_buf = (char *)safe_malloc(128*size);
-  
-  MPI_CHECK( MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD) );
+
+  comm_gather_hostname(hostname_recv_buf);
 
   gpuid = 0;
   for (int i = 0; i < rank; i++) {
-    if (!strncmp(hostname, &hostname_recv_buf[128*i], 128)) {
+    if (!strncmp(comm_hostname(), &hostname_recv_buf[128*i], 128)) {
       gpuid++;
     }
   }
-  host_free(hostname_recv_buf);
 
   int device_count;
   cudaGetDeviceCount(&device_count);
@@ -87,10 +100,22 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
     errorQuda("No CUDA devices found");
   }
   if (gpuid >= device_count) {
-    errorQuda("Too few GPUs available on %s", hostname);
+    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
+    if (enable_mps_env && strcmp(enable_mps_env,"1") == 0) {
+      gpuid = gpuid%device_count;
+      printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
+    } else {
+      errorQuda("Too few GPUs available on %s", comm_hostname());
+    }
   }
-}
 
+  comm_peer2peer_init(hostname_recv_buf);
+
+  host_free(hostname_recv_buf);
+
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+  snprintf(topology_string, 16, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+}
 
 int comm_rank(void)
 {
@@ -110,15 +135,31 @@ int comm_gpuid(void)
 }
 
 
+static const int max_displacement = 4;
+
+static void check_displacement(const int displacement[], int ndim) {
+  for (int i=0; i<ndim; i++) {
+    if (abs(displacement[i]) > max_displacement){
+      errorQuda("Requested displacement[%d] = %d is greater than maximum allowed", i, displacement[i]);
+    }
+  }
+}
+
 /**
  * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
  */
 MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
   Topology *topo = comm_default_topology();
+  int ndim = comm_ndim(topo);
+  check_displacement(displacement, ndim);
 
   int rank = comm_rank_displaced(topo, displacement);
-  int tag = comm_rank();
+
+  int tag = 0;
+  for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
+  tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
+
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK( MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
   mh->custom = false;
@@ -133,9 +174,15 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
 MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
   Topology *topo = comm_default_topology();
+  int ndim = comm_ndim(topo);
+  check_displacement(displacement,ndim);
 
   int rank = comm_rank_displaced(topo, displacement);
-  int tag = rank;
+
+  int tag = 0;
+  for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
+  tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
+
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK( MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
   mh->custom = false;
@@ -151,9 +198,15 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacem
 					       size_t blksize, int nblocks, size_t stride)
 {
   Topology *topo = comm_default_topology();
+  int ndim = comm_ndim(topo);
+  check_displacement(displacement, ndim);
 
   int rank = comm_rank_displaced(topo, displacement);
-  int tag = comm_rank();
+
+  int tag = 0;
+  for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
+  tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
+
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
   // create a new strided MPI type
@@ -174,9 +227,15 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 						  size_t blksize, int nblocks, size_t stride)
 {
   Topology *topo = comm_default_topology();
+  int ndim = comm_ndim(topo);
+  check_displacement(displacement,ndim);
 
   int rank = comm_rank_displaced(topo, displacement);
-  int tag = rank;
+
+  int tag = 0;
+  for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
+  tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
+
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
   // create a new strided MPI type
@@ -192,8 +251,8 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 
 void comm_free(MsgHandle *mh)
 {
-  MPI_Request_free(&(mh->request));
-  if (mh->custom) MPI_Type_free(&(mh->datatype));
+  MPI_CHECK(MPI_Request_free(&(mh->request)));
+  if (mh->custom) MPI_CHECK(MPI_Type_free(&(mh->datatype)));
   host_free(mh);
 }
 
@@ -210,7 +269,7 @@ void comm_wait(MsgHandle *mh)
 }
 
 
-int comm_query(MsgHandle *mh) 
+int comm_query(MsgHandle *mh)
 {
   int query;
   MPI_CHECK( MPI_Test(&(mh->request), &query, MPI_STATUS_IGNORE) );
@@ -224,7 +283,7 @@ void comm_allreduce(double* data)
   double recvbuf;
   MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
   *data = recvbuf;
-} 
+}
 
 
 void comm_allreduce_max(double* data)
@@ -232,7 +291,7 @@ void comm_allreduce_max(double* data)
   double recvbuf;
   MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD) );
   *data = recvbuf;
-} 
+}
 
 void comm_allreduce_array(double* data, size_t size)
 {
@@ -247,6 +306,14 @@ void comm_allreduce_int(int* data)
 {
   int recvbuf;
   MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD) );
+  *data = recvbuf;
+}
+
+void comm_allreduce_xor(uint64_t *data)
+{
+  if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
+  uint64_t recvbuf;
+  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_UNSIGNED_LONG, MPI_BXOR, MPI_COMM_WORLD) );
   *data = recvbuf;
 }
 
@@ -266,5 +333,16 @@ void comm_barrier(void)
 
 void comm_abort(int status)
 {
+#ifdef HOST_DEBUG
+  raise(SIGINT);
+#endif
   MPI_Abort(MPI_COMM_WORLD, status) ;
+}
+
+const char* comm_dim_partitioned_string() {
+  return partition_string;
+}
+
+const char* comm_dim_topology_string() {
+  return topology_string;
 }

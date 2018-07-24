@@ -6,30 +6,7 @@
 #include <color_spinor_field.h>
 #include <comm_quda.h> // for comm_drand()
 
-/*
-Maybe this will be useful at some point
-
-#define myalloc(type, n, m0) (type *) aligned_malloc(n*sizeof(type), m0)
-
-#define ALIGN 16
-void *
-aligned_malloc(size_t n, void **m0)
-{
-  size_t m = (size_t) safe_malloc(n+ALIGN);
-  *m0 = (void*)m;
-  size_t r = m % ALIGN;
-  if(r) m += (ALIGN - r);
-  return (void *)m;
-}
-*/
-
 namespace quda {
-
-  /*cpuColorSpinorField::cpuColorSpinorField() : 
-    ColorSpinorField(), init(false) {
-
-    }*/
-
 
   int cpuColorSpinorField::initGhostFaceBuffer =0;
   void* cpuColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM]; 
@@ -37,16 +14,23 @@ namespace quda {
   void* cpuColorSpinorField::fwdGhostFaceSendBuffer[QUDA_MAX_DIM]; 
   void* cpuColorSpinorField::backGhostFaceSendBuffer[QUDA_MAX_DIM];
 
+  size_t cpuColorSpinorField::ghostFaceBytes[QUDA_MAX_DIM] = { };
+
   cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
     ColorSpinorField(param), init(false), reference(false) {
+
+    // need to set this before create
+    if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+      v = param.v;
+      reference = true;
+    }
+
     create(param.create);
-    if (param.create == QUDA_NULL_FIELD_CREATE) {
+
+    if (param.create == QUDA_NULL_FIELD_CREATE || param.create == QUDA_REFERENCE_FIELD_CREATE) {
       // do nothing
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
-    } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      v = param.v;
-      reference = true;
     } else {
       errorQuda("Creation type %d not supported", param.create);
     }
@@ -68,6 +52,31 @@ namespace quda {
     } else {
       errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
     }
+  }
+
+  /*
+    This is special case constructor used to create parity subset references with in a full field
+   */
+  cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) : 
+    ColorSpinorField(src), init(false), reference(false) {
+
+    // can only overide if we parity subset reference special case
+    if ( param.create == QUDA_REFERENCE_FIELD_CREATE &&
+	 src.SiteSubset() == QUDA_FULL_SITE_SUBSET &&
+	 param.siteSubset == QUDA_PARITY_SITE_SUBSET &&
+	 typeid(src) == typeid(cpuColorSpinorField) ) {
+      reset(param);
+    } else {
+      errorQuda("Undefined behaviour"); // else silent bug possible?
+    }
+
+    // need to set this before create
+    if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+      v = (void*)src.V();
+      norm = (void*)src.Norm();
+    }
+
+    create(param.create);
   }
 
   cpuColorSpinorField::~cpuColorSpinorField() {
@@ -113,20 +122,23 @@ namespace quda {
     // these need to be reset to ensure no ghost zones for the cpu
     // fields since we can't determine during the parent's constructor
     // whether the field is a cpu or cuda field
-    ghost_length = 0;
-    ghost_norm_length = 0;
-    total_length = length;
-    total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
-    bytes = total_length * precision; // includes pads and ghost zones
-    bytes = ALIGNMENT_ADJUST(bytes);
+
+    // set this again here.  this is a hack since we can determine we
+    // have a cpu or cuda field in ColorSpinorField::create(), which
+    // means a ghost zone is set.  So we unset it here.  This will be
+    // fixed when clean up the ghost code with the peer-2-peer branch
+    bytes = length * precision;
+    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+
 
     if (pad != 0) errorQuda("Non-zero pad not supported");  
     if (precision == QUDA_HALF_PRECISION) errorQuda("Half precision not supported");
 
     if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
 	fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
-	fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER &&
-	fieldOrder != QUDA_QDPJIT_FIELD_ORDER) {
+	fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER  &&
+	fieldOrder != QUDA_QDPJIT_FIELD_ORDER           &&
+	fieldOrder != QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
       errorQuda("Field order %d not supported", fieldOrder);
     }
 
@@ -142,6 +154,32 @@ namespace quda {
       init = true;
     }
  
+    if (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) {
+      ColorSpinorParam param(*this);
+      param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+      param.nDim = nDim;
+      memcpy(param.x, x, nDim*sizeof(int));
+      param.x[0] /= 2;
+      param.create = QUDA_REFERENCE_FIELD_CREATE;
+      param.v = v;
+      param.norm = norm;
+      param.is_composite  = false;
+      param.composite_dim = 0;
+      param.is_component  = composite_descr.is_component;
+      param.component_id  = composite_descr.id;
+      even = new cpuColorSpinorField(*this, param);
+      odd = new cpuColorSpinorField(*this, param);
+
+      // need this hackery for the moment (need to locate the odd pointers half way into the full field)
+      (dynamic_cast<cpuColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
+      if (precision == QUDA_HALF_PRECISION)
+	(dynamic_cast<cpuColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+
+      if (bytes != 2*even->Bytes() || bytes != 2*odd->Bytes())
+	errorQuda("dual-parity fields should have double the size of a single-parity field (%lu,%lu,%lu)\n",
+		  bytes, even->Bytes(), odd->Bytes());
+    }
+
   }
 
   void cpuColorSpinorField::destroy() {
@@ -153,19 +191,50 @@ namespace quda {
       init = false;
     }
 
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      if (even) delete even;
+      if (odd) delete odd;
+    }
+
   }
 
   void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
     checkField(*this, src);
-    if (fieldOrder == src.fieldOrder) {
+    if (fieldOrder == src.fieldOrder && bytes == src.Bytes()) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	// FIXME (HJ Kim): I think this is a bug, we should copy the data with amount of "bytes/Ls"
-        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes); 
+        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes/x[nDim-1]);
       else 
         memcpy(v, src.v, bytes);
     } else {
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION);
     }
+  }
+
+  void cpuColorSpinorField::backup() const {
+    if (backed_up) errorQuda("Field already backed up");
+
+    backup_h = new char[bytes];
+    memcpy(backup_h, v, bytes);
+
+    if (norm_bytes) {
+      backup_norm_h = new char[norm_bytes];
+      memcpy(backup_norm_h, norm, norm_bytes);
+    }
+
+    backed_up = true;
+  }
+
+  void cpuColorSpinorField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+
+    memcpy(v, backup_h, bytes);
+    delete []backup_h;
+    if (norm_bytes) {
+      memcpy(norm, backup_norm_h, norm_bytes);
+      delete []backup_norm_h;
+    }
+
+    backed_up = false;
   }
 
   void cpuColorSpinorField::zero() {
@@ -186,38 +255,28 @@ namespace quda {
   // print out the vector at volume point x
   void cpuColorSpinorField::PrintVector(unsigned int x) { genericPrintVector(*this, x); }
 
-  void cpuColorSpinorField::allocateGhostBuffer(void)
+  void cpuColorSpinorField::allocateGhostBuffer(int nFace) const
   {
-    if (initGhostFaceBuffer) return;
+    int spinor_size = 2*nSpin*nColor*precision;
+    bool resize = false;
 
-    if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
-      errorQuda("Full spinor is not supported in alllocateGhostBuffer\n");
+    // resize face only if requested size is larger than previously allocated one
+    for (int i=0; i<nDimComms; i++) {
+      size_t nbytes = siteSubset*nFace*surfaceCB[i]*spinor_size;
+      resize = (nbytes > ghostFaceBytes[i]) ? true : resize;
+      ghostFaceBytes[i] = (nbytes > ghostFaceBytes[i]) ? nbytes : ghostFaceBytes[i];
     }
-  
-    int X1 = this->x[0]*2;
-    int X2 = this->x[1];
-    int X3 = this->x[2];
-    int X4 = this->x[3];
-    int X5 = this->nDim == 5 ? this->x[4] : 1;
-  
-    int Vsh[4]={ X2*X3*X4*X5/2,
-		 X1*X3*X4*X5/2,
-		 X1*X2*X4*X5/2,
-		 X1*X2*X3*X5/2};
-  
-    int num_faces = 1;
-    if(this->nSpin == 1) num_faces = 3; // staggered
 
-    int spinor_size = 2*this->nSpin*this->nColor*this->precision;
-    for (int i=0; i<4; i++) {
-      size_t nbytes = num_faces*Vsh[i]*spinor_size;
-
-      fwdGhostFaceBuffer[i] = safe_malloc(nbytes);
-      backGhostFaceBuffer[i] = safe_malloc(nbytes);
-      fwdGhostFaceSendBuffer[i] = safe_malloc(nbytes);
-      backGhostFaceSendBuffer[i] = safe_malloc(nbytes);
+    if (!initGhostFaceBuffer || resize) {
+      freeGhostBuffer();
+      for (int i=0; i<nDimComms; i++) {
+	fwdGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+	backGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+	fwdGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+	backGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+      }
+      initGhostFaceBuffer = 1;
     }
-    initGhostFaceBuffer = 1;
   }
 
 
@@ -225,7 +284,7 @@ namespace quda {
   {
     if(!initGhostFaceBuffer) return;
 
-    for(int i=0;i < 4; i++){
+    for(int i=0; i < 4; i++){  // make nDimComms static?
       host_free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
       host_free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
       host_free(fwdGhostFaceSendBuffer[i]); fwdGhostFaceSendBuffer[i] = NULL;
@@ -235,121 +294,9 @@ namespace quda {
   }
 
 
-  void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim, 
-				      const QudaDirection dir, const QudaParity oddBit, const int dagger)
+  void cpuColorSpinorField::packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const
   {
-    if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
-      errorQuda("Full spinor is not supported in packGhost for cpu");
-    }
-  
-    if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-      errorQuda("Field order %d not supported", fieldOrder);
-    }
-
-    int num_faces=1;
-    if(this->nSpin == 1){ //staggered
-      num_faces=3;
-    }
-    int spinor_size = 2*this->nSpin*this->nColor*this->precision;
-
-    int X1 = this->x[0]*2;
-    int X2 = this->x[1];
-    int X3 = this->x[2];
-    int X4 = this->x[3];
-    int X5 = this->nDim == 5 ? this->x[4]: 1;
-
-
-    for(int i=0;i < this->volume;i++){ 
-    
-      int X1h = X1/2;
-    
-      int sid =i;
-      int za = sid/X1h;
-      int x1h = sid - za*X1h;
-      int zb = za/X2;
-      int x2 = za - zb*X2;
-      int zc = zb / X3;
-      int x3 = zb - zc*X3;
-      int x5 = zc / X4; //this->nDim == 5 ? zz / X4 : 0;
-      int x4 = zc - x5*X4;
-      int x1odd;
-      if(this->DWFPCtype() == QUDA_5D_PC)
-      {
-        x1odd = (x2 + x3 + x4 + x5 + oddBit) & 1;
-      }
-      //else if(this->DWFPCtype() == QUDA_4D_PC)
-      else
-      {
-        x1odd = (x2 + x3 + x4 + oddBit) & 1;
-      }
-      //else
-      //  errorQuda("Preconditioning type is not set(PC type = %d), please check your preconditioning method\n",this->DWFPCtype());
-      int x1 = 2*x1h + x1odd;
-
-      int ghost_face_idx ;
-    
-      //NOTE: added extra dimension for DW and TM dslash    
-
-      switch(dim){            
-      case 0: //X dimension
-	if (dir == QUDA_BACKWARDS){
-	  if (x1 < num_faces){
-	    ghost_face_idx =  (x1*X5*X4*X3*X2 + x5*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
-	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);
-	  }
-	}else{  // QUDA_FORWARDS
-	  if (x1 >=X1 - num_faces){
-	    ghost_face_idx = ((x1-X1+num_faces)*X5*X4*X3*X2 + x5*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
-	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
-	  }
-	}
-	break;      
-      
-      case 1: //Y dimension
-	if (dir == QUDA_BACKWARDS){
-	  if (x2 < num_faces){
-	    ghost_face_idx = (x2*X5*X4*X3*X1 +x5*X4*X3*X1 + x4*X3*X1+x3*X1+x1)>>1;
-	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
-	  }
-	}else{ // QUDA_FORWARDS      
-	  if (x2 >= X2 - num_faces){
-	    ghost_face_idx = ((x2-X2+num_faces)*X5*X4*X3*X1 +x5*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
-	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
-	  }
-	}
-	break;
-
-      case 2: //Z dimension      
-	if (dir == QUDA_BACKWARDS){
-	  if (x3 < num_faces){
-	    ghost_face_idx = (x3*X5*X4*X2*X1 + x5*X4*X2*X1 + x4*X2*X1+x2*X1+x1)>>1;
-	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
-	  }
-	}else{ // QUDA_FORWARDS     
-	  if (x3 >= X3 - num_faces){
-	    ghost_face_idx = ((x3-X3+num_faces)*X5*X4*X2*X1 + x5*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
-	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
-	  }
-	}
-	break;
-      
-      case 3:  //T dimension      
-	if (dir == QUDA_BACKWARDS){
-	  if (x4 < num_faces){
-	    ghost_face_idx = (x4*X5*X3*X2*X1 + x5*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
-	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
-	  }
-	}else{ // QUDA_FORWARDS     
-	  if (x4 >= X4 - num_faces){
-	    ghost_face_idx = ((x4-X4+num_faces)*X5*X3*X2*X1 + x5*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
-	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
-	  }
-	}
-	break;
-      default:
-	errorQuda("Invalid dim value\n");
-      }//switch
-    }//for i
+    genericPackGhost(ghost, *this, parity, nFace, dagger);
     return;
   }
 
@@ -361,9 +308,26 @@ namespace quda {
     }
   }
 
-  // Return the location of the field
-  QudaFieldLocation cpuColorSpinorField::Location() const { 
-    return QUDA_CPU_FIELD_LOCATION;
+  void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *dummy1,
+					  const MemoryLocation *dummy2, bool dummy3, bool dummy4) const
+  {
+    // allocate ghost buffer if not yet allocated
+    allocateGhostBuffer(nFace);
+
+    void **sendbuf = static_cast<void**>(safe_malloc(nDimComms * 2 * sizeof(void*)));
+
+    for (int i=0; i<nDimComms; i++) {
+      sendbuf[2*i + 0] = backGhostFaceSendBuffer[i];
+      sendbuf[2*i + 1] = fwdGhostFaceSendBuffer[i];
+      ghost_buf[2*i + 0] = backGhostFaceBuffer[i];
+      ghost_buf[2*i + 1] = fwdGhostFaceBuffer[i];
+    }
+
+    packGhost(sendbuf, parity, nFace, dagger);
+
+    exchange(ghost_buf, sendbuf, nFace);
+
+    host_free(sendbuf);
   }
 
 } // namespace quda

@@ -15,91 +15,69 @@ namespace quda {
   template <typename Gauge>
   struct GaugePlaqArg : public ReduceArg<double2> {
     int threads; // number of active threads required
-    int X[4]; // grid dimensions
-#ifdef MULTI_GPU
+    int E[4]; // extended grid dimensions
+    int X[4]; // true grid dimensions
     int border[4]; 
-#endif
     Gauge dataOr;
     
     GaugePlaqArg(const Gauge &dataOr, const GaugeField &data)
       : ReduceArg<double2>(), dataOr(dataOr)
     {
-
-#ifdef MULTI_GPU
-        for(int dir=0; dir<4; ++dir){
-          border[dir] = data.R()[dir];
-	  X[dir] = data.X()[dir] - border[dir]*2;
-        }
-#else
-        for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
-#endif
-	threads = X[0]*X[1]*X[2]*X[3]/2;
+      int R = 0;
+      for (int dir=0; dir<4; ++dir){
+	border[dir] = data.R()[dir];
+	E[dir] = data.X()[dir];
+	X[dir] = data.X()[dir] - border[dir]*2;
+	R += border[dir];
+      }
+      threads = X[0]*X[1]*X[2]*X[3]/2;
     }
   };
 
   template<int blockSize, typename Float, typename Gauge>
   __global__ void computePlaq(GaugePlaqArg<Gauge> arg){
-      int idx = threadIdx.x + blockIdx.x*blockDim.x;
-      int parity = threadIdx.y;
+    typedef Matrix<complex<Float>,3> Link;
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int parity = threadIdx.y;
 
-      double2 plaq = make_double2(0.0,0.0);
+    double2 plaq = make_double2(0.0,0.0);
 
-      if(idx < arg.threads) {
-        typedef typename ComplexTypeId<Float>::Type Cmplx;
-        int X[4]; 
-        for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
+    if(idx < arg.threads) {
+      int x[4];
+      getCoords(x, idx, arg.X, parity);
+      for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-        int x[4];
-        getCoords(x, idx, X, parity);
-#ifdef MULTI_GPU
-        for(int dr=0; dr<4; ++dr) {
-          x[dr] += arg.border[dr];
-          X[dr] += 2*arg.border[dr];
-        }
-#endif
+      int dx[4] = {0, 0, 0, 0};
+      for (int mu = 0; mu < 3; mu++) {
+	for (int nu = (mu+1); nu < 3; nu++) {
 
-        int dx[4] = {0, 0, 0, 0};
-        for (int mu = 0; mu < 3; mu++) {
-          for (int nu = (mu+1); nu < 3; nu++) {
-            Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
+	  Link U1 = arg.dataOr(mu, linkIndexShift(x,dx,arg.E), parity);
+	  dx[mu]++;
+	  Link U2 = arg.dataOr(nu, linkIndexShift(x,dx,arg.E), 1-parity);
+	  dx[mu]--;
+	  dx[nu]++;
+	  Link U3 = arg.dataOr(mu, linkIndexShift(x,dx,arg.E), 1-parity);
+	  dx[nu]--;
+	  Link U4 = arg.dataOr(nu, linkIndexShift(x,dx,arg.E), parity);
 
-            arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
-	    dx[mu]++;
-            arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity);
-            dx[mu]--;
-            dx[nu]++;
-            arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
-	    dx[nu]--;
-            arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), nu, parity);
+	  plaq.x += getTrace( U1 * U2 * conj(U3) * conj(U4) ).x;
+	}
 
-	    tmpM = U1 * U2;
-	    tmpM = tmpM * conj(U3);
-	    tmpM = tmpM * conj(U4);
+	Link U1 = arg.dataOr(mu, linkIndexShift(x,dx,arg.E), parity);
+	dx[mu]++;
+	Link U2 = arg.dataOr(3, linkIndexShift(x,dx,arg.E), 1-parity);
+	dx[mu]--;
+	dx[3]++;
+	Link U3 = arg.dataOr(mu,linkIndexShift(x,dx,arg.E), 1-parity);
+	dx[3]--;
+	Link U4 = arg.dataOr(3, linkIndexShift(x,dx,arg.E), parity);
 
-	    plaq.x += getTrace(tmpM).x;
-          }
-
-          Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
-
-          arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
-          dx[mu]++;
-          arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), 3, 1-parity);
-          dx[mu]--;
-          dx[3]++;
-          arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
-          dx[3]--;
-          arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), 3, parity);
-
-          tmpM = U1 * U2;
-          tmpM = tmpM * conj(U3);
-          tmpM = tmpM * conj(U4);
-
-          plaq.y += getTrace(tmpM).x;
-        }
+	plaq.y += getTrace( U1 * U2 * conj(U3) * conj(U4) ).x;
       }
+    }
 
-      // perform final inter-block reduction and write out result
-      reduce2d<blockSize,2>(arg, plaq);
+    // perform final inter-block reduction and write out result
+    reduce2d<blockSize,2>(arg, plaq);
   }
 
   template<typename Float, typename Gauge>
@@ -121,7 +99,7 @@ namespace quda {
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	  LAUNCH_KERNEL_LOCAL_PARITY(computePlaq, tp, stream, arg, Float, Gauge);
-	  cudaDeviceSynchronize();
+	  qudaDeviceSynchronize();
         } else {
           errorQuda("CPU not supported yet\n");
         }
@@ -134,18 +112,8 @@ namespace quda {
         return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
       }
 
-      std::string paramString(const TuneParam &param) const {
-        std::stringstream ps;
-        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-        ps << "shared=" << param.shared_bytes;
-        return ps.str();
-      }
-
-      void preTune(){}
-      void postTune(){}
       long long flops() const { return 6ll*2*arg.threads*(3*198+3); }
       long long bytes() const { return 6ll*4*2*arg.threads*arg.dataOr.Bytes(); } 
-
     }; 
 
   template<typename Float, typename Gauge>
@@ -157,13 +125,12 @@ namespace quda {
       comm_allreduce_array((double*) arg.result_h, 2);
       arg.result_h[0].x /= 9.*(2*arg.threads*comm_size());
       arg.result_h[0].y /= 9.*(2*arg.threads*comm_size());
-
       plq.x = arg.result_h[0].x;
       plq.y = arg.result_h[0].y;
     }
 
   template<typename Float>
-  double2 plaquette(const GaugeField& data, double2 &plq, QudaFieldLocation location) {
+  void plaquette(const GaugeField& data, double2 &plq, QudaFieldLocation location) {
     INSTANTIATE_RECONSTRUCT(plaquette<Float>, data, plq, location);
   }
 #endif

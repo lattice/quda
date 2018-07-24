@@ -1,8 +1,7 @@
 #ifndef _QUDA_INTERNAL_H
 #define _QUDA_INTERNAL_H
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <quda_cuda_api.h>
 #include <sys/time.h>
 #include <string>
 #include <complex>
@@ -44,6 +43,11 @@
 #define USE_TEXTURE_OBJECTS
 #endif
 
+// if not using texture objects then we need to disable multi-blas support since these don't work with texture references
+#ifndef USE_TEXTURE_OBJECTS
+#undef MAX_MULTI_BLAS_N
+#define MAX_MULTI_BLAS_N 1
+#endif
 
 
 #ifdef INTERFACE_NVTX
@@ -89,9 +93,6 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#define REAL(a) (*((double*)&a))
-#define IMAG(a) (*((double*)&a+1))
 
 namespace quda {
 
@@ -150,6 +151,16 @@ namespace quda {
 
     double Last() { return last; }
 
+    void Reset(const char *func, const char *file, int line) {
+      if (running) {
+	printfQuda("ERROR: Cannot reset a started timer (%s:%d in %s())\n", file, line, func);
+	errorQuda("Aborting");
+      }
+      time = 0.0;
+      last = 0.0;
+      count = 0;
+    }
+
   };
 
   /**< Enumeration type used for writing a simple but extensible profiling framework. */
@@ -159,20 +170,33 @@ namespace quda {
     QUDA_PROFILE_INIT, /**< The time in seconds taken for initiation */
     QUDA_PROFILE_PREAMBLE, /**< The time in seconds taken for any preamble */
     QUDA_PROFILE_COMPUTE, /**< The time in seconds taken for the actual computation */
+    QUDA_PROFILE_COMMS, /**< synchronous communication */
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
+    QUDA_PROFILE_IO, /**< time spent on file i/o */
 
-    // lower level counters used in the dslash
-    QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers */
+    // lower level counters used in the dslash and api profiling
+    QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers which do not count towrads global time */
     QUDA_PROFILE_PACK_KERNEL, /**< face packing kernel */
     QUDA_PROFILE_DSLASH_KERNEL, /**< dslash kernel */
     QUDA_PROFILE_GATHER, /**< gather (device -> host) */
     QUDA_PROFILE_SCATTER, /**< scatter (host -> device) */
+
+    QUDA_PROFILE_LAUNCH_KERNEL, /**< cudaLaunchKernel */
     QUDA_PROFILE_EVENT_RECORD, /**< cuda event record  */
     QUDA_PROFILE_EVENT_QUERY, /**< cuda event querying */
     QUDA_PROFILE_STREAM_WAIT_EVENT, /**< stream waiting for event completion */
+    QUDA_PROFILE_FUNC_SET_ATTRIBUTE, /**< set function attribute */
 
-    QUDA_PROFILE_COMMS, /**< synchronous communication */
+    QUDA_PROFILE_EVENT_SYNCHRONIZE, /**< event synchronization */
+    QUDA_PROFILE_STREAM_SYNCHRONIZE, /**< stream synchronization */
+    QUDA_PROFILE_DEVICE_SYNCHRONIZE, /**< device synchronization */
+
+    QUDA_PROFILE_MEMCPY_D2D_ASYNC, /**< device to device async copy */
+    QUDA_PROFILE_MEMCPY_D2H_ASYNC, /**< device to host async copy */
+    QUDA_PROFILE_MEMCPY2D_D2H_ASYNC, /**< device to host 2-d memcpy async copy*/
+    QUDA_PROFILE_MEMCPY_H2D_ASYNC, /**< host to device async copy */
+
     QUDA_PROFILE_COMMS_START, /**< initiating communication */
     QUDA_PROFILE_COMMS_QUERY, /**< querying communication */
 
@@ -280,11 +304,14 @@ namespace quda {
       if (use_global) StopGlobal(func,file,line,idx);
     }
 
+    void Reset_(const char *func, const char *file, int line) {
+      for (int idx=0; idx<QUDA_PROFILE_COUNT; idx++)
+	profile[idx].Reset(func, file, line);
+    }
+
     double Last(QudaProfileType idx) { 
       return profile[idx].last;
     }
-
-
 
     static void PrintGlobal();
 
@@ -292,22 +319,22 @@ namespace quda {
 
 #define TPSTART(idx) Start_(__func__, __FILE__, __LINE__, idx)
 #define TPSTOP(idx) Stop_(__func__, __FILE__, __LINE__, idx)
+#define TPRESET() Reset_(__func__, __FILE__, __LINE__)
 
 #undef PUSH_RANGE
 #undef POP_RANGE
 
-#ifdef MULTI_GPU
 #ifdef PTHREADS
   const int Nstream = 10;
 #else
   const int Nstream = 9;
 #endif
-#else
-  const int Nstream = 1;
-#endif
 
-} // namespace quda
-
-
+  /**
+     * Check that the resident gauge field is compatible with the requested inv_param
+     * @param inv_param   Contains all metadata regarding host and device storage
+     */
+  bool canReuseResidentGauge(QudaInvertParam *inv_param);
+}
 
 #endif // _QUDA_INTERNAL_H

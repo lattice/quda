@@ -79,7 +79,7 @@ class GaugeAlgTest : public ::testing::Test {
 
 
   void CallUnitarizeLinks(cudaGaugeField *cudaInGauge){
-    unitarizeLinksQuda(*cudaInGauge, num_failures_dev);
+    unitarizeLinks(*cudaInGauge, num_failures_dev);
     cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if(num_failures>0){
       cudaFree(num_failures_dev);
@@ -91,10 +91,6 @@ class GaugeAlgTest : public ::testing::Test {
 
   virtual void SetUp() {
     setVerbosity(QUDA_VERBOSE);
-    if (true) {
-      printfQuda("Tuning...\n");
-      setTuning(QUDA_TUNE_YES);
-    }
 
     param = newQudaGaugeParam();
 

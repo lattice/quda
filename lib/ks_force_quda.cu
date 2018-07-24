@@ -8,6 +8,8 @@
 
 namespace quda {
 
+  using namespace gauge;
+
   template<typename Oprod, typename Gauge, typename Mom>
     struct KSForceArg {
       int threads; 
@@ -61,11 +63,9 @@ namespace quda {
 #endif
 #endif
 
-      typedef typename ComplexTypeId<Float>::Type Cmplx;
-
-      Matrix<Cmplx,3> O;
-      Matrix<Cmplx,3> G;
-      Matrix<Cmplx,3> M;
+      Matrix<complex<Float>,3> O;
+      Matrix<complex<Float>,3> G;
+      Matrix<complex<Float>,3> M;
 
 
       int dx[4] = {0,0,0,0};
@@ -158,14 +158,6 @@ namespace quda {
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-      std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
-        std::stringstream ps;
-        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-        ps << "shared=" << param.shared_bytes;
-        return ps.str();
-      }
-
-
       long long flops() const { return 792*arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3]; } 
       long long bytes() const { return 0; } // Fix this
     };
@@ -177,7 +169,7 @@ namespace quda {
       KSForceComplete<Float,Oprod,Gauge,Mom> completeForce(arg,meta,location);
       completeForce.apply(0);
       if(flops) *flops = completeForce.flops();	
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
     }
 
 
@@ -275,7 +267,7 @@ X[dir] += 2*arg.border[dir];
 #endif
 #endif
 
-typedef typename ComplexTypeId<Float>::Type Cmplx;
+typedef complex<Float> Cmplx;
 
 Matrix<Cmplx,3> O;
 Matrix<Cmplx,3> G;
@@ -375,16 +367,6 @@ class KSLongLinkForce : Tunable {
 
   TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-  std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "shared=" << param.shared_bytes;
-    return ps.str();
-  }
-
-
-  void preTune(){}
-  void postTune(){}
   long long flops() const { return 0; } // Fix this
   long long bytes() const { return 0; } // Fix this
 }; 
@@ -398,7 +380,7 @@ void computeKSLongLinkForce(Result res, Oprod oprod, Gauge gauge, int dim[4], co
   KSLongLinkArg<Result,Oprod,Gauge> arg(res, oprod, gauge, dim);
   KSLongLinkForce<Float,Result,Oprod,Gauge> computeLongLink(arg,meta,location);
   computeLongLink.apply(0);
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
 }
 
   template<typename Float>

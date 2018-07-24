@@ -8,7 +8,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <face_quda.h>
 
 /*!
  * Generic Multi Shift Solver 
@@ -31,15 +30,26 @@ namespace quda {
      complete.  This results in improved strong scaling of the
      multi-shift solver.
 
-     Since the natrix-vector consists of multiple dslash applications,
+     Since the matrix-vector consists of multiple dslash applications,
      we partition the shifts between these successive dslash
-     applicaitons for optimal communications hiding.
+     applications for optimal communications hiding.
+
+     In general, when using a Worker class to hide communication in
+     the dslash, one must be aware whether auto-tuning on the dslash
+     policy that envelops the dslash will occur.  If so, then the
+     Worker class instance will be called multiple times during this
+     tuning, potentially rendering the results wrong.  This isn't a
+     problem in the multi-shift solve, since we are guaranteed to not
+     run the worker class on the first iteration (when the dslash
+     policy tuning will take place), but this is something that will
+     need to be addressed in the future as the Worker idea to applied
+     elsewhere.
    */
   class ShiftUpdate : public Worker {
 
-    cudaColorSpinorField *r;
-    cudaColorSpinorField **p;
-    cudaColorSpinorField **x;
+    ColorSpinorField *r;
+    std::vector<ColorSpinorField*> p;
+    std::vector<ColorSpinorField*> x;
 
     double *alpha;
     double *beta;
@@ -58,7 +68,7 @@ namespace quda {
     int n_update; 
 
   public:
-    ShiftUpdate(cudaColorSpinorField *r, cudaColorSpinorField **p, cudaColorSpinorField **x,
+    ShiftUpdate(ColorSpinorField *r, std::vector<ColorSpinorField*> p, std::vector<ColorSpinorField*> x,
 		double *alpha, double *beta, double *zeta, double *zeta_old, int j_low, int n_shift) :
       r(r), p(p), x(x), alpha(alpha), beta(beta), zeta(zeta), zeta_old(zeta_old), j_low(j_low), 
       n_shift(n_shift), n_update( (r->Nspin()==4) ? 4 : 2 ) {
@@ -67,20 +77,30 @@ namespace quda {
     virtual ~ShiftUpdate() { }
     
     void updateNshift(int new_n_shift) { n_shift = new_n_shift; }
-    void updateNupdate(int new_n_update) { n_update = 1; }
+    void updateNupdate(int new_n_update) { n_update = new_n_update; }
     
     // note that we can't set the stream parameter here so it is
     // ignored.  This is more of a future design direction to consider
     void apply(const cudaStream_t &stream) {      
       static int count = 0;
 
+#if 0
       // on the first call do the first half of the update
       for (int j= (count*n_shift)/n_update+1; j<=((count+1)*n_shift)/n_update && j<n_shift; j++) {
 	beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
 	// update p[i] and x[i]
-	axpyBzpcxCuda(alpha[j], *(p[j]), *(x[j]), zeta[j], *r, beta[j]);
+	blas::axpyBzpcx(alpha[j], *(p[j]), *(x[j]), zeta[j], *r, beta[j]);
       }
-      
+#else
+      int zero = (count*n_shift)/n_update+1;
+      std::vector<ColorSpinorField*> P, X;
+      for (int j= (count*n_shift)/n_update+1; j<=((count+1)*n_shift)/n_update && j<n_shift; j++) {
+	beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
+	P.push_back(p[j]);
+	X.push_back(x[j]);
+      }
+      if (P.size()) blas::axpyBzpcx(&alpha[zero], P, X, &zeta[zero], *r, &beta[zero]);
+#endif
       if (++count == n_update) count = 0;
     }
     
@@ -133,8 +153,11 @@ namespace quda {
     }  
   }
 
-  void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
+  void MultiShiftCG::operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b)
   {
+    if (checkLocation(*(x[0]), b) != QUDA_CUDA_FIELD_LOCATION)
+      errorQuda("Not supported");
+
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     int num_offset = param.num_offset;
@@ -142,7 +165,7 @@ namespace quda {
  
     if (num_offset == 0) return;
 
-    const double b2 = normCuda(b);
+    const double b2 = blas::norm2(b);
     // Check to see that we're not trying to invert on a zero-field source
     if(b2 == 0){
       profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -178,13 +201,17 @@ namespace quda {
 
 
     cudaColorSpinorField *r = new cudaColorSpinorField(b);
-    cudaColorSpinorField **y = reliable ? new cudaColorSpinorField*[num_offset] : NULL;
+    std::vector<ColorSpinorField*> x_sloppy;
+    x_sloppy.resize(num_offset);
+    std::vector<ColorSpinorField*> y;
   
     ColorSpinorParam csParam(b);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    if (reliable)
+    if (reliable) {
+      y.resize(num_offset);
       for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(*r, csParam);
+    }
 
     csParam.setPrecision(param.precision_sloppy);
   
@@ -196,18 +223,21 @@ namespace quda {
       r_sloppy = new cudaColorSpinorField(*r, csParam);
     }
   
-    cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offset];
     if (param.precision_sloppy == x[0]->Precision() ||
 	!param.use_sloppy_partial_accumulator) {
-      for (int i=0; i<num_offset; i++) x_sloppy[i] = x[i];
+      for (int i=0; i<num_offset; i++){
+	x_sloppy[i] = x[i];
+	blas::zero(*x_sloppy[i]);
+      }
     } else {
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       for (int i=0; i<num_offset; i++)
 	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
     }
   
-    cudaColorSpinorField **p = new cudaColorSpinorField*[num_offset];  
-    for (int i=0; i<num_offset; i++) p[i]= new cudaColorSpinorField(*r_sloppy);    
+    std::vector<ColorSpinorField*> p;
+    p.resize(num_offset);
+    for (int i=0; i<num_offset; i++) p[i] = new cudaColorSpinorField(*r_sloppy);    
   
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
@@ -232,10 +262,14 @@ namespace quda {
     // stopping condition of each shift
     double stop[QUDA_MAX_MULTI_SHIFT];
     double r2[QUDA_MAX_MULTI_SHIFT];
+    int iter[QUDA_MAX_MULTI_SHIFT+1];     // record how many iterations for each shift
     for (int i=0; i<num_offset; i++) {
       r2[i] = b2;
       stop[i] = Solver::stopping(param.tol_offset[i], b2, param.residual_type);
+      iter[i] = 0;
     }
+    // this initial condition ensures that the heaviest shift can be removed
+    iter[num_offset] = 1;
 
     double r2_old;
     double pAp;
@@ -266,7 +300,7 @@ namespace quda {
 
     int k = 0;
     int rUpdate = 0;
-    quda::blas_flops = 0;
+    blas::flops = 0;
 
     bool aux_update = false;
 
@@ -279,7 +313,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) 
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     
-    while (r2[0] > stop[0] &&  k < param.maxiter) {
+    while ( !convergence(r2, stop, num_offset_now) &&  k < param.maxiter) {
 
       if (aux_update) dslash::aux_worker = &shift_update;
       matSloppy(*Ap, *p[0], tmp1, tmp2);
@@ -290,16 +324,15 @@ namespace quda {
       // iteration so that all shifts are updated during the dslash
       shift_update.updateNshift(num_offset_now);
 
-      // FIXME - this should be curried into the Dirac operator
-      if (r->Nspin()==4) axpyCuda(offset[0], *p[0], *Ap); 
-
-      pAp = reDotProductCuda(*p[0], *Ap);
+      // at some point we should curry these into the Dirac operator
+      if (r->Nspin()==4) pAp = blas::axpyReDot(offset[0], *p[0], *Ap);
+      else pAp = blas::reDotProduct(*p[0], *Ap);
 
       // compute zeta and alpha
       updateAlphaZeta(alpha, zeta, zeta_old, r2, beta, pAp, offset, num_offset_now, j_low);
 	
       r2_old = r2[0];
-      Complex cg_norm = axpyCGNormCuda(-alpha[j_low], *Ap, *r_sloppy);
+      Complex cg_norm = blas::axpyCGNorm(-alpha[j_low], *Ap, *r_sloppy);
       r2[0] = real(cg_norm);
       double zn = imag(cg_norm);
 
@@ -323,32 +356,31 @@ namespace quda {
 	//beta[0] = r2[0] / r2_old;	
 	beta[0] = zn / r2_old;
 	// update p[0] and x[0]
-	axpyZpbxCuda(alpha[0], *p[0], *x_sloppy[0], *r_sloppy, beta[0]);	
+	blas::axpyZpbx(alpha[0], *p[0], *x_sloppy[0], *r_sloppy, beta[0]);	
 
 	// this should trigger the shift update in the subsequent sloppy dslash
 	aux_update = true;
-	//shift_update.apply(0);
-	//shift_update.apply(0);
-	/*for (int j=1; j<num_offset_now; j++) {
+	/*
+	  for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
 	  // update p[i] and x[i]
-	  axpyBzpcxCuda(alpha[j], *p[j], *x_sloppy[j], zeta[j], *r_sloppy, beta[j]);
-	  }*/
+	  blas::axpyBzpcx(alpha[j], *p[j], *x_sloppy[j], zeta[j], *r_sloppy, beta[j]);
+	  }
+	*/
       } else {
 	for (int j=0; j<num_offset_now; j++) {
-	  axpyCuda(alpha[j], *p[j], *x_sloppy[j]);
-	  copyCuda(*x[j], *x_sloppy[j]);
-	  xpyCuda(*x[j], *y[j]);
+	  blas::axpy(alpha[j], *p[j], *x_sloppy[j]);
+	  blas::xpy(*x_sloppy[j], *y[j]);
 	}
 
 	mat(*r, *y[0], *x[0], tmp3); // here we can use x as tmp
-	if (r->Nspin()==4) axpyCuda(offset[0], *y[0], *r);
+	if (r->Nspin()==4) blas::axpy(offset[0], *y[0], *r);
 
-	r2[0] = xmyNormCuda(b, *r);
+	r2[0] = blas::xmyNorm(b, *r);
 	for (int j=1; j<num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
-	for (int j=0; j<num_offset_now; j++) zeroCuda(*x_sloppy[j]);
+	for (int j=0; j<num_offset_now; j++) blas::zero(*x_sloppy[j]);
 
-	copyCuda(*r_sloppy, *r);            
+	blas::copy(*r_sloppy, *r);            
 
 	// break-out check if we have reached the limit of the precision
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
@@ -367,16 +399,16 @@ namespace quda {
 
 	// explicitly restore the orthogonality of the gradient vector
 	for (int j=0; j<num_offset_now; j++) {
-	  double rp = reDotProductCuda(*r_sloppy, *p[j]) / (r2[0]);
-	  axpyCuda(-rp, *r_sloppy, *p[j]);
+	  Complex rp = blas::cDotProduct(*r_sloppy, *p[j]) / (r2[0]);
+	  blas::caxpy(-rp, *r_sloppy, *p[j]);
 	}
 
 	// update beta and p
 	beta[0] = r2[0] / r2_old; 
-	xpayCuda(*r_sloppy, beta[0], *p[0]);
+	blas::xpay(*r_sloppy, beta[0], *p[0]);
 	for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
-	  axpbyCuda(zeta[j], *r_sloppy, beta[j], *p[j]);
+	  blas::axpby(zeta[j], *r_sloppy, beta[j], *p[j]);
 	}    
 
 	// update reliable update parameters for the system that triggered the update
@@ -386,19 +418,21 @@ namespace quda {
 	maxrx[m] = rNorm[m];
 	r0Norm[m] = rNorm[m];      
 	rUpdate++;
-      }    
+      }
 
       // now we can check if any of the shifts have converged and remove them
       int converged = 0;
-      for (int j=1; j<num_offset_now; j++) {
-        if (zeta[j] == 0.0) {
+      for (int j=num_offset_now-1; j>=1; j--) {
+        if (zeta[j] == 0.0 && r2[j+1] < stop[j+1]) {
           converged++;
           if (getVerbosity() >= QUDA_VERBOSE)
               printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
         } else {
 	  r2[j] = zeta[j] * zeta[j] * r2[0];
-	  if (r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) {
+	  // only remove if shift above has converged
+	  if ((r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) && iter[j+1] ) {
 	    converged++;
+	    iter[j] = k+1;
 	    if (getVerbosity() >= QUDA_VERBOSE)
 	      printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
           }
@@ -408,13 +442,15 @@ namespace quda {
 
       // this ensure we do the update on any shifted systems that
       // happen to converge when the un-shifted system converges
-      if ( (r2[0] <= stop[0] ||  k == param.maxiter) && aux_update == true) {
+      if ( (convergence(r2, stop, num_offset_now) ||  k == param.maxiter) && aux_update == true) {
 	if (getVerbosity() >= QUDA_VERBOSE) 
 	  printfQuda("Convergence of unshifted system so trigger shiftUpdate\n");
 	
 	// set worker to do all updates at once
 	shift_update.updateNupdate(1);
 	shift_update.apply(0);
+
+	for (int j=0; j<num_offset_now; j++) iter[j] = k+1;
       }
       
       k++;
@@ -423,10 +459,10 @@ namespace quda {
 	printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     }
     
-    
     for (int i=0; i<num_offset; i++) {
-      copyCuda(*x[i], *x_sloppy[i]);
-      if (reliable) xpyCuda(*y[i], *x[i]);
+      if (iter[i] == 0) iter[i] = k;
+      blas::copy(*x[i], *x_sloppy[i]);
+      if (reliable) blas::xpy(*y[i], *x[i]);
     }
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -438,35 +474,53 @@ namespace quda {
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d\n", param.maxiter);
     
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
-    reduceDouble(gflops);
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
     param.gflops = gflops;
     param.iter += k;
 
-    for(int i=0; i < num_offset; i++) { 
-      mat(*r, *x[i]); 
-      if (r->Nspin()==4) {
-	axpyCuda(offset[i], *x[i], *r); // Offset it.
-      } else if (i!=0) {
-	axpyCuda(offset[i]-offset[0], *x[i], *r); // Offset it.
+    if (param.compute_true_res) {
+      // only allocate temporaries if necessary
+      csParam.setPrecision(param.precision);
+      ColorSpinorField *tmp4_p = reliable ? y[0] : tmp1.Precision() == x[0]->Precision() ? &tmp1 : ColorSpinorField::Create(csParam);
+      ColorSpinorField *tmp5_p = mat.isStaggered() ? tmp4_p :
+	reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
+
+      for(int i=0; i < num_offset; i++) {
+	mat(*r, *x[i], *tmp4_p, *tmp5_p);
+	if (r->Nspin()==4) {
+	  blas::axpy(offset[i], *x[i], *r); // Offset it.
+	} else if (i!=0) {
+	  blas::axpy(offset[i]-offset[0], *x[i], *r); // Offset it.
+	}
+	double true_res = blas::xmyNorm(b, *r);
+	param.true_res_offset[i] = sqrt(true_res/b2);
+	param.iter_res_offset[i] = sqrt(r2[i]/b2);
+	param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
       }
-      double true_res = xmyNormCuda(b, *r);
-      param.true_res_offset[i] = sqrt(true_res/b2);
-      param.iter_res_offset[i] = sqrt(r2[i]/b2);
-      param.true_res_hq_offset[i] = sqrt(HeavyQuarkResidualNormCuda(*x[i], *r).z);
+
+      if (getVerbosity() >= QUDA_SUMMARIZE){
+	printfQuda("MultiShift CG: Converged after %d iterations\n", k);
+	for(int i=0; i < num_offset; i++) {
+	  printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e, true = %e\n",
+		     i, iter[i], param.iter_res_offset[i], param.true_res_offset[i]);
+	}
+      }
+
+      if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && (reliable ? tmp5_p != y[1] : 1)) delete tmp5_p;
+      if (tmp4_p != &tmp1 && (reliable ? tmp4_p != y[0] : 1)) delete tmp4_p;
+    } else {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+	printfQuda("MultiShift CG: Converged after %d iterations\n", k);
+	for(int i=0; i < num_offset; i++) {
+	  param.iter_res_offset[i] = sqrt(r2[i]/b2);
+	  printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e\n",
+		     i, iter[i], param.iter_res_offset[i]);
+	}
+      }
     }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE){
-      printfQuda("MultiShift CG: Converged after %d iterations\n", k);
-      for(int i=0; i < num_offset; i++) { 
-	printfQuda(" shift=%d, relative residual: iterated = %e, true = %e\n", 
-		   i, param.iter_res_offset[i], param.true_res_offset[i]);
-      }
-    }
-
-  
     // reset the flops counters
-    quda::blas_flops = 0;
+    blas::flops = 0;
     mat.flops();
     matSloppy.flops();
 
@@ -479,16 +533,11 @@ namespace quda {
     if (r_sloppy->Precision() != r->Precision()) delete r_sloppy;
     for (int i=0; i<num_offset; i++) 
        if (x_sloppy[i]->Precision() != x[i]->Precision()) delete x_sloppy[i];
-    delete []x_sloppy;
   
     delete r;
     for (int i=0; i<num_offset; i++) delete p[i];
-    delete []p;
 
-    if (reliable) {
-      for (int i=0; i<num_offset; i++) delete y[i];
-      delete []y;
-    }
+    if (reliable) for (int i=0; i<num_offset; i++) delete y[i];
 
     delete Ap;
   

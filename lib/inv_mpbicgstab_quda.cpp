@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -8,11 +9,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
-
-#include <face_quda.h>
-
-#include <iostream>
 
 namespace quda {
 
@@ -67,7 +63,7 @@ namespace quda {
 
     for(int i=0; i<dim; ++i){
       for(int j=0; j<dim; ++j){
-        G[i][j] = cDotProductCuda(v[i],v[j]);
+        G[i][j] = blas::cDotProduct(v[i],v[j]);
       }
     }
     return;
@@ -78,7 +74,7 @@ namespace quda {
     const int dim = pr.size();
 
     for(int i=0; i<dim; ++i){
-      g[i] = cDotProductCuda(r0,pr[i]);
+      g[i] = blas::cDotProduct(r0,pr[i]);
     }
   }
 
@@ -131,13 +127,13 @@ namespace quda {
   } 
 #endif
 
-  void MPBiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  void MPBiCGstab::operator()(ColorSpinorField &x, ColorSpinorField &b) 
   {
 #ifndef SSTEP
     errorQuda("S-step solvers not built\n");
 #else
     // Check to see that we're not trying to invert on a zero-field source    
-    const double b2 = norm2(b);
+    const double b2 = blas::norm2(b);
     if(b2 == 0){
       profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
@@ -157,7 +153,7 @@ namespace quda {
 
 
     mat(r, x, temp);  // r = Ax
-    double r2 = xmyNormCuda(b,r); // r = b - Ax
+    double r2 = blas::xmyNorm(b,r); // r = b - Ax
 
 
 
@@ -262,19 +258,19 @@ namespace quda {
             c[k][i] = c_new[k][i];
           }
         }
-        zeroCuda(r);
+	blas::zero(r);
         for(int i=0; i<(4*s+2); ++i){
-          caxpyCuda(c[0][i], PR[i], r);
+	  blas::caxpy(c[0][i], PR[i], r);
         }
-        r2 = norm2(r);
+        r2 = blas::norm2(r);
         j++;
         it++;
       } // j
 
-      zeroCuda(p);
+      blas::zero(p);
       for(int i=0; i<(4*s+2); ++i){
-        caxpyCuda(a[0][i], PR[i], p);
-        caxpyCuda(e[i], PR[i], x);
+	blas::caxpy(a[0][i], PR[i], p);
+	blas::caxpy(e[i], PR[i], x);
       }
 
       m++;
@@ -285,7 +281,7 @@ namespace quda {
 
     // compute the true residual
     mat(r, x, temp);
-    param.true_res = sqrt(xmyNormCuda(b, r)/b2);
+    param.true_res = sqrt(blas::xmyNorm(b, r)/b2);
 
     PrintSummary("MPBiCGstab", it, r2, b2);
 

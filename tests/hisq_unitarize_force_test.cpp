@@ -5,7 +5,6 @@
 #include <quda.h>
 #include "test_util.h"
 #include "gauge_field.h"
-#include "fat_force_quda.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
@@ -89,7 +88,7 @@ hisq_force_init()
 
   setDims(gaugeParam.X);
 
-  gaugeParam.cpu_prec = link_prec;
+  gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   gaugeParam.cuda_prec = link_prec;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -119,8 +118,8 @@ hisq_force_init()
   cudaResult  = new cudaGaugeField(gParam);
   gParam.order = QUDA_QDP_GAUGE_ORDER;
 
-  cudaFatLink->loadCPUField(*cpuFatLink, QUDA_CPU_FIELD_LOCATION);
-  cudaOprod->loadCPUField(*cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  cudaFatLink->loadCPUField(*cpuFatLink);
+  cudaOprod->loadCPUField(*cpuOprod);
 
 
   return;
@@ -168,15 +167,15 @@ hisq_force_test()
   cudaMemset(num_failures_dev, 0, sizeof(int));
 
   printfQuda("Calling unitarizeForceCuda\n");
-  fermion_force::unitarizeForceCuda(*cudaOprod, *cudaFatLink, cudaResult, num_failures_dev);
+  fermion_force::unitarizeForce(*cudaResult, *cudaOprod, *cudaFatLink, num_failures_dev);
 
 
   if(verify_results){
     printfQuda("Calling unitarizeForceCPU\n");
-    fermion_force::unitarizeForceCPU(*cpuOprod, *cpuFatLink, cpuResult);
+    fermion_force::unitarizeForceCPU(*cpuResult, *cpuOprod, *cpuFatLink);
   }
 
-  cudaResult->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION);
+  cudaResult->saveCPUField(*cpuReference);
   
   printfQuda("Comparing CPU and GPU results\n");
   for(int dir=0; dir<4; ++dir){

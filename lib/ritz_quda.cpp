@@ -1,22 +1,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <iostream>
+
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
 #include <lanczos_quda.h>
 #include <ritz_quda.h>
-#include <face_quda.h>
-#include <iostream>
 
 namespace quda {
 
   void RitzMat::operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {
+    using namespace blas;
+    
     const double alpha = pow(cheby_param[0], 2);
     const double beta  = pow(cheby_param[1]+fabs(shift), 2);
 
@@ -29,12 +30,12 @@ namespace quda {
     *(tmp2) = in;
     dirac_mat( *(tmp1), in);
 
-    axpbyCuda(-0.5*c1, const_cast<cudaColorSpinorField&>(in), 0.5*c0*c1, *(tmp1));
+    axpby(-0.5*c1, const_cast<cudaColorSpinorField&>(in), 0.5*c0*c1, *(tmp1));
     for(int i=2; i < N_Poly+1; ++i)
     {
       dirac_mat(out,*(tmp1));
-      axpbyCuda(-c1,*(tmp1),c0*c1,out);
-      axpyCuda(-1.0,*(tmp2),out);
+      axpby(-c1,*(tmp1),c0*c1,out);
+      axpy(-1.0,*(tmp2),out);
       //printfQuda("ritzMat: Ritz mat loop %d\n",i);
 
       if(i != N_Poly)

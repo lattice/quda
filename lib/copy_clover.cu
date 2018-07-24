@@ -3,6 +3,8 @@
 
 namespace quda {
 
+  using namespace clover;
+
 #ifdef GPU_CLOVER_DIRAC
 
   /** 
@@ -44,21 +46,21 @@ namespace quda {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
-    for (int parity=0; parity<2; parity++) {
-      int x = blockIdx.x * blockDim.x + threadIdx.x;
-      if (x >= arg.volumeCB) return;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x >= arg.volumeCB) return;
+    int parity = blockIdx.y * blockDim.y + threadIdx.y;
 
-      RegTypeIn in[length];
-      RegTypeOut out[length];
-      arg.in.load(in, x, parity);
-      for (int i=0; i<length; i++) out[i] = in[i];
-      arg.out.save(out, x, parity);
-    }
+    RegTypeIn in[length];
+    RegTypeOut out[length];
+    arg.in.load(in, x, parity);
+#pragma unroll
+    for (int i=0; i<length; i++) out[i] = in[i];
+    arg.out.save(out, x, parity);
 
   }  
 
   template <typename FloatOut, typename FloatIn, int length, typename Out, typename In>
-    class CopyClover : Tunable {
+    class CopyClover : TunableVectorY {
     CopyCloverArg<Out,In> arg;
     const CloverField &meta;
 
@@ -70,7 +72,8 @@ namespace quda {
     unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    CopyClover(CopyCloverArg<Out,In> &arg, const CloverField &meta) : arg(arg), meta(meta) { 
+    CopyClover(CopyCloverArg<Out,In> &arg, const CloverField &meta)
+      : TunableVectorY(2), arg(arg), meta(meta) {
       writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
     virtual ~CopyClover() { ; }
@@ -82,13 +85,6 @@ namespace quda {
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-
-    std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
 
     long long flops() const { return 0; } 
     long long bytes() const { return 2*arg.volumeCB*(arg.in.Bytes() + arg.out.Bytes()); } 
@@ -114,8 +110,9 @@ namespace quda {
  void copyClover(const InOrder &inOrder, CloverField &out, bool inverse, QudaFieldLocation location, FloatOut *Out, float *outNorm) {
 
     if (out.isNative()) {
+      const bool override = true;
       typedef typename clover_mapper<FloatOut>::type C;
-      copyClover<FloatOut,FloatIn,length>(C(out, inverse, Out, outNorm), inOrder, out, location);
+      copyClover<FloatOut,FloatIn,length>(C(out, inverse, Out, outNorm, override), inOrder, out, location);
     } else if (out.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatOut,length>(out, inverse, Out), inOrder, out, location);
@@ -142,8 +139,9 @@ namespace quda {
 
     // reconstruction only supported on FloatN fields currently
    if (in.isNative()) {
+      const bool override = true;
       typedef typename clover_mapper<FloatIn>::type C;
-      copyClover<FloatOut,FloatIn,length>(C(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
+      copyClover<FloatOut,FloatIn,length>(C(in, inverse, In, inNorm, override), out, inverse, location, Out, outNorm);
     } else if (in.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);
@@ -176,7 +174,6 @@ namespace quda {
   // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
 			void *Out, void *In, void *outNorm, void *inNorm) {
-
 #ifdef GPU_CLOVER_DIRAC
     if (out.Precision() == QUDA_HALF_PRECISION && out.Order() > 4) 
       errorQuda("Half precision not supported for order %d", out.Order());
@@ -211,7 +208,6 @@ namespace quda {
 #else
     errorQuda("Clover has not been built");
 #endif
-
   }
 
 

@@ -1,13 +1,13 @@
 #include <quda_internal.h>
 #include <gauge_field.h>
-#include <face_quda.h>
 #include <assert.h>
 #include <string.h>
+#include <typeinfo>
 
 namespace quda {
 
-  cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
-    GaugeField(param), pinned(param.pinned)
+  cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
+    GaugeField(param)
   {
     if (precision == QUDA_HALF_PRECISION) {
       errorQuda("CPU fields do not support half precision");
@@ -18,7 +18,7 @@ namespace quda {
     if (reconstruct != QUDA_RECONSTRUCT_NO && reconstruct != QUDA_RECONSTRUCT_10) {
       errorQuda("Reconstruction type %d not supported", reconstruct);
     }
-    if (reconstruct == QUDA_RECONSTRUCT_10 && order != QUDA_MILC_GAUGE_ORDER) {
+    if (reconstruct == QUDA_RECONSTRUCT_10 && order != QUDA_MILC_GAUGE_ORDER && order != QUDA_MILC_SITE_GAUGE_ORDER) {
       errorQuda("10-reconstruction only supported with MILC gauge order");
     }
 
@@ -26,18 +26,26 @@ namespace quda {
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
+    else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = 2*nDim;
+    else errorQuda("Unknown geometry type %d", geometry);
+
+    // compute the correct bytes size for these padded field orders
+    if (order == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+      bytes = siteDim * (x[0]*x[1]*(x[2]+4)*x[3]) * nInternal * precision;
+    } else if (order == QUDA_BQCD_GAUGE_ORDER) {
+      bytes = siteDim * (x[0]+4)*(x[1]+2)*(x[2]+2)*(x[3]+2) * nInternal * precision;
+    } else if (order == QUDA_MILC_SITE_GAUGE_ORDER) {
+      bytes = volume * site_size;
+    }
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
-
       gauge = (void**) safe_malloc(siteDim * sizeof(void*));
 
       for (int d=0; d<siteDim; d++) {
-	size_t nbytes = volume * reconstruct * precision;
+	size_t nbytes = volume * nInternal * precision;
 	if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	  gauge[d] = (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
-	  if (create == QUDA_ZERO_FIELD_CREATE){
-	    memset(gauge[d], 0, nbytes);
-	  }
+	  gauge[d] = safe_malloc(nbytes);
+	  if (create == QUDA_ZERO_FIELD_CREATE) memset(gauge[d], 0, nbytes);
 	} else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	  gauge[d] = ((void**)param.gauge)[d];
 	} else {
@@ -45,15 +53,17 @@ namespace quda {
 	}
       }
     
-    } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER  || 
-	       order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_TIFR_GAUGE_ORDER) {
+    } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER  ||
+	       order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_TIFR_GAUGE_ORDER ||
+	       order == QUDA_TIFR_PADDED_GAUGE_ORDER || order == QUDA_MILC_SITE_GAUGE_ORDER) {
+
+      if (order == QUDA_MILC_SITE_GAUGE_ORDER && create != QUDA_REFERENCE_FIELD_CREATE) {
+	errorQuda("MILC site gauge order only supported for reference fields");
+      }
 
       if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	size_t nbytes = siteDim * volume * reconstruct * precision;
-	gauge = (void **) (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
-	if(create == QUDA_ZERO_FIELD_CREATE){
-	  memset(gauge, 0, nbytes);
-	}
+	gauge = (void **) safe_malloc(bytes);
+	if(create == QUDA_ZERO_FIELD_CREATE) memset(gauge, 0, bytes);
       } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	gauge = (void**) param.gauge;
       } else {
@@ -68,15 +78,16 @@ namespace quda {
     if (link_type != QUDA_ASQTAD_MOM_LINKS) {
       // Ghost zone is always 2-dimensional    
       for (int i=0; i<nDim; i++) {
-	size_t nbytes = nFace * surface[i] * reconstruct * precision;
-	ghost[i] = safe_malloc(nbytes); // no need to use pinned memory for this
-      }  
+	size_t nbytes = nFace * surface[i] * nInternal * precision;
+	ghost[i] = nbytes ? safe_malloc(nbytes) : nullptr;
+	ghost[i+4] = (nbytes && geometry == QUDA_COARSE_GEOMETRY) ? safe_malloc(nbytes) : nullptr;
+      }
 
       if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
 	// exchange the boundaries if a non-trivial field
 	if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE &&
-	    geometry == QUDA_VECTOR_GEOMETRY) 
-	  exchangeGhost();
+	    (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY) )
+	  exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
       }
     }
 
@@ -87,10 +98,13 @@ namespace quda {
 
   cpuGaugeField::~cpuGaugeField()
   {
+    
     int siteDim = 0;
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
+    else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = 2*nDim;
+    else errorQuda("Unknown geometry type %d", geometry);
 
     if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
       if (order == QUDA_QDP_GAUGE_ORDER) {
@@ -110,24 +124,63 @@ namespace quda {
     if (link_type != QUDA_ASQTAD_MOM_LINKS) {
       for (int i=0; i<nDim; i++) {
 	if (ghost[i]) host_free(ghost[i]);
+	if (ghost[i+4] && geometry == QUDA_COARSE_GEOMETRY) host_free(ghost[i+4]);
       }
     }
   }
 
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
-  void cpuGaugeField::exchangeGhost() {
-    void *send[QUDA_MAX_DIM];
-    for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*reconstruct*precision);
+  void cpuGaugeField::exchangeGhost(QudaLinkDirection link_direction) {
+    if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
+      errorQuda("Cannot exchange for %d geometry gauge field", geometry);
 
-    // get the links into contiguous buffers
-    extractGaugeGhost(*this, send);
+    if ( (link_direction == QUDA_LINK_BIDIRECTIONAL || link_direction == QUDA_LINK_FORWARDS) && geometry != QUDA_COARSE_GEOMETRY)
+      errorQuda("Cannot request exchange of forward links on non-coarse geometry");
+
+    void *send[2*QUDA_MAX_DIM];
+    for (int d=0; d<nDim; d++) {
+      send[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
+      if (geometry == QUDA_COARSE_GEOMETRY) send[d+4] = safe_malloc(nFace*surface[d]*nInternal*precision);
+    }
+
+    if (link_direction == QUDA_LINK_BACKWARDS || link_direction == QUDA_LINK_BIDIRECTIONAL) {
+      // get the links into contiguous buffers
+      extractGaugeGhost(*this, send, true);
+
+      // communicate between nodes
+      exchange(ghost, send, QUDA_FORWARDS);
+    }
+
+    // repeat if requested and links are bi-directional
+    if (link_direction == QUDA_LINK_FORWARDS || link_direction == QUDA_LINK_BIDIRECTIONAL) {
+      extractGaugeGhost(*this, send, true, nDim);
+      exchange(ghost+nDim, send+nDim, QUDA_FORWARDS);
+    }
+
+    for (int d=0; d<geometry; d++) host_free(send[d]);
+  }
+
+  // This does the opposite of exchangeGhost and sends back the ghost
+  // zone to the node from which it came and injects it back into the
+  // field
+  void cpuGaugeField::injectGhost(QudaLinkDirection link_direction) {
+    if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
+      errorQuda("Cannot exchange for %d geometry gauge field", geometry);
+
+    if (link_direction != QUDA_LINK_BACKWARDS)
+      errorQuda("link_direction = %d not supported", link_direction);
+
+    void *recv[QUDA_MAX_DIM];
+    for (int d=0; d<nDim; d++) recv[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
 
     // communicate between nodes
-    FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
-    faceBuf.exchangeLink(ghost, send, QUDA_CPU_FIELD_LOCATION);
+    exchange(recv, ghost, QUDA_BACKWARDS);
 
-    for (int d=0; d<nDim; d++) host_free(send[d]);
+    // get the links into contiguous buffers
+    extractGaugeGhost(*this, recv, false);
+
+    for (int d=0; d<nDim; d++) host_free(recv[d]);
   }
 
   void cpuGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill) {
@@ -137,18 +190,18 @@ namespace quda {
     size_t bytes[QUDA_MAX_DIM];
     // store both parities and directions in each
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d) && !no_comms_fill) continue;
-      bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
+      if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
+      bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
       send[d] = safe_malloc(2 * bytes[d]);
       recv[d] = safe_malloc(2 * bytes[d]);
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+      if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
       //extract into a contiguous buffer
       extractExtendedGaugeGhost(*this, d, R, send, true);
 
-      if (commDimPartitioned(d)) {
+      if (comm_dim_partitioned(d)) {
 	// do the exchange
 	MsgHandle *mh_recv_back;
 	MsgHandle *mh_recv_fwd;
@@ -184,11 +237,97 @@ namespace quda {
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+      if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
       host_free(send[d]);
       host_free(recv[d]);
     }
 
+  }
+
+  void cpuGaugeField::exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill) {
+    profile.TPSTART(QUDA_PROFILE_COMMS);
+    exchangeExtendedGhost(R, no_comms_fill);
+    profile.TPSTOP(QUDA_PROFILE_COMMS);
+  }
+
+  // defined in cudaGaugeField
+  void *create_gauge_buffer(size_t bytes, QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
+  void **create_ghost_buffer(size_t bytes[], QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
+  void free_gauge_buffer(void *buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
+  void free_ghost_buffer(void **buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
+
+  void cpuGaugeField::copy(const GaugeField &src) {
+    if (this == &src) return;
+
+    checkField(src);
+
+    if (link_type == QUDA_ASQTAD_FAT_LINKS) {
+      fat_link_max = src.LinkMax();
+      if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0)
+        errorQuda("fat_link_max has not been computed");
+    } else {
+      fat_link_max = 1.0;
+    }
+
+    if (typeid(src) == typeid(cudaGaugeField)) {
+
+      if (reorder_location() == QUDA_CPU_FIELD_LOCATION) {
+
+	if (!src.isNative()) errorQuda("Only native order is supported");
+	void *buffer = pool_pinned_malloc(src.Bytes());
+	// this copies over both even and odd
+	qudaMemcpy(buffer, static_cast<const cudaGaugeField&>(src).Gauge_p(),
+		   src.Bytes(), cudaMemcpyDeviceToHost);
+
+	copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, buffer);
+	pool_pinned_free(buffer);
+
+      } else { // else on the GPU
+
+	void *buffer = create_gauge_buffer(bytes, order, geometry);
+	size_t ghost_bytes[8];
+	int dstNinternal = reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : 2*nColor*nColor;
+	for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * dstNinternal * precision;
+	void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, order, geometry) : nullptr;
+
+	if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	  copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, 0, ghost_buffer, 0);
+	  if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, 0, ghost_buffer, 0, 3); // forwards links if bi-directional
+	} else {
+	  copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, 0);
+	}
+
+	if (order == QUDA_QDP_GAUGE_ORDER) {
+	  for (int d=0; d<geometry; d++) {
+	    qudaMemcpy(((void**)gauge)[d], ((void**)buffer)[d], bytes/geometry, cudaMemcpyDeviceToHost);
+	  }
+	} else {
+	  qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
+	}
+
+	if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+	  for (int d=0; d<geometry; d++)
+	    qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDeviceToHost);
+
+	free_gauge_buffer(buffer, order, geometry);
+	if (nFace > 0) free_ghost_buffer(ghost_buffer, order, geometry);
+      }
+
+    } else if (typeid(src) == typeid(cpuGaugeField)) {
+      // copy field and ghost zone directly
+      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge,
+		       const_cast<void*>(static_cast<const cpuGaugeField&>(src).Gauge_p()));
+    } else {
+      errorQuda("Invalid gauge field type");
+    }
+
+    // if we have copied from a source without a pad then we need to exchange
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD &&
+	src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) {
+      exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
+    }
+
+    checkCudaError();
   }
 
   void cpuGaugeField::setGauge(void **gauge_)
@@ -198,6 +337,42 @@ namespace quda {
 		"QUDA_REFERENCE_FIELD_CREATE type\n");
     }
     gauge = gauge_;
+  }
+
+  void cpuGaugeField::backup() const {
+    if (backed_up) errorQuda("Gauge field already backed up");
+
+    if (order == QUDA_QDP_GAUGE_ORDER) {
+      char **buffer = new char*[geometry];
+      for (int d=0; d<geometry; d++) {
+	buffer[d] = new char[bytes/geometry];
+	memcpy(buffer[d], gauge[d], bytes/geometry);
+      }
+      backup_h = reinterpret_cast<char*>(buffer);
+    } else {
+      backup_h = new char[bytes];
+      memcpy(backup_h, gauge, bytes);
+    }
+
+    backed_up = true;
+  }
+
+  void cpuGaugeField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+
+    if (order == QUDA_QDP_GAUGE_ORDER) {
+      char **buffer = reinterpret_cast<char**>(backup_h);
+      for (int d=0; d<geometry; d++) {
+	memcpy(gauge[d], buffer[d], bytes/geometry);
+	delete []buffer[d];
+      }
+      delete []buffer;
+    } else {
+      memcpy(gauge, backup_h, bytes);
+      delete []backup_h;
+    }
+
+    backed_up = false;
   }
 
   void cpuGaugeField::zero() {

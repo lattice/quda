@@ -8,6 +8,13 @@
 extern "C" {
 #endif
 
+  typedef enum QudaMemoryType_s {
+    QUDA_MEMORY_DEVICE,
+    QUDA_MEMORY_PINNED,
+    QUDA_MEMORY_MAPPED,
+    QUDA_MEMORY_INVALID = QUDA_INVALID_ENUM
+  } QudaMemoryType;
+
   //
   // Types used in QudaGaugeParam
   //
@@ -16,11 +23,13 @@ extern "C" {
     QUDA_SU3_LINKS,
     QUDA_GENERAL_LINKS,
     QUDA_THREE_LINKS,
-    QUDA_MOMENTUM,
+    QUDA_MOMENTUM_LINKS,
+    QUDA_COARSE_LINKS, // used for coarse-gauge field with multigrid
+    QUDA_SMEARED_LINKS, // used for loading and saving gaugeSmeared in the interface
     QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
     QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
     QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,
-    QUDA_ASQTAD_MOM_LINKS  = QUDA_MOMENTUM,
+    QUDA_ASQTAD_MOM_LINKS  = QUDA_MOMENTUM_LINKS,
     QUDA_ASQTAD_GENERAL_LINKS = QUDA_GENERAL_LINKS,
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
   } QudaLinkType;
@@ -33,8 +42,10 @@ extern "C" {
     QUDA_QDPJIT_GAUGE_ORDER, // expect *gauge[mu], even-odd, complex-column-row-spacetime
     QUDA_CPS_WILSON_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, column-row color
     QUDA_MILC_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, row-column order
+    QUDA_MILC_SITE_GAUGE_ORDER, // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
     QUDA_BQCD_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime+halos, column-row order
     QUDA_TIFR_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime, column-row order
+    QUDA_TIFR_PADDED_GAUGE_ORDER, // expect *gauge, mu, parity, t, z+halo, y, x/2, column-row order
     QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
   } QudaGaugeFieldOrder;
 
@@ -81,18 +92,10 @@ extern "C" {
     QUDA_ASQTAD_DSLASH,
     QUDA_TWISTED_MASS_DSLASH,
     QUDA_TWISTED_CLOVER_DSLASH,
+    QUDA_LAPLACE_DSLASH,
+    QUDA_COVDEV_DSLASH,
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
-
-  typedef enum QudaDslashPolicy_s {
-    QUDA_DSLASH,
-    QUDA_DSLASH2,
-    QUDA_PTHREADS_DSLASH,
-    QUDA_GPU_COMMS_DSLASH,
-    QUDA_FUSED_DSLASH,
-    QUDA_FUSED_GPU_COMMS_DSLASH,
-    QUDA_DSLASH_NC
-  } QudaDslashPolicy;
 
   typedef enum QudaInverterType_s {
     QUDA_CG_INVERTER,
@@ -110,6 +113,10 @@ extern "C" {
     QUDA_GMRESDR_PROJ_INVERTER,
     QUDA_GMRESDR_SH_INVERTER,
     QUDA_FGMRESDR_INVERTER,
+    QUDA_MG_INVERTER,
+    QUDA_BICGSTABL_INVERTER,
+    QUDA_CGNE_INVERTER,
+    QUDA_CGNR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -140,6 +147,14 @@ extern "C" {
     QUDA_NORMEQ_PC_SOLVE = QUDA_NORMOP_PC_SOLVE, // deprecated
     QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
   } QudaSolveType;
+
+  typedef enum QudaMultigridCycleType_s {
+    QUDA_MG_CYCLE_VCYCLE,
+    QUDA_MG_CYCLE_FCYCLE,
+    QUDA_MG_CYCLE_WCYCLE,
+    QUDA_MG_CYCLE_RECURSIVE,
+    QUDA_MG_CYCLE_INVALID = QUDA_INVALID_ENUM
+  } QudaMultigridCycleType;
 
   typedef enum QudaSchwarzType_s {
     QUDA_ADDITIVE_SCHWARZ,
@@ -202,13 +217,14 @@ extern "C" {
     QUDA_QDPJIT_DIRAC_ORDER,     // even-odd, complex-color-spin-spacetime
     QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, color inside spin
     QUDA_LEX_DIRAC_ORDER,        // lexicographical order, color inside spin
+    QUDA_TIFR_PADDED_DIRAC_ORDER, // padded z dimension for TIFR RHMC code
     QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
   } QudaDiracFieldOrder;  
 
   typedef enum QudaCloverFieldOrder_s {
-    QUDA_FLOAT_CLOVER_ORDER=1,   // even-odd float ordering 
-    QUDA_FLOAT2_CLOVER_ORDER=2,   // even-odd float2 ordering
-    QUDA_FLOAT4_CLOVER_ORDER=4,   // even-odd float4 ordering
+    QUDA_FLOAT_CLOVER_ORDER = 1,  // even-odd float ordering
+    QUDA_FLOAT2_CLOVER_ORDER = 2, // even-odd float2 ordering
+    QUDA_FLOAT4_CLOVER_ORDER = 4, // even-odd float4 ordering
     QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
     QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
     QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
@@ -256,7 +272,8 @@ extern "C" {
     QUDA_CLOVERPC_DIRAC,
     QUDA_DOMAIN_WALL_DIRAC,
     QUDA_DOMAIN_WALLPC_DIRAC,
-    QUDA_DOMAIN_WALL_4DPC_DIRAC,// 4D preconditioned domain wall dirac operator
+    QUDA_DOMAIN_WALL_4DPC_DIRAC,
+    QUDA_MOBIUS_DOMAIN_WALL_DIRAC,
     QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC,
     QUDA_STAGGERED_DIRAC,
     QUDA_STAGGEREDPC_DIRAC,
@@ -266,6 +283,11 @@ extern "C" {
     QUDA_TWISTED_MASSPC_DIRAC,
     QUDA_TWISTED_CLOVER_DIRAC,
     QUDA_TWISTED_CLOVERPC_DIRAC,
+    QUDA_COARSE_DIRAC,
+    QUDA_COARSEPC_DIRAC,
+    QUDA_GAUGE_LAPLACE_DIRAC,
+    QUDA_GAUGE_LAPLACEPC_DIRAC,
+    QUDA_GAUGE_COVDEV_DIRAC,
     QUDA_INVALID_DIRAC = QUDA_INVALID_ENUM
   } QudaDiracType;
 
@@ -278,8 +300,8 @@ extern "C" {
   
   // Which sites are included
   typedef enum QudaSiteSubset_s {
-    QUDA_FULL_SITE_SUBSET,
-    QUDA_PARITY_SITE_SUBSET,
+    QUDA_PARITY_SITE_SUBSET = 1,
+    QUDA_FULL_SITE_SUBSET = 2,
     QUDA_INVALID_SITE_SUBSET = QUDA_INVALID_ENUM
   } QudaSiteSubset;
   
@@ -300,6 +322,7 @@ extern "C" {
     QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, // QLA ordering (spin inside color)
     QUDA_QDPJIT_FIELD_ORDER, // QDP field ordering (complex-color-spin-spacetime)
     QUDA_QOP_DOMAIN_WALL_FIELD_ORDER, // QOP domain-wall ordering
+    QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, // TIFR RHMC ordering
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
   } QudaFieldOrder;
   
@@ -321,6 +344,8 @@ extern "C" {
   typedef enum QudaSourceType_s {
     QUDA_POINT_SOURCE,
     QUDA_RANDOM_SOURCE,
+    QUDA_CONSTANT_SOURCE,
+    QUDA_SINUSOIDAL_SOURCE,
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
   
@@ -339,8 +364,7 @@ extern "C" {
   } QudaDWFPCType; 
 
   typedef enum QudaTwistFlavorType_s {
-    QUDA_TWIST_MINUS = -1,
-    QUDA_TWIST_PLUS = +1,
+    QUDA_TWIST_SINGLET = 1,
     QUDA_TWIST_NONDEG_DOUBLET = +2,
     QUDA_TWIST_DEG_DOUBLET = -2,    
     QUDA_TWIST_NO  = 0,
@@ -374,28 +398,35 @@ extern "C" {
     QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
   } QudaUseInitGuess;
 
+  typedef enum QudaComputeNullVector_s {
+    QUDA_COMPUTE_NULL_VECTOR_NO,    
+    QUDA_COMPUTE_NULL_VECTOR_YES,
+    QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
+  } QudaComputeNullVector;
+
+  typedef enum QudaBoolean_s {
+    QUDA_BOOLEAN_NO = 0,
+    QUDA_BOOLEAN_YES = 1,
+    QUDA_BOOLEAN_INVALID = QUDA_INVALID_ENUM
+  } QudaBoolean;
+
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
     QUDA_FORWARDS = +1,
     QUDA_BOTH_DIRS = 2
   } QudaDirection;
-  
-  typedef enum QudaComputeFatMethod_s {
-    QUDA_COMPUTE_FAT_STANDARD,
-    QUDA_COMPUTE_FAT_EXTENDED_VOLUME,
-    QUDA_COMPUTE_FAT_INVALID=  QUDA_INVALID_ENUM
-  } QudaComputeFatMethod;
 
-  typedef enum QudaFatLinkFlag_s {
-    QUDA_FAT_PRESERVE_CPU_GAUGE=1,
-    QUDA_FAT_PRESERVE_GPU_GAUGE=2,
-    QUDA_FAT_PRESERVE_COMM_MEM=4
-  } QudaFatLinkFlag;
+  typedef enum QudaLinkDirection_s {
+    QUDA_LINK_BACKWARDS,
+    QUDA_LINK_FORWARDS,
+    QUDA_LINK_BIDIRECTIONAL
+  } QudaLinkDirection;
 
   typedef enum QudaFieldGeometry_s {
     QUDA_SCALAR_GEOMETRY = 1,
     QUDA_VECTOR_GEOMETRY = 4,
     QUDA_TENSOR_GEOMETRY = 6,
+    QUDA_COARSE_GEOMETRY = 8,
     QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
   } QudaFieldGeometry;
 
@@ -407,10 +438,11 @@ extern "C" {
   } QudaGhostExchange;
 
   typedef enum QudaStaggeredPhase_s {
-    QUDA_MILC_STAGGERED_PHASE = 0,
-    QUDA_CPS_STAGGERED_PHASE = 1,
-    QUDA_TIFR_STAGGERED_PHASE = 2,
-    QUDA_INVALID_STAGGERED_PHASE = QUDA_INVALID_ENUM
+    QUDA_STAGGERED_PHASE_NO = 0,
+    QUDA_STAGGERED_PHASE_MILC = 1,
+    QUDA_STAGGERED_PHASE_CPS = 2,
+    QUDA_STAGGERED_PHASE_TIFR = 3,
+    QUDA_STAGGERED_PHASE_INVALID = QUDA_INVALID_ENUM
   } QudaStaggeredPhase;
 
   typedef enum QudaContractType_s {
@@ -425,6 +457,14 @@ extern "C" {
     QUDA_CONTRACT_TSLICE_MINUS,
     QUDA_CONTRACT_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
+
+  //Allows to choose an appropriate external library
+  typedef enum QudaExtLibType_s {
+    QUDA_CUSOLVE_EXTLIB,
+    QUDA_EIGEN_EXTLIB,
+    QUDA_MAGMA_EXTLIB,
+    QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
+  } QudaExtLibType;
 
 #ifdef __cplusplus
 }

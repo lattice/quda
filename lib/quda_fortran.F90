@@ -14,9 +14,7 @@
 
 !-------------------------------------------------------------------------------
 
-#define QUDA_MAX_DIM 5
-#define QUDA_MAX_MULTI_SHIFT 32
-#define QUDA_MAX_DWF_LS 128
+#include <quda_constants.h>
 
 module quda_fortran
 
@@ -52,8 +50,6 @@ module quda_fortran
      integer(4) :: mom_ga_pad   ! Used by the gauge and fermion forces
      real(8) :: gauge_gib
 
-     integer(4) :: preserve_gauge ! Used by link fattening
-
      ! Set the staggered phase type of the links
      QudaStaggeredPhase :: staggered_phase_type
      ! Whether the staggered phase has already been applied to the links
@@ -75,7 +71,11 @@ module quda_fortran
      integer(4) :: return_result_gauge ! Return the result gauge field
      integer(4) :: return_result_mom   ! Return the result momentum field
 
-  end type quda_gauge_param
+     integer(8) :: gauge_offset ! Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+     integer(8) :: mom_offset   ! Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+     integer(8) :: site_size    ! Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+
+ end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
   type quda_invert_param
@@ -102,17 +102,19 @@ module quda_fortran
      real(8) :: tol ! Requested L2 residual norm
      real(8) :: tol_restart ! Solver tolerance in the L2 residual norm (used to restart InitCG)
      real(8) :: tol_hq ! Requested heavy quark residual norm
+     integer(4) :: compute_true_res ! Whether to compute the true residual post solve
      real(8) :: true_res ! Actual L2 residual norm achieved in solver
      real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance
      integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
+     integer(4) :: solution_accumulator_pipeline ! How many direction vectors we accumulate into the solution vector at once
      integer(4) :: max_res_increase ! How many residual increases we tolerate when doing reliable updates
      integer(4) :: max_res_increase_total ! Total number of residual increases we tolerate
      integer(4) :: heavy_quark_check ! After how many iterations shall the heavy quark residual be updated
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver
-
+     integer(4) :: num_src ! Number of sources in the multiple source solver
      integer(4) :: overlap ! width of domain overlaps
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_offset ! Solver tolerance for each offset
@@ -128,6 +130,17 @@ module quda_fortran
 
      ! Actual heavy quark residual norm achieved in solver for each offset
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_hq_offset
+
+     ! Residuals in the partial faction expansion
+     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: residue
+
+     ! Whether we should evaluate the action after the linear solve
+     integer(4) :: compute_action
+
+     ! Computed value of the bilinear action (complex valued)
+     !   invert: \phi^\dagger A^{-1} \phi
+     !   multishift: \phi^\dagger r(x) \phi = \phi^\dagger (sum_k residue[k] * (A + offset[k])^{-1} ) \phi
+     real(8), dimension(2) :: action
 
      QudaSolutionType :: solution_type  ! Type of system to solve
      QudaSolveType :: solve_type        ! How to solve it
@@ -158,10 +171,16 @@ module quda_fortran
      QudaUseInitGuess :: use_init_guess
 
      real(8) :: clover_coeff ! Coefficient of the clover term
+     real(8) :: clover_rho   ! Real number added to the clover diagonal (not to inverse)
      integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
      real(8), dimension(2) :: trlogA    ! The trace log of the clover term (even/odd computed separately)
 
-     QudaVerbosity :: verbosity
+     integer(4) :: compute_clover                    ! Whether to compute the clover field
+     integer(4) :: compute_clover_inverse            ! Whether to compute the clover inverse field
+     integer(4) :: return_clover                     ! Whether to copy back the clover matrix field
+     integer(4) :: return_clover_inverse             ! Whether to copy back the inverted clover matrix field
+
+     QudaVerbosity :: verbosity                      ! The verbosity setting to use in the solver
 
      integer(4) :: sp_pad
      integer(4) :: cl_pad
@@ -187,6 +206,9 @@ module quda_fortran
      ! QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      QudaInverterType :: inv_type_precondition
 
+     integer(8) :: preconditioner ! pointer to preconditioner instance
+
+     integer(8) :: deflation_op ! pointer to deflation instance
 
      ! Dslash used in the inner Krylov solver
      QudaDslashType :: dslash_type_precondition
@@ -227,8 +249,23 @@ module quda_fortran
      real(8)::inc_tol     ! initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle
 
      ! Parameters for setting data residency of the solver
-     integer(8)::make_resident_solution ! Whether to make the solution vector(s) after the solve
-     integer(8)::use_resident_solution  ! Whether to use the resident solution vector(s)
+     integer(4)::make_resident_solution ! Whether to make the solution vector(s) after the solve
+     integer(4)::use_resident_solution  ! Whether to use the resident solution vector(s)
+
+     ! Whether to use the solution vector to augment the chronological forecast
+     integer(4)::make_resident_chrono
+
+     ! Whether to use the resident chronological basis
+     integer(4)::use_resident_chrono
+
+     ! The maximum length of the chronological history to store
+     integer(4)::max_chrono_dim
+
+     ! The index to indeicate which chrono history we are augmenting */
+     integer(4)::chrono_index
+
+     ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     QudaExtLibType::extlib_type
 
   end type quda_invert_param
 

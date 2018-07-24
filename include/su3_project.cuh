@@ -67,11 +67,10 @@ namespace quda {
    * @param in The input matrix to which we're projecting
    * @param tol Tolerance to which this check is applied
    */
-  template <typename Float2,typename Float>
-  __host__ __device__ void polarSu3(Matrix<Float2,3> &in, Float tol)
+  template <typename Float>
+  __host__ __device__ void polarSu3(Matrix<complex<Float>,3> &in, Float tol)
   {
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
-    Matrix<Cmplx,3> inv, out;
+    Matrix<complex<Float>,3> inv, out;
 
     out = in;
     computeMatrixInverse(out, &inv);
@@ -84,13 +83,13 @@ namespace quda {
 
 
     // now project onto special unitary group
-    Cmplx  det = getDeterminant(out);
+    complex<Float> det = getDeterminant(out);
     double mod = det.x*det.x + det.y*det.y;
     mod = pow(mod, (1./6.));
     double angle = atan2(det.y, det.x);
     angle /= -3.;
     
-    Cmplx cTemp;
+    complex<Float> cTemp;
 
     cTemp.x = cos(angle)/mod;
     cTemp.y = sin(angle)/mod;

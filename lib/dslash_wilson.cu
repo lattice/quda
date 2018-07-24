@@ -21,7 +21,6 @@
 #include <dslash_quda.h>
 #include <sys/time.h>
 #include <blas_quda.h>
-#include <face_quda.h>
 
 #include <inline_ptx.h>
 
@@ -60,10 +59,6 @@ namespace quda {
   template <typename sFloat, typename gFloat>
   class WilsonDslashCuda : public SharedDslashCuda {
 
-  private:
-    const gFloat *gauge0, *gauge1;
-    const double a;
-
   protected:
     unsigned int sharedBytesPerThread() const
     {
@@ -76,82 +71,60 @@ namespace quda {
     }
 
   public:
-    WilsonDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-		     const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
-		     const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), a(a)
+    WilsonDslashCuda(cudaColorSpinorField *out, const GaugeField &gauge, const cudaColorSpinorField *in,
+		     const cudaColorSpinorField *x, const double a, const int parity, const int dagger,
+                     const int *commOverride)
+      : SharedDslashCuda(out, in, x, gauge, parity, dagger, commOverride)
     { 
-      bindSpinorTex<sFloat>(in, out, x); 
+      dslashParam.a = a;
+      dslashParam.a_f = a;
     }
 
-    virtual ~WilsonDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
+    virtual ~WilsonDslashCuda() {
+      unbindSpinorTex<sFloat>(in, out, x);
+    }
 
     void apply(const cudaStream_t &stream)
     {
 #ifdef SHARED_WILSON_DSLASH
-      if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
-	errorQuda("Shared dslash does not yet support X-dimension partitioning");
+      if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
+#ifndef USE_TEXTURE_OBJECTS
+      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
+#endif // USE_TEXTURE_OBJECTS
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, 
-	     dslashParam, (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
-	     (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
+      setParam();
+      dslashParam.block[0] = tp.aux.x; dslashParam.block[1] = tp.aux.y; dslashParam.block[2] = tp.aux.z; dslashParam.block[3] = tp.aux.w;
+      for (int i=0; i<4; i++) dslashParam.grid[i] = ( (i==0 ? 2 : 1) * in->X(i)) / dslashParam.block[i];
+      DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
+
   };
 #endif // GPU_WILSON_DIRAC
 
 #include <dslash_policy.cuh>
 
   // Wilson wrappers
-  void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
-			const int parity, const int dagger, const cudaColorSpinorField *x, const double &k, 
-			const int *commOverride, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
+  void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+			const int parity, const int dagger, const cudaColorSpinorField *x, const double &k,
+			const int *commOverride, TimeProfile &profile)
   {
-    inSpinor = (cudaColorSpinorField*)in; // EVIL
-
 #ifdef GPU_WILSON_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
-    for(int i=0;i<4;i++){
-      dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-      dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
-      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
-    }
+    const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
-    void *gauge0, *gauge1;
-    bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-    if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge %d and spinor %d precision not supported", 
-		gauge.Precision(), in->Precision());
-
-    DslashCuda *dslash = 0;
-    size_t regSize = sizeof(float);
+    DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new WilsonDslashCuda<double2, double2>(out, (double2*)gauge0, (double2*)gauge1, 
-						      gauge.Reconstruct(), in, x, k, dagger);
-      regSize = sizeof(double);
+      dslash = new WilsonDslashCuda<double2, double2>(out, gauge, in, x, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new WilsonDslashCuda<float4, float4>(out, (float4*)gauge0, (float4*)gauge1,
-						    gauge.Reconstruct(), in, x, k, dagger);
+      dslash = new WilsonDslashCuda<float4, float4>(out, gauge, in, x, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new WilsonDslashCuda<short4, short4>(out, (short4*)gauge0, (short4*)gauge1,
-						    gauge.Reconstruct(), in, x, k, dagger);
+      dslash = new WilsonDslashCuda<short4, short4>(out, gauge, in, x, k, parity, dagger, commOverride);
     }
 
-#ifndef GPU_COMMS
-    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
-#else
-    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-#endif
-
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
-    delete dslashImp;
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
+    dslash_policy.apply(0);
 
     delete dslash;
-    unbindGaugeTex(gauge);
-
-    checkCudaError();
 #else
     errorQuda("Wilson dslash has not been built");
 #endif // GPU_WILSON_DIRAC

@@ -18,7 +18,7 @@ AC_ARG_ENABLE(cpu-arch,
 
 dnl Specify GPU Arch
 AC_ARG_ENABLE(gpu-arch,
- AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 (default: sm_35)]),
+ AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60, sm_70 (default: sm_35)]),
  [ gpu_arch=${enableval} ],
  [ gpu_arch="sm_35" ]
 )
@@ -162,7 +162,7 @@ AC_ARG_ENABLE(hisq-force,
 )
 
 AC_ARG_ENABLE(gauge-tools,
-  AC_HELP_STRING([--enable-gauge-tools], [ Build auxilary gauge tools: plaquette, gauge evolver, APE, extended gauge routines (default: disabled)]),
+  AC_HELP_STRING([--enable-gauge-tools], [ Build auxilary gauge tools: plaquette, gauge evolver, APE, STOUT, extended gauge routines (default: disabled)]),
   [ build_gauge_tools=${enableval} ],
   [ build_gauge_tools="no" ]
 )
@@ -171,6 +171,12 @@ AC_ARG_ENABLE(gauge-alg,
   AC_HELP_STRING([--enable-gauge-alg], [ Build gauge fixing and pure gauge algorithms (default: disabled)]),
   [ build_gauge_alg=${enableval} ],
   [ build_gauge_alg="no" ]
+)
+
+AC_ARG_ENABLE(multigrid,
+  AC_HELP_STRING([--enable-multigrid], [ Build multigrid linear solvers (default: disabled)]),
+  [ build_multigrid=${enableval} ],
+  [ build_multigrid="no" ]
 )
 
 AC_ARG_ENABLE(sstep,
@@ -201,20 +207,6 @@ AC_ARG_ENABLE(multi-gpu,
   [ multi_gpu="no" ]
 )
 
-dnl enable cuda / nic interop buffer
-AC_ARG_ENABLE(gpu-direct,
-  AC_HELP_STRING([--enable-gpu-direct], [ Enable CUDA/NIC interop pinned memory (default: enabled)]),
-  [ gpu_direct=${enableval}],
-  [ gpu_direct="yes" ]
-)
-
-dnl enable direct cuda-nic communication
-AC_ARG_ENABLE(gpu-comms,
-  AC_HELP_STRING([--enable-gpu-comms], [ Enable direct CUDA-NIC communication (experimental, default: disabled)]),
-  [ gpu_comms=${enableval}],
-  [ gpu_comms="no" ]
-)
-
 dnl enable NVTX mark up for the MPI in the visual profiler
 AC_ARG_ENABLE(mpi-nvtx,
   AC_HELP_STRING([--enable-mpi-nvtx], [ Enable NVTX markup for profiling MPI API calls in the visual profiler (default: disabled)]),
@@ -227,13 +219,6 @@ AC_ARG_ENABLE(interface-nvtx,
   AC_HELP_STRING([--enable-interface-nvtx], [ Enable NVTX markup for profiling interface calls in the visual profiler (default: disabled)]),
   [ interface_nvtx=${enableval}],
   [ interface_nvtx="no" ]
-)
-
-dnl enable packing and unpacking on the device
-AC_ARG_ENABLE(device-pack,
-  AC_HELP_STRING([--enable-device-pack], [ Enable the packing / unpacking of fields on the device (default: disabled)]),
-  [ device_pack=${enableval}],
-  [ device_pack="no" ]
 )
 
 AC_ARG_WITH(mpi,
@@ -285,6 +270,25 @@ AC_ARG_ENABLE(magma,
   [ build_magma="no" ]
 )
 
+AC_ARG_ENABLE(magma-vars,
+ AC_HELP_STRING([--enable-magma-vars], [ Build with MAGMA using env vars: MAGMA_INC and MAGMA_LIB ]),
+  [ build_magma_vars=${enableval}],
+  [ build_magma_vars="no" ]
+)
+
+AC_ARG_ENABLE(arpack,
+  AC_HELP_STRING([--enable-arpack], [ Build with ARPACK (requires pkg-config to detect arpack)]),
+  [ build_arpack=${enableval}],
+  [ build_arpack="no" ]
+)
+
+AC_ARG_ENABLE(arpack-vars,
+ AC_HELP_STRING([--enable-arpack-vars], [ Build with ARPACK using env vars: ARPACK_INC and ARPACK_LIB ]),
+  [ build_arpack_vars=${enableval}],
+  [ build_arpack_vars="no" ]
+)
+
+
 AC_ARG_VAR(NVCCFLAGS, [ Extra flags for NVCC ])
 AC_MSG_NOTICE([User supplied NVCCFLAGS: ${NVCCFLAGS} ])
 if test "X${build_qdpjit}X" = "XyesX" ; then
@@ -322,12 +326,6 @@ AC_ARG_ENABLE(fermi-double-tex,
  [ fermi_double_tex="yes" ]
 )
 
-AC_ARG_ENABLE(numa-affinity,
- AC_HELP_STRING([--enable-numa-affinity], [ Enable NUMA affinity support (default: enabled, always disabled on osx target)]),
- [ numa_affinity=${enableval}],
- [ numa_affinity="yes" ]
-)
-
 AC_ARG_ENABLE(force-ac,
   AC_HELP_STRING([--enable-force-ac], [ Force using deprecated autoconf based build system. (default: disabled)]),
   [ force_ac=${enableval} ],
@@ -346,9 +344,9 @@ esac
 
 dnl CPU Arch
 case ${gpu_arch} in
-sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
+sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52 | sm_60 | sm_70) ;;
 *)
-  AC_MSG_ERROR([ GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 ])
+  AC_MSG_ERROR([ GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60, sm_70 ])
   ;;
 esac
 
@@ -544,6 +542,14 @@ yes|no);;
   ;;
 esac
 
+dnl Build multigrid
+case ${build_multigrid} in
+yes|no);;
+*)
+  AC_MSG_ERROR([ invalid value for --enable-multigrid ])
+  ;;
+esac
+
 dnl Build sstep
 case ${build_sstep} in
 yes|no);;
@@ -573,22 +579,6 @@ case ${multi_gpu} in
 yes|no);;
 *)
   AC_MSG_ERROR([ invalid value for --enable-multi-gpu ])
-  ;;
-esac
-
-dnl Enables CUDA/NIC buffer interop
-case ${gpu_direct} in
-yes|no);;
-*)
-  AC_MSG_ERROR([ invalid value for --enable-gpu-direct ])
-  ;;
-esac
-
-dnl Enables direct CUDA-NIC communication
-case ${gpu_comms} in
-yes|no);;
-*)
-  AC_MSG_ERROR([ invalid value for --enable-gpu-comms ])
   ;;
 esac
 
@@ -682,12 +672,7 @@ yes|no);;
   ;;
 esac
 
-case ${numa_affinity} in
-yes|no);;
-*)
-  AC_MSG_ERROR([ invalid value for --enable-numa-affinity ])
-  ;;
-esac
+
 
 dnl Output Substitutions
 AC_MSG_NOTICE([Setting CUDA_INSTALL_PATH = ${cuda_home} ])
@@ -756,6 +741,9 @@ AC_SUBST( BUILD_GAUGE_TOOLS, [${build_gauge_tools}])
 AC_MSG_NOTICE([Setting BUILD_GAUGE_ALG = ${build_gauge_alg} ] )
 AC_SUBST( BUILD_GAUGE_ALG, [${build_gauge_alg}])
 
+AC_MSG_NOTICE([Setting BUILD_MULTIGRID = ${build_multigrid} ] )
+AC_SUBST( BUILD_MULTIGRID, [${build_multigrid}])
+
 AC_MSG_NOTICE([Setting BUILD_SSTEP = ${build_sstep} ] )
 AC_SUBST( BUILD_SSTEP, [${build_sstep}])
 
@@ -776,12 +764,6 @@ AC_SUBST( BUILD_MPI, [${build_mpi}])
 
 AC_MSG_NOTICE([Setting POSIX_THREADS = ${posix_threads}])
 AC_SUBST( POSIX_THREADS, [${posix_threads}])
-
-AC_MSG_NOTICE([Setting GPU_DIRECT= ${gpu_direct}])
-AC_SUBST( GPU_DIRECT, [${gpu_direct}])
-
-AC_MSG_NOTICE([Setting GPU_COMMS= ${gpu_comms}])
-AC_SUBST( GPU_COMMS, [${gpu_comms}])
 
 AC_MSG_NOTICE([Setting MPI_NVTXS= ${mpi_nvtx}])
 AC_SUBST( MPI_NVTX, [${mpi_nvtx}])
@@ -806,9 +788,6 @@ AC_SUBST( BUILD_BQCD_INTERFACE, [${build_bqcd_interface}])
 
 AC_MSG_NOTICE([Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}])
 AC_SUBST( BUILD_TIFR_INTERFACE, [${build_tifr_interface}])
-
-AC_MSG_NOTICE([Setting DEVICE_PACK= ${device_pack}])
-AC_SUBST( DEVICE_PACK, [${device_pack}])
 
 AC_MSG_NOTICE([Setting BUILD_QIO = ${build_qio} ])
 AC_SUBST( BUILD_QIO, [${build_qio}])
@@ -837,9 +816,6 @@ AC_SUBST( BLAS_TEX, [${blas_tex}])
 AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
 AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])
 
-AC_MSG_NOTICE([Setting NUMA_AFFINITY= ${numa_affinity}])
-AC_SUBST( NUMA_AFFINITY, [${numa_affinity}])
-
 AC_MSG_NOTICE([Setting USE_QDPJIT = ${build_qdpjit} ])
 AC_SUBST( USE_QDPJIT, [${build_qdpjit}])
 
@@ -848,6 +824,16 @@ AC_SUBST( QDP_INSTALL_PATH, [${qdp_home} ])
 
 AC_MSG_NOTICE([Setting BUILD_MAGMA = ${build_magma}])
 AC_SUBST( BUILD_MAGMA, [${build_magma}])
+
+AC_MSG_NOTICE([Setting BUILD_MAGMA_VARS = ${build_magma_vars}])
+AC_SUBST( BUILD_MAGMA_VARS, [${build_magma_vars}])
+
+AC_MSG_NOTICE([Setting BUILD_ARPACK = ${build_arpack}])
+AC_SUBST( BUILD_ARPACK, [${build_arpack}])
+
+AC_MSG_NOTICE([Setting BUILD_ARPACK_VARS = ${build_arpack_vars}])
+AC_SUBST( BUILD_ARPACK_VARS, [${build_arpack_vars}])
+
 
 if test "X${force_ac}X" = "XnoX";
   then

@@ -37,13 +37,7 @@ extern QudaPrecision prec;
 extern char latfile[];
 extern int gridsize_from_cmdline[];
     
-extern bool tune;
-
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
-
-// where is the packing / unpacking taking place
-//most orders are CPU only currently
-const QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION;
 
 void init() {
 
@@ -82,7 +76,7 @@ void init() {
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  csParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_NULL_FIELD_CREATE;
 
@@ -94,8 +88,9 @@ void init() {
   initQuda(device);
 
   setVerbosityQuda(QUDA_VERBOSE, "", stdout);
-  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
 
+  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  csParam.precision = QUDA_DOUBLE_PRECISION;
   csParam.setPrecision(prec);
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.pad = param.X[0] * param.X[1] * param.X[2];
@@ -125,7 +120,7 @@ void packTest() {
 #ifdef BUILD_CPS_INTERFACE
   {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-    
+
     GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
     cpuGaugeField cpsCpuGauge(cpsParam);
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
@@ -138,12 +133,12 @@ void packTest() {
     cudaGaugeField cudaCpsGauge(cpsParam);
 
     stopwatchStart();
-    cudaCpsGauge.loadCPUField(cpsCpuGauge, location);    
+    cudaCpsGauge.loadCPUField(cpsCpuGauge);
     double cpsGtime = stopwatchReadSeconds();
     printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
     stopwatchStart();
-    cudaCpsGauge.saveCPUField(cpsCpuGauge, location);
+    cudaCpsGauge.saveCPUField(cpsCpuGauge);
     double cpsGRtime = stopwatchReadSeconds();
     printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
   }
@@ -152,7 +147,7 @@ void packTest() {
 #ifdef BUILD_QDP_INTERFACE
   {
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-    
+
     GaugeFieldParam qdpParam(qdpCpuGauge_p, param);
     cpuGaugeField qdpCpuGauge(qdpParam);
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
@@ -165,12 +160,12 @@ void packTest() {
     cudaGaugeField cudaQdpGauge(qdpParam);
 
     stopwatchStart();
-    cudaQdpGauge.loadCPUField(qdpCpuGauge, location);    
+    cudaQdpGauge.loadCPUField(qdpCpuGauge);
     double qdpGtime = stopwatchReadSeconds();
     printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 
     stopwatchStart();
-    cudaQdpGauge.saveCPUField(qdpCpuGauge, location);
+    cudaQdpGauge.saveCPUField(qdpCpuGauge);
     double qdpGRtime = stopwatchReadSeconds();
     printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
   }
@@ -187,9 +182,9 @@ void packTest() {
   double sRecTime = stopwatchReadSeconds();
   printf("Spinor receive time = %e seconds\n", sRecTime); fflush(stdout);
   
-  double spinor_norm = norm2(*spinor);
-  double cuda_spinor_norm = norm2(*cudaSpinor);
-  double spinor2_norm = norm2(*spinor2);
+  double spinor_norm = blas::norm2(*spinor);
+  double cuda_spinor_norm = blas::norm2(*cudaSpinor);
+  double spinor2_norm = blas::norm2(*spinor2);
 
   printf("Norm check: CPU = %e, CUDA = %e, CPU = %e\n",
 	 spinor_norm, cuda_spinor_norm, spinor2_norm);

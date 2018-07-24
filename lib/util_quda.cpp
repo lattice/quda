@@ -6,7 +6,7 @@
 
 #include <enum_quda.h>
 #include <util_quda.h>
-
+#include <sstream>
 
 static const size_t MAX_PREFIX_SIZE = 100;
 
@@ -26,13 +26,43 @@ void setVerbosity(QudaVerbosity verbosity)
   verbosity_ = verbosity;
 }
 
+bool getRankVerbosity() {
+  static bool init = false;
+  static bool rank_verbosity = false;
+  static char *rank_verbosity_env = getenv("QUDA_RANK_VERBOSITY");
 
-static QudaTune tune_;
+  if (!init && rank_verbosity_env) { // set the policies to tune for explicitly
+    std::stringstream rank_list(rank_verbosity_env);
 
-QudaTune getTuning() { return tune_; }
-void setTuning(QudaTune tune)
-{
-  tune_ = tune;
+    int rank_;
+    while (rank_list >> rank_) {
+      if (comm_rank() == rank_ || rank_ == -1) rank_verbosity = true;
+      if (rank_list.peek() == ',') rank_list.ignore();
+    }
+  } else if (!init) {
+    rank_verbosity = comm_rank() == 0 ? true : false; // default is process 0 only
+  }
+  init = true;
+
+  return rank_verbosity;
+}
+
+// default has autotuning enabled but can be overridden with the QUDA_ENABLE_TUNING environment variable
+QudaTune getTuning() {
+  static bool init = false;
+  static QudaTune tune = QUDA_TUNE_YES;
+
+  if (!init) {
+    char *enable_tuning = getenv("QUDA_ENABLE_TUNING");
+    if (!enable_tuning || strcmp(enable_tuning,"0")!=0) {
+      tune = QUDA_TUNE_YES;
+    } else {
+      tune = QUDA_TUNE_NO;
+    }
+    init = true;
+  }
+
+  return tune;
 }
 
 void setOutputPrefix(const char *prefix)

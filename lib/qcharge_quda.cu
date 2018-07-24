@@ -20,14 +20,10 @@ namespace quda {
   template<typename Float, typename Gauge>
   struct QChargeArg : public ReduceArg<double> {
     int threads; // number of active threads required
-
-    typename ComplexTypeId<Float>::Type* Fmunu;
-
     Gauge data;
-    
-      QChargeArg(const Gauge &data, GaugeField& Fmunu) : ReduceArg<double>(), data(data), 
-        threads(Fmunu.Volume()) {}
-    };
+    QChargeArg(const Gauge &data, GaugeField& Fmunu)
+      : ReduceArg<double>(), data(data), threads(Fmunu.Volume()) {}
+  };
 
   // Core routine for computing the topological charge from the field strength
   template<int blockSize, typename Float, typename Gauge>
@@ -43,10 +39,9 @@ namespace quda {
           parity = 1;
           idx -= arg.threads/2;
         }
-        typedef typename ComplexTypeId<Float>::Type Cmplx;
 
         // Load the field-strength tensor from global memory
-        Matrix<Cmplx,3> F[6], temp1, temp2, temp3;
+        Matrix<complex<Float>,3> F[6], temp1, temp2, temp3;
         double tmpQ2, tmpQ3;
         for(int i=0; i<6; ++i){
           arg.data.load((Float*)(F[i].data), idx, i, parity);
@@ -94,7 +89,7 @@ namespace quda {
           arg.result_h[0] = 0.;
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           LAUNCH_KERNEL(qChargeComputeKernel, tp, stream, arg, Float);
-          cudaDeviceSynchronize();
+          qudaDeviceSynchronize();
         }else{ // run the CPU code
 	  errorQuda("qChargeComputeKernel not supported on CPU");
 //          qChargeComputeCPU(arg);
@@ -105,15 +100,6 @@ namespace quda {
 	return TuneKey(vol->VolString(), typeid(*this).name(), aux);
       }
 
-      std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
-        std::stringstream ps;
-        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-        ps << "shared=" << param.shared_bytes;
-        return ps.str();
-      }
-
-      void preTune(){}
-      void postTune(){}
       long long flops() const { return arg.threads*(3*198+9); }
       long long bytes() const { return arg.threads*(6*18)*sizeof(Float); }
     };
@@ -156,22 +142,19 @@ namespace quda {
 
   double computeQCharge(GaugeField& Fmunu, QudaFieldLocation location){
 
+    double charge = 0;
 #ifdef GPU_GAUGE_TOOLS
-    if(Fmunu.Precision() == QUDA_HALF_PRECISION){
-      errorQuda("Half precision not supported\n");
-    }
-
     if (Fmunu.Precision() == QUDA_SINGLE_PRECISION){
-      return computeQCharge<float>(Fmunu, location);
+      charge = computeQCharge<float>(Fmunu, location);
     } else if(Fmunu.Precision() == QUDA_DOUBLE_PRECISION) {
-      return computeQCharge<double>(Fmunu, location);
+      charge = computeQCharge<double>(Fmunu, location);
     } else {
       errorQuda("Precision %d not supported", Fmunu.Precision());
     }
-    return;
 #else
     errorQuda("Gauge tools are not build");
 #endif
+    return charge;
 
   }
 

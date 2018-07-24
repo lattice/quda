@@ -2,6 +2,8 @@
 
 namespace quda {
 
+  using namespace gauge;
+
   /**
      Kernel argument struct
    */
@@ -9,7 +11,7 @@ namespace quda {
   struct CopyGaugeExArg {
     OutOrder out;
     const InOrder in;
-    int Xin[QUDA_MAX_DIM]; 
+    int Xin[QUDA_MAX_DIM];
     int Xout[QUDA_MAX_DIM];
     int volume;
     int volumeEx;
@@ -17,21 +19,20 @@ namespace quda {
     int geometry;
     int faceVolumeCB[QUDA_MAX_DIM];
     bool regularToextended;
-    CopyGaugeExArg(const OutOrder &out, const InOrder &in, const int *Xout, const int *Xin, 
-       const int *faceVolumeCB, int nDim, int geometry) 
-      : out(out), in(in), 
-  nDim(nDim), geometry(geometry) {
+    CopyGaugeExArg(const OutOrder &out, const InOrder &in, const int *Xout, const int *Xin,
+       const int *faceVolumeCB, int nDim, int geometry)
+      : out(out), in(in), nDim(nDim), geometry(geometry) {
       for (int d=0; d<nDim; d++) {
-  this->Xout[d] = Xout[d];
-  this->Xin[d] = Xin[d];
-  this->faceVolumeCB[d] = faceVolumeCB[d];
+	this->Xout[d] = Xout[d];
+	this->Xin[d] = Xin[d];
+	this->faceVolumeCB[d] = faceVolumeCB[d];
       }
-      if(out.volumeCB > in.volumeCB){
+
+      if (out.volumeCB > in.volumeCB) {
         this->volume = 2*in.volumeCB;
         this->volumeEx = 2*out.volumeCB;
         this->regularToextended = true;
-      }
-      else{
+      } else {
         this->volume = 2*out.volumeCB;
         this->volumeEx = 2*in.volumeCB;
         this->regularToextended = false;
@@ -64,10 +65,9 @@ namespace quda {
       // Y is the cb spatial index into the extended gauge field
       xout = ((((x[3]+R[3])*arg.Xout[2] + (x[2]+R[2]))*arg.Xout[1] + (x[1]+R[1]))*arg.Xout[0]+(x[0]+R[0])) >> 1;
       xin = X;
-    }
-    else{
+    } else{
       //extended to regular gauge
-      for (int d=0; d<4; d++) R[d] = (arg.Xin[d] - arg.Xout[d]) >> 1; 
+      for (int d=0; d<4; d++) R[d] = (arg.Xin[d] - arg.Xout[d]) >> 1;
       int za = X/(arg.Xout[0]/2);
       int x0h = X - za*(arg.Xout[0]/2);
       int zb = za/arg.Xout[1];
@@ -77,9 +77,9 @@ namespace quda {
       x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
       // Y is the cb spatial index into the extended gauge field
       xin = ((((x[3]+R[3])*arg.Xin[2] + (x[2]+R[2]))*arg.Xin[1] + (x[1]+R[1]))*arg.Xin[0]+(x[0]+R[0])) >> 1;
-      xout = X;     
-    } 
-    for(int d=0; d<arg.geometry; d++){
+      xout = X;
+    }
+    for (int d=0; d<arg.geometry; d++){
       RegTypeIn in[length];
       RegTypeOut out[length];
       arg.in.load(in, xin, d, parity);
@@ -122,21 +122,20 @@ namespace quda {
   public:
     CopyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> &arg, const GaugeField &meta, QudaFieldLocation location)
       : arg(arg), meta(meta), location(location) {
-      writeAuxString("out_stride=%d,in_stride=%d,geometery=%d",arg.out.stride,arg.in.stride,arg.geometry);
+      writeAuxString("out_stride=%d,in_stride=%d,geometry=%d",arg.out.stride,arg.in.stride,arg.geometry);
     }
     virtual ~CopyGaugeEx() { ; }
-  
+
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	if(arg.regularToextended) copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, true>(arg);
 	else copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, false>(arg);
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-	if(arg.regularToextended) copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, true> 
+	if(arg.regularToextended) copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, true>
 				    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	else copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, false> 
+	else copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, false>
 	       <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
     }
@@ -145,38 +144,32 @@ namespace quda {
       return TuneKey(meta.VolString(), typeid(*this).name(), aux);
     }
 
-    std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-
-    long long flops() const { return 0; } 
-    long long bytes() const { 
+    long long flops() const { return 0; }
+    long long bytes() const {
       int sites = 4*arg.volume/2;
-      return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn) 
-                          + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
-    } 
+      return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn)
+                          + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) );
+    }
   };
 
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-  void copyGaugeEx(OutOrder outOrder, const InOrder inOrder, const int *E, 
+  void copyGaugeEx(OutOrder outOrder, const InOrder inOrder, const int *E,
 		   const int *X, const int *faceVolumeCB, const GaugeField &meta, QudaFieldLocation location) {
 
-    CopyGaugeExArg<OutOrder,InOrder> 
+    CopyGaugeExArg<OutOrder,InOrder>
       arg(outOrder, inOrder, E, X, faceVolumeCB, meta.Ndim(), meta.Geometry());
     CopyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder> copier(arg, meta, location);
     copier.apply(0);
     if (location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
-  
+
   template <typename FloatOut, typename FloatIn, int length, typename InOrder>
-  void copyGaugeEx(const InOrder &inOrder, const int *X, GaugeField &out, 
+  void copyGaugeEx(const InOrder &inOrder, const int *X, GaugeField &out,
 		   QudaFieldLocation location, FloatOut *Out) {
+
     int faceVolumeCB[QUDA_MAX_DIM];
-    for (int i=0; i<4; i++) faceVolumeCB[i] = out.SurfaceCB(i) * out.Nface(); 
+    for (int i=0; i<4; i++) faceVolumeCB[i] = out.SurfaceCB(i) * out.Nface();
 
     if (out.isNative()) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
@@ -190,11 +183,11 @@ namespace quda {
 	}
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_12>::type G;
-	copyGaugeEx<FloatOut,FloatIn,length> 
+	copyGaugeEx<FloatOut,FloatIn,length>
 	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_8>::type G;
-	copyGaugeEx<FloatOut,FloatIn,length> 
+	copyGaugeEx<FloatOut,FloatIn,length>
 	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
 #ifdef GPU_STAGGERED_DIRAC
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
@@ -243,13 +236,13 @@ namespace quda {
   }
 
   template <typename FloatOut, typename FloatIn, int length>
-  void copyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location, 
+  void copyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 		   FloatOut *Out, FloatIn *In) {
 
     if (in.isNative()) {
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatIn)==typeid(short) && in.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  copyGaugeEx<FloatOut,short,length> (FloatNOrder<short,length,2,19>(in, (short*)In), 
+	  copyGaugeEx<FloatOut,short,length> (FloatNOrder<short,length,2,19>(in, (short*)In),
 					      in.X(), out, location, Out);
 	} else {
 	  typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
@@ -275,7 +268,7 @@ namespace quda {
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
-      copyGaugeEx<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(in, In), 
+      copyGaugeEx<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(in, In),
 					   in.X(), out, location, Out);
 #else
       errorQuda("QDP interface has not been built\n");
@@ -284,7 +277,7 @@ namespace quda {
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef BUILD_MILC_INTERFACE
-      copyGaugeEx<FloatOut,FloatIn,length>(MILCOrder<FloatIn,length>(in, In), 
+      copyGaugeEx<FloatOut,FloatIn,length>(MILCOrder<FloatIn,length>(in, In),
 					   in.X(), out, location, Out);
 #else
       errorQuda("MILC interface has not been built\n");
@@ -293,7 +286,7 @@ namespace quda {
     } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      copyGaugeEx<FloatOut,FloatIn,length>(TIFROrder<FloatIn,length>(in, In), 
+      copyGaugeEx<FloatOut,FloatIn,length>(TIFROrder<FloatIn,length>(in, In),
 					   in.X(), out, location, Out);
 #else
       errorQuda("TIFR interface has not been built\n");
@@ -306,13 +299,13 @@ namespace quda {
   }
 
   template <typename FloatOut, typename FloatIn>
-  void copyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location, 
+  void copyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 		   FloatOut *Out, FloatIn *In) {
-    
+
     if (in.Ncolor() != 3 && out.Ncolor() != 3) {
       errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }
-    
+
     if (out.Geometry() != in.Geometry()) {
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
     }

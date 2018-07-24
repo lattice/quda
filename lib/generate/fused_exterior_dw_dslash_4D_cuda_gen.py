@@ -153,9 +153,12 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
-    str += "#define m5 m5_d\n"
-    str += "#define mdwf_b5 mdwf_b5_d\n"
-    str += "#define mdwf_c5 mdwf_c5_d\n"
+    str += "#define m5 param.m5_d\n"
+    str += "#define mdwf_b5 param.mdwf_b5_d\n"
+    str += "#define mdwf_c5 param.mdwf_c5_d\n"
+    str += "#define mferm param.mferm\n"
+    str += "#define a param.a\n"
+    str += "#define b param.b\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
     for s in range(0,4):
@@ -163,9 +166,12 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n"
-    str += "#define m5 m5_f\n"
-    str += "#define mdwf_b5 mdwf_b5_f\n"
-    str += "#define mdwf_c5 mdwf_c5_f\n"
+    str += "#define m5 param.m5_f\n"
+    str += "#define mdwf_b5 param.mdwf_b5_f\n"
+    str += "#define mdwf_c5 param.mdwf_c5_f\n"
+    str += "#define mferm param.mferm_f\n"
+    str += "#define a param.a_f\n"
+    str += "#define b param.b_f\n"
     str += "#endif // SPINOR_DOUBLE\n\n"
     return str
 # end def def_input_spinor
@@ -362,38 +368,30 @@ int sp_norm_idx;
         prolog_str += (
 """
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*param.Ls) return;
+if (sid >= param.threads*param.dc.Ls) return;
 
 int dim;
-int face_num;
 int face_idx;
-int Y[4] = {X1,X2,X3,X4};
-int faceVolume[4];
-faceVolume[0] = (X2*X3*X4)>>1;
-faceVolume[1] = (X1*X3*X4)>>1;
-faceVolume[2] = (X1*X2*X4)>>1;
-faceVolume[3] = (X1*X2*X3)>>1;
 
 
-
-
-int boundaryCrossing;
 """)
         if domain_wall:
           if dslash4 == True:
             prolog_str+=(
 """
-int X, x1, x2, x3, x4, xs;
+int coord[5];
+int X;
 """)
           else:
             prolog_str+=(
 """
-int X, xs;
+int coord[5];
 """)
         else:
           prolog_str+=(
 """
-int X, x1, x2, x3, x4, xs;
+int coord[5];
+int X;
 """)
 
 
@@ -403,10 +401,10 @@ int X, x1, x2, x3, x4, xs;
 """
 { // exterior kernel
 
-dim = dimFromDWFaceIndex(sid, param); // sid is also modified
+dim = dimFromFaceIndex<5>(sid, param); // sid is also modified
 
-//const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
-const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim])*param.Ls >> 1);
+//const int face_volume = (param.threads*param.dc.Ls >> 1); // volume of one face
+const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim])*param.dc.Ls >> 1);
 
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
@@ -415,24 +413,30 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
 
-
-const int dims[] = {X1, X2, X3, X4};
-coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
+switch(dim) {
+case 0:
+  coordsFromFaceIndex<5,QUDA_4D_PC,0,1>(X, sid, coord, face_idx, face_num, param);
+  break;
+case 1:
+  coordsFromFaceIndex<5,QUDA_4D_PC,1,1>(X, sid, coord, face_idx, face_num, param);
+  break;
+case 2:
+  coordsFromFaceIndex<5,QUDA_4D_PC,2,1>(X, sid, coord, face_idx, face_num, param);
+  break;
+case 3:
+  coordsFromFaceIndex<5,QUDA_4D_PC,3,1>(X, sid, coord, face_idx, face_num, param);
+  break;
+}
 
 {
   bool active = false;
   for(int dir=0; dir<4; ++dir){
-    active = active || isActive(dim,dir,+1,x1,x2,x3,x4,param.commDim,param.X);
+    active = active || isActive(dim,dir,+1,coord,param.commDim,param.dc.X);
   }
   if(!active) return;
 }
 
 
-
-
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
 
 READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
 """)
@@ -514,24 +518,22 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-# boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-# interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
-    boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-    interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
+    boundary = ["coord[0]==(param.dc.X[0]-1)", "coord[0]==0", "coord[1]==(param.dc.X[1]-1)", "coord[1]==0", "coord[2]==(param.dc.X[2]-1)", "coord[2]==0", "coord[3]==(param.dc.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.dc.X[0]-1)", "coord[0]>0", "coord[1]<(param.dc.X[1]-1)", "coord[1]>0", "coord[2]<(param.dc.X[2]-1)", "coord[2]>0", "coord[3]<(param.dc.X[3]-1)", "coord[3]>0"]
 
     offset = ["+1", "-1", "+1", "-1", "+1", "-1", "+1", "-1"]
 
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+X1", "X-X1", "X+X2X1", "X-X2X1", "X+X3X2X1", "X-X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.dc.X[0]", "X-param.dc.X[0]", "X+param.dc.X2X1", "X-param.dc.X2X1", "X+param.dc.X3X2X1", "X-param.dc.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-X1m1", "X+X1m1", "X-X2X1mX1", "X+X2X1mX1", "X-X3X2X1mX2X1", "X+X3X2X1mX2X1",
-                   "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.dc.X[0]-1)", "X+(param.dc.X[0]-1)", "X-param.dc.X2X1mX1", "X+param.dc.X2X1mX1", "X-param.dc.X3X2X1mX2X1", "X+param.dc.X3X2X1mX2X1",
+                   "X-param.dc.X4X3X2X1mX3X2X1", "X+param.dc.X4X3X2X1mX3X2X1"]
 
     cond = ""
-    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " + boundary[dir] + " )\n"
+    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.dc.X) && " + boundary[dir] + " )\n"
 
 
     str = ""
@@ -542,24 +544,24 @@ def gen(dir, pack_only=False):
         str += "//"+l+"\n"
     str += "\n"
 
-    str += "faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs," + `dir/2` + ",Y);\n"
-    str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "];\n"
+    str += "faceIndexFromCoords<5,1>(face_idx,coord," + `dir/2` + ",param);\n"
+    str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "][" + `1-dir%2` + "];\n"
     str += "#if (DD_PREC==2) // half precision\n"
     str += "  sp_norm_idx = face_idx + "
-    if dir%2 == 0:
-      str += "param.Ls*ghostFace[" + `dir/2` + "] + "
-    str += "param.ghostNormOffset[" + `dir/2` + "];\n"
+#    if dir%2 == 0:
+#      str += "param.dc.Ls*param.dc.ghostFace[" + `dir/2` + "] + "
+    str += "param.ghostNormOffset[" + `dir/2` + "][" + `1-dir%2` + "];\n"
     str += "#endif\n\n"
     str += "\n"
 
 
 
     if dir % 2 == 0:
-        if domain_wall: str += "const int ga_idx = sid % Vh;\n"
+        if domain_wall: str += "const int ga_idx = sid % param.dc.volume_4d_cb;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
-        if domain_wall: str += "const int ga_idx = Vh+(face_idx % ghostFace[" + `dir/2` + "]);\n"
-        else: str += "const int ga_idx = Vh+face_idx;\n"
+        if domain_wall: str += "const int ga_idx = param.dc.volume_4d_cb+(face_idx % param.dc.ghostFace[" + `dir/2` + "]);\n"
+        else: str += "const int ga_idx = param.dc.volume_4d_cb+face_idx;\n"
     str += "\n"
 
     # scan the projector to determine which loads are required
@@ -590,9 +592,9 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     if domain_wall : 
-        load_half += "const int sp_stride_pad = param.Ls*ghostFace[" + `dir/2` + "];\n"
+        load_half += "const int sp_stride_pad = param.dc.Ls*param.dc.ghostFace[" + `dir/2` + "];\n"
     else :
-        load_half += "const int sp_stride_pad = ghostFace[" + `dir/2` + "];\n" 
+        load_half += "const int sp_stride_pad = param.dc.ghostFace[" + `dir/2` + "];\n" 
 
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"
@@ -600,10 +602,11 @@ def gen(dir, pack_only=False):
 
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    if (dir+1) % 2 == 0: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
-    else: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
+    load_half += "READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, "+`dir`+");\n\n"
+#    if (dir+1) % 2 == 0: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+#    else: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
     load_gauge = "// read gauge matrix from device memory\n"
-    load_gauge += "ASSN_GAUGE_MATRIX(G, GAUGE"+`( dir%2)`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
+    load_gauge += "ASSN_GAUGE_MATRIX(G, GAUGE"+`( dir%2)`+"TEX, "+`dir`+", ga_idx, param.gauge_stride);\n\n"
 
     reconstruct_gauge = "// reconstruct gauge matrix\n"
     reconstruct_gauge += "RECONSTRUCT_GAUGE_MATRIX("+`dir`+");\n\n"
@@ -699,7 +702,7 @@ def gen(dir, pack_only=False):
         if ( m < 2 ): reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.dc.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(load_gauge + decl_half + prep_half + reconstruct_gauge + mult + reconstruct)
@@ -720,7 +723,7 @@ def gen_dw_inv():
     str = "\n"
     str += "VOLATILE spinorFloat kappa;\n\n"
     str += "#ifdef MDWF_mode   // Check whether MDWF option is enabled\n" 
-    str += "  kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));\n"
+    str += "  kappa = (spinorFloat)(-(mdwf_c5[coord[4]]*(4.0 + m5) - 1.0)/(mdwf_b5[coord[4]]*(4.0 + m5) + 1.0));\n"
     str += "#else\n" 
     str += "  kappa = 2.0*a;\n"
     str += "#endif  // select MDWF mode\n\n"
@@ -730,23 +733,23 @@ def gen_dw_inv():
     str += "// 'w' means output vector\n"
     str += "// 'v' means input vector\n"
     str += "{\n"
-    str += "  int base_idx = sid%Vh;\n"
+    str += "  int base_idx = sid%param.dc.volume_4d_cb;\n"
     str += "  int sp_idx;\n\n"
     str += "// let's assume the index,\n"
     str += "// s = output vector index,\n"
     str += "// s' = input vector index and\n"
     str += "// 'a'= kappa5\n"
     str += "\n"
-    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,param.Ls)*mferm);\n"
+    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,param.dc.Ls)*mferm);\n"
     str += "  spinorFloat factorR;\n"
     str += "  spinorFloat factorL;\n"
     str += "\n"
-    str += "  for(int s = 0; s < param.Ls; s++)\n  {\n"
+    str += "  for(int s = 0; s < param.dc.Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    factorR = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    factorR = ( coord[4] > s ? -inv_d_n*pow(kappa,param.dc.Ls-coord[4]+s)*mferm : inv_d_n*pow(kappa,s-coord[4]))/2.0;\n\n"
     else : 
-        str += "    factorR = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
-    str += "    sp_idx = base_idx + s*Vh;\n"
+        str += "    factorR = ( coord[4] < s ? -inv_d_n*pow(kappa,param.dc.Ls-s+coord[4])*mferm : inv_d_n*pow(kappa,coord[4]-s))/2.0;\n\n"
+    str += "    sp_idx = base_idx + s*param.dc.volume_4d_cb;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
     str += "    o00_re += factorR*(i00_re + i20_re);\n" 
@@ -775,9 +778,9 @@ def gen_dw_inv():
     str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
     if dagger == True :  
-        str += "    factorL = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
+        str += "    factorL = ( coord[4] < s ? -inv_d_n*pow(kappa,param.dc.Ls-s+coord[4])*mferm : inv_d_n*pow(kappa,coord[4]-s))/2.0;\n\n"
     else : 
-        str += "    factorL = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    factorL = ( coord[4] > s ? -inv_d_n*pow(kappa,param.dc.Ls-coord[4]+s)*mferm : inv_d_n*pow(kappa,s-coord[4]))/2.0;\n\n"
 
     str += "    o00_re += factorL*(i00_re - i20_re);\n"
     str += "    o00_im += factorL*(i00_im - i20_im);\n"
@@ -909,64 +912,6 @@ def apply_clover():
 # end def clover
 
 
-def twisted_rotate(x):
-    str = "// apply twisted mass rotation\n"
-
-    for h in range(0, 4):
-        for c in range(0, 3):
-            strRe = ""
-            strIm = ""
-            for s in range(0, 4):
-                # identity
-                re = id[4*h+s].real
-                im = id[4*h+s].imag
-                if re==0 and im==0: ()
-                elif im==0:
-                    strRe += sign(re)+out_re(s,c)
-                    strIm += sign(re)+out_im(s,c)
-                elif re==0:
-                    strRe += sign(-im)+out_im(s,c)
-                    strIm += sign(im)+out_re(s,c)
-                
-                # sign(x)*i*mu*gamma_5
-                re = igamma5[4*h+s].real
-                im = igamma5[4*h+s].imag
-                if re==0 and im==0: ()
-                elif im==0:
-                    strRe += sign(re*x)+out_re(s,c) + "*a"
-                    strIm += sign(re*x)+out_im(s,c) + "*a"
-                elif re==0:
-                    strRe += sign(-im*x)+out_im(s,c) + "*a"
-                    strIm += sign(im*x)+out_re(s,c) + "*a"
-
-            str += "VOLATILE spinorFloat "+tmp_re(h,c)+" = " + strRe + ";\n"
-            str += "VOLATILE spinorFloat "+tmp_im(h,c)+" = " + strIm + ";\n"
-        str += "\n"
-    
-    return str+"\n"
-
-
-def twisted():
-    str = ""
-    str += twisted_rotate(+1)
-
-    str += "#ifndef DSLASH_XPAY\n"
-    str += "//scale by b = 1/(1 + a*a) \n"
-    for s in range(0,4):
-        for c in range(0,3):
-            str += out_re(s,c) + " = b*" + tmp_re(s,c) + ";\n"
-            str += out_im(s,c) + " = b*" + tmp_im(s,c) + ";\n"
-    str += "#else\n"
-    for s in range(0,4):
-        for c in range(0,3):
-            str += out_re(s,c) + " = " + tmp_re(s,c) + ";\n"
-            str += out_im(s,c) + " = " + tmp_im(s,c) + ";\n"
-    str += "#endif // DSLASH_XPAY\n"
-    str += "\n"
-
-    return block(str)+"\n"
-# end def twisted
-
 def coeff():
   if dslash4:
     str = "coeff"
@@ -984,18 +929,16 @@ def ypax():
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat2(2*i+1)+";\n"
+            str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat2(2*i+0)+";\n"
+            str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat2(2*i+1)+";\n"
 
     str += "#else\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat4(2*i+1)+";\n"
+            str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat4(2*i+0)+";\n"
+            str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat4(2*i+1)+";\n"
 
     str += "#endif // SPINOR_DOUBLE\n"
     return str
@@ -1005,17 +948,18 @@ def xpay():
     str = ""
     str += "#ifdef DSLASH_XPAY\n"
     str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n"
+
     if dslash4:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
-      str += "coeff = (spinorFloat)(0.5*a/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
+      str += "coeff = (spinorFloat)(0.5*a/(mdwf_b5[coord[4]]*(m5+4.0) + 1.0));\n"
       str += "#else\n"
       str += "coeff = a;\n"
       str += "#endif\n\n"
     elif dslash5:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
-      str += "coeff = (spinorFloat)(0.5/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
+      str += "coeff = (spinorFloat)(0.5/(mdwf_b5[coord[4]]*(m5+4.0) + 1.0));\n"
       str += "coeff *= -coeff;\n"
       str += "#else\n"
       str += "coeff = a;\n"
@@ -1029,24 +973,16 @@ def xpay():
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
-            else:
-                str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
+            str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
+            str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
 
     str += "#else\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
-            else:
-                str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
+            str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
+            str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
 
     str += "#endif // SPINOR_DOUBLE\n"
     if dslash5:
@@ -1059,7 +995,7 @@ def xpay():
 
 def epilog():
     str = ""
-    str += block( "\n" + (twisted() if twist else apply_clover()) + xpay() )
+    str += block( "\n" + ( apply_clover()) + xpay() )
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
@@ -1069,6 +1005,9 @@ def epilog():
     str += "#undef m5\n"
     str += "#undef mdwf_b5\n"
     str += "#undef mdwf_c5\n"
+    str += "#undef mferm\n"
+    str += "#undef a\n"
+    str += "#undef b\n"
     str += "#undef spinorFloat\n"
     str += "#undef SHARED_STRIDE\n\n"
 
@@ -1199,7 +1138,6 @@ print "Shared floats set to " + str(sharedFloats);
 
 # generate Domain Wall Dslash kernels
 domain_wall = True
-twist = False
 clover = False
 dslash4 = True
 dslash5 = False

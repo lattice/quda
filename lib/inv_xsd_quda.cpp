@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -10,32 +11,26 @@
 #include <util_quda.h>
 #include <sys/time.h>
 
-#include <face_quda.h>
-#include <iostream>
-
-
 namespace quda {
 
-#ifdef MULTI_GPU
   XSD::XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
     Solver(param,profile), mat(mat)
   {
     sd = new SD(mat,param,profile);
-    for(int i=0; i<4; ++i) R[i] = param.overlap_precondition*commDimPartitioned(i);
+    for(int i=0; i<4; ++i) R[i] = param.overlap_precondition*comm_dim_partitioned(i);
   }
 
   XSD::~XSD(){
-    if(param.inv_type_precondition != QUDA_GCR_INVERTER) profile.TPSTART(QUDA_PROFILE_FREE);
+    if(!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
     if(init){
       delete xx;
       delete bx;
     }
     delete sd;
-    if(param.inv_type_precondition != QUDA_GCR_INVERTER) profile.TPSTOP(QUDA_PROFILE_FREE);
+    if(!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-
-  void XSD::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
+  void XSD::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
     if(!init){
      ColorSpinorParam csParam(b);
@@ -56,5 +51,4 @@ namespace quda {
     return;
   }
 
-#endif // MULTI_GPU
 } // namespace quda

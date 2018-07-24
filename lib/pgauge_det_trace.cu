@@ -38,12 +38,6 @@ struct KernelArg : public ReduceArg<double2> {
   double2 getValue(){return result_h[0];}
 };
 
-template<class Cmplx>
- __device__ __host__ inline double2 CmplxToDouble2(const Cmplx b){
-  return make_double2(b.x , b.y);
-}
-
-
 
 
 template<int blockSize, typename Float, typename Gauge, int NCOLORS, int functiontype>
@@ -51,12 +45,8 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   int idx = threadIdx.x + blockIdx.x*blockDim.x;
   int parity = threadIdx.y;
 
-  typedef cub::BlockReduce<double2, blockSize> BlockReduce;
-  __shared__ typename BlockReduce::TempStorage temp_storage;
-  
-  double2 val = make_double2(0.0, 0.0);
+  complex<double> val(0.0, 0.0);
   if(idx < arg.threads) {
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
     int X[4]; 
     #pragma unroll
     for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
@@ -73,14 +63,15 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   #endif
 #pragma unroll
     for (int mu = 0; mu < 4; mu++) {
-      Matrix<Cmplx,NCOLORS> U;
+      Matrix<complex<Float>,NCOLORS> U;
       arg.dataOr.load((Float*)(U.data), idx, mu, parity);
-      if(functiontype == 0) val += CmplxToDouble2(getDeterminant(U));
-      if(functiontype == 1) val += CmplxToDouble2(getTrace(U));
+      if(functiontype == 0) val += getDeterminant(U);
+      if(functiontype == 1) val += getTrace(U);
     }
   }
 
-  reduce2d<blockSize,2>(arg, val);
+  double2 sum = make_double2(val.real(), val.imag());
+  reduce2d<blockSize,2>(arg, sum);
 }
 
 
@@ -101,7 +92,7 @@ class CalcFunc : TunableLocalParity {
     tp = tuneLaunch(*this, getTuning(), getVerbosity());
     arg.result_h[0] = make_double2(0.0, 0.0);
     LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
     comm_allreduce_array((double*)arg.result_h, 2);
     arg.result_h[0].x  /= (double)(4*2*arg.threads*comm_size());
@@ -111,20 +102,14 @@ class CalcFunc : TunableLocalParity {
   TuneKey tuneKey() const {
     std::stringstream vol;
     vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
-    sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+    sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
     return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     
   }
-  std::string paramString(const TuneParam &param) const {
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-    ps << "shared=" << param.shared_bytes;
-    return ps.str();
-  }
 
   long long flops() const { 
-    if(NCOLORS==3 && functiontype == 0) return 264LL*2*arg.threads+2LL*tp.block.x ; 
-    if(NCOLORS==3 && functiontype == 1) return 24LL*2*arg.threads+2LL*tp.block.x ; 
+    if(NCOLORS==3 && functiontype == 0) return 264LL*2*arg.threads+2LL*tp.block.x;
+    else if(NCOLORS==3 && functiontype == 1) return 24LL*2*arg.threads+2LL*tp.block.x;
     else return 0; 
   }// Only correct if there is no link reconstruction
   long long bytes() const { return 4LL*NCOLORS * NCOLORS * sizeof(Float)*2*2*arg.threads + tp.block.x * sizeof(double2); }
@@ -145,7 +130,7 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 0) printfQuda("Determinant: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 1) printfQuda("Trace: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   checkCudaError();
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
   if (getVerbosity() >= QUDA_SUMMARIZE){
     profileGenericFunc.TPSTOP(QUDA_PROFILE_COMPUTE);
     double secs = profileGenericFunc.Last(QUDA_PROFILE_COMPUTE);
@@ -174,27 +159,29 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
 template<typename Float, int functiontype>
 double2 computeValue(cudaGaugeField& data) {
 
+  double2 rtn = make_double2(0.0,0.0);
+
   // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-  // Need to fix this!!
   if(data.isNative()) {
     if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
     //printfQuda("QUDA_RECONSTRUCT_NO\n");
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
-      return  computeValue<Float, 3, functiontype>(Gauge(data), data);
+      rtn = computeValue<Float, 3, functiontype>(Gauge(data), data);
     } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
     //printfQuda("QUDA_RECONSTRUCT_12\n");
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
-      return computeValue<Float, 3, functiontype>(Gauge(data), data);
+      rtn = computeValue<Float, 3, functiontype>(Gauge(data), data);
     } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
     //printfQuda("QUDA_RECONSTRUCT_8\n");
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
-      return computeValue<Float, 3, functiontype>(Gauge(data), data);    
+      rtn = computeValue<Float, 3, functiontype>(Gauge(data), data);
     } else {
       errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
     }
   } else {
     errorQuda("Invalid Gauge Order\n");
   }
+  return rtn;
 }
 #endif // GPU_GAUGE_ALG
 
@@ -204,20 +191,19 @@ double2 computeValue(cudaGaugeField& data) {
 * @returns double2 complex Determinant value
 */
 double2 getLinkDeterminant( cudaGaugeField& data) {
+  double2 det = make_double2(0.0,0.0);
 #ifdef GPU_GAUGE_ALG
-  if(data.Precision() == QUDA_HALF_PRECISION) {
-    errorQuda("Half precision not supported\n");
-  }
   if (data.Precision() == QUDA_SINGLE_PRECISION) {
-    return computeValue<float, 0> (data);
+    det = computeValue<float, 0> (data);
   } else if(data.Precision() == QUDA_DOUBLE_PRECISION) {
-    return computeValue<double, 0>(data);
+    det = computeValue<double, 0>(data);
   } else {
     errorQuda("Precision %d not supported", data.Precision());
   }
 #else
   errorQuda("Pure gauge code has not been built");
 #endif // GPU_GAUGE_ALG
+  return det;
 }
 
 /** @brief Calculate the Trace
@@ -226,21 +212,20 @@ double2 getLinkDeterminant( cudaGaugeField& data) {
 * @returns double2 complex trace value
 */
 double2 getLinkTrace( cudaGaugeField& data) {
+  double2 det = make_double2(0.0,0.0);
 #ifdef GPU_GAUGE_ALG
-  if(data.Precision() == QUDA_HALF_PRECISION) {
-    errorQuda("Half precision not supported\n");
-  }
   if (data.Precision() == QUDA_SINGLE_PRECISION) {
-    return computeValue<float, 1> (data);
+    det = computeValue<float, 1> (data);
   } else if(data.Precision() == QUDA_DOUBLE_PRECISION) {
-    return computeValue<double, 1>(data);
+    det = computeValue<double, 1>(data);
   } else {
     errorQuda("Precision %d not supported", data.Precision());
   }
 #else
   errorQuda("Pure gauge code has not been built");
 #endif // GPU_GAUGE_ALG
+  return det;
 }
 
 
-}
+} // namespace quda

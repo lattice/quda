@@ -42,13 +42,12 @@ namespace quda {
   __global__ void compute_InitGauge_ColdStart(InitGaugeColdArg<Gauge> arg){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if ( idx >= arg.threads ) return;
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
     int parity = 0;
     if ( idx >= arg.threads / 2 ) {
       parity = 1;
       idx -= arg.threads / 2;
     }
-    Matrix<Cmplx,NCOLORS> U;
+    Matrix<complex<Float>,NCOLORS> U;
     setIdentity(&U);
     for ( int d = 0; d < 4; d++ )
       arg.dataOr.save((Float*)(U.data),idx, d, parity);
@@ -93,20 +92,11 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-    void preTune(){
-    }
-    void postTune(){
-    }
+
     long long flops() const {
       return 0;
     }                                  // Only correct if there is no link reconstruction, no cub reduction accounted also
@@ -197,25 +187,15 @@ namespace quda {
   };
 
 
-
-  template<typename Cmplx>
-  __device__ __host__ static inline typename RealTypeId<Cmplx>::Type Abs2(const Cmplx & a){
-    return a.x * a.x + a.y * a.y;
-  }
-
-
-
   template <typename Float>
-  __host__ __device__ static inline void reunit_link( Matrix<typename ComplexTypeId<Float>::Type,3> &U ){
+  __host__ __device__ static inline void reunit_link( Matrix<complex<Float>,3> &U ){
 
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
-
-    Cmplx t2 = makeComplex((Float)0.0, (Float)0.0);
+    complex<Float> t2((Float)0.0, (Float)0.0);
     Float t1 = 0.0;
     //first normalize first row
     //sum of squares of row
 #pragma unroll
-    for ( int c = 0; c < 3; c++ ) t1 += Abs2(U(0, c));
+    for ( int c = 0; c < 3; c++ ) t1 += norm(U(0,c));
     t1 = (Float)1.0 / sqrt(t1);
     //14
     //used to normalize row
@@ -223,7 +203,7 @@ namespace quda {
     for ( int c = 0; c < 3; c++ ) U(0,c) *= t1;
     //6
 #pragma unroll
-    for ( int c = 0; c < 3; c++ ) t2 += Conj(U(0,c)) * U(1,c);
+    for ( int c = 0; c < 3; c++ ) t2 += conj(U(0,c)) * U(1,c);
     //24
 #pragma unroll
     for ( int c = 0; c < 3; c++ ) U(1,c) -= t2 * U(0,c);
@@ -232,7 +212,7 @@ namespace quda {
     //sum of squares of row
     t1 = 0.0;
 #pragma unroll
-    for ( int c = 0; c < 3; c++ ) t1 += Abs2(U(1,c));
+    for ( int c = 0; c < 3; c++ ) t1 += norm(U(1,c));
     t1 = (Float)1.0 / sqrt(t1);
     //14
     //used to normalize row
@@ -240,9 +220,9 @@ namespace quda {
     for ( int c = 0; c < 3; c++ ) U(1, c) *= t1;
     //6
     //Reconstruct lat row
-    U(2,0) = Conj(U(0,1) * U(1,2) - U(0,2) * U(1,1));
-    U(2,1) = Conj(U(0,2) * U(1,0) - U(0,0) * U(1,2));
-    U(2,2) = Conj(U(0,0) * U(1,1) - U(0,1) * U(1,0));
+    U(2,0) = conj(U(0,1) * U(1,2) - U(0,2) * U(1,1));
+    U(2,1) = conj(U(0,2) * U(1,0) - U(0,0) * U(1,2));
+    U(2,2) = conj(U(0,0) * U(1,1) - U(0,1) * U(1,0));
     //42
     //T=130
   }
@@ -280,11 +260,10 @@ namespace quda {
     @param id indices
  */
   template <class T, int NCOLORS>
-  __host__ __device__ static inline void mul_block_sun( Matrix<T,2> u, Matrix<typename ComplexTypeId<T>::Type,NCOLORS> &link, int2 id ){
-    typename ComplexTypeId<T>::Type tmp;
+  __host__ __device__ static inline void mul_block_sun( Matrix<T,2> u, Matrix<complex<T>,NCOLORS> &link, int2 id ){
     for ( int j = 0; j < NCOLORS; j++ ) {
-      tmp = makeComplex( u(0,0), u(1,1) ) * link(id.x, j) + makeComplex( u(1,0), u(0,1) ) * link(id.y, j);
-      link(id.y, j) = makeComplex(-u(1,0), u(0,1) ) * link(id.x, j) + makeComplex( u(0,0),-u(1,1) ) * link(id.y, j);
+      complex<T> tmp = complex<T>( u(0,0), u(1,1) ) * link(id.x, j) + complex<T>( u(1,0), u(0,1) ) * link(id.y, j);
+      link(id.y, j) = complex<T>(-u(1,0), u(0,1) ) * link(id.x, j) + complex<T>( u(0,0),-u(1,1) ) * link(id.y, j);
       link(id.x, j) = tmp;
     }
   }
@@ -323,12 +302,12 @@ namespace quda {
     @return SU(Nc) matrix
  */
   template <class Float, int NCOLORS>
-  __device__ inline Matrix<typename ComplexTypeId<Float>::Type,NCOLORS> randomize( cuRNGState& localState ){
-    Matrix<typename ComplexTypeId<Float>::Type,NCOLORS> U;
+  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( cuRNGState& localState ){
+    Matrix<complex<Float>,NCOLORS> U;
 
     for ( int i = 0; i < NCOLORS; i++ )
       for ( int j = 0; j < NCOLORS; j++ )
-        U(i,j) = makeComplex( (Float)(Random<Float>(localState) - 0.5), (Float)(Random<Float>(localState) - 0.5));
+        U(i,j) = complex<Float>( (Float)(Random<Float>(localState) - 0.5), (Float)(Random<Float>(localState) - 0.5) );
     reunit_link<Float>(U);
     return U;
 
@@ -346,7 +325,6 @@ namespace quda {
   __global__ void compute_InitGauge_HotStart(InitGaugeHotArg<Gauge> arg){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if ( idx >= arg.threads ) return;
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
   #ifdef MULTI_GPU
     int X[4], x[4];
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
@@ -363,7 +341,7 @@ namespace quda {
       idx = linkIndex(x,X);
     #endif
       for ( int d = 0; d < 4; d++ ) {
-        Matrix<Cmplx,NCOLORS> U;
+        Matrix<complex<Float>,NCOLORS> U;
         U = randomize<Float, NCOLORS>(localState);
         arg.dataOr.save((Float*)(U.data),idx, d, parity);
       }
@@ -418,16 +396,11 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+      sprintf(aux_string,"threads=%d,prec=%lud", arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     void preTune(){ arg.rngstate.backup(); }
     void postTune(){ arg.rngstate.restore(); }
     long long flops() const {
@@ -449,33 +422,9 @@ namespace quda {
     InitGaugeHot<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
     checkCudaError();
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
     data.exchangeExtendedGhost(data.R(),false);
-    /*cudaDeviceSynchronize();
-       const double unitarize_eps = 1e-14;
-       const double max_error = 1e-10;
-       const int reunit_allow_svd = 1;
-       const int reunit_svd_only  = 0;
-       const double svd_rel_error = 1e-6;
-       const double svd_abs_error = 1e-6;
-       setUnitarizeLinksConstants(unitarize_eps, max_error,
-        reunit_allow_svd, reunit_svd_only,
-        svd_rel_error, svd_abs_error);
-       int num_failures=0;
-       int* num_failures_dev;
-       cudaMalloc((void**)&num_failures_dev, sizeof(int));
-       cudaMemset(num_failures_dev, 0, sizeof(int));
-       if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
-
-       unitarizeLinksQuda(data, num_failures_dev);
-       cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-       if(num_failures>0){
-       cudaFree(num_failures_dev);
-       errorQuda("Error in the unitarization\n");
-       exit(1);
-       }
-       cudaFree(num_failures_dev);*/
   }
 
 

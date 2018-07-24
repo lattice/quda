@@ -12,8 +12,6 @@
 
 namespace quda {
 
-#ifdef GPU_GAUGE_ALG
-  
 #define BLOCKSDIVUP(a, b)  (((a)+(b)-1)/(b))
 
 
@@ -34,16 +32,16 @@ dim3 GetBlockDim(size_t threads, size_t size){
             exit(EXIT_FAILURE);                                         \
         } }
 
-#  define CUDA_SAFE_CALL( call)     CUDA_SAFE_CALL_NO_SYNC(call);   
+#  define CUDA_SAFE_CALL( call)     CUDA_SAFE_CALL_NO_SYNC(call);
 
 /**
     @brief CUDA kernel to initialize CURAND RNG states
     @param state CURAND RNG state array
     @param seed initial seed for RNG
     @param rng_size size of the CURAND RNG state array
-    @param node_offset this parameter is used to skip ahead the index in the sequence, usefull for multigpu. 
+    @param node_offset this parameter is used to skip ahead the index in the sequence, usefull for multigpu.
 */
-__global__ void 
+__global__ void
 kernel_random(cuRNGState *state, int seed, int rng_size, int node_offset ){
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if(id < rng_size){
@@ -59,7 +57,7 @@ struct rngArg{
 };
 
 
-__global__ void 
+__global__ void
 kernel_random(cuRNGState *state, int seed, int rng_size, int node_offset, rngArg arg ){
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if(id < rng_size){
@@ -82,9 +80,9 @@ kernel_random(cuRNGState *state, int seed, int rng_size, int node_offset, rngArg
     @param state CURAND RNG state array
     @param seed initial seed for RNG
     @param rng_size size of the CURAND RNG state array
-    @param node_offset this parameter is used to skip ahead the index in the sequence, usefull for multigpu. 
+    @param node_offset this parameter is used to skip ahead the index in the sequence, usefull for multigpu.
 */
-void launch_kernel_random(cuRNGState *state, int seed, int rng_size, int node_offset, int X[4]){  
+void launch_kernel_random(cuRNGState *state, int seed, int rng_size, int node_offset, int X[4]){
     dim3 nthreads(128,1,1);
     dim3 nblocks = GetBlockDim(nthreads.x, rng_size);
     //CUDA_SAFE_CALL(cudaFuncSetCacheConfig( kernel_random,	cudaFuncCachePreferL1));
@@ -99,7 +97,7 @@ void launch_kernel_random(cuRNGState *state, int seed, int rng_size, int node_of
     }
     kernel_random<<<nblocks,nthreads>>>(state, seed, rng_size, 0, arg);
     #endif
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 }
 
 RNG::RNG(int rng_sizes, int seedin){
@@ -118,8 +116,10 @@ RNG::RNG(int rng_sizes, int seedin){
 #else
     printfQuda("Using curandStateMRG32k3a\n");
 #endif
-} 
-RNG::RNG(int rng_sizes, int seedin, int XX[4]){
+}
+
+
+RNG::RNG(int rng_sizes, int seedin, const int XX[4]){
     rng_size = rng_sizes;
     seed = seedin;
     state = NULL;
@@ -135,7 +135,7 @@ RNG::RNG(int rng_sizes, int seedin, int XX[4]){
 #else
     printfQuda("Using curandStateMRG32k3a\n");
 #endif
-} 
+}
 
 
 
@@ -146,8 +146,8 @@ RNG::RNG(int rng_sizes, int seedin, int XX[4]){
 void RNG::Init(){
 	AllocateRNG();
 	launch_kernel_random(state, seed, rng_size, node_offset, X);
-}		
-					
+}
+
 
 /**
     @brief Allocate Device memory for CURAND RNG states
@@ -176,7 +176,7 @@ void RNG::Release(){
 
 
 /*! @brief Restore CURAND array states initialization */
-void RNG::restore(){    
+void RNG::restore(){
   cudaError_t err = cudaMemcpy(state, backup_state, rng_size * sizeof(cuRNGState), cudaMemcpyHostToDevice);
   if (err != cudaSuccess) {
     host_free(backup_state);
@@ -186,8 +186,8 @@ void RNG::restore(){
   host_free(backup_state);
 }
 /*! @brief Backup CURAND array states initialization */
-void RNG::backup(){ 
-  backup_state = (cuRNGState*) safe_malloc(rng_size * sizeof(cuRNGState));   
+void RNG::backup(){
+  backup_state = (cuRNGState*) safe_malloc(rng_size * sizeof(cuRNGState));
   cudaError_t err = cudaMemcpy(backup_state, state, rng_size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
   if (err != cudaSuccess) {
     host_free(backup_state);
@@ -196,6 +196,5 @@ void RNG::backup(){
   }
 }
 
-#endif // GPU_GAUGE_ALG
 
 }
