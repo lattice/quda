@@ -3,6 +3,6 @@ show_downloads: "true"
 title: QUDA
 description: A library for QCD on GPUs
 github:
-        #zip_url: https://github.com/lattice/quda/archive/v0.9.0.zip
+  zip_url: https://github.com/lattice/quda/archive/v0.9.0.zip
   tar_url: https://github.com/lattice/quda/archive/v0.9.0.tar.gz
 
