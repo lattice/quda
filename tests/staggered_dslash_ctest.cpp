@@ -100,7 +100,7 @@ extern int Nsrc; // number of spinors to apply to simultaneously
 Dirac* dirac;
 
 const char *prec_str[] = {"half", "single", "double"};
-const char *recon_str[] = {"r18"}; //{"r18", "r13", "r9"};
+const char *recon_str[] = {"r18", "r13", "r9"};
 
 // Unitarization coefficients
 static double unitarize_eps  = 1e-6;
@@ -196,8 +196,10 @@ void init(int precision, QudaReconstructType link_recon) {
 
     // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH &&
-    dslash_type != QUDA_ASQTAD_DSLASH)
+    dslash_type != QUDA_ASQTAD_DSLASH &&
+    dslash_type != QUDA_LAPLACE_DSLASH) {
     dslash_type = QUDA_ASQTAD_DSLASH;
+  }
 
   gaugeParam.anisotropy = 1.0;
   gaugeParam.tadpole_coeff = 1.0; //0.8;
@@ -216,11 +218,17 @@ void init(int precision, QudaReconstructType link_recon) {
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = dslash_type;
   inv_param.mass = mass;
+  inv_param.kappa = 1.0/(8.0+mass); // for laplace
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+
+  if (test_type < 2) {
+    inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  }
 
   // ensure that the default is improved staggered
   if (inv_param.dslash_type != QUDA_STAGGERED_DSLASH &&
-    inv_param.dslash_type != QUDA_ASQTAD_DSLASH)
+    inv_param.dslash_type != QUDA_ASQTAD_DSLASH &&
+    inv_param.dslash_type != QUDA_LAPLACE_DSLASH)
     inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
@@ -233,43 +241,6 @@ void init(int precision, QudaReconstructType link_recon) {
 
   gaugeParam.ga_pad = tmpint;
   inv_param.sp_pad = tmpint;
-
-  ColorSpinorParam csParam;
-  csParam.nColor=3;
-  csParam.nSpin=1;
-  csParam.nDim=5;
-  for(int d = 0; d < 4; d++) {
-    csParam.x[d] = gaugeParam.X[d];
-  }
-  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
-
-  csParam.setPrecision(inv_param.cpu_prec);
-  csParam.pad = 0;
-  if (test_type < 2) {
-    inv_param.solution_type = QUDA_MATPC_SOLUTION;
-    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-    csParam.x[0] /= 2;
-  } else {
-    inv_param.solution_type = QUDA_MAT_SOLUTION;
-    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;	
-  }
-
-  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
-  csParam.create = QUDA_ZERO_FIELD_CREATE;    
-
-  spinor = new cpuColorSpinorField(csParam);
-  spinorOut = new cpuColorSpinorField(csParam);
-  spinorRef = new cpuColorSpinorField(csParam);
-  tmpCpu = new cpuColorSpinorField(csParam);
-
-  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  csParam.x[0] = gaugeParam.X[0];
-
-  // printfQuda("Randomizing fields ...\n");
-
-  spinor->Source(QUDA_RANDOM_SOURCE);
   
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -308,17 +279,22 @@ void init(int precision, QudaReconstructType link_recon) {
   if (strcmp(latfile,"")) {
     if (!gauge_loaded) {
       read_gauge_field(latfile, qdp_inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
+      if (dslash_type != QUDA_LAPLACE_DSLASH) {
+        applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
+      }
       gauge_loaded = true;
     } // else it's already been loaded
   } else {
-    construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
-    //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      construct_gauge_field(qdp_inlink, 0, gaugeParam.cpu_prec, &gaugeParam);
+    } else {
+      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
+    }
   }
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
   // "compute" the fat/long links or not.
-  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     for (int dir = 0; dir < 4; dir++) {
       memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
       memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
@@ -484,6 +460,43 @@ void init(int precision, QudaReconstructType link_recon) {
   // printfQuda("Sending fields to GPU..."); 
 
   if (!transfer) {
+
+    ColorSpinorParam csParam;
+    csParam.nColor=3;
+    csParam.nSpin=1;
+    csParam.nDim=5;
+    for(int d = 0; d < 4; d++) {
+      csParam.x[d] = gaugeParam.X[d];
+    }
+    csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+
+    csParam.setPrecision(inv_param.cpu_prec);
+    csParam.pad = 0;
+    if (test_type < 2 && dslash_type != QUDA_LAPLACE_DSLASH) {
+      inv_param.solution_type = QUDA_MATPC_SOLUTION;
+      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+      csParam.x[0] /= 2;
+    } else {
+      inv_param.solution_type = QUDA_MAT_SOLUTION;
+      csParam.siteSubset = QUDA_FULL_SITE_SUBSET; 
+    }
+
+    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
+    csParam.create = QUDA_ZERO_FIELD_CREATE;    
+
+    spinor = new cpuColorSpinorField(csParam);
+    spinorOut = new cpuColorSpinorField(csParam);
+    spinorRef = new cpuColorSpinorField(csParam);
+    tmpCpu = new cpuColorSpinorField(csParam);
+
+    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    csParam.x[0] = gaugeParam.X[0];
+
+    // printfQuda("Randomizing fields ...\n");
+
+    spinor->Source(QUDA_RANDOM_SOURCE);
 
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     csParam.pad = inv_param.sp_pad;
@@ -680,44 +693,6 @@ void staggeredDslashRef()
     default:
     errorQuda("Test type not defined");
   }
-
-  /*printfQuda("CPU Test\n");
-  int latDim[4] = {xdim,ydim,zdim,tdim};
-  int coord[4];
-
-  printfQuda("\nFat links:\n\n");
-
-  for (int i = 0; i < 8; i++) {
-    int dir = i/2; int pm = 2*(i%2)-1;
-    coord[0] = coord[1] = 3;
-    coord[2] = coord[3] = 3;
-    coord[dir] += pm;
-    coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
-    printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
-    // wrong, but whatever
-    spinorRef->PrintVector(((((coord[3]*latDim[2]+coord[2])*latDim[1]+coord[1])*latDim[0]+coord[0])>>1)-(dir==0?1:0));
-  }
-
-  printfQuda("\nLong links:\n\n");
-
-  for (int i = 0; i < 8; i++) {
-    int dir = i/2; int pm = 2*(i%2)-1;
-    coord[0] = coord[1] = 3;
-    coord[2] = coord[3] = 3;
-    coord[dir] += 3*pm;
-    coord[dir] = (coord[dir]+latDim[dir])%latDim[dir];
-    printfQuda("Coords %d %d %d %d, ", coord[0], coord[1], coord[2], coord[3]);
-    // wrong, but whatever, it grabs the right neighbor of (2,3,3,3)
-    spinorRef->PrintVector(((((coord[3]*latDim[2]+coord[2])*latDim[1]+coord[1])*latDim[0]+coord[0])>>1)-(dir==0?1:0));
-  }*/
-
-  //errorQuda("Meh\n");
-
-  //for (int i = 0; i < Vh; i++)    
-  //  spinorRef->PrintVector(i);
-
-  // printfQuda("done.\n");
-  //errorQuda("meh");
 
 }
 
