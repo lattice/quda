@@ -394,7 +394,12 @@ namespace quda {
 
     long long flops() const {
       long long Ls = in->X(4);
-      long long vol4d = in->VolumeCB() / Ls;
+			long long vol4d = 0;
+			if( dslashParam.partial_length ){
+      	vol4d = dslashParam.partial_length;
+			}else{
+        vol4d = in->VolumeCB() / Ls;
+			}
       long long bulk = (Ls-2)*vol4d;
       long long wall = 2*vol4d;
       long long flops = 0;
@@ -407,32 +412,26 @@ namespace quda {
           }
           break;
         case 1:
-          flops = 72ll*in->VolumeCB() + 96ll*bulk + 120ll*wall;
+          flops = 72ll*vol4d*Ls + 96ll*bulk + 120ll*wall;
           break;
         case 2:
-          flops = (x ? 96ll : 48ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
+          flops = (x ? 96ll : 48ll)*vol4d*Ls + 96ll*bulk + 120ll*wall;
           break;
         case 3:
 				case 8:
-          flops = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
-          break;
+						flops = 144ll*vol4d*Ls*Ls + 3ll*Ls*(Ls-1ll);
+					break;
         case 4:
 				case 6:
-          if( dslashParam.partial_length ){
-            flops = 1320ll*dslashParam.partial_length*Ls + 144ll*dslashParam.partial_length*Ls*Ls + 3ll*Ls*(Ls-1ll);
-          }else{
-            flops = DslashCuda::flops() + 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
-          }
+            flops = 1320ll*vol4d*Ls + 144ll*vol4d*Ls*Ls + 3ll*Ls*(Ls-1ll) + 72ll*vol4d*Ls + 96ll*bulk + 120ll*wall;
 					break;
 				case 5:
-        case 7:
-          if( dslashParam.partial_length ){
-            flops = 1320ll*dslashParam.partial_length*Ls + 144ll*dslashParam.partial_length*Ls*Ls + 3ll*Ls*(Ls-1ll);
-          }else{
-            flops = DslashCuda::flops() + 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
-          }
+            flops = (x?1368ll:1320ll)*vol4d*Ls + 144ll*vol4d*Ls*Ls + 3ll*Ls*(Ls-1ll);
           break;
-        default:
+        case 7:
+            flops = (x?1368ll:1320ll)*vol4d*Ls + 72ll*vol4d*Ls + 96ll*bulk + 120ll*wall;
+       		break; 
+				default:
           errorQuda("invalid Dslash type");
       }
       return flops;
@@ -451,7 +450,7 @@ namespace quda {
 				case 6:
         case 7:
           if( dslashParam.partial_length ){
-            bytes = 15ll * spinor_bytes * in->VolumeCB();
+            bytes = (x?16ll:15ll)*spinor_bytes*(long long)dslashParam.partial_length*Ls;
           }else{
             bytes = DslashCuda::bytes();
           }
