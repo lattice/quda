@@ -48,6 +48,7 @@ cpuColorSpinorField* tmp;
 
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
+extern double reliable_delta;
 extern int test_type;
 extern int xdim;
 extern int ydim;
@@ -116,7 +117,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
     int X1, int  X2, int X3, int X4,
     QudaPrecision cpu_prec, QudaPrecision prec, QudaPrecision prec_sloppy,
     QudaReconstructType link_recon, QudaReconstructType link_recon_sloppy,
-    double mass, double tol, double reliable_delta,
+    double mass, double tol,
     double tadpole_coeff
     )
 {
@@ -153,7 +154,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->tol_restart = 1e-3; //now theoretical background for this parameter... 
   inv_param->maxiter = niter;
-  inv_param->reliable_delta = 1e-1;
+  inv_param->reliable_delta = reliable_delta;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param->pipeline = pipeline;
@@ -255,7 +256,7 @@ invert_test(void)
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
       cpu_prec, prec, prec_sloppy,
-      link_recon, link_recon_sloppy, mass, tol, 1e-3, tadpole_factor);
+      link_recon, link_recon_sloppy, mass, tol, tadpole_factor);
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
