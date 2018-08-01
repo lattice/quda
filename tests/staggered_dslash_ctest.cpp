@@ -202,7 +202,7 @@ void init(int precision, QudaReconstructType link_recon) {
   }
 
   gaugeParam.anisotropy = 1.0;
-  gaugeParam.tadpole_coeff = 1.0; //0.8;
+  gaugeParam.tadpole_coeff = 0.8;
   gaugeParam.scale = (dslash_type == QUDA_ASQTAD_DSLASH) ? -1.0/(24.0*gaugeParam.tadpole_coeff*gaugeParam.tadpole_coeff) : 1.0;
   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -311,14 +311,20 @@ void init(int precision, QudaReconstructType link_recon) {
 
       // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
 
-      // First path: create V, W links 
+      double u1 = 1.0/gaugeParam.tadpole_coeff;
+      double u2 = u1*u1;
+      double u3 = u2*u1;
+      double u5 = u3*u2;
+      double u7 = u5*u2;
+
+      // First path: create V, W links
       double act_path_coeff_1[6] = {
-        ( 1.0/8.0),                 // one link 
-          0.0,                      // Naik 
-        (-1.0/8.0)*0.5,             // simple staple 
-        ( 1.0/8.0)*0.25*0.5,        // displace link in two directions 
-        (-1.0/8.0)*0.125*(1.0/6.0), // displace link in three directions 
-          0.0                       // Lepage term 
+        u1*( 1.0/8.0),                 /* one link */
+        u5*( 0.0),                     /* Naik */
+        u3*(-1.0/8.0)*0.5,             /* simple staple */
+        u5*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
+        u7*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
+        u5*( 0.0)                      /* Lepage term */
       };
 
       // Second path: create X, long links

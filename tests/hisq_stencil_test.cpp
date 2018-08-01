@@ -82,6 +82,7 @@ static void hisq_test()
   qudaGaugeParam = newQudaGaugeParam();
 
   qudaGaugeParam.anisotropy = 1.0;
+  qudaGaugeParam.tadpole_coeff = 0.8; 
 
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
@@ -115,16 +116,23 @@ static void hisq_test()
   // Set up the coefficients for each part of the HISQ stencil //
   ///////////////////////////////////////////////////////////////
   
-  // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
+  // Reference: "generic_ks/imp_actions/hisq/hisq_action.h",
+  // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
+
+  double u1 = 1.0/qudaGaugeParam.tadpole_coeff;
+  double u2 = u1*u1;
+  double u3 = u2*u1;
+  double u5 = u3*u2;
+  double u7 = u5*u2;
 
   // First path: create V, W links 
   double act_path_coeff_1[6] = {
-    ( 1.0/8.0),                 /* one link */
-      0.0,                      /* Naik */
-    (-1.0/8.0)*0.5,             /* simple staple */
-    ( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
-    (-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
-      0.0                       /* Lepage term */
+    u1*( 1.0/8.0),                 /* one link */
+    u5*( 0.0),                     /* Naik */
+    u3*(-1.0/8.0)*0.5,             /* simple staple */
+    u5*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
+    u7*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
+    u5*( 0.0)                      /* Lepage term */
   };
 
   // Second path: create X, long links
