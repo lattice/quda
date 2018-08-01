@@ -255,7 +255,7 @@ invert_test(void)
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
       cpu_prec, prec, prec_sloppy,
-      link_recon, link_recon_sloppy, mass, tol, 1e-3, tadpole_factor);
+      link_recon, link_recon_sloppy, mass, tol, tadpole_factor);
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
