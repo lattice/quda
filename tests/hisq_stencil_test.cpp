@@ -35,6 +35,7 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern int niter;
 
+extern double tadpole_factor;
 // relativistic correction for naik term
 extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
@@ -82,7 +83,7 @@ static void hisq_test()
   qudaGaugeParam = newQudaGaugeParam();
 
   qudaGaugeParam.anisotropy = 1.0;
-  qudaGaugeParam.tadpole_coeff = 0.8; 
+  qudaGaugeParam.tadpole_coeff = tadpole_factor; 
 
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
@@ -119,13 +120,13 @@ static void hisq_test()
   // Reference: "generic_ks/imp_actions/hisq/hisq_action.h",
   // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
 
-  double u1 = 1.0/qudaGaugeParam.tadpole_coeff;
+  double u1 = 1.0/tadpole_factor;
   double u2 = u1*u1;
   double u3 = u2*u1;
   double u5 = u3*u2;
   double u7 = u5*u2;
 
-  // First path: create V, W links 
+  // First path: create V, W links
   double act_path_coeff_1[6] = {
     u1*( 1.0/8.0),                 /* one link */
     u5*( 0.0),                     /* Naik */

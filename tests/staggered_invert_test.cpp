@@ -68,6 +68,7 @@ extern double mass; // the mass of the Dirac operator
 
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
 
+extern double tadpole_factor;
 // relativistic correction for naik term
 extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
@@ -324,9 +325,7 @@ invert_test(void)
       // Set path coefficients //
       ///////////////////////////
 
-      // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
-
-      double u1 = 1.0/gaugeParam.tadpole_coeff;
+      double u1 = 1.0/tadpole_factor;
       double u2 = u1*u1;
       double u3 = u2*u1;
       double u5 = u3*u2;
