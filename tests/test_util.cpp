@@ -1643,6 +1643,7 @@ double clover_coeff = 0.1;
 bool compute_clover = false;
 double tol = 1e-7;
 double tol_hq = 0.;
+double reliable_delta = 0.1;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
@@ -1769,6 +1770,7 @@ void usage(char** argv )
   printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
+  printf("    --reliable-delta <delta>                  # Set reliable update delta factor\n");
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
   printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
@@ -2412,6 +2414,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--reliable-delta") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    reliable_delta = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mass-normalization") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2467,7 +2479,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Nsrc = atoi(argv[i+1]);
-    if (Nsrc < 1 || Nsrc > 128){
+    if (Nsrc < 0 || Nsrc > 128){ // allow 0 for testing setup in isolation
       printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
       usage(argv);
     }
