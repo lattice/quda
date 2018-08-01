@@ -1,3 +1,94 @@
+Version 0.9.0 - 24 July 2018
+
+- Add support for CUDA 9.x: QUDA 0.9.0 is supported on CUDA 7.0-9.2.
+
+- Continued focus on optimization of multi-GPU execution, with
+  particular emphasis on Dslash scaling.  For more details on
+  optimizing multi-GPU performance, see
+  https://github.com/lattice/quda/wiki/Multi-GPU-Support
+
+- On systems that support it, QUDA now uses direct peer-to-peer
+  communication between GPUs with in the same node.  The Dslash policy
+  autotuner will ascertain the optimal commuication route to take,
+  whether it be to route through CPU memory, use DMA copy engines or
+  directly write the halo buffer to neighboring GPUs. 
+
+- On systems that support it, QUDA will take advantage of GPU Direct
+  RDMA.  This is enabled through setting the environment variable
+  QUDA_ENABLE_GDR=1 which will augment the dslash tuning policies to
+  include policies using GPU-aware MPI to facilitate direct GPU-NIC
+  communication.  This can improve strong scaling by up to 3x.
+
+- Improved precision when using half precision (use rounding instead
+  of truncation when converting to/from float).
+
+- Add support for symmetric preconditioning for 4-d preconditioned
+  Shamir and Mobius Dirac operators.
+
+- Added initial support for multi-right-hand-side staggered Dirac
+  operator (treat the rhs index as a fifth dimension).
+
+- Added initial implementation of block CG linear solver.
+
+- Added BiCGStab(l) linear solver.  The parameter "l" corresponds to
+  the size of the space to perform GCR-style residual minimization.
+  This is typically much better behaved than BiCGStab for the Wilson
+  and Wilson-clover linear systems.
+
+- Initial version of adaptive multigrid fully implemented into QUDA.
+
+- Creation of multi-blas and multi-reduction framework, this is
+  essential for high performance for pipelined, block and
+  communication-avoiding solvers that work on "matrices of vectors" as
+  opposed to "scalars of vectors".  The max tile size used by the
+  multi-blas framework is set by QUDA_MAX_MULTI_BLAS_N cmake
+  parameter, which default to 4 for reduced compile time.  For
+  production use of such solvers, this should be increase to 8..16.
+
+- Optimization of multi-shift solver using multi-blas framework to permit
+  kernel fusion of all shift updates.
+
+- Complete rewrite and optimization of clover inversion, HISQ force
+  kernels, HISQ link fattening algorithms using accessors.
+
+- QUDA can now directly load/store from MILC's site structure array.
+  This removes the need to unpack and pack data prior to calling QUDA,
+  and dramatically reduces CPU overhead.
+
+- Removal of legacy data structures and kernels.  In particular
+  original single-GPU only ASQTAD fermion force has been removed.
+
+- Implementation of STOUT fattening kernel.
+
+- Significant improvement to the cmake build system to improve
+  compilation speed and aid productivity.  In particular, QUDA now
+  supports being built as a shared library which greatly reduces link
+  time.
+
+- Autoconf and configure build system is no longer supported.
+
+- Automated unit testing of dslash_test and blas_test are now enabled
+  using ctest.
+
+- Adds support for MPS, enabled through setting the environment
+  variable QUDA_ENABLE_MPS=1.  This allow GPUs to be oversubscribed by
+  multiple processes, which can improve overall job throughput.
+
+- Implemented self-profiler that builds on top of autotuning
+  framework.  Kernel profile is output to profile_n.tsv, where n=0,
+  with n incremented with each call to saveProfile (which dumps the
+  profile to disk).  An equivalent algorithm policy profile is output
+  to profile_async_n.tsv which contains policies such as a complete
+  dslash.  Filename prefix and path can be overridden using
+  QUDA_PROFILE_OUTPUT_BASE environment variable.
+
+- Implemented simple tracing facility that dumps the flow of kernels
+  called through a single execution to trace.tsv.  Enabled with
+  environment variable QUDA_ENABLE_TRACE=1.
+
+- Multiple bug fixes and clean up to the library. Many of these are
+  listed here: https://github.com/lattice/quda/milestone/15?closed=1
+
 Version 0.8.0 - 1st February 2016
 
 - Removed all Tesla-generation GPU support from QUDA (sm_1x).  As a

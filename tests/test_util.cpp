@@ -94,6 +94,13 @@ void initComms(int argc, char **argv, const int *commDims)
 
   printfQuda("Rank order is %s major (%s running fastest)\n",
 	     rank_order == 0 ? "column" : "row", rank_order == 0 ? "t" : "x");
+
+#ifdef HAVE_QIO
+  int partitioned = 0;
+  for (int i=0; i<4; i++) if (comm_dim(i) > 1) partitioned++;
+  if (rank_order == 0 && partitioned > 1)
+    errorQuda("Use of QIO is not supported with column-major process ordering, use row-major instead (--rank-order row)");
+#endif
 }
 
 
