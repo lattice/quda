@@ -1667,7 +1667,6 @@ double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
 double anisotropy = 1.0;
-double tadpole_factor = 1.0;
 double eps_naik = 0.0;
 double clover_coeff = 0.1;
 bool compute_clover = false;
@@ -1792,7 +1791,6 @@ void usage(char** argv )
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
-  printf("    --tadpole-coeff                           # Tadpole coefficient for the HISQ stencil (default 1.0, suggested value [Plaquette]^(1/4))\n");
   printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
   printf("    --compute-fat-long                        # Compute the fat/long field or use random numbers (default false)\n");
@@ -2430,16 +2428,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     eps_naik = atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--tadpole-coeff") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    tadpole_factor = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;

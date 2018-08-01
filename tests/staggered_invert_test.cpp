@@ -65,8 +65,6 @@ extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
 
-// HISQ tadpole factor
-extern double tadpole_factor;
 
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
 
@@ -255,7 +253,7 @@ invert_test(void)
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
       cpu_prec, prec, prec_sloppy,
-      link_recon, link_recon_sloppy, mass, tol, 1e-3, tadpole_factor);
+      link_recon, link_recon_sloppy, mass, tol, 1e-3, 0.8);
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
@@ -326,22 +324,22 @@ invert_test(void)
       // Set path coefficients //
       ///////////////////////////
 
-      // Reference: "generic_ks/imp_actions/hisq/hisq_action.h",
-      // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
+      // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
 
-      double u1 = 1.0/tadpole_factor;
+      double u1 = 1.0/gaugeParam.tadpole_coeff;
       double u2 = u1*u1;
-      double u4 = u2*u2;
-      double u6 = u4*u2;
+      double u3 = u2*u1;
+      double u5 = u3*u2;
+      double u7 = u5*u2;
 
-      // First path: create V, W links 
+      // First path: create V, W links
       double act_path_coeff_1[6] = {
-           ( 1.0/8.0),                 /* one link */
-        u2*( 0.0),                     /* Naik */
-        u2*(-1.0/8.0)*0.5,             /* simple staple */
-        u4*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
-        u6*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
-        u4*( 0.0)                      /* Lepage term */
+        u1*( 1.0/8.0),                 /* one link */
+        u5*( 0.0),                     /* Naik */
+        u3*(-1.0/8.0)*0.5,             /* simple staple */
+        u5*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
+        u7*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
+        u5*( 0.0)                      /* Lepage term */
       };
 
       // Second path: create X, long links

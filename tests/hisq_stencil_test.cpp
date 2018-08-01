@@ -35,9 +35,6 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern int niter;
 
-// tadpole factor
-extern double tadpole_factor;
-
 // relativistic correction for naik term
 extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
@@ -85,7 +82,7 @@ static void hisq_test()
   qudaGaugeParam = newQudaGaugeParam();
 
   qudaGaugeParam.anisotropy = 1.0;
-  qudaGaugeParam.tadpole_coeff = tadpole_factor; 
+  qudaGaugeParam.tadpole_coeff = 0.8; 
 
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
@@ -122,21 +119,22 @@ static void hisq_test()
   // Reference: "generic_ks/imp_actions/hisq/hisq_action.h",
   // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
 
-  double u1 = 1.0/tadpole_factor;
+  double u1 = 1.0/qudaGaugeParam.tadpole_coeff;
   double u2 = u1*u1;
-  double u4 = u2*u2;
-  double u6 = u4*u2;
+  double u3 = u2*u1;
+  double u5 = u3*u2;
+  double u7 = u5*u2;
 
   // First path: create V, W links 
   double act_path_coeff_1[6] = {
-       ( 1.0/8.0),                 /* one link */
-    u2*( 0.0),                     /* Naik */
-    u2*(-1.0/8.0)*0.5,             /* simple staple */
-    u4*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
-    u6*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
-    u4*( 0.0)                      /* Lepage term */
+    u1*( 1.0/8.0),                 /* one link */
+    u5*( 0.0),                     /* Naik */
+    u3*(-1.0/8.0)*0.5,             /* simple staple */
+    u5*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
+    u7*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
+    u5*( 0.0)                      /* Lepage term */
   };
-  
+
   // Second path: create X, long links
   double act_path_coeff_2[6] = {
     (( 1.0/8.0)+(2.0*6.0/16.0)+(1.0/8.0)),   /* one link */
