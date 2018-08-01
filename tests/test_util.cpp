@@ -1800,7 +1800,7 @@ void usage(char** argv )
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
-  printf("    --tadpole-coeff                           # Tadpole coefficient for the HISQ stencil (default 1.0, suggested value [Plaquette]^(1/4))\n");
+  printf("    --tadpole-coeff                           # Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)\n");
   printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
   printf("    --compute-fat-long                        # Compute the fat/long field or use random numbers (default false)\n");
