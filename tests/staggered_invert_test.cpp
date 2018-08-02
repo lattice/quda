@@ -292,6 +292,16 @@ invert_test(int argc, char** argv)
     //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
   }
 
+  #ifdef GPU_GAUGE_TOOLS
+  gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  double plaq[3];
+  loadGaugeQuda(qdp_inlink, &gaugeParam);
+  plaqQuda(plaq);
+  gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  #endif
+
+
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
