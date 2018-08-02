@@ -71,6 +71,7 @@ extern double mass; // the mass of the Dirac operator
 
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
 
+extern double tadpole_factor;
 // relativistic correction for naik term
 extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
@@ -130,7 +131,11 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->gauge_fix = QUDA_GAUGE_FIXED_NO;
   gaugeParam->type = QUDA_WILSON_LINKS;
   gaugeParam->anisotropy = 1.0;
-  gaugeParam->tadpole_coeff = tadpole_coeff;
+
+  // Fix me: must always be set to 1.0 for reasons not yet discerned. 
+  // The tadpole coefficient gets encoded directly into the fat link
+  // construct coefficents.
+  gaugeParam->tadpole_coeff = 1.0;
 
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
@@ -252,7 +257,7 @@ invert_test(int argc, char** argv)
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
       cpu_prec, prec, prec_sloppy,
-      link_recon, link_recon_sloppy, mass, tol, 0.8);
+      link_recon, link_recon_sloppy, mass, tol, tadpole_factor);
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
@@ -286,22 +291,27 @@ invert_test(int argc, char** argv)
     }
   } else {
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      construct_gauge_field(qdp_fatlink, 0, gaugeParam.cpu_prec, &gaugeParam);
+      construct_gauge_field(qdp_inlink, 0, gaugeParam.cpu_prec, &gaugeParam);
     } else {
       construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
     }
     //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
   }
 
-  #ifdef GPU_GAUGE_TOOLS
+#ifdef GPU_GAUGE_TOOLS
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   double plaq[3];
   loadGaugeQuda(qdp_inlink, &gaugeParam);
   plaqQuda(plaq);
   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  #endif
+  if (dslash_type != QUDA_LAPLACE_DSLASH) {
+    plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
+    plaq[1] = -plaq[1];
+    plaq[2] = -plaq[2];
+  }
 
+  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+#endif
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
   // "compute" the fat/long links or not.
@@ -318,16 +328,20 @@ invert_test(int argc, char** argv)
       // Set path coefficients //
       ///////////////////////////
 
-      // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
+      double u1 = 1.0/tadpole_factor;
+      double u2 = u1*u1;
+      double u3 = u2*u1;
+      double u5 = u3*u2;
+      double u7 = u5*u2;
 
-      // First path: create V, W links 
+      // First path: create V, W links
       double act_path_coeff_1[6] = {
-        ( 1.0/8.0),                 // one link 
-          0.0,                      // Naik 
-        (-1.0/8.0)*0.5,             // simple staple 
-        ( 1.0/8.0)*0.25*0.5,        // displace link in two directions 
-        (-1.0/8.0)*0.125*(1.0/6.0), // displace link in three directions 
-          0.0                       // Lepage term 
+        u1*( 1.0/8.0),                 /* one link */
+        u5*( 0.0),                     /* Naik */
+        u3*(-1.0/8.0)*0.5,             /* simple staple */
+        u5*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
+        u7*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
+        u5*( 0.0)                      /* Lepage term */
       };
 
       // Second path: create X, long links
@@ -390,6 +404,22 @@ invert_test(int argc, char** argv)
     }
 
   }
+
+#ifdef GPU_GAUGE_TOOLS
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+    double plaq[3];
+    loadGaugeQuda(qdp_fatlink, &gaugeParam);
+    plaqQuda(plaq);
+    gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
+
+    plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
+    plaq[1] = -plaq[1];
+    plaq[2] = -plaq[2];
+
+    printf("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  }
+#endif
 
   // Alright, we've created all the void** links.
   // Create the void* pointers
