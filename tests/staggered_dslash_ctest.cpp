@@ -308,7 +308,8 @@ void init(int precision, QudaReconstructType link_recon) {
       // Set path coefficients //
       ///////////////////////////
 
-      // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
+      // Reference: "generic_ks/imp_actions/hisq/hisq_action.h",
+  // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
 
       double u1 = 1.0/tadpole_factor;
       double u2 = u1*u1;
