@@ -309,22 +309,21 @@ void init(int precision, QudaReconstructType link_recon) {
       ///////////////////////////
 
       // Reference: "generic_ks/imp_actions/hisq/hisq_action.h",
-  // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
+      // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
 
       double u1 = 1.0/tadpole_factor;
       double u2 = u1*u1;
-      double u3 = u2*u1;
-      double u5 = u3*u2;
-      double u7 = u5*u2;
+      double u4 = u2*u2;
+      double u6 = u4*u2;
 
       // First path: create V, W links
       double act_path_coeff_1[6] = {
-        u1*( 1.0/8.0),                 /* one link */
-        u5*( 0.0),                     /* Naik */
-        u3*(-1.0/8.0)*0.5,             /* simple staple */
-        u5*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
-        u7*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
-        u5*( 0.0)                      /* Lepage term */
+           ( 1.0/8.0),                 /* one link */
+        u2*( 0.0),                     /* Naik */
+        u2*(-1.0/8.0)*0.5,             /* simple staple */
+        u4*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
+        u6*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
+        u4*( 0.0)                      /* Lepage term */
       };
 
       // Second path: create X, long links
