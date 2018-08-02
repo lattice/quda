@@ -133,7 +133,11 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->gauge_fix = QUDA_GAUGE_FIXED_NO;
   gaugeParam->type = QUDA_WILSON_LINKS;
   gaugeParam->anisotropy = 1.0;
-  gaugeParam->tadpole_coeff = tadpole_coeff;
+
+  // Fix me: must always be set to 1.0 for reasons not yet discerned. 
+  // The tadpole coefficient gets encoded directly into the fat link
+  // construct coefficents.
+  gaugeParam->tadpole_coeff = 1.0;
 
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;

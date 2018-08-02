@@ -83,7 +83,11 @@ static void hisq_test()
   qudaGaugeParam = newQudaGaugeParam();
 
   qudaGaugeParam.anisotropy = 1.0;
-  qudaGaugeParam.tadpole_coeff = tadpole_factor; 
+
+  // Fix me: must always be set to 1.0 for reasons not yet discerned. 
+  // The tadpole coefficient gets encoded directly into the fat link
+  // construct coefficents.
+  qudaGaugeParam.tadpole_coeff = 1.0;
 
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;

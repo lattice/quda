@@ -203,7 +203,11 @@ void init(int precision, QudaReconstructType link_recon) {
   }
 
   gaugeParam.anisotropy = 1.0;
-  gaugeParam.tadpole_coeff = tadpole_factor;
+
+  // Fix me: must always be set to 1.0 for reasons not yet discerned. 
+  // The tadpole coefficient gets encoded directly into the fat link
+  // construct coefficents.
+  gaugeParam.tadpole_coeff = 1.0;
   gaugeParam.scale = (dslash_type == QUDA_ASQTAD_DSLASH) ? -1.0/(24.0*gaugeParam.tadpole_coeff*gaugeParam.tadpole_coeff) : 1.0;
   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -275,7 +279,7 @@ void init(int precision, QudaReconstructType link_recon) {
     if (!gauge_loaded) {
       read_gauge_field(latfile, qdp_inlink, gaugeParam.cpu_prec, gaugeParam.X, argc_copy, argv_copy);
       if (dslash_type != QUDA_LAPLACE_DSLASH) {
-        applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, dslash_type, gaugeParam.cpu_prec);
+        applyGaugeFieldScaling_long(qdp_inlink, Vh, &gaugeParam, QUDA_STAGGERED_DSLASH, gaugeParam.cpu_prec);
       }
       gauge_loaded = true;
     } // else it's already been loaded
