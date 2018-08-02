@@ -64,6 +64,7 @@ extern QudaReconstructType link_recon_precondition;
 extern double mass;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
+extern double reliable_delta;
 extern char latfile[];
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
@@ -455,7 +456,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.inv_type = QUDA_GCR_INVERTER;
   inv_param.tol = 1e-10;
   inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 1e-10;
+  inv_param.reliable_delta = reliable_delta;
   inv_param.gcrNkrylov = 10;
 
   //inv_param.verbosity = QUDA_SUMMARIZE;
@@ -552,7 +553,10 @@ int main(int argc, char **argv)
     coarse_solver_maxiter[i] = 100;
     solver_location[i] = QUDA_CUDA_FIELD_LOCATION;
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
+    nu_pre[i] = 2;
+    nu_post[i] = 2;
   }
+  reliable_delta = 1e-4;
 
   // Give the dslash type a reasonable default.
   dslash_type = QUDA_STAGGERED_DSLASH;
