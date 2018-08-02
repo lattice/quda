@@ -77,8 +77,9 @@ extern int mg_levels;
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
 
-
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
+
+extern double tadpole_factor;
 
 // relativistic correction for naik term
 extern double eps_naik;
@@ -245,13 +246,17 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.anisotropy = 1.0;
-  const double tadpole_coeff = 0.8; // hard coded in staggered_invert_test
-  gauge_param.tadpole_coeff = tadpole_coeff; 
+
+
+  // Fix me: must always be set to 1.0 for reasons not yet discerned. 
+  // The tadpole coefficient gets encoded directly into the fat link
+  // construct coefficents.
+  gauge_param.tadpole_coeff = 1.0;
 
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
 
-  gauge_param.scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
+  gauge_param.scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*gauge_param.tadpole_coeff*gauge_param.tadpole_coeff);
 
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -680,18 +685,24 @@ int main(int argc, char **argv)
       // Set path coefficients //
       ///////////////////////////
 
-      // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
+      // Reference: "generic_ks/imp_actions/hisq/hisq_action.h",
+      // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
 
-      // First path: create V, W links 
+      double u1 = 1.0/tadpole_factor;
+      double u2 = u1*u1;
+      double u4 = u2*u2;
+      double u6 = u4*u2;
+
+      // First path: create V, W links
       double act_path_coeff_1[6] = {
-        ( 1.0/8.0),                 // one link 
-          0.0,                      // Naik 
-        (-1.0/8.0)*0.5,             // simple staple 
-        ( 1.0/8.0)*0.25*0.5,        // displace link in two directions 
-        (-1.0/8.0)*0.125*(1.0/6.0), // displace link in three directions 
-          0.0                       // Lepage term 
+           ( 1.0/8.0),                 /* one link */
+        u2*( 0.0),                     /* Naik */
+        u2*(-1.0/8.0)*0.5,             /* simple staple */
+        u4*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
+        u6*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
+        u4*( 0.0)                      /* Lepage term */
       };
-
+      
       // Second path: create X, long links
       double act_path_coeff_2[6] = {
         (( 1.0/8.0)+(2.0*6.0/16.0)+(1.0/8.0)),   // one link 
