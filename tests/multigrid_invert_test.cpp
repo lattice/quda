@@ -47,6 +47,7 @@ extern double mu;
 extern double anisotropy;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
+extern double reliable_delta;
 extern char latfile[];
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
@@ -473,7 +474,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-4;
+  inv_param.reliable_delta = reliable_delta;
 
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
@@ -507,6 +508,7 @@ int main(int argc, char **argv)
     nu_pre[i] = 2;
     nu_post[i] = 2;
   }
+  reliable_delta = 1e-4;
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
