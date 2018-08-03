@@ -670,6 +670,21 @@ int main(int argc, char **argv)
     //createSiteLinkCPU(inlink, gauge_param.cpu_prec, 0); // 0 for no phases
   }
 
+#ifdef GPU_GAUGE_TOOLS
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  double plaq[3];
+  loadGaugeQuda(qdp_inlink, &gauge_param);
+  plaqQuda(plaq);
+  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  if (dslash_type != QUDA_LAPLACE_DSLASH) {
+    plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
+    plaq[1] = -plaq[1];
+    plaq[2] = -plaq[2];
+  }
+
+  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+#endif
+
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
@@ -763,6 +778,22 @@ int main(int argc, char **argv)
     }
 
   }
+
+#ifdef GPU_GAUGE_TOOLS
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+    double plaq[3];
+    loadGaugeQuda(qdp_fatlink, &gauge_param);
+    plaqQuda(plaq);
+    gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
+
+    plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
+    plaq[1] = -plaq[1];
+    plaq[2] = -plaq[2];
+
+    printf("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  }
+#endif
 
   // Alright, we've created all the void** links.
   // Create the void* pointers

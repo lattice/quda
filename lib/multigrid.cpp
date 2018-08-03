@@ -73,17 +73,23 @@ namespace quda {
     } else {
       if (param.level < param.Nlevel-1) {
         if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-          if (param.B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-            rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
-            rng->Init();
+
+
+          if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) {
+
+            if (param.B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+              rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
+              rng->Init();
+            }
+
+            // Initializing to random vectors
+            for(int i=0; i<(int)param.B.size(); i++) {
+              if (param.B[i]->Location() == QUDA_CPU_FIELD_LOCATION) param.B[i]->Source(QUDA_RANDOM_SOURCE);
+              else spinorNoise(*param.B[i], *rng, QUDA_NOISE_UNIFORM);
+            }
           }
 
-          // Initializing to random vectors
-          for(int i=0; i<(int)param.B.size(); i++) {
-            if (param.B[i]->Location() == QUDA_CPU_FIELD_LOCATION) param.B[i]->Source(QUDA_RANDOM_SOURCE);
-            else spinorNoise(*param.B[i], *rng, QUDA_NOISE_UNIFORM);
-          }
-          generateNullVectors(param.B);
+          if (param.mg_global.num_setup_iter[param.level] > 0) generateNullVectors(param.B);
         } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
           loadVectors(param.B);
         } else { // generate free field vectors
@@ -148,9 +154,13 @@ namespace quda {
 
     if ( esw_debug ) printfQuda("Created smoother.\n");
 
-    // Refresh the null-space vectors if we need to
-    if (refresh && param.level < param.Nlevel-1) {
-      if (param.mg_global.setup_maxiter_refresh[param.level]) generateNullVectors(param.B, refresh);
+
+    // ESW HACK GENERATE STAGGERED WITHOUT CORRECT INTERFACE
+    if (param.level != 0) {
+      // Refresh the null-space vectors if we need to
+      if (refresh && param.level < param.Nlevel-1) {
+        if (param.mg_global.setup_maxiter_refresh[param.level]) generateNullVectors(param.B, refresh);
+      }
     }
 
     // if not on the coarsest level, update next
