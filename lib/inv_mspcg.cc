@@ -299,6 +299,7 @@ namespace quda {
     mat_precondition->Dagger(QUDA_DAG_NO);
 */
 
+
     inner_dslash(*fx, *fb);
 
     double fx2 = norm2(*fx);
@@ -312,6 +313,15 @@ namespace quda {
     printfQuda("Rebuild     x2 = %16.12e.\n", x2_);
     double dd = xmyNorm(*tt, *tx);
     printfQuda("%% diff      x2 = %16.12e (This number is SUPPOSED to be tiny).\n", dd);
+    
+		mat_precondition->Dagger(QUDA_DAG_YES);
+    mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
+    mat_precondition->dslash5inv_sm_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
+		mat_precondition->Dagger(QUDA_DAG_NO);
+
+    double mdd = xmyNorm(*ft, *fx);
+    printfQuda("%% diff      m2 = %16.12e (This number is SUPPOSED to be tiny).\n", mdd);
+
 
     delete tx;
     delete tt;
@@ -359,7 +369,8 @@ namespace quda {
     
 //    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
 //    mat_precondition->Dslash5inv(out, *iftmp, parity[1]);                  // +2
-    mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
+//    mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
+    mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
     
 		mat_precondition->Dagger(QUDA_DAG_NO);
 	  mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
@@ -419,8 +430,8 @@ namespace quda {
       //xpay(ib, beta, *ip);
       axpyZpbx(alpha, *ip, ix, ib, beta);
 
-//      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
-//          local_loop_count, rk2, alpha, beta, Mpk2);
+      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
+          local_loop_count, rk2, alpha, beta, Mpk2);
     }
 
     commGlobalReductionSet(true);

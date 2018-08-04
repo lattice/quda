@@ -471,6 +471,9 @@ namespace quda {
 
 		void dslash5inv_sm_partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
 			    int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+		
+    void dslash5inv_sm_tc_partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+			    int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
 
 		void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;

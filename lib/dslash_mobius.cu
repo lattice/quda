@@ -23,6 +23,9 @@
 
 #include <inline_ptx.h>
 
+#include <cublas_v2.h>
+#include <mma.h>
+
 namespace quda {
 
   namespace mobius {
@@ -62,6 +65,7 @@ namespace quda {
 #include <mdw_dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_def.h>
 #include <mdw_dslash4_dagger_dslash4pre_dagger_xpay_def.h>
 #include <mdw_dslash5inv_def_sm.h>
+#include <mdw_dslash5inv_def_sm_tc.h>
 #endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
@@ -100,8 +104,8 @@ namespace quda {
     {
 //      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       const unsigned int max_shared = deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock;
-//      const int step[2] = { deviceProp.warpSize, 1 };
-      const int step[2] = { 8, 1 };
+      const int step[2] = { deviceProp.warpSize, 1 };
+//      const int step[2] = { 8, 1 };
       bool advance[2] = { false, false };
 
       // first try to advance block.x
@@ -167,6 +171,9 @@ namespace quda {
 
     unsigned int sharedBytesPerThread() const { 
       if(DS_type >= 4){
+        if(DS_type == 9){
+          return 24*2 + 24*4 + 16*2; // TODO: fix this!
+        }
         return 24*(in->Precision()==8?8:4);
       }else{
         return 0;
@@ -274,7 +281,16 @@ namespace quda {
             }
             strcat(key.aux,config);
             break;
-
+					case 9:
+            if(dslashParam.expanding){
+              sprintf(config, ",Dslash5invSmTc,partial%d,%d,%d,%d,expand%d,%d,%d,%d", 
+								dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3],
+                dslashParam.Rz[0], dslashParam.Rz[1], dslashParam.Rz[2], dslashParam.Rz[3]);
+            }else{
+              sprintf(config, ",Dslash5invSmTc,partial%d,%d,%d,%d", dslashParam.R[0], dslashParam.R[1], dslashParam.R[2], dslashParam.R[3]);
+            }
+            strcat(key.aux,config);
+            break;
         }
       
       }else{
@@ -307,7 +323,9 @@ namespace quda {
 					case 8:
             strcat(key.aux,",Dslash5invSm");
             break;
-
+          case 9:
+            strcat(key.aux,",Dslash5invSmTc");
+            break;
         }
       
       }
@@ -320,8 +338,8 @@ namespace quda {
       if(DS_type >= 4){ 
         // For these kernels, for one 4D-site all corresponding 5D-sites have to be within the same block,
         // since shared memory is used.
-//        param.block = dim3( param.block.x, in->X(4), 1);
-        param.block = dim3( 8, in->X(4), 1);
+        param.block = dim3( param.block.x, in->X(4), 1);
+//        param.block = dim3( 8, in->X(4), 1);
       }
       param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y;
         printfQuda( "Shared memory %08lu is larger than limit %08lu.\n", (size_t)param.shared_bytes, (size_t)(deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock) );
@@ -340,8 +358,8 @@ namespace quda {
       if(DS_type >= 4){ 
         // For these kernels, for one 4D-site all corresponding 5D-sites have to be within the same block,
         // since shared memory is used.
-//        param.block = dim3( param.block.x, in->X(4), 1);
-        param.block = dim3( 8, in->X(4), 1);
+        param.block = dim3( param.block.x, in->X(4), 1);
+//        param.block = dim3( 8, in->X(4), 1);
       }
       param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y;
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
@@ -387,6 +405,9 @@ namespace quda {
 				case 8:
           DSLASH(MDWFDslash5invSm, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
           break;
+        case 9:
+          DSLASH(MDWFDslash5invSmTc, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+          break;
         default:
           errorQuda("invalid Dslash type");
       }
@@ -419,6 +440,7 @@ namespace quda {
           break;
         case 3:
 				case 8:
+				case 9:
 						flops = 144ll*vol4d*Ls*Ls + 3ll*Ls*(Ls-1ll);
 					break;
         case 4:
@@ -460,7 +482,8 @@ namespace quda {
           bytes = (x ? 5ll : 4ll) * spinor_bytes * in->VolumeCB();
           break;
         case 3:
-				case 8: 
+				case 8:
+        case 9:
           bytes = (x ? Ls + 2 : Ls + 1) * spinor_bytes * in->VolumeCB();
           break;
         default:
@@ -553,6 +576,14 @@ namespace quda {
 #ifdef GPU_DOMAIN_WALL_DIRAC
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
+    if(DS_type == 9){
+      cudaDeviceProp device_prop;
+      cudaGetDeviceProperties( &device_prop, 0 );
+      if(device_prop.major < 7 || in->Precision() != QUDA_HALF_PRECISION){
+        errorQuda("Your are either NOT rich enough to buy a Volta or TOO rich to buy a Volta.\n");
+      }
+    }
+
 		if(!init){
 			set_shared_memory_on_volta((const void*)MDWFDslash4Dslash5invDslash4preH18Kernel<INTERIOR_KERNEL>, 
 				"MDWFDslash4Dslash5invDslash4preH18Kernel<INTERIOR_KERNEL>");
@@ -560,6 +591,8 @@ namespace quda {
 				"MDWFDslash4Dslash5invXpayDslash5invDaggerH18XpayKernel<INTERIOR_KERNEL>");
 			set_shared_memory_on_volta((const void*)MDWFDslash4DaggerDslash4preDaggerDslash5invDaggerH18Kernel<INTERIOR_KERNEL>, 
 				"MDWFDslash4DaggerDslash4preDaggerDslash5invDaggerH18Kernel<INTERIOR_KERNEL>");
+      set_shared_memory_on_volta((const void*)MDWFDslash5invSmTcH18DaggerKernel<INTERIOR_KERNEL>, 
+				"MDWFDslash5invSmTcH18DaggerKernel<INTERIOR_KERNEL>");
 			set_shared_memory_on_volta((const void*)MDWFDslash4DaggerDslash4preDaggerXpayH18XpayKernel<INTERIOR_KERNEL>, 
 				"MDWFDslash4DaggerDslash4preDaggerXpayH18XpayKernel<INTERIOR_KERNEL>");
 			init = true;
