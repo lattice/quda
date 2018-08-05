@@ -195,8 +195,9 @@ const int WMMA_M = 16;
 const int WMMA_N = 16;
 const int WMMA_K = 16;
 
-int tm_dim = M / WMMA_M;
-int tn_dim = N / WMMA_N;
+const int tm_dim = M / WMMA_M;
+const int tn_dim = N / WMMA_N;
+const int tk_dim = K / WMMA_K;
 
 // The actual/physical warp assigned to each thread in this block
 int phys_warp_n_dim = blockDim.x/warpSize; // TODO: should make sure blockDim.x is AT LEAST 32.
@@ -212,7 +213,7 @@ int warp_cycle = total_num_tile/total_num_warp;
 
 // Set up the wmma stuff
 wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> a_frag;
-wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> b_frag;
+wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> b_frag[3];
 wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, half> c_frag;
 // Zero the initial acc.
 
@@ -221,7 +222,6 @@ for(int c = 0; c < warp_cycle; c++){
   // The logical warp assigned to each part of the matrix.
   int warp_n = phys_warp_index % tn_dim;
   int warp_m = phys_warp_index / tn_dim;
-  
 
   wmma::fill_fragment(c_frag, (half)0.0f);
   for( int k = 0; k < K; k+=WMMA_K ){
@@ -233,15 +233,15 @@ for(int c = 0; c < warp_cycle; c++){
 
     if(a_row < M && a_col < K && b_row < K && b_col < N) {    
       // Load Matrix
+      if( c==0 ) wmma::load_matrix_sync(b_frag[k/WMMA_K], sm_b+b_col+b_row*N_sm, N_sm);
       wmma::load_matrix_sync(a_frag, sm_a+a_row+a_col*M_sm, M_sm);
-      wmma::load_matrix_sync(b_frag, sm_b+b_col+b_row*N_sm, N_sm);
       // Perform the matrix multiplication
-      wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+      wmma::mma_sync(c_frag, a_frag, b_frag[k/WMMA_K], c_frag);
     }
-    __syncthreads();
+//    __syncthreads();
   } 
 
-  __syncthreads();
+//  __syncthreads();
 
   int c_row = warp_m*WMMA_M;
   int c_col = warp_n*WMMA_N;
@@ -249,7 +249,7 @@ for(int c = 0; c < warp_cycle; c++){
   if(c_row < M && c_col < N){ 
     wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, wmma::mem_row_major);
   }
-  __syncthreads();
+//  __syncthreads();
 }
 __syncthreads();
 
