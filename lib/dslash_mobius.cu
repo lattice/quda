@@ -172,7 +172,7 @@ namespace quda {
     unsigned int sharedBytesPerThread() const { 
       if(DS_type >= 4){
         if(DS_type == 9){
-          return 24*2 + 24*4 + 16*2; // TODO: fix this!
+          return 114; // ( (48+8)+48*(192+8)*2 )*2 / (12*32) TODO: fix this!
         }
         return 24*(in->Precision()==8?8:4);
       }else{

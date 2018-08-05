@@ -65,9 +65,18 @@ float o32_im = 0.0f;
 
 MDWFSharedMemory<float4> sm_data;
 
+const int M = param.dc.Ls*4;
+const int N = 6*blockDim.x;
+const int K = param.dc.Ls*4;
+
+const int sm_pad_size = 8;
+
+const int N_sm = N + sm_pad_size;
+const int M_sm = M + sm_pad_size;
+
 half* sm_b = (half*)((void*)sm_data);
-half* sm_c = (half*)(sm_b + param.dc.Ls*24*blockDim.x);
-half* sm_a = (half*)(sm_c + param.dc.Ls*24*blockDim.x);
+half* sm_c = (half*)(sm_b + K*(N+sm_pad_size));
+half* sm_a = (half*)(sm_c + M*(N+sm_pad_size));
 
 #define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
 
@@ -105,30 +114,30 @@ READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
 // lda = Lsx4, column-major
 // ldb = Lsx4, column-major
 // total number of halves = Ls*24*blockDim.x
-sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 ] = i00_re;
-sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 ] = i00_im;
-sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 ] = i01_re;
-sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 ] = i01_im;
-sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 ] = i02_re;
-sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 ] = i02_im;
-sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 ] = i10_re;
-sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 ] = i10_im;
-sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 ] = i11_re;
-sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 ] = i11_im;
-sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 ] = i12_re;
-sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 ] = i12_im;
-sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 ] = i20_re;
-sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 ] = i20_im;
-sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 ] = i21_re;
-sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 ] = i21_im;
-sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 ] = i22_re;
-sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 ] = i22_im;
-sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 ] = i30_re;
-sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 ] = i30_im;
-sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 ] = i31_re;
-sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 ] = i31_im;
-sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 ] = i32_re;
-sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 ] = i32_im;
+sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 +(0*param.dc.Ls+coord[4])*sm_pad_size ] = i00_re;
+sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 +(0*param.dc.Ls+coord[4])*sm_pad_size ] = i00_im;
+sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 +(0*param.dc.Ls+coord[4])*sm_pad_size ] = i01_re;
+sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 +(0*param.dc.Ls+coord[4])*sm_pad_size ] = i01_im;
+sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 +(0*param.dc.Ls+coord[4])*sm_pad_size ] = i02_re;
+sm_b[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(0*param.dc.Ls+coord[4])*sm_pad_size ] = i02_im;
+sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 +(1*param.dc.Ls+coord[4])*sm_pad_size ] = i10_re;
+sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 +(1*param.dc.Ls+coord[4])*sm_pad_size ] = i10_im;
+sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 +(1*param.dc.Ls+coord[4])*sm_pad_size ] = i11_re;
+sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 +(1*param.dc.Ls+coord[4])*sm_pad_size ] = i11_im;
+sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 +(1*param.dc.Ls+coord[4])*sm_pad_size ] = i12_re;
+sm_b[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(1*param.dc.Ls+coord[4])*sm_pad_size ] = i12_im;
+sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 +(2*param.dc.Ls+coord[4])*sm_pad_size ] = i20_re;
+sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 +(2*param.dc.Ls+coord[4])*sm_pad_size ] = i20_im;
+sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 +(2*param.dc.Ls+coord[4])*sm_pad_size ] = i21_re;
+sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 +(2*param.dc.Ls+coord[4])*sm_pad_size ] = i21_im;
+sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 +(2*param.dc.Ls+coord[4])*sm_pad_size ] = i22_re;
+sm_b[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(2*param.dc.Ls+coord[4])*sm_pad_size ] = i22_im;
+sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 +(3*param.dc.Ls+coord[4])*sm_pad_size ] = i30_re;
+sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 +(3*param.dc.Ls+coord[4])*sm_pad_size ] = i30_im;
+sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 +(3*param.dc.Ls+coord[4])*sm_pad_size ] = i31_re;
+sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 +(3*param.dc.Ls+coord[4])*sm_pad_size ] = i31_im;
+sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 +(3*param.dc.Ls+coord[4])*sm_pad_size ] = i32_re;
+sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(3*param.dc.Ls+coord[4])*sm_pad_size ] = i32_im;
 
 // Construct matrix A: TODO: should be careful about the idle threads.
 
@@ -154,25 +163,25 @@ if(threadIdx.x == 0){
     factorL = inv_d_n * static_cast<half>(POW(kappa,exponent2)) * ( coord[4] < s ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
 
     // (mu, s) by (nu, t). column-major. t := threadIdx.y
-    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4)+(0*param.dc.Ls+coord[4]) ] = factorR + factorL;
-    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4)+(2*param.dc.Ls+coord[4]) ] = factorR - factorL;
-    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR + factorL;
+    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR - factorL;
+    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
     
-    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4)+(1*param.dc.Ls+coord[4]) ] = factorR + factorL;
-    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4)+(3*param.dc.Ls+coord[4]) ] = factorR - factorL;
+    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR + factorL;
+    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR - factorL;
     
-    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4)+(0*param.dc.Ls+coord[4]) ] = factorR - factorL;
-    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4)+(2*param.dc.Ls+coord[4]) ] = factorR + factorL;
-    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR - factorL;
+    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR + factorL;
+    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
     
-    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4)+(1*param.dc.Ls+coord[4]) ] = factorR - factorL;
-    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4)+(3*param.dc.Ls+coord[4]) ] = factorR + factorL;
+    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR - factorL;
+    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR + factorL;
   }
 }
 
@@ -185,10 +194,6 @@ using namespace nvcuda;
 const int WMMA_M = 16;
 const int WMMA_N = 16;
 const int WMMA_K = 16;
-
-const int M = param.dc.Ls*4;
-const int N = 6*blockDim.x;
-const int K = param.dc.Ls*4;
 
 int tm_dim = M / WMMA_M;
 int tn_dim = N / WMMA_N;
@@ -214,8 +219,9 @@ wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, half> c_frag;
 for(int c = 0; c < warp_cycle; c++){
   int phys_warp_index = phys_warp_n*phys_warp_m_dim+phys_warp_m + total_num_warp*c;
   // The logical warp assigned to each part of the matrix.
-  int warp_n = phys_warp_index / tm_dim;
-  int warp_m = phys_warp_index % tm_dim;
+  int warp_n = phys_warp_index % tn_dim;
+  int warp_m = phys_warp_index / tn_dim;
+  
 
   wmma::fill_fragment(c_frag, (half)0.0f);
   for( int k = 0; k < K; k+=WMMA_K ){
@@ -227,8 +233,8 @@ for(int c = 0; c < warp_cycle; c++){
 
     if(a_row < M && a_col < K && b_row < K && b_col < N) {    
       // Load Matrix
-      wmma::load_matrix_sync(a_frag, sm_a+a_row+a_col*M, M);
-      wmma::load_matrix_sync(b_frag, sm_b+b_col+b_row*N, N);
+      wmma::load_matrix_sync(a_frag, sm_a+a_row+a_col*M_sm, M_sm);
+      wmma::load_matrix_sync(b_frag, sm_b+b_col+b_row*N_sm, N_sm);
       // Perform the matrix multiplication
       wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
     }
@@ -241,36 +247,36 @@ for(int c = 0; c < warp_cycle; c++){
   int c_col = warp_n*WMMA_N;
 
   if(c_row < M && c_col < N){ 
-    wmma::store_matrix_sync(sm_c+c_col+c_row*N, c_frag, N, wmma::mem_row_major);
+    wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, wmma::mem_row_major);
   }
   __syncthreads();
 }
 __syncthreads();
 
-o00_re = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 ];
-o00_im = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 ];
-o01_re = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 ];
-o01_im = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 ];
-o02_re = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 ];
-o02_im = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 ];
-o10_re = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 ];
-o10_im = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 ];
-o11_re = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 ];
-o11_im = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 ];
-o12_re = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 ];
-o12_im = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 ];
-o20_re = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 ];
-o20_im = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 ];
-o21_re = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 ];
-o21_im = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 ];
-o22_re = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 ];
-o22_im = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 ];
-o30_re = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 ];
-o30_im = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 ];
-o31_re = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 ];
-o31_im = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 ];
-o32_re = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 ];
-o32_im = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 ];
+o00_re = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 +(0*param.dc.Ls+coord[4])*sm_pad_size ];
+o00_im = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 +(0*param.dc.Ls+coord[4])*sm_pad_size ];
+o01_re = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 +(0*param.dc.Ls+coord[4])*sm_pad_size ];
+o01_im = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 +(0*param.dc.Ls+coord[4])*sm_pad_size ];
+o02_re = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 +(0*param.dc.Ls+coord[4])*sm_pad_size ];
+o02_im = sm_c[ ((0*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(0*param.dc.Ls+coord[4])*sm_pad_size ];
+o10_re = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 +(1*param.dc.Ls+coord[4])*sm_pad_size ];
+o10_im = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 +(1*param.dc.Ls+coord[4])*sm_pad_size ];
+o11_re = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 +(1*param.dc.Ls+coord[4])*sm_pad_size ];
+o11_im = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 +(1*param.dc.Ls+coord[4])*sm_pad_size ];
+o12_re = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 +(1*param.dc.Ls+coord[4])*sm_pad_size ];
+o12_im = sm_c[ ((1*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(1*param.dc.Ls+coord[4])*sm_pad_size ];
+o20_re = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 +(2*param.dc.Ls+coord[4])*sm_pad_size ];
+o20_im = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 +(2*param.dc.Ls+coord[4])*sm_pad_size ];
+o21_re = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 +(2*param.dc.Ls+coord[4])*sm_pad_size ];
+o21_im = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 +(2*param.dc.Ls+coord[4])*sm_pad_size ];
+o22_re = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 +(2*param.dc.Ls+coord[4])*sm_pad_size ];
+o22_im = sm_c[ ((2*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(2*param.dc.Ls+coord[4])*sm_pad_size ];
+o30_re = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+0 +(3*param.dc.Ls+coord[4])*sm_pad_size ];
+o30_im = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+1 +(3*param.dc.Ls+coord[4])*sm_pad_size ];
+o31_re = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+2 +(3*param.dc.Ls+coord[4])*sm_pad_size ];
+o31_im = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+3 +(3*param.dc.Ls+coord[4])*sm_pad_size ];
+o32_re = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+4 +(3*param.dc.Ls+coord[4])*sm_pad_size ];
+o32_im = sm_c[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(3*param.dc.Ls+coord[4])*sm_pad_size ];
 
 } // wmma.h
 
