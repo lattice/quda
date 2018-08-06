@@ -576,13 +576,13 @@ namespace quda {
 #ifdef GPU_DOMAIN_WALL_DIRAC
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
-    if(DS_type == 9){
-      cudaDeviceProp device_prop;
-      cudaGetDeviceProperties( &device_prop, 0 );
-      if(device_prop.major < 7 || in->Precision() != QUDA_HALF_PRECISION){
-        errorQuda("Your are either NOT rich enough to buy a Volta or TOO rich to buy a Volta.\n");
-      }
-    }
+//    if(DS_type == 9){
+//      cudaDeviceProp device_prop;
+//      cudaGetDeviceProperties( &device_prop, 0 );
+//      if(device_prop.major < 7 || in->Precision() != QUDA_HALF_PRECISION){
+//        errorQuda("Your are either NOT rich enough to buy a Volta or TOO rich to buy a Volta.\n");
+//      }
+//    }
 
 		if(!init){
 			set_shared_memory_on_volta((const void*)MDWFDslash4Dslash5invDslash4preH18Kernel<INTERIOR_KERNEL>, 

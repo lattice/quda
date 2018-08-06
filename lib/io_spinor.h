@@ -86,6 +86,19 @@
 #define READ_SPINOR_HALF(spinor, stride, sp_idx, norm_idx)	   \
   READ_SPINOR_HALF_(spinor, stride, sp_idx, norm_idx)		   
 
+#define READ_SPINOR_HALF_TC_(spinor_, stride, sp_idx, norm_idx)	   \
+  short4 *spinor = (short4*)spinor_;				   \
+  float4 I0 = short42float4(spinor[sp_idx + 0*(stride)]);	   \
+  float4 I1 = short42float4(spinor[sp_idx + 1*(stride)]);	   \
+  float4 I2 = short42float4(spinor[sp_idx + 2*(stride)]);	   \
+  float4 I3 = short42float4(spinor[sp_idx + 3*(stride)]);	   \
+  float4 I4 = short42float4(spinor[sp_idx + 4*(stride)]);	   \
+  float4 I5 = short42float4(spinor[sp_idx + 5*(stride)]);	   \
+  float C = (spinor_ ## Norm)[norm_idx];			   
+
+#define READ_SPINOR_HALF_TC(spinor, stride, sp_idx, norm_idx)	   \
+  READ_SPINOR_HALF_TC_(spinor, stride, sp_idx, norm_idx)		   
+
 #define READ_SPINOR_GHOST_HALF_(spinor_, stride, sp_idx, norm_idx, dir) \
   short4 *spinor = (short4*)spinor_[dir];                               \
   float4 I0 = short42float4(spinor[sp_idx + 0*(stride)]);               \
