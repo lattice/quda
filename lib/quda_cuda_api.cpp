@@ -220,7 +220,9 @@ namespace quda {
     case CUDA_ERROR_NOT_READY: // this is the only return value care about
       return cudaErrorNotReady;
     default:
-      errorQuda("cuEventQuery return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventQuery returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -237,7 +239,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuEventRecord return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventrecord returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -254,7 +258,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuStreamWaitEvent return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuStreamWaitEvent returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -271,7 +277,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuStreamSynchronize return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuStreamSynchronize returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -288,7 +296,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuEventSynchronize return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventSynchronize returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -305,7 +315,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuCtxSynchronize return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuCtxSynchronize returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
