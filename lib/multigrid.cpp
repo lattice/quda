@@ -826,8 +826,6 @@ namespace quda {
   //supports seperate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
 
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) errorQuda("GPU fields not supported here yet");
-
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
 
@@ -838,24 +836,44 @@ namespace quda {
     const int Nvec = B.size();
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
 
-    void **V = new void*[Nvec];
-    for (int i=0; i<Nvec; i++) { 
-      V[i] = B[i]->V();
-      if (V[i] == NULL) {
-	printfQuda("Could not allocate V[%d]\n", i);
-      }
-    }
-
     if (strcmp(vec_infile.c_str(),"")!=0) {
 #ifdef HAVE_QIO
+      std::vector<ColorSpinorField*> B_;
+      if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+        ColorSpinorParam csParam(*B[0]);
+        csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+        csParam.setPrecision(B[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : B[0]->Precision());
+        csParam.location = QUDA_CPU_FIELD_LOCATION;
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+        for (int i=0; i<Nvec; i++) {
+          B_.push_back(ColorSpinorField::Create(csParam));
+        }
+      } else {
+        for (int i=0; i<Nvec; i++) {
+          B_.push_back(B[i]);
+        }
+      }
+
+      void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
+      for (int i=0; i<Nvec; i++) V[i] = B_[i]->V();
+
       read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
 			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+
+      host_free(V);
+
+      if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+        for (int i=0; i<Nvec; i++) {
+          *B[i] = *B_[i];
+          delete B_[i];
+        }
+      }
+
 #else
       errorQuda("\nQIO library was not built.\n");      
 #endif
     } else {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using %d constant nullvectors\n", Nvec);
-      //errorQuda("No nullspace file defined");
 
       for (int i = 0; i < (Nvec < 2 ? Nvec : 2); i++) {
 	zero(*B[i]);
@@ -875,8 +893,6 @@ namespace quda {
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using random source for nullvector = %d\n",i);
 	B[i]->Source(QUDA_RANDOM_SOURCE);
 #endif
-	//printfQuda("B[%d]\n",i);
-	//for (int x=0; x<B[i]->Volume(); x++) static_cast<cpuColorSpinorField*>(B[i])->PrintVector(x);
       }
 
       for (int i=2; i<Nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
@@ -889,31 +905,47 @@ namespace quda {
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
 #ifdef HAVE_QIO
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) errorQuda("GPU fields not supported here yet");
 
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
+
+    const int Nvec = B.size();
+    std::vector<ColorSpinorField*> B_;
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+      ColorSpinorParam csParam(*B[0]);
+      csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      csParam.setPrecision(B[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : B[0]->Precision());
+      csParam.location = QUDA_CPU_FIELD_LOCATION;
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      for (int i=0; i<Nvec; i++) {
+        B_.push_back(ColorSpinorField::Create(csParam));
+        *B_[i] = *B[i];
+      }
+    } else {
+      for (int i=0; i<Nvec; i++) {
+        B_.push_back(B[i]);
+      }
+    }
+
     std::string vec_outfile(param.mg_global.vec_outfile);
     vec_outfile += "_level_";
     vec_outfile += std::to_string(param.level);
 
     if (strcmp(param.mg_global.vec_outfile,"")!=0) {
-      const int Nvec = B.size();
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
 
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
-      for (int i=0; i<Nvec; i++) {
-	V[i] = B[i]->V();
-	if (V[i] == NULL) {
-	  printfQuda("Could not allocate V[%d]\n", i);
-	}
-      }
+      for (int i=0; i<Nvec; i++) V[i] = B_[i]->V();
 
       write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
 			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
 
       host_free(V);
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done saving vectors\n");
+    }
+
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+      for (int i=0; i<Nvec; i++) delete B_[i];
     }
 
     profile_global.TPSTOP(QUDA_PROFILE_IO);
