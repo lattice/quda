@@ -800,6 +800,8 @@ namespace quda {
 
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    else coarseParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
     coarseParam.setPrecision(new_precision);
 
     // set where we allocate the field
@@ -838,7 +840,10 @@ namespace quda {
     if (new_location == QUDA_CUDA_FIELD_LOCATION) {
       fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.Precision()!= QUDA_DOUBLE_PRECISION) ?
 	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
+    } else {
+      fineParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     }
+
     fineParam.setPrecision(new_precision);
 
     // set where we allocate the field
