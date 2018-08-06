@@ -2432,7 +2432,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   ColorSpinorParam csParam(0, *param, cudaGauge->X(), pc_solution, mg_param.setup_location[0]);
   csParam.create = QUDA_NULL_FIELD_CREATE;
-  csParam.setPrecision(param->cuda_prec_sloppy);
+  csParam.setPrecision(mg_param.precision_null[0]);
   csParam.fieldOrder = mg_param.setup_location[0] == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_YES ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);

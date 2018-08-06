@@ -119,6 +119,7 @@ namespace quda {
     param.create = QUDA_NULL_FIELD_CREATE;
     param.location = location;
     param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       if (fine_tmp_d && coarse_tmp_d) return;
