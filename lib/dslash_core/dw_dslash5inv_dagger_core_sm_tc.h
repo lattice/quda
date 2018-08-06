@@ -141,79 +141,45 @@ sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(3*param.dc.Ls+coor
 
 // Construct matrix A: TODO: should be careful about the idle threads.
 
-// threadIdx.x==0 should not be idle(?).
-
+// threadIdx.x should not be idle(?).
+// With Ls=12 and blockDim.x=32 the following gives a 2-way bank conflict.  
+  if(threadIdx.x < param.dc.Ls){
+  
 #ifdef MDWF_mode   // Check whether MDWF option is enabled
     half kappa = -(static_cast<half>(mdwf_c5[ coord[4] ])*(static_cast<half>(4.0) + static_cast<half>(m5)) - static_cast<half>(1.0))/(static_cast<half>(mdwf_b5[ coord[4] ])*(static_cast<half>(4.0) + static_cast<half>(m5)) + static_cast<half>(1.0));
 #else
     half kappa = static_cast<half>(2.0)*static_cast<half>(a);
 #endif  // select MDWF mode
   
-  half inv_d_n = static_cast<half>(0.5) / ( static_cast<half>(1.0) + static_cast<half>(POW(kappa,param.dc.Ls))*static_cast<half>(mferm) );
-  half factorR;
-  half factorL;
-
-  for(int s  = 0; s  < param.dc.Ls; s++){
-    int exponent = coord[4]  > s ? param.dc.Ls-coord[4]+s : s-coord[4];
-    factorR = inv_d_n * static_cast<half>(POW(kappa,exponent))  * ( coord[4] > s ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
-    int exponent2 = coord[4] < s ? param.dc.Ls-s+coord[4] : coord[4]-s;
-    factorL = inv_d_n * static_cast<half>(POW(kappa,exponent2)) * ( coord[4] < s ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
+    half inv_d_n = static_cast<half>(0.5) / ( static_cast<half>(1.0) + static_cast<half>(POW(kappa,param.dc.Ls))*static_cast<half>(mferm) );
+    half factorR;
+    half factorL;
+  
+    int exponent = coord[4]  > threadIdx.x ? param.dc.Ls-coord[4]+threadIdx.x : threadIdx.x-coord[4];
+    factorR = inv_d_n * static_cast<half>(POW(kappa,exponent))  * ( coord[4] > threadIdx.x ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
+    int exponent2 = coord[4] < threadIdx.x ? param.dc.Ls-threadIdx.x+coord[4] : coord[4]-threadIdx.x;
+    factorL = inv_d_n * static_cast<half>(POW(kappa,exponent2)) * ( coord[4] < threadIdx.x ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
     // (mu, s) by (nu, t). column-major. t := threadIdx.y
-    switch(threadIdx.x){
-    case  0:
-      sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR + factorL;
-      break;
-    case  1:
-      sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-      break;
-    case  2:
-      sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR - factorL;
-      break;
-    case  3:
-      sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-      break;
-    //
-    case  4:
-      sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-      break;
-    case  5:
-      sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR + factorL;
-      break;
-    case  6:
-      sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-      break;
-    case  7:
-      sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR - factorL;
-      break;
-    //
-    case  8:
-      sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR - factorL;
-      break;
-    case  9:
-      sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-      break;
-    case 10:
-      sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR + factorL;
-      break;
-    case 11:
-      sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-      break;
-    //
-    case 12:
-      sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-      break;
-    case 13:
-      sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR - factorL;
-      break;
-    case 14:
-      sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-      break;
-    case 15:
-      sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR + factorL;
-      break;
-    default:  
-      break;
-    }
+  
+    sm_a[ (0*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR + factorL;
+    sm_a[ (0*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (0*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR - factorL;
+    sm_a[ (0*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+  
+    sm_a[ (1*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (1*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR + factorL;
+    sm_a[ (1*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (1*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR - factorL;
+  
+    sm_a[ (2*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR - factorL;
+    sm_a[ (2*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (2*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR + factorL;
+    sm_a[ (2*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+  
+    sm_a[ (3*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (3*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR - factorL;
+    sm_a[ (3*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+    sm_a[ (3*param.dc.Ls+threadIdx.x)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR + factorL;    
   }
 }
 
