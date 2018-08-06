@@ -425,14 +425,21 @@ namespace quda {
 
 
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order,
-      typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false>
+      typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false, bool block_float=false>
       class FieldOrderCB {
 
     protected:
       complex<storeFloat> *v;
       const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
-      Float scale;
-      Float scale_inv;
+      // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
+      union {
+        float *norm;
+        Float scale;
+      };
+      union {
+        Float scale_inv;
+        int norm_offset;
+      };
 #ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
       mutable float *ghost_norm[8];
@@ -476,6 +483,12 @@ namespace quda {
 #ifdef DISABLE_GHOST
         if (!disable_ghost) errorQuda("DISABLE_GHOST macro set but corresponding disable_ghost template not set");
 #endif
+
+        if (block_float) {
+          // only if we have block_float format do we set these (only block_orthogonalize.cu at present)
+          norm = static_cast<float*>(const_cast<void*>(field.Norm()));
+          norm_offset = field.NormBytes()/(2*sizeof(float));
+        }
       }
 
       /**
@@ -527,7 +540,8 @@ namespace quda {
           return complex<Float>(v[accessor.index(parity,x_cb,s,c,n)]);
         } else {
           complex<storeFloat> tmp = v[accessor.index(parity,x_cb,s,c,n)];
-          return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+          Float norm_ = block_float ? norm[parity*norm_offset+x_cb] : scale_inv;
+          return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
       }
 
@@ -791,7 +805,7 @@ namespace quda {
       // use textures unless we have a large alloc
       RegType nrm = !huge_alloc ? tex1Dfetch<float>(texNorm,x+parity*norm_offset) : norm[x+parity*norm_offset];
 #else
-            RegType nrm = norm[x+parity*norm_offset];
+      RegType nrm = norm[x+parity*norm_offset];
 #endif
 #pragma unroll
       for (int i=0; i<length; i++) v[i] *= nrm;
