@@ -142,7 +142,6 @@ sm_b[ ((3*param.dc.Ls+coord[4])*blockDim.x+threadIdx.x)*6+5 +(3*param.dc.Ls+coor
 // Construct matrix A: TODO: should be careful about the idle threads.
 
 // threadIdx.x==0 should not be idle(?).
-if(threadIdx.x == 0){
 
 #ifdef MDWF_mode   // Check whether MDWF option is enabled
     half kappa = -(static_cast<half>(mdwf_c5[ coord[4] ])*(static_cast<half>(4.0) + static_cast<half>(m5)) - static_cast<half>(1.0))/(static_cast<half>(mdwf_b5[ coord[4] ])*(static_cast<half>(4.0) + static_cast<half>(m5)) + static_cast<half>(1.0));
@@ -155,37 +154,70 @@ if(threadIdx.x == 0){
   half factorL;
 
   for(int s  = 0; s  < param.dc.Ls; s++){
-  
     int exponent = coord[4]  > s ? param.dc.Ls-coord[4]+s : s-coord[4];
     factorR = inv_d_n * static_cast<half>(POW(kappa,exponent))  * ( coord[4] > s ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
-    
     int exponent2 = coord[4] < s ? param.dc.Ls-s+coord[4] : coord[4]-s;
     factorL = inv_d_n * static_cast<half>(POW(kappa,exponent2)) * ( coord[4] < s ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
-
     // (mu, s) by (nu, t). column-major. t := threadIdx.y
-    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR + factorL;
-    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR - factorL;
-    sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    
-    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR + factorL;
-    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR - factorL;
-    
-    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR - factorL;
-    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR + factorL;
-    sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    
-    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR - factorL;
-    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
-    sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR + factorL;
+    switch(threadIdx.x){
+    case  0:
+      sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR + factorL;
+      break;
+    case  1:
+      sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+      break;
+    case  2:
+      sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR - factorL;
+      break;
+    case  3:
+      sm_a[ (0*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+      break;
+    //
+    case  4:
+      sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+      break;
+    case  5:
+      sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR + factorL;
+      break;
+    case  6:
+      sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+      break;
+    case  7:
+      sm_a[ (1*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR - factorL;
+      break;
+    //
+    case  8:
+      sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = factorR - factorL;
+      break;
+    case  9:
+      sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+      break;
+    case 10:
+      sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = factorR + factorL;
+      break;
+    case 11:
+      sm_a[ (2*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+      break;
+    //
+    case 12:
+      sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(0*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+      break;
+    case 13:
+      sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(1*param.dc.Ls+coord[4]) ] = factorR - factorL;
+      break;
+    case 14:
+      sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(2*param.dc.Ls+coord[4]) ] = static_cast<half>(0.0f);
+      break;
+    case 15:
+      sm_a[ (3*param.dc.Ls+s)*(param.dc.Ls*4+sm_pad_size)+(3*param.dc.Ls+coord[4]) ] = factorR + factorL;
+      break;
+    default:  
+      break;
+    }
   }
 }
 
-}__syncthreads();
+__syncthreads();
 
 // wmma.h
 {
@@ -195,49 +227,49 @@ const int WMMA_M = 16;
 const int WMMA_N = 16;
 const int WMMA_K = 16;
 
-const int tm_dim = M / WMMA_M;
-const int tn_dim = N / WMMA_N;
-const int tk_dim = K / WMMA_K;
+const int tm_dim = float(M) / float(WMMA_M);
+const int tn_dim = float(N) / float(WMMA_N);
+const int tk_dim = float(K) / float(WMMA_K);
 
 // The actual/physical warp assigned to each thread in this block
-int phys_warp_n_dim = blockDim.x/warpSize; // TODO: should make sure blockDim.x is AT LEAST 32.
+int phys_warp_n_dim = float(blockDim.x)/float(warpSize); // TODO: should make sure blockDim.x is AT LEAST 32.
 int phys_warp_m_dim = blockDim.y;
 
-int phys_warp_n = threadIdx.x/warpSize;
+int phys_warp_n = float(threadIdx.x)/float(warpSize);
 int phys_warp_m = threadIdx.y; 
 
 int total_num_warp = phys_warp_n_dim*phys_warp_m_dim;
 int total_num_tile = tm_dim*tn_dim;
 
-int warp_cycle = total_num_tile/total_num_warp;
+int warp_cycle = float(total_num_tile)/float(total_num_warp);
 
 // Set up the wmma stuff
 wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> a_frag;
-wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> b_frag[3];
+wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> b_frag;
 wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, half> c_frag;
 // Zero the initial acc.
 
 for(int c = 0; c < warp_cycle; c++){
   int phys_warp_index = phys_warp_n*phys_warp_m_dim+phys_warp_m + total_num_warp*c;
   // The logical warp assigned to each part of the matrix.
-  int warp_n = phys_warp_index % tn_dim;
-  int warp_m = phys_warp_index / tn_dim;
-
+  int warp_m = float(phys_warp_index)/float(tn_dim);
+  int warp_n = phys_warp_index-warp_m*tn_dim;
+  //
   wmma::fill_fragment(c_frag, (half)0.0f);
-  for( int k = 0; k < K; k+=WMMA_K ){
+  for( int k = 0; k < tk_dim; k++ ){
+    
     int a_row = warp_m*WMMA_M;
-    int a_col = k;
-
-    int b_row = k;
+    int a_col = k*WMMA_K;
+    int b_row = k*WMMA_K;
     int b_col = warp_n*WMMA_N;
-
-    if(a_row < M && a_col < K && b_row < K && b_col < N) {    
+    
+//    if( a_row < M && a_col < K && b_row < K && b_col < N ){    
       // Load Matrix
-      if( c==0 ) wmma::load_matrix_sync(b_frag[k/WMMA_K], sm_b+b_col+b_row*N_sm, N_sm);
       wmma::load_matrix_sync(a_frag, sm_a+a_row+a_col*M_sm, M_sm);
+      wmma::load_matrix_sync(b_frag, sm_b+b_col+b_row*N_sm, N_sm);
       // Perform the matrix multiplication
-      wmma::mma_sync(c_frag, a_frag, b_frag[k/WMMA_K], c_frag);
-    }
+      wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+//    }
 //    __syncthreads();
   } 
 
