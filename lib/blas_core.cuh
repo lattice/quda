@@ -140,11 +140,6 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 
   checkLength(x, y); checkLength(x, z); checkLength(x, w);
 
-  if (!x.isNative() && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION) ) {
-    warningQuda("Device blas on non-native fields is not supported\n");
-    return;
-  }
-
   blasStrings.vol_str = x.VolString();
   strcpy(blasStrings.aux_tmp, x.AuxString());
   if (typeid(StoreType) != typeid(yType)) {

@@ -196,9 +196,9 @@ namespace quda {
        @param precision_ New precision value
        @param ghost_precision_ New ghost precision value
      */
-    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) {
+    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision=QUDA_INVALID_PRECISION, bool force_native=false) {
       // is the current status in native field order?
-      bool native = false;
+      bool native = force_native ? true : false;
       if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1 || nSpin==2) &&
 	    (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
 	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION || this->precision == QUDA_QUARTER_PRECISION) &&
@@ -507,10 +507,12 @@ namespace quda {
        @param[in] geoBlockSize Geometric block size that defines the coarse grid dimensions
        @param[in] spinlockSize Geometric block size that defines the coarse spin dimension
        @param[in] Nvec Number of coarse color degrees of freedom per grid point
+       @param[in] precision Optionally set the precision of the fine field
        @param[in] location Optionally set the location of the coarse field
        @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
     */
     ColorSpinorField* CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+                                   QudaPrecision precision=QUDA_INVALID_PRECISION,
 				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
                                    QudaMemoryType mem_Type=QUDA_MEMORY_INVALID);
 
@@ -519,10 +521,12 @@ namespace quda {
        @param[in] geoBlockSize Geometric block size that defines the fine grid dimensions
        @param[in] spinlockSize Geometric block size that defines the fine spin dimension
        @param[in] Nvec Number of fine color degrees of freedom per grid point
+       @param[in] precision Optionally set the precision of the fine field
        @param[in] location Optionally set the location of the fine field
        @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
     */
     ColorSpinorField* CreateFine(const int *geoblockSize, int spinBlockSize, int Nvec,
+                                 QudaPrecision precision=QUDA_INVALID_PRECISION,
 				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
                                  QudaMemoryType mem_type=QUDA_MEMORY_INVALID);
 
