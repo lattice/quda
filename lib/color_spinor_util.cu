@@ -140,10 +140,10 @@ namespace quda {
     } else if (a.Ncolor() == 32) {
       genericSource<Float,nSpin,32,order>(a,sourceType, x, s, c);
 #ifdef GPU_STAGGERED_DIRAC
+    } else if (a.Ncolor() == 64) {
+      genericSource<Float,nSpin,64,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 96) {
       genericSource<Float,nSpin,96,order>(a,sourceType, x, s, c);
-    } else if (a.Ncolor() == 128) {
-      genericSource<Float,nSpin,128,order>(a,sourceType, x, s, c);
 #endif
     } else {
       errorQuda("Unsupported nColor=%d\n", a.Ncolor());
@@ -357,7 +357,17 @@ namespace quda {
     else if (a.Ncolor() == 576 && a.Nspin() == 2) {
       FieldOrderCB<Float,2,576,1,order> A(a);
       print_vector(A, x);
-    }    
+    }
+#ifdef GPU_STAGGERED_DIRAC
+    else if (a.Ncolor() == 64 && a.Nspin() == 2) {
+      FieldOrderCB<Float,2,64,1,order> A(a);
+      print_vector(A, x);
+    } 
+else if (a.Ncolor() == 96 && a.Nspin() == 2) {
+      FieldOrderCB<Float,2,96,1,order> A(a);
+      print_vector(A, x);
+    } 
+#endif
     else {
       errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());	 
     }

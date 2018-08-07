@@ -401,6 +401,12 @@ if (x.Ncolor() == 3) {
     genericMultiBlas<Float,yFloat,nSpin,24,order,write,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 32) {
     genericMultiBlas<Float,yFloat,nSpin,32,order,write,Functor>(x, y, z, w, f);
+#ifdef GPU_STAGGERED_DIRAC
+  } else if (x.Ncolor() == 64) {
+    genericMultiBlas<Float,yFloat,nSpin,64,order,write,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 96) {
+    genericMultiBlas<Float,yFloat,nSpin,96,order,write,Functor>(x, y, z, w, f);
+#endif
   } else {
     errorQuda("nColor = %d not implemeneted",x.Ncolor());
   }

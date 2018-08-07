@@ -457,6 +457,8 @@ namespace quda {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,36>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 48) {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,48>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 64) {
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,64>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 72) {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 96) {
@@ -472,16 +474,16 @@ namespace quda {
     } else if (a.Ncolor() == 1024) {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1024>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef GPU_STAGGERED_DIRAC
+    } else if (a.Ncolor() == 1536) { // staggered KD 24 -> 64 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1536>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 2304) { // staggered KD 24 -> 96 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,2304>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 3072) { // staggered KD 24 -> 128 nvec
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,3072>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 9216) { // staggered 96 -> 96
+    } else if (a.Ncolor() == 4096) { // staggered 64 -> 64
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,4096>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 6144) { // staggered 64 -> 96 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6144>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 9216) { // staggered 96 -> 96 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,9216>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 12288) { // staggered 96 -> 128 nvec
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,12288>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 16384) { // staggered 128 -> 128 nvec
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,16384>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // GPU_STAGGERED_DIRAC
 #endif // GPU_MULTIGRID
     } else {

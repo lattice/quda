@@ -252,6 +252,9 @@ namespace quda {
   case 48:                \
     CopyGenericColorSpinor<48>(dst, src, location, dst_ptr, src_ptr); \
     break;                \
+  case 64:                \
+    CopyGenericColorSpinor<64>(dst, src, location, dst_ptr, src_ptr); \
+    break;                \
   case 72:                \
     CopyGenericColorSpinor<72>(dst, src, location, dst_ptr, src_ptr); \
     break;                \
@@ -276,20 +279,20 @@ namespace quda {
   case 1024:                \
     CopyGenericColorSpinor<1024>(dst, src, location, dst_ptr, src_ptr); \
     break;                \
+  case 1536:               \
+    CopyGenericColorSpinor<1536>(dst, src, location, dst_ptr, src_ptr); \
+    break;                \
   case 2304:               \
-    CopyGenericColorSpinor<2304>(dst, src, location, dst_ptr, src_ptr); \
+    CopyGenericColorSpinor<2304>(dst, src, location, dst_ptr, src_ptr);  \
     break;                \
-  case 3072:               \
-    CopyGenericColorSpinor<3072>(dst, src, location, dst_ptr, src_ptr);  \
+  case 4096:               \
+    CopyGenericColorSpinor<4096>(dst, src, location, dst_ptr, src_ptr);  \
     break;                \
-  case 9216:               \
-    CopyGenericColorSpinor<9216>(dst, src, location, dst_ptr, src_ptr);  \
+  case 6144:               \
+    CopyGenericColorSpinor<6144>(dst, src, location, dst_ptr, src_ptr);  \
     break;                \
-  case 12288:               \
-    CopyGenericColorSpinor<12288>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 16384:                \
-    CopyGenericColorSpinor<16384>(dst, src, location, dst_ptr, src_ptr); \
+  case 9216:                \
+    CopyGenericColorSpinor<9216>(dst, src, location, dst_ptr, src_ptr); \
     break;                \
   default:                \
     errorQuda("Ncolors=%d not supported", src.Ncolor());    \

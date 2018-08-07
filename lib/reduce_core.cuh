@@ -350,10 +350,10 @@ template <typename ReduceType, typename Float, typename zFloat, int nSpin, QudaF
   } else if (x.Ncolor() == 576) {
     value = genericReduce<ReduceType,Float,zFloat,nSpin,576,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
 #ifdef GPU_STAGGERED_DIRAC
+  } else if (x.Ncolor() == 64) {
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,64,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 96) {
     value = genericReduce<ReduceType,Float,zFloat,nSpin,96,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
-  } else if (x.Ncolor() == 128) {
-    value = genericReduce<ReduceType,Float,zFloat,nSpin,128,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
 #endif
   } else {
     ::quda::zero(value);

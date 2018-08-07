@@ -539,10 +539,10 @@ namespace quda {
       } else if (Nvec == 32) {
 	BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,32>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
 #ifdef GPU_STAGGERED_DIRAC
+      } else if (Nvec == 64) {
+  BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,64>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 96) {
   BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
-      } else if (Nvec == 128) {
-  BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,128>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
 #endif
       } else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
@@ -558,21 +558,21 @@ namespace quda {
       }
 
 #ifdef GPU_STAGGERED_DIRAC
+    } else if (V.Ncolor()/Nvec == 64) {
+
+      constexpr int nColor = 64;
+      if (Nvec == 64) {
+  BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,64>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
+      } else if (Nvec == 96) {
+        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
+      } else {
+  errorQuda("Unsupported nVec %d\n", Nvec);
+      }
     } else if (V.Ncolor()/Nvec == 96) {
 
       constexpr int nColor = 96;
       if (Nvec == 96) {
   BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
-      } else if (Nvec == 128) {
-        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,128>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
-      } else {
-  errorQuda("Unsupported nVec %d\n", Nvec);
-      }
-    } else if (V.Ncolor()/Nvec == 128) {
-
-      constexpr int nColor = 128;
-      if (Nvec == 128) {
-  BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,128>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
       } else {
   errorQuda("Unsupported nVec %d\n", Nvec);
       }

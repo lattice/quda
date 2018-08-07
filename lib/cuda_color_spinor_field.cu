@@ -1721,6 +1721,9 @@ namespace quda {
     else if (field.Ncolor() == 32 && field.Nspin() == 2) {
       genericCudaPrintVector<Float,2,32>(field,i);
     }
+    else if (field.Ncolor() == 64 && field.Nspin() == 2) {
+      genericCudaPrintVector<Float,2,64>(field,i);
+    }
     else if (field.Ncolor() == 96 && field.Nspin() == 2) {
       genericCudaPrintVector<Float,2,96>(field,i);
     } else {

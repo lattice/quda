@@ -895,10 +895,10 @@ namespace quda {
       ApplyCoarse<Float,yFloat,ghostFloat,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
 #ifdef GPU_STAGGERED_DIRAC
+    } else if (inA.Ncolor() == 64) {
+      ApplyCoarse<Float,yFloat,ghostFloat,64,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
     } else if (inA.Ncolor() == 96) {
       ApplyCoarse<Float,yFloat,ghostFloat,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-    } else if (inA.Ncolor() == 128) {
-      ApplyCoarse<Float,yFloat,ghostFloat,128,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
@@ -1014,7 +1014,10 @@ namespace quda {
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
           }
         } else if (Y.Precision() == QUDA_HALF_PRECISION) {
-          if (halo_precision == QUDA_HALF_PRECISION) {
+          if (halo_precision == QUDA_SINGLE_PRECISION) {
+            ApplyCoarse<float,short,float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                           dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+          } else if (halo_precision == QUDA_HALF_PRECISION) {
             ApplyCoarse<float,short,short>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                            dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
