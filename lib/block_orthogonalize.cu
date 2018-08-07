@@ -201,6 +201,7 @@ namespace quda {
 
   template <typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin, int nVec,
 	    typename Arg, int block_size>
+  __launch_bounds__(2*block_size)
   __global__ void blockOrthoGPU(Arg arg) {
 
     int x_coarse = blockIdx.x;
@@ -406,7 +407,7 @@ namespace quda {
 	  case 128: GPU<Rotator,Vector,128>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x4x4 aggregates
 	  case 144: GPU<Rotator,Vector,144>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x3x6 aggregates
 	  case 192: GPU<Rotator,Vector,192>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x3x8 aggregates
-	  case 200: GPU<Rotator,Vector,200>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 6x6x6x4 aggregates
+	  case 200: GPU<Rotator,Vector,200>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 5x5x5x4 aggregates
 	  case 256: GPU<Rotator,Vector,256>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 4x4x4x8 aggregates
 	  case 432: GPU<Rotator,Vector,432>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 6x6x6x4 aggregates
 	  case 500: GPU<Rotator,Vector,500>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 5x5x5x8 aggregates

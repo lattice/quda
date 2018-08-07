@@ -565,7 +565,7 @@ namespace quda {
     if (x_cb >= arg.fineVolumeCB) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    arg.max_d[x_cb*2+parity] = computeCloverInvMax<Float,Arg>(arg, parity, x_cb);
+    arg.max_d[parity+2*x_cb] = computeCloverInvMax<Float,Arg>(arg, parity, x_cb);
   }
 #endif // DYNAMIC_CLOVER
 
@@ -1565,7 +1565,7 @@ namespace quda {
 
 	  if (from_coarse) errorQuda("ComputeCloverInvMax should only be called from the fine grid");
 #ifdef DYNAMIC_CLOVER
-	  arg.max_d = static_cast<Float*>(pool_device_malloc(2 * arg.fineVolumeCB));
+	  arg.max_d = static_cast<Float*>(pool_device_malloc(2 * arg.fineVolumeCB *sizeof(Float)));
 	  ComputeCloverInvMaxGPU<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 
           if (!activeTuning()) { // only do reduction once tuning is done else thrust will catch tuning failures
