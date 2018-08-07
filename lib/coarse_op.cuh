@@ -1445,7 +1445,7 @@ namespace quda {
     virtual ~CalculateY() { }
 
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 
@@ -1567,10 +1567,13 @@ namespace quda {
 #ifdef DYNAMIC_CLOVER
 	  arg.max_d = static_cast<Float*>(pool_device_malloc(2 * arg.fineVolumeCB));
 	  ComputeCloverInvMaxGPU<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	  thrust_allocator alloc;
-	  thrust::device_ptr<Float> ptr(arg.max_d);
-	  arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr+2*arg.fineVolumeCB, static_cast<Float>(0.0), thrust::maximum<Float>());
-	  pool_device_free(arg.max_d);
+
+          if (!activeTuning()) { // only do reduction once tuning is done else thrust will catch tuning failures
+            thrust_allocator alloc;
+            thrust::device_ptr<Float> ptr(arg.max_d);
+            arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr+2*arg.fineVolumeCB, static_cast<Float>(0.0), thrust::maximum<Float>());
+          }
+          pool_device_free(arg.max_d);
 #else
 	  errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
 #endif
@@ -1750,7 +1753,7 @@ namespace quda {
       else if (type == COMPUTE_AV)                 strcat(Aux,",computeAV");
       else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");
       else if (type == COMPUTE_TMCAV)              strcat(Aux,",computeTmcAV");
-      else if (type == COMPUTE_CLOVER_INV_MAX) strcat(Aux,",computeCloverInverseMax");
+      else if (type == COMPUTE_CLOVER_INV_MAX)     strcat(Aux,",computeCloverInverseMax");
       else if (type == COMPUTE_VUV)                strcat(Aux,",computeVUV");
       else if (type == COMPUTE_COARSE_CLOVER)      strcat(Aux,",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
