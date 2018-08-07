@@ -682,7 +682,7 @@ int main(int argc, char **argv)
     plaq[2] = -plaq[2];
   }
 
-  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 #endif
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
@@ -791,7 +791,7 @@ int main(int argc, char **argv)
     plaq[1] = -plaq[1];
     plaq[2] = -plaq[2];
 
-    printf("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
 #endif
 
