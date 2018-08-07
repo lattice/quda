@@ -104,14 +104,14 @@ namespace quda {
     {
 //      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       const unsigned int max_shared = deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock;
-      const int step[2] = { deviceProp.warpSize, 1 };
-//      const int step[2] = { 8, 1 };
+//      const int step[2] = { deviceProp.warpSize, 1 };
+      const int step[2] = { 16, 1 };
       bool advance[2] = { false, false };
 
       // first try to advance block.x
       param.block.x += step[0];
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0] ||
-          sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
+          shared_bytes_per_block(param.block.x, param.block.y) > max_shared) {
         advance[0] = false;
         param.block.x = step[0]; // reset block.x
       } else {
@@ -119,23 +119,25 @@ namespace quda {
       }
       
       if(DS_type < 4){
-      if (!advance[0]) {  // if failed to advance block.x, now try block.y
-        param.block.y += step[1];
-
-        if (param.block.y > (unsigned)in->X(4) ||
-            sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
-          advance[1] = false;
-          param.block.y = step[1]; // reset block.x
-        } else {
-          advance[1] = true; // successfully advanced block.y
+        if (!advance[0]) {  // if failed to advance block.x, now try block.y
+          param.block.y += step[1];
+  
+          if (param.block.y > (unsigned)in->X(4) ||
+              sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
+            advance[1] = false;
+            param.block.y = step[1]; // reset block.x
+          } else {
+            advance[1] = true; // successfully advanced block.y
+          }
         }
-      }
       }
 
       if (advance[0] || advance[1]) {
         param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			   (in->X(4)+param.block.y-1) / param.block.y, 1);
 
+        param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y);
+        
         bool advance = true;
         if (!checkGrid(param)) advance = advanceBlockDim(param);
         return advance;
@@ -154,12 +156,12 @@ namespace quda {
 				if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 				param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
 			
-				if (param.shared_bytes > max_shared) {
+				if ((size_t)param.shared_bytes > max_shared) {
 				  TuneParam next(param);
 				  advanceBlockDim(next); // to get next blockDim
 				  int nthreads = next.block.x * next.block.y * next.block.z;
-				  param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-				    sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+				  param.shared_bytes = shared_bytes_per_block(next.block.x,next.block.y) > sharedBytesPerBlock(param) ?
+				     shared_bytes_per_block(next.block.x,next.block.y) : sharedBytesPerBlock(param);
 				  return false;
 				} else {
 				  return true;
@@ -171,15 +173,20 @@ namespace quda {
 
     unsigned int sharedBytesPerThread() const { 
       if(DS_type >= 4){
-        if(DS_type == 9){
-          return 114; // ( (48+8)**2+48*(192+8)*2 )*2 / (12*32) TODO: fix this!
-        }
         return 24*(in->Precision()==8?8:4);
       }else{
         return 0;
       }
     }
-  
+ 
+    unsigned int shared_bytes_per_block(int x, int y) const { 
+      if(DS_type == 9){
+        return ( (y*4)*(y*4+8)+(y*4)*(x*6+8)*2 )*2; // 4*4*2 TODO: fix this!
+      }else{
+        return sharedBytesPerThread()*x*y;
+      }
+    }
+ 
   public:
     MDWFDslashPCCuda(cudaColorSpinorField *out, const GaugeField &gauge, const cudaColorSpinorField *in,
 		     const cudaColorSpinorField *x, const double mferm, const double a,
@@ -338,11 +345,11 @@ namespace quda {
       if(DS_type >= 4){ 
         // For these kernels, for one 4D-site all corresponding 5D-sites have to be within the same block,
         // since shared memory is used.
-        param.block = dim3( param.block.x, in->X(4), 1);
-//        param.block = dim3( 8, in->X(4), 1);
+//        param.block = dim3( param.block.x, in->X(4), 1);
+        param.block = dim3( 16, in->X(4), 1);
       }
-      param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y;
-        printfQuda( "Shared memory %08lu is larger than limit %08lu.\n", (size_t)param.shared_bytes, (size_t)(deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock) );
+      param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y);
+        printfQuda( "Shared memory %08lu is larger than limit %08lu?\n", (size_t)param.shared_bytes, (size_t)(deviceProp.major>=7 ? 96*1024 : deviceProp.sharedMemPerBlock) );
 //      if( (size_t)param.shared_bytes > (size_t)deviceProp.sharedMemPerBlock ) 
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			 (in->X(4)+param.block.y-1) / param.block.y, 1);
@@ -358,10 +365,10 @@ namespace quda {
       if(DS_type >= 4){ 
         // For these kernels, for one 4D-site all corresponding 5D-sites have to be within the same block,
         // since shared memory is used.
-        param.block = dim3( param.block.x, in->X(4), 1);
-//        param.block = dim3( 8, in->X(4), 1);
+//        param.block = dim3( param.block.x, in->X(4), 1);
+        param.block = dim3( 16, in->X(4), 1);
       }
-      param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y;
+      param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y);
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			 (in->X(4)+param.block.y-1) / param.block.y, 1);
       bool ok = true;

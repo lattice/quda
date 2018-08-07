@@ -115,30 +115,30 @@ READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
 // lda = Lsx4, column-major
 // ldb = Lsx4, column-major
 // total number of halves = Ls*24*blockDim.x
-sm_b[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+0 ] = i00_re*1e4f;
-sm_b[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+1 ] = i00_im*1e4f;
-sm_b[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+2 ] = i01_re*1e4f;
-sm_b[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+3 ] = i01_im*1e4f;
-sm_b[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+4 ] = i02_re*1e4f;
-sm_b[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+5 ] = i02_im*1e4f;
-sm_b[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+0 ] = i10_re*1e4f;
-sm_b[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+1 ] = i10_im*1e4f;
-sm_b[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+2 ] = i11_re*1e4f;
-sm_b[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+3 ] = i11_im*1e4f;
-sm_b[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+4 ] = i12_re*1e4f;
-sm_b[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+5 ] = i12_im*1e4f;
-sm_b[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+0 ] = i20_re*1e4f;
-sm_b[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+1 ] = i20_im*1e4f;
-sm_b[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+2 ] = i21_re*1e4f;
-sm_b[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+3 ] = i21_im*1e4f;
-sm_b[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+4 ] = i22_re*1e4f;
-sm_b[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+5 ] = i22_im*1e4f;
-sm_b[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+0 ] = i30_re*1e4f;
-sm_b[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+1 ] = i30_im*1e4f;
-sm_b[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+2 ] = i31_re*1e4f;
-sm_b[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+3 ] = i31_im*1e4f;
-sm_b[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+4 ] = i32_re*1e4f;
-sm_b[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+5 ] = i32_im*1e4f;
+sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+0 ] = i00_re*1e4f;
+sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+1 ] = i00_im*1e4f;
+sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+2 ] = i01_re*1e4f;
+sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+3 ] = i01_im*1e4f;
+sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+4 ] = i02_re*1e4f;
+sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+5 ] = i02_im*1e4f;
+sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+0 ] = i10_re*1e4f;
+sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+1 ] = i10_im*1e4f;
+sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+2 ] = i11_re*1e4f;
+sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+3 ] = i11_im*1e4f;
+sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+4 ] = i12_re*1e4f;
+sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+5 ] = i12_im*1e4f;
+sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+0 ] = i20_re*1e4f;
+sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+1 ] = i20_im*1e4f;
+sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+2 ] = i21_re*1e4f;
+sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+3 ] = i21_im*1e4f;
+sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+4 ] = i22_re*1e4f;
+sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+5 ] = i22_im*1e4f;
+sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+0 ] = i30_re*1e4f;
+sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+1 ] = i30_im*1e4f;
+sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+2 ] = i31_re*1e4f;
+sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+3 ] = i31_im*1e4f;
+sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+4 ] = i32_re*1e4f;
+sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+5 ] = i32_im*1e4f;
 
 // Construct matrix A: TODO: should be careful about the idle threads.
 
@@ -162,25 +162,25 @@ sm_b[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+5 ] = i32_im*1e4
     factorL = inv_d_n * static_cast<half>(POW(kappa,exponent2)) * ( threadIdx.x < coord[4] ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
     // (mu, s) by (nu, t). column-major. t := threadIdx.y
   
-    sm_a[ (coord[4]*4+0)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+0) ] = factorR + factorL;
-    sm_a[ (coord[4]*4+0)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+1) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+0)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+2) ] = factorR - factorL;
-    sm_a[ (coord[4]*4+0)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+3) ] = static_cast<half>(0.0f);
-                                                                  
-    sm_a[ (coord[4]*4+1)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+0) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+1)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+1) ] = factorR + factorL;
-    sm_a[ (coord[4]*4+1)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+2) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+1)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+3) ] = factorR - factorL;
-                                                                  
-    sm_a[ (coord[4]*4+2)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+0) ] = factorR - factorL;
-    sm_a[ (coord[4]*4+2)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+1) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+2)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+2) ] = factorR + factorL;
-    sm_a[ (coord[4]*4+2)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+3) ] = static_cast<half>(0.0f);
-                                                                  
-    sm_a[ (coord[4]*4+3)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+0) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+3)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+1) ] = factorR - factorL;
-    sm_a[ (coord[4]*4+3)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+2) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+3)*(param.dc.Ls*4+sm_m_pad_size)+(threadIdx.x*4+3) ] = factorR + factorL;  
+    sm_a[ (coord[4]*4+0)*(M_sm)+(threadIdx.x*4+0) ] = factorR + factorL;
+    sm_a[ (coord[4]*4+0)*(M_sm)+(threadIdx.x*4+1) ] = static_cast<half>(0.0f);
+    sm_a[ (coord[4]*4+0)*(M_sm)+(threadIdx.x*4+2) ] = factorR - factorL;
+    sm_a[ (coord[4]*4+0)*(M_sm)+(threadIdx.x*4+3) ] = static_cast<half>(0.0f);
+    
+    sm_a[ (coord[4]*4+1)*(M_sm)+(threadIdx.x*4+0) ] = static_cast<half>(0.0f);
+    sm_a[ (coord[4]*4+1)*(M_sm)+(threadIdx.x*4+1) ] = factorR + factorL;
+    sm_a[ (coord[4]*4+1)*(M_sm)+(threadIdx.x*4+2) ] = static_cast<half>(0.0f);
+    sm_a[ (coord[4]*4+1)*(M_sm)+(threadIdx.x*4+3) ] = factorR - factorL;
+    
+    sm_a[ (coord[4]*4+2)*(M_sm)+(threadIdx.x*4+0) ] = factorR - factorL;
+    sm_a[ (coord[4]*4+2)*(M_sm)+(threadIdx.x*4+1) ] = static_cast<half>(0.0f);
+    sm_a[ (coord[4]*4+2)*(M_sm)+(threadIdx.x*4+2) ] = factorR + factorL;
+    sm_a[ (coord[4]*4+2)*(M_sm)+(threadIdx.x*4+3) ] = static_cast<half>(0.0f);
+    
+    sm_a[ (coord[4]*4+3)*(M_sm)+(threadIdx.x*4+0) ] = static_cast<half>(0.0f);
+    sm_a[ (coord[4]*4+3)*(M_sm)+(threadIdx.x*4+1) ] = factorR - factorL;
+    sm_a[ (coord[4]*4+3)*(M_sm)+(threadIdx.x*4+2) ] = static_cast<half>(0.0f);
+    sm_a[ (coord[4]*4+3)*(M_sm)+(threadIdx.x*4+3) ] = factorR + factorL;  
   }
 }
 
@@ -194,21 +194,24 @@ const int WMMA_M = 16;
 const int WMMA_N = 16;
 const int WMMA_K = 16;
 
-const int tm_dim = float(M) / float(WMMA_M);
-const int tn_dim = float(N) / float(WMMA_N);
-const int tk_dim = float(K) / float(WMMA_K);
+const int tm_dim = float(M)/WMMA_M;
+const int tn_dim = float(N)/WMMA_N;
+const int tk_dim = float(K)/WMMA_K;
 
 // The actual/physical warp assigned to each thread in this block
-int phys_warp_n_dim = float(blockDim.x)/float(warpSize); // TODO: should make sure blockDim.x is AT LEAST 32.
-int phys_warp_m_dim = blockDim.y;
+//int phys_warp_n_dim = float(blockDim.x)/float(warpSize); // TODO: should make sure blockDim.x is AT LEAST 32.
+//int phys_warp_m_dim = blockDim.y;
 
-int phys_warp_n = float(threadIdx.x)/float(warpSize);
-int phys_warp_m = threadIdx.y; 
+int total_warp = float(blockDim.x*blockDim.y)/warpSize;
+int this_warp = float(threadIdx.y*blockDim.x+threadIdx.x)/warpSize;
 
-int total_num_warp = phys_warp_n_dim*phys_warp_m_dim;
-int total_num_tile = tm_dim*tn_dim;
+//int phys_warp_n = float(threadIdx.x)/float(warpSize);
+//int phys_warp_m = threadIdx.y; 
 
-int warp_cycle = float(total_num_tile)/float(total_num_warp);
+//int total_num_warp = phys_warp_n_dim*phys_warp_m_dim;
+int total_tile = tm_dim*tn_dim;
+
+int warp_cycle = float(total_tile)/total_warp;
 
 // Set up the wmma stuff
 wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> a_frag;
@@ -217,9 +220,9 @@ wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, half> c_frag;
 // Zero the initial acc.
 
 for(int c = 0; c < warp_cycle; c++){
-  int phys_warp_index = phys_warp_n*phys_warp_m_dim+phys_warp_m + total_num_warp*c;
+  int phys_warp_index = this_warp + total_warp*c;
   // The logical warp assigned to each part of the matrix.
-  int warp_m = float(phys_warp_index)/float(tn_dim);
+  int warp_m = float(phys_warp_index)/tn_dim;
   int warp_n = phys_warp_index-warp_m*tn_dim;
   //
   wmma::fill_fragment(c_frag, (half)0.0f);
@@ -252,30 +255,30 @@ for(int c = 0; c < warp_cycle; c++){
 }
 __syncthreads();
 
-o00_re = 1e-4f*float(sm_c[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+0 ]);
-o00_im = 1e-4f*float(sm_c[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+1 ]);
-o01_re = 1e-4f*float(sm_c[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+2 ]);
-o01_im = 1e-4f*float(sm_c[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+3 ]);
-o02_re = 1e-4f*float(sm_c[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+4 ]);
-o02_im = 1e-4f*float(sm_c[ (coord[4]*4+0)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+5 ]);
-o10_re = 1e-4f*float(sm_c[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+0 ]);
-o10_im = 1e-4f*float(sm_c[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+1 ]);
-o11_re = 1e-4f*float(sm_c[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+2 ]);
-o11_im = 1e-4f*float(sm_c[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+3 ]);
-o12_re = 1e-4f*float(sm_c[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+4 ]);
-o12_im = 1e-4f*float(sm_c[ (coord[4]*4+1)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+5 ]);
-o20_re = 1e-4f*float(sm_c[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+0 ]);
-o20_im = 1e-4f*float(sm_c[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+1 ]);
-o21_re = 1e-4f*float(sm_c[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+2 ]);
-o21_im = 1e-4f*float(sm_c[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+3 ]);
-o22_re = 1e-4f*float(sm_c[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+4 ]);
-o22_im = 1e-4f*float(sm_c[ (coord[4]*4+2)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+5 ]);
-o30_re = 1e-4f*float(sm_c[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+0 ]);
-o30_im = 1e-4f*float(sm_c[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+1 ]);
-o31_re = 1e-4f*float(sm_c[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+2 ]);
-o31_im = 1e-4f*float(sm_c[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+3 ]);
-o32_re = 1e-4f*float(sm_c[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+4 ]);
-o32_im = 1e-4f*float(sm_c[ (coord[4]*4+3)*(blockDim.x*6+sm_n_pad_size)+threadIdx.x*6+5 ]);
+o00_re = 1e-4f*float(sm_c[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+0 ]);
+o00_im = 1e-4f*float(sm_c[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+1 ]);
+o01_re = 1e-4f*float(sm_c[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+2 ]);
+o01_im = 1e-4f*float(sm_c[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+3 ]);
+o02_re = 1e-4f*float(sm_c[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+4 ]);
+o02_im = 1e-4f*float(sm_c[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+5 ]);
+o10_re = 1e-4f*float(sm_c[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+0 ]);
+o10_im = 1e-4f*float(sm_c[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+1 ]);
+o11_re = 1e-4f*float(sm_c[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+2 ]);
+o11_im = 1e-4f*float(sm_c[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+3 ]);
+o12_re = 1e-4f*float(sm_c[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+4 ]);
+o12_im = 1e-4f*float(sm_c[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+5 ]);
+o20_re = 1e-4f*float(sm_c[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+0 ]);
+o20_im = 1e-4f*float(sm_c[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+1 ]);
+o21_re = 1e-4f*float(sm_c[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+2 ]);
+o21_im = 1e-4f*float(sm_c[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+3 ]);
+o22_re = 1e-4f*float(sm_c[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+4 ]);
+o22_im = 1e-4f*float(sm_c[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+5 ]);
+o30_re = 1e-4f*float(sm_c[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+0 ]);
+o30_im = 1e-4f*float(sm_c[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+1 ]);
+o31_re = 1e-4f*float(sm_c[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+2 ]);
+o31_im = 1e-4f*float(sm_c[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+3 ]);
+o32_re = 1e-4f*float(sm_c[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+4 ]);
+o32_im = 1e-4f*float(sm_c[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+5 ]);
 
 } // wmma.h
 

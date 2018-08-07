@@ -314,10 +314,10 @@ namespace quda {
     double dd = xmyNorm(*tt, *tx);
     printfQuda("%% diff      x2 = %16.12e (This number is SUPPOSED to be tiny).\n", dd);
     
-		mat_precondition->Dagger(QUDA_DAG_YES);
+    mat_precondition->Dagger(QUDA_DAG_YES);
     mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
     mat_precondition->dslash5inv_sm_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
-		mat_precondition->Dagger(QUDA_DAG_NO);
+    mat_precondition->Dagger(QUDA_DAG_NO);
 
     double mdd = xmyNorm(*ft, *fx);
     printfQuda("%% diff      m2 = %16.12e (This number is SUPPOSED to be tiny).\n", mdd);
@@ -364,16 +364,16 @@ namespace quda {
 //    mat_precondition->Dslash5invXpay(*ifset, *iftmp, parity[1], in, -1.0);      // +2
 
     mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
-//		blas::copy(*ifset, *iftmp);    
-		mat_precondition->Dagger(QUDA_DAG_YES);
+//    blas::copy(*ifset, *iftmp);    
+    mat_precondition->Dagger(QUDA_DAG_YES);
     
 //    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
 //    mat_precondition->Dslash5inv(out, *iftmp, parity[1]);                  // +2
 //    mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
     mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
     
-		mat_precondition->Dagger(QUDA_DAG_NO);
-	  mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
+    mat_precondition->Dagger(QUDA_DAG_NO);
+    mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
 
 //    mat_precondition->Dslash4(out, *iftmp, parity[0]);
 //    mat_precondition->Dslash4Partial(out, *ifset, parity[0], sp_len1, RR1, Xs1); // +1
@@ -382,14 +382,14 @@ namespace quda {
 //    mat_precondition->Dslash5inv(out, *iftmp, parity[0]);                 // +1
 //    mat_precondition->Dslash5invPartial(out, *ifset, parity[0], sp_len1, RR1, Xs1);                 // +1
 
-//	  blas::copy(out, *ifset);	
-//		mat_precondition->Dagger(QUDA_DAG_YES);
+//    blas::copy(out, *ifset);  
+//    mat_precondition->Dagger(QUDA_DAG_YES);
 //    mat_precondition->Dslash4(*iftmp, out, parity[1]);
 //    mat_precondition->Dslash4Partial(*ifset, out, parity[1], sp_len0, RR0, Xs0); // +0
-//		mat_precondition->Dagger(QUDA_DAG_NO);
+//    mat_precondition->Dagger(QUDA_DAG_NO);
     mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   
 //    mat_precondition->Dslash4preXpay(out, *iftmp, parity[1], *ifset, -1.0);   // +0
-//		mat_precondition->Dagger(QUDA_DAG_YES);
+//    mat_precondition->Dagger(QUDA_DAG_YES);
 //    mat_precondition->Dslash4preXpayPartial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   // +0
   }
 
@@ -778,7 +778,7 @@ namespace quda {
       param.true_res_hq = 0.;
     }
     
-		this->allocate( db );
+    this->allocate( db );
 
     int k;
     //    int parity = nrm_op->getMatPCType();
@@ -802,7 +802,7 @@ namespace quda {
     double r2_max = r2;
     int num_reliable_updates = 0;
 // reliable update
-		
+    
     const double u = param.precision_sloppy==8?std::numeric_limits<double>::epsilon()/2.:((param.precision_sloppy==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
     const double uhigh = param.precision==8?std::numeric_limits<double>::epsilon()/2.:((param.precision==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
     const double deps = sqrt(u);
@@ -875,7 +875,7 @@ namespace quda {
       //printfQuda("pApp = %e %e %e\n", pAppp.x, pAppp.y, pAppp.z);
       //for (int i=0; i<6; i++) printfQuda("%d %e %e\n", i, dot[i].real(), dot[i].imag());
 
-      //			pkApk = reDotProduct(*p, *mmp);
+      //      pkApk = reDotProduct(*p, *mmp);
       pkApk = pAppp.x;
       ppnorm = pAppp.z;
 
@@ -892,7 +892,7 @@ namespace quda {
       if( rr2 > r2_max ) r2_max = rr2;
 //      if( rr2 < reliable_update_delta*reliable_update_delta*r2_max || rr2 < stop ){
       if( rr2 < stop or ( ( (d <= deps*sqrt(r2_old)) or (dfac*dinit > deps*r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac*dinit) ) ){
-				
+        
         printfQuda("Reliable update conditions: \n    d_n-1 < eps*r2_old: %8.4e < %8.4e,\n    dn    > eps*r_n: %8.4e    > %8.4e,\n    dnew  > 1.1*dinit: %8.4e  > (1.1*)%8.4e.\n",
                    d, deps*sqrt(r2_old), d_new,deps*rNorm, d_new, dinit);
 
