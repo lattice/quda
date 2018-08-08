@@ -70,6 +70,8 @@ namespace quda {
       int RR2[4], RR1[4], RR0[4];
       int_fastdiv Xs2[4], Xs1[4], Xs0[4];
 
+      bool tc;
+
     public:
 
       MSPCG(QudaInvertParam* inv_param, SolverParam& _param, TimeProfile& profile, int ic=6);

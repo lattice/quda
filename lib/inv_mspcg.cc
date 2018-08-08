@@ -138,6 +138,14 @@ namespace quda {
       errorQuda("gaugeSloppy not valid.");
     }
 
+    cudaDeviceProp device_prop;
+    cudaGetDeviceProperties( &device_prop, 0 );
+    if(device_prop.major < 7){
+      tc = false;
+    }else{
+      tc = true;
+    }
+
     int gR[4] = {2*R[0], R[1], R[2], R[3]}; 
     padded_gauge_field = createExtendedGauge(*gaugePrecise, gR, profile, true);
     padded_gauge_field_precondition = createExtendedGauge(*gaugePrecondition, gR, profile, true);
@@ -314,11 +322,12 @@ namespace quda {
     double dd = xmyNorm(*tt, *tx);
     printfQuda("%% diff      x2 = %16.12e (This number is SUPPOSED to be tiny).\n", dd);
     
-    mat_precondition->Dagger(QUDA_DAG_YES);
-    mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
-    mat_precondition->dslash5inv_sm_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
-    mat_precondition->Dagger(QUDA_DAG_NO);
-
+    if(tc){
+      mat_precondition->Dagger(QUDA_DAG_YES);
+      mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
+      mat_precondition->dslash5inv_sm_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
+      mat_precondition->Dagger(QUDA_DAG_NO);
+    }
     double mdd = xmyNorm(*ft, *fx);
     printfQuda("%% diff      m2 = %16.12e (This number is SUPPOSED to be tiny).\n", mdd);
 
@@ -369,9 +378,12 @@ namespace quda {
     
 //    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
 //    mat_precondition->Dslash5inv(out, *iftmp, parity[1]);                  // +2
-//    mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
-    mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
-    
+    if(tc){
+      mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
+    }else{
+      mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
+    }
+
     mat_precondition->Dagger(QUDA_DAG_NO);
     mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
 
