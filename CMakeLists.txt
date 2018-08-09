@@ -400,7 +400,7 @@ if(QUDA_BLOCKSOLVER)
 endif()
 
 if(QUDA_ALTRELIABLE)
-  add_definitions(-DALTRELIABE)
+  add_definitions(-DALTRELIABLE)
 endif()
 
 if(QUDA_USE_EIGEN)
