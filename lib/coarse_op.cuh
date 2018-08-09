@@ -5,7 +5,7 @@
 // freedom is handled by a single thread block.  This is presently
 // slower than using global atomics (due to increased latency from
 // having to run larger thread blocks)
-//#define SHARED_ATOMIC
+#define SHARED_ATOMIC
 
 #ifdef SHARED_ATOMIC
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
@@ -13,6 +13,17 @@
 #ifdef SWIZZLE
 #undef SWIZZLE
 #endif
+
+// with shared atomics, since the thread block is constrained to
+// contain the entire aggregate, we often don't have enough threads
+// left to work on multiple coarse colors (which increases the
+// locality) in the thread block.  In lieu of this, if we schedule the
+// coarse grid point index to grid.y and the coarse column index to
+// grid.x, this will increase the potential for L2 reuse since a given
+// wave of thread blocks will be for different coarse color but the
+// same coarse grid point.
+#define COARSE_COLOR_WAVE
+
 #endif
 
 namespace quda {
@@ -760,7 +771,11 @@ namespace quda {
   __device__ __host__ inline int coarseIndex(const Arg &arg) {
     constexpr int warp_size = 32;
     int warp_lane = threadIdx.x % warp_size;
+#ifdef COARSE_COLOR_WAVE    // coarse grid point is mapped to grid.y
+    int x_coarse = blockIdx.y*arg.aggregates_per_block + warp_lane % arg.aggregates_per_block;
+#else                       // coarse grid point is mapped to grid.x
     int x_coarse = blockIdx.x*arg.aggregates_per_block + warp_lane % arg.aggregates_per_block;
+#endif
     return x_coarse;
   }
 
@@ -823,9 +838,12 @@ namespace quda {
     __shared__ complex<storeType> Y[coarseColor][4][coarseSpin][coarseSpin];
     int x_ = coarse_x_cb%arg.aggregates_per_block;
 
-    if (virtualThreadIdx(arg) == 0 && threadIdx.y == 0) {
-      for (int s_row = 0; s_row<coarseSpin; s_row++) for (int s_col = 0; s_col<coarseSpin; s_col++)
-       { Y[c_row][x_][s_row][s_col] = 0; X[c_row][x_][s_row][s_col] = 0; }
+    int tx = virtualThreadIdx(arg);
+    int s_col = tx / 2;
+    int s_row = tx % 2;
+    if (tx < coarseSpin*coarseSpin && threadIdx.y == 0) {
+      Y[c_row][x_][s_row][s_col] = 0;
+      X[c_row][x_][s_row][s_col] = 0;
     }
 
     __syncthreads();
@@ -865,45 +883,19 @@ namespace quda {
 
     __syncthreads();
 
-    if (virtualThreadIdx(arg)==0 && threadIdx.y==0) {
-
-#pragma unroll
-      for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
-#pragma unroll
-	for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	  arg.Y_atomic(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) = Y[c_row][x_][s_row][s_col];
-	}
-      }
+    if (tx < coarseSpin*coarseSpin && threadIdx.y==0) {
+      arg.Y_atomic(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) = Y[c_row][x_][s_row][s_col];
 
       if (dir == QUDA_BACKWARDS) {
-#pragma unroll
-	for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
-#pragma unroll
-	  for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	    arg.X_atomic(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row) += conj(X[c_row][x_][s_row][s_col]);
-	  }
-	}
+        arg.X_atomic(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row) += conj(X[c_row][x_][s_row][s_col]);
       } else {
-#pragma unroll
-	for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
-#pragma unroll
-	  for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	    arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += X[c_row][x_][s_row][s_col];
-	  }
-	}
+        arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += X[c_row][x_][s_row][s_col];
       }
 
       if (!arg.bidirectional) {
-#pragma unroll
-	for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
-#pragma unroll
-	  for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	    if (s_row == s_col) arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += X[c_row][x_][s_row][s_col];
-	    else arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) -= X[c_row][x_][s_row][s_col];
-	  }
-	}
+        if (s_row == s_col) arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += X[c_row][x_][s_row][s_col];
+        else arg.X_atomic(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) -= X[c_row][x_][s_row][s_col];
       }
-
     }
 
 #else
@@ -969,10 +961,15 @@ namespace quda {
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg, typename Gamma>
   __global__ void ComputeVUVGPU(Arg arg, const Gamma gamma) {
 
+#ifdef SHARED_ATOMIC
+#ifdef COARSE_COLOR_WAVE    // coarse color is mapped to grid.x
+    int parity_c_col = blockDim.y*blockIdx.x + threadIdx.y;
+#else                       // coarse color is mapped to grid.y
     int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
+#endif
+
     if (parity_c_col >= 2*coarseColor) return;
 
-#ifdef SHARED_ATOMIC
     int c_col = parity_c_col / 2; // coarse color col index
     int parity = parity_c_col % 2;
 
@@ -995,6 +992,9 @@ namespace quda {
     int x_fine = arg.coarse_to_fine[ (x_coarse*2 + parity) * block_dim_x + thread_idx_x];
     int x_cb = x_fine - parity*arg.fineVolumeCB;
 #else
+    int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
+    if (parity_c_col >= 2*coarseColor) return;
+
     int x_coarse_cb = 0;
     int parity_coarse = 0;
 
@@ -1580,11 +1580,9 @@ namespace quda {
 #endif
 
 	} else if (type == COMPUTE_VUV) {
-#ifndef SHARED_ATOMIC
-	  //tp.grid.y = 2*coarseColor;
-#else
+#ifdef SHARED_ATOMIC
+          // we force parity in the block
 	  tp.block.y = 2;
-
 	  tp.grid.y = coarseColor;
 
           arg.swizzle = tp.aux.x;
@@ -1592,6 +1590,13 @@ namespace quda {
 	  arg.aggregates_per_block = tp.aux.y;
 	  tp.block.x *= tp.aux.y;
 	  tp.grid.x /= tp.aux.y;
+
+#ifdef COARSE_COLOR_WAVE
+          // swap x and y grids
+          tp.grid.y = tp.grid.x;
+	  tp.grid.x = coarseColor;
+#endif
+
 #endif
 	  if (dir == QUDA_BACKWARDS) {
 	    if      (dim==0) ComputeVUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg, Gamma_<0>());
@@ -1608,6 +1613,12 @@ namespace quda {
 	  }
 
 #ifdef SHARED_ATOMIC
+
+#ifdef COARSE_COLOR_WAVE
+          // revert x and y grids
+          tp.grid.x = tp.grid.y;
+	  tp.grid.y = coarseColor;
+#endif
 	  tp.block.x /= tp.aux.y;
 	  tp.grid.x *= tp.aux.y;
 #endif
