@@ -363,7 +363,13 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #ifdef GPU_DOMAIN_WALL_DIRAC
 #define MDWF_mode 1
 #if DD_DAG && (DD_PREC==2)
+
+#if (__COMPUTE_CAPABILITY__ >= 700)
 #include "dw_dslash5inv_dagger_core_sm_tc.h"
+#else
+#include "dw_dslash5inv_core.h"
+#endif
+
 #else
 #include "dw_dslash5inv_core.h"
 #endif

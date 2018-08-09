@@ -23,8 +23,10 @@
 
 #include <inline_ptx.h>
 
+#if (__COMPUTE_CAPABILITY__ >= 700)
 #include <cublas_v2.h>
 #include <mma.h>
+#endif
 
 namespace quda {
 
