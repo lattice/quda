@@ -210,42 +210,80 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->output_location = QUDA_CPU_FIELD_LOCATION;
 }
 
-void computeHISQLinksGPU(void** fatlink, void** longlink,
-        void** fatlink_eps, void** longlink_eps,
-        void** inlink, void* qudaGaugeParamPtr,
+// Wrap everything for the GPU construction of fat/long links here
+void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
+        void** qdp_fatlink_eps, void** qdp_longlink_eps,
+        void** qdp_inlink, void* qudaGaugeParamPtr,
         double** act_path_coeffs, double eps_naik) {
 
   QudaGaugeParam gaugeParam = *(reinterpret_cast<QudaGaugeParam*>(qudaGaugeParamPtr));
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   // inlink in different format
-  void *inlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize);
-  reorderQDPtoMILC(inlink_milc,inlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  void *milc_inlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
+  reorderQDPtoMILC(milc_inlink,qdp_inlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
 
   // Paths for step 1:
-  void* vlink_milc  = pinned_malloc(4*V*gaugeSiteSize*gSize); // V links
-  void* wlink_milc  = pinned_malloc(4*V*gaugeSiteSize*gSize); // W links
+  void* milc_vlink  = pinned_malloc(4*V*gaugeSiteSize*gSize); // V links
+  void* milc_wlink  = pinned_malloc(4*V*gaugeSiteSize*gSize); // W links
   
   // Paths for step 2:
-  void* fatlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize); // final fat ("X") links
-  void* longlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize); // final long links
+  void* milc_fatlink = pinned_malloc(4*V*gaugeSiteSize*gSize); // final fat ("X") links
+  void* milc_longlink = pinned_malloc(4*V*gaugeSiteSize*gSize); // final long links
+
+  // Place to accumulate Naiks, step 3:
+  void* milc_fatlink_eps = nullptr;
+  void* milc_longlink_eps = nullptr;
+  if (n_naiks > 1) {
+    milc_fatlink_eps = pinned_malloc(4*V*gaugeSiteSize*gSize); // epsilon fat links
+    milc_longlink_eps = pinned_malloc(4*V*gaugeSiteSize*gSize); // epsilon long naiks
+  }
   
   // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
-  computeKSLinkQuda(vlink_milc, nullptr, wlink_milc, inlink_milc, act_path_coeffs[0], &gaugeParam);
+  computeKSLinkQuda(milc_vlink, nullptr, milc_wlink, milc_inlink, act_path_coeffs[0], &gaugeParam);
+
+  if (n_naiks > 1) {
+    // Create Naiks, 3rd path table set
+    computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[2], &gaugeParam);
+
+    // Rescale+copy Naiks into Naik field
+    cpu_axy(gaugeParam.cpu_prec, eps_naik, milc_fatlink, milc_fatlink_eps, V*4*gaugeSiteSize);
+    cpu_axy(gaugeParam.cpu_prec, eps_naik, milc_longlink, milc_longlink_eps, V*4*gaugeSiteSize);
+  } else {
+    memset(milc_fatlink, 0, V*4*gaugeSiteSize*gSize);
+    memset(milc_longlink, 0, V*4*gaugeSiteSize*gSize);
+  }
 
   // Create X and long links, 2nd path table set
-  computeKSLinkQuda(fatlink_milc, longlink_milc, nullptr, wlink_milc, act_path_coeffs[1], &gaugeParam);
+  computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[1], &gaugeParam);
+
+  if (n_naiks > 1) {
+    // Add into Naik field
+    cpu_xpy(gaugeParam.cpu_prec, milc_fatlink, milc_fatlink_eps, V*4*gaugeSiteSize);
+    cpu_xpy(gaugeParam.cpu_prec, milc_longlink, milc_longlink_eps, V*4*gaugeSiteSize);
+  }
 
   // Copy back
-  reorderMILCtoQDP(fatlink,fatlink_milc,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-  reorderMILCtoQDP(longlink,longlink_milc,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderMILCtoQDP(qdp_fatlink,milc_fatlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderMILCtoQDP(qdp_longlink,milc_longlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+
+  if (n_naiks > 1) {
+    // Add into Naik field
+    reorderMILCtoQDP(qdp_fatlink_eps,milc_fatlink_eps,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+    reorderMILCtoQDP(qdp_longlink_eps,milc_longlink_eps,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  }
 
   // Clean up GPU compute links
-  host_free(inlink_milc);
-  host_free(vlink_milc);
-  host_free(wlink_milc);
-  host_free(fatlink_milc);
-  host_free(longlink_milc);
+  host_free(milc_inlink);
+  host_free(milc_vlink);
+  host_free(milc_wlink);
+  host_free(milc_fatlink);
+  host_free(milc_longlink);
+
+  if (n_naiks > 1) {
+    host_free(milc_fatlink_eps);
+    host_free(milc_longlink_eps);
+  }
 
 }
 
@@ -312,7 +350,7 @@ invert_test(void)
     plaq[2] = -plaq[2];
   }
 
-  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 #endif
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
@@ -371,10 +409,6 @@ invert_test(void)
 
       double* act_paths[3] = { act_path_coeff_1, act_path_coeff_2, act_path_coeff_3 };
 
-      // silence some Naik complaining
-      (void)n_naiks;
-
-
       ////////////////////////////////////
       // Set unitarization coefficients //
       ////////////////////////////////////
@@ -386,6 +420,20 @@ invert_test(void)
                svd_rel_error,
                svd_abs_error);
 
+      ///////////////////////////////////////////////////////////////////////
+      // Create some temporary space if we want to test the epsilon fields //
+      ///////////////////////////////////////////////////////////////////////
+
+      void* qdp_fatlink_naik_temp[4];
+      void* qdp_longlink_naik_temp[4];
+      if (n_naiks == 2) {
+        for (int dir = 0; dir < 4; dir++) {
+          qdp_fatlink_naik_temp[dir] = malloc(V*gaugeSiteSize*gSize);
+          qdp_longlink_naik_temp[dir] = malloc(V*gaugeSiteSize*gSize);
+        }
+      }
+      
+
       //////////////////////////
       // Create the GPU links //
       //////////////////////////
@@ -394,11 +442,20 @@ invert_test(void)
 
       // Note: GPU link creation only works for single and double precision
       computeHISQLinksGPU(qdp_fatlink, qdp_longlink,
-                          nullptr, nullptr,
+                          (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
+                          (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr,
                           qdp_inlink, &gaugeParam, act_paths, 0.0 /* eps_naik */);
 
       
-
+      if (n_naiks == 2) {
+        // Override the naik fields into the fat/long link fields
+        for (int dir = 0; dir < 4; dir++) {
+          memcpy(qdp_fatlink[dir],qdp_fatlink_naik_temp[dir], V*gaugeSiteSize*gSize);
+          memcpy(qdp_longlink[dir],qdp_longlink_naik_temp[dir], V*gaugeSiteSize*gSize);
+          free(qdp_fatlink_naik_temp[dir]); qdp_fatlink_naik_temp[dir] = nullptr;
+          free(qdp_longlink_naik_temp[dir]); qdp_longlink_naik_temp[dir] = nullptr;
+        }
+      }
 
     } else { //
 
@@ -421,7 +478,7 @@ invert_test(void)
     plaq[1] = -plaq[1];
     plaq[2] = -plaq[2];
 
-    printf("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
 #endif
 
@@ -781,9 +838,16 @@ int main(int argc, char** argv)
     if(test_type != 0 && test_type != 1) errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
   }
 
-
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
+
+  // Set n_naiks to 2 if eps_naik != 0.0
+  if (eps_naik != 0.0) {
+    n_naiks = 2;
+    printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
+  } else {
+    printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
+  }
 
   display_test_info();
   
