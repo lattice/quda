@@ -263,9 +263,11 @@ void init(int precision, QudaReconstructType link_recon) {
   inv_param.kappa = 1.0/(8.0+mass); // for laplace
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
-  if (test_type < 2) {
+  /*if (test_type < 2) {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
-  }
+  } else {
+    inv_param.solution_type = QUDA_MAT_SOLUTION;
+  }*/
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
@@ -572,20 +574,13 @@ void init(int precision, QudaReconstructType link_recon) {
     spinorRef = new cpuColorSpinorField(csParam);
     tmpCpu = new cpuColorSpinorField(csParam);
 
-    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    csParam.x[0] = gaugeParam.X[0];
-
     // printfQuda("Randomizing fields ...\n");
 
-    spinor->Source(QUDA_RANDOM_SOURCE);
+    spinor->Source(QUDA_CONSTANT_SOURCE,1);
 
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     csParam.pad = inv_param.sp_pad;
     csParam.setPrecision(inv_param.cuda_prec);
-    if (test_type < 2){
-      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      csParam.x[0] /=2;
-    }
 
     // printfQuda("Creating cudaSpinor\n");
     cudaSpinor = new cudaColorSpinorField(csParam);
@@ -603,9 +598,9 @@ void init(int precision, QudaReconstructType link_recon) {
     // double cuda_spinor_norm2=  blas::norm2(*cudaSpinor);
     // printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 
-    if(test_type == 2) csParam.x[0] /=2;
+    //if(test_type == 2) csParam.x[0] /=2;
 
-    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+    //csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     tmp = new cudaColorSpinorField(csParam);
 
     bool pc = (test_type != 2);
@@ -689,26 +684,25 @@ DslashTime dslashCUDA(int niter) {
 
     switch (test_type) {
       case 0:
-      if (transfer){
-          //dslashQuda(spinorOdd, spinorEven, &inv_param, parity);
-      } else {
-        dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
-      }	   
-      break;
+        if (transfer){
+            //dslashQuda(spinorOdd, spinorEven, &inv_param, parity);
+        } else {
+          dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
+        }	   
+        break;
       case 1:
-      if (transfer){
-          //MatPCDagMatPcQuda(spinorOdd, spinorEven, &inv_param);
-      } else {
-        dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
-      }
-      break;
+        if (transfer){
+            //MatPCDagMatPcQuda(spinorOdd, spinorEven, &inv_param);
+        } else {
+          dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
       case 2:
-      errorQuda("Staggered operator acting on full-site not supported");
-      if (transfer){
-          //MatQuda(spinorGPU, spinor, &inv_param);
-      } else {
-        dirac->M(*cudaSpinorOut, *cudaSpinor);
-      }
+        if (transfer){
+            //MatQuda(spinorGPU, spinor, &inv_param);
+        } else {
+          dirac->M(*cudaSpinorOut, *cudaSpinor);
+        }
     }
 
     gettimeofday(&tstop, NULL);
@@ -753,26 +747,35 @@ void staggeredDslashRef()
   switch (test_type) {
     case 0:
 #ifdef MULTI_GPU
-    staggered_dslash_mg4dir(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
-     spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash_mg4dir(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+       spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
-    staggered_dslash(spinorRef->V(), fatlink_cpu, longlink_cpu, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash(spinorRef->V(), fatlink_cpu, longlink_cpu, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif    
-    break;
+      break;
     case 1:
 #ifdef MULTI_GPU
-    matdagmat_mg4dir(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
-     spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu, parity);
+      matdagmat_mg4dir(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+       spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu, parity);
 #else
-    matdagmat(spinorRef->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu->V(), parity);
+      matdagmat(spinorRef->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu->V(), parity);
 #endif
-    break;
+      break;
     case 2:
-      //mat(spinorRef->V(), fatlink_cpu, longlink_cpu, spinor->V(), kappa, dagger, 
-      //inv_param.cpu_prec, gaugeParam.cpu_prec);
-    break;
+#ifdef MULTI_GPU
+      // Not sure about the !dagger...
+      staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Even()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+       reinterpret_cast<cpuColorSpinorField*>(&spinor->Odd()), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Odd()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+       reinterpret_cast<cpuColorSpinorField*>(&spinor->Even()), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+#else
+      staggered_dslash(spinorRef->Even()->V(), fatlink_cpu, longlink_cpu, spinor->Odd()->V(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash(spinorRef->Odd()->V(), fatlink_cpu, longlink_cpu, spinor->Even()->V(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+#endif    
+      axpy(2*mass, spinor->V(), spinorRef->V(), spinor->Length(), gaugeParam.cpu_prec);
+      break;
     default:
-    errorQuda("Test type not defined");
+      errorQuda("Test type not defined");
   }
 
 }
@@ -900,6 +903,9 @@ public:
 
       double spinor_ref_norm2 = blas::norm2(*spinorRef);
       double spinor_out_norm2 = blas::norm2(*spinorOut);
+
+      printfQuda("\n\n%f\n\n", ((double*)(spinorOut->V()))[0]);
+      printfQuda("\n\n%f\n\n", ((double*)(spinorRef->V()))[0]);
 
       // Catching nans is weird.
       if (std::isnan(spinor_ref_norm2)) { failed = true; }
