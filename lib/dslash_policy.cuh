@@ -1918,14 +1918,20 @@ struct DslashFactory {
        config += comm_gdr_enabled();
        config += 2*comm_peer2peer_enabled_global();
 
-       if (comm_peer2peer_enabled_global() & 2) {
+       if (comm_peer2peer_enabled_global() & 2) { // enable/disable p2p copy engine policy tuning
          p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)] = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
+         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE);
        }
-       if (comm_peer2peer_enabled_global() & 1) {
+
+       if (comm_peer2peer_enabled_global() & 1) { // enable/disable p2p direct store policy tuning
          p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE)] = QudaP2PPolicy::QUDA_P2P_COPY_ENGINE;
+         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE);
        }
-       p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
-       first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT); // first active policy is presently always the default
+
+       if (!(comm_peer2peer_enabled_global() & 4)) { // enable/disable non-p2p policy tuning
+         p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
+         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT);
+       }
 
        static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_POLICY");
        if (dslash_policy_env) { // set the policies to tune for explicitly
