@@ -1452,6 +1452,13 @@ namespace quda {
       strcpy(aux, meta.AuxString());
       strcat(aux,comm_dim_partitioned_string());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
+
+#ifdef SHARED_ATOMIC
+      int block_size = arg.fineVolumeCB/arg.coarseVolumeCB;
+      if (block_size/2 < coarseSpin*coarseSpin) // due to how shared memory initialization and global store is done in VUV
+        errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
+#endif
+
     }
     virtual ~CalculateY() { }
 
