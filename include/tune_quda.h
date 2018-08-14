@@ -382,7 +382,7 @@ namespace quda {
 	  return true;
 	} else { // we have run off the end so let's reset
 	  param.block.y = step_y;
-	  param.grid.y = vector_length_y;
+	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return false;
 	}
       }
@@ -439,7 +439,7 @@ namespace quda {
 	  return true;
 	} else { // we have run off the end so let's reset
 	  param.block.z = step_z;
-	  param.grid.z = vector_length_z;
+	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
 	  return false;
 	}
       }
