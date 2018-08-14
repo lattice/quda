@@ -24,6 +24,10 @@
 // same coarse grid point.
 #define COARSE_COLOR_WAVE
 
+#define PARITY_FLIP true
+
+#define max_color_per_block 8
+
 #endif
 
 namespace quda {
@@ -72,6 +76,8 @@ namespace quda {
     const int *coarse_to_fine;
 
     const bool bidirectional;
+
+    static constexpr bool parity_flip = PARITY_FLIP; // determines whether parity runs fast or slow versus coarse color dimension in VUV
 
     int_fastdiv aggregates_per_block; // number of aggregates per thread block
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
@@ -834,17 +840,20 @@ namespace quda {
 
     constexpr int dim_index = (dir == QUDA_BACKWARDS) ? dim : dim + 4;
 #if defined(SHARED_ATOMIC) && __CUDA_ARCH__
-    __shared__ complex<storeType> X[coarseColor][4][coarseSpin][coarseSpin];
-    __shared__ complex<storeType> Y[coarseColor][4][coarseSpin][coarseSpin];
+    __shared__ complex<storeType> X[max_color_per_block][max_color_per_block][4][coarseSpin][coarseSpin];
+    __shared__ complex<storeType> Y[max_color_per_block][max_color_per_block][4][coarseSpin][coarseSpin];
     int x_ = coarse_x_cb%arg.aggregates_per_block;
 
     int tx = virtualThreadIdx(arg);
     int s_col = tx / coarseSpin;
     int s_row = tx % coarseSpin;
 
-    if (tx < coarseSpin*coarseSpin && parity == 0) { // need to make this more robust when spreading parity
-      Y[c_row][x_][s_row][s_col] = 0;
-      X[c_row][x_][s_row][s_col] = 0;
+    int c_col_block = c_col % max_color_per_block;
+    int c_row_block = c_row % max_color_per_block;
+
+    if (tx < coarseSpin*coarseSpin) {
+      Y[c_row_block][c_col_block][x_][s_row][s_col] = 0;
+      X[c_row_block][c_col_block][x_][s_row][s_col] = 0;
     }
 
     __syncthreads();
@@ -856,11 +865,11 @@ namespace quda {
 	for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
 	  if (gauge::fixed_point<Float,storeType>()) {
 	    Float scale = arg.Y_atomic.accessor.scale;
-	    complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
-				 round(scale * vuv[s_row*coarseSpin+s_col].imag()));
-	    atomicAdd(&Y[c_row][x_][s_row][s_col],a);
+            complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
+                                 round(scale * vuv[s_row*coarseSpin+s_col].imag()));
+            atomicAdd(&Y[c_row_block][c_col_block][x_][s_row][s_col],a);
 	  } else {
-	    atomicAdd(&Y[c_row][x_][s_row][s_col],reinterpret_cast<complex<storeType>*>(vuv)[s_row*coarseSpin+s_col]);
+	    atomicAdd(&Y[c_row_block][c_col_block][x_][s_row][s_col],reinterpret_cast<complex<storeType>*>(vuv)[s_row*coarseSpin+s_col]);
 	  }
 	}
       }
@@ -872,11 +881,11 @@ namespace quda {
 	  vuv[s_row*coarseSpin+s_col] *= -arg.kappa;
 	  if (gauge::fixed_point<Float,storeType>()) {
 	    Float scale = arg.X_atomic.accessor.scale;
-	    complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
-				 round(scale * vuv[s_row*coarseSpin+s_col].imag()));
-	    atomicAdd(&X[c_row][x_][s_row][s_col],a);
-	  } else {
-	    atomicAdd(&X[c_row][x_][s_row][s_col],reinterpret_cast<complex<storeType>*>(vuv)[s_row*coarseSpin+s_col]);
+            complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
+                                 round(scale * vuv[s_row*coarseSpin+s_col].imag()));
+            atomicAdd(&X[c_row_block][c_col_block][x_][s_row][s_col],a);
+          } else {
+	    atomicAdd(&X[c_row_block][c_col_block][x_][s_row][s_col],reinterpret_cast<complex<storeType>*>(vuv)[s_row*coarseSpin+s_col]);
 	  }
 	}
       }
@@ -884,18 +893,18 @@ namespace quda {
 
     __syncthreads();
 
-    if (tx < coarseSpin*coarseSpin && parity == 0) { // need to make this more robust when spreading parity
-      arg.Y_atomic(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) = Y[c_row][x_][s_row][s_col];
+    if (tx < coarseSpin*coarseSpin && (parity == 0 || arg.parity_flip == 1) ) {
+      arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,Y[c_row_block][c_col_block][x_][s_row][s_col]);
 
       if (dir == QUDA_BACKWARDS) {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row,conj(X[c_row][x_][s_row][s_col]));
+        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row,conj(X[c_row_block][c_col_block][x_][s_row][s_col]));
       } else {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,X[c_row][x_][s_row][s_col]);
+        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,X[c_row_block][c_col_block][x_][s_row][s_col]);
       }
 
       if (!arg.bidirectional) {
-        if (s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,X[c_row][x_][s_row][s_col]);
-        else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,-X[c_row][x_][s_row][s_col]);
+        if (s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,X[c_row_block][c_col_block][x_][s_row][s_col]);
+        else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,-X[c_row_block][c_col_block][x_][s_row][s_col]);
       }
     }
 
@@ -971,8 +980,8 @@ namespace quda {
 
     if (parity_c_col >= 2*coarseColor) return;
 
-    int c_col = parity_c_col / 2; // coarse color col index
-    int parity = parity_c_col % 2;
+    int c_col = arg.parity_flip ? (parity_c_col % coarseColor) : (parity_c_col / 2); // coarse color col index
+    int parity = arg.parity_flip ? (parity_c_col / coarseColor) : (parity_c_col % 2);
 
     int block_dim_x = virtualBlockDim(arg);
     int thread_idx_x = virtualThreadIdx(arg);
@@ -1582,7 +1591,10 @@ namespace quda {
 
 	} else if (type == COMPUTE_VUV) {
 #ifdef SHARED_ATOMIC
+          // need to resize the grid since we don't tune over the entire coarseColor dimension
+          // factor of two comes from forcing parity onto different blocks (e.g. in the grid)
           tp.grid.y = (2*coarseColor + tp.block.y - 1) / tp.block.y;
+          tp.grid.z = (coarseColor + tp.block.z - 1) / tp.block.z;
 
           arg.swizzle = tp.aux.x;
 
@@ -1666,7 +1678,8 @@ namespace quda {
       switch(type) {
       case COMPUTE_VUV:
 #ifdef SHARED_ATOMIC
-	resizeVector(2,coarseColor);
+        // if not parity flip then we need to force parity within the block (hence factor of 2)
+	resizeVector( (arg.parity_flip ? 1 : 2) * max_color_per_block,max_color_per_block);
 #else
 	resizeVector(2*coarseColor,coarseColor);
 #endif
@@ -1689,8 +1702,8 @@ namespace quda {
       }
 
       resizeStep(1,1);
-#ifdef SHARED_ATOMIC
-      if (type == COMPUTE_VUV) resizeStep(2, 1);  // we force parity in the block
+#if defined(SHARED_ATOMIC)
+      if (type == COMPUTE_VUV && !arg.parity_flip) resizeStep(2, 1);
 #endif
 
       // do not tune spatial block size for VUV or COARSE_CLOVER
