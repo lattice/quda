@@ -71,7 +71,7 @@ extern QudaDslashType dslash_type;
 
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
-
+extern double kappa;
 
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
 
@@ -174,7 +174,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   inv_param->verbosity = QUDA_VERBOSE;
   inv_param->mass = mass;
-  inv_param->kappa = 1.0/(8.0 + mass); // for Laplace operator
+  inv_param->kappa = kappa = 1.0/(8.0 + mass); // for Laplace operator
 
   // outer solver parameters
   inv_param->inv_type = inv_type;
@@ -215,7 +215,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   //inv_param->solve_type = dslash_type == QUDA_LAPLACE_DSLASH ? solve_type : QUDA_NORMOP_PC_SOLVE;
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     inv_param->solution_type = QUDA_MAT_SOLUTION;
-    inv_param->solve_type = solve_type;
+    inv_param->solve_type = QUDA_DIRECT_SOLVE;
   } else {
     inv_param->solution_type = (solve_type == QUDA_DIRECT_PC_SOLVE) ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MAT_SOLUTION; // temp due to staggeredPC convention
     inv_param->solve_type = (solve_type == QUDA_DIRECT_PC_SOLVE) ? QUDA_NORMOP_PC_SOLVE : solve_type;
@@ -319,9 +319,6 @@ void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
   }
 
 }
-
-extern cudaGaugeField* gaugePrecise;
-
 
   int
 invert_test(void)
@@ -659,7 +656,9 @@ invert_test(void)
     case 2: //full spinor
 
       if (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER) {
-        errorQuda("The full spinor staggered operator can't be inverted with (P)CG.\n");
+        if (dslash_type != QUDA_LAPLACE_DSLASH) {
+          errorQuda("The full spinor staggered operator can't be inverted with (P)CG.\n");
+        }
       }
 
       invertQuda(out->V(), in->V(), &inv_param);  
@@ -669,14 +668,23 @@ invert_test(void)
 #ifdef MULTI_GPU
       // Not sure about the QUDA_DAG_YES...
       staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Even()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-       reinterpret_cast<cpuColorSpinorField*>(&out->Odd()), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec);
+       reinterpret_cast<cpuColorSpinorField*>(&out->Odd()), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
       staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Odd()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-       reinterpret_cast<cpuColorSpinorField*>(&out->Even()), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec);
+       reinterpret_cast<cpuColorSpinorField*>(&out->Even()), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
 #else
-      staggered_dslash(ref->Even()->V(), qdp_fatlink, qdp_longlink, out->Odd()->V(), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec);
-      staggered_dslash(ref->Odd()->V(), qdp_fatlink, qdp_longlink, out->Even()->V(), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash(ref->Even()->V(), qdp_fatlink, qdp_longlink, out->Odd()->V(), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+      staggered_dslash(ref->Odd()->V(), qdp_fatlink, qdp_longlink, out->Even()->V(), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
 #endif    
-      axpy(2*mass, out->V(), ref->V(), ref->Length(), gaugeParam.cpu_prec);
+      if (dslash_type == QUDA_LAPLACE_DSLASH) {
+        xpay(out->V(), kappa, ref->V(), ref->Length(), gaugeParam.cpu_prec);
+        ax(0.5/kappa, ref->V(), ref->Length(), gaugeParam.cpu_prec);
+      } else {
+        axpy(2*mass, out->V(), ref->V(), ref->Length(), gaugeParam.cpu_prec);
+      }
+
+      // for verification
+      //printfQuda("\n\nCUDA: %f\n\n", ((double*)(in->V()))[0]);
+      //printfQuda("\n\nCPU:  %f\n\n", ((double*)(ref->V()))[0]);
 
       mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
@@ -732,13 +740,12 @@ invert_test(void)
         if (inv_param.solve_type == QUDA_NORMOP_SOLVE){
           //parity = QUDA_EVENODD_PARITY;
           errorQuda("full parity not supported\n");
-        }else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN){
+        } else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN) {
           parity = QUDA_EVEN_PARITY;
-        }else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD){
+        } else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD) {
           parity = QUDA_ODD_PARITY;
-        }else{
+        } else {
           errorQuda("ERROR: invalid spinor parity \n");
-          exit(1);
         }
         for(int i=0;i < inv_param.num_offset;i++){
           printfQuda("%dth solution: mass=%f, ", i, masses[i]);
@@ -750,21 +757,21 @@ invert_test(void)
           matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
 #endif
 
-	  mxpy(in->V(), ref->V(), ref->Length()*mySpinorSiteSize, inv_param.cpu_prec);
-	  double nrm2 = norm_2(ref->V(), ref->Length()*mySpinorSiteSize, inv_param.cpu_prec);
-	  double src2 = norm_2(in->V(), ref->Length()*mySpinorSiteSize, inv_param.cpu_prec);
-	  double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
-	  double l2r = sqrt(nrm2/src2);
-	
-	  printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
-		   inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
+          mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+          double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+          double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+          double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
+          double l2r = sqrt(nrm2/src2);
 
-	  //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
-	  if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
-	    ret |=1;
-	  }
-	}
+          printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+        	   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
+        	   inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
+
+          //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
+          if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
+            ret |=1;
+          }
+        }
 
         for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
       }
@@ -883,11 +890,21 @@ int main(int argc, char** argv)
     usage(argv);
   }
 
+  if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      if (test_type != 2) {
+        errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type);
+      }
+    }
+
   if (solve_type == QUDA_INVALID_SOLVE) {
     if (test_type == 2) {
       solve_type = QUDA_DIRECT_SOLVE;
     } else {
-      solve_type = QUDA_DIRECT_PC_SOLVE;
+      if (dslash_type == QUDA_LAPLACE_DSLASH) {
+        solve_type = QUDA_DIRECT_SOLVE;
+      } else {
+        solve_type = QUDA_DIRECT_PC_SOLVE;
+      }
     }
   }
 

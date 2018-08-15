@@ -82,6 +82,7 @@ extern int niter;
 extern bool kernel_pack_t;
 
 extern double mass; // the mass of the Dirac operator
+extern double kappa; // will get overriden
 
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
 
@@ -197,7 +198,14 @@ bool skip_kernel(int prec, QudaReconstructType link_recon) {
   // If we're building fat/long links, there are some
   // tests we have to skip.
   if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong) {
-    if (prec == 0 /* half */) { warningQuda("Half precision unsupported in fat/long compute, skipping..."); return true; }
+    if (prec == 0 /* half */) {
+      warningQuda("Half precision unsupported in fat/long compute, skipping...");
+      return true;
+    }
+  }
+  if (dslash_type == QUDA_LAPLACE_DSLASH && prec == 0) {
+    warningQuda("Half precision unsupported for Laplace operator.\n");
+    return true;
   }
 
   return false;
@@ -260,7 +268,7 @@ void init(int precision, QudaReconstructType link_recon) {
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = dslash_type;
   inv_param.mass = mass;
-  inv_param.kappa = 1.0/(8.0+mass); // for laplace
+  inv_param.kappa = kappa = 1.0/(8.0+mass); // for laplace
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
   /*if (test_type < 2) {
@@ -765,14 +773,18 @@ void staggeredDslashRef()
 #ifdef MULTI_GPU
       // Not sure about the !dagger...
       staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Even()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
-       reinterpret_cast<cpuColorSpinorField*>(&spinor->Odd()), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+       reinterpret_cast<cpuColorSpinorField*>(&spinor->Odd()), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
       staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Odd()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
-       reinterpret_cast<cpuColorSpinorField*>(&spinor->Even()), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+       reinterpret_cast<cpuColorSpinorField*>(&spinor->Even()), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
 #else
-      staggered_dslash(spinorRef->Even()->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Odd()->V(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
-      staggered_dslash(spinorRef->Odd()->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Even()->V(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash(spinorRef->Even()->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Odd()->V(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+      staggered_dslash(spinorRef->Odd()->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Even()->V(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
 #endif    
-      axpy(2*mass, spinor->V(), spinorRef->V(), spinor->Length(), gaugeParam.cpu_prec);
+      if (dslash_type == QUDA_LAPLACE_DSLASH) {
+        xpay(spinor->V(), kappa, spinorRef->V(), spinor->Length(), gaugeParam.cpu_prec);
+      } else {
+        axpy(2*mass, spinor->V(), spinorRef->V(), spinor->Length(), gaugeParam.cpu_prec);
+      }
       break;
     default:
       errorQuda("Test type not defined");
@@ -904,8 +916,9 @@ public:
       double spinor_ref_norm2 = blas::norm2(*spinorRef);
       double spinor_out_norm2 = blas::norm2(*spinorOut);
 
-      printfQuda("\n\n%f\n\n", ((double*)(spinorOut->V()))[0]);
-      printfQuda("\n\n%f\n\n", ((double*)(spinorRef->V()))[0]);
+      // for verification
+      //printfQuda("\n\nCUDA: %f\n\n", ((double*)(spinorOut->V()))[0]);
+      //printfQuda("\n\nCPU:  %f\n\n", ((double*)(spinorRef->V()))[0]);
 
       // Catching nans is weird.
       if (std::isnan(spinor_ref_norm2)) { failed = true; }
@@ -995,6 +1008,12 @@ TEST_P(StaggeredDslashTest, benchmark) {
       printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
     } else {
       printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
+    }
+
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      if (test_type != 2) {
+        errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type);
+      }
     }
 
     // If need be, load the gauge field once.
