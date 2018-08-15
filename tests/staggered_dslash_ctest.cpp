@@ -750,7 +750,7 @@ void staggeredDslashRef()
       staggered_dslash_mg4dir(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
        spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
-      staggered_dslash(spinorRef->V(), fatlink_cpu, longlink_cpu, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash(spinorRef->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif    
       break;
     case 1:
@@ -769,8 +769,8 @@ void staggeredDslashRef()
       staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Odd()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
        reinterpret_cast<cpuColorSpinorField*>(&spinor->Even()), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
-      staggered_dslash(spinorRef->Even()->V(), fatlink_cpu, longlink_cpu, spinor->Odd()->V(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
-      staggered_dslash(spinorRef->Odd()->V(), fatlink_cpu, longlink_cpu, spinor->Even()->V(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash(spinorRef->Even()->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Odd()->V(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash(spinorRef->Odd()->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Even()->V(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif    
       axpy(2*mass, spinor->V(), spinorRef->V(), spinor->Length(), gaugeParam.cpu_prec);
       break;
