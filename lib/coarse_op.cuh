@@ -119,6 +119,15 @@ namespace quda {
     ~CalculateYArg() { }
   };
 
+  // complex multiply-add with optimal use of fma
+  template<typename Float>
+  inline __device__ __host__ void caxpy(const complex<Float> &a, const complex<Float> &x, complex<Float> &y) {
+    y.x += a.x*x.x;
+    y.x -= a.y*x.y;
+    y.y += a.y*x.x;
+    y.y += a.x*x.y;
+  }
+
   /**
      Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
      Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
@@ -149,12 +158,12 @@ namespace quda {
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    if (!from_coarse) {
-	      UV[s][ic] += arg.U(dim, parity, x_cb, ic, jc) * W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
+	      caxpy(arg.U(dim, parity, x_cb, ic, jc), W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c), UV[s][ic]);
 	    } else {
 	      for (int s_col=0; s_col<fineSpin; s_col++) {
 		// on the coarse lattice if forwards then use the forwards links
-		UV[s_col*fineSpin+s][ic] += arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) *
-		  W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c);
+		caxpy(arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc),
+                      W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c), UV[s_col*fineSpin+s][ic]);
 	      } // which chiral block
 	    }
 	  }  //Fine color columns
@@ -168,13 +177,12 @@ namespace quda {
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    if (!from_coarse) {
-	      UV[s][ic] += arg.U(dim, parity, x_cb, ic, jc) * W((parity+1)&1, y_cb, s, jc, ic_c);
+	      caxpy(arg.U(dim, parity, x_cb, ic, jc), W((parity+1)&1, y_cb, s, jc, ic_c), UV[s][ic]);
 	    } else {
 	      for (int s_col=0; s_col<fineSpin; s_col++) {
 		// on the coarse lattice if forwards then use the forwards links
-		UV[s_col*fineSpin+s][ic] +=
-		  arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) *
-		  W((parity+1)&1, y_cb, s_col, jc, ic_c);
+                caxpy(arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc),
+                      W((parity+1)&1, y_cb, s_col, jc, ic_c), UV[s_col*fineSpin+s][ic]);
 	      } // which chiral block
 	    }
 	  }  //Fine color columns
@@ -246,7 +254,7 @@ namespace quda {
 
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	    AV[s][ic] += arg.Cinv(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, ic_c);
+	    caxpy(arg.Cinv(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, ic_c), AV[s][ic]);
 	  }  //Fine color columns
 	}  //Fine color rows
       }
@@ -619,7 +627,7 @@ namespace quda {
 	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
 	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	      UV[s][ic][ic_c] += arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, ic_c);
+	      caxpy(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, ic_c), UV[s][ic][ic_c]);
 	    }  //Fine color columns
 	  }  //Fine color rows
 	} //Coarse color
@@ -660,8 +668,7 @@ namespace quda {
 	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
 	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	      arg.AV(parity, x_cb, s, ic, ic_c) +=
-		arg.Cinv(0, parity, x_cb, s, s_col, ic, jc) * UV[s_col][jc][ic_c];
+              caxpy(arg.Cinv(0, parity, x_cb, s, s_col, ic, jc), UV[s_col][jc][ic_c], arg.AV(parity, x_cb, s, ic, ic_c));
 	    }  //Fine color columns
 	  }  //Fine color rows
 	} //Coarse color
@@ -689,15 +696,6 @@ namespace quda {
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
     computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
-  }
-
-  // complex multiply-add with optimal use of fma
-  template<typename Float>
-  inline __device__ __host__ void caxpy(const complex<Float> &a, const complex<Float> &x, complex<Float> &y) {
-    y.x += a.x*x.x;
-    y.x -= a.y*x.y;
-    y.y += a.y*x.x;
-    y.y += a.x*x.y;
   }
 
   /**
@@ -1124,49 +1122,37 @@ namespace quda {
 
     if (!from_coarse) {
       //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
-      for(int s = 0; s < fineSpin; s++) { //Loop over fine spin row
+      for (int s = 0; s < fineSpin; s++) { //Loop over fine spin row
 	const int s_c = arg.spin_map(s,parity);
 	//On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
 	//in the same chiral block.
-	for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
-	  //for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Coarse Color row
-          //for(int jc_c = 0; jc_c < coarseColor; jc_c++) { //Coarse Color column
-	      for(int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
-		for(int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
-		  X[s_c*coarseSpin + s_c] +=
-		    conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
-		} //Fine color column
-	      }  //Fine color row
-              //} //Coarse Color column
-	    //} //Coarse Color row
+	for (int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
+          for (int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
+            for (int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
+              X[s_c*coarseSpin + s_c] +=
+                conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
+            } //Fine color column
+          }  //Fine color row
 	}  //Fine spin column
       } //Fine spin
     } else {
       //If Nspin != 4, then spin structure is a dense matrix and there is now spin aggregation
       //N.B. assumes that no further spin blocking is done in this case.
-      for(int s = 0; s < fineSpin; s++) { //Loop over spin row
-	for(int s_col = 0; s_col < fineSpin; s_col++) { //Loop over spin column
-	  //for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Coarse Color row
-          //for(int jc_c = 0; jc_c <coarseColor; jc_c++) { //Coarse Color column
-	      for(int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
-		for(int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
-		  X[s*coarseSpin + s_col] +=
-		    conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
-		} //Fine color column
-	      }  //Fine color row
-              //} //Coarse Color column
-	    //} //Coarse Color row
+      for (int s = 0; s < fineSpin; s++) { //Loop over spin row
+	for (int s_col = 0; s_col < fineSpin; s_col++) { //Loop over spin column
+          for (int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
+            for (int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
+              X[s*coarseSpin + s_col] +=
+                conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
+            } //Fine color column
+          }  //Fine color row
 	}  //Fine spin column
       } //Fine spin
     }
 
     for (int si = 0; si < coarseSpin; si++) {
       for (int sj = 0; sj < coarseSpin; sj++) {
-	//for (int ic = 0; ic < coarseColor; ic++) {
-        //for (int jc = 0; jc < coarseColor; jc++) {
-	    arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc_c,X[si*coarseSpin+sj]);
-            //}
-	  //}
+        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc_c,X[si*coarseSpin+sj]);
       }
     }
 
