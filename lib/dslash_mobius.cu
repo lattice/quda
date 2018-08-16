@@ -600,12 +600,17 @@ namespace quda {
 				"MDWFDslash4Dslash5invXpayDslash5invDaggerH18XpayKernel<INTERIOR_KERNEL>");
 			set_shared_memory_on_volta((const void*)MDWFDslash4DaggerDslash4preDaggerDslash5invDaggerH18Kernel<INTERIOR_KERNEL>, 
 				"MDWFDslash4DaggerDslash4preDaggerDslash5invDaggerH18Kernel<INTERIOR_KERNEL>");
+      
       set_shared_memory_on_volta((const void*)MDWFDslash5invSmTcH18DaggerKernel<INTERIOR_KERNEL>, 
 				"MDWFDslash5invSmTcH18DaggerKernel<INTERIOR_KERNEL>");
-			set_shared_memory_on_volta((const void*)MDWFDslash4DaggerDslash4preDaggerXpayH18XpayKernel<INTERIOR_KERNEL>, 
+      set_shared_memory_on_volta((const void*)MDWFDslash5invSmH18DaggerKernel<INTERIOR_KERNEL>, 
+				"MDWFDslash5invSmH18DaggerKernel<INTERIOR_KERNEL>");
+			
+      set_shared_memory_on_volta((const void*)MDWFDslash4DaggerDslash4preDaggerXpayH18XpayKernel<INTERIOR_KERNEL>, 
 				"MDWFDslash4DaggerDslash4preDaggerXpayH18XpayKernel<INTERIOR_KERNEL>");
 			init = true;
-		}
+		  // cudaFuncSetSharedMemConfig((const void*)MDWFDslash5invSmTcH18DaggerKernel<INTERIOR_KERNEL>, cudaSharedMemBankSizeEightByte);
+    }
 
     DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {

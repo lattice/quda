@@ -81,6 +81,10 @@ half* sm_b = (half*)((void*)sm_data);
 half* sm_c = (half*)(sm_b + K*(N_sm));
 half* sm_a = (half*)(sm_c + M*(N_sm));
 
+// for(int offset = threadIdx.y*blockDim.x+threadIdx.x; offset*4 < M*M_sm*2; offset += blockDim.x*blockDim.y){
+//   memset((void*)(sm_a)+offset*4, 0, 4);
+// }
+
 #define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
 
 #include "io_spinor.h"
@@ -113,36 +117,46 @@ if(!idle){
 
 READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
 
-// data layout for tensor core B and C: spatial, color, complex, spin, s; Lsx4 by Lsx4 @ Lsx4 by 6xblockDim.x.
+int offset_pre_m;
+int offset_pre_n = threadIdx.x*6;
+
+// data layout for tensor core B and C: s, spin, spatial, color, complex; Lsx4 by Lsx4 @ Lsx4 by 6xblockDim.x.
 // lda = Lsx4, column-major
-// ldb = Lsx4, column-major
+// ldb = blockDim.x x 6, row-major
 // total number of halves = Ls*24*blockDim.x
-sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+0 ] = i00_re*scale;
-sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+1 ] = i00_im*scale;
-sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+2 ] = i01_re*scale;
-sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+3 ] = i01_im*scale;
-sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+4 ] = i02_re*scale;
-sm_b[ (coord[4]*4+0)*(N_sm)+threadIdx.x*6+5 ] = i02_im*scale;
-sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+0 ] = i10_re*scale;
-sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+1 ] = i10_im*scale;
-sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+2 ] = i11_re*scale;
-sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+3 ] = i11_im*scale;
-sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+4 ] = i12_re*scale;
-sm_b[ (coord[4]*4+1)*(N_sm)+threadIdx.x*6+5 ] = i12_im*scale;
-sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+0 ] = i20_re*scale;
-sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+1 ] = i20_im*scale;
-sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+2 ] = i21_re*scale;
-sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+3 ] = i21_im*scale;
-sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+4 ] = i22_re*scale;
-sm_b[ (coord[4]*4+2)*(N_sm)+threadIdx.x*6+5 ] = i22_im*scale;
-sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+0 ] = i30_re*scale;
-sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+1 ] = i30_im*scale;
-sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+2 ] = i31_re*scale;
-sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+3 ] = i31_im*scale;
-sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+4 ] = i32_re*scale;
-sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+5 ] = i32_im*scale;
+offset_pre_m = (coord[4]*4+0)*N_sm;
+sm_b[ offset_pre_m+offset_pre_n+0 ] = i00_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+1 ] = i00_im*scale;
+sm_b[ offset_pre_m+offset_pre_n+2 ] = i01_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+3 ] = i01_im*scale;
+sm_b[ offset_pre_m+offset_pre_n+4 ] = i02_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+5 ] = i02_im*scale;
+offset_pre_m = (coord[4]*4+1)*N_sm;
+sm_b[ offset_pre_m+offset_pre_n+0 ] = i10_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+1 ] = i10_im*scale;
+sm_b[ offset_pre_m+offset_pre_n+2 ] = i11_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+3 ] = i11_im*scale;
+sm_b[ offset_pre_m+offset_pre_n+4 ] = i12_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+5 ] = i12_im*scale;
+offset_pre_m = (coord[4]*4+2)*N_sm;
+sm_b[ offset_pre_m+offset_pre_n+0 ] = i20_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+1 ] = i20_im*scale;
+sm_b[ offset_pre_m+offset_pre_n+2 ] = i21_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+3 ] = i21_im*scale;
+sm_b[ offset_pre_m+offset_pre_n+4 ] = i22_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+5 ] = i22_im*scale;
+offset_pre_m = (coord[4]*4+3)*N_sm;
+sm_b[ offset_pre_m+offset_pre_n+0 ] = i30_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+1 ] = i30_im*scale;
+sm_b[ offset_pre_m+offset_pre_n+2 ] = i31_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+3 ] = i31_im*scale;
+sm_b[ offset_pre_m+offset_pre_n+4 ] = i32_re*scale;
+sm_b[ offset_pre_m+offset_pre_n+5 ] = i32_im*scale;
 
 // Construct matrix A: TODO: should be careful about the idle threads.
+
+int offset_k = coord[4]*4;
+int offset_m = threadIdx.x*4;
 
 // threadIdx.x should not be idle(?).
 // With Ls=12 and blockDim.x=32 the following gives a 2-way bank conflict.  
@@ -162,27 +176,32 @@ sm_b[ (coord[4]*4+3)*(N_sm)+threadIdx.x*6+5 ] = i32_im*scale;
     factorR = inv_d_n * static_cast<half>(POW(kappa,exponent))  * ( threadIdx.x > coord[4] ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
     int exponent2 = threadIdx.x < coord[4] ? param.dc.Ls-coord[4]+threadIdx.x : threadIdx.x-coord[4];
     factorL = inv_d_n * static_cast<half>(POW(kappa,exponent2)) * ( threadIdx.x < coord[4] ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
-    // (mu, s) by (nu, t). column-major. t := threadIdx.y
+    // (mu, s) by (nu, t). column-major.
   
-    sm_a[ (coord[4]*4+0)*(M_sm)+(threadIdx.x*4+0) ] = factorR + factorL;
-    sm_a[ (coord[4]*4+0)*(M_sm)+(threadIdx.x*4+1) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+0)*(M_sm)+(threadIdx.x*4+2) ] = factorR - factorL;
-    sm_a[ (coord[4]*4+0)*(M_sm)+(threadIdx.x*4+3) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+0)*M_sm+(offset_m+0) ] = factorR + factorL;
+    sm_a[ (offset_k+0)*M_sm+(offset_m+2) ] = factorR - factorL;
+
+    sm_a[ (offset_k+1)*M_sm+(offset_m+1) ] = factorR + factorL;
+    sm_a[ (offset_k+1)*M_sm+(offset_m+3) ] = factorR - factorL;
     
-    sm_a[ (coord[4]*4+1)*(M_sm)+(threadIdx.x*4+0) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+1)*(M_sm)+(threadIdx.x*4+1) ] = factorR + factorL;
-    sm_a[ (coord[4]*4+1)*(M_sm)+(threadIdx.x*4+2) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+1)*(M_sm)+(threadIdx.x*4+3) ] = factorR - factorL;
+    sm_a[ (offset_k+2)*M_sm+(offset_m+0) ] = factorR - factorL;
+    sm_a[ (offset_k+2)*M_sm+(offset_m+2) ] = factorR + factorL;
     
-    sm_a[ (coord[4]*4+2)*(M_sm)+(threadIdx.x*4+0) ] = factorR - factorL;
-    sm_a[ (coord[4]*4+2)*(M_sm)+(threadIdx.x*4+1) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+2)*(M_sm)+(threadIdx.x*4+2) ] = factorR + factorL;
-    sm_a[ (coord[4]*4+2)*(M_sm)+(threadIdx.x*4+3) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+3)*M_sm+(offset_m+1) ] = factorR - factorL;
+    sm_a[ (offset_k+3)*M_sm+(offset_m+3) ] = factorR + factorL;
     
-    sm_a[ (coord[4]*4+3)*(M_sm)+(threadIdx.x*4+0) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+3)*(M_sm)+(threadIdx.x*4+1) ] = factorR - factorL;
-    sm_a[ (coord[4]*4+3)*(M_sm)+(threadIdx.x*4+2) ] = static_cast<half>(0.0f);
-    sm_a[ (coord[4]*4+3)*(M_sm)+(threadIdx.x*4+3) ] = factorR + factorL;  
+    sm_a[ (offset_k+0)*M_sm+(offset_m+1) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+0)*M_sm+(offset_m+3) ] = static_cast<half>(0.0f);
+    
+    sm_a[ (offset_k+1)*M_sm+(offset_m+0) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+1)*M_sm+(offset_m+2) ] = static_cast<half>(0.0f);
+    
+    sm_a[ (offset_k+2)*M_sm+(offset_m+1) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+2)*M_sm+(offset_m+3) ] = static_cast<half>(0.0f);
+    
+    sm_a[ (offset_k+3)*M_sm+(offset_m+0) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+3)*M_sm+(offset_m+2) ] = static_cast<half>(0.0f);
+ 
   }
 }
 
