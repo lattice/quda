@@ -239,28 +239,35 @@ namespace quda {
 
     complex<Float> AV[fineSpin][fineColor];
 
-    for(int s = 0; s < fineSpin; s++) {
-      for(int c = 0; c < fineColor; c++) {
+#pragma unroll
+    for (int s = 0; s < fineSpin; s++) {
+#pragma unroll
+      for (int c = 0; c < fineColor; c++) {
 	AV[s][c] = static_cast<Float>(0.0);
       }
     }
 
-    for(int s = 0; s < fineSpin; s++) {  //Fine Spin
+#pragma unroll
+    for (int s = 0; s < fineSpin; s++) {  //Fine Spin
       const int s_c = arg.spin_map(s,parity); // Coarse spin
 
       //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
       //in the same chiral block.
-      for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
+      for (int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
 
-	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
+#pragma unroll
+	for (int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
+#pragma unroll
+	  for (int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    caxpy(arg.Cinv(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, ic_c), AV[s][ic]);
 	  }  //Fine color columns
 	}  //Fine color rows
       }
     } //Fine Spin
 
+#pragma unroll
     for (int s=0; s<fineSpin; s++) {
+#pragma unroll
       for (int ic=0; ic<fineColor; ic++) {
 	arg.AV(parity, x_cb, s, ic, ic_c) = AV[s][ic];
       }
@@ -752,7 +759,7 @@ namespace quda {
 	    caxpy(conj(AV), arg.UV(parity, x_cb, s, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_row]);
 
 	    //Off-diagonal Spin (forward link / negative projector applied)
-	    caxpy( gamma.apply(s, conj(AV)), arg.UV(parity, x_cb, s_col, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_col]);
+	    caxpy( -gamma.apply(s, conj(AV)), arg.UV(parity, x_cb, s_col, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_col]);
 	  }
 	} //Fine color
       }
