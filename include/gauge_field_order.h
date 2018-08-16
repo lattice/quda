@@ -229,8 +229,29 @@ namespace quda {
         __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
 	  : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
 
-	__device__ __host__ inline Float real() const { return scale_inv*static_cast<Float>(v[idx].real()); }
-	__device__ __host__ inline Float imag() const { return scale_inv*static_cast<Float>(v[idx].imag()); }
+	__device__ __host__ inline Float real() const {
+          if (!fixed) {
+            return v[idx].real();
+          } else {
+            return scale_inv*static_cast<Float>(v[idx].real());
+          }
+        }
+
+	__device__ __host__ inline Float imag() const {
+          if (!fixed) {
+            return v[idx].imag();
+          } else {
+            return scale_inv*static_cast<Float>(v[idx].imag());
+          }
+        }
+
+	/**
+	   @brief negation operator
+           @return negation of this complex number
+	*/
+	__device__ __host__ inline complex<Float> operator-() const {
+	  return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
+	}
 
 	/**
 	   @brief Assignment operator with fieldorder_wrapper instance as input
