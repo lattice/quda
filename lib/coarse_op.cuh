@@ -1,16 +1,14 @@
 #include <multigrid_helper.cuh>
 
 // enable this for shared-memory atomics instead of global atomics.
-// Doing so means that all of the coarsening for a coarse degree of
-// freedom is handled by a single thread block.  This is presently
-// slower than using global atomics (due to increased latency from
-// having to run larger thread blocks)
+// Doing so means that all (modulo the parity) of the coarsening for a
+// coarse degree of freedom is handled by a single thread block.
 
 #if (__COMPUTE_CAPABILITY__ >= 500)
-#define SHARED_ATOMIC // shared-memory atomics supported on Maxwell and upwards
+#define SHARED_ATOMIC 1// shared-memory atomics supported on Maxwell and upwards
 #endif
 
-#ifdef SHARED_ATOMIC
+#if SHARED_ATOMIC == 1
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
 // if disabled then we pack multiple aggregates into a single block to improve coalescing
 #ifdef SWIZZLE
@@ -21,22 +19,6 @@
 
 #define max_color_per_block 8
 
-// To increase L2 locality we can schedule the geometry to grid.y and
-// the coarse colors to grid.x.  This will increase the potential for
-// L2 reuse since a given wave of thread blocks will be for different
-// coarse color but the same coarse grid point which will have common
-// loads.
-#define COARSE_COLOR_WAVE
-
-// with PARITY_FLIP enabled we make parity the slowest running
-// dimension in the y-thread axis, and coarse color runs faster.  This
-// improves read locality at the expense of write locality
-#ifdef SHARED_ATOMIC
-#define PARITY_FLIP true
-#else
-#define PARITY_FLIP false
-#endif
-
 namespace quda {
 
   // For coarsening un-preconditioned operators we use uni-directional
@@ -44,7 +26,7 @@ namespace quda {
   // bi-directional coarsening.
   static bool bidirectional_debug = false;
 
-  template <typename Float, int fineSpin, int coarseSpin,
+  template <typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor,
 	    typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor,
 	    typename fineSpinorTmp, typename fineSpinorV, typename fineClover>
   struct CalculateYArg {
@@ -84,11 +66,25 @@ namespace quda {
 
     const bool bidirectional;
 
-    static constexpr bool parity_flip = PARITY_FLIP; // determines whether parity runs fast or slow versus coarse color dimension in VUV
+    static constexpr int coarse_color = coarseColor;
+
+    static constexpr bool shared_atomic = SHARED_ATOMIC;
+
+    // To increase L2 locality we can schedule the geometry to grid.y and
+    // the coarse colors to grid.x.  This will increase the potential for
+    // L2 reuse since a given wave of thread blocks will be for different
+    // coarse color but the same coarse grid point which will have common
+    // loads.
+    static constexpr bool coarse_color_wave = true;
+
+    // with parity_flip enabled we make parity the slowest running
+    // dimension in the y-thread axis, and coarse color runs faster.  This
+    // improves read locality at the expense of write locality
+    static constexpr bool parity_flip = shared_atomic ? true : false; // determines whether parity runs fast or slow versus coarse color dimension in VUV
 
     int_fastdiv aggregates_per_block; // number of aggregates per thread block
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
-    int_fastdiv grid_z; // this is the coarseColor grid that is wrapped into the x grid when COARSE_COLOR_WAVE is enabled
+    int_fastdiv grid_z; // this is the coarseColor grid that is wrapped into the x grid when coarse_color_wave is enabled
     int_fastdiv coarse_color_grid_z; // constant we ned to divide by
 
     Float max_h; // scalar that stores the maximum element of the dynamic clover inverse
@@ -811,11 +807,7 @@ namespace quda {
   __device__ __host__ inline int coarseIndex(const Arg &arg) {
     constexpr int warp_size = 32;
     int warp_lane = threadIdx.x % warp_size;
-#ifdef COARSE_COLOR_WAVE    // coarse grid point is mapped to grid.y
-    int x_coarse = blockIdx.y*arg.aggregates_per_block + warp_lane % arg.aggregates_per_block;
-#else                       // coarse grid point is mapped to grid.x
-    int x_coarse = blockIdx.x*arg.aggregates_per_block + warp_lane % arg.aggregates_per_block;
-#endif
+    int x_coarse = (arg.coarse_color_wave ? blockIdx.y : blockIdx.x)*arg.aggregates_per_block + warp_lane % arg.aggregates_per_block;
     return x_coarse;
   }
 
@@ -858,135 +850,140 @@ namespace quda {
     //is in same block, M = X, else M = Y
     const bool isDiagonal = ((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim] ? true : false;
 
-#if defined(SHARED_ATOMIC) && __CUDA_ARCH__
-    int coarse_parity = parity_coarse_;
-    int coarse_x_cb = coarse_x_cb_;
-#else
-    int coarse_parity = 0;
-    for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
-    coarse_parity &= 1;
-    coord_coarse[0] /= 2;
-    int coarse_x_cb = ((coord_coarse[3]*arg.xc_size[2]+coord_coarse[2])*arg.xc_size[1]+coord_coarse[1])*(arg.xc_size[0]/2) + coord_coarse[0];
-#endif
+    int coarse_parity = arg.shared_atomic ? parity_coarse_ : 0;
+    if (!arg.shared_atomic) {
+      for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
+      coarse_parity &= 1;
+      coord_coarse[0] /= 2;
+    }
+    int coarse_x_cb = arg.shared_atomic ? coarse_x_cb_ : ((coord_coarse[3]*arg.xc_size[2]+coord_coarse[2])*arg.xc_size[1]+coord_coarse[1])*(arg.xc_size[0]/2) + coord_coarse[0];
 
     complex<Float> vuv[coarseSpin*coarseSpin];
     multiplyVUV<from_coarse,Float,dim,dir,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, gamma, parity, x_cb, c_row, c_col);
 
     constexpr int dim_index = (dir == QUDA_BACKWARDS) ? dim : dim + 4;
-#if defined(SHARED_ATOMIC) && __CUDA_ARCH__
-    __shared__ complex<storeType> X[max_color_per_block][max_color_per_block][4][coarseSpin][coarseSpin];
-    __shared__ complex<storeType> Y[max_color_per_block][max_color_per_block][4][coarseSpin][coarseSpin];
-    int x_ = coarse_x_cb%arg.aggregates_per_block;
 
-    int tx = virtualThreadIdx(arg);
-    int s_col = tx / coarseSpin;
-    int s_row = tx % coarseSpin;
+    if (arg.shared_atomic) {
 
-    int c_col_block = c_col % max_color_per_block;
-    int c_row_block = c_row % max_color_per_block;
+#ifdef __CUDA_ARCH__
+      __shared__ complex<storeType> X[max_color_per_block][max_color_per_block][4][coarseSpin][coarseSpin];
+      __shared__ complex<storeType> Y[max_color_per_block][max_color_per_block][4][coarseSpin][coarseSpin];
 
-    if (tx < coarseSpin*coarseSpin) {
-      Y[c_row_block][c_col_block][x_][s_row][s_col] = 0;
-      X[c_row_block][c_col_block][x_][s_row][s_col] = 0;
-    }
+      int x_ = coarse_x_cb%arg.aggregates_per_block;
 
-    __syncthreads();
+      int tx = virtualThreadIdx(arg);
+      int s_col = tx / coarseSpin;
+      int s_row = tx % coarseSpin;
 
-    if (!isDiagonal) {
-#pragma unroll
-      for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
-#pragma unroll
-	for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	  if (gauge::fixed_point<Float,storeType>()) {
-	    Float scale = arg.Y_atomic.accessor.scale;
-            complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
-                                 round(scale * vuv[s_row*coarseSpin+s_col].imag()));
-            atomicAdd(&Y[c_row_block][c_col_block][x_][s_row][s_col],a);
-	  } else {
-	    atomicAdd(&Y[c_row_block][c_col_block][x_][s_row][s_col],reinterpret_cast<complex<storeType>*>(vuv)[s_row*coarseSpin+s_col]);
-	  }
-	}
+      int c_col_block = c_col % max_color_per_block;
+      int c_row_block = c_row % max_color_per_block;
+
+      if (tx < coarseSpin*coarseSpin) {
+        Y[c_row_block][c_col_block][x_][s_row][s_col] = 0;
+        X[c_row_block][c_col_block][x_][s_row][s_col] = 0;
       }
-    } else {
+
+      __syncthreads();
+
+      if (!isDiagonal) {
 #pragma unroll
-      for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+        for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
-	for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	  vuv[s_row*coarseSpin+s_col] *= -arg.kappa;
-	  if (gauge::fixed_point<Float,storeType>()) {
-	    Float scale = arg.X_atomic.accessor.scale;
-            complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
-                                 round(scale * vuv[s_row*coarseSpin+s_col].imag()));
-            atomicAdd(&X[c_row_block][c_col_block][x_][s_row][s_col],a);
-          } else {
-	    atomicAdd(&X[c_row_block][c_col_block][x_][s_row][s_col],reinterpret_cast<complex<storeType>*>(vuv)[s_row*coarseSpin+s_col]);
-	  }
-	}
-      }
-    }
-
-    __syncthreads();
-
-    if (tx < coarseSpin*coarseSpin && (parity == 0 || arg.parity_flip == 1) ) {
-      arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,Y[c_row_block][c_col_block][x_][s_row][s_col]);
-
-      if (dir == QUDA_BACKWARDS) {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row,conj(X[c_row_block][c_col_block][x_][s_row][s_col]));
+          for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+            if (gauge::fixed_point<Float,storeType>()) {
+              Float scale = arg.Y_atomic.accessor.scale;
+              complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
+                                   round(scale * vuv[s_row*coarseSpin+s_col].imag()));
+              atomicAdd(&Y[c_row_block][c_col_block][x_][s_row][s_col],a);
+            } else {
+              atomicAdd(&Y[c_row_block][c_col_block][x_][s_row][s_col],reinterpret_cast<complex<storeType>*>(vuv)[s_row*coarseSpin+s_col]);
+            }
+          }
+        }
       } else {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,X[c_row_block][c_col_block][x_][s_row][s_col]);
+#pragma unroll
+        for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+          for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+            vuv[s_row*coarseSpin+s_col] *= -arg.kappa;
+            if (gauge::fixed_point<Float,storeType>()) {
+              Float scale = arg.X_atomic.accessor.scale;
+              complex<storeType> a(round(scale * vuv[s_row*coarseSpin+s_col].real()),
+                                   round(scale * vuv[s_row*coarseSpin+s_col].imag()));
+              atomicAdd(&X[c_row_block][c_col_block][x_][s_row][s_col],a);
+            } else {
+              atomicAdd(&X[c_row_block][c_col_block][x_][s_row][s_col],reinterpret_cast<complex<storeType>*>(vuv)[s_row*coarseSpin+s_col]);
+            }
+          }
+        }
       }
 
-      if (!arg.bidirectional) {
-        if (s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,X[c_row_block][c_col_block][x_][s_row][s_col]);
-        else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,-X[c_row_block][c_col_block][x_][s_row][s_col]);
-      }
-    }
+      __syncthreads();
 
+      if (tx < coarseSpin*coarseSpin && (parity == 0 || arg.parity_flip == 1) ) {
+        arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,Y[c_row_block][c_col_block][x_][s_row][s_col]);
+
+        if (dir == QUDA_BACKWARDS) {
+          arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row,conj(X[c_row_block][c_col_block][x_][s_row][s_col]));
+        } else {
+          arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,X[c_row_block][c_col_block][x_][s_row][s_col]);
+        }
+
+        if (!arg.bidirectional) {
+          if (s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,X[c_row_block][c_col_block][x_][s_row][s_col]);
+          else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,-X[c_row_block][c_col_block][x_][s_row][s_col]);
+        }
+      }
 #else
+      errorQuda("Shared-memory atomic aggregation not supported on CPU");
+#endif
 
-    if (!isDiagonal) {
-#pragma unroll
-      for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
-#pragma unroll
-	for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	  arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
-	}
-      }
     } else {
 
-      for (int s2=0; s2<coarseSpin*coarseSpin; s2++) vuv[s2] *= -arg.kappa;
-
-      if (dir == QUDA_BACKWARDS) {
+      if (!isDiagonal) {
 #pragma unroll
-	for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+        for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
-	  for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	    arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row,conj(vuv[s_row*coarseSpin+s_col]));
-	  }
-	}
+          for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+            arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
+          }
+        }
       } else {
-#pragma unroll
-	for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
-#pragma unroll
-	  for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	    arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
-	  }
-	}
-      }
 
-      if (!arg.bidirectional) {
+        for (int s2=0; s2<coarseSpin*coarseSpin; s2++) vuv[s2] *= -arg.kappa;
+
+        if (dir == QUDA_BACKWARDS) {
 #pragma unroll
-	for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+          for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
-	  for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	    const Float sign = (s_row == s_col) ? static_cast<Float>(1.0) : static_cast<Float>(-1.0);
-	    arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,sign*vuv[s_row*coarseSpin+s_col]);
-	  }
-	}
+            for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,c_col,c_row,conj(vuv[s_row*coarseSpin+s_col]));
+            }
+          }
+        } else {
+#pragma unroll
+          for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+            for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
+            }
+          }
+        }
+
+        if (!arg.bidirectional) {
+#pragma unroll
+          for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+            for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+              const Float sign = (s_row == s_col) ? static_cast<Float>(1.0) : static_cast<Float>(-1.0);
+              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,sign*vuv[s_row*coarseSpin+s_col]);
+            }
+          }
+        }
+
       }
 
     }
-#endif
 
   }
 
@@ -1002,36 +999,29 @@ namespace quda {
     } // parity
   }
 
-  template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg, typename Gamma>
-  __global__ void ComputeVUVGPU(Arg arg, const Gamma gamma) {
+  // compute indices for shared-atomic kernel
+  template <typename Arg>
+  __device__ inline void getIndicesShared(const Arg &arg, int &parity, int &x_cb, int &parity_coarse, int &x_coarse_cb, int &c_col, int &c_row) {
 
-#ifdef SHARED_ATOMIC
-#ifdef COARSE_COLOR_WAVE    // coarse color is mapped to grid.x
-    int parity_c_col_block_z = blockDim.y*blockIdx.x + threadIdx.y;
-    if (parity_c_col_block_z >= 2*arg.coarse_color_grid_z) return;
-
-    int c_col_block_z = arg.parity_flip ? (parity_c_col_block_z % arg.coarse_color_grid_z ) : (parity_c_col_block_z / 2); // coarse color col index
-    int parity = arg.parity_flip ? (parity_c_col_block_z / arg.coarse_color_grid_z ) : (parity_c_col_block_z % 2);
-    int c_col = c_col_block_z % coarseColor;
-    int c_row = blockDim.z*(c_col_block_z/coarseColor) + threadIdx.z; // coarse color row index
-    if (c_row >= coarseColor) return;
-#else                       // coarse color is mapped to grid.y
-    int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
-    if (parity_c_col >= 2*coarseColor) return;
-
-    int c_col = arg.parity_flip ? (parity_c_col % coarseColor) : (parity_c_col / 2); // coarse color col index
-    int parity = arg.parity_flip ? (parity_c_col / coarseColor) : (parity_c_col % 2);
-
-    int c_row = blockDim.z*blockIdx.z + threadIdx.z; // coarse color row index
-    if (c_row >= coarseColor) return;
-#endif // COARSE_COLOR_WAVE
+    if (arg.coarse_color_wave) {
+      int parity_c_col_block_z = blockDim.y*blockIdx.x + threadIdx.y;
+      int c_col_block_z = arg.parity_flip ? (parity_c_col_block_z % arg.coarse_color_grid_z ) : (parity_c_col_block_z / 2); // coarse color col index
+      parity = arg.parity_flip ? (parity_c_col_block_z / arg.coarse_color_grid_z ) : (parity_c_col_block_z % 2);
+      c_col = c_col_block_z % arg.coarse_color;
+      c_row = blockDim.z*(c_col_block_z/arg.coarse_color) + threadIdx.z; // coarse color row index
+    } else {
+      int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
+      c_col = arg.parity_flip ? (parity_c_col % arg.coarse_color) : (parity_c_col / 2); // coarse color col index
+      parity = arg.parity_flip ? (parity_c_col / arg.coarse_color) : (parity_c_col % 2);
+      c_row = blockDim.z*blockIdx.z + threadIdx.z; // coarse color row index
+    }
 
     int block_dim_x = virtualBlockDim(arg);
     int thread_idx_x = virtualThreadIdx(arg);
     int x_coarse = coarseIndex(arg);
 
-    int parity_coarse = x_coarse >= arg.coarseVolumeCB ? 1 : 0;
-    int x_coarse_cb = x_coarse - parity_coarse*arg.coarseVolumeCB;
+    parity_coarse = x_coarse >= arg.coarseVolumeCB ? 1 : 0;
+    x_coarse_cb = x_coarse - parity_coarse*arg.coarseVolumeCB;
 
     // obtain fine index from this look-up table
     // since both parities map to the same block, each thread block must do both parities
@@ -1043,38 +1033,43 @@ namespace quda {
     // and that fine-point-id is parity ordered
 
     int x_fine = arg.coarse_to_fine[ (x_coarse*2 + parity) * block_dim_x + thread_idx_x];
-    int x_cb = x_fine - parity*arg.fineVolumeCB;
+    x_cb = x_fine - parity*arg.fineVolumeCB;
+  }
 
-#else // !SHARED_ATOMIC
+  // compute indices for global-atomic kernel
+  template <typename Arg>
+  __device__ inline void getIndicesGlobal(const Arg &arg, int &parity, int &x_cb, int &parity_coarse, int &x_coarse_cb, int &c_col, int &c_row) {
 
-#ifdef COARSE_COLOR_WAVE
-    int x_cb = blockDim.x*blockIdx.y + threadIdx.x;
+    x_cb = blockDim.x*(arg.coarse_color_wave ? blockIdx.y : blockIdx.x) + threadIdx.x;
 
-    int parity_c_col_block_z = blockDim.y*blockIdx.x + threadIdx.y;
-    if (parity_c_col_block_z >= 2*arg.coarse_color_grid_z) return;
+    if (arg.coarse_color_wave) {
+      int parity_c_col_block_z = blockDim.y*blockIdx.x + threadIdx.y;
+      int c_col_block_z = arg.parity_flip ? (parity_c_col_block_z % arg.coarse_color_grid_z ) : (parity_c_col_block_z / 2); // coarse color col index
+      parity = arg.parity_flip ? (parity_c_col_block_z / arg.coarse_color_grid_z ) : (parity_c_col_block_z % 2);
+      c_col = c_col_block_z % arg.coarse_color;
+      c_row = blockDim.z*(c_col_block_z/arg.coarse_color) + threadIdx.z; // coarse color row index
+    } else {
+      int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
+      c_col  = arg.parity_flip ? (parity_c_col % arg.coarse_color) : (parity_c_col / 2); // coarse color col index
+      parity = arg.parity_flip ? (parity_c_col / arg.coarse_color) : (parity_c_col % 2); // coarse color col index
+      c_row = blockDim.z*blockIdx.z + threadIdx.z; // coarse color row index
+    }
 
-    int c_col_block_z = arg.parity_flip ? (parity_c_col_block_z % arg.coarse_color_grid_z ) : (parity_c_col_block_z / 2); // coarse color col index
-    int parity = arg.parity_flip ? (parity_c_col_block_z / arg.coarse_color_grid_z ) : (parity_c_col_block_z % 2);
-    int c_col = c_col_block_z % coarseColor;
-    int c_row = blockDim.z*(c_col_block_z/coarseColor) + threadIdx.z; // coarse color row index
-#else
-    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
+    x_coarse_cb = 0;
+    parity_coarse = 0;
+  }
 
-    int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
-    if (parity_c_col >= 2*coarseColor) return;
+  template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg, typename Gamma>
+  __global__ void ComputeVUVGPU(Arg arg, const Gamma gamma) {
 
-    int c_col  = arg.parity_flip ? (parity_c_col % coarseColor) : (parity_c_col / 2); // coarse color col index
-    int parity = arg.parity_flip ? (parity_c_col / coarseColor) : (parity_c_col % 2); // coarse color col index
+    int parity, x_cb, parity_coarse, x_coarse_cb, c_col, c_row;
+    if (arg.shared_atomic) getIndicesShared(arg, parity, x_cb, parity_coarse, x_coarse_cb, c_col, c_row);
+    else getIndicesGlobal(arg, parity, x_cb, parity_coarse, x_coarse_cb, c_col, c_row);
 
-    int c_row = blockDim.z*blockIdx.z + threadIdx.z; // coarse color row index
-#endif // COARSE_COLOR_WAVE
-    if (x_cb >= arg.fineVolumeCB) return;
-    if (c_row >= coarseColor) return;
-
-    int x_coarse_cb = 0;
-    int parity_coarse = 0;
-
-#endif
+    if (parity > 1) return;
+    if (c_col >= arg.coarse_color) return;
+    if (c_row >= arg.coarse_color) return;
+    if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
 
     computeVUV<from_coarse,Float,dim,dir,fineSpin,fineColor,coarseSpin,coarseColor>(arg, gamma, parity, x_cb, c_row, c_col, parity_coarse, x_coarse_cb);
   }
@@ -1504,9 +1499,7 @@ namespace quda {
     bool tuneAuxDim() const { return type != COMPUTE_VUV ? false : true; }
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-#ifdef SHARED_ATOMIC
-      if (type == COMPUTE_VUV) return 4*sizeof(storeType)*max_color_per_block*max_color_per_block*4*coarseSpin*coarseSpin;
-#endif
+      if (arg.shared_atomic && type == COMPUTE_VUV) return 4*sizeof(storeType)*max_color_per_block*max_color_per_block*4*coarseSpin*coarseSpin;
       return TunableVectorYZ::sharedBytesPerBlock(param);
     }
 
@@ -1519,12 +1512,11 @@ namespace quda {
       strcat(aux,comm_dim_partitioned_string());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
 
-#ifdef SHARED_ATOMIC
-      int block_size = arg.fineVolumeCB/arg.coarseVolumeCB;
-      if (block_size/2 < coarseSpin*coarseSpin) // due to how shared memory initialization and global store is done in VUV
-        errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
-#endif
-
+      if (arg.shared_atomic) {
+        int block_size = arg.fineVolumeCB/arg.coarseVolumeCB;
+        if (block_size/2 < coarseSpin*coarseSpin) // due to how shared memory initialization and global store is done in VUV
+          errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
+      }
     }
     virtual ~CalculateY() { }
 
@@ -1637,13 +1629,21 @@ namespace quda {
 
 	} else if (type == COMPUTE_TMAV) {
 
+#ifdef GPU_TWISTED_MASS_DIRAC
 	  if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
 	  ComputeTMAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#else
+          errorQuda("Twisted mass dslash has not been built");
+#endif
 
 	} else if (type == COMPUTE_TMCAV) {
 
+#ifdef GPU_TWISTED_CLOVER_DIRAC
 	  if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
 	  ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#else
+          errorQuda("Twisted clover dslash has not been built");
+#endif
 
 	} else if (type == COMPUTE_CLOVER_INV_MAX) {
 
@@ -1669,23 +1669,22 @@ namespace quda {
           tp.grid.y = (2*coarseColor + tp.block.y - 1) / tp.block.y;
           tp.grid.z = (coarseColor + tp.block.z - 1) / tp.block.z;
 
-#ifdef SHARED_ATOMIC
-          arg.swizzle = tp.aux.x;
+          if (arg.shared_atomic) {
+            arg.swizzle = tp.aux.x;
+            arg.aggregates_per_block = tp.aux.y;
+            tp.block.x *= tp.aux.y;
+            tp.grid.x /= tp.aux.y;
+          }
 
-	  arg.aggregates_per_block = tp.aux.y;
-	  tp.block.x *= tp.aux.y;
-	  tp.grid.x /= tp.aux.y;
-#endif
-
-#ifdef COARSE_COLOR_WAVE
-          // swap x and y grids
-          std::swap(tp.grid.y,tp.grid.x);
-          // augment x grid with coarseColor row grid (z grid)
-          arg.grid_z = tp.grid.z;
-          arg.coarse_color_grid_z = coarseColor*tp.grid.z;
-          tp.grid.x *= tp.grid.z;
-          tp.grid.z = 1;
-#endif
+          if (arg.coarse_color_wave) {
+            // swap x and y grids
+            std::swap(tp.grid.y,tp.grid.x);
+            // augment x grid with coarseColor row grid (z grid)
+            arg.grid_z = tp.grid.z;
+            arg.coarse_color_grid_z = coarseColor*tp.grid.z;
+            tp.grid.x *= tp.grid.z;
+            tp.grid.z = 1;
+          }
 
           tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
 
@@ -1705,17 +1704,17 @@ namespace quda {
 
           tp.shared_bytes -= sharedBytesPerBlock(tp); // restore shared memory
 
-#ifdef COARSE_COLOR_WAVE
-          // revert the grids
-          tp.grid.z = arg.grid_z;
-          tp.grid.x /= tp.grid.z;
-          std::swap(tp.grid.x,tp.grid.y);
-#endif
+          if (arg.coarse_color_wave) {
+            // revert the grids
+            tp.grid.z = arg.grid_z;
+            tp.grid.x /= tp.grid.z;
+            std::swap(tp.grid.x,tp.grid.y);
+          }
 
-#ifdef SHARED_ATOMIC
-	  tp.block.x /= tp.aux.y;
-	  tp.grid.x *= tp.aux.y;
-#endif
+          if (arg.shared_atomic) {
+            tp.block.x /= tp.aux.y;
+            tp.grid.x *= tp.aux.y;
+          }
 
 	} else if (type == COMPUTE_COARSE_CLOVER) {
 
@@ -1762,12 +1761,12 @@ namespace quda {
       type = type_;
       switch(type) {
       case COMPUTE_VUV:
-#ifdef SHARED_ATOMIC
-        // if not parity flip then we need to force parity within the block (hence factor of 2)
-	resizeVector( (arg.parity_flip ? 1 : 2) * max_color_per_block,max_color_per_block);
-#else
-	resizeVector(2*max_color_per_block,max_color_per_block);
-#endif
+        if (arg.shared_atomic) {
+          // if not parity flip then we need to force parity within the block (hence factor of 2)
+          resizeVector( (arg.parity_flip ? 1 : 2) * max_color_per_block,max_color_per_block);
+        } else {
+          resizeVector(2*max_color_per_block,max_color_per_block);
+        }
 	break;
       case COMPUTE_COARSE_CLOVER: // no shared atomic version so keep separate from above
       case COMPUTE_REVERSE_Y:
@@ -1787,9 +1786,7 @@ namespace quda {
       }
 
       resizeStep(1,1);
-#if defined(SHARED_ATOMIC)
-      if (type == COMPUTE_VUV && !arg.parity_flip) resizeStep(2, 1);
-#endif
+      if (arg.shared_atomic && type == COMPUTE_VUV && !arg.parity_flip) resizeStep(2, 1);
 
       // do not tune spatial block size for VUV or COARSE_CLOVER
       tune_block_x = (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) ? false : true;
@@ -1798,36 +1795,32 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
       if (type != COMPUTE_VUV) return false;
-#ifdef SHARED_ATOMIC
+      if (arg.shared_atomic) {
 #ifdef SWIZZLE
-      constexpr int max_swizzle = 4;
-      if (param.aux.x < max_swizzle) {
-        param.aux.x++;
-	return true;
-      } else {
-        param.aux.x = 1;
-	return false;
-      }
+        constexpr int max_swizzle = 4;
+        if (param.aux.x < max_swizzle) {
+          param.aux.x++;
+          return true;
+        } else {
+          param.aux.x = 1;
+          return false;
+        }
 #else
-      if (param.aux.y < 4) {
-        param.aux.y *= 2;
-	return true;
+        if (param.aux.y < 4) {
+          param.aux.y *= 2;
+          return true;
+        } else {
+          param.aux.y = 1;
+          return false;
+        }
+#endif
       } else {
-        param.aux.y = 1;
-	return false;
+        return false;
       }
-#endif
-#else
-      return false;
-#endif
     }
 
     bool advanceSharedBytes(TuneParam &param) const {
-#ifdef SHARED_ATOMIC
-      return (type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
-#else
-      return ( (!from_coarse && type == COMPUTE_VUV) || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
-#endif
+      return ( (!arg.shared_atomic && !from_coarse && type == COMPUTE_VUV) || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
     }
 
     bool advanceTuneParam(TuneParam &param) const {
@@ -1839,13 +1832,13 @@ namespace quda {
     void initTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::initTuneParam(param);
-      if (type == COMPUTE_VUV) {
-#ifdef SHARED_ATOMIC
+
+      // with shared-atomic VUV, each block.x matches exactly to a c/b aggregate
+      if (arg.shared_atomic && type == COMPUTE_VUV) {
 	param.block.x = arg.fineVolumeCB/(2*arg.coarseVolumeCB); // checker-boarded block size
 	param.grid.x = 2*arg.coarseVolumeCB;
 	param.aux.x = 1; // swizzle factor
 	param.aux.y = 1; // aggregates per block
-#endif
       }
     }
 
@@ -1853,13 +1846,13 @@ namespace quda {
     void defaultTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::defaultTuneParam(param);
-      if (type == COMPUTE_VUV) {
-#ifdef SHARED_ATOMIC
+
+      // with shared-atomic VUV, each block.x matches exactly to a c/b aggregate
+      if (arg.shared_atomic && type == COMPUTE_VUV) {
 	param.block.x = arg.fineVolumeCB/(2*arg.coarseVolumeCB); // checker-boarded block size
 	param.grid.x = 2*arg.coarseVolumeCB;
 	param.aux.x = 1; // swizzle factor
 	param.aux.y = 1; // aggregates per block
-#endif
       }
     }
 
@@ -2021,7 +2014,7 @@ namespace quda {
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
-    typedef CalculateYArg<Float,fineSpin,coarseSpin,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
+    typedef CalculateYArg<Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa,
 	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_);
