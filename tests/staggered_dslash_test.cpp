@@ -15,7 +15,7 @@
 #include <test_util.h>
 #include <dslash_util.h>
 #include <staggered_dslash_reference.h>
-#include "llfat_reference.h"
+#include <llfat_reference.h>
 #include <gauge_field.h>
 #include <unitarization_links.h>
 
@@ -749,8 +749,8 @@ void staggeredDslashRef()
       staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Odd()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
        reinterpret_cast<cpuColorSpinorField*>(&spinor->Even()), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
 #else
-      staggered_dslash(spinorRef->Even()->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Odd()->V(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-      staggered_dslash(spinorRef->Odd()->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Even()->V(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+      staggered_dslash(spinorRef->Even().V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Odd().V(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+      staggered_dslash(spinorRef->Odd().V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Even().V(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
 #endif    
       if (dslash_type == QUDA_LAPLACE_DSLASH) {
         xpay(spinor->V(), kappa, spinorRef->V(), spinor->Length(), gaugeParam.cpu_prec);

@@ -672,8 +672,8 @@ invert_test(void)
       staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Odd()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
        reinterpret_cast<cpuColorSpinorField*>(&out->Even()), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
 #else
-      staggered_dslash(ref->Even()->V(), qdp_fatlink, qdp_longlink, out->Odd()->V(), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-      staggered_dslash(ref->Odd()->V(), qdp_fatlink, qdp_longlink, out->Even()->V(), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+      staggered_dslash(ref->Even().V(), qdp_fatlink, qdp_longlink, out->Odd().V(), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+      staggered_dslash(ref->Odd().V(), qdp_fatlink, qdp_longlink, out->Even().V(), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
 #endif    
       if (dslash_type == QUDA_LAPLACE_DSLASH) {
         xpay(out->V(), kappa, ref->V(), ref->Length(), gaugeParam.cpu_prec);
@@ -804,8 +804,10 @@ invert_test(void)
   if (milc_fatlink != nullptr) { free(milc_fatlink); milc_fatlink = nullptr; }
   if (milc_longlink != nullptr) { free(milc_longlink); milc_longlink = nullptr; }
 
+#ifdef MULTI_GPU
   if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
   if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
+#endif
 
   end();
   return ret;
