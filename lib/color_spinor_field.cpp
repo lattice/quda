@@ -782,7 +782,8 @@ namespace quda {
   }
 
   ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
-						   QudaFieldLocation new_location, QudaMemoryType new_mem_type) {
+                                                   QudaPrecision new_precision, QudaFieldLocation new_location,
+                                                   QudaMemoryType new_mem_type) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
     coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin
@@ -791,11 +792,17 @@ namespace quda {
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
 
+    // if new precision is not set, use this->precision
+    new_precision = (new_precision == QUDA_INVALID_PRECISION) ? Precision() : new_precision;
+
     // if new location is not set, use this->location
-    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location() : new_location;
 
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    else coarseParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    coarseParam.setPrecision(new_precision);
 
     // set where we allocate the field
     coarseParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
@@ -814,13 +821,17 @@ namespace quda {
   }
 
   ColorSpinorField* ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec,
-						 QudaFieldLocation new_location, QudaMemoryType new_mem_type) {
+                                                 QudaPrecision new_precision, QudaFieldLocation new_location,
+                                                 QudaMemoryType new_mem_type) {
     ColorSpinorParam fineParam(*this);
     for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
     fineParam.nSpin = nSpin * spinBlockSize;
     fineParam.nColor = Nvec;
     fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
     fineParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    // if new precision is not set, use this->precision
+    new_precision = (new_precision == QUDA_INVALID_PRECISION) ? Precision() : new_precision;
 
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
@@ -829,7 +840,11 @@ namespace quda {
     if (new_location == QUDA_CUDA_FIELD_LOCATION) {
       fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.Precision()!= QUDA_DOUBLE_PRECISION) ?
 	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
+    } else {
+      fineParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     }
+
+    fineParam.setPrecision(new_precision);
 
     // set where we allocate the field
     fineParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :

@@ -175,6 +175,9 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     case 1: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store)\n"); break;
     case 2: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines)\n"); break;
     case 3: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n"); break;
+    case 5: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n"); break;
+    case 6: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n"); break;
+    case 7: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n"); break;
     default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
     }
 
