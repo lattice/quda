@@ -5,7 +5,10 @@
 // freedom is handled by a single thread block.  This is presently
 // slower than using global atomics (due to increased latency from
 // having to run larger thread blocks)
-#define SHARED_ATOMIC
+
+#if (__COMPUTE_CAPABILITY__ >= 500)
+#define SHARED_ATOMIC // shared-memory atomics supported on Maxwell and upwards
+#endif
 
 #ifdef SHARED_ATOMIC
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
@@ -14,26 +17,25 @@
 #undef SWIZZLE
 #endif
 
-// with shared atomics, since the thread block is constrained to
-// contain the entire aggregate, we often don't have enough threads
-// left to work on multiple coarse colors (which increases the
-// locality) in the thread block.  In lieu of this, if we schedule the
-// coarse grid point index to grid.y and the coarse column index to
-// grid.x, this will increase the potential for L2 reuse since a given
-// wave of thread blocks will be for different coarse color but the
-// same coarse grid point.
-#define COARSE_COLOR_WAVE
+#endif
 
 #define max_color_per_block 8
 
-#endif
+// To increase L2 locality we can schedule the geometry to grid.y and
+// the coarse colors to grid.x.  This will increase the potential for
+// L2 reuse since a given wave of thread blocks will be for different
+// coarse color but the same coarse grid point which will have common
+// loads.
+#define COARSE_COLOR_WAVE
 
 // with PARITY_FLIP enabled we make parity the slowest running
 // dimension in the y-thread axis, and coarse color runs faster.  This
-// improves read locality at the expense of write locality which
-// proves to be a good optimization.  Only applies ot SHARED_ATOMIC
-// variant of computeVUV at present
+// improves read locality at the expense of write locality
+#ifdef SHARED_ATOMIC
 #define PARITY_FLIP true
+#else
+#define PARITY_FLIP false
+#endif
 
 namespace quda {
 
@@ -657,10 +659,11 @@ namespace quda {
       } //Coarse color
     } //Fine Spin
 
+    complex<Float> AV[fineSpin][fineColor][coarseColor];
     for (int s = 0; s < fineSpin; s++)
       for (int c = 0; c < fineColor; c++)
 	for (int v = 0; v < coarseColor; v++)
-	  arg.AV(parity,x_cb,s,c,v) = static_cast<Float>(0.0);
+	  AV[s][c][v] = static_cast<Float>(0.0);
 
 #ifndef	DYNAMIC_CLOVER
     //Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
@@ -675,12 +678,17 @@ namespace quda {
 	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
 	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-              caxpy(arg.Cinv(0, parity, x_cb, s, s_col, ic, jc), UV[s_col][jc][ic_c], arg.AV(parity, x_cb, s, ic, ic_c));
+              caxpy(arg.Cinv(0, parity, x_cb, s, s_col, ic, jc), UV[s_col][jc][ic_c], AV[s][ic][ic_c]);
 	    }  //Fine color columns
 	  }  //Fine color rows
 	} //Coarse color
       }
     } //Fine Spin
+
+    for (int s = 0; s < fineSpin; s++)
+      for (int c = 0; c < fineColor; c++)
+	for (int v = 0; v < coarseColor; v++)
+	  arg.AV(parity, x_cb, s, c, v) = AV[s][c][v];
 #else
     applyCloverInv<Float,fineSpin,fineColor,coarseColor,Arg>(arg, UV, parity, x_cb);
 #endif
@@ -1016,7 +1024,7 @@ namespace quda {
 
     int c_row = blockDim.z*blockIdx.z + threadIdx.z; // coarse color row index
     if (c_row >= coarseColor) return;
-#endif
+#endif // COARSE_COLOR_WAVE
 
     int block_dim_x = virtualBlockDim(arg);
     int thread_idx_x = virtualThreadIdx(arg);
@@ -1037,21 +1045,35 @@ namespace quda {
     int x_fine = arg.coarse_to_fine[ (x_coarse*2 + parity) * block_dim_x + thread_idx_x];
     int x_cb = x_fine - parity*arg.fineVolumeCB;
 
+#else // !SHARED_ATOMIC
+
+#ifdef COARSE_COLOR_WAVE
+    int x_cb = blockDim.x*blockIdx.y + threadIdx.x;
+
+    int parity_c_col_block_z = blockDim.y*blockIdx.x + threadIdx.y;
+    if (parity_c_col_block_z >= 2*arg.coarse_color_grid_z) return;
+
+    int c_col_block_z = arg.parity_flip ? (parity_c_col_block_z % arg.coarse_color_grid_z ) : (parity_c_col_block_z / 2); // coarse color col index
+    int parity = arg.parity_flip ? (parity_c_col_block_z / arg.coarse_color_grid_z ) : (parity_c_col_block_z % 2);
+    int c_col = c_col_block_z % coarseColor;
+    int c_row = blockDim.z*(c_col_block_z/coarseColor) + threadIdx.z; // coarse color row index
 #else
+    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
+
     int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
     if (parity_c_col >= 2*coarseColor) return;
+
+    int c_col  = arg.parity_flip ? (parity_c_col % coarseColor) : (parity_c_col / 2); // coarse color col index
+    int parity = arg.parity_flip ? (parity_c_col / coarseColor) : (parity_c_col % 2); // coarse color col index
+
+    int c_row = blockDim.z*blockIdx.z + threadIdx.z; // coarse color row index
+#endif // COARSE_COLOR_WAVE
+    if (x_cb >= arg.fineVolumeCB) return;
+    if (c_row >= coarseColor) return;
 
     int x_coarse_cb = 0;
     int parity_coarse = 0;
 
-    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.fineVolumeCB) return;
-
-    int c_col = parity_c_col % coarseColor; // coarse color col index
-    int parity = parity_c_col / coarseColor;
-
-    int c_row = blockDim.z*blockIdx.z + threadIdx.z; // coarse color row index
-    if (c_row >= coarseColor) return;
 #endif
 
     computeVUV<from_coarse,Float,dim,dir,fineSpin,fineColor,coarseSpin,coarseColor>(arg, gamma, parity, x_cb, c_row, c_col, parity_coarse, x_coarse_cb);
@@ -1062,18 +1084,19 @@ namespace quda {
    * sign of the spin projector
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb, int ic_c) {
+  __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
     auto &Y = arg.Y_atomic;
 
+#pragma unroll
     for (int d=0; d<4; d++) {
-      for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
-	for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-
-	  const Float sign = (s_row == s_col) ? static_cast<Float>(1.0) : static_cast<Float>(-1.0);
-
-	  for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
-	    Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = sign*Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
-	  } //Color column
+#pragma unroll
+      for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+#pragma unroll
+	for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+	if (s_row == s_col)
+	  Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
+	else
+	  Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = -Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
 	} //Spin column
       } //Spin row
 
@@ -1086,8 +1109,10 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-	for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
-	  computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c);
+	for (int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
+	  for (int jc_c = 0; jc_c < nColor; jc_c++) { //Color col
+	    computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
+	  }
 	}
       } // c/b volume
     } // parity
@@ -1098,11 +1123,15 @@ namespace quda {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
+    int parity_jc_c = blockDim.y*blockIdx.y + threadIdx.y; // parity and color col
+    if (parity_jc_c >= 2*nColor) return;
+    int parity = parity_jc_c / nColor;
+    int jc_c = parity_jc_c % nColor;
+
     int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // color row
     if (ic_c >= nColor) return;
 
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c);
+    computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
   }
 
   template<bool from_coarse, typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
@@ -1634,17 +1663,19 @@ namespace quda {
 #endif
 
 	} else if (type == COMPUTE_VUV) {
-#ifdef SHARED_ATOMIC
+
           // need to resize the grid since we don't tune over the entire coarseColor dimension
-          // factor of two comes from forcing parity onto different blocks (e.g. in the grid)
+          // factor of two comes from parity onto different blocks (e.g. in the grid)
           tp.grid.y = (2*coarseColor + tp.block.y - 1) / tp.block.y;
           tp.grid.z = (coarseColor + tp.block.z - 1) / tp.block.z;
 
+#ifdef SHARED_ATOMIC
           arg.swizzle = tp.aux.x;
 
 	  arg.aggregates_per_block = tp.aux.y;
 	  tp.block.x *= tp.aux.y;
 	  tp.grid.x /= tp.aux.y;
+#endif
 
 #ifdef COARSE_COLOR_WAVE
           // swap x and y grids
@@ -1657,7 +1688,7 @@ namespace quda {
 #endif
 
           tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-#endif
+
 	  if (dir == QUDA_BACKWARDS) {
 	    if      (dim==0) ComputeVUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg, Gamma_<0>());
 	    else if (dim==1) ComputeVUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg, Gamma_<1>());
@@ -1672,7 +1703,6 @@ namespace quda {
 	    errorQuda("Undefined direction %d", dir);
 	  }
 
-#ifdef SHARED_ATOMIC
           tp.shared_bytes -= sharedBytesPerBlock(tp); // restore shared memory
 
 #ifdef COARSE_COLOR_WAVE
@@ -1681,6 +1711,8 @@ namespace quda {
           tp.grid.x /= tp.grid.z;
           std::swap(tp.grid.x,tp.grid.y);
 #endif
+
+#ifdef SHARED_ATOMIC
 	  tp.block.x /= tp.aux.y;
 	  tp.grid.x *= tp.aux.y;
 #endif
@@ -1734,10 +1766,11 @@ namespace quda {
         // if not parity flip then we need to force parity within the block (hence factor of 2)
 	resizeVector( (arg.parity_flip ? 1 : 2) * max_color_per_block,max_color_per_block);
 #else
-	resizeVector(2*coarseColor,coarseColor);
+	resizeVector(2*max_color_per_block,max_color_per_block);
 #endif
 	break;
       case COMPUTE_COARSE_CLOVER: // no shared atomic version so keep separate from above
+      case COMPUTE_REVERSE_Y:
 	resizeVector(2*coarseColor,coarseColor);
         break;
       case COMPUTE_CONVERT:
@@ -1746,7 +1779,6 @@ namespace quda {
       case COMPUTE_UV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
-      case COMPUTE_REVERSE_Y:
 	resizeVector(2,coarseColor);
 	break;
       default:
@@ -1794,7 +1826,7 @@ namespace quda {
 #ifdef SHARED_ATOMIC
       return (type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
 #else
-      return (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
+      return ( (!from_coarse && type == COMPUTE_VUV) || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
 #endif
     }
 
