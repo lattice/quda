@@ -156,14 +156,16 @@ sm_b[ offset_pre_m+offset_pre_n+5 ] = i32_im*scale;
 // Construct matrix A: TODO: should be careful about the idle threads.
 
 int offset_k = coord[4]*4;
-int offset_m = threadIdx.x*4;
+int one_or_zero = threadIdx.x >> 4; // Assumming blockDim.x = 32
+int xxx = threadIdx.x-one_or_zero*16;
+int offset_m = xxx*4;
 
 // threadIdx.x should not be idle(?).
 // With Ls=12 and blockDim.x=32 the following gives a 2-way bank conflict.  
-  if(threadIdx.x < param.dc.Ls){
+  if(xxx < param.dc.Ls){
 
 #ifdef MDWF_mode   // Check whether MDWF option is enabled
-    half kappa = -(static_cast<half>(mdwf_c5[ threadIdx.x ])*(static_cast<half>(4.0) + static_cast<half>(m5)) - static_cast<half>(1.0))/(static_cast<half>(mdwf_b5[ threadIdx.x ])*(static_cast<half>(4.0) + static_cast<half>(m5)) + static_cast<half>(1.0));
+    half kappa = -(static_cast<half>(mdwf_c5[ xxx ])*(static_cast<half>(4.0) + static_cast<half>(m5)) - static_cast<half>(1.0))/(static_cast<half>(mdwf_b5[ xxx ])*(static_cast<half>(4.0) + static_cast<half>(m5)) + static_cast<half>(1.0));
 #else
     half kappa = static_cast<half>(2.0)*static_cast<half>(a);
 #endif  // select MDWF mode
@@ -172,35 +174,35 @@ int offset_m = threadIdx.x*4;
     half factorR;
     half factorL;
   
-    int exponent = threadIdx.x  > coord[4] ? param.dc.Ls-threadIdx.x+coord[4] : coord[4]-threadIdx.x;
-    factorR = inv_d_n * static_cast<half>(POW(kappa,exponent))  * ( threadIdx.x > coord[4] ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
-    int exponent2 = threadIdx.x < coord[4] ? param.dc.Ls-coord[4]+threadIdx.x : threadIdx.x-coord[4];
-    factorL = inv_d_n * static_cast<half>(POW(kappa,exponent2)) * ( threadIdx.x < coord[4] ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
+    int exponent = xxx  > coord[4] ? param.dc.Ls-xxx+coord[4] : coord[4]-xxx;
+    factorR = inv_d_n * static_cast<half>(POW(kappa,exponent))  * ( xxx > coord[4] ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
+    int exponent2 = xxx < coord[4] ? param.dc.Ls-coord[4]+xxx : xxx-coord[4];
+    factorL = inv_d_n * static_cast<half>(POW(kappa,exponent2)) * ( xxx < coord[4] ? static_cast<half>(-mferm) : static_cast<half>(1.0) );
     // (mu, s) by (nu, t). column-major.
   
-    sm_a[ (offset_k+0)*M_sm+(offset_m+0) ] = factorR + factorL;
-    sm_a[ (offset_k+0)*M_sm+(offset_m+2) ] = factorR - factorL;
+    sm_a[ (offset_k+0)*M_sm+(offset_m+0+one_or_zero*2) ] = factorR + static_cast<half>(-2*one_or_zero+1)*factorL;
+//    sm_a[ (offset_k+0)*M_sm+(offset_m+2) ] = factorR - factorL;
 
-    sm_a[ (offset_k+1)*M_sm+(offset_m+1) ] = factorR + factorL;
-    sm_a[ (offset_k+1)*M_sm+(offset_m+3) ] = factorR - factorL;
+    sm_a[ (offset_k+1)*M_sm+(offset_m+1+one_or_zero*2) ] = factorR + static_cast<half>(-2*one_or_zero+1)*factorL;
+//    sm_a[ (offset_k+1)*M_sm+(offset_m+3) ] = factorR - factorL;
     
-    sm_a[ (offset_k+2)*M_sm+(offset_m+0) ] = factorR - factorL;
-    sm_a[ (offset_k+2)*M_sm+(offset_m+2) ] = factorR + factorL;
+    sm_a[ (offset_k+2)*M_sm+(offset_m+0+one_or_zero*2) ] = factorR + static_cast<half>(+2*one_or_zero-1)*factorL;
+//    sm_a[ (offset_k+2)*M_sm+(offset_m+2) ] = factorR + factorL;
     
-    sm_a[ (offset_k+3)*M_sm+(offset_m+1) ] = factorR - factorL;
-    sm_a[ (offset_k+3)*M_sm+(offset_m+3) ] = factorR + factorL;
+    sm_a[ (offset_k+3)*M_sm+(offset_m+1+one_or_zero*2) ] = factorR + static_cast<half>(+2*one_or_zero-1)*factorL;
+//    sm_a[ (offset_k+3)*M_sm+(offset_m+3) ] = factorR + factorL;
     
-    sm_a[ (offset_k+0)*M_sm+(offset_m+1) ] = static_cast<half>(0.0f);
-    sm_a[ (offset_k+0)*M_sm+(offset_m+3) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+0)*M_sm+(offset_m+1+one_or_zero*2) ] = static_cast<half>(0.);
+//    sm_a[ (offset_k+0)*M_sm+(offset_m+3) ] = static_cast<half>(0.0f);
     
-    sm_a[ (offset_k+1)*M_sm+(offset_m+0) ] = static_cast<half>(0.0f);
-    sm_a[ (offset_k+1)*M_sm+(offset_m+2) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+1)*M_sm+(offset_m+0+one_or_zero*2) ] = static_cast<half>(0.);
+//    sm_a[ (offset_k+1)*M_sm+(offset_m+2) ] = static_cast<half>(0.0f);
     
-    sm_a[ (offset_k+2)*M_sm+(offset_m+1) ] = static_cast<half>(0.0f);
-    sm_a[ (offset_k+2)*M_sm+(offset_m+3) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+2)*M_sm+(offset_m+1+one_or_zero*2) ] = static_cast<half>(0.);
+//    sm_a[ (offset_k+2)*M_sm+(offset_m+3) ] = static_cast<half>(0.0f);
     
-    sm_a[ (offset_k+3)*M_sm+(offset_m+0) ] = static_cast<half>(0.0f);
-    sm_a[ (offset_k+3)*M_sm+(offset_m+2) ] = static_cast<half>(0.0f);
+    sm_a[ (offset_k+3)*M_sm+(offset_m+0+one_or_zero*2) ] = static_cast<half>(0.);
+//    sm_a[ (offset_k+3)*M_sm+(offset_m+2+one_or_zero*2) ] = static_cast<half>(0.0f);
  
   }
 }
