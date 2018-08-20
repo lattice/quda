@@ -26,6 +26,15 @@ namespace quda {
     }
   };
 
+  // complex multiply-add with optimal use of fma
+  template<typename Float>
+  inline __device__ __host__ void caxpy(const complex<Float> &a, const complex<Float> &x, complex<Float> &y) {
+    y.x += a.x*x.x;
+    y.x -= a.y*x.y;
+    y.y += a.y*x.x;
+    y.y += a.x*x.y;
+  }
+
   template<typename Float, int n, typename Arg>
   __device__ __host__ void computeYhat(Arg &arg, int d, int x_cb, int parity, int i) {
 
@@ -41,7 +50,7 @@ namespace quda {
       for(int j = 0; j<n; j++) {
 	complex<Float> yHat = 0.0;
 	for(int k = 0; k<n; k++) {
-	  yHat += arg.Y.Ghost(d,1-parity,ghost_idx,i,k) * conj(arg.Xinv(0,parity,x_cb,j,k));
+	  caxpy(arg.Y.Ghost(d,1-parity,ghost_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
 	}
 	arg.Yhat.Ghost(d,1-parity,ghost_idx,i,j) = yHat;
       }
@@ -52,7 +61,7 @@ namespace quda {
       for(int j = 0; j<n; j++) {
 	complex<Float> yHat = 0.0;
 	for(int k = 0; k<n; k++) {
-	  yHat += arg.Y(d,1-parity,back_idx,i,k) * conj(arg.Xinv(0,parity,x_cb,j,k));
+	  caxpy(arg.Y(d,1-parity,back_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
 	}
 	arg.Yhat(d,1-parity,back_idx,i,j) = yHat;
       }
@@ -63,7 +72,7 @@ namespace quda {
     for(int j = 0; j<n; j++) {
       complex<Float> yHat = 0.0;
       for(int k = 0; k<n; k++) {
-	yHat += arg.Xinv(0,parity,x_cb,i,k) * arg.Y(d+4,parity,x_cb,k,j);
+	caxpy(arg.Xinv(0,parity,x_cb,i,k), arg.Y(d+4,parity,x_cb,k,j), yHat);
       }
       arg.Yhat(d+4,parity,x_cb,i,j) = yHat;
     }

@@ -229,8 +229,29 @@ namespace quda {
         __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
 	  : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
 
-	__device__ __host__ inline Float real() const { return scale_inv*static_cast<Float>(v[idx].real()); }
-	__device__ __host__ inline Float imag() const { return scale_inv*static_cast<Float>(v[idx].imag()); }
+	__device__ __host__ inline Float real() const {
+          if (!fixed) {
+            return v[idx].real();
+          } else {
+            return scale_inv*static_cast<Float>(v[idx].real());
+          }
+        }
+
+	__device__ __host__ inline Float imag() const {
+          if (!fixed) {
+            return v[idx].imag();
+          } else {
+            return scale_inv*static_cast<Float>(v[idx].imag());
+          }
+        }
+
+	/**
+	   @brief negation operator
+           @return negation of this complex number
+	*/
+	__device__ __host__ inline complex<Float> operator-() const {
+	  return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
+	}
 
 	/**
 	   @brief Assignment operator with fieldorder_wrapper instance as input
@@ -374,18 +395,20 @@ namespace quda {
 	{ return fieldorder_wrapper<Float,storeFloat>(u[d], parity*cb_offset + (x*nColor + row)*nColor + col,
 						      scale, scale_inv); }
 
-      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<Float> &val) const {
+      template<typename theirFloat>
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
+                                                 const complex<theirFloat> &val) const {
 #ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 	  atomicAdd(u2, (vec2&)val_);
 	} else {
 	  atomicAdd(u2, (vec2&)val);
 	}
 #else
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 #pragma omp atomic update
 	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].x += val_.x;
@@ -512,18 +535,19 @@ namespace quda {
 	{ return fieldorder_wrapper<Float,storeFloat>
 	    (u, (((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col, scale, scale_inv); }
 
-      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<Float> &val) const {
+      template <typename theirFloat>
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
 #ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 	  atomicAdd(u2, (vec2&)val_);
 	} else {
 	  atomicAdd(u2, (vec2&)val);
 	}
 #else
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 #pragma omp atomic update
 	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].x += val_.x;
@@ -701,18 +725,19 @@ namespace quda {
 	return fieldorder_wrapper<Float,storeFloat>(u, index, scale, scale_inv);
       }
 
-      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<Float> &val) const {
+      template <typename theirFloat>
+      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
 #ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 	  atomicAdd(u2, (vec2&)val_);
 	} else {
 	  atomicAdd(u2, (vec2&)val);
 	}
 #else
-	if (fixed) {
+        if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 #pragma omp atomic update
 	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].x += val_.x;
@@ -1037,8 +1062,9 @@ namespace quda {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
 
+        template <typename theirFloat>
 	__device__ __host__ inline void atomicAdd(int d, int parity, int x, int s_row, int s_col,
-						  int c_row, int c_col, const complex<Float> &val) {
+						  int c_row, int c_col, const complex<theirFloat> &val) {
 	  accessor.atomic_add(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col, val);
 	}
 
