@@ -35,13 +35,13 @@ namespace quda {
     const int volumeCB;               // checkerboarded volume
     const int nVec;                   // number of vectors in the propagator (usually 12)
 
-    qudaAPI_ContractId cntrID;        // contract index
+    qluaCntrQQ_Id cntrID;             // contract index
 
-  ContractQQArg(ColorSpinorField **propOut, ColorSpinorField **propIn1, ColorSpinorField **propIn2, int parity, contractParam cParam)
+  ContractQQArg(ColorSpinorField **propOut, ColorSpinorField **propIn1, ColorSpinorField **propIn2, int parity, cntrQQParam cQQParam)
   :   parity(parity), nParity(propIn1[0]->SiteSubset()), nFace(1),
       dim{ (3-nParity) * propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3), 1 },      
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB(propIn1[0]->VolumeCB()), nVec(cParam.nVec), cntrID(cParam.cntrID)
+      volumeCB(propIn1[0]->VolumeCB()), nVec(cQQParam.nVec), cntrID(cQQParam.cntrID)
     {
       
       for(int ivec=0;ivec<nVec;ivec++){
@@ -224,13 +224,13 @@ namespace quda {
 
   
   //-- Top level function, called within interface-qlua
-  void cudaContractQQ(ColorSpinorField **propOut, ColorSpinorField **propIn1, ColorSpinorField **propIn2, int parity, int Nc, int Ns, contractParam cParam){
+  void cudaContractQQ(ColorSpinorField **propOut, ColorSpinorField **propIn1, ColorSpinorField **propIn2, int parity, int Nc, int Ns, cntrQQParam cQQParam){
     
     if(Nc != QUDA_Nc) errorQuda("cudaContractQQ: Supports only Ncolor = %d. Got Nc = %d\n", QUDA_Nc, Nc);
     if(Ns != QUDA_Ns) errorQuda("cudaContractQQ: Supports only Nspin = %d.  Got Ns = %d\n", QUDA_Ns, Ns);
-    if(cParam.nVec != QUDA_PROP_NVEC) errorQuda("cudaContractQQ: Supports only nVec = %d.  Got nVec = %d\n", QUDA_PROP_NVEC, cParam.nVec);
+    if(cQQParam.nVec != QUDA_PROP_NVEC) errorQuda("cudaContractQQ: Supports only nVec = %d.  Got nVec = %d\n", QUDA_PROP_NVEC, cQQParam.nVec);
     
-    ContractQQArg arg(propOut, propIn1, propIn2, parity, cParam);
+    ContractQQArg arg(propOut, propIn1, propIn2, parity, cQQParam);
     
     ContractQQArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(ContractQQArg) );

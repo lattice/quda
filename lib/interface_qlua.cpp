@@ -40,9 +40,9 @@ QudaVerbosity parseVerbosity(const char *v){
   return verbosity;
 }
 
-qudaAPI_ContractId parseContractIdx(const char *v){
+qluaCntrQQ_Id parseContractIdx(const char *v){
   
-  qudaAPI_ContractId cId;
+  qluaCntrQQ_Id cId;
   
   if      (strcmp(v,"contract12")==0) cId = cntr12;
   else if (strcmp(v,"contract13")==0) cId = cntr13;
@@ -401,12 +401,12 @@ doQQ_contract_Quda(
     return 1;
 
   //-- Check-print parameters
-  if (paramAPI.cParam.cntrID == cntr_INVALID)
+  if (paramAPI.cQQParam.cntrID == cntr_INVALID)
     errorQuda("doQQ_contract_Quda: Contract index not set correctly!\n");
 
-  int nVec = paramAPI.cParam.nVec;  
+  int nVec = paramAPI.cQQParam.nVec;  
   printfQuda("doQQ_contract_Quda: Got nVec = %d\n", nVec);
-  printfQuda("doQQ_contract_Quda: Got contractID = %d\n", (int)paramAPI.cParam.cntrID);
+  printfQuda("doQQ_contract_Quda: Got contractID = %d\n", (int)paramAPI.cQQParam.cntrID);
   
   setVerbosity(paramAPI.verbosity);
   
@@ -443,7 +443,7 @@ doQQ_contract_Quda(
   //-- Call contractions kernel here
   int parity = 0;
   double t1 = MPI_Wtime();
-  cudaContractQQ(cudaProp_out, cudaProp_in1, cudaProp_in2, parity, nColor, nSpin, paramAPI.cParam);
+  cudaContractQQ(cudaProp_out, cudaProp_in1, cudaProp_in2, parity, nColor, nSpin, paramAPI.cQQParam);
   double t2 = MPI_Wtime();
   printfQuda("TIMING - doQQ_contract_Quda: Contractions in %.6f sec.\n", t2-t1);
   

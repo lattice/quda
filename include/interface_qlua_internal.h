@@ -57,7 +57,7 @@ namespace quda {
   		      ColorSpinorField **propIn1,
   		      ColorSpinorField **propIn2,
   		      int parity, int Nc, int Ns,
-  		      contractParam cParam);
+  		      cntrQQParam cParam);
 
   
   void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix,

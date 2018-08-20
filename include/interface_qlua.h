@@ -51,7 +51,7 @@ static const char *qc_contractTypeStr[13] = {
   "tmd_g_F_B"
 };
 
-typedef enum qudaAPI_ContractId_s{
+typedef enum qluaCntrQQ_Id_s{
   cntr12 = 12,
   cntr13 = 13,
   cntr14 = 14,
@@ -59,7 +59,7 @@ typedef enum qudaAPI_ContractId_s{
   cntr24 = 24,
   cntr34 = 34,
   cntr_INVALID = 0
-} qudaAPI_ContractId;
+} qluaCntrQQ_Id;
 
 typedef enum {
   what_none           = 0,
@@ -105,8 +105,8 @@ typedef struct {
 
 typedef struct {
   int nVec;
-  qudaAPI_ContractId cntrID;
-} contractParam;
+  qluaCntrQQ_Id cntrID;
+} cntrQQParam;
 
 typedef struct {
   int QsqMax;
@@ -129,7 +129,7 @@ typedef struct {
   QudaVerbosity verbosity;
   wuppertalParam wParam;
   APESmearParam apeParam;
-  contractParam cParam;
+  cntrQQParam cQQParam;
   momProjParam mpParam;
 } qudaAPI_Param;
 
@@ -148,7 +148,7 @@ EXTRN_C
 QudaVerbosity parseVerbosity(const char *v);
 
 EXTRN_C
-qudaAPI_ContractId parseContractIdx(const char *v);
+qluaCntrQQ_Id parseContractIdx(const char *v);
 
 EXTRN_C
 qluaCntr_Type parse_qcContractType(const char *s);
