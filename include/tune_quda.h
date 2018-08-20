@@ -354,8 +354,8 @@ namespace quda {
     virtual unsigned int sharedBytesPerThread() const { return 0; }
     virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-    unsigned int vector_length_y;
-    unsigned int step_y;
+    mutable unsigned int vector_length_y;
+    mutable unsigned int step_y;
     bool tune_block_x;
 
   public:
@@ -403,14 +403,14 @@ namespace quda {
       param.grid.y = (vector_length_y + step_y - 1) / step_y;
     }
 
-    void resizeVector(int y) { vector_length_y = y; }
-    void resizeStep(int y) { step_y = y; }
+    void resizeVector(int y) const { vector_length_y = y; }
+    void resizeStep(int y) const { step_y = y; }
   };
 
   class TunableVectorYZ : public TunableVectorY {
 
-    unsigned vector_length_z;
-    unsigned step_z;
+    mutable unsigned vector_length_z;
+    mutable unsigned step_z;
     bool tune_block_y;
 
   public:
@@ -460,8 +460,8 @@ namespace quda {
       param.grid.z = (vector_length_z + step_z - 1) / step_z;
     }
 
-    void resizeVector(int y, int z) { vector_length_z = z;  TunableVectorY::resizeVector(y); }
-    void resizeStep(int y, int z) { step_z = z;  TunableVectorY::resizeStep(y); }
+    void resizeVector(int y, int z) const { vector_length_z = z;  TunableVectorY::resizeVector(y); }
+    void resizeStep(int y, int z) const { step_z = z;  TunableVectorY::resizeStep(y); }
   };
 
   /**
