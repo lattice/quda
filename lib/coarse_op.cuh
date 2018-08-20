@@ -1798,7 +1798,7 @@ namespace quda {
       if (param.aux.y == 0) {
 
         // pre-Maxwell does not support shared-memory atomics natively so no point in trying
-        if ( __COMPUTE_CAPABILITY__ < 500 ) return false;
+        if (deviceProp.major < 5) return false;
 
         // before advancing, check we can use shared-memory atomics
         int block_size = arg.fineVolumeCB/arg.coarseVolumeCB;
