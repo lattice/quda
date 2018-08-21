@@ -18,8 +18,6 @@
 #include <complex_quda.h>
 #include <qlua_contract.h>
 
-#define QC_REAL double
-
 #ifndef LONG_T
 #define LONG_T long long
 #endif
@@ -34,10 +32,6 @@
 #define QC_CONJ QC_QUDA_CONJ
   
 #define I  complex<QC_REAL>{0.0,1.0}
-
-
-#define QC_Ns       4
-#define QC_Nc       3
   
 #define QC_LEN_G  (QC_Ns*QC_Ns)
 #define QC_LEN_GG (QC_LEN_G*QC_LEN_G)
@@ -174,13 +168,6 @@ INFUNC_ DEVFUNC_ int qc_gamma_sim_parity(int m, int n){
 #define gamma_left_coeff(m,n) (complex<QC_REAL>{gamma_left_coeff_Re(m,n,0),gamma_left_coeff_Re(m,n,1)})
 
 
-typedef enum qcShiftType_s {
-  qcFwdShfActR, //-- Forward  shift, derivative acting on quark
-  qcBwdShfActR, //-- Backward shift, derivative acting on quark
-  qcFwdShfActL, //-- Forward  shift, derivative acting on anti-quark
-  qcBwdShfActL  //-- Backward shift, derivative acting on anti-quark
-} qcShiftType;
-
 namespace quda { 
 
   DEVFUNC_ void QC(contract_tr_g_P_P)(
@@ -230,13 +217,8 @@ namespace quda {
   void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
   void copylocvolToSymbol(LONG_T locvol);
 
-
   __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, Vector *vec);
 
-  __device__ void shiftDevicePropPM1(QluaContractArg *arg,
-                                     Vector *outShf, Propagator prop[],
-                                     int x_cb, int pty,
-                                     int dir, qcShiftType shiftDir);
 
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
@@ -245,7 +227,8 @@ namespace quda {
   __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);  
-  __global__ void qpdf_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void qpdf_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg,
+					 Vector *shfVec1, Vector *shfVec2);
   /* ----------------------------------------------------------------------------------------------- */
  
 } //- namespace quda

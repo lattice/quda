@@ -15,6 +15,9 @@
 #include <color_spinor_field_order.h>
 #include <interface_qlua.h>
 
+#define QC_REAL double
+#define QC_Ns       4
+#define QC_Nc       3
 
 namespace quda {
 
@@ -131,6 +134,13 @@ namespace quda {
 
   };//-- Structure definition
   //---------------------------------------------------------------------------
+
+  typedef enum qcShiftType_s {
+    qcFwdShfActR, //-- Forward  shift, derivative acting on quark
+    qcBwdShfActR, //-- Backward shift, derivative acting on quark
+    qcFwdShfActL, //-- Forward  shift, derivative acting on anti-quark
+    qcBwdShfActL  //-- Backward shift, derivative acting on anti-quark
+  } qcShiftType;
   
 }//-- namespace quda
 

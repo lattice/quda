@@ -11,6 +11,7 @@
 #include <interface_qlua_internal.h>
 #include <qlua_contract.h>
 #include <qlua_contract_kernels.cuh>
+#include <qlua_contract_shifts.cuh>
 
 namespace quda {  
   
@@ -164,7 +165,14 @@ namespace quda {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     case what_qpdf_g_F_B: {
-      qpdf_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+      //- Test case!!
+      Vector shfVec1[QUDA_PROP_NVEC], shfVec2[QUDA_PROP_NVEC];
+      int dir1 = 1; // Shift in y-direction
+      int dir2 = 2; // Shift in z-direction
+      CovShiftDevicePropPM1<<<gridDim,blockDim>>>(arg_dev, shfVec1, arg_dev->prop1, dir1, qcFwdShfActL);
+      CovShiftDevicePropPM1<<<gridDim,blockDim>>>(arg_dev, shfVec2, arg_dev->prop2, dir2, qcBwdShfActL);
+
+      qpdf_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev, shfVec1, shfVec2);
     } break;
     case what_tmd_g_F_B:
     default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[mpParam.cntrType]);
