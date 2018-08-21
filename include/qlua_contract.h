@@ -13,11 +13,7 @@
 #include <gauge_field_order.h>
 #include <color_spinor.h>
 #include <color_spinor_field_order.h>
-#include <interface_qlua.h>
-
-#define QC_REAL double
-#define QC_Ns       4
-#define QC_Nc       3
+#include <interface_qlua_internal.h>
 
 namespace quda {
 

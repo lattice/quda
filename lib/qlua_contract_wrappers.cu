@@ -8,7 +8,6 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <mpi.h>
-#include <interface_qlua_internal.h>
 #include <qlua_contract.h>
 #include <qlua_contract_kernels.cuh>
 #include <qlua_contract_shifts.cuh>
@@ -112,17 +111,19 @@ namespace quda {
 
   
   //-Top-level function in GPU contractions
-  void QuarkContract_GPU(complex<QC_REAL> *corrQuda_dev,
+  void QuarkContract_GPU(complex<QUDA_REAL> *corrQuda_dev,
 			 ColorSpinorField **cudaProp1,
 			 ColorSpinorField **cudaProp2,
 			 ColorSpinorField **cudaProp3,
 			 GaugeField *U,
-			 complex<QC_REAL> *S2, complex<QC_REAL> *S1,
+			 complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
 			 momProjParam mpParam){    
 
     char *func_name;
     asprintf(&func_name,"QuarkContract_GPU");
     
+    //-- C.K. Here we check in fact that the contractions precision (QC_REAL)
+    //-- is the same as the one used throughout.
     if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
 
     //-- Define the arguments structure

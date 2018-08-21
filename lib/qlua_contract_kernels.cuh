@@ -22,6 +22,16 @@
 #define LONG_T long long
 #endif
 
+
+/* C.K. By (re)defining the macros REAL, Ns, Nc with QC_ prefix, the conventions are that these macros
+ * will be used ONLY in the contraction kernels. That's why they are defined here.
+ * Original definitions with QUDA_ prefix are in interface_qlua.h.
+ */
+#define QC_REAL QUDA_REAL
+#define QC_Ns   QUDA_Ns
+#define QC_Nc   QUDA_Nc
+
+
 #define QC_QUDA_CPLX complex<QC_REAL>
 #define QC_QUDA_CONJ conj
   

@@ -18,11 +18,11 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
 
-    const int Ns = QC_Ns;
-    const int Nc = QC_Nc;
+    const int Ns = QUDA_Ns;
+    const int Nc = QUDA_Nc;
 
-    typedef Matrix<complex<QC_REAL>,Nc> Link;
-    typedef ColorSpinor<QC_REAL,Nc,Ns> Vector;
+    typedef Matrix<complex<QUDA_REAL>,Nc> Link;
+    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
 
     const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
     int coord[5];
