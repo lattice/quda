@@ -331,6 +331,18 @@ namespace quda {
     return Checksum(*this, mini);
   }
 
+  GaugeField* GaugeField::Create(const GaugeFieldParam &param) {
 
+    GaugeField *field = nullptr;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = new cpuGaugeField(param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = new cudaGaugeField(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
 
 } // namespace quda
