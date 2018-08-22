@@ -398,7 +398,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
-    P(clover_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
+    P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
     P(compute_clover_trlog, 0);
     P(compute_clover, 0);
     P(compute_clover_inverse, 0);

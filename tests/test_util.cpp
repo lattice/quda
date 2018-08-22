@@ -1607,6 +1607,7 @@ QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision prec_sloppy = QUDA_INVALID_PRECISION;
+QudaPrecision prec_refinement_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 QudaPrecision  prec_ritz = QUDA_INVALID_PRECISION;
@@ -1723,6 +1724,7 @@ void usage(char** argv )
   printf("    --verbosity <silent/summurize/verbose>    # The the verbosity on the top level of QUDA( default summarize)\n");
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
+  printf("    --prec-refine <double/single/half>        # Sloppy precision for refinement in GPU\n");
   printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
   printf("    --prec-ritz <double/single/half>  # Eigenvector precision in GPU\n");
   printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n");
@@ -1920,6 +1922,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--prec-refine") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    prec_refinement_sloppy =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--prec-precondition") == 0){
     if (i+1 >= argc){
       usage(argv);
