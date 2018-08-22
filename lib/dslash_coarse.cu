@@ -32,14 +32,14 @@ namespace quda {
   template <typename Float, typename yFloat, typename ghostFloat, int coarseSpin, int coarseColor, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
   struct DslashCoarseArg {
     typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder,Float,ghostFloat> F;
-    typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> G;
+    typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,yFloat> G;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,yFloat> GY;
 
     F out;
     const F inA;
     const F inB;
     const GY Y;
-    const G X;
+    const GY X;
     const Float kappa;
     const int parity; // only use this for single parity fields
     const int nParity; // number of parities we're working on
@@ -943,7 +943,8 @@ namespace quda {
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
       // check all precisions match
-      QudaPrecision precision = checkPrecision(out, inA, inB, X);
+      QudaPrecision precision = checkPrecision(out, inA, inB);
+      checkPrecision(Y, X);
 
       // check all locations match
       checkLocation(out, inA, inB, Y, X);

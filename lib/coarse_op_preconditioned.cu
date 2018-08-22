@@ -36,7 +36,7 @@ namespace quda {
   }
 
   template<typename Float, int n, typename Arg>
-  __device__ __host__ void computeYhat(Arg &arg, int d, int x_cb, int parity, int i) {
+  inline __device__ __host__ void computeYhat(Arg &arg, int d, int x_cb, int parity, int i) {
 
     int coord[5];
     getCoords(coord, x_cb, arg.dim, parity);
@@ -47,8 +47,10 @@ namespace quda {
     // first do the backwards links Y^{+\mu} * X^{-\dagger}
     if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
 
-      for(int j = 0; j<n; j++) {
+#pragma unroll
+      for (int j = 0; j<n; j++) {
 	complex<Float> yHat = 0.0;
+#pragma unroll
 	for(int k = 0; k<n; k++) {
 	  caxpy(arg.Y.Ghost(d,1-parity,ghost_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
 	}
@@ -58,9 +60,11 @@ namespace quda {
     } else {
       const int back_idx = linkIndexM1(coord, arg.dim, d);
 
-      for(int j = 0; j<n; j++) {
+#pragma unroll
+      for (int j = 0; j<n; j++) {
 	complex<Float> yHat = 0.0;
-	for(int k = 0; k<n; k++) {
+#pragma unroll
+	for (int k = 0; k<n; k++) {
 	  caxpy(arg.Y(d,1-parity,back_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
 	}
 	arg.Yhat(d,1-parity,back_idx,i,j) = yHat;
@@ -69,9 +73,11 @@ namespace quda {
     }
 
     // now do the forwards links X^{-1} * Y^{-\mu}
+#pragma unroll
     for(int j = 0; j<n; j++) {
       complex<Float> yHat = 0.0;
-      for(int k = 0; k<n; k++) {
+#pragma unroll
+      for (int k = 0; k<n; k++) {
 	caxpy(arg.Xinv(0,parity,x_cb,i,k), arg.Y(d+4,parity,x_cb,k,j), yHat);
       }
       arg.Yhat(d+4,parity,x_cb,i,j) = yHat;
@@ -174,11 +180,20 @@ namespace quda {
       GaugeFieldParam param(X);
       // need to copy into AoS format for CUBLAS
       param.order = QUDA_MILC_GAUGE_ORDER;
+      param.setPrecision( X.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision() );
       cudaGaugeField X_(param);
       cudaGaugeField Xinv_(param);
       X_.copy(X);
       blas::flops += cublas::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
+      if (Xinv.Precision() < QUDA_SINGLE_PRECISION) {
+        typedef typename gauge::FieldOrder<Float,N,1,QUDA_MILC_GAUGE_ORDER> G;
+        G x(X_);
+        G xinv(Xinv_);
+        Xinv.Scale(xinv.abs_max());
+      }
+
       Xinv.copy(Xinv_);
+
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
       const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(&X);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
@@ -199,7 +214,7 @@ namespace quda {
       xc_size[4] = 1;
 
       // use spin-ignorant accessor to make multiplication simpler
-      typedef typename gauge::FieldOrder<Float,N,1,gOrder> gCoarse;
+      typedef typename gauge::FieldOrder<Float,N,1,gOrder,true,storeFloat> gCoarse;
       typedef typename gauge::FieldOrder<Float,N,1,gOrder,true,storeFloat> gPreconditionedCoarse;
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gPreconditionedCoarse yHatAccessor(const_cast<GaugeField&>(Yhat));
@@ -224,6 +239,7 @@ namespace quda {
 	for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, arg.Yhat.norm2(d),
 					   arg.Yhat.abs_max(d), arg.Y.abs_max(d) * arg.Xinv.abs_max(0),
 					   arg.Y.abs_max(d), arg.Xinv.abs_max(0));
+
     }
 
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
@@ -277,14 +293,18 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (Yhat.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Unsupported precision %d\n", Yhat.Precision());
-      calculateYhat<double>(Yhat, Xinv, Y, X);
+      calculateYhat<double,double>(Yhat, Xinv, Y, X);
 #else
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (precision == QUDA_SINGLE_PRECISION) {
       if (Yhat.Precision() == QUDA_SINGLE_PRECISION) {
 	calculateYhat<float,float>(Yhat, Xinv, Y, X);
-      } else if (Yhat.Precision() == QUDA_HALF_PRECISION) {
+      } else {
+	errorQuda("Unsupported precision %d\n", precision);
+      }
+    } else if (precision == QUDA_HALF_PRECISION) {
+      if (Yhat.Precision() == QUDA_HALF_PRECISION) {
 	calculateYhat<short,float>(Yhat, Xinv, Y, X);
       } else {
 	errorQuda("Unsupported precision %d\n", precision);

@@ -320,7 +320,7 @@ namespace quda {
     return nrm1;
   }
 
-  // Return the L2 norm squared of the gauge field
+  // Scale the gauge field by the constant a
   void ax(const double &a, GaugeField &u) {
     ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(u));
     blas::ax(a, *b);
