@@ -1116,8 +1116,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   setVerbosity(paramAPI.verbosity);
 
   //-- Load the propagators into cuda-CSFs
-
-  int nVec = 12;
+  int nVec = QUDA_PROP_NVEC;
   LONG_T fieldLgh = paramAPI.mpParam.locvol * Nc * Ns * 2;
   
   ColorSpinorField *cudaProp1[nVec];
@@ -1142,6 +1141,16 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
       cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop3[ivec * fieldLgh]) );
       if(cudaProp3[ivec] == NULL)
 	errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
+
+      cudaDeviceSynchronize();    
+      checkCudaError();
+    }//-ivec
+  }
+  else if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){ //-- Use the third propagator as output in the tmd case, initialize it to zero
+    for(int ivec=0;ivec<nVec;ivec++){
+      cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, NULL );
+      if(cudaProp3[ivec] == NULL)
+	errorQuda("%s: Cannot allocate propagator-3 for cntrType = %s. Exiting.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
       cudaDeviceSynchronize();    
       checkCudaError();
@@ -1215,7 +1224,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
     delete cudaProp1[ivec];
     delete cudaProp2[ivec];
   }  
-  if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS){
+  if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS || paramAPI.mpParam.cntrType == what_tmd_g_F_B){
     for(int ivec=0;ivec<nVec;ivec++)
       delete cudaProp3[ivec];
   }

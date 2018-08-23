@@ -3,9 +3,8 @@
 namespace quda {
 
   //- C.K. Constant variable declarations
-  __constant__ QC_CPLX cS1_gvec[QC_LEN_G];
-  __constant__ QC_CPLX cS2_gvec[QC_LEN_G];
-  __constant__ LONG_T c_locvol;
+   __constant__ QC_CPLX cS1_gvec[QC_LEN_G];
+   __constant__ QC_CPLX cS2_gvec[QC_LEN_G];
 
   
   /* elementary actions on gamma matrices */
@@ -773,9 +772,6 @@ namespace quda {
   // U T I L I T Y   F U N C T I O N S   A N D   K E R N E L   W R A P P E R S //
   //---------------------------------------------------------------------------//
 
-  void copylocvolToSymbol(LONG_T locvol){
-    cudaMemcpyToSymbol(c_locvol, &locvol, sizeof(LONG_T));
-  }
   void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1){
     cudaMemcpyToSymbol(cS2_gvec, S2, sizeof(complex<QC_REAL>)*QC_LEN_G);
     cudaMemcpyToSymbol(cS1_gvec, S1, sizeof(complex<QC_REAL>)*QC_LEN_G);
@@ -815,8 +811,7 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
     int tid  = x_cb + pty * arg->volumeCB;
-
-    LONG_T lV = c_locvol;
+    int lV   = arg->volume;
 
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
@@ -838,7 +833,7 @@ namespace quda {
     prepareDevicePropSite(prop2, vec2);
     prepareDevicePropSite(prop3, vec3);
 
-    qc_quda_baryon_sigma_twopt_asymsrc_gvec(Corr_dev + tid, (int)lV,
+    qc_quda_baryon_sigma_twopt_asymsrc_gvec(Corr_dev + tid, lV,
                                             prop1, 1,
                                             prop2, 1,
                                             prop3, 1);
@@ -850,8 +845,7 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
     int tid  = x_cb + pty * arg->volumeCB;
-
-    LONG_T lV = c_locvol;
+    int lV  = arg->volume;
 
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
@@ -869,7 +863,7 @@ namespace quda {
     prepareDevicePropSite(prop1, vec1);
     prepareDevicePropSite(prop2, vec2);
 
-    qc_quda_contract_tr_g_P_P(Corr_dev + tid, (int)lV,
+    qc_quda_contract_tr_g_P_P(Corr_dev + tid, lV,
 			      prop1, 1,
 			      prop2, 1);
   }
@@ -880,8 +874,7 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
     int tid  = x_cb + pty * arg->volumeCB;
-
-    LONG_T lV = c_locvol;
+    int lV   = arg->volume;
 
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
@@ -899,7 +892,7 @@ namespace quda {
     prepareDevicePropSite(prop1, vec1);
     prepareDevicePropSite(prop2, vec2);
 
-    qc_quda_contract_tr_g_P_aP(Corr_dev + tid, (int)lV,
+    qc_quda_contract_tr_g_P_aP(Corr_dev + tid, lV,
 			       prop1, 1,
 			       prop2, 1);
   }
@@ -910,8 +903,7 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
     int tid  = x_cb + pty * arg->volumeCB;
-
-    LONG_T lV = c_locvol;
+    int lV   = arg->volume;
 
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
@@ -929,7 +921,7 @@ namespace quda {
     prepareDevicePropSite(prop1, vec1);
     prepareDevicePropSite(prop2, vec2);
 
-    qc_quda_contract_tr_g_P_hP(Corr_dev + tid, (int)lV,
+    qc_quda_contract_tr_g_P_hP(Corr_dev + tid, lV,
 			       prop1, 1,
 			       prop2, 1);
   }
@@ -940,8 +932,7 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
     int tid  = x_cb + pty * arg->volumeCB;
-
-    LONG_T lV = c_locvol;
+    int lV   = arg->volume;
 
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
@@ -959,7 +950,7 @@ namespace quda {
     prepareDevicePropSite(prop1, vec1);
     prepareDevicePropSite(prop2, vec2);
 
-    qc_quda_contract_tr_g_P_mgbar_P(Corr_dev + tid, (int)lV,
+    qc_quda_contract_tr_g_P_mgbar_P(Corr_dev + tid, lV,
 				    prop1, 1,
 				    prop2, 1);
   }
@@ -970,8 +961,7 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
     int tid  = x_cb + pty * arg->volumeCB;
-
-    LONG_T lV = c_locvol;
+    int lV   = arg->volume;
 
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
@@ -989,7 +979,7 @@ namespace quda {
     prepareDevicePropSite(prop1, vec1);
     prepareDevicePropSite(prop2, vec2);
 
-    qc_quda_contract_tr_g_P_mgbar_aP(Corr_dev + tid, (int)lV,
+    qc_quda_contract_tr_g_P_mgbar_aP(Corr_dev + tid, lV,
 				     prop1, 1,
 				     prop2, 1);
   }
@@ -1000,8 +990,7 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
     int tid  = x_cb + pty * arg->volumeCB;
-
-    LONG_T lV = c_locvol;
+    int lV   = arg->volume;
 
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
@@ -1019,21 +1008,51 @@ namespace quda {
     prepareDevicePropSite(prop1, vec1);
     prepareDevicePropSite(prop2, vec2);
 
-    qc_quda_contract_tr_g_P_mgbar_hP(Corr_dev + tid, (int)lV,
+    qc_quda_contract_tr_g_P_mgbar_hP(Corr_dev + tid, lV,
 				     prop1, 1,
 				     prop2, 1);
   }
   //------------------------------------------------------------------------------------------
 
-
-  __global__ void qpdf_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg,
-					 Vector *shfVec1, Vector *shfVec2){
+  __global__ void qpdf_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
     int tid  = x_cb + pty * arg->volumeCB;
+    int lV   = arg->volume;
 
-    LONG_T lV = c_locvol;
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> prop1[QC_LEN_P];
+    complex<QC_REAL> prop2[QC_LEN_P];
+
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+
+    //-- Test case!
+    int dir1 = 1; // Shift in y-direction
+    int dir2 = 2; // Shift in z-direction
+    shiftDevicePropPM1(arg, vec1, arg->prop1, x_cb, pty, dir1, qcFwdCovShfActL);
+    shiftDevicePropPM1(arg, vec2, arg->prop2, x_cb, pty, dir2, qcBwdCovShfActL);
+
+    prepareDevicePropSite(prop1, vec1);
+    prepareDevicePropSite(prop2, vec2);
+
+    qc_quda_contract_tr_g_P_P(Corr_dev + tid, lV,
+			      prop1, 1,
+			      prop2, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void qtmd_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					 QluaContractArg *arg, QluaAuxCntrArg *auxArg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+    int lV   = arg->volume;
 
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
@@ -1045,17 +1064,117 @@ namespace quda {
     Vector vec1[QUDA_PROP_NVEC];
     Vector vec2[QUDA_PROP_NVEC];
     for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec1[i] = shfVec1[i];
-      vec2[i] = shfVec2[i];
+      vec1[i] = auxArg->auxProp1[i](x_cb, pty); //- This is the shifted propagator
+      vec2[i] = arg->prop2[i](x_cb, pty);
     }
     prepareDevicePropSite(prop1, vec1);
     prepareDevicePropSite(prop2, vec2);
 
-    qc_quda_contract_tr_g_P_P(Corr_dev + tid, (int)lV,
+    qc_quda_contract_tr_g_P_P(Corr_dev + tid, lV,
 			      prop1, 1,
 			      prop2, 1);
   }
   //------------------------------------------------------------------------------------------
+
+  __device__ void shiftDevicePropPM1(QluaContractArg *arg,
+				     Vector *outShf, Propagator prop[],
+				     int x_cb, int pty,
+				     int dir, qcCovShiftType shiftType){
+    const int Ns = QC_Ns;
+    const int Nc = QC_Nc;
+    
+    typedef Matrix<complex<QC_REAL>,Nc> Link;
+    typedef ColorSpinor<QC_REAL,Nc,Ns> Vector;
+
+    const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
+    int coord[5];
+    getCoords(coord, x_cb, arg->dim, pty);
+    coord[4] = 0;
+
+    if(shiftType == qcFwdCovShfActR){ // Forward shift, derivative acting on quark
+      const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
+      
+      if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
+	const int ghostIdx = ghostFaceIndex<1>(coord, arg->dim, dir, arg->nFace);
+	const Link U = arg->U(dir, x_cb, pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i].Ghost(dir, 1, ghostIdx, nbrPty);
+	  outShf[i] = U * pIn;   //-- y(x) = U_\mu(x) y(x+\mu)
+	}
+      }
+      else{
+	const Link U = arg->U(dir, x_cb, pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i](fwdIdx, nbrPty);
+	  outShf[i] = U * pIn;   //-- y(x) = U_\mu(x) y(x+\mu)
+	}
+      }
+    }
+    else if(shiftType == qcBwdCovShfActR){ // Backward shift, derivative acting on quark
+      const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
+      const int gaugeIdx = bwdIdx;
+      
+      if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
+	const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);
+	const Link U = arg->U.Ghost(dir, ghostIdx, 1-pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i].Ghost(dir, 0, ghostIdx, nbrPty);
+	  outShf[i] = conj(U) * pIn;   //-- y(x) = U_\mu^\dag(x-\mu) \psi(x-\mu)
+	}
+      }
+      else{
+	const Link U = arg->U(dir, gaugeIdx, 1-pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i](bwdIdx, nbrPty);
+	  outShf[i] = conj(U) * pIn;   //-- y(x) = U_\mu^\dag(x-\mu) \psi(x-\mu)
+	}
+      }
+    }
+    else if(shiftType == qcFwdCovShfActL){ // Forward shift, derivative acting on anti-quark
+      const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
+      
+      if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
+	const int ghostIdx = ghostFaceIndex<1>(coord, arg->dim, dir, arg->nFace);
+	const Link U = arg->U(dir, x_cb, pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i].Ghost(dir, 1, ghostIdx, nbrPty);
+	  outShf[i] = conj(U) * pIn;   //-- y(x) = U_\mu^\dag(x) y(x+\mu)
+	}
+      }
+      else{
+	const Link U = arg->U(dir, x_cb, pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i](fwdIdx, nbrPty);
+	  outShf[i] = conj(U) * pIn;   //-- y(x) = U_\mu^\dag(x) y(x+\mu)
+	}
+      }
+    }
+    else if(shiftType == qcBwdCovShfActL){ // Backward shift, derivative acting on anti-quark
+      const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
+      const int gaugeIdx = bwdIdx;
+      
+      if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
+	const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);
+	const Link U = arg->U.Ghost(dir, ghostIdx, 1-pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i].Ghost(dir, 0, ghostIdx, nbrPty);
+	  outShf[i] = U * pIn;   //-- y(x) = U_\mu(x-\mu) \psi(x-\mu)
+	}
+      }
+      else{
+	const Link U = arg->U(dir, gaugeIdx, 1-pty);
+	for(int i=0;i<QUDA_PROP_NVEC;i++){
+	  const Vector pIn = prop[i](bwdIdx, nbrPty);
+	  outShf[i] = U * pIn;   //-- y(x) = U_\mu(x-\mu) \psi(x-\mu)
+	}
+      }
+    }
+    else{ // All threads printing!!!
+      printf("shiftDeviceProp - ERROR: Got invalid shiftType = %d\n", shiftType);
+      return;
+    }
+
+  }//- Function shiftDeviceProp
 
 
 } //- namespace quda

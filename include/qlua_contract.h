@@ -21,6 +21,7 @@ namespace quda {
   typedef typename colorspinor_mapper<QUDA_REAL,QUDA_Ns,QUDA_Nc>::type Propagator;
   typedef typename gauge_mapper<QUDA_REAL,QUDA_RECONSTRUCT_NO>::type GaugeU;
   typedef ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> Vector;
+  typedef Matrix<complex<QUDA_REAL>,QUDA_Nc> Link;
 
   /**
      When copying ColorSpinorFields to GPU, Quda rotates the fields to another basis using a rotation matrix.
@@ -131,12 +132,79 @@ namespace quda {
   };//-- Structure definition
   //---------------------------------------------------------------------------
 
-  typedef enum qcShiftType_s {
-    qcFwdShfActR, //-- Forward  shift, derivative acting on quark
-    qcBwdShfActR, //-- Backward shift, derivative acting on quark
-    qcFwdShfActL, //-- Forward  shift, derivative acting on anti-quark
-    qcBwdShfActL  //-- Backward shift, derivative acting on anti-quark
-  } qcShiftType;
+
+  struct QluaAuxCntrArg {
+
+    Propagator auxProp1[QUDA_PROP_NVEC]; // Propagator
+
+    const qluaCntr_Type cntrType;     // contraction type
+    
+    QluaAuxCntrArg(ColorSpinorField **propIn1, qluaCntr_Type cntrType) : cntrType(cntrType)
+    {
+      if(cntrType != what_tmd_g_F_B) warningQuda("Ambiguous call to QluaAuxCntrArg. Check your code!\n");
+      if(propIn1 == NULL) errorQuda("QluaAuxCntrArg: Input propagator-1 is not allocated!\n");
+      
+      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) auxProp1[ivec].init(*propIn1[ivec]);
+    }
+
+  };//-- Structure definition
+  //---------------------------------------------------------------------------
+
+  static const char *qcTMD_ShiftStringArray[20] = {
+    "x", "X", "y", "Y", "z", "Z", "t", "T", "q", "Q",
+    "r", "R", "s", "S", "u", "U", "v", "V", "w", "W"};
+
+  static const char *qcTMD_ShiftDirArray[4] = {"x", "y", "z", "t"};
+  static const char *qcTMD_ShiftSgnArray[2] = {"-", "+"};
+
+  typedef enum qcCovShiftType_s {
+    qcFwdCovShfActR, //-- Forward  shift, derivative acting on quark
+    qcBwdCovShfActR, //-- Backward shift, derivative acting on quark
+    qcFwdCovShfActL, //-- Forward  shift, derivative acting on anti-quark
+    qcBwdCovShfActL  //-- Backward shift, derivative acting on anti-quark
+  } qcCovShiftType;
+
+
+  typedef enum qcTMD_ShiftString_s {
+    qcShfStr_None = -1,
+    qcShfStr_x = 0,  // +x
+    qcShfStr_X = 1,  // -x
+    qcShfStr_y = 2,  // +y
+    qcShfStr_Y = 3,  // -y
+    qcShfStr_z = 4,  // +z
+    qcShfStr_Z = 5,  // -z
+    qcShfStr_t = 6,  // +t
+    qcShfStr_T = 7,  // -t
+    qcShfStr_q = 8,  // +x+y
+    qcShfStr_Q = 9,  // -x-y
+    qcShfStr_r = 10, // -x+y
+    qcShfStr_R = 11, // +x-y
+    qcShfStr_s = 12, // +y+z
+    qcShfStr_S = 13, // -y-z
+    qcShfStr_u = 14, // -y+z
+    qcShfStr_U = 15, // +y-z
+    qcShfStr_v = 16, // +x+z
+    qcShfStr_V = 17, // -x-z
+    qcShfStr_w = 18, // +x-z
+    qcShfStr_W = 19  // -x+z
+  } qcTMD_ShiftString;
+
+
+
+  typedef enum qcTMD_ShiftDir_s {
+    qcShfDirNone = -1,
+    qcShfDir_x = 0,
+    qcShfDir_y = 1,
+    qcShfDir_z = 2,
+    qcShfDir_t = 3
+  } qcTMD_ShiftDir;
+
+  typedef enum qcTMD_ShiftSgn_s {
+    qcShfSgnNone  = -1,
+    qcShfSgnMinus =  0,
+    qcShfSgnPlus  =  1
+  } qcTMD_ShiftSgn;
+
   
 }//-- namespace quda
 

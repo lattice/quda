@@ -13,6 +13,7 @@
 #include <qlua_contract_shifts.cuh>
 
 namespace quda {  
+
   
   __global__ void QluaSiteOrderCheck_kernel(QluaUtilArg *utilArg){
 
@@ -109,6 +110,65 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
+
+  void perform_NonCovShiftPropOnAxis(qcTMD_ShiftString shfFlag, QluaContractArg *arg_dev, QluaAuxCntrArg *auxArg_dev, int vCB, int nPty){
+
+    qcTMD_ShiftDir shfDir = qcShfDirNone;
+    qcTMD_ShiftSgn shfSgn = qcShfSgnNone;
+
+    switch(shfFlag){
+    case qcShfStr_x: {
+      shfDir = qcShfDir_x;
+      shfSgn = qcShfSgnPlus;
+    } break;
+    case qcShfStr_X: {
+      shfDir = qcShfDir_x;
+      shfSgn = qcShfSgnMinus;
+    } break;
+    case qcShfStr_y: {
+      shfDir = qcShfDir_y;
+      shfSgn = qcShfSgnPlus;
+    } break;
+    case qcShfStr_Y: {
+      shfDir = qcShfDir_y;
+      shfSgn = qcShfSgnMinus;
+    } break;
+    case qcShfStr_z: {
+      shfDir = qcShfDir_z;
+      shfSgn = qcShfSgnPlus;
+    } break;
+    case qcShfStr_Z: {
+      shfDir = qcShfDir_z;
+      shfSgn = qcShfSgnMinus;
+    } break;
+    case qcShfStr_t: {
+      shfDir = qcShfDir_t;
+      shfSgn = qcShfSgnPlus;
+    } break;
+    case qcShfStr_T: {
+      shfDir = qcShfDir_t;
+      shfSgn = qcShfSgnMinus;
+    } break;
+    default: errorQuda("performNonCovShiftProp_OnAxis: Got un-supported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<20) ? qcTMD_ShiftStringArray[(int)shfFlag] : "None");
+    }//-- switch    
+
+    printfQuda("perform_NonCovShiftPropOnAxis: Got shift flag shfFlag = %s\n", qcTMD_ShiftStringArray[(int)shfFlag]);
+    if( (shfSgn>=0 && shfSgn<2) && (shfDir>=0 && shfDir<4) ){
+      printfQuda("perform_NonCovShiftPropOnAxis: Will perform an On-Axis non-covariant propagator shift in the %s%s direction\n", qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    }
+    else{
+      errorQuda("perform_NonCovShiftPropOnAxis: Got invalid shfDir and/or shfSgn.\n");
+    }
+
+    //-- Call kernel that performs non-covariant on axis propagator shift
+    dim3 blockDim(THREADS_PER_BLOCK, nPty, 1);
+    dim3 gridDim((vCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    NonCovShiftPropOnAxis_kernel<<<gridDim,blockDim>>>(arg_dev, auxArg_dev, shfDir, shfSgn);
+
+  }//-- perform_NonCovShiftPropOnAxis
+  //---------------------------------------------------------------------------
+
   
   //-Top-level function in GPU contractions
   void QuarkContract_GPU(complex<QUDA_REAL> *corrQuda_dev,
@@ -131,15 +191,16 @@ namespace quda {
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
     QluaContractArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
-    checkCudaErrorNoSync();
+    checkCudaError();
     cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);    
+    cudaDeviceSynchronize();
+    checkCudaError();
 
 
     //-- Call kernels that perform contractions
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
-    copylocvolToSymbol(mpParam.locvol); //- Copy the local volume to constant memory
 
     double t5 = MPI_Wtime();
     switch(mpParam.cntrType){
@@ -165,17 +226,28 @@ namespace quda {
     case what_meson_F_hB: {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
-    case what_qpdf_g_F_B: {
-      //- Test case!!
-      Vector shfVec1[QUDA_PROP_NVEC], shfVec2[QUDA_PROP_NVEC];
-      int dir1 = 1; // Shift in y-direction
-      int dir2 = 2; // Shift in z-direction
-      CovShiftDevicePropPM1<<<gridDim,blockDim>>>(arg_dev, shfVec1, arg_dev->prop1, dir1, qcFwdShfActL);
-      CovShiftDevicePropPM1<<<gridDim,blockDim>>>(arg_dev, shfVec2, arg_dev->prop2, dir2, qcBwdShfActL);
+    case what_tmd_g_F_B: {
 
-      qpdf_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev, shfVec1, shfVec2);
+      //-- C.K. Define the structure containing the auxilliary propagators (and gauge fields later on...)
+      //-- Use cudaProp3 as output propagator in the qpdf case
+      QluaAuxCntrArg auxArg(cudaProp3, mpParam.cntrType);
+      QluaAuxCntrArg *auxArg_dev;
+      cudaMalloc((void**)&(auxArg_dev), sizeof(QluaAuxCntrArg) );
+      checkCudaError();
+      cudaMemcpy(auxArg_dev, &auxArg, sizeof(QluaAuxCntrArg), cudaMemcpyHostToDevice);    
+      cudaDeviceSynchronize();
+      checkCudaError();
+
+      //-- Non-covariant on-axis shift of propagator, test case
+      qcTMD_ShiftString shfFlag;
+      shfFlag = qcShfStr_y;
+      perform_NonCovShiftPropOnAxis(shfFlag, arg_dev, auxArg_dev, arg.volumeCB, arg.nParity);
+
+      //-- Perform contractions
+      qtmd_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev, auxArg_dev);
     } break;
-    case what_tmd_g_F_B:
+    case what_qpdf_g_F_B:
+      qpdf_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[mpParam.cntrType]);
     }//-- switch
     cudaDeviceSynchronize();
@@ -185,6 +257,7 @@ namespace quda {
     
     //-- Clean-up
     cudaFree(arg_dev);
+    //    cudaFree(auxArg_dev);
     free(func_name);
     
   }//-- function
