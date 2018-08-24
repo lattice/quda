@@ -329,8 +329,11 @@ extern "C" {
     /** The maximum length of the chronological history to store */
     int chrono_max_dim;
 
-    /** The index to indeicate which chrono history we are augmenting */
+    /** The index to indicate which chrono history we are augmenting */
     int chrono_index;
+
+    /** Precision to store the chronological basis in */
+    QudaPrecision chrono_precision;
 
     /** Which external library to use in the linear solvers (MAGMA or Eigen) */
     QudaExtLibType extlib_type;

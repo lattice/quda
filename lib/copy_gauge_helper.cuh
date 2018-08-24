@@ -219,7 +219,7 @@ namespace quda {
 	if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
       }
 #else
-      writeAuxString("fine-grained,geometry=%d", arg.in.geometry);
+      writeAuxString("fine-grained,geometry=%d", (int)arg.in.geometry);
 #endif
     }
 

@@ -2516,7 +2516,9 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   ColorSpinorParam csParam(0, *param, cudaGauge->X(), pc_solution, mg_param.setup_location[0]);
   csParam.create = QUDA_NULL_FIELD_CREATE;
-  csParam.setPrecision(param->cuda_prec_sloppy);
+  QudaPrecision Bprec = mg_param.precision_null[0];
+  Bprec = (mg_param.setup_location[0] == QUDA_CPU_FIELD_LOCATION && Bprec < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : Bprec);
+  csParam.setPrecision(Bprec);
   csParam.fieldOrder = mg_param.setup_location[0] == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_YES ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
@@ -2920,27 +2922,40 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     // chronological forecasting
     if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
       profileInvert.TPSTART(QUDA_PROFILE_CHRONO);
+
       auto &basis = chronoResident[param->chrono_index];
-      cudaColorSpinorField tmp(*in), tmp2(*in);
-      std::vector<ColorSpinorField*> Ap;
+
       ColorSpinorParam cs_param(*basis[0]);
-      for(unsigned int k=0; k < basis.size(); k++){
+      ColorSpinorField *tmp = ColorSpinorField::Create(cs_param);
+      ColorSpinorField *tmp2 = (param->chrono_precision == out->Precision()) ? out : ColorSpinorField::Create(cs_param);
+      std::vector<ColorSpinorField*> Ap;
+      for (unsigned int k=0; k < basis.size(); k++) {
         Ap.emplace_back((ColorSpinorField::Create(cs_param)));
       }
 
-      for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], tmp, tmp2);
+      if (param->chrono_precision == param->cuda_prec) {
+        for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], *tmp, *tmp2);
+      } else if (param->chrono_precision == param->cuda_prec_sloppy) {
+        for (unsigned int j=0; j<basis.size(); j++) mSloppy(*Ap[j], *basis[j], *tmp, *tmp2);
+      } else {
+        errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
+                  param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
+      }
 
       bool orthogonal = true;
       bool apply_mat = false;
       bool hermitian = false;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
-      blas::copy(tmp, *in);
 
-      mre(*out, tmp, basis, Ap);
+      blas::copy(*tmp, *in);
+      mre(*out, *tmp, basis, Ap);
       
-      for(auto ap: Ap){
+      for (auto ap: Ap) {
         if (ap) delete(ap);
       }
+      delete tmp;
+      if (tmp2 != out) delete tmp2;
+
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
 
@@ -2955,27 +2970,40 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     // chronological forecasting
     if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
       profileInvert.TPSTART(QUDA_PROFILE_CHRONO);
+
       auto &basis = chronoResident[param->chrono_index];
 
-      std::vector<ColorSpinorField*> Ap;
-      cudaColorSpinorField tmp(*in), tmp2(*in);
       ColorSpinorParam cs_param(*basis[0]);
-      for(unsigned int k=0; k < basis.size(); k++){
+      std::vector<ColorSpinorField*> Ap;
+      ColorSpinorField *tmp = ColorSpinorField::Create(cs_param);
+      ColorSpinorField *tmp2 = (param->chrono_precision == out->Precision()) ? out : ColorSpinorField::Create(cs_param);
+      for (unsigned int k=0; k < basis.size(); k++) {
         Ap.emplace_back((ColorSpinorField::Create(cs_param)));
       }
 
-      for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], tmp, tmp2);
+      if (param->chrono_precision == param->cuda_prec) {
+        for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], *tmp, *tmp2);
+      } else if (param->chrono_precision == param->cuda_prec_sloppy) {
+        for (unsigned int j=0; j<basis.size(); j++) mSloppy(*Ap[j], *basis[j], *tmp, *tmp2);
+      } else {
+        errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
+                  param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
+      }
 
       bool orthogonal = true;
       bool apply_mat = false;
       bool hermitian = true;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
-      blas::copy(tmp, *in);
 
-      mre(*out, tmp, basis, Ap);
-      for(auto ap: Ap){
+      blas::copy(*tmp, *in);
+      mre(*out, *tmp, basis, Ap);
+
+      for (auto ap: Ap) {
         if (ap) delete(ap);
       }
+      delete tmp;
+      if (tmp2 != out) delete tmp2;
+
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
 
@@ -3016,13 +3044,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
 
     if(not param->chrono_replace_last){
-    // if we have not filled the space yet just augment
+      // if we have not filled the space yet just augment
       if ((int)basis.size() < param->chrono_max_dim) {
         ColorSpinorParam cs_param(*out);
+        cs_param.setPrecision(param->chrono_precision);
         basis.emplace_back(ColorSpinorField::Create(cs_param));
       }
 
-    // shuffle every entry down one and bring the last to the front
+      // shuffle every entry down one and bring the last to the front
       ColorSpinorField *tmp = basis[basis.size()-1];
       for (unsigned int j=basis.size()-1; j>0; j--) basis[j] = basis[j-1];
         basis[0] = tmp;

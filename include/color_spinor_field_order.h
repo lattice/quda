@@ -368,6 +368,14 @@ namespace quda {
   }
 
   /**
+     @brief negation operator
+     @return negation of this complex number
+  */
+  __device__ __host__ inline complex<Float> operator-() const {
+    return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
+  }
+
+  /**
      @brief Assignment operator with fieldorder_wrapper instance as input
      @param a fieldorder_wrapper we are copying from
   */
@@ -425,14 +433,21 @@ namespace quda {
 
 
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order,
-      typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false>
+      typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false, bool block_float=false, bool use_tex=false>
       class FieldOrderCB {
 
     protected:
       complex<storeFloat> *v;
-      const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
-      Float scale;
-      Float scale_inv;
+    const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
+      // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
+      union {
+        float *norm;
+        Float scale;
+      };
+      union {
+        Float scale_inv;
+        int norm_offset;
+      };
 #ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
       mutable float *ghost_norm[8];
@@ -443,7 +458,7 @@ namespace quda {
       const int siteSubset;
       const int nParity;
       const QudaFieldLocation location;
-      const GhostAccessorCB<ghostFloat,nSpin,nColor,nVec,order> ghostAccessor;
+    const GhostAccessorCB<ghostFloat,nSpin,nColor,nVec,order> ghostAccessor;
       Float ghost_scale;
       Float ghost_scale_inv;
 #endif
@@ -476,6 +491,12 @@ namespace quda {
 #ifdef DISABLE_GHOST
         if (!disable_ghost) errorQuda("DISABLE_GHOST macro set but corresponding disable_ghost template not set");
 #endif
+
+        if (block_float) {
+          // only if we have block_float format do we set these (only block_orthogonalize.cu at present)
+          norm = static_cast<float*>(const_cast<void*>(field.Norm()));
+          norm_offset = field.NormBytes()/(2*sizeof(float));
+        }
       }
 
       /**
@@ -523,13 +544,25 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> operator()(int parity, int x_cb, int s, int c, int n=0) const
       {
+#ifdef __CUDA_ARCH__
         if (!fixed) {
-          return complex<Float>(v[accessor.index(parity,x_cb,s,c,n)]);
-        } else {
-          complex<storeFloat> tmp = v[accessor.index(parity,x_cb,s,c,n)];
-          return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+          return complex<Float>( use_tex ? __ldg(v + accessor.index(parity,x_cb,s,c,n)) : v[accessor.index(parity,x_cb,s,c,n)]);
+	} else {
+	  complex<storeFloat> tmp = use_tex ? __ldg(v + accessor.index(parity,x_cb,s,c,n)) : v[accessor.index(parity,x_cb,s,c,n)];
+	  Float norm_ = block_float ? (use_tex ? __ldg(norm + parity*norm_offset+x_cb) : norm[parity*norm_offset+x_cb]) : scale_inv;
+	  return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
+#else
+        if (!fixed) {
+          return complex<Float>( v[accessor.index(parity,x_cb,s,c,n)] );
+	} else {
+	  complex<storeFloat> tmp = v[accessor.index(parity,x_cb,s,c,n)];
+	  Float norm_ = block_float ? norm[parity*norm_offset+x_cb] : scale_inv;
+	  return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+        }
+#endif
       }
+
 
       /**
        * Writable complex-member accessor function.  The last
@@ -555,14 +588,28 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
       {
+#ifdef __CUDA_ARCH__
         if (!ghost_fixed) {
-          return complex<Float>(ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]);
+          return complex<Float>( use_tex ? __ldg(ghost[2*dim+dir]+ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)) :
+				 ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)] );
+        } else {
+          Float scale = ghost_scale_inv;
+          if (block_float_ghost) scale *= (use_tex ? __ldg(ghost_norm[2*dim+dir]+parity*ghostAccessor.faceVolumeCB[dim] + x_cb) :
+					   ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb]);
+          complex<ghostFloat> tmp = (use_tex ? __ldg(ghost[2*dim+dir] + ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)) :
+				     ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]);
+          return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+        }
+#else
+        if (!ghost_fixed) {
+          return complex<Float>( ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)] );
         } else {
           Float scale = ghost_scale_inv;
           if (block_float_ghost) scale *= ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb];
           complex<ghostFloat> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)];
           return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
+#endif
       }
 
       /**
@@ -610,29 +657,29 @@ namespace quda {
       }
 
       /**
-   Convert from n-dimensional spatial index to the 1-dimensional index.
-   With full fields, we assume that the field is even-odd ordered.  The
-   input lattice coordinates are always full-field coordinates.
+	 Convert from n-dimensional spatial index to the 1-dimensional index.
+	 With full fields, we assume that the field is even-odd ordered.  The
+	 input lattice coordinates are always full-field coordinates.
       */
       __device__ __host__ inline void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
-  int parity = 0;
-  int savey0 = y[0];
+	int parity = 0;
+	int savey0 = y[0];
 
-  if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-    for (int d=0; d<nDim; d++) parity += y[d];
-    parity = parity & 1;
-    y[0] /= 2;
-    x[0] /= 2;
-  }
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  for (int d=0; d<nDim; d++) parity += y[d];
+	  parity = parity & 1;
+	  y[0] /= 2;
+	  x[0] /= 2;
+	}
 
-  i = parity;
-  for (int d=nDim-1; d>=0; d--) i = x[d]*i + y[d];
+	i = parity;
+	for (int d=nDim-1; d>=0; d--) i = x[d]*i + y[d];
 
-  if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-    //y[0] = 2*y[0] + parity;
-    y[0] = savey0;
-    x[0] *= 2; // restore x[0]
-  }
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  //y[0] = 2*y[0] + parity;
+	  y[0] = savey0;
+	  x[0] *= 2; // restore x[0]
+	}
       }
 
       /** Return the length of dimension d */
@@ -791,7 +838,7 @@ namespace quda {
       // use textures unless we have a large alloc
       RegType nrm = !huge_alloc ? tex1Dfetch<float>(texNorm,x+parity*norm_offset) : norm[x+parity*norm_offset];
 #else
-            RegType nrm = norm[x+parity*norm_offset];
+      RegType nrm = norm[x+parity*norm_offset];
 #endif
 #pragma unroll
       for (int i=0; i<length; i++) v[i] *= nrm;

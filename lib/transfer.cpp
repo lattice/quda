@@ -24,6 +24,7 @@ namespace quda {
       spin_bs(spin_bs), spin_map(0), nspin_fine(B[0]->Nspin()), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
       enable_gpu(false), enable_cpu(false), gpu_setup(true), use_gpu(true), flops_(0), profile(profile)
   {
+    postTrace();
     int ndim = B[0]->Ndim();
 
     for (int d = 0; d < ndim; d++) {
@@ -57,7 +58,6 @@ namespace quda {
 
     createV(B[0]->Location()); // allocate V field
     createTmp(QUDA_CPU_FIELD_LOCATION); // allocate temporaries
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) createTmp(QUDA_CUDA_FIELD_LOCATION);
 
     // allocate and compute the fine-to-coarse and coarse-to-fine site maps
     fine_to_coarse_h = static_cast<int*>(pool_pinned_malloc(B[0]->Volume()*sizeof(int)));
@@ -76,10 +76,12 @@ namespace quda {
     createSpinMap(spin_bs);
 
     reset();
+    postTrace();
   }
 
   void Transfer::createV(QudaFieldLocation location) const
   {
+    postTrace();
     // create the storage for the final block orthogonal elements
     ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
 
@@ -107,27 +109,35 @@ namespace quda {
       V_h = ColorSpinorField::Create(param);
       enable_cpu = true;
     }
+    postTrace();
   }
 
   void Transfer::createTmp(QudaFieldLocation location) const
   {
+    postTrace();
     ColorSpinorParam param(*B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
     param.location = location;
     param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
+      if (fine_tmp_d && coarse_tmp_d) return;
       fine_tmp_d = ColorSpinorField::Create(param);
       coarse_tmp_d = fine_tmp_d->CreateCoarse(geo_bs, spin_bs, Nvec);
     } else {
       fine_tmp_h = ColorSpinorField::Create(param);
       coarse_tmp_h = fine_tmp_h->CreateCoarse(geo_bs, spin_bs, Nvec);
     }
+    postTrace();
   }
 
   void Transfer::initializeLazy(QudaFieldLocation location) const
   {
     if (!enable_cpu && !enable_gpu) errorQuda("Neither CPU or GPU coarse fields initialized");
+
+    // delayed allocating this temporary until we need it
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) createTmp(QUDA_CUDA_FIELD_LOCATION);
 
     switch (location) {
     case QUDA_CUDA_FIELD_LOCATION:
@@ -152,6 +162,7 @@ namespace quda {
 
   void Transfer::reset()
   {
+    postTrace();
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
 
     if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -169,6 +180,7 @@ namespace quda {
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
       }
     }
+    postTrace();
   }
 
   Transfer::~Transfer() {

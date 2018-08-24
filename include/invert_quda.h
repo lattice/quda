@@ -354,7 +354,6 @@ namespace quda {
 
     virtual void solve(ColorSpinorField &out, ColorSpinorField &in);
 
-
     /**
        Solver factory
     */
@@ -722,6 +721,62 @@ namespace quda {
   };
 
   /**
+     @brief Communication-avoiding CG solver.  This solver does
+     un-preconditioned CG, running in steps of nKrylov, build up a
+     polynomial in the linear operator of length nKrylov, and then
+     performs a steepest descent minimization on the resuling basis
+     vectors.  For now only implemented using the power basis so is
+     only useful as a preconditioner.
+   */
+  class CACG : public Solver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    bool init;
+
+    Complex *W; // inner product matrix
+    Complex *C; // inner product matrix
+    Complex *alpha;
+    Complex *beta;
+    Complex *phi;
+
+    ColorSpinorField *rp;
+    ColorSpinorField *tmpp;
+    ColorSpinorField *tmpp2;
+    ColorSpinorField *tmp_sloppy;
+    ColorSpinorField *tmp_sloppy2;
+
+    std::vector<ColorSpinorField*> r;  // residual vectors
+    std::vector<ColorSpinorField*> q;  // mat * residual vectors
+    std::vector<ColorSpinorField*> p;  // CG direction vectors
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] b Source vector used for solver meta data.  If we're
+       not preserving the source vector and we have a uni-precision
+       solver, we set p[0] = b to save memory and memory copying.
+    */
+    void create(ColorSpinorField &b);
+
+    /**
+       @brief Compute the alpha coefficients
+    */
+    void compute_alpha(Complex *x, Complex *W, Complex *phi);
+
+    /**
+       @brief Compute the beta coefficients
+    */
+    void compute_beta(Complex *beta, Complex *W, Complex *C);
+
+  public:
+    CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CACG();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  /**
      @brief Communication-avoiding GCR solver.  This solver does
      un-preconditioned GCR, first building up a polynomial in the
      linear operator of length nKrylov, and then performs a minimum
@@ -754,9 +809,10 @@ namespace quda {
 
     /**
        @brief Solve the equation A p_k psi_k = q_k psi_k = b by minimizing the
-       residual and using Eigen's SVD algorithm for numerical stability
+       least square residual using Eigen's LDLT Cholesky for numerical stability
        @param[out] psi Array of coefficients
        @param[in] q Search direction vectors with the operator applied
+       @param[in] b Source vector against which we are solving
     */
     void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
 
