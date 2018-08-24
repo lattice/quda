@@ -3612,7 +3612,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     DiracMdagM m(dirac), mSloppy(diracSloppy);
     SolverParam solverParam(*param);
     MultiShiftCG cg_m(m, mSloppy, solverParam, profileMulti);
-    cg_m.solve(x, *b, p, r2_old.get());
+    cg_m(x, *b, p, r2_old.get());
     // cg_m(x, *b);
     solverParam.updateInvertParam(*param);
   }

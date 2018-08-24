@@ -855,8 +855,18 @@ namespace quda {
     MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~MultiShiftCG();
 
-    void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in);
-    void solve(std::vector<ColorSpinorField*> out, ColorSpinorField &in, std::vector<ColorSpinorField*>  &p, double* r2_old );
+    void operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b, std::vector<ColorSpinorField*> &p, double* r2_old_array );
+
+    void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in){
+    std::unique_ptr<double[]> r2_old(new double[QUDA_MAX_MULTI_SHIFT]);
+    std::vector<ColorSpinorField*> p;
+    (*this)(out, in, p, r2_old.get());
+    for (auto& pp : p) delete pp;   
+    };
+
+
+ 
+    // void solve(std::vector<ColorSpinorField*> out, ColorSpinorField &in, std::vector<ColorSpinorField*>  &p, double* r2_old );
   };
 
 
