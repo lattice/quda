@@ -197,7 +197,7 @@ namespace quda {
 
   }
 
-  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField* pin, double r2_old_in) {
+  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField* p_init, double r2_old_init) {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (checkPrecision(x, b) != param.precision)
@@ -332,22 +332,14 @@ namespace quda {
       p.resize(Np);
       ColorSpinorParam csParam(rSloppy);
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      if(pin){
-        for (auto &pi : p) pi = ColorSpinorField::Create(*pin, csParam);        
-      } else {
-        for (auto &pi : p) pi = ColorSpinorField::Create(rSloppy, csParam);
-      }
+        for (auto &pi : p) pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);      
     } else {
-      if(pin){
-        for (auto &pi : p) blas::copy(*pi,*pin); 
-      } else {
-        for (auto &pi : p) *pi = rSloppy;
-      }
+        for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
     }
 
-    double r2_old;
-    if(r2_old_in != 0.0 and pin){
-      r2_old = r2_old_in;
+    double r2_old=0.0;
+    if(r2_old_init != 0.0 and p_init){
+      r2_old = r2_old_init;
       Complex rp = blas::cDotProduct(rSloppy, *p[0]) / (r2);
       blas::caxpy(-rp, rSloppy, *p[0]);
       beta = r2 / r2_old;

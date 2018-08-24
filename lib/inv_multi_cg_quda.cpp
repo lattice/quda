@@ -181,7 +181,7 @@ namespace quda {
     
     // this is the limit of precision possible
 
-    bool exitearly = false;
+    bool exit_early = false;
     bool mixed = param.precision_sloppy == param.precision;
     const double sloppy_tol= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() : pow(2.,-17));
     const double fine_tol = pow(10.,(-2*(int)b.Precision()+1));
@@ -246,7 +246,6 @@ namespace quda {
 	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
     }
   
-    // std::vector<ColorSpinorField*> p;
     p.resize(num_offset);
     for (int i=0; i<num_offset; i++) p[i] = new cudaColorSpinorField(*r_sloppy);    
   
@@ -324,7 +323,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) 
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     
-    while ( !convergence(r2, stop, num_offset_now) &&  !exitearly && k < param.maxiter) {
+    while ( !convergence(r2, stop, num_offset_now) &&  !exit_early && k < param.maxiter) {
 
       if (aux_update) dslash::aux_worker = &shift_update;
       matSloppy(*Ap, *p[0], tmp1, tmp2);
@@ -456,19 +455,19 @@ namespace quda {
 
       // exit early so that we can finish of shift 0 using CG and allowing for mixed precison refinement
       if(num_offset_now==1){
-        exitearly=true;
+        exit_early=true;
         num_offset_now--;
       }
 
       // this ensure we do the update on any shifted systems that
       // happen to converge when the un-shifted system converges
-      if ( (convergence(r2, stop, num_offset_now) || exitearly|| k == param.maxiter) && aux_update == true) {
+      if ( (convergence(r2, stop, num_offset_now) || exit_early|| k == param.maxiter) && aux_update == true) {
 	if (getVerbosity() >= QUDA_VERBOSE) 
 	  printfQuda("Convergence of unshifted system so trigger shiftUpdate\n");
 	
 	// set worker to do all updates at once
 	shift_update.updateNupdate(1);
-	shift_update.apply(nullptr);
+	shift_update.apply(0);
 
 	for (int j=0; j<num_offset_now; j++) iter[j] = k+1;
       }

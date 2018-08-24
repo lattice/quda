@@ -416,6 +416,10 @@ namespace quda {
     virtual double flops() const { return 0; }
   };
 
+
+  /**
+     @brief  Conjugtate-Gradient Solver.
+   */
   class CG : public Solver {
 
   private:
@@ -429,11 +433,28 @@ namespace quda {
   public:
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
-
+    /**
+     * @brief: Run CG.
+     * 
+     * @param out Solution vector.
+     * @param in Right-hand side.
+     */
     void operator()(ColorSpinorField &out, ColorSpinorField &in){
       (*this)(out, in, nullptr, 0.0);
     };
-    void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *pin, double r2_old_in);
+
+    /**
+     * @brief Solve re-using an inital Krylov space defined by an inital r2_old_init and search direction p_init.
+     * @details This can be used when continuing a CG, e.g. as refinement step after a multi-shift solve.
+     * 
+     * @param out Solution-vector.
+     * @param in Right-hand side.
+     * @param p_init Inital-search direction.
+     * @param r2_old_init [description]
+     */
+    void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
+
+
     void solve(ColorSpinorField& out, ColorSpinorField& in);
   };
 
@@ -898,6 +919,16 @@ namespace quda {
     bool convergence(const double *r2, const double *r2_tol, int n) const;
   };
 
+/**
+ * @brief [brief description]
+ * @details [long description]
+ * 
+ * @param mat [description]
+ * @param matSloppy [description]
+ * @param param [description]
+ * @param profile [description]
+ * @return [description]
+ */
   class MultiShiftCG : public MultiShiftSolver {
 
   protected:
@@ -907,16 +938,29 @@ namespace quda {
   public:
     MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~MultiShiftCG();
-
+/**
+ * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
+ * 
+ * @param out std::vector of pointer to solutions for all the shifts.
+ * @param in right-hand side.
+ * @param p std::vector of pointers to hold search directions. Note this will be resized as necessary.
+ * @param r2_old_array pointer to last values of r2_old for old shifts. Needs to be large enough to hold r2_old for all shifts.
+ */
     void operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b, std::vector<ColorSpinorField*> &p, double* r2_old_array );
 
+/**
+ * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
+ * 
+ * @param out std::vector of pointer to solutions for all the shifts.
+ * @param in right-hand side.
+ */
     void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in){
-    std::unique_ptr<double[]> r2_old(new double[QUDA_MAX_MULTI_SHIFT]);
-    std::vector<ColorSpinorField*> p;
-    
-    (*this)(out, in, p, r2_old.get());
-    
-    for (auto& pp : p) delete pp;   
+      std::unique_ptr<double[]> r2_old(new double[QUDA_MAX_MULTI_SHIFT]);
+      std::vector<ColorSpinorField*> p;
+
+      (*this)(out, in, p, r2_old.get());
+
+      for (auto& pp : p) delete pp;   
     }
 
   };
