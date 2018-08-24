@@ -197,8 +197,6 @@ namespace quda {
 
   }
 
-//   void CG::refine(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField &pin, double r2_old_in) {
-
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField* pin, double r2_old_in) {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
@@ -329,11 +327,6 @@ namespace quda {
     if (&x != &xSloppy) blas::zero(xSloppy);
     blas::copy(rSloppy,r);
 
-
-
-
-
-
     if (Np != (int)p.size()) {
       for (auto &pi : p) delete pi;
       p.resize(Np);
@@ -367,9 +360,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-
-
-
 
     double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 

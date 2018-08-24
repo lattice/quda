@@ -435,9 +435,6 @@ namespace quda {
     };
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *pin, double r2_old_in);
     void solve(ColorSpinorField& out, ColorSpinorField& in);
-    // void refine(ColorSpinorField& out, ColorSpinorField& in, ColorSpinorField *pin, double r2_old_in){
-    //   *this(out, in, pin, r2_old_in);
-    // };
   };
 
 
@@ -916,13 +913,12 @@ namespace quda {
     void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in){
     std::unique_ptr<double[]> r2_old(new double[QUDA_MAX_MULTI_SHIFT]);
     std::vector<ColorSpinorField*> p;
+    
     (*this)(out, in, p, r2_old.get());
+    
     for (auto& pp : p) delete pp;   
-    };
+    }
 
-
- 
-    // void solve(std::vector<ColorSpinorField*> out, ColorSpinorField &in, std::vector<ColorSpinorField*>  &p, double* r2_old );
   };
 
 

@@ -453,12 +453,12 @@ namespace quda {
 	}
       }
       num_offset_now -= converged;
-// #ifdef EXITEARLY
+
+      // exit early so that we can finish of shift 0 using CG and allowing for mixed precison refinement
       if(num_offset_now==1){
         exitearly=true;
         num_offset_now--;
       }
-// #endif
 
       // this ensure we do the update on any shifted systems that
       // happen to converge when the un-shifted system converges
