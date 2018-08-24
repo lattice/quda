@@ -41,6 +41,7 @@ QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
+extern QudaPrecision  prec_refinement_sloppy;
 cpuColorSpinorField* in;
 cpuColorSpinorField* out;
 cpuColorSpinorField* ref;
@@ -91,7 +92,7 @@ void constructSpinorField(Float *res) {
 static void
 set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
     int X1, int  X2, int X3, int X4,
-    QudaPrecision cpu_prec, QudaPrecision prec, QudaPrecision prec_sloppy,
+    QudaPrecision cpu_prec, QudaPrecision prec, QudaPrecision prec_sloppy, QudaPrecision prec_refinement_sloppy,
     QudaReconstructType link_recon, QudaReconstructType link_recon_sloppy,
     double mass, double tol,
     double tadpole_coeff
@@ -106,6 +107,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->cuda_prec = prec;
   gaugeParam->reconstruct = link_recon;  
   gaugeParam->cuda_prec_sloppy = prec_sloppy;
+  gaugeParam->cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   gaugeParam->reconstruct_sloppy = link_recon_sloppy;
   gaugeParam->gauge_fix = QUDA_GAUGE_FIXED_NO;
   gaugeParam->anisotropy = 1.0;
@@ -169,6 +171,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->cpu_prec = cpu_prec;
   inv_param->cuda_prec = prec; 
   inv_param->cuda_prec_sloppy = prec_sloppy;
+  inv_param->cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   inv_param->preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
   inv_param->dirac_order = QUDA_DIRAC_ORDER;
@@ -191,7 +194,7 @@ invert_test(void)
 
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
-      cpu_prec, prec, prec_sloppy,
+      cpu_prec, prec, prec_sloppy, prec_refinement_sloppy,
       link_recon, link_recon_sloppy, mass, tol, 0.8);
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
@@ -568,6 +571,10 @@ int main(int argc, char** argv)
 
   if (prec_sloppy == QUDA_INVALID_PRECISION){
     prec_sloppy = prec;
+  }
+
+  if (prec_refinement_sloppy == QUDA_INVALID_PRECISION){
+    prec_refinement_sloppy = prec_sloppy;
   }
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
     link_recon_sloppy = link_recon;

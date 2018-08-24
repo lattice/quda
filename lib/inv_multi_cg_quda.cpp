@@ -185,12 +185,11 @@ namespace quda {
     bool mixed = param.precision_sloppy == param.precision;
     const double sloppy_tol= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() : pow(2.,-17));
     const double fine_tol = pow(10.,(-2*(int)b.Precision()+1));
-    auto *prec_tol = new double[num_offset];
+    std::unique_ptr<double[]> prec_tol(new double[num_offset]);
 
     prec_tol[0] = mixed ? sloppy_tol : fine_tol;
     for (int i=1; i<num_offset; i++) {
        prec_tol[i] = std::max(fine_tol,sqrt(param.tol_offset[i]*sloppy_tol));
-       //prec_tol[i] = fine_tol;
     }
 
     auto *zeta = new double[num_offset];
@@ -561,7 +560,6 @@ namespace quda {
        if (x_sloppy[i]->Precision() != x[i]->Precision()) delete x_sloppy[i];
   
     delete r;
-    // for (auto& pp : p) delete pp;
 
     if (reliable) for (int i=0; i<num_offset; i++) delete y[i];
 
@@ -571,7 +569,7 @@ namespace quda {
     delete []zeta;
     delete []alpha;
     delete []beta;
-    delete []prec_tol;
+
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
 
