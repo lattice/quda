@@ -783,7 +783,7 @@ namespace quda {
     const int Ns = QC_Ns;
     const int Nc = QC_Nc;
 
-    rotatePropBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
+    rotateVectorBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
 
     for(int jc = 0; jc < Nc; jc++){
       for(int js = 0; js < Ns; js++){
@@ -1058,8 +1058,8 @@ namespace quda {
     if (pty >= arg->nParity) return;
     if(tid >= lV) return;
 
-    complex<QC_REAL> prop1[QC_LEN_P];
-    complex<QC_REAL> prop2[QC_LEN_P];
+    complex<QC_REAL> dev_prop1[QC_LEN_P];
+    complex<QC_REAL> dev_prop2[QC_LEN_P];
 
     Vector vec1[QUDA_PROP_NVEC];
     Vector vec2[QUDA_PROP_NVEC];
@@ -1067,12 +1067,12 @@ namespace quda {
       vec1[i] = auxArg->auxProp1[i](x_cb, pty); //- This is the shifted propagator
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
-    prepareDevicePropSite(prop1, vec1);
-    prepareDevicePropSite(prop2, vec2);
+    prepareDevicePropSite(dev_prop1, vec1);
+    prepareDevicePropSite(dev_prop2, vec2);
 
     qc_quda_contract_tr_g_P_P(Corr_dev + tid, lV,
-			      prop1, 1,
-			      prop2, 1);
+			      dev_prop1, 1,
+			      dev_prop2, 1);
   }
   //------------------------------------------------------------------------------------------
 

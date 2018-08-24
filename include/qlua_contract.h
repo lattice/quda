@@ -23,7 +23,7 @@ namespace quda {
   typedef ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> Vector;
   typedef Matrix<complex<QUDA_REAL>,QUDA_Nc> Link;
 
-  /**
+  /** C.K.
      When copying ColorSpinorFields to GPU, Quda rotates the fields to another basis using a rotation matrix.
      This function is required in order to rotate the ColorSpinorFields between the Quda and the QDP bases.
      The rotation matrix is ( with a factor sqrt(0.5) ):
@@ -36,7 +36,7 @@ namespace quda {
      After the calculation the result must be rotated back to the Quda basis R <- M^T R (qdp2quda),
      so that when Quda copies back to the CPU the result is again rotated to the QDP convention.
    */
-  __device__ __host__ inline void rotatePropBasis(Vector *prop, RotateType rType){
+  __device__ __host__ inline void rotateVectorBasis(Vector *vecIO, RotateType rType){
 
     const int Ns = QUDA_Ns;
     const int Nc = QUDA_Nc;
@@ -61,7 +61,7 @@ namespace quda {
     if      (rType == QLUA_quda2qdp) A = M;
     else if (rType == QLUA_qdp2quda) A = M_Trans;
 
-        for(int ic = 0; ic < Nc; ic++){
+    for(int ic = 0; ic < Nc; ic++){
       for(int jc = 0; jc < Nc; jc++){
         for(int is = 0; is < Ns; is++){
           for(int js = 0; js < Ns; js++){
@@ -72,13 +72,13 @@ namespace quda {
             for(int a=0;a<Ns;a++){
               int as = ic + Nc*a;
 
-              res[iv].data[id] += A[is][a] * prop[iv].data[as];
+              res[iv].data[id] += A[is][a] * vecIO[iv].data[as];
             }
           }}}
     }
 
     for(int v = 0; v<QUDA_PROP_NVEC; v++)
-      prop[v] = res[v];
+      vecIO[v] = res[v];
 
   }
   //---------------------------------------------------------------------------

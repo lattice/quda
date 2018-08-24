@@ -165,10 +165,18 @@ namespace quda {
     dim3 gridDim((vCB + blockDim.x -1)/blockDim.x, 1, 1);
 
     NonCovShiftPropOnAxis_kernel<<<gridDim,blockDim>>>(arg_dev, auxArg_dev, shfDir, shfSgn);
+    cudaDeviceSynchronize();
+    checkCudaError();
 
   }//-- perform_NonCovShiftPropOnAxis
   //---------------------------------------------------------------------------
 
+  void qcExchangeGhostProp(ColorSpinorField **prop){
+    int nFace  = 1;
+    int parity = 0; //prop[0]->SiteSubset();
+    for(int i=0;i<QUDA_PROP_NVEC;i++)
+      prop[i]->exchangeGhost((QudaParity)(1-parity), nFace, 0);
+  }
   
   //-Top-level function in GPU contractions
   void QuarkContract_GPU(complex<QUDA_REAL> *corrQuda_dev,
@@ -185,6 +193,15 @@ namespace quda {
     //-- C.K. Here we check in fact that the contractions precision (QC_REAL)
     //-- is the same as the one used throughout.
     if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
+
+
+    //-- Take care of the ghost exchange (only for forward prop)
+    if( (mpParam.cntrType == what_tmd_g_F_B) || (mpParam.cntrType == what_qpdf_g_F_B) ){
+      double t7 = MPI_Wtime();
+      qcExchangeGhostProp(cudaProp1);
+      double t8 = MPI_Wtime();
+      printfQuda("TIMING - %s: Propagator ghost exchange test-0 done in %f sec.\n", func_name, t8-t7);
+    }
 
     //-- Define the arguments structure
     QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, U, mpParam.cntrType); 
@@ -226,8 +243,10 @@ namespace quda {
     case what_meson_F_hB: {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
+    case what_qpdf_g_F_B: {
+      qpdf_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+    } break;
     case what_tmd_g_F_B: {
-
       //-- C.K. Define the structure containing the auxilliary propagators (and gauge fields later on...)
       //-- Use cudaProp3 as output propagator in the qpdf case
       QluaAuxCntrArg auxArg(cudaProp3, mpParam.cntrType);
@@ -241,13 +260,14 @@ namespace quda {
       //-- Non-covariant on-axis shift of propagator, test case
       qcTMD_ShiftString shfFlag;
       shfFlag = qcShfStr_y;
+      double t9 = MPI_Wtime();
       perform_NonCovShiftPropOnAxis(shfFlag, arg_dev, auxArg_dev, arg.volumeCB, arg.nParity);
+      double t10 = MPI_Wtime();
+      printfQuda("TIMING - %s: Propagator shift finished in %f sec.\n", func_name, t10-t9);
 
       //-- Perform contractions
       qtmd_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev, auxArg_dev);
     } break;
-    case what_qpdf_g_F_B:
-      qpdf_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[mpParam.cntrType]);
     }//-- switch
     cudaDeviceSynchronize();

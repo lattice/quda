@@ -77,8 +77,8 @@ namespace quda {
       In1[i] = arg->pIn1[i](x_cb, pty);					\
       In2[i] = arg->pIn2[i](x_cb, pty);					\
     }									\
-    rotatePropBasis(In1,QLUA_quda2qdp);					\
-    rotatePropBasis(In2,QLUA_quda2qdp);					\
+    rotateVectorBasis(In1,QLUA_quda2qdp);				\
+    rotateVectorBasis(In2,QLUA_quda2qdp);				\
     									\
     									\
     for(int p_a = 0; p_a < Nc; p_a++){					\
@@ -147,7 +147,7 @@ namespace quda {
       break;
     }    
 
-    rotatePropBasis(out, QLUA_qdp2quda);
+    rotateVectorBasis(out, QLUA_qdp2quda);
         
     for(int ivec=0;ivec<arg->nVec;ivec++)
       arg->pOut[ivec](x_cb, pty) = out[ivec];
