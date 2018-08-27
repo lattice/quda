@@ -174,8 +174,11 @@ namespace quda {
   void qcExchangeGhostProp(ColorSpinorField **prop){
     int nFace  = 1;
     int parity = 0; //prop[0]->SiteSubset();
-    for(int i=0;i<QUDA_PROP_NVEC;i++)
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
       prop[i]->exchangeGhost((QudaParity)(1-parity), nFace, 0);
+      cudaDeviceSynchronize();
+      checkCudaError();
+    }
   }
   
   //-Top-level function in GPU contractions
@@ -185,7 +188,7 @@ namespace quda {
 			 ColorSpinorField **cudaProp3,
 			 GaugeField *U,
 			 complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
-			 momProjParam mpParam){    
+			 qudaAPI_Param paramAPI){    
 
     char *func_name;
     asprintf(&func_name,"QuarkContract_GPU");
@@ -194,17 +197,28 @@ namespace quda {
     //-- is the same as the one used throughout.
     if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
 
+    momProjParam mpParam = paramAPI.mpParam;
 
     //-- Take care of the ghost exchange (only for forward prop)
     if( (mpParam.cntrType == what_tmd_g_F_B) || (mpParam.cntrType == what_qpdf_g_F_B) ){
       double t7 = MPI_Wtime();
-      qcExchangeGhostProp(cudaProp1);
+      int nFace  = 1;
+      //      int parity = 0; //prop[0]->SiteSubset();
+      for(int i=0;i<QUDA_PROP_NVEC;i++){
+	cudaProp1[i]->exchangeGhost((QudaParity)1, nFace, 0);
+	cudaDeviceSynchronize();
+	checkCudaError();
+	// cudaProp1[i]->exchangeGhost((QudaParity)1, nFace, 0);
+	// cudaDeviceSynchronize();
+	// checkCudaError();
+      }
+      //      qcExchangeGhostProp(cudaProp1);
       double t8 = MPI_Wtime();
-      printfQuda("TIMING - %s: Propagator ghost exchange test-0 done in %f sec.\n", func_name, t8-t7);
+      printfQuda("TIMING - %s: Propagator ghost exchange done in %f sec.\n", func_name, t8-t7);
     }
 
     //-- Define the arguments structure
-    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, U, mpParam.cntrType); 
+    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, U, mpParam.cntrType, paramAPI.preserveBasis); 
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
     QluaContractArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );

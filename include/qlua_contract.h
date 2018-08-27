@@ -84,14 +84,15 @@ namespace quda {
   //---------------------------------------------------------------------------
 
   struct QluaContractArg {
-
+    
     Propagator prop1[QUDA_PROP_NVEC]; // Input
     Propagator prop2[QUDA_PROP_NVEC]; // Propagators
     Propagator prop3[QUDA_PROP_NVEC]; //
     
     GaugeU U;                         // Gauge Field
-
+    
     const qluaCntr_Type cntrType;     // contraction type
+    const int parity;                 // hard code to 0 for now
     const int nParity;                // number of parities we're working on
     const int nFace;                  // hard code to 1 for now
     const int dim[5];                 // full lattice dimensions
@@ -99,34 +100,35 @@ namespace quda {
     const int lL[4];                  // 4-d local lattice dimensions
     const int volumeCB;               // checkerboarded volume
     const int volume;                 // full-site local volume
+    const bool preserveBasis;         // whether to preserve the gamma basis or not
     
     QluaContractArg(ColorSpinorField **propIn1,
-                    ColorSpinorField **propIn2,
-                    ColorSpinorField **propIn3,
-                    GaugeField *Uin,
-                    qluaCntr_Type cntrType)
-      : cntrType(cntrType), nParity(propIn1[0]->SiteSubset()), nFace(1),
+		    ColorSpinorField **propIn2,
+		    ColorSpinorField **propIn3,
+		    GaugeField *Uin,
+		    qluaCntr_Type cntrType, bool preserveBasis)
+      : cntrType(cntrType), parity(0), nParity(propIn1[0]->SiteSubset()), nFace(1),
 	dim{ (3-nParity) * propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3), 1 },
-        commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-        lL{propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3)},
-        volumeCB(propIn1[0]->VolumeCB()),volume(propIn1[0]->Volume())
+      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+      lL{propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3)},
+      volumeCB(propIn1[0]->VolumeCB()),volume(propIn1[0]->Volume()), preserveBasis(preserveBasis)
     {
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
         prop1[ivec].init(*propIn1[ivec]);
         prop2[ivec].init(*propIn2[ivec]);
       }
-
+      
       if(cntrType == what_baryon_sigma_UUS){
         if(propIn3 == NULL) errorQuda("QluaContractArg: Input propagator-3 is not allocated!\n");
         for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
           prop3[ivec].init(*propIn3[ivec]);
       }
-
+      
       if((cntrType == what_qpdf_g_F_B) || (cntrType == what_tmd_g_F_B)){
 	if(Uin == NULL) errorQuda("QluaContractArg: Gauge Field is not allocated!\n");
 	U.init(*Uin);
       }
-
+      
     }
 
   };//-- Structure definition
@@ -134,19 +136,19 @@ namespace quda {
 
 
   struct QluaAuxCntrArg {
-
+    
     Propagator auxProp1[QUDA_PROP_NVEC]; // Propagator
-
+    
     const qluaCntr_Type cntrType;     // contraction type
     
-    QluaAuxCntrArg(ColorSpinorField **propIn1, qluaCntr_Type cntrType) : cntrType(cntrType)
+  QluaAuxCntrArg(ColorSpinorField **propIn1, qluaCntr_Type cntrType) : cntrType(cntrType)
     {
       if(cntrType != what_tmd_g_F_B) warningQuda("Ambiguous call to QluaAuxCntrArg. Check your code!\n");
       if(propIn1 == NULL) errorQuda("QluaAuxCntrArg: Input propagator-1 is not allocated!\n");
       
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) auxProp1[ivec].init(*propIn1[ivec]);
     }
-
+    
   };//-- Structure definition
   //---------------------------------------------------------------------------
 

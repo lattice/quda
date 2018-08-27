@@ -99,8 +99,10 @@ check_quda_comms(const qudaLattice *qS)
 //-- fill out QudaInvertParam
 static void
 init_QudaInvertParam_generic(QudaInvertParam& ip,
-                             const QudaGaugeParam& gp, qudaAPI_Param paramAPI)
+                             const QudaGaugeParam& gp, qudaAPI_Param paramAPI, bool preserveBasis=false)
 {
+
+  printfQuda("init_QudaInvertParam_generic: %s preserve the Gamma basis!\n", preserveBasis ? "Will" : "Will NOT");
 
   ip  = newQudaInvertParam();
 
@@ -114,7 +116,7 @@ init_QudaInvertParam_generic(QudaInvertParam& ip,
   ip.cuda_prec_sloppy         = QUDA_HALF_PRECISION;
   ip.dagger                   = QUDA_DAG_NO;
   ip.dirac_order              = QUDA_QDP_DIRAC_ORDER;
-  ip.gamma_basis              = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  ip.gamma_basis              = (preserveBasis ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS);
   ip.inv_type                 = QUDA_BICGSTAB_INVERTER;
   ip.mass_normalization       = QUDA_KAPPA_NORMALIZATION;
   ip.matpc_type               = QUDA_MATPC_EVEN_EVEN;
@@ -197,17 +199,17 @@ new_cudaGaugeField(QudaGaugeParam& gp, QUDA_REAL *hbuf_u[])
 static cudaColorSpinorField*
 new_cudaColorSpinorField(QudaGaugeParam& gp, QudaInvertParam& ip,
 			 int nColor, int nSpin,
-			 QUDA_REAL *hbuf_x, bool preserveBasis=false)
+			 QUDA_REAL *hbuf_x)
 {
   ColorSpinorParam cpuParam(hbuf_x, ip, gp.X, false, QUDA_CPU_FIELD_LOCATION); // false stands for the pc_solution
   ColorSpinorParam cudaParam(cpuParam, ip, QUDA_CUDA_FIELD_LOCATION);
-  if (preserveBasis) {
-    cpuParam.gammaBasis = cudaParam.gammaBasis;
-    printfQuda("new_cudaColorSpinorField: Will preserve the Gamma Basis!\n");
-  }
-  else{
-    printfQuda("new_cudaColorSpinorField: Will not preserve the Gamma Basis!\n");
-  }
+  // if (preserveBasis) {
+  //   cpuParam.gammaBasis = cudaParam.gammaBasis;
+  //   printfQuda("new_cudaColorSpinorField: Will preserve the Gamma Basis!\n");
+  // }
+  // else{
+  //   printfQuda("new_cudaColorSpinorField: Will not preserve the Gamma Basis!\n");
+  // }
 
   cudaColorSpinorField *cuda_x = NULL;
   if (NULL != hbuf_x) {
@@ -1112,17 +1114,17 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
     errorQuda("%s: Contraction type not parsed correctly or not supported!\n", func_name);
   else
     printfQuda("%s: Got Contraction type \'%s\'\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
-    
+
+  bool preserveBasis = paramAPI.preserveBasis == 1 ? true : false;
+  
   //-- Load the parameters required for the CSFs, TODO: May need to control this with paramAPI.mpParam.bc_t
   QudaGaugeParam gp;
   int tBoundaryGauge = -1;
   init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
   
   QudaInvertParam ip;
-  init_QudaInvertParam_generic(ip, gp, paramAPI);
+  init_QudaInvertParam_generic(ip, gp, paramAPI, preserveBasis);
   setVerbosity(paramAPI.verbosity);
-
-  bool preserveBasis = paramAPI.preserveBasis == 1 ? true : false;
 
   //-- Load the propagators into cuda-CSFs
   int nVec = QUDA_PROP_NVEC;
@@ -1134,8 +1136,8 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   
   double t1 = MPI_Wtime();
   for(int ivec=0;ivec<nVec;ivec++){
-    cudaProp1[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop1[ivec * fieldLgh]), preserveBasis );
-    cudaProp2[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop2[ivec * fieldLgh]), preserveBasis );
+    cudaProp1[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop1[ivec * fieldLgh]) );
+    cudaProp2[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop2[ivec * fieldLgh]) );
     if( (cudaProp1[ivec] == NULL) || (cudaProp2[ivec] == NULL) )
       errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
 
@@ -1147,7 +1149,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
     if(hprop3 == NULL) errorQuda("%s: Got hprop3 = NULL for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
     for(int ivec=0;ivec<nVec;ivec++){
-      cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop3[ivec * fieldLgh]), preserveBasis );
+      cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop3[ivec * fieldLgh]) );
       if(cudaProp3[ivec] == NULL)
 	errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
 
@@ -1157,7 +1159,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   }
   else if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){ //-- Use the third propagator as output in the tmd case, initialize it to zero
     for(int ivec=0;ivec<nVec;ivec++){
-      cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, NULL, preserveBasis );
+      cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, NULL );
       if(cudaProp3[ivec] == NULL)
 	errorQuda("%s: Cannot allocate propagator-3 for cntrType = %s. Exiting.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
@@ -1207,7 +1209,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   double t5 = MPI_Wtime();
   QuarkContract_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3, cuda_gf,
 		    (complex<QUDA_REAL>*)S2, (complex<QUDA_REAL>*)S1,
-		    paramAPI.mpParam);
+		    paramAPI);
   double t6 = MPI_Wtime();
   printfQuda("TIMING - %s: Function \'QuarkContract_GPU\' completed in %f sec.\n", func_name, t6-t5);
   /* --------------------------------------------------------------------------------------- */

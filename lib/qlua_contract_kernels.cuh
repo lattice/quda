@@ -226,7 +226,7 @@ namespace quda {
 
   void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
 
-  __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, Vector *vec);
+  __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, Vector *vec, bool preserveBasis);
 
 
   __device__ void shiftDevicePropPM1(QluaContractArg *arg,
