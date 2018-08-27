@@ -403,7 +403,7 @@ namespace quda {
 
     /**
 	Prints out the summary of the solver convergence (requires a
-	versbosity of QUDA_SUMMARIZE).  Assumes
+	verbosity of QUDA_SUMMARIZE).  Assumes
 	SolverParam.true_res and SolverParam.true_res_hq has
 	been set
     */
@@ -418,7 +418,7 @@ namespace quda {
 
 
   /**
-     @brief  Conjugtate-Gradient Solver.
+     @brief  Conjugate-Gradient Solver.
    */
   class CG : public Solver {
 
@@ -444,12 +444,12 @@ namespace quda {
     };
 
     /**
-     * @brief Solve re-using an inital Krylov space defined by an inital r2_old_init and search direction p_init.
+     * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
      * @details This can be used when continuing a CG, e.g. as refinement step after a multi-shift solve.
      * 
      * @param out Solution-vector.
      * @param in Right-hand side.
-     * @param p_init Inital-search direction.
+     * @param p_init Initial-search direction.
      * @param r2_old_init [description]
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
@@ -742,7 +742,7 @@ namespace quda {
      @brief Communication-avoiding CG solver.  This solver does
      un-preconditioned CG, running in steps of nKrylov, build up a
      polynomial in the linear operator of length nKrylov, and then
-     performs a steepest descent minimization on the resuling basis
+     performs a steepest descent minimization on the resulting basis
      vectors.  For now only implemented using the power basis so is
      only useful as a preconditioner.
    */
@@ -798,7 +798,7 @@ namespace quda {
      @brief Communication-avoiding GCR solver.  This solver does
      un-preconditioned GCR, first building up a polynomial in the
      linear operator of length nKrylov, and then performs a minimum
-     residual extrapolation on the resuling basis vectors.  For use as
+     residual extrapolation on the resulting basis vectors.  For use as
      a multigrid smoother with minimum global synchronization.
    */
   class CAGCR : public Solver {
@@ -920,14 +920,7 @@ namespace quda {
   };
 
 /**
- * @brief [brief description]
- * @details [long description]
- * 
- * @param mat [description]
- * @param matSloppy [description]
- * @param param [description]
- * @param profile [description]
- * @return [description]
+ * @brief Multi-Shift Conjugate Gradient Solver.
  */
   class MultiShiftCG : public MultiShiftSolver {
 
@@ -976,7 +969,7 @@ namespace quda {
      basis is stored to conserve memory.
 
      If Eigen support is enabled then Eigen's SVD algorithm is used
-     for solving the linear system, else Gaussian eliminiation with
+     for solving the linear system, else Gaussian elimination with
      partial pivots is used.
   */
   class MinResExt {
@@ -1021,7 +1014,7 @@ namespace quda {
        @param x The optimum for the solution vector.
        @param b The source vector in the equation to be solved. This is not preserved.
        @param p The basis vectors in which we are building the guess
-       @param q The basis vectors multipled by A
+       @param q The basis vectors multiplied by A
     */
     void operator()(ColorSpinorField &x, ColorSpinorField &b,
 		    std::vector<ColorSpinorField*> p,
