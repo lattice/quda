@@ -206,7 +206,7 @@ new_cudaColorSpinorField(QudaGaugeParam& gp, QudaInvertParam& ip,
     printfQuda("new_cudaColorSpinorField: Will preserve the Gamma Basis!\n");
   }
   else{
-    printfQuda("new_cudaColorSpinorField: Will preserve the Gamma Basis!\n");
+    printfQuda("new_cudaColorSpinorField: Will not preserve the Gamma Basis!\n");
   }
 
   cudaColorSpinorField *cuda_x = NULL;
