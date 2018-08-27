@@ -112,12 +112,9 @@ namespace quda {
     
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-    int tid  = x_cb + pty * arg->volumeCB;
-    int lV   = arg->volume;
 
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
-    if(tid >= lV) return;
 
     Vector outShf[QUDA_PROP_NVEC];
 
@@ -153,7 +150,7 @@ namespace quda {
 	for(int i=0;i<QUDA_PROP_NVEC;i++){
 	  const Vector pIn = arg->prop1[i].Ghost(dir, 1, ghostIdx, nbrPty);
 	  outShf[i] = pIn;   //-- y(x) <- y(x+\mu)
-	}
+	}//- QUDA_PROP_NVEC
       }
       else{
 	for(int i=0;i<QUDA_PROP_NVEC;i++){
@@ -193,12 +190,10 @@ namespace quda {
     
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-    int tid  = x_cb + pty * arg->volumeCB;
-    int lV   = arg->volume;
 
+    pty = (arg->nParity == 2) ? pty : arg->parity;
     if (x_cb >= arg->volumeCB) return;
     if (pty >= arg->nParity) return;
-    if(tid >= lV) return;
 
     Vector outShf[QUDA_PROP_NVEC];
 
@@ -207,7 +202,7 @@ namespace quda {
     for(int i=0;i<QUDA_PROP_NVEC;i++)
       auxArg->auxProp1[i](x_cb, pty) = outShf[i];
 
-  }//- CovShiftDevicePropPM1_kernel
+  }//- NonCovShiftPropOnAxis_kernel
   //------------------------------------------------------------------------------------------
 
 
