@@ -1047,8 +1047,7 @@ namespace quda {
   }
   //------------------------------------------------------------------------------------------
 
-  __global__ void qtmd_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
-					 QluaContractArg *arg, QluaAuxCntrArg *auxArg){
+  __global__ void qtmd_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
@@ -1065,7 +1064,7 @@ namespace quda {
     Vector vec1[QUDA_PROP_NVEC];
     Vector vec2[QUDA_PROP_NVEC];
     for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec1[i] = auxArg->auxProp1[i](x_cb, pty); //- This is the shifted propagator
+      vec1[i] = arg->prop3[i](x_cb, pty); //- prop3 is the SHIFTED propagator
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
     prepareDevicePropSite(dev_prop1, vec1, arg->preserveBasis);

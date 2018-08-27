@@ -125,6 +125,10 @@ namespace quda {
       }
       
       if((cntrType == what_qpdf_g_F_B) || (cntrType == what_tmd_g_F_B)){
+        if(propIn3 == NULL) errorQuda("QluaContractArg: Input propagator-3 is not allocated!\n");
+        for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
+          prop3[ivec].init(*propIn3[ivec]);
+
 	if(Uin == NULL) errorQuda("QluaContractArg: Gauge Field is not allocated!\n");
 	U.init(*Uin);
       }
@@ -134,23 +138,6 @@ namespace quda {
   };//-- Structure definition
   //---------------------------------------------------------------------------
 
-
-  struct QluaAuxCntrArg {
-    
-    Propagator auxProp1[QUDA_PROP_NVEC]; // Propagator
-    
-    const qluaCntr_Type cntrType;     // contraction type
-    
-  QluaAuxCntrArg(ColorSpinorField **propIn1, qluaCntr_Type cntrType) : cntrType(cntrType)
-    {
-      if(cntrType != what_tmd_g_F_B) warningQuda("Ambiguous call to QluaAuxCntrArg. Check your code!\n");
-      if(propIn1 == NULL) errorQuda("QluaAuxCntrArg: Input propagator-1 is not allocated!\n");
-      
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) auxProp1[ivec].init(*propIn1[ivec]);
-    }
-    
-  };//-- Structure definition
-  //---------------------------------------------------------------------------
 
   static const char *qcTMD_ShiftStringArray[20] = {
     "x", "X", "y", "Y", "z", "Z", "t", "T", "q", "Q",

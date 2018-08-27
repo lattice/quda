@@ -107,7 +107,7 @@ namespace quda {
   }//- CovShiftDevicePropPM1
   //------------------------------------------------------------------------------------------
 
-  __global__ void CovShiftPropPM1_kernel(QluaContractArg *arg, QluaAuxCntrArg *auxArg,
+  __global__ void CovShiftPropPM1_kernel(QluaContractArg *arg,
 					 int shfDir, qcCovShiftType shiftType){
     
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
@@ -120,8 +120,9 @@ namespace quda {
 
     CovShiftPropPM1_dev(arg, outShf, arg->prop1, x_cb, pty, shfDir, shiftType);
 
+    //- Assign the shifted propagator to the third propagator in the arguments structure
     for(int i=0;i<QUDA_PROP_NVEC;i++)
-      auxArg->auxProp1[i](x_cb, pty) = outShf[i];
+      arg->prop3[i](x_cb, pty) = outShf[i];
 
   }//- CovShiftPropPM1_dev
   //------------------------------------------------------------------------------------------
@@ -185,7 +186,7 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
 
-  __global__ void NonCovShiftPropOnAxis_kernel(QluaContractArg *arg, QluaAuxCntrArg *auxArg,
+  __global__ void NonCovShiftPropOnAxis_kernel(QluaContractArg *arg,
 					       qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
     
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
@@ -199,8 +200,9 @@ namespace quda {
 
     NonCovShiftPropOnAxis_dev(arg, outShf, x_cb, pty, shfDir, shfSgn);
 
+    //- Assign the shifted propagator to the third propagator in the arguments structure
     for(int i=0;i<QUDA_PROP_NVEC;i++)
-      auxArg->auxProp1[i](x_cb, pty) = outShf[i];
+      arg->prop3[i](x_cb, pty) = outShf[i];
 
   }//- NonCovShiftPropOnAxis_kernel
   //------------------------------------------------------------------------------------------

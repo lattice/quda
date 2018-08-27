@@ -14,7 +14,7 @@ namespace quda {
 				      int x_cb, int pty,
 				      int dir, qcCovShiftType shiftType);
 
-  __global__ void CovShiftPropPM1_kernel(QluaContractArg *arg, QluaAuxCntrArg *auxArg,
+  __global__ void CovShiftPropPM1_kernel(QluaContractArg *arg,
 					 int shfDir, qcCovShiftType shiftType);
 
 
@@ -23,7 +23,7 @@ namespace quda {
 						   int x_cb, int pty,
 						   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
 
-  __global__ void NonCovShiftPropOnAxis_kernel(QluaContractArg *arg, QluaAuxCntrArg *auxArg,
+  __global__ void NonCovShiftPropOnAxis_kernel(QluaContractArg *arg,
 					       qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
 
 } //- namespace quda
