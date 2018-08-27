@@ -145,11 +145,23 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   gaugeParam->anisotropy = 1.0;
 
-  // Fix me: must always be set to 1.0 for reasons not yet discerned. 
-  // The tadpole coefficient gets encoded directly into the fat link
-  // construct coefficents.
+  // For asqtad:
+  //gaugeParam->tadpole_coeff = tadpole_coeff;
+  //gaugeParam->scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
+
+  // For HISQ, this must always be set to 1.0, since the tadpole
+  // correction is baked into the coefficients for the first fattening.
+  // The tadpole doesn't mean anything for the second fattening
+  // since the input fields are unitarized.
   gaugeParam->tadpole_coeff = 1.0;
-  gaugeParam->scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam->scale = -1.0/24.0;
+    if (eps_naik != 0) {
+      gaugeParam->scale *= (1.0+eps_naik);
+    }
+  } else {
+    gaugeParam->scale = 1.0;
+  }
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam->staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;

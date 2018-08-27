@@ -249,11 +249,23 @@ void init(int precision, QudaReconstructType link_recon) {
 
   gaugeParam.anisotropy = 1.0;
 
-  // Fix me: must always be set to 1.0 for reasons not yet discerned. 
-  // The tadpole coefficient gets encoded directly into the fat link
-  // construct coefficents.
+  // For asqtad:
+  //gaugeParam.tadpole_coeff = tadpole_coeff;
+  //gaugeParam.scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
+
+  // For HISQ, this must always be set to 1.0, since the tadpole
+  // correction is baked into the coefficients for the first fattening.
+  // The tadpole doesn't mean anything for the second fattening
+  // since the input fields are unitarized.
   gaugeParam.tadpole_coeff = 1.0;
-  gaugeParam.scale = (dslash_type == QUDA_ASQTAD_DSLASH) ? -1.0/(24.0*gaugeParam.tadpole_coeff*gaugeParam.tadpole_coeff) : 1.0;
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam.scale = -1.0/24.0;
+    if (eps_naik != 0) {
+      gaugeParam.scale *= (1.0+eps_naik);
+    }
+  } else {
+    gaugeParam.scale = 1.0;
+  }
   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
@@ -535,13 +547,7 @@ void init(int precision, QudaReconstructType link_recon) {
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
 
-    if (eps_naik != 0.0)
-    {
-      // The epsilon correction takes the naik field from U(3) -> (1+epsilon)U(3)
-      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    } else { // we're guaranteed to be in U(3)
-      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
-    }
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
     // printfQuda("Long links sending..."); 
     loadGaugeQuda(milc_longlink_gpu, &gaugeParam);
     // printfQuda("Long links sent...\n");
