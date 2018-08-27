@@ -131,6 +131,7 @@ typedef struct {
   APESmearParam apeParam;
   cntrQQParam cQQParam;
   momProjParam mpParam;
+  int preserveBasis;
 } qudaAPI_Param;
 
 typedef struct{
