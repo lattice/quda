@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <limits>
+#include <memory>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -192,10 +193,11 @@ namespace quda {
        prec_tol[i] = std::max(fine_tol,sqrt(param.tol_offset[i]*sloppy_tol));
     }
 
-    auto *zeta = new double[num_offset];
-    auto *zeta_old = new double[num_offset];
-    auto *alpha = new double[num_offset];
-    auto *beta = new double[num_offset];
+    // when we use C++14 this should be written using make_unique
+    auto zeta = std::unique_ptr<double[]>(new double[num_offset]);
+    auto zeta_old = std::unique_ptr<double[]>(new double[num_offset]);
+    auto alpha = std::unique_ptr<double[]>(new double[num_offset]);
+    auto beta = std::unique_ptr<double[]>(new double[num_offset]);
   
     int j_low = 0;   
     int num_offset_now = num_offset;
@@ -211,7 +213,7 @@ namespace quda {
       if (param.tol_offset[j] < param.delta) reliable = true;
 
 
-    auto *r = new cudaColorSpinorField(b);
+    auto r = std::make_shared<cudaColorSpinorField>(b);
     std::vector<ColorSpinorField*> x_sloppy;
     x_sloppy.resize(num_offset);
     std::vector<ColorSpinorField*> y;
@@ -226,12 +228,12 @@ namespace quda {
 
     csParam.setPrecision(param.precision_sloppy);
   
-    cudaColorSpinorField *r_sloppy;
+    std::shared_ptr<cudaColorSpinorField> r_sloppy;
     if (param.precision_sloppy == x[0]->Precision()) {
       r_sloppy = r;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = new cudaColorSpinorField(*r, csParam);
+      r_sloppy = std::make_shared<cudaColorSpinorField>(*r, csParam);
     }
   
     if (param.precision_sloppy == x[0]->Precision() ||
@@ -250,7 +252,7 @@ namespace quda {
     for (int i=0; i<num_offset; i++) p[i] = new cudaColorSpinorField(*r_sloppy);    
   
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    auto* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
+    auto Ap = std::unique_ptr<cudaColorSpinorField>(new cudaColorSpinorField(*r_sloppy, csParam));
   
     cudaColorSpinorField tmp1(*Ap, csParam);
 
@@ -315,7 +317,7 @@ namespace quda {
     bool aux_update = false;
 
     // now create the worker class for updating the shifted solutions and gradient vectors
-    ShiftUpdate shift_update(r_sloppy, p, x_sloppy, alpha, beta, zeta, zeta_old, j_low, num_offset_now);
+    ShiftUpdate shift_update(r_sloppy.get(), p, x_sloppy, alpha.get(), beta.get(), zeta.get(), zeta_old.get(), j_low, num_offset_now);
     
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -340,7 +342,7 @@ namespace quda {
 
       // compute zeta and alpha
       for (int j=1; j<num_offset_now; j++) r2_old_array[j] = zeta[j] * zeta[j] * r2[0];
-      updateAlphaZeta(alpha, zeta, zeta_old, r2, beta, pAp, offset, num_offset_now, j_low);
+      updateAlphaZeta(alpha.get(), zeta.get(), zeta_old.get(), r2, beta.get(), pAp, offset, num_offset_now, j_low);
 	
       r2_old = r2[0];
       r2_old_array[0] = r2_old;
@@ -554,20 +556,20 @@ namespace quda {
     if (&tmp3 != &tmp1) delete tmp3_p;
     if (&tmp2 != &tmp1) delete tmp2_p;
 
-    if (r_sloppy->Precision() != r->Precision()) delete r_sloppy;
+    // if (r_sloppy->Precision() != r->Precision()) delete r_sloppy;
     for (int i=0; i<num_offset; i++) 
        if (x_sloppy[i]->Precision() != x[i]->Precision()) delete x_sloppy[i];
   
-    delete r;
+    // delete r;
 
     if (reliable) for (int i=0; i<num_offset; i++) delete y[i];
 
-    delete Ap;
+    // delete Ap;
   
-    delete []zeta_old;
-    delete []zeta;
-    delete []alpha;
-    delete []beta;
+    // delete []zeta_old;
+    // delete []zeta;
+    // delete []alpha;
+    // delete []beta;
 
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
