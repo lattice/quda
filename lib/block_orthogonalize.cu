@@ -13,7 +13,6 @@
 
 #include <color_spinor_field_order.h>
 
-#include <integer_sequence.hpp> // C++11 version of this C++14 feature
 
 namespace quda {
 
