@@ -173,8 +173,8 @@ namespace quda {
 
 
   static const char *qcTMD_ShiftStringArray[20] = {
-    "x", "X", "y", "Y", "z", "Z", "t", "T", "q", "Q",
-    "r", "R", "s", "S", "u", "U", "v", "V", "w", "W"};
+    "X", "x", "Y", "y", "Z", "z", "T", "t", "Q", "q",
+    "R", "r", "S", "s", "U", "u", "V", "v", "W", "w"};
 
   static const char *qcTMD_ShiftDirArray[4] = {"x", "y", "z", "t"};
   static const char *qcTMD_ShiftSgnArray[2] = {"-", "+"};
@@ -189,26 +189,26 @@ namespace quda {
 
   typedef enum qcTMD_ShiftString_s {
     qcShfStr_None = -1,
-    qcShfStr_x = 0,  // +x
-    qcShfStr_X = 1,  // -x
-    qcShfStr_y = 2,  // +y
-    qcShfStr_Y = 3,  // -y
-    qcShfStr_z = 4,  // +z
-    qcShfStr_Z = 5,  // -z
-    qcShfStr_t = 6,  // +t
-    qcShfStr_T = 7,  // -t
-    qcShfStr_q = 8,  // +x+y
-    qcShfStr_Q = 9,  // -x-y
-    qcShfStr_r = 10, // -x+y
-    qcShfStr_R = 11, // +x-y
-    qcShfStr_s = 12, // +y+z
-    qcShfStr_S = 13, // -y-z
-    qcShfStr_u = 14, // -y+z
-    qcShfStr_U = 15, // +y-z
-    qcShfStr_v = 16, // +x+z
-    qcShfStr_V = 17, // -x-z
-    qcShfStr_w = 18, // +x-z
-    qcShfStr_W = 19  // -x+z
+    qcShfStr_X = 0,  // +x
+    qcShfStr_x = 1,  // -x
+    qcShfStr_Y = 2,  // +y
+    qcShfStr_y = 3,  // -y
+    qcShfStr_Z = 4,  // +z
+    qcShfStr_z = 5,  // -z
+    qcShfStr_T = 6,  // +t
+    qcShfStr_t = 7,  // -t
+    qcShfStr_Q = 8,  // +x+y
+    qcShfStr_q = 9,  // -x-y
+    qcShfStr_R = 10, // -x+y
+    qcShfStr_r = 11, // +x-y
+    qcShfStr_S = 12, // +y+z
+    qcShfStr_s = 13, // -y-z
+    qcShfStr_U = 14, // -y+z
+    qcShfStr_u = 15, // +y-z
+    qcShfStr_V = 16, // +x+z
+    qcShfStr_v = 17, // -x-z
+    qcShfStr_W = 18, // +x-z
+    qcShfStr_w = 19  // -x+z
   } qcTMD_ShiftString;
 
 

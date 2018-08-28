@@ -145,16 +145,16 @@ namespace quda {
 
     qcTMD_ShiftSgn shfSgn = qcShfSgnNone;
     switch(shfFlag){
-    case qcShfStr_x:
-    case qcShfStr_y:
-    case qcShfStr_z:
-    case qcShfStr_t: {
-      shfSgn = qcShfSgnPlus;
-    } break;
     case qcShfStr_X:
     case qcShfStr_Y:
     case qcShfStr_Z:
     case qcShfStr_T: {
+      shfSgn = qcShfSgnPlus;
+    } break;
+    case qcShfStr_x:
+    case qcShfStr_y:
+    case qcShfStr_z:
+    case qcShfStr_t: {
       shfSgn = qcShfSgnMinus;
     } break;
     default: errorQuda("TMDparseShiftSign: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<20) ? qcTMD_ShiftStringArray[(int)shfFlag] : "None");

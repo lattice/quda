@@ -844,14 +844,6 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
  
   setVerbosity(paramAPI.verbosity);
   
-  //-- Initialize the quda-gauge and invert parameters
-  QudaGaugeParam gp;
-  int tBoundaryGauge = -1;
-  init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
-
-  QudaInvertParam ip;
-  init_QudaInvertParam_generic(ip, gp, paramAPI);
-
   //-- Define useful topology quantities
   int nDim = qS->rank;
   int momDim = nDim - 1;
