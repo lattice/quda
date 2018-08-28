@@ -68,18 +68,24 @@ namespace{
     }
   };
 
+#endif // GPU_UNITARIZE
+
   void setUnitarizeLinksConstants(double unitarize_eps_, double max_error_,
 				  bool reunit_allow_svd_, bool reunit_svd_only_,
 				  double svd_rel_error_, double svd_abs_error_) {
+#ifdef GPU_UNITARIZE
     unitarize_eps = unitarize_eps_;
     max_error = max_error_;
     reunit_allow_svd = reunit_allow_svd_;
     reunit_svd_only = reunit_svd_only_;
     svd_rel_error = svd_rel_error_;
     svd_abs_error = svd_abs_error_;
+#else
+    errorQuda("Unitarization has not been built");
+#endif
   }
 
-
+#ifdef GPU_UNITARIZE
   template<class Cmplx>
   __device__ __host__
   bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
@@ -289,8 +295,11 @@ namespace{
     return true;
   }   
 
+#endif // GPU_UNITARIZE
+
   void unitarizeLinksCPU(cpuGaugeField &outfield, const cpuGaugeField& infield)
   {
+#ifdef GPU_UNITARIZE
     if (infield.Precision() != outfield.Precision())
       errorQuda("Precisions must match (out=%d != in=%d)", outfield.Precision(), infield.Precision());
     
@@ -311,11 +320,16 @@ namespace{
       } // dir
     }  // loop over volume
     return;
+#else
+    errorQuda("Unitarization has not been built");
+#endif
   }
+
     
   // CPU function which checks that the gauge field is unitary
   bool isUnitary(const cpuGaugeField& field, double max_error)
   {
+#ifdef GPU_UNITARIZE
     Matrix<complex<double>,3> link, identity;
       
     for(int i=0; i<field.Volume(); ++i){
@@ -338,8 +352,14 @@ namespace{
       } // dir
     } // i	  
     return true;
+#else
+    errorQuda("Unitarization has not been built");
+    return false;
+#endif
   } // is unitary
 
+
+#ifdef GPU_UNITARIZE
 
   template<typename Float, typename Out, typename In>
   __global__ void DoUnitarizedLink(UnitarizeLinksArg<Out,In> arg){
@@ -490,7 +510,7 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
   }
 }
   
-#endif
+#endif // GPU_UNITARIZE
   
   void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fails) {
 #ifdef GPU_UNITARIZE

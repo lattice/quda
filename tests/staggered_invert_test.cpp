@@ -1,20 +1,25 @@
-#include <stdlib.h>
+#include <iostream>
 #include <stdio.h>
-#include <time.h>
-#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
+#include <quda.h>
+#include <quda_internal.h>
+#include <dirac_quda.h>
+#include <dslash_quda.h>
+#include <invert_quda.h>
+#include <util_quda.h>
+#include <blas_quda.h>
+
+#include <misc.h>
 #include <test_util.h>
 #include <dslash_util.h>
-#include <blas_reference.h>
 #include <staggered_dslash_reference.h>
-#include "llfat_reference.h"
-#include <quda.h>
-#include <string.h>
-#include "misc.h"
-#include <dslash_quda.h>
+#include <llfat_reference.h>
 #include <gauge_field.h>
-#include <blas_quda.h>
 #include <unitarization_links.h>
+#include <blas_reference.h>
+
 
 #if defined(QMP_COMMS)
 #include <qmp.h>
