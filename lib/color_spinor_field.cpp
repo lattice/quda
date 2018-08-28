@@ -755,7 +755,7 @@ namespace quda {
 
   ColorSpinorField* ColorSpinorField::Create(const ColorSpinorParam &param) {
 
-    ColorSpinorField *field = NULL;
+    ColorSpinorField *field = nullptr;
     if (param.location == QUDA_CPU_FIELD_LOCATION) {
       field = new cpuColorSpinorField(param);
     } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
@@ -769,7 +769,7 @@ namespace quda {
 
   ColorSpinorField* ColorSpinorField::Create(const ColorSpinorField &src, const ColorSpinorParam &param) {
 
-    ColorSpinorField *field = NULL;
+    ColorSpinorField *field = nullptr;
     if (param.location == QUDA_CPU_FIELD_LOCATION) {
       field = new cpuColorSpinorField(src, param);
     } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {

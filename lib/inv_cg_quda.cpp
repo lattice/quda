@@ -197,7 +197,7 @@ namespace quda {
 
   }
 
-  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField* p_init, double r2_old_init) {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (checkPrecision(x, b) != param.precision)
@@ -302,6 +302,7 @@ namespace quda {
     double pnorm = 0;
     double ppnorm = 0;
     double Anorm = 0;
+    double beta = 0.0;
     
     // for alternative reliable updates
     if(alternative_reliable){
@@ -324,16 +325,25 @@ namespace quda {
     }
     blas::zero(x);
     if (&x != &xSloppy) blas::zero(xSloppy);
-
     blas::copy(rSloppy,r);
+
     if (Np != (int)p.size()) {
       for (auto &pi : p) delete pi;
       p.resize(Np);
       ColorSpinorParam csParam(rSloppy);
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      for (auto &pi : p) pi = ColorSpinorField::Create(rSloppy, csParam);
+        for (auto &pi : p) pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);      
     } else {
-      for (auto &pi : p) *pi = rSloppy;
+        for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
+    }
+
+    double r2_old=0.0;
+    if(r2_old_init != 0.0 and p_init){
+      r2_old = r2_old_init;
+      Complex rp = blas::cDotProduct(rSloppy, *p[0]) / (r2);
+      blas::caxpy(-rp, rSloppy, *p[0]);
+      beta = r2 / r2_old;
+      blas::xpayz(rSloppy, beta, *p[0], *p[0]); 
     }
 
     const bool use_heavy_quark_res =
@@ -342,8 +352,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-
-    double r2_old;
 
     double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
@@ -357,7 +365,6 @@ namespace quda {
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
     double alpha[Np];
-    double beta = 0.0;
     double pAp;
     int rUpdate = 0;
 

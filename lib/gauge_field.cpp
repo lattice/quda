@@ -320,7 +320,7 @@ namespace quda {
     return nrm1;
   }
 
-  // Return the L2 norm squared of the gauge field
+  // Scale the gauge field by the constant a
   void ax(const double &a, GaugeField &u) {
     ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(u));
     blas::ax(a, *b);
@@ -331,6 +331,18 @@ namespace quda {
     return Checksum(*this, mini);
   }
 
+  GaugeField* GaugeField::Create(const GaugeFieldParam &param) {
 
+    GaugeField *field = nullptr;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = new cpuGaugeField(param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = new cudaGaugeField(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
 
 } // namespace quda

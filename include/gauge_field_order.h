@@ -562,23 +562,55 @@ namespace quda {
 #endif
       }
 
-      __host__ double device_norm2() const {
+      __host__ double device_norm2(int dim=-1) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
 	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	return thrust::transform_reduce(thrust::cuda::par(alloc),
-					ptr+0*volumeCB*geometry*nColor*nColor,
-					ptr+2*volumeCB*geometry*nColor*nColor,
-					square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	double even = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+(0*geometry+lower)*volumeCB*nColor*nColor,
+					       ptr+(0*geometry+upper)*volumeCB*nColor*nColor,
+					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	double odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+(1*geometry+lower)*volumeCB*nColor*nColor,
+                                               ptr+(1*geometry+upper)*volumeCB*nColor*nColor,
+					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	return even + odd;
       }
 
       __host__ double device_absmax(int dim=0) const {
-	errorQuda("Not implemented");
-	return 0.0;
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
+	thrust_allocator alloc;
+	thrust::device_ptr<complex<storeFloat> > ptr(u);
+	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
+                                              ptr+(0*geometry+lower)*volumeCB*nColor*nColor,
+                                              ptr+(0*geometry+upper)*volumeCB*nColor*nColor,
+                                              abs_<Float,storeFloat>(scale_inv), 0.0, thrust::maximum<Float>());
+	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+                                              ptr+(1*geometry+lower)*volumeCB*nColor*nColor,
+                                              ptr+(1*geometry+upper)*volumeCB*nColor*nColor,
+                                              abs_<Float,storeFloat>(scale_inv), 0.0, thrust::maximum<Float>());
+	return even + odd;
       }
 
       __host__ double device_absmin(int dim=0) const {
-	errorQuda("Not implemented");
-	return 0.0;
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
+	thrust_allocator alloc;
+	thrust::device_ptr<complex<storeFloat> > ptr(u);
+	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
+                                              ptr+(0*geometry+lower)*volumeCB*nColor*nColor,
+                                              ptr+(0*geometry+upper)*volumeCB*nColor*nColor,
+                                              abs_<Float,storeFloat>(scale_inv), 0.0, thrust::minimum<Float>());
+	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+                                              ptr+(1*geometry+lower)*volumeCB*nColor*nColor,
+                                              ptr+(1*geometry+upper)*volumeCB*nColor*nColor,
+                                              abs_<Float,storeFloat>(scale_inv), 0.0, thrust::minimum<Float>());
+	return even + odd;
       }
     };
 
@@ -752,87 +784,53 @@ namespace quda {
 #endif
       }
 
-      __host__ double device_norm2() const {
+      __host__ double device_norm2(int dim=-1) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
 	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
 	double even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					       ptr+0*offset_cb, ptr+0*offset_cb+geometry*stride*nColor*nColor,
+					       ptr+0*offset_cb+lower*stride*nColor*nColor,
+					       ptr+0*offset_cb+upper*stride*nColor*nColor,
 					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	double odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					       ptr+1*offset_cb, ptr+1*offset_cb+geometry*stride*nColor*nColor,
+					       ptr+1*offset_cb+lower*stride*nColor*nColor,
+					       ptr+1*offset_cb+upper*stride*nColor*nColor,
 					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	return even + odd;
       }
 
-      __host__ double device_norm2(int dim) const {
+      __host__ Float device_absmax(int dim=-1) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-	thrust_allocator alloc;
-	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	double even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					       ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
-					       ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
-					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-	double odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					       ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
-					       ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
-					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-	return even + odd;
-      }
-
-      __host__ Float device_absmax() const {
-	thrust_allocator alloc;
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
+        thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
 	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+0*offset_cb+0*stride*nColor*nColor,
-					      ptr+0*offset_cb+geometry*stride*nColor*nColor,
+					      ptr+0*offset_cb+lower*stride*nColor*nColor,
+					      ptr+0*offset_cb+upper*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
 	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+1*offset_cb+0*stride*nColor*nColor,
-					      ptr+1*offset_cb+geometry*stride*nColor*nColor,
+					      ptr+1*offset_cb+lower*stride*nColor*nColor,
+					      ptr+1*offset_cb+upper*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
 	return std::max(even,odd);
       }
 
-      __host__ Float device_absmax(int dim) const {
+      __host__ Float device_absmin(int dim=-1) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
 	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
 	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
-					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
-	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
-					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
-	return std::max(even,odd);
-      }
-
-      __host__ Float device_absmin() const {
-	thrust_allocator alloc;
-	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+0*offset_cb+0*stride*nColor*nColor,
-					      ptr+0*offset_cb+geometry*stride*nColor*nColor,
+					      ptr+0*offset_cb+lower*stride*nColor*nColor,
+					      ptr+0*offset_cb+upper*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
 	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+1*offset_cb+0*stride*nColor*nColor,
-					      ptr+1*offset_cb+geometry*stride*nColor*nColor,
-					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
-	return std::min(even,odd);
-      }
-
-      __host__ Float device_absmin(int dim) const {
-	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-	thrust_allocator alloc;
-	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
-					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
-	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
+					      ptr+1*offset_cb+lower*stride*nColor*nColor,
+					      ptr+1*offset_cb+upper*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
 	return std::min(even,odd);
       }
@@ -924,7 +922,7 @@ namespace quda {
 	/** An internal reference to the actual field we are accessing */
 	const int volumeCB;
 	const int nDim;
-	const int geometry;
+	const int_fastdiv geometry;
 	const QudaFieldLocation location;
 	static constexpr int nColorCoarse = nColor / nSpinCoarse;
 
