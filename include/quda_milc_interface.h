@@ -40,7 +40,9 @@ extern "C" {
     int make_resident_solution; /** Make the solution resident and don't copy back */
     int use_resident_solution; /** Use the resident solution */
     QudaInverterType solver_type; /** Type of solver to use */
-    double tadpole; /** Tadpole improvement factor */
+    double tadpole; /** Tadpole improvement factor - set to 1.0 for
+                        HISQ fermions since the tadpole factor is
+                        baked into the links during their construction */
     double naik_epsilon; /** Naik epsilon parameter (HISQ fermions only).*/
   } QudaInvertArgs_t;
 
