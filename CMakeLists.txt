@@ -4,7 +4,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 # disable in source builds
 # this is only a temporary fix, but for now we need it as cmake will
 # otherwise overwrite the existing makefiles
@@ -547,7 +547,7 @@ endif()
 if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
   set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
   set(USING_CUDA_LANG_SUPPORT True)
-  set(CMAKE_CUDA_STANDARD 11)
+  set(CMAKE_CUDA_STANDARD 14)
   set(CMAKE_CUDA_STANDARD_REQUIRED True)
   mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
   set(QUDA_SHAREDLIB_INTERFACE "INTERFACE")
