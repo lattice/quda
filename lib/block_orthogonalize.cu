@@ -5,6 +5,7 @@
 #include <cub_helper.cuh>
 #include <uint_to_char.h>
 #include <typeinfo>
+#include <utility>
 #include <vector>
 #include <assert.h>
 
