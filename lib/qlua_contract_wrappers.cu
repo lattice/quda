@@ -189,7 +189,8 @@ namespace quda {
   void perform_NonCovShiftVectorOnAxis(QluaCntrTMDArg &TMDarg, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, int vCB, int nPty){
 
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) )
-      printfQuda("perform_NonCovShiftVectorOnAxis: Will perform an On-Axis non-covariant propagator shift in the %s%s direction\n", qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+      printfQuda("perform_NonCovShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis non-covariant propagator shift in the %s%s direction\n",
+		 ivec, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     else
       errorQuda("perform_NonCovShiftVectorOnAxis: Got invalid shfDir and/or shfSgn.\n");
 
@@ -254,7 +255,7 @@ namespace quda {
      * The shifted propagator is placed into cudaProp3.
      */
     if(mpParam.cntrType == what_tmd_g_F_B){      
-      qcTMD_ShiftString shfFlag = qcShfStr_y; //-- Hard coded!!!
+      qcTMD_ShiftString shfFlag = qcShfStr_Z; //-- Hard coded for now
       qcTMD_ShiftDir shfDir = TMDparseShiftDirection(shfFlag);
       qcTMD_ShiftSgn shfSgn = TMDparseShiftSign(shfFlag);     
 
@@ -306,12 +307,10 @@ namespace quda {
     case what_meson_F_hB: {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
-    case what_qpdf_g_F_B: {
-      qpdf_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
-    } break;
     case what_tmd_g_F_B: {
       qtmd_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
+    case what_qpdf_g_F_B:
     default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[mpParam.cntrType]);
     }//-- switch
     cudaDeviceSynchronize();

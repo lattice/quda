@@ -9,7 +9,8 @@
 namespace quda {
 
   /* This function performs Forward and Backward covariant shifts of propagators in any direction,
-   * with the derivative acting either on the right (on quarks) or on the left (on anti-quarks)
+   * with the derivative acting either on the right (on quarks) or on the left (on anti-quarks).
+   * One needs to properly have the ghosts loaded in the input propagator before calling this function.
    */
   __device__ void CovShiftPropPM1_dev(Vector *shfVec, QluaContractArg *arg, Propagator prop[],
 				      int dir, qcCovShiftType shiftType,
@@ -130,6 +131,7 @@ namespace quda {
 
   /* This function performs Forward and Backward non-covariant shifts of propagators in any direction.
    * It only supports shifting the forward propagator, hence it does not accept a propagator argument.
+   * One needs to properly have the ghosts loaded in the input propagator before calling this function.
    */
   __device__ void NonCovShiftPropOnAxis_dev(Vector *shfVec, QluaContractArg *arg, 
 					    qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn,
@@ -207,8 +209,11 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
 
-  //- This function performs Forward and Backward non-covariant shifts of vectors
-  //- within the forward propagator in any direction.
+  /* This function performs Forward and Backward non-covariant shifts of vectors
+   * within the forward propagator in any direction.
+   * One needs to properly have the ghosts loaded in the input propagator before calling this function.
+   * This is the main function that will be used in TMD contractions.
+   */
   __device__ void NonCovShiftVectorOnAxis_dev(Vector &shfVec, QluaCntrTMDArg *TMDarg, int ivec,
 					      qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn,
 					      int x_cb, int pty){

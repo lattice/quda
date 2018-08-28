@@ -1150,20 +1150,16 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
 
     for(int ivec=0;ivec<nVec;ivec++){
       cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop3[ivec * fieldLgh]) );
-      if(cudaProp3[ivec] == NULL)
-	errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
-
-      cudaDeviceSynchronize();    
+      if(cudaProp3[ivec] == NULL) errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
+      cudaDeviceSynchronize();
       checkCudaError();
     }//-ivec
   }
   else if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){ //-- Use the third propagator as output in the tmd case, initialize it to the first (forward) propagator
     for(int ivec=0;ivec<nVec;ivec++){
       cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop1[ivec * fieldLgh]) );
-      if(cudaProp3[ivec] == NULL)
-	errorQuda("%s: Cannot allocate propagator-3 for cntrType = %s. Exiting.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
-
-      cudaDeviceSynchronize();    
+      if(cudaProp3[ivec] == NULL) errorQuda("%s: Cannot allocate propagator-3 for cntrType = %s. Exiting.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
+      cudaDeviceSynchronize();
       checkCudaError();
     }//-ivec
   }
@@ -1173,13 +1169,11 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   
   //-- Load the gauge field, if applicable
   GaugeField *cuda_gf = NULL;
-  if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) ){
+  if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
     double t3 = MPI_Wtime();
     for(int mu=0;mu<qS->rank;mu++)
-      if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
-    
+      if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]); 
     cuda_gf = new_cudaGaugeField(gp, h_gauge);
-
     cudaDeviceSynchronize();    
     checkCudaError();
     double t4 = MPI_Wtime();
@@ -1188,7 +1182,8 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   /* --------------------------------------------------------------------------------------- */
 
   
-  //-- Create a utility structure (required in momentum projection as well)
+  //-- Create a utility structure (required in momentum projection as well).
+  //-- Passing paramAPI.mpParam.Ndata twice is NOT a bug!
   QluaUtilArg utilArg(cudaProp1, paramAPI.mpParam.Ndata, paramAPI.mpParam.Ndata, paramAPI.mpParam.tAxis, sizeof(complex<QUDA_REAL>));
 
   //-- Check Site order conventions
@@ -1239,7 +1234,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
     for(int ivec=0;ivec<nVec;ivec++)
       delete cudaProp3[ivec];
   }
-  if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) )
+  if(paramAPI.mpParam.cntrType == what_tmd_g_F_B)
     delete cuda_gf;  
 
   cudaFree(corrQuda_dev);
