@@ -679,12 +679,13 @@ static void setInvertParams(const int dim[4],
 
 
 static void setGaugeParams(const int dim[4],
-    QudaPrecision cpu_prec,
-    QudaPrecision cuda_prec,
-    QudaPrecision cuda_prec_sloppy,
-    QudaPrecision cuda_prec_precondition,
-    const double tadpole,
-    QudaGaugeParam *gaugeParam)
+                           QudaPrecision cpu_prec,
+                           QudaPrecision cuda_prec,
+                           QudaPrecision cuda_prec_sloppy,
+                           QudaPrecision cuda_prec_precondition,
+                           double tadpole,
+                           double naik_epsilon,
+                           QudaGaugeParam *gaugeParam)
 {
 
   for(int dir=0; dir<4; ++dir){
@@ -703,8 +704,7 @@ static void setGaugeParams(const int dim[4],
   gaugeParam->t_boundary = QUDA_PERIODIC_T; // anti-periodic boundary conditions are built into the gauge field
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->ga_pad = getFatLinkPadding(dim);
-  gaugeParam->scale = -1.0/(24.0*gaugeParam->tadpole_coeff*gaugeParam->tadpole_coeff);
-
+  gaugeParam->scale = -(1.0+naik_epsilon)/(24.0*gaugeParam->tadpole_coeff*gaugeParam->tadpole_coeff);
 
   // preconditioning...
   gaugeParam->cuda_prec_precondition = cuda_prec_precondition;
@@ -788,7 +788,6 @@ void qudaMultishiftInvert(int external_precision,
     const double target_fermilab_residual[],
     const void* const fatlink,
     const void* const longlink,
-    const double tadpole,
     void* source,
     void** solutionArray,
     double* const final_residual,
@@ -818,7 +817,8 @@ void qudaMultishiftInvert(int external_precision,
   QudaPrecision device_precision_precondition = device_precision_sloppy;
 
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
-  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
+  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
+                 inv_args.tadpole, inv_args.naik_epsilon, &gaugeParam);
 
   QudaInvertParam invertParam = newQudaInvertParam();
 
@@ -863,7 +863,6 @@ void qudaMultishiftInvert(int external_precision,
   } else {
     errorQuda("reconstruct request %s not supported", quda_reconstruct);
   }
-
 
   if(invalidate_quda_gauge || !create_quda_gauge ){
     const int fat_pad  = getFatLinkPadding(localDim);
@@ -919,7 +918,6 @@ void qudaInvert(int external_precision,
     double target_fermilab_residual,
     const void* const fatlink,
     const void* const longlink,
-    const double tadpole,
     void* source,
     void* solution,
     double* const final_residual,
@@ -948,7 +946,8 @@ void qudaInvert(int external_precision,
   QudaPrecision device_precision_precondition = device_precision_sloppy;
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   // a basic set routine for the gauge parameters
-  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
+  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
+                 inv_args.tadpole, inv_args.naik_epsilon, &gaugeParam);
   QudaInvertParam invertParam = newQudaInvertParam();
 
   invertParam.residual_type = static_cast<QudaResidualType_s>(0);
@@ -1032,7 +1031,6 @@ void qudaDslash(int external_precision,
 		QudaInvertArgs_t inv_args,
 		const void* const fatlink,
 		const void* const longlink,
-		const double tadpole,
 		void* src,
 		void* dst,
 		int* num_iters)
@@ -1048,7 +1046,8 @@ void qudaDslash(int external_precision,
 
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   // a basic set routine for the gauge parameters
-  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
+  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
+                 inv_args.tadpole, inv_args.naik_epsilon, &gaugeParam);
   QudaInvertParam invertParam = newQudaInvertParam();
 
   QudaParity local_parity = inv_args.evenodd;
@@ -1104,7 +1103,6 @@ void qudaInvertMsrc(int external_precision,
     double target_fermilab_residual,
     const void* const fatlink,
     const void* const longlink,
-    const double tadpole,
     void** sourceArray,
     void** solutionArray,
     double* const final_residual,
@@ -1135,7 +1133,8 @@ void qudaInvertMsrc(int external_precision,
   QudaPrecision device_precision_precondition = device_precision_sloppy;
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   // a basic set routine for the gauge parameters
-  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
+  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
+                 inv_args.tadpole, inv_args.naik_epsilon, &gaugeParam);
   QudaInvertParam invertParam = newQudaInvertParam();
 
   invertParam.residual_type = static_cast<QudaResidualType_s>(0);
@@ -1213,7 +1212,6 @@ void qudaEigCGInvert(int external_precision,
     double target_fermilab_residual,
     const void* const fatlink,
     const void* const longlink,
-    const double tadpole,
     void* source,//array of source vectors -> overwritten on exit
     void* solution,//temporary
     QudaEigArgs_t eig_args,
@@ -1245,7 +1243,8 @@ void qudaEigCGInvert(int external_precision,
   QudaPrecision device_precision_precondition = device_precision_sloppy;
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   // a basic set routine for the gauge parameters
-  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
+  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
+                 inv_args.tadpole, inv_args.naik_epsilon, &gaugeParam);
   QudaInvertParam invertParam = newQudaInvertParam();
 
   invertParam.residual_type = static_cast<QudaResidualType_s>(0);
@@ -1401,7 +1400,7 @@ void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, do
 
 
 void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs_t &inv_args,
-    int external_precision, int quda_precision) {
+                    int external_precision, int quda_precision) {
 
   const QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   const QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
