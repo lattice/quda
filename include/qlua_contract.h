@@ -138,6 +138,39 @@ namespace quda {
   };//-- Structure definition
   //---------------------------------------------------------------------------
 
+  //- Additional structure required for the TMD contractions
+  struct QluaCntrTMDArg {
+    
+    Propagator fwdVec; // A vector from the forward propagator (input)
+    Propagator shfVec; // A vector from the shifted propagator (output)
+    
+    const qluaCntr_Type cntrType;     // contraction type
+    const int parity;                 // hard code to 0 for now
+    const int nParity;                // number of parities we're working on
+    const int nFace;                  // hard code to 1 for now
+    const int dim[5];                 // full lattice dimensions
+    const int commDim[4];             // whether a given dimension is partitioned or not
+    const int lL[4];                  // 4-d local lattice dimensions
+    const int volumeCB;               // checkerboarded volume
+    const int volume;                 // full-site local volume
+    const bool preserveBasis;         // whether to preserve the gamma basis or not
+    
+    QluaCntrTMDArg(ColorSpinorField *vec1,
+		   ColorSpinorField *vec2,
+		   qluaCntr_Type cntrType, bool preserveBasis)
+      : cntrType(cntrType), parity(0), nParity(vec1->SiteSubset()), nFace(1),
+	dim{ (3-nParity) * vec1->X(0), vec1->X(1), vec1->X(2), vec1->X(3), 1 },
+      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+      lL{vec1->X(0), vec1->X(1), vec1->X(2), vec1->X(3)},
+      volumeCB(vec1->VolumeCB()), volume(vec1->Volume()), preserveBasis(preserveBasis)
+    {
+      fwdVec.init(*vec1);
+      shfVec.init(*vec2);
+    }
+
+  };//-- Structure definition
+  //---------------------------------------------------------------------------
+
 
   static const char *qcTMD_ShiftStringArray[20] = {
     "x", "X", "y", "Y", "z", "Z", "t", "T", "q", "Q",

@@ -9,22 +9,31 @@
 
 namespace quda {
 
-  __device__ void CovShiftPropPM1_dev(QluaContractArg *arg,
-				      Vector *outShf, Propagator prop[],
-				      int x_cb, int pty,
-				      int dir, qcCovShiftType shiftType);
+  __device__ void CovShiftPropPM1_dev(Vector *shfVec, QluaContractArg *arg, Propagator prop[],				      
+				      int dir, qcCovShiftType shiftType,
+				      int x_cb, int pty);
 
   __global__ void CovShiftPropPM1_kernel(QluaContractArg *arg,
 					 int shfDir, qcCovShiftType shiftType);
 
 
 
-  __device__ void NonCovShiftPropOnAxis_kernel_dev(QluaContractArg *arg, Vector *outShf,
-						   int x_cb, int pty,
-						   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
+  __device__ void NonCovShiftPropOnAxis_kernel_dev(Vector *shfVec, QluaContractArg *arg,
+						   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn,
+						   int x_cb, int pty);
 
   __global__ void NonCovShiftPropOnAxis_kernel(QluaContractArg *arg,
 					       qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
+
+
+
+  __device__ void NonCovShiftVectorOnAxis_dev(Vector &shfVec, QluaCntrTMDArg *TMDarg, int ivec,
+                                              qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn,
+                                              int x_cb, int pty);
+
+  __global__ void NonCovShiftVectorOnAxis_kernel(QluaCntrTMDArg *TMDarg, int ivec,
+                                                 qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
+
 
 } //- namespace quda
 

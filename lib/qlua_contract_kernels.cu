@@ -1064,7 +1064,7 @@ namespace quda {
     Vector vec1[QUDA_PROP_NVEC];
     Vector vec2[QUDA_PROP_NVEC];
     for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec1[i] = arg->prop3[i](x_cb, pty); //- prop3 is the SHIFTED propagator
+      vec1[i] = arg->prop3[i](x_cb, pty); //- prop3 is the SHIFTED propagator in QluaContractArg arg
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
     prepareDevicePropSite(dev_prop1, vec1, arg->preserveBasis);

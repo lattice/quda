@@ -110,50 +110,64 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
+  qcTMD_ShiftDir TMDparseShiftDirection(qcTMD_ShiftString shfFlag){
 
-  void perform_NonCovShiftPropOnAxis(qcTMD_ShiftString shfFlag, QluaContractArg *arg_dev, int vCB, int nPty){ // , QluaAuxCntrArg *auxArg_dev
+    printfQuda("TMDparseShiftDirection: Got shift flag shfFlag = %s\n", qcTMD_ShiftStringArray[(int)shfFlag]);
 
     qcTMD_ShiftDir shfDir = qcShfDirNone;
-    qcTMD_ShiftSgn shfSgn = qcShfSgnNone;
-
     switch(shfFlag){
-    case qcShfStr_x: {
-      shfDir = qcShfDir_x;
-      shfSgn = qcShfSgnPlus;
-    } break;
+    case qcShfStr_x:
     case qcShfStr_X: {
       shfDir = qcShfDir_x;
-      shfSgn = qcShfSgnMinus;
     } break;
-    case qcShfStr_y: {
-      shfDir = qcShfDir_y;
-      shfSgn = qcShfSgnPlus;
-    } break;
+    case qcShfStr_y:
     case qcShfStr_Y: {
       shfDir = qcShfDir_y;
-      shfSgn = qcShfSgnMinus;
     } break;
-    case qcShfStr_z: {
-      shfDir = qcShfDir_z;
-      shfSgn = qcShfSgnPlus;
-    } break;
+    case qcShfStr_z:
     case qcShfStr_Z: {
       shfDir = qcShfDir_z;
-      shfSgn = qcShfSgnMinus;
     } break;
-    case qcShfStr_t: {
-      shfDir = qcShfDir_t;
-      shfSgn = qcShfSgnPlus;
-    } break;
+    case qcShfStr_t:
     case qcShfStr_T: {
       shfDir = qcShfDir_t;
-      shfSgn = qcShfSgnMinus;
     } break;
-    default: errorQuda("performNonCovShiftProp_OnAxis: Got un-supported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<20) ? qcTMD_ShiftStringArray[(int)shfFlag] : "None");
+    default: errorQuda("TMDparseShiftDirection: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<20) ? qcTMD_ShiftStringArray[(int)shfFlag] : "None");
     }//-- switch    
 
-    printfQuda("perform_NonCovShiftPropOnAxis: Got shift flag shfFlag = %s\n", qcTMD_ShiftStringArray[(int)shfFlag]);
-    if( (shfSgn>=0 && shfSgn<2) && (shfDir>=0 && shfDir<4) ){
+    return shfDir;
+  }
+  //---------------------------------------------------------------------------
+
+  qcTMD_ShiftSgn TMDparseShiftSign(qcTMD_ShiftString shfFlag){
+
+    printfQuda("TMDparseShiftSign: Got shift flag shfFlag = %s\n", qcTMD_ShiftStringArray[(int)shfFlag]);
+
+    qcTMD_ShiftSgn shfSgn = qcShfSgnNone;
+    switch(shfFlag){
+    case qcShfStr_x:
+    case qcShfStr_y:
+    case qcShfStr_z:
+    case qcShfStr_t: {
+      shfSgn = qcShfSgnPlus;
+    } break;
+    case qcShfStr_X:
+    case qcShfStr_Y:
+    case qcShfStr_Z:
+    case qcShfStr_T: {
+      shfSgn = qcShfSgnMinus;
+    } break;
+    default: errorQuda("TMDparseShiftSign: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<20) ? qcTMD_ShiftStringArray[(int)shfFlag] : "None");
+    }//-- switch    
+
+    return shfSgn;
+  }
+  //---------------------------------------------------------------------------
+
+
+  void perform_NonCovShiftPropOnAxis(QluaContractArg *arg_dev, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, int vCB, int nPty){ // , QluaAuxCntrArg *auxArg_dev
+
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) ){
       printfQuda("perform_NonCovShiftPropOnAxis: Will perform an On-Axis non-covariant propagator shift in the %s%s direction\n", qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     }
     else{
@@ -171,14 +185,48 @@ namespace quda {
   }//-- perform_NonCovShiftPropOnAxis
   //---------------------------------------------------------------------------
 
+
+  void perform_NonCovShiftVectorOnAxis(QluaCntrTMDArg &TMDarg, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, int vCB, int nPty){
+
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) )
+      printfQuda("perform_NonCovShiftVectorOnAxis: Will perform an On-Axis non-covariant propagator shift in the %s%s direction\n", qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    else
+      errorQuda("perform_NonCovShiftVectorOnAxis: Got invalid shfDir and/or shfSgn.\n");
+
+    //-- Call kernel that performs non-covariant on-axis vector shift
+    dim3 blockDim(THREADS_PER_BLOCK, nPty, 1);
+    dim3 gridDim((vCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    QluaCntrTMDArg *TMDarg_dev;
+    cudaMalloc((void**)&(TMDarg_dev), sizeof(QluaCntrTMDArg) );
+    checkCudaError();
+    cudaMemcpy(TMDarg_dev, &TMDarg, sizeof(QluaCntrTMDArg), cudaMemcpyHostToDevice);    
+    checkCudaError();
+    
+    NonCovShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDarg_dev, ivec, shfDir, shfSgn);
+    cudaDeviceSynchronize();
+    checkCudaError();
+
+    cudaFree(TMDarg_dev);
+  }//-- perform_NonCovShiftVectorOnAxis
+  //---------------------------------------------------------------------------
+
+
+  void qcExchangeGhostVec(ColorSpinorField **prop, int ivec){
+    const int nFace  = 1;
+    prop[ivec]->exchangeGhost((QudaParity)(1), nFace, 0); //- first argument is redundant when nParity = 2. nFace MUST be 1 for now.
+    cudaDeviceSynchronize();
+    checkCudaError();
+  }
+
   void qcExchangeGhostProp(ColorSpinorField **prop){
-    int nFace  = 1;
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      prop[i]->exchangeGhost((QudaParity)(1), nFace, 0); //- first argument is redundant when nParity = 2. nFace MUST be 1 for now.
-      cudaDeviceSynchronize();
-      checkCudaError();
+    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+      qcExchangeGhostVec(prop,ivec);
     }
   }
+  //---------------------------------------------------------------------------
+  
+
   
   //-Top-level function in GPU contractions
   void QuarkContract_GPU(complex<QUDA_REAL> *corrQuda_dev,
@@ -198,12 +246,26 @@ namespace quda {
 
     momProjParam mpParam = paramAPI.mpParam;
 
-    //-- Take care of the ghost exchange (only for forward prop)
-    if( (mpParam.cntrType == what_tmd_g_F_B) || (mpParam.cntrType == what_qpdf_g_F_B) ){
+    /* C.K: Perform exchange ghost and shifts in the TMD case
+     * Here we exchange ghosts vector by vector within the 
+     * forward propagator (cudaProp1).
+     * Then a shift takes place, again vector by vector,
+     * hence TMDarg accepts (and returns) elements of the cudaColorSpinorField propagators.
+     * The shifted propagator is placed into cudaProp3.
+     */
+    if(mpParam.cntrType == what_tmd_g_F_B){      
+      qcTMD_ShiftString shfFlag = qcShfStr_y; //-- Hard coded!!!
+      qcTMD_ShiftDir shfDir = TMDparseShiftDirection(shfFlag);
+      qcTMD_ShiftSgn shfSgn = TMDparseShiftSign(shfFlag);     
+
       double t7 = MPI_Wtime();
-      qcExchangeGhostProp(cudaProp1);
+      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+      	qcExchangeGhostVec(cudaProp1, ivec);
+	QluaCntrTMDArg TMDarg(cudaProp1[ivec], cudaProp3[ivec], mpParam.cntrType, paramAPI.preserveBasis);
+      	perform_NonCovShiftVectorOnAxis(TMDarg, ivec, shfDir, shfSgn, TMDarg.volumeCB, TMDarg.nParity);
+      }
       double t8 = MPI_Wtime();
-      printfQuda("TIMING - %s: Propagator ghost exchange done in %f sec.\n", func_name, t8-t7);
+      printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t8-t7);
     }
 
     //-- Define the arguments structure
@@ -213,14 +275,12 @@ namespace quda {
     cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
     checkCudaError();
     cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);    
-    cudaDeviceSynchronize();
     checkCudaError();
 
 
     //-- Call kernels that perform contractions
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-
 
     double t5 = MPI_Wtime();
     switch(mpParam.cntrType){
@@ -250,22 +310,6 @@ namespace quda {
       qpdf_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     case what_tmd_g_F_B: {
-
-      //-- Non-covariant on-axis shift of propagator, test case
-      //-- Use cudaProp3 as output propagator
-      qcTMD_ShiftString shfFlag;
-      shfFlag = qcShfStr_y;
-      double t9 = MPI_Wtime();
-      perform_NonCovShiftPropOnAxis(shfFlag, arg_dev, arg.volumeCB, arg.nParity);
-      double t10 = MPI_Wtime();
-      printfQuda("TIMING - %s: Propagator shift finished in %f sec.\n", func_name, t10-t9);
-      
-      for(int i=0;i<QUDA_PROP_NVEC;i++){
-	cudaProp1[i]->bufferIndex = (1 - cudaProp1[i]->bufferIndex);
-	cudaProp3[i]->bufferIndex = (1 - cudaProp1[i]->bufferIndex);
-      }
-
-      //-- Perform contractions
       qtmd_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
     default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[mpParam.cntrType]);
@@ -276,9 +320,9 @@ namespace quda {
     printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[mpParam.cntrType], t6-t5);
     
     //-- Clean-up
-    cudaFree(arg_dev);
     free(func_name);
-    
+    cudaFree(arg_dev);
+
   }//-- function
   
 } //-namespace quda
