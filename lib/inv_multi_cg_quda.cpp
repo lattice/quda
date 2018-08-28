@@ -1,6 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <limits>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -153,7 +154,7 @@ namespace quda {
     }  
   }
 
-  void MultiShiftCG::operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b)
+  void MultiShiftCG::operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b, std::vector<ColorSpinorField*> &p, double* r2_old_array )
   {
     if (checkLocation(*(x[0]), b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
@@ -179,12 +180,22 @@ namespace quda {
     }
     
     // this is the limit of precision possible
-    const double prec_tol = pow(10.,(-2*(int)b.Precision()+1));
 
-    double *zeta = new double[num_offset];
-    double *zeta_old = new double[num_offset];
-    double *alpha = new double[num_offset];
-    double *beta = new double[num_offset];
+    bool exit_early = false;
+    bool mixed = param.precision_sloppy == param.precision;
+    const double sloppy_tol= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() : pow(2.,-17));
+    const double fine_tol = pow(10.,(-2*(int)b.Precision()+1));
+    std::unique_ptr<double[]> prec_tol(new double[num_offset]);
+
+    prec_tol[0] = mixed ? sloppy_tol : fine_tol;
+    for (int i=1; i<num_offset; i++) {
+       prec_tol[i] = std::max(fine_tol,sqrt(param.tol_offset[i]*sloppy_tol));
+    }
+
+    auto *zeta = new double[num_offset];
+    auto *zeta_old = new double[num_offset];
+    auto *alpha = new double[num_offset];
+    auto *beta = new double[num_offset];
   
     int j_low = 0;   
     int num_offset_now = num_offset;
@@ -200,7 +211,7 @@ namespace quda {
       if (param.tol_offset[j] < param.delta) reliable = true;
 
 
-    cudaColorSpinorField *r = new cudaColorSpinorField(b);
+    auto *r = new cudaColorSpinorField(b);
     std::vector<ColorSpinorField*> x_sloppy;
     x_sloppy.resize(num_offset);
     std::vector<ColorSpinorField*> y;
@@ -235,12 +246,11 @@ namespace quda {
 	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
     }
   
-    std::vector<ColorSpinorField*> p;
     p.resize(num_offset);
     for (int i=0; i<num_offset; i++) p[i] = new cudaColorSpinorField(*r_sloppy);    
   
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
+    auto* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
   
     cudaColorSpinorField tmp1(*Ap, csParam);
 
@@ -313,11 +323,11 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) 
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     
-    while ( !convergence(r2, stop, num_offset_now) &&  k < param.maxiter) {
+    while ( !convergence(r2, stop, num_offset_now) &&  !exit_early && k < param.maxiter) {
 
       if (aux_update) dslash::aux_worker = &shift_update;
       matSloppy(*Ap, *p[0], tmp1, tmp2);
-      dslash::aux_worker = NULL;
+      dslash::aux_worker = nullptr;
       aux_update = false;
 
       // update number of shifts now instead of end of previous
@@ -329,9 +339,12 @@ namespace quda {
       else pAp = blas::reDotProduct(*p[0], *Ap);
 
       // compute zeta and alpha
+      for (int j=1; j<num_offset_now; j++) r2_old_array[j] = zeta[j] * zeta[j] * r2[0];
       updateAlphaZeta(alpha, zeta, zeta_old, r2, beta, pAp, offset, num_offset_now, j_low);
 	
       r2_old = r2[0];
+      r2_old_array[0] = r2_old;
+      
       Complex cg_norm = blas::axpyCGNorm(-alpha[j_low], *Ap, *r_sloppy);
       r2[0] = real(cg_norm);
       double zn = imag(cg_norm);
@@ -430,7 +443,7 @@ namespace quda {
         } else {
 	  r2[j] = zeta[j] * zeta[j] * r2[0];
 	  // only remove if shift above has converged
-	  if ((r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) && iter[j+1] ) {
+	  if ((r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol[j]) && iter[j+1] ) {
 	    converged++;
 	    iter[j] = k+1;
 	    if (getVerbosity() >= QUDA_VERBOSE)
@@ -440,9 +453,15 @@ namespace quda {
       }
       num_offset_now -= converged;
 
+      // exit early so that we can finish of shift 0 using CG and allowing for mixed precison refinement
+      if(num_offset_now==1){
+        exit_early=true;
+        num_offset_now--;
+      }
+
       // this ensure we do the update on any shifted systems that
       // happen to converge when the un-shifted system converges
-      if ( (convergence(r2, stop, num_offset_now) ||  k == param.maxiter) && aux_update == true) {
+      if ( (convergence(r2, stop, num_offset_now) || exit_early|| k == param.maxiter) && aux_update == true) {
 	if (getVerbosity() >= QUDA_VERBOSE) 
 	  printfQuda("Convergence of unshifted system so trigger shiftUpdate\n");
 	
@@ -486,6 +505,7 @@ namespace quda {
 	reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
 
       for(int i=0; i < num_offset; i++) {
+        if(param.precision == param.precision_sloppy || i ==0){
 	mat(*r, *x[i], *tmp4_p, *tmp5_p);
 	if (r->Nspin()==4) {
 	  blas::axpy(offset[i], *x[i], *r); // Offset it.
@@ -496,6 +516,10 @@ namespace quda {
 	param.true_res_offset[i] = sqrt(true_res/b2);
 	param.iter_res_offset[i] = sqrt(r2[i]/b2);
 	param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
+      } else
+      {
+        param.iter_res_offset[i] = sqrt(r2[i]/b2);
+      }
       }
 
       if (getVerbosity() >= QUDA_SUMMARIZE){
@@ -535,7 +559,6 @@ namespace quda {
        if (x_sloppy[i]->Precision() != x[i]->Precision()) delete x_sloppy[i];
   
     delete r;
-    for (int i=0; i<num_offset; i++) delete p[i];
 
     if (reliable) for (int i=0; i<num_offset; i++) delete y[i];
 
@@ -545,6 +568,7 @@ namespace quda {
     delete []zeta;
     delete []alpha;
     delete []beta;
+
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
 
