@@ -778,6 +778,37 @@ static size_t getColorVectorOffset(QudaParity local_parity, bool even_odd_exchan
   return offset;
 }
 
+static void getReconstruct(QudaReconstructType &reconstruct, QudaReconstructType &reconstruct_sloppy) {
+
+  {
+    char *reconstruct_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
+    if (!reconstruct_env || strcmp(reconstruct_env,"18")==0) {
+      reconstruct = QUDA_RECONSTRUCT_NO;
+    } else if (strcmp(reconstruct_env,"13")==0) {
+      reconstruct = QUDA_RECONSTRUCT_13;
+    } else if (strcmp(reconstruct_env,"9")==0) {
+      reconstruct = QUDA_RECONSTRUCT_9;
+    } else {
+      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT=%s not supported", reconstruct_env);
+    }
+  }
+
+  {
+    char *reconstruct_sloppy_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY");
+    if (!reconstruct_sloppy_env) { // if env is not set, default to using outer reconstruct type
+      reconstruct_sloppy = reconstruct;
+    } else if (strcmp(reconstruct_sloppy_env,"18")==0) {
+      reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    } else if (strcmp(reconstruct_sloppy_env,"13")==0) {
+      reconstruct_sloppy = QUDA_RECONSTRUCT_13;
+    } else if (strcmp(reconstruct_sloppy_env,"9")==0) {
+      reconstruct_sloppy = QUDA_RECONSTRUCT_9;
+    } else {
+      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY=%s not supported", reconstruct_sloppy_env);
+    }
+  }
+
+}
 
 void qudaMultishiftInvert(int external_precision,
     int quda_precision,
@@ -852,18 +883,6 @@ void qudaMultishiftInvert(int external_precision,
   }
 
   // set the solver
-  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
-  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
-  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_NO;
-  } else if (strcmp(quda_reconstruct,"13")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_13;
-  } else if (strcmp(quda_reconstruct,"9")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_9;
-  } else {
-    errorQuda("reconstruct request %s not supported", quda_reconstruct);
-  }
-
   if(invalidate_quda_gauge || !create_quda_gauge ){
     const int fat_pad  = getFatLinkPadding(localDim);
     gaugeParam.type = QUDA_GENERAL_LINKS;
@@ -875,7 +894,7 @@ void qudaMultishiftInvert(int external_precision,
       const int long_pad = 3*fat_pad;
       gaugeParam.type = QUDA_THREE_LINKS;
       gaugeParam.ga_pad = long_pad;
-      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
+      getReconstruct(gaugeParam.reconstruct, gaugeParam.reconstruct_sloppy);
       loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     }
     invalidate_quda_gauge = false;
@@ -976,19 +995,6 @@ void qudaInvert(int external_precision,
     invalidateGaugeQuda();
   }
 
-  // set the solver
-  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
-  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
-  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_NO;
-  } else if (strcmp(quda_reconstruct,"13")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_13;
-  } else if (strcmp(quda_reconstruct,"9")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_9;
-  } else {
-    errorQuda("reconstruct request %s not supported", quda_reconstruct);
-  }
-
   if(invalidate_quda_gauge || !create_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;
@@ -997,7 +1003,7 @@ void qudaInvert(int external_precision,
     if(longlink != nullptr) {
       gaugeParam.type = QUDA_THREE_LINKS;
       gaugeParam.ga_pad = long_pad;
-      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
+      getReconstruct(gaugeParam.reconstruct, gaugeParam.reconstruct_sloppy);
       loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     }
     invalidate_quda_gauge = false;
@@ -1066,19 +1072,6 @@ void qudaDslash(int external_precision,
     invalidateGaugeQuda();
   }
 
-  // set the solver
-  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
-  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
-  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_NO;
-  } else if (strcmp(quda_reconstruct,"13")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_13;
-  } else if (strcmp(quda_reconstruct,"9")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_9;
-  } else {
-    errorQuda("reconstruct request %s not supported", quda_reconstruct);
-  }
-
   if(invalidate_quda_gauge || !create_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;
@@ -1087,7 +1080,7 @@ void qudaDslash(int external_precision,
     if(longlink != nullptr) {
       gaugeParam.type = QUDA_THREE_LINKS;
       gaugeParam.ga_pad = long_pad;
-      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
+      getReconstruct(gaugeParam.reconstruct, gaugeParam.reconstruct_sloppy);
       loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     }
     invalidate_quda_gauge = false;
@@ -1182,19 +1175,6 @@ void qudaInvertMsrc(int external_precision,
     invalidateGaugeQuda();
   }
 
-  // set the solver
-  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
-  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
-  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_NO;
-  } else if (strcmp(quda_reconstruct,"13")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_13;
-  } else if (strcmp(quda_reconstruct,"9")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_9;
-  } else {
-    errorQuda("reconstruct request %s not supported", quda_reconstruct);
-  }
-
   if(invalidate_quda_gauge || !create_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;
@@ -1204,7 +1184,7 @@ void qudaInvertMsrc(int external_precision,
     if(longlink != nullptr) {
       gaugeParam.type = QUDA_THREE_LINKS;
       gaugeParam.ga_pad = long_pad;
-      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
+      getReconstruct(gaugeParam.reconstruct, gaugeParam.reconstruct_sloppy);
       loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     }
 
@@ -1327,19 +1307,6 @@ void qudaEigCGInvert(int external_precision,
     invalidateGaugeQuda();
   }
 
-  // set the solver
-  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
-  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
-  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_NO;
-  } else if (strcmp(quda_reconstruct,"13")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_13;
-  } else if (strcmp(quda_reconstruct,"9")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_9;
-  } else {
-    errorQuda("reconstruct request %s not supported", quda_reconstruct);
-  }
-
   if((invalidate_quda_gauge || !create_quda_gauge) && (rhs_idx == 0)){//do this for the first RHS
 
     const int fat_pad  = getFatLinkPadding(localDim);
@@ -1354,7 +1321,7 @@ void qudaEigCGInvert(int external_precision,
     if(longlink != nullptr) {
       gaugeParam.type = QUDA_THREE_LINKS;
       gaugeParam.ga_pad = long_pad;
-      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
+      getReconstruct(gaugeParam.reconstruct, gaugeParam.reconstruct_sloppy);
       loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     }
 
