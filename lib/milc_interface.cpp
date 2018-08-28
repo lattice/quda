@@ -989,7 +989,6 @@ void qudaInvert(int external_precision,
     errorQuda("reconstruct request %s not supported", quda_reconstruct);
   }
 
-
   if(invalidate_quda_gauge || !create_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;
@@ -1067,18 +1066,35 @@ void qudaDslash(int external_precision,
     invalidateGaugeQuda();
   }
 
+  // set the solver
+  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
+  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
+  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_NO;
+  } else if (strcmp(quda_reconstruct,"13")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_13;
+  } else if (strcmp(quda_reconstruct,"9")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_9;
+  } else {
+    errorQuda("reconstruct request %s not supported", quda_reconstruct);
+  }
+
   if(invalidate_quda_gauge || !create_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam);
-
-    gaugeParam.type = QUDA_THREE_LINKS;
-    gaugeParam.ga_pad = long_pad;
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
-
+    if(longlink != nullptr) {
+      gaugeParam.type = QUDA_THREE_LINKS;
+      gaugeParam.ga_pad = long_pad;
+      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
+      loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+    }
     invalidate_quda_gauge = false;
+  }
+
+  if(longlink == nullptr) {
+    invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
   }
 
   int src_offset = getColorVectorOffset(other_parity, false, gaugeParam.X);
@@ -1166,18 +1182,37 @@ void qudaInvertMsrc(int external_precision,
     invalidateGaugeQuda();
   }
 
+  // set the solver
+  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
+  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
+  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_NO;
+  } else if (strcmp(quda_reconstruct,"13")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_13;
+  } else if (strcmp(quda_reconstruct,"9")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_9;
+  } else {
+    errorQuda("reconstruct request %s not supported", quda_reconstruct);
+  }
+
   if(invalidate_quda_gauge || !create_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam);
 
-    gaugeParam.type = QUDA_THREE_LINKS;
-    gaugeParam.ga_pad = long_pad;
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+    if(longlink != nullptr) {
+      gaugeParam.type = QUDA_THREE_LINKS;
+      gaugeParam.ga_pad = long_pad;
+      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
+      loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+    }
 
     invalidate_quda_gauge = false;
+  }
+
+  if(longlink == nullptr) {
+    invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
   }
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X)*host_precision;
@@ -1188,9 +1223,9 @@ void qudaInvertMsrc(int external_precision,
   for(int i=0; i<num_src; ++i) src_pointer[i] = static_cast<char*>(sourceArray[i]) + quark_offset;
 
   invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
+
   free(sln_pointer);
   free(src_pointer);
-
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
@@ -1287,6 +1322,24 @@ void qudaEigCGInvert(int external_precision,
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
 
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (*num_iters == -1  || !canReuseResidentGauge(&invertParam) ) {
+    invalidateGaugeQuda();
+  }
+
+  // set the solver
+  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
+  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
+  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_NO;
+  } else if (strcmp(quda_reconstruct,"13")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_13;
+  } else if (strcmp(quda_reconstruct,"9")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_9;
+  } else {
+    errorQuda("reconstruct request %s not supported", quda_reconstruct);
+  }
+
   if((invalidate_quda_gauge || !create_quda_gauge) && (rhs_idx == 0)){//do this for the first RHS
 
     const int fat_pad  = getFatLinkPadding(localDim);
@@ -1298,12 +1351,18 @@ void qudaEigCGInvert(int external_precision,
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam);
 
-    gaugeParam.type = QUDA_THREE_LINKS;
-    gaugeParam.ga_pad = long_pad;
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+    if(longlink != nullptr) {
+      gaugeParam.type = QUDA_THREE_LINKS;
+      gaugeParam.ga_pad = long_pad;
+      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
+      loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+    }
 
     invalidate_quda_gauge = false;
+  }
+
+  if(longlink == nullptr) {
+    invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
   }
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X)*host_precision;
