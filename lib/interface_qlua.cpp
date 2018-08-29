@@ -1118,10 +1118,22 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   init_QudaInvertParam_generic(ip, gp, paramAPI, preserveBasis);
   setVerbosity(paramAPI.verbosity);
 
+  //-- Load the gauge field, if applicable
+  GaugeField *cuda_gf = NULL;
+  if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
+    double t3 = MPI_Wtime();
+    for(int mu=0;mu<qS->rank;mu++)
+      if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
+    cuda_gf = new_cudaGaugeField(gp, h_gauge);
+    double t4 = MPI_Wtime();
+    printfQuda("TIMING - %s: Cuda Gauge Field loaded in %f sec.\n", func_name, t4-t3);
+  }
+  //------------------------------------------------------------------------------------------
+  
   //-- Load the propagators into cuda-CSFs
   int nVec = QUDA_PROP_NVEC;
   LONG_T fieldLgh = paramAPI.mpParam.locvol * Nc * Ns * 2;
-  
+
   ColorSpinorField *cudaProp1[nVec];
   ColorSpinorField *cudaProp2[nVec];
   ColorSpinorField *cudaProp3[nVec];
@@ -1145,20 +1157,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   }
   double t2 = MPI_Wtime();
   printfQuda("TIMING - %s: Cuda Color-Spinor fields loaded in %f sec.\n", func_name, t2-t1);
-
-  
-  //-- Load the gauge field, if applicable
-  GaugeField *cuda_gf = NULL;
-  if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
-    double t3 = MPI_Wtime();
-    for(int mu=0;mu<qS->rank;mu++)
-      if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
-    cuda_gf = new_cudaGaugeField(gp, h_gauge);
-    double t4 = MPI_Wtime();
-    printfQuda("TIMING - %s: Cuda Gauge Field loaded in %f sec.\n", func_name, t4-t3);
-  }
-  /* --------------------------------------------------------------------------------------- */
-
+  //------------------------------------------------------------------------------------------
   
   //-- Create a utility structure (required in momentum projection as well).
   //-- Passing paramAPI.mpParam.Ndata twice is NOT a bug!

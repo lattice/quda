@@ -31,7 +31,7 @@ namespace quda {
                                               qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn,
                                               int x_cb, int pty);
 
-  __global__ void NonCovShiftVectorOnAxis_kernel(QluaCntrTMDArg *TMDarg, int ivec,
+  __global__ void NonCovShiftVectorOnAxis_kernel(QluaCntrTMDArg TMDarg, int ivec,
                                                  qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
 
 

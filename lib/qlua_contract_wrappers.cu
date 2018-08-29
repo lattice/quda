@@ -197,18 +197,10 @@ namespace quda {
     //-- Call kernel that performs non-covariant on-axis vector shift
     dim3 blockDim(THREADS_PER_BLOCK, TMDarg.nParity, 1);
     dim3 gridDim((TMDarg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-
-    QluaCntrTMDArg *TMDarg_dev;
-    cudaMalloc((void**)&(TMDarg_dev), sizeof(QluaCntrTMDArg) );
-    checkCudaError();
-    cudaMemcpy(TMDarg_dev, &TMDarg, sizeof(QluaCntrTMDArg), cudaMemcpyHostToDevice);    
-    checkCudaError();
     
-    NonCovShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDarg_dev, ivec, shfDir, shfSgn);
+    NonCovShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDarg, ivec, shfDir, shfSgn);
     cudaDeviceSynchronize();
     checkCudaError();
-
-    cudaFree(TMDarg_dev);
   }//-- perform_NonCovShiftVectorOnAxis
   //---------------------------------------------------------------------------
 
@@ -259,7 +251,7 @@ namespace quda {
 
       double t7 = MPI_Wtime();
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-      	qcExchangeGhostVec(cudaProp1, ivec);
+	qcExchangeGhostVec(cudaProp1, ivec);
 	QluaCntrTMDArg TMDarg(cudaProp1[ivec], cudaProp3[ivec], mpParam.cntrType, paramAPI.preserveBasis);
       	perform_NonCovShiftVectorOnAxis(TMDarg, ivec, shfDir, shfSgn);
       }
