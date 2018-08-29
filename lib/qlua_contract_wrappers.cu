@@ -186,7 +186,7 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
-  void perform_NonCovShiftVectorOnAxis(QluaCntrTMDArg &TMDarg, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, int vCB, int nPty){
+  void perform_NonCovShiftVectorOnAxis(QluaCntrTMDArg &TMDarg, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
 
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) )
       printfQuda("perform_NonCovShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis non-covariant propagator shift in the %s%s direction\n",
@@ -195,8 +195,8 @@ namespace quda {
       errorQuda("perform_NonCovShiftVectorOnAxis: Got invalid shfDir and/or shfSgn.\n");
 
     //-- Call kernel that performs non-covariant on-axis vector shift
-    dim3 blockDim(THREADS_PER_BLOCK, nPty, 1);
-    dim3 gridDim((vCB + blockDim.x -1)/blockDim.x, 1, 1);
+    dim3 blockDim(THREADS_PER_BLOCK, TMDarg.nParity, 1);
+    dim3 gridDim((TMDarg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
     QluaCntrTMDArg *TMDarg_dev;
     cudaMalloc((void**)&(TMDarg_dev), sizeof(QluaCntrTMDArg) );
@@ -216,8 +216,6 @@ namespace quda {
   void qcExchangeGhostVec(ColorSpinorField **prop, int ivec){
     const int nFace  = 1;
     prop[ivec]->exchangeGhost((QudaParity)(1), nFace, 0); //- first argument is redundant when nParity = 2. nFace MUST be 1 for now.
-    cudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void qcExchangeGhostProp(ColorSpinorField **prop){
@@ -263,7 +261,7 @@ namespace quda {
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
       	qcExchangeGhostVec(cudaProp1, ivec);
 	QluaCntrTMDArg TMDarg(cudaProp1[ivec], cudaProp3[ivec], mpParam.cntrType, paramAPI.preserveBasis);
-      	perform_NonCovShiftVectorOnAxis(TMDarg, ivec, shfDir, shfSgn, TMDarg.volumeCB, TMDarg.nParity);
+      	perform_NonCovShiftVectorOnAxis(TMDarg, ivec, shfDir, shfSgn);
       }
       double t8 = MPI_Wtime();
       printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t8-t7);
