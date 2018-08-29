@@ -116,6 +116,9 @@ namespace quda {
 
     /**< The precision used by the QUDA sloppy operator */
     QudaPrecision precision_sloppy;
+    
+    /**< The precision used by the QUDA sloppy operator for multishift refinement */
+    QudaPrecision precision_refinement_sloppy;
 
     /**< The precision used by the QUDA preconditioner */
     QudaPrecision precision_precondition;
@@ -236,7 +239,7 @@ namespace quda {
       compute_true_res(param.compute_true_res), sloppy_converge(false), true_res(param.true_res),
       true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
-      precision_precondition(param.cuda_prec_precondition),
+      precision_refinement_sloppy(param.cuda_prec_refinement_sloppy), precision_precondition(param.cuda_prec_precondition),
       preserve_source(param.preserve_source),
       return_residual(preserve_source == QUDA_PRESERVE_SOURCE_NO ? true : false),
       num_src(param.num_src), num_offset(param.num_offset),
@@ -273,7 +276,7 @@ namespace quda {
       compute_true_res(param.compute_true_res), sloppy_converge(param.sloppy_converge), true_res(param.true_res),
       true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.precision), precision_sloppy(param.precision_sloppy),
-      precision_precondition(param.precision_precondition),
+      precision_refinement_sloppy(param.precision_refinement_sloppy), precision_precondition(param.precision_precondition),
       preserve_source(param.preserve_source), return_residual(param.return_residual),
       num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.Nkrylov), precondition_cycle(param.precondition_cycle),
@@ -400,7 +403,7 @@ namespace quda {
 
     /**
 	Prints out the summary of the solver convergence (requires a
-	versbosity of QUDA_SUMMARIZE).  Assumes
+	verbosity of QUDA_SUMMARIZE).  Assumes
 	SolverParam.true_res and SolverParam.true_res_hq has
 	been set
     */
@@ -413,6 +416,10 @@ namespace quda {
     virtual double flops() const { return 0; }
   };
 
+
+  /**
+     @brief  Conjugate-Gradient Solver.
+   */
   class CG : public Solver {
 
   private:
@@ -426,8 +433,28 @@ namespace quda {
   public:
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
+    /**
+     * @brief: Run CG.
+     * 
+     * @param out Solution vector.
+     * @param in Right-hand side.
+     */
+    void operator()(ColorSpinorField &out, ColorSpinorField &in){
+      (*this)(out, in, nullptr, 0.0);
+    };
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    /**
+     * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
+     * @details This can be used when continuing a CG, e.g. as refinement step after a multi-shift solve.
+     * 
+     * @param out Solution-vector.
+     * @param in Right-hand side.
+     * @param p_init Initial-search direction.
+     * @param r2_old_init [description]
+     */
+    void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
+
+
     void solve(ColorSpinorField& out, ColorSpinorField& in);
   };
 
@@ -715,7 +742,7 @@ namespace quda {
      @brief Communication-avoiding CG solver.  This solver does
      un-preconditioned CG, running in steps of nKrylov, build up a
      polynomial in the linear operator of length nKrylov, and then
-     performs a steepest descent minimization on the resuling basis
+     performs a steepest descent minimization on the resulting basis
      vectors.  For now only implemented using the power basis so is
      only useful as a preconditioner.
    */
@@ -771,7 +798,7 @@ namespace quda {
      @brief Communication-avoiding GCR solver.  This solver does
      un-preconditioned GCR, first building up a polynomial in the
      linear operator of length nKrylov, and then performs a minimum
-     residual extrapolation on the resuling basis vectors.  For use as
+     residual extrapolation on the resulting basis vectors.  For use as
      a multigrid smoother with minimum global synchronization.
    */
   class CAGCR : public Solver {
@@ -892,6 +919,9 @@ namespace quda {
     bool convergence(const double *r2, const double *r2_tol, int n) const;
   };
 
+/**
+ * @brief Multi-Shift Conjugate Gradient Solver.
+ */
   class MultiShiftCG : public MultiShiftSolver {
 
   protected:
@@ -901,8 +931,31 @@ namespace quda {
   public:
     MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~MultiShiftCG();
+/**
+ * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
+ * 
+ * @param out std::vector of pointer to solutions for all the shifts.
+ * @param in right-hand side.
+ * @param p std::vector of pointers to hold search directions. Note this will be resized as necessary.
+ * @param r2_old_array pointer to last values of r2_old for old shifts. Needs to be large enough to hold r2_old for all shifts.
+ */
+    void operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b, std::vector<ColorSpinorField*> &p, double* r2_old_array );
 
-    void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in);
+/**
+ * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
+ * 
+ * @param out std::vector of pointer to solutions for all the shifts.
+ * @param in right-hand side.
+ */
+    void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in){
+      std::unique_ptr<double[]> r2_old(new double[QUDA_MAX_MULTI_SHIFT]);
+      std::vector<ColorSpinorField*> p;
+
+      (*this)(out, in, p, r2_old.get());
+
+      for (auto& pp : p) delete pp;   
+    }
+
   };
 
 
@@ -916,7 +969,7 @@ namespace quda {
      basis is stored to conserve memory.
 
      If Eigen support is enabled then Eigen's SVD algorithm is used
-     for solving the linear system, else Gaussian eliminiation with
+     for solving the linear system, else Gaussian elimination with
      partial pivots is used.
   */
   class MinResExt {
@@ -961,7 +1014,7 @@ namespace quda {
        @param x The optimum for the solution vector.
        @param b The source vector in the equation to be solved. This is not preserved.
        @param p The basis vectors in which we are building the guess
-       @param q The basis vectors multipled by A
+       @param q The basis vectors multiplied by A
     */
     void operator()(ColorSpinorField &x, ColorSpinorField &b,
 		    std::vector<ColorSpinorField*> p,
