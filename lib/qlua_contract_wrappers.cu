@@ -165,31 +165,10 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
-  void perform_NonCovShiftPropOnAxis(QluaContractArg *arg_dev, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, int vCB, int nPty){ // , QluaAuxCntrArg *auxArg_dev
-
-    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) ){
-      printfQuda("perform_NonCovShiftPropOnAxis: Will perform an On-Axis non-covariant propagator shift in the %s%s direction\n", qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
-    }
-    else{
-      errorQuda("perform_NonCovShiftPropOnAxis: Got invalid shfDir and/or shfSgn.\n");
-    }
-
-    //-- Call kernel that performs non-covariant on axis propagator shift
-    dim3 blockDim(THREADS_PER_BLOCK, nPty, 1);
-    dim3 gridDim((vCB + blockDim.x -1)/blockDim.x, 1, 1);
-
-    NonCovShiftPropOnAxis_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);  // , auxArg_dev
-    cudaDeviceSynchronize();
-    checkCudaError();
-
-  }//-- perform_NonCovShiftPropOnAxis
-  //---------------------------------------------------------------------------
-
-
   void perform_ShiftVectorOnAxis(QluaCntrTMDArg &TMDarg, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
 
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
-      printfQuda("perform_NonCovShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis %scovariant shift in the %s%s direction\n",
+      printfQuda("perform_ShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis %scovariant shift in the %s%s direction\n",
 		 ivec, (shfType == qcCovShift) ? "" : "non-",
 		 qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     else
@@ -202,7 +181,7 @@ namespace quda {
     ShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDarg, ivec, shfDir, shfSgn, shfType);
     cudaDeviceSynchronize();
     checkCudaError();
-  }//-- perform_NonCovShiftVectorOnAxis
+  }//-- perform_ShiftVectorOnAxis
   //---------------------------------------------------------------------------
 
 

@@ -9,24 +9,6 @@
 
 namespace quda {
 
-  __device__ void CovShiftPropPM1_dev(Vector *shfVec, QluaContractArg *arg, Propagator prop[],				      
-				      int dir, qcCovShiftType shiftType,
-				      int x_cb, int pty);
-
-  __global__ void CovShiftPropPM1_kernel(QluaContractArg *arg,
-					 int shfDir, qcCovShiftType shiftType);
-
-
-
-  __device__ void NonCovShiftPropOnAxis_kernel_dev(Vector *shfVec, QluaContractArg *arg,
-						   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn,
-						   int x_cb, int pty);
-
-  __global__ void NonCovShiftPropOnAxis_kernel(QluaContractArg *arg,
-					       qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
-
-
-
   __device__ void ShiftVectorOnAxis_dev(Vector &shfVec, QluaCntrTMDArg *TMDarg, int ivec,
 					qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
 					int x_cb, int pty);

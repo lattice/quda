@@ -184,12 +184,6 @@ namespace quda {
   static const char *qcTMD_ShiftDirArray[4] = {"x", "y", "z", "t"};
   static const char *qcTMD_ShiftSgnArray[2] = {"-", "+"};
 
-  typedef enum qcCovShiftType_s {
-    qcFwdCovShfActR, //-- Forward  shift, derivative acting on quark
-    qcBwdCovShfActR, //-- Backward shift, derivative acting on quark
-    qcFwdCovShfActL, //-- Forward  shift, derivative acting on anti-quark
-    qcBwdCovShfActL  //-- Backward shift, derivative acting on anti-quark
-  } qcCovShiftType;
 
   typedef enum qcTMD_ShiftString_s {
     qcShfStr_None = -1,
