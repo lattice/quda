@@ -367,7 +367,10 @@
 # include <TargetConditionals.h>
 #endif
 
+#if 0
+// algorithm doesn't seem to be actually used by gtest - disable since causes incompatibility between CUDA 9.x and GCC 5.5
 #include <algorithm>  // NOLINT
+#endif
 #include <iostream>  // NOLINT
 #include <sstream>  // NOLINT
 #include <string>  // NOLINT
