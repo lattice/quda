@@ -214,9 +214,9 @@ namespace quda {
    * One needs to properly have the ghosts loaded in the input propagator before calling this function.
    * This is the main function that will be used in TMD contractions.
    */
-  __device__ void NonCovShiftVectorOnAxis_dev(Vector &shfVec, QluaCntrTMDArg &TMDarg, int ivec,
-					      qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn,
-					      int x_cb, int pty){
+  __device__ void ShiftVectorOnAxis_dev(Vector &shfVec, QluaCntrTMDArg &TMDarg, int ivec,
+					qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
+					int x_cb, int pty){
 
     const int nbrPty = (TMDarg.nParity == 2) ? 1-pty : 0; // Parity of neighboring site
     int coord[5];
@@ -226,25 +226,42 @@ namespace quda {
     int dir = (int)shfDir; //-- Direction of the shift
 
     if(shfSgn == qcShfSgnPlus){ // Forward shift
+      Vector vIn;
       const int fwdIdx = linkIndexP1(coord, TMDarg.dim, dir);
 
       if( TMDarg.commDim[dir] && (coord[dir] + TMDarg.nFace >= TMDarg.dim[dir]) ){
-	const int ghostIdx = ghostFaceIndex<1>(coord, TMDarg.dim, dir, TMDarg.nFace);
-	shfVec = TMDarg.fwdVec.Ghost(dir, 1, ghostIdx, nbrPty); //-- y(x) <- y(x+\mu)
+	const int ghostIdx = ghostFaceIndex<1>(coord, TMDarg.dim, dir, TMDarg.nFace);      
+	vIn = TMDarg.fwdVec.Ghost(dir, 1, ghostIdx, nbrPty);
       }
-      else{
-	shfVec = TMDarg.fwdVec(fwdIdx, nbrPty); //-- y(x) <- y(x+\mu)
+      else vIn = TMDarg.fwdVec(fwdIdx, nbrPty);
+
+      if(shfType == qcCovShift){
+	const Link U = TMDarg.U(dir, x_cb, pty);
+	shfVec = U * vIn;                             //-- y(x) <- U_\mu(x) * y(x+\mu)
       }
+      else if(shfType == qcNonCovShift) shfVec = vIn; //-- y(x) <- y(x+\mu)
     }
     else if(shfSgn == qcShfSgnMinus){ // Backward shift
       const int bwdIdx = linkIndexM1(coord, TMDarg.dim, dir);
 
       if ( TMDarg.commDim[dir] && (coord[dir] - TMDarg.nFace < 0) ) {
 	const int ghostIdx = ghostFaceIndex<0>(coord, TMDarg.dim, dir, TMDarg.nFace);
-	shfVec = TMDarg.fwdVec.Ghost(dir, 0, ghostIdx, nbrPty); //-- y(x) <- y(x-\mu)
+	const Vector vIn = TMDarg.fwdVec.Ghost(dir, 0, ghostIdx, nbrPty);
+
+	if(shfType == qcCovShift){
+	  const Link U = TMDarg.U.Ghost(dir, ghostIdx, 1-pty);
+	  shfVec = conj(U) * vIn;                           //-- y(x) <- U_\mu^\dag(x-\mu) * y(x-\mu)
+	}
+	else if(shfType == qcNonCovShift) shfVec = vIn;     //-- y(x) <- y(x-\mu)
       }
       else{
-	shfVec = TMDarg.fwdVec(bwdIdx, nbrPty); //-- y(x) <- y(x-\mu)
+	const Vector vIn = TMDarg.fwdVec(bwdIdx, nbrPty);
+
+	if(shfType == qcCovShift){
+	  const Link U = TMDarg.U(dir, bwdIdx, 1-pty);
+	  shfVec = conj(U) * vIn;                           //-- y(x) <- U_\mu^\dag(x-\mu) * y(x-\mu)
+	}
+	else if(shfType == qcNonCovShift) shfVec = vIn;     //-- y(x) <- y(x-\mu)
       }
     }
     else{
@@ -256,8 +273,8 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
 
-  __global__ void NonCovShiftVectorOnAxis_kernel(QluaCntrTMDArg TMDarg, int ivec,
-						 qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+  __global__ void ShiftVectorOnAxis_kernel(QluaCntrTMDArg TMDarg, int ivec,
+					   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
     
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
@@ -268,7 +285,7 @@ namespace quda {
 
     Vector shfVec;
 
-    NonCovShiftVectorOnAxis_dev(shfVec, TMDarg, ivec, shfDir, shfSgn, x_cb, pty);
+    ShiftVectorOnAxis_dev(shfVec, TMDarg, ivec, shfDir, shfSgn, shfType, x_cb, pty);
 
     TMDarg.shfVec(x_cb, pty) = shfVec;
 

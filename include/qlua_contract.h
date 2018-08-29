@@ -144,6 +144,8 @@ namespace quda {
     Propagator fwdVec; // A vector from the forward propagator (input)
     Propagator shfVec; // A vector from the shifted propagator (output)
     
+    GaugeU U;                         // Gauge Field
+    
     const qluaCntr_Type cntrType;     // contraction type
     const int parity;                 // hard code to 0 for now
     const int nParity;                // number of parities we're working on
@@ -157,6 +159,7 @@ namespace quda {
     
     QluaCntrTMDArg(ColorSpinorField *vec1,
 		   ColorSpinorField *vec2,
+		   GaugeField *Uin,
 		   qluaCntr_Type cntrType, bool preserveBasis)
       : cntrType(cntrType), parity(0), nParity(vec1->SiteSubset()), nFace(1),
 	dim{ (3-nParity) * vec1->X(0), vec1->X(1), vec1->X(2), vec1->X(3), 1 },
@@ -166,6 +169,8 @@ namespace quda {
     {
       fwdVec.init(*vec1);
       shfVec.init(*vec2);
+      if(Uin == NULL) errorQuda("QluaContractArg: Gauge Field is not allocated!\n");
+      U.init(*Uin);
     }
 
   };//-- Structure definition
@@ -185,7 +190,6 @@ namespace quda {
     qcFwdCovShfActL, //-- Forward  shift, derivative acting on anti-quark
     qcBwdCovShfActL  //-- Backward shift, derivative acting on anti-quark
   } qcCovShiftType;
-
 
   typedef enum qcTMD_ShiftString_s {
     qcShfStr_None = -1,
@@ -211,8 +215,6 @@ namespace quda {
     qcShfStr_w = 19  // -x+z
   } qcTMD_ShiftString;
 
-
-
   typedef enum qcTMD_ShiftDir_s {
     qcShfDirNone = -1,
     qcShfDir_x = 0,
@@ -227,6 +229,11 @@ namespace quda {
     qcShfSgnPlus  =  1
   } qcTMD_ShiftSgn;
 
+  typedef enum qcTMD_ShiftType_s {
+    qcInvalidShift = -1,
+    qcCovShift = 0,      //-- Covariant Shift (involving a gauge link)
+    qcNonCovShift = 1    //-- Non-covariant shift
+  } qcTMD_ShiftType;
   
 }//-- namespace quda
 

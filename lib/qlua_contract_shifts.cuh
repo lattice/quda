@@ -27,12 +27,12 @@ namespace quda {
 
 
 
-  __device__ void NonCovShiftVectorOnAxis_dev(Vector &shfVec, QluaCntrTMDArg *TMDarg, int ivec,
-                                              qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn,
-                                              int x_cb, int pty);
+  __device__ void ShiftVectorOnAxis_dev(Vector &shfVec, QluaCntrTMDArg *TMDarg, int ivec,
+					qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
+					int x_cb, int pty);
 
-  __global__ void NonCovShiftVectorOnAxis_kernel(QluaCntrTMDArg TMDarg, int ivec,
-                                                 qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
+  __global__ void ShiftVectorOnAxis_kernel(QluaCntrTMDArg TMDarg, int ivec,
+					   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType);
 
 
 } //- namespace quda

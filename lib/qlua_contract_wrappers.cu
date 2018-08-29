@@ -186,19 +186,20 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
-  void perform_NonCovShiftVectorOnAxis(QluaCntrTMDArg &TMDarg, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+  void perform_ShiftVectorOnAxis(QluaCntrTMDArg &TMDarg, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
 
-    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) )
-      printfQuda("perform_NonCovShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis non-covariant propagator shift in the %s%s direction\n",
-		 ivec, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
+      printfQuda("perform_NonCovShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis %scovariant shift in the %s%s direction\n",
+		 ivec, (shfType == qcCovShift) ? "" : "non-",
+		 qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     else
-      errorQuda("perform_NonCovShiftVectorOnAxis: Got invalid shfDir and/or shfSgn.\n");
+      errorQuda("perform_ShiftVectorOnAxis: Got invalid shfDir and/or shfSgn and/or shfType.\n");
 
     //-- Call kernel that performs non-covariant on-axis vector shift
     dim3 blockDim(THREADS_PER_BLOCK, TMDarg.nParity, 1);
     dim3 gridDim((TMDarg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
     
-    NonCovShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDarg, ivec, shfDir, shfSgn);
+    ShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDarg, ivec, shfDir, shfSgn, shfType);
     cudaDeviceSynchronize();
     checkCudaError();
   }//-- perform_NonCovShiftVectorOnAxis
@@ -245,15 +246,16 @@ namespace quda {
      * The shifted propagator is placed into cudaProp3.
      */
     if(mpParam.cntrType == what_tmd_g_F_B){      
-      qcTMD_ShiftString shfFlag = qcShfStr_Z; //-- Hard coded for now
-      qcTMD_ShiftDir shfDir = TMDparseShiftDirection(shfFlag);
-      qcTMD_ShiftSgn shfSgn = TMDparseShiftSign(shfFlag);     
+      qcTMD_ShiftString shfFlag = qcShfStr_z; //-- Hard coded for now
+      qcTMD_ShiftDir shfDir   = TMDparseShiftDirection(shfFlag);
+      qcTMD_ShiftSgn shfSgn   = TMDparseShiftSign(shfFlag);     
+      qcTMD_ShiftType shfType = qcCovShift;
 
       double t7 = MPI_Wtime();
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
 	qcExchangeGhostVec(cudaProp1, ivec);
-	QluaCntrTMDArg TMDarg(cudaProp1[ivec], cudaProp3[ivec], mpParam.cntrType, paramAPI.preserveBasis);
-      	perform_NonCovShiftVectorOnAxis(TMDarg, ivec, shfDir, shfSgn);
+	QluaCntrTMDArg TMDarg(cudaProp1[ivec], cudaProp3[ivec], U, mpParam.cntrType, paramAPI.preserveBasis);
+      	perform_ShiftVectorOnAxis(TMDarg, ivec, shfDir, shfSgn, shfType);
       }
       double t8 = MPI_Wtime();
       printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t8-t7);
