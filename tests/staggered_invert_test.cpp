@@ -382,7 +382,7 @@ invert_test(void)
     }
   } else {
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      construct_gauge_field(qdp_inlink, 0, gaugeParam.cpu_prec, &gaugeParam);
+      construct_gauge_field(qdp_inlink, 1, gaugeParam.cpu_prec, &gaugeParam);
     } else {
       construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
     }

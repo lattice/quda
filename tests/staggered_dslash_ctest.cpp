@@ -344,7 +344,7 @@ void init(int precision, QudaReconstructType link_recon) {
     } // else it's already been loaded
   } else {
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      construct_gauge_field(qdp_inlink, 0, gaugeParam.cpu_prec, &gaugeParam);
+      construct_gauge_field(qdp_inlink, 1, gaugeParam.cpu_prec, &gaugeParam);
     } else {
       construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
     }
