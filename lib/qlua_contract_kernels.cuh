@@ -242,12 +242,3 @@ namespace quda {
 } //- namespace quda
 
 #endif/*QLUA_CONTRACT_KERNELS_H__*/
-
-
-
-  // __device__ void shiftDevicePropPM1(QluaContractArg *arg,
-  //                                    Vector *outShf, Propagator prop[],
-  //                                    int x_cb, int pty,
-  //                                    int dir, qcCovShiftType shiftType);
-
-  // __global__ void qpdf_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);

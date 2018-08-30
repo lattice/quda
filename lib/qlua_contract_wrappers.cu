@@ -248,8 +248,6 @@ namespace quda {
      * The shifted propagator is placed into cudaProp3.
      */
     if(mpParam.cntrType == what_tmd_g_F_B){      
-      //      qcTMD_ShiftFlag shfFlag = qcShfStr_z; //-- Hard coded for now
-      //      qcTMD_ShiftType shfType = qcCovShift;
       qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(paramAPI.shfFlag);
       qcTMD_ShiftType shfType = TMDparseShiftType(paramAPI.shfType);
       qcTMD_ShiftDir shfDir   = TMDparseShiftDirection(shfFlag);
