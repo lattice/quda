@@ -139,12 +139,12 @@ namespace quda {
   //---------------------------------------------------------------------------
 
   //- Additional structure required for the TMD contractions
-  struct QluaCntrTMDArg {
+  struct TMDcontractState {
     
     Propagator fwdVec; // A vector from the forward propagator (input)
     Propagator shfVec; // A vector from the shifted propagator (output)
     
-    GaugeU U;                         // Gauge Field
+    GaugeU U;                         // Original Gauge Field
     
     const qluaCntr_Type cntrType;     // contraction type
     const int parity;                 // hard code to 0 for now
@@ -157,10 +157,10 @@ namespace quda {
     const int volume;                 // full-site local volume
     const bool preserveBasis;         // whether to preserve the gamma basis or not
     
-    QluaCntrTMDArg(ColorSpinorField *vec1,
-		   ColorSpinorField *vec2,
-		   GaugeField *Uin,
-		   qluaCntr_Type cntrType, bool preserveBasis)
+    TMDcontractState(ColorSpinorField *vec1,
+		     ColorSpinorField *vec2,
+		     GaugeField *Uin,
+		     qluaCntr_Type cntrType, bool preserveBasis)
       : cntrType(cntrType), parity(0), nParity(vec1->SiteSubset()), nFace(1),
 	dim{ (3-nParity) * vec1->X(0), vec1->X(1), vec1->X(2), vec1->X(3), 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
@@ -169,7 +169,7 @@ namespace quda {
     {
       fwdVec.init(*vec1);
       shfVec.init(*vec2);
-      if(Uin == NULL) errorQuda("QluaContractArg: Gauge Field is not allocated!\n");
+      if(Uin == NULL) errorQuda("TMDcontractState: Gauge Field is not allocated!\n");
       U.init(*Uin);
     }
 

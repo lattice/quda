@@ -189,7 +189,7 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
-  void perform_ShiftVectorOnAxis(QluaCntrTMDArg &TMDarg, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
+  void perform_ShiftVectorOnAxis(TMDcontractState &TMDcs, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
 
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
       printfQuda("perform_ShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis %s shift in the %s%s direction\n",
@@ -198,10 +198,10 @@ namespace quda {
       errorQuda("perform_ShiftVectorOnAxis: Got invalid shfDir and/or shfSgn and/or shfType.\n");
 
     //-- Call kernel that performs non-covariant on-axis vector shift
-    dim3 blockDim(THREADS_PER_BLOCK, TMDarg.nParity, 1);
-    dim3 gridDim((TMDarg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+    dim3 blockDim(THREADS_PER_BLOCK, TMDcs.nParity, 1);
+    dim3 gridDim((TMDcs.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
     
-    ShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDarg, ivec, shfDir, shfSgn, shfType);
+    ShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDcs, ivec, shfDir, shfSgn, shfType);
     cudaDeviceSynchronize();
     checkCudaError();
   }//-- perform_ShiftVectorOnAxis
@@ -244,7 +244,7 @@ namespace quda {
      * Here we exchange ghosts vector by vector within the 
      * forward propagator (cudaProp1).
      * Then a shift takes place, again vector by vector,
-     * hence TMDarg accepts (and returns) elements of the cudaColorSpinorField propagators.
+     * hence TMDcs accepts (and returns) elements of the cudaColorSpinorField propagators.
      * The shifted propagator is placed into cudaProp3.
      */
     if(mpParam.cntrType == what_tmd_g_F_B){      
@@ -256,8 +256,8 @@ namespace quda {
       double t7 = MPI_Wtime();
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
 	qcExchangeGhostVec(cudaProp1, ivec);
-	QluaCntrTMDArg TMDarg(cudaProp1[ivec], cudaProp3[ivec], U, mpParam.cntrType, paramAPI.preserveBasis);
-      	perform_ShiftVectorOnAxis(TMDarg, ivec, shfDir, shfSgn, shfType);
+	TMDcontractState TMDcs(cudaProp1[ivec], cudaProp3[ivec], U, mpParam.cntrType, paramAPI.preserveBasis);
+      	perform_ShiftVectorOnAxis(TMDcs, ivec, shfDir, shfSgn, shfType);
       }
       double t8 = MPI_Wtime();
       printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t8-t7);
