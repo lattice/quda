@@ -176,16 +176,22 @@ namespace quda {
   };//-- Structure definition
   //---------------------------------------------------------------------------
 
+  const int nShiftFlag = 20;
+  const int nShiftType = 2;
 
-  static const char *qcTMD_ShiftStringArray[20] = {
+  static const char *qcTMD_ShiftFlagArray[nShiftFlag] = {
     "X", "x", "Y", "y", "Z", "z", "T", "t", "Q", "q",
     "R", "r", "S", "s", "U", "u", "V", "v", "W", "w"};
+
+  static const char *qcTMD_ShiftTypeArray[nShiftType] = {
+    "Covariant",
+    "Non-Covariant"};
 
   static const char *qcTMD_ShiftDirArray[4] = {"x", "y", "z", "t"};
   static const char *qcTMD_ShiftSgnArray[2] = {"-", "+"};
 
 
-  typedef enum qcTMD_ShiftString_s {
+  typedef enum qcTMD_ShiftFlag_s {
     qcShfStr_None = -1,
     qcShfStr_X = 0,  // +x
     qcShfStr_x = 1,  // -x
@@ -207,7 +213,7 @@ namespace quda {
     qcShfStr_v = 17, // -x-z
     qcShfStr_W = 18, // +x-z
     qcShfStr_w = 19  // -x+z
-  } qcTMD_ShiftString;
+  } qcTMD_ShiftFlag;
 
   typedef enum qcTMD_ShiftDir_s {
     qcShfDirNone = -1,

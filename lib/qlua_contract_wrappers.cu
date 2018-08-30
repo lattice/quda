@@ -110,9 +110,33 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
-  qcTMD_ShiftDir TMDparseShiftDirection(qcTMD_ShiftString shfFlag){
+  qcTMD_ShiftFlag TMDparseShiftFlag(char *flagStr){
+    
+    qcTMD_ShiftFlag shfFlag = qcShfStr_None;
+    for(int iopt=0;iopt<nShiftFlag;iopt++){
+      if( strcmp(flagStr,qcTMD_ShiftFlagArray[iopt])==0 ){
+	shfFlag = (qcTMD_ShiftFlag)iopt;
+	break;
+      }
+    }
+    return shfFlag;
+  }
 
-    printfQuda("TMDparseShiftDirection: Got shift flag shfFlag = %s\n", qcTMD_ShiftStringArray[(int)shfFlag]);
+  qcTMD_ShiftType TMDparseShiftType(char *typeStr){
+    
+    qcTMD_ShiftType shfType = qcInvalidShift;
+    for(int iopt=0;iopt<nShiftType;iopt++){
+      if( strcmp(typeStr,qcTMD_ShiftTypeArray[iopt])==0 ){
+	shfType = (qcTMD_ShiftType)iopt;
+	break;
+      }
+    }
+    return shfType;
+  }
+
+  qcTMD_ShiftDir TMDparseShiftDirection(qcTMD_ShiftFlag shfFlag){
+
+    printfQuda("TMDparseShiftDirection: Got shfFlag = %s\n", qcTMD_ShiftFlagArray[(int)shfFlag]);
 
     qcTMD_ShiftDir shfDir = qcShfDirNone;
     switch(shfFlag){
@@ -132,16 +156,16 @@ namespace quda {
     case qcShfStr_T: {
       shfDir = qcShfDir_t;
     } break;
-    default: errorQuda("TMDparseShiftDirection: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<20) ? qcTMD_ShiftStringArray[(int)shfFlag] : "None");
+    default: errorQuda("TMDparseShiftDirection: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<nShiftFlag) ? qcTMD_ShiftFlagArray[(int)shfFlag] : "None");
     }//-- switch    
 
     return shfDir;
   }
   //---------------------------------------------------------------------------
 
-  qcTMD_ShiftSgn TMDparseShiftSign(qcTMD_ShiftString shfFlag){
+  qcTMD_ShiftSgn TMDparseShiftSign(qcTMD_ShiftFlag shfFlag){
 
-    printfQuda("TMDparseShiftSign: Got shift flag shfFlag = %s\n", qcTMD_ShiftStringArray[(int)shfFlag]);
+    printfQuda("TMDparseShiftSign: Got shfFlag = %s\n", qcTMD_ShiftFlagArray[(int)shfFlag]);
 
     qcTMD_ShiftSgn shfSgn = qcShfSgnNone;
     switch(shfFlag){
@@ -157,7 +181,7 @@ namespace quda {
     case qcShfStr_t: {
       shfSgn = qcShfSgnMinus;
     } break;
-    default: errorQuda("TMDparseShiftSign: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<20) ? qcTMD_ShiftStringArray[(int)shfFlag] : "None");
+    default: errorQuda("TMDparseShiftSign: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<nShiftFlag) ? qcTMD_ShiftFlagArray[(int)shfFlag] : "None");
     }//-- switch    
 
     return shfSgn;
@@ -168,9 +192,8 @@ namespace quda {
   void perform_ShiftVectorOnAxis(QluaCntrTMDArg &TMDarg, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
 
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
-      printfQuda("perform_ShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis %scovariant shift in the %s%s direction\n",
-		 ivec, (shfType == qcCovShift) ? "" : "non-",
-		 qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+      printfQuda("perform_ShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis %s shift in the %s%s direction\n",
+		 ivec, qcTMD_ShiftTypeArray[(int)shfType], qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     else
       errorQuda("perform_ShiftVectorOnAxis: Got invalid shfDir and/or shfSgn and/or shfType.\n");
 
@@ -225,11 +248,13 @@ namespace quda {
      * The shifted propagator is placed into cudaProp3.
      */
     if(mpParam.cntrType == what_tmd_g_F_B){      
-      qcTMD_ShiftString shfFlag = qcShfStr_z; //-- Hard coded for now
+      //      qcTMD_ShiftFlag shfFlag = qcShfStr_z; //-- Hard coded for now
+      //      qcTMD_ShiftType shfType = qcCovShift;
+      qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(paramAPI.shfFlag);
+      qcTMD_ShiftType shfType = TMDparseShiftType(paramAPI.shfType);
       qcTMD_ShiftDir shfDir   = TMDparseShiftDirection(shfFlag);
       qcTMD_ShiftSgn shfSgn   = TMDparseShiftSign(shfFlag);     
-      qcTMD_ShiftType shfType = qcCovShift;
-
+      
       double t7 = MPI_Wtime();
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
 	qcExchangeGhostVec(cudaProp1, ivec);

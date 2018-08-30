@@ -132,6 +132,8 @@ typedef struct {
   cntrQQParam cQQParam;
   momProjParam mpParam;
   int preserveBasis;
+  char shfFlag[512];
+  char shfType[512];
 } qudaAPI_Param;
 
 typedef struct{
