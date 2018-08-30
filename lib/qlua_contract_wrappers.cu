@@ -227,15 +227,25 @@ namespace quda {
   //---------------------------------------------------------------------------
   
 
-  void qcSwapVector(Propagator *fwdVec, Propagator *auxVec){
+  void qcSwapCudaVec(void *fwdVec, void *auxVec){
+    void *Vtmp = fwdVec;
+    fwdVec = auxVec;
+    auxVec = Vtmp;
+  }
+  void qcSwapCudaProp(ColorSpinorField **fwdProp, ColorSpinorField **auxProp){
+    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
+      qcSwapCudaVec((void*)(fwdProp[ivec]), (void*)(auxProp[ivec]));
+  }
+  //---------------------------------------------------------------------------
+
+  void qcSwapStateVec(Propagator *fwdVec, Propagator *auxVec){
     Propagator *Vtmp = fwdVec;
     *fwdVec = *auxVec;
     *auxVec = *Vtmp;
   }
-
-  void qcSwapPropagator(Propagator **fwdProp, Propagator **auxProp){
+  void qcSwapStateProp(Propagator *fwdProp, Propagator *auxProp){
     for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
-      qcSwapVector(fwdProp[ivec], auxProp[ivec]);
+      qcSwapStateVec(&fwdProp[ivec], &auxProp[ivec]);
   }
   //---------------------------------------------------------------------------
 
@@ -321,13 +331,16 @@ namespace quda {
       double t7 = MPI_Wtime();
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
 	qcExchangeGhostVec(cudaProp1, ivec);
-	TMDcs.shfInit(cudaProp1[ivec], cudaProp3[ivec], U, shfU, mpParam.cntrType, paramAPI.preserveBasis);
+	TMDcs.shfInit(cudaProp1[ivec], cudaProp3[ivec], ivec, U, shfU, mpParam.cntrType, paramAPI.preserveBasis);
 	perform_ShiftVectorOnAxis(TMDcs_dev, &TMDcs, ivec, shfDir, shfSgn, shfType);
-	qcSwapVector(&TMDcs.fwdProp[ivec], &TMDcs.shfVec);
       }
       double t8 = MPI_Wtime();
       printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t8-t7);	
 
+      qcSwapCudaProp(cudaProp1, cudaProp3);
+      qcSwapStateProp(TMDcs.fwdProp, TMDcs.auxProp);
+
+      //      qcSwapVector(&TMDcs.fwdProp[ivec], &TMDcs.auxProp[ivec]);
 
       cudaMemcpy(TMDcs_dev, &TMDcs, sizeof(TMDcontractState), cudaMemcpyHostToDevice);    
       checkCudaError();

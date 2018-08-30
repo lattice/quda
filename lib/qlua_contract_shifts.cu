@@ -30,9 +30,9 @@ namespace quda {
 
       if( TMDcs->commDim[dir] && (coord[dir] + TMDcs->nFace >= TMDcs->dim[dir]) ){
 	const int ghostIdx = ghostFaceIndex<1>(coord, TMDcs->dim, dir, TMDcs->nFace);      
-	vIn = TMDcs->fwdVec.Ghost(dir, 1, ghostIdx, nbrPty);
+	vIn = TMDcs->fwdProp[ivec].Ghost(dir, 1, ghostIdx, nbrPty);
       }
-      else vIn = TMDcs->fwdVec(fwdIdx, nbrPty);
+      else vIn = TMDcs->fwdProp[ivec](fwdIdx, nbrPty);
 
       if(shfType == qcCovShift){
 	const Link U = TMDcs->U(dir, x_cb, pty);
@@ -45,7 +45,7 @@ namespace quda {
 
       if ( TMDcs->commDim[dir] && (coord[dir] - TMDcs->nFace < 0) ) {
 	const int ghostIdx = ghostFaceIndex<0>(coord, TMDcs->dim, dir, TMDcs->nFace);
-	const Vector vIn = TMDcs->fwdVec.Ghost(dir, 0, ghostIdx, nbrPty);
+	const Vector vIn = TMDcs->fwdProp[ivec].Ghost(dir, 0, ghostIdx, nbrPty);
 
 	if(shfType == qcCovShift){
 	  const Link U = TMDcs->U.Ghost(dir, ghostIdx, 1-pty);
@@ -54,7 +54,7 @@ namespace quda {
 	else if(shfType == qcNonCovShift) shfVec = vIn;     //-- y(x) <- y(x-\mu)
       }
       else{
-	const Vector vIn = TMDcs->fwdVec(bwdIdx, nbrPty);
+	const Vector vIn = TMDcs->fwdProp[ivec](bwdIdx, nbrPty);
 
 	if(shfType == qcCovShift){
 	  const Link U = TMDcs->U(dir, bwdIdx, 1-pty);
@@ -85,7 +85,7 @@ namespace quda {
 
     ShiftVectorOnAxis_dev(shfVec, TMDcs, ivec, shfDir, shfSgn, shfType, x_cb, pty);
 
-    TMDcs->shfVec(x_cb, pty) = shfVec;
+    TMDcs->auxProp[ivec](x_cb, pty) = shfVec;
 
   }//- ShiftVectorOnAxis_kernel
   //------------------------------------------------------------------------------------------
