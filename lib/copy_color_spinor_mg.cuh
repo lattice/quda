@@ -11,7 +11,7 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <tune_quda.h>
-#include <algorithm> // for std::swap
+#include <utility> // for std::swap
 
 namespace quda {
 
