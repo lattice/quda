@@ -198,7 +198,6 @@ namespace quda {
     
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
-    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / arg.nParity; }
     
   public:
   ContractQQ(ContractQQArg &arg, ContractQQArg *arg_dev, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), arg_dev(arg_dev), meta(meta)

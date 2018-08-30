@@ -13,17 +13,17 @@ namespace quda {
 					qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
 					int x_cb, int pty);
 
-  __global__ void ShiftVectorOnAxis_kernel(TMDcontractState TMDcs, int ivec,
+  __global__ void ShiftVectorOnAxis_kernel(TMDcontractState *TMDcs, int ivec,
 					   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType);
 
 
 
-  __device__ void ShiftGauge_dev(Link &shfGauge, TMDcontractState &TMDcs, qcTMD_ShiftDir muSrc,
+  __device__ void ShiftGauge_dev(Link &shfGauge, TMDcontractState *TMDcs, qcTMD_ShiftDir muSrc,
                                  qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
                                  int x_cb, int pty);
 
-  __global__ void ShiftGauge_kernel(TMDcontractState TMDcs, qcTMD_ShiftDir muDst, qcTMD_ShiftDir muSrc,
-				    qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType);
+  __global__ void ShiftGauge_kernel(TMDcontractState *TMDcs, qcTMD_ShiftDir muDst, qcTMD_ShiftDir muSrc,
+  				    qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType);
 
 } //- namespace quda
 

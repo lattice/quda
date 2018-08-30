@@ -70,7 +70,7 @@ namespace quda {
 			 ColorSpinorField **cudaProp1,
 			 ColorSpinorField **cudaProp2,
 			 ColorSpinorField **cudaProp3,
-			 GaugeField *U,
+			 GaugeField *U, GaugeField *shfU,
 			 complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1, qudaAPI_Param paramAPI);
 
   
