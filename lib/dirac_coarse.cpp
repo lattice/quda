@@ -72,7 +72,8 @@ namespace quda {
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.setPrecision( transfer->NullPrecision(QUDA_CPU_FIELD_LOCATION) ); // minimum of single precision
+    // use null-space precision for coarse links on gpu
+    gParam.setPrecision( transfer->NullPrecision(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION) );
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;

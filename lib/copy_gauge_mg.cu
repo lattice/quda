@@ -13,7 +13,7 @@ namespace quda {
     typedef typename mapper<sFloatOut>::type FloatOut;
     typedef typename mapper<sFloatIn>::type FloatIn;
 
-if (out.Reconstruct() != QUDA_RECONSTRUCT_NO) 
+    if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
       errorQuda("Reconstruct type %d not supported", out.Reconstruct());
 
     int faceVolumeCB[QUDA_MAX_DIM];

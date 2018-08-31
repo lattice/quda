@@ -36,6 +36,7 @@ namespace quda {
     int comm_dim[QUDA_MAX_DIM]; /** Node parition array */
 
     Float mass;                 /** staggered mass value */
+    Float rescale;              /** rescaling factor used when rescaling the Y links if the maximum increases */
 
     const int fineVolumeCB;     /** Fine grid volume */
     const int coarseVolumeCB;   /** Coarse grid volume */
@@ -65,6 +66,8 @@ namespace quda {
     int_fastdiv aggregates_per_block; // number of aggregates per thread block
     int_fastdiv grid_z; // this is the coarseColor grid that is wrapped into the x grid when coarse_color_wave is enabled
     int_fastdiv coarse_color_grid_z; // constant we ned to divide by
+
+    int dim_index; // which direction / dimension we are working on
 
     CalculateStaggeredYArg(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
@@ -274,7 +277,7 @@ namespace quda {
     complex<Float> vuv[coarseSpin*coarseSpin];
     multiplyStaggeredVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, parity, x_cb, c_row, c_col);
 
-    constexpr int dim_index = (dir == QUDA_BACKWARDS) ? dim : dim + 4;
+    const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
 
 
     if (shared_atomic) {
@@ -499,7 +502,7 @@ namespace quda {
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ void computeStaggeredYreverse(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
-    auto &Y = arg.Y_atomic;
+    auto &Y = arg.Y;
 
 #pragma unroll
     for (int d=0; d<4; d++) {
@@ -581,24 +584,33 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ void convertStaggered(Arg &arg, int parity, int x_cb, int c_row, int c_col) {
 
-    const auto &Yin = arg.Y_atomic;
-    const auto &Xin = arg.X_atomic;
+    if (arg.dim_index < 8) {
 
-    for (int d=0; d<8; d++) {
-      for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
-        for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-          complex<Float> Y = Yin(d,parity,x_cb,s_row,s_col,c_row,c_col);
-          arg.Y(d,parity,x_cb,s_row,s_col,c_row,c_col) = Y;
+      const auto &in = arg.Y_atomic;
+      int d_in = arg.dim_index % in.geometry;
+      int d_out = arg.dim_index % arg.Y.geometry;
+
+#pragma unroll
+      for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+#pragma unroll
+        for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+          complex<Float> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
+          arg.Y(d_out,parity,x_cb,s_row,s_col,c_row,c_col) = M;
         } //Spin column
       } //Spin row
-    } // dimension
-
-    for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
-      for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-        arg.X(0,parity,x_cb,s_row,s_col,c_row,c_col) = Xin(0,parity,x_cb,s_row,s_col,c_row,c_col);
-      }
-    }
-
+    } else {
+      const auto &in = arg.X_atomic;
+      int d_in = arg.dim_index % in.geometry;
+      int d_out = arg.dim_index % arg.X.geometry;
+#pragma unroll
+      for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+#pragma unroll
+        for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+          complex<Float> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
+          arg.X(d_out,parity,x_cb,s_row,s_col,c_row,c_col) = M;
+        } //Spin column
+      } // spin row
+    } // arg.dim_index >= 8
   }
 
   template<typename Float, int nSpin, int nColor, typename Arg>
@@ -632,12 +644,53 @@ namespace quda {
     convertStaggered<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
   }
 
+  /**
+   * Rescale the matrix elements by arg.rescale
+   */
+  template<typename Float, int nSpin, int nColor, typename Arg>
+  __device__ __host__ void rescaleStaggeredY(Arg &arg, int parity, int x_cb, int c_row, int c_col) {
+#pragma unroll
+    for (int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+#pragma unroll
+      for (int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+        complex<Float> M = arg.Y(arg.dim_index,parity,x_cb,s_row,s_col,c_row,c_col);
+        arg.Y(arg.dim_index,parity,x_cb,s_row,s_col,c_row,c_col) = arg.rescale*M;
+      } //Spin column
+    } //Spin row
+  }
+  template<typename Float, int nSpin, int nColor, typename Arg>
+  void RescaleStaggeredYCPU(Arg &arg) {
+    for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
+      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+  for(int c_row = 0; c_row < nColor; c_row++) { //Color row
+    for(int c_col = 0; c_col < nColor; c_col++) { //Color column
+      rescaleStaggeredY<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+    }
+  }
+      } // c/b volume
+    } // parity
+  }
+  template<typename Float, int nSpin, int nColor, typename Arg>
+  __global__ void RescaleStaggeredYGPU(Arg arg) {
+    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
+    if (x_cb >= arg.coarseVolumeCB) return;
+    int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
+    if (parity_c_col >= 2*nColor) return;
+    int c_col = parity_c_col % nColor; // color col index
+    int parity = parity_c_col / nColor;
+    int c_row = blockDim.z*blockIdx.z + threadIdx.z; // color row index
+    if (c_row >= nColor) return;
+    rescaleStaggeredY<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+  }
+
   enum ComputeType {
     COMPUTE_UV,
     COMPUTE_VUV,
     COMPUTE_REVERSE_Y,
     COMPUTE_MASS,
     COMPUTE_CONVERT,
+    COMPUTE_RESCALE,
     COMPUTE_INVALID
   };
 
@@ -650,6 +703,8 @@ namespace quda {
     const ColorSpinorField &meta;
     GaugeField &Y;
     GaugeField &X;
+    GaugeField &Y_atomic;
+    GaugeField &X_atomic;
 
     int dim;
     QudaDirection dir;
@@ -675,7 +730,9 @@ namespace quda {
       case COMPUTE_MASS:
         flops_ = 2l * arg.coarseVolumeCB*coarseSpin*coarseColor;
         break;
-      case COMPUTE_CONVERT: // no floating point operations
+      case COMPUTE_CONVERT:
+      case COMPUTE_RESCALE:
+        // no floating point operations
         flops_ = 0;
         break;
       default:
@@ -708,6 +765,10 @@ namespace quda {
         break;
       case COMPUTE_CONVERT:
         bytes_ = 2*(arg.X.Bytes() + arg.X_atomic.Bytes() + 8*(arg.Y.Bytes() + arg.Y_atomic.Bytes()));
+        bytes_ = dim == 4 ? 2*(arg.X.Bytes() + arg.X_atomic.Bytes()) : 2*(arg.Y.Bytes() + arg.Y_atomic.Bytes());
+        break;
+      case COMPUTE_RESCALE:
+        bytes_ = 2*2*arg.Y.Bytes(); // 2 from i/o, 2 from parity
         break;
       default:
         errorQuda("Undefined compute type %d", type);
@@ -725,6 +786,7 @@ namespace quda {
       case COMPUTE_REVERSE_Y:
       case COMPUTE_MASS:
       case COMPUTE_CONVERT:
+      case COMPUTE_RESCALE:
         threads = arg.coarseVolumeCB;
         break;
       default:
@@ -742,9 +804,9 @@ namespace quda {
     }
 
   public:
-    CalculateStaggeredY(Arg &arg, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X)
+    CalculateStaggeredY(Arg &arg, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X, GaugeField &Y_atomic, GaugeField &X_atomic)
       : TunableVectorYZ(2,1), arg(arg), type(COMPUTE_INVALID),
-        meta(meta), Y(Y), X(X), dim(0), dir(QUDA_BACKWARDS)
+        meta(meta), Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic), dim(0), dir(QUDA_BACKWARDS)
     {
       strcpy(aux, meta.AuxString());
       strcat(aux,comm_dim_partitioned_string());
@@ -776,6 +838,8 @@ namespace quda {
 
       	} else if (type == COMPUTE_VUV) {
 
+          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
+
       	  if (dir == QUDA_BACKWARDS) {
       	    if      (dim==0) ComputeStaggeredVUVCPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
       	    else if (dim==1) ComputeStaggeredVUVCPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
@@ -800,7 +864,13 @@ namespace quda {
 
       	} else if (type == COMPUTE_CONVERT) {
 
+          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
       	  ConvertStaggeredCPU<Float,coarseSpin,coarseColor>(arg);
+
+        } else if (type == COMPUTE_RESCALE) {
+
+          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
+          RescaleStaggeredYCPU<Float,coarseSpin,coarseColor>(arg);
 
       	} else {
       	  errorQuda("Undefined compute type %d", type);
@@ -824,6 +894,8 @@ namespace quda {
       	  }
 
       	} else if (type == COMPUTE_VUV) {
+
+          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
           // need to resize the grid since we don't tune over the entire coarseColor dimension
           // factor of two comes from parity onto different blocks (e.g. in the grid)
@@ -914,10 +986,15 @@ namespace quda {
 
       	} else if (type == COMPUTE_CONVERT) {
 
-      	  tp.grid.y = 2*coarseColor;
+      	  arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
       	  ConvertStaggeredGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 
-      	} else {
+      	} else if (type == COMPUTE_RESCALE) {
+
+          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
+          RescaleStaggeredYGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+
+        } else {
       	  errorQuda("Undefined compute type %d", type);
         }
       }
@@ -950,10 +1027,9 @@ namespace quda {
         }
       break;
       case COMPUTE_REVERSE_Y:
-        resizeVector(2*coarseColor,coarseColor);
-        break;
       case COMPUTE_CONVERT:
-        resizeVector(1,coarseColor);
+      case COMPUTE_RESCALE:
+        resizeVector(2*coarseColor,coarseColor);
         break;
       case COMPUTE_UV:
         resizeVector(2,coarseColor);
@@ -1060,6 +1136,7 @@ namespace quda {
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeStaggeredYreverse");
       else if (type == COMPUTE_MASS)               strcat(Aux,",computeStaggeredMass");
       else if (type == COMPUTE_CONVERT)            strcat(Aux,",computeStaggeredConvert");
+      else if (type == COMPUTE_RESCALE)            strcat(Aux,",ComputeStaggeredRescale");
       else errorQuda("Unknown type=%d\n", type);
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
@@ -1075,7 +1152,7 @@ namespace quda {
       }
 
       const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_MASS ||
-			     type == COMPUTE_CONVERT) ? X.VolString () : meta.VolString();
+			     type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString () : meta.VolString();
 
       if (type == COMPUTE_VUV) {
       	strcat(Aux, (meta.Location()==QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
@@ -1093,10 +1170,16 @@ namespace quda {
     void preTune() {
       switch (type) {
       case COMPUTE_VUV:
-      case COMPUTE_CONVERT:
-        Y.backup();
+        Y_atomic.backup();
       case COMPUTE_MASS:
-        X.backup();
+        X_atomic.backup();
+        break;
+      case COMPUTE_CONVERT:
+        if (Y_atomic.Gauge_p() == Y.Gauge_p()) Y.backup();
+        if (X_atomic.Gauge_p() == X.Gauge_p()) X.backup();
+        break;
+      case COMPUTE_RESCALE:
+        Y.backup();
       case COMPUTE_UV:
       case COMPUTE_REVERSE_Y:
         break;
@@ -1108,13 +1191,19 @@ namespace quda {
     void postTune() {
       switch (type) {
       case COMPUTE_VUV:
-      case COMPUTE_CONVERT:
-        Y.restore();
+        Y_atomic.restore();
       case COMPUTE_MASS:
-        X.restore();
+        X_atomic.restore();
+        break;
+      case COMPUTE_CONVERT:
+        if (Y_atomic.Gauge_p() == Y.Gauge_p()) Y.restore();
+        if (X_atomic.Gauge_p() == X.Gauge_p()) X.restore();
+        break;
+      case COMPUTE_RESCALE:
+        Y.restore();
       case COMPUTE_UV:
       case COMPUTE_REVERSE_Y:
-	break;
+        break;
       default:
 	errorQuda("Undefined compute type %d", type);
       }
@@ -1143,8 +1232,8 @@ namespace quda {
   void calculateStaggeredY(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
 		  Ftmp &UV, Vt &V, fineGauge &G,
-		  GaugeField &Y_, GaugeField &X_, ColorSpinorField &uv,
-		  const ColorSpinorField &v,
+		  GaugeField &Y_, GaugeField &X_, GaugeField &Y_atomic_, GaugeField &X_atomic_,
+      ColorSpinorField &uv, const ColorSpinorField &v,
 		  double mass, QudaDiracType dirac, QudaMatPCType matpc,
 		  const int *fine_to_coarse, const int *coarse_to_fine) {
 
@@ -1184,7 +1273,7 @@ namespace quda {
 
     typedef CalculateStaggeredYArg<Float,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,Ftmp,Vt> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, G, V, mass, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
-    CalculateStaggeredY<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_);
+    CalculateStaggeredY<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_);
 
     QudaFieldLocation location = checkLocation(Y_, X_, v);
     printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -1204,6 +1293,8 @@ namespace quda {
       arg.Y_atomic.resetScale(max);
       arg.X_atomic.resetScale(max);
     }
+
+    bool set_scale = false; // records where the scale has been set already or not
 
     // First compute the coarse forward links if needed
     if (bidirectional_links) {
@@ -1225,9 +1316,38 @@ namespace quda {
       	y.apply(0);
       	printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
-      	y.setComputeType(COMPUTE_VUV); // compute Y += VUV
+      	// if we are writing to a temporary, we need to zero it first
+        if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
+        y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       	y.apply(0);
-      	printfQuda("Y2[%d] = %e\n", d, arg.Y_atomic.norm2(4+d));
+      	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", 4+d, arg.Y_atomic.norm2( (4+d) % arg.Y_atomic.geometry ));
+        // now convert from atomic to application computation format if necessary for Y[d]
+        if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint()) {
+          if (coarseGauge::fixedPoint()) {
+            double y_max = arg.Y_atomic.abs_max( (4+d) % arg.Y_atomic.geometry );
+            if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, y_max, 4+d, Y_.Scale());
+            if (!set_scale) {
+              Y_.Scale(1.1*y_max); // slightly oversize to avoid unnecessary rescaling
+              arg.Y.resetScale(Y_.Scale());
+              set_scale = true;
+            } else if (y_max > Y_.Scale()) {
+              // we have exceeded the maximum used before so we need to reset the maximum and rescale the elements
+              arg.rescale = Y_.Scale() / y_max; // how much we need to shrink the elements by
+              y.setComputeType(COMPUTE_RESCALE);
+              for (int d_=0; d_<d; d_++) {
+                y.setDimension(d_);
+                y.apply(0);
+              }
+              y.setDimension(d);
+              Y_.Scale(y_max);
+              arg.Y.resetScale(Y_.Scale());
+            }
+          }
+          y.setComputeType(COMPUTE_CONVERT);
+          y.apply(0);
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", 4+d, arg.Y.norm2( 4+d ));
+        }
+
       }
     }
 
@@ -1250,11 +1370,50 @@ namespace quda {
       y.apply(0);
       printfQuda("UV2[%d] = %e\n", d+4, arg.UV.norm2());
 
+      // if we are writing to a temporary, we need to zero it first
+      if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
+
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(0);
-      printfQuda("Y2[%d] = %e\n", d+4, arg.Y_atomic.norm2(d));
+            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", d, arg.Y_atomic.norm2( d%arg.Y_atomic.geometry ));
+      // now convert from atomic to application computation format if necessary for Y[d]
+      if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint() ) {
+        if (coarseGauge::fixedPoint()) {
+          double y_max = arg.Y_atomic.abs_max( d % arg.Y_atomic.geometry );
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", d, y_max, d, Y_.Scale());
+          if (!set_scale) {
+            Y_.Scale(1.1*y_max); // slightly oversize to avoid unnecessary rescaling
+            arg.Y.resetScale(Y_.Scale());
+            set_scale = true;
+          } else if (y_max > Y_.Scale()) {
+            // we have exceeded the maximum used before so we need to reset the maximum and rescale the elements
+            arg.rescale = Y_.Scale() / y_max; // how much we need to shrink the elements by
+            y.setComputeType(COMPUTE_RESCALE);
+            // update all prior compute Y links
+            if (bidirectional_links) {
+              y.setDirection(QUDA_FORWARDS);
+              for (int d_=0; d_<4; d_++) {
+                y.setDimension(d_);
+                y.apply(0);
+              }
+            }
+            y.setDirection(QUDA_BACKWARDS);
+            for (int d_=0; d_<d; d_++) {
+              y.setDimension(d_);
+              y.apply(0);
+            }
+            y.setDimension(d);
+            Y_.Scale(y_max);
+            arg.Y.resetScale(Y_.Scale());
+          }
+        }
+        y.setComputeType(COMPUTE_CONVERT);
+        y.apply(0);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", d, arg.Y.norm2( d ));
+      }
 
     }
+
     printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
 
     // if not doing a preconditioned operator then we can trivially
@@ -1270,13 +1429,22 @@ namespace quda {
     y.setComputeType(COMPUTE_MASS);
     y.apply(0);
 
-    printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
+    // now convert from atomic to application computation format if necessary for X field
+    if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint() ) {
+      // dim=4 corresponds to X field
+      y.setDimension(8);
+      y.setDirection(QUDA_BACKWARDS);
+      if (coarseGauge::fixedPoint()) {
+        double x_max = arg.X_atomic.abs_max(0);
+        X_.Scale(x_max);
+        arg.X.resetScale(x_max);
+      }
 
-    // now convert from atomic to application computation format if necesaary
-    if (coarseGaugeAtomic::fixedPoint()) {
       y.setComputeType(COMPUTE_CONVERT);
       y.apply(0);
     }
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", arg.X.norm2(0));
 
   }
 
