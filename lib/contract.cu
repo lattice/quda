@@ -1,3 +1,16 @@
+#include <color_spinor_field.h>
+#include <tune_quda.h>
+
+// these control the Wilson-type actions
+#ifdef GPU_WILSON_DIRAC
+//#define DIRECT_ACCESS_LINK
+//#define DIRECT_ACCESS_WILSON_SPINOR
+//#define DIRECT_ACCESS_WILSON_ACCUM
+//#define DIRECT_ACCESS_WILSON_INTER
+//#define DIRECT_ACCESS_WILSON_PACK_SPINOR
+//#define DIRECT_ACCESS_CLOVER
+#endif // GPU_WILSON_DIRAC
+
 namespace quda {
 
   namespace dslash_aux {

@@ -28,7 +28,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
 	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
 	blas_quda.o multi_blas_quda.o copy_quda.o 			\
-	reduce_quda.o multi_reduce_quda.o				\
+	reduce_quda.o multi_reduce_quda.o contract.o			\
 	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	copy_color_spinor.o copy_color_spinor_dd.o			\
