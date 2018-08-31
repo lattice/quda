@@ -373,8 +373,10 @@ namespace quda {
     diracParam.matpcType = matpc_type;
     diracParam.type = QUDA_COARSE_DIRAC;
     diracParam.tmp1 = tmp_coarse;
-    diracParam.type = QUDA_COARSE_DIRAC;
-    
+    diracParam.halo_precision = param.mg_global.precision_null[param.level];
+    constexpr int MAX_BLOCK_FLOAT_NC=32; // FIXME this is the maximum number of colors for which we support block-float format
+    if (param.Nvec > MAX_BLOCK_FLOAT_NC) diracParam.halo_precision = QUDA_SINGLE_PRECISION;
+
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;
     diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,

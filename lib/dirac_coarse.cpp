@@ -238,9 +238,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out,in);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (8*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
@@ -255,9 +255,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out,in);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger, commDim);
+      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim);
+      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim, halo_precision);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
@@ -268,9 +268,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out,in);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
