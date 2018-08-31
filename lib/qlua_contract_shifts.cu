@@ -96,7 +96,7 @@ namespace quda {
    * gauge fields in any direction and dimension.
    * One needs to properly have the ghosts loaded in the input gauge field before calling this function.
    */
-  __device__ void ShiftGauge_dev(Link &shfGauge, TMDcontractState *TMDcs, qcTMD_ShiftDir muSrc,
+  __device__ void ShiftGauge_dev(Link &shfGauge, TMDcontractState *TMDcs, qcTMD_DimU muSrc,
   				 qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
   				 int x_cb, int pty){
     
@@ -156,7 +156,7 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
 
-  __global__ void ShiftGauge_kernel(TMDcontractState *TMDcs, qcTMD_ShiftDir muDst, qcTMD_ShiftDir muSrc,
+  __global__ void ShiftGauge_kernel(TMDcontractState *TMDcs, qcTMD_DimU muDst, qcTMD_DimU muSrc,
                                     qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
     
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
@@ -167,10 +167,11 @@ namespace quda {
     if (pty >= TMDcs->nParity) return;
 
     Link shfGauge;
+    int mu = (int)muDst;      //-- Lorentz index of output (destination) gauge field
 
     ShiftGauge_dev(shfGauge, TMDcs, muSrc, shfDir, shfSgn, shfType, x_cb, pty);
 
-    TMDcs->shfU(muDst, x_cb, pty) = shfGauge;
+    TMDcs->auxU(mu, x_cb, pty) = shfGauge;
 
   }//- ShiftGauge_kernel
 

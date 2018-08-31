@@ -18,11 +18,11 @@ namespace quda {
 
 
 
-  __device__ void ShiftGauge_dev(Link &shfGauge, TMDcontractState *TMDcs, qcTMD_ShiftDir muSrc,
+  __device__ void ShiftGauge_dev(Link &shfGauge, TMDcontractState *TMDcs, qcTMD_DimU muSrc,
                                  qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
                                  int x_cb, int pty);
 
-  __global__ void ShiftGauge_kernel(TMDcontractState *TMDcs, qcTMD_ShiftDir muDst, qcTMD_ShiftDir muSrc,
+  __global__ void ShiftGauge_kernel(TMDcontractState *TMDcs, qcTMD_DimU muDst, qcTMD_DimU muSrc,
   				    qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType);
 
 } //- namespace quda

@@ -146,7 +146,7 @@ namespace quda {
     Propagator auxProp[QUDA_PROP_NVEC];  // This will be an auxilliary propagator
 
     GaugeU U;                   // Original Gauge Field
-    GaugeU shfU;                // Shifted Gauge Field
+    GaugeU auxU;                // Auxilliary Gauge Field
 
     bool csInit = false;
     
@@ -177,7 +177,7 @@ namespace quda {
     }
     
     TMDcontractState(ColorSpinorField *fwdVec, ColorSpinorField *auxVec, int ivec,
-    		     GaugeField *U_, GaugeField *shfU_,
+    		     GaugeField *U_, GaugeField *auxU_,
     		     qluaCntr_Type cntrType, bool preserveBasis)
       : cntrType(cntrType), parity(0), nParity(fwdVec->SiteSubset()), nFace(1),
     	dim{ (3-nParity) * fwdVec->X(0), fwdVec->X(1), fwdVec->X(2), fwdVec->X(3), 1 },
@@ -188,9 +188,9 @@ namespace quda {
       fwdProp[ivec].init(*fwdVec);
       auxProp[ivec].init(*auxVec);
       if(U_    == NULL) errorQuda("TMDcontractState: Gauge Field U    is not allocated!\n");
-      if(shfU_ == NULL) errorQuda("TMDcontractState: Gauge Field shfU is not allocated!\n");
+      if(auxU_ == NULL) errorQuda("TMDcontractState: Gauge Field auxU is not allocated!\n");
       U.init(*U_);
-      shfU.init(*shfU_);
+      auxU.init(*auxU_);
       csInit = true;
     }
 
@@ -200,12 +200,18 @@ namespace quda {
       auxProp[ivec].init(*auxVec);
     }//-- initPropShf
     
-    void initGaugeShf(GaugeField *U_, GaugeField *shfU_){      
+    void initGaugeShf(GaugeField *U_, GaugeField *auxU_){
       if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
       if(U_    == NULL) errorQuda("TMDcontractState: Gauge Field U    is not allocated!\n");
-      if(shfU_ == NULL) errorQuda("TMDcontractState: Gauge Field shfU is not allocated!\n");
+      if(auxU_ == NULL) errorQuda("TMDcontractState: Gauge Field auxU is not allocated!\n");
       U.init(*U_);
-      shfU.init(*shfU_);
+      auxU.init(*auxU_);
+    }//-- initGaugeShf
+    
+    void initGaugeShf(GaugeField *auxU_){
+      if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
+      if(auxU_ == NULL) errorQuda("TMDcontractState: Gauge Field auxU is not allocated!\n");
+      auxU.init(*auxU_);
     }//-- initGaugeShf
 
     void initBwdProp(ColorSpinorField **bwdProp_){
@@ -263,6 +269,15 @@ namespace quda {
     qcShfDir_z = 2,
     qcShfDir_t = 3
   } qcTMD_ShiftDir;
+
+  typedef enum qcTMD_DimU_s {
+    qcDimU_None = -1,
+    qcDimU_x = 0,
+    qcDimU_y = 1,
+    qcDimU_z = 2,
+    qcDimU_t = 3,
+    qcDimAll = 10
+  } qcTMD_DimU;
 
   typedef enum qcTMD_ShiftSgn_s {
     qcShfSgnNone  = -1,
