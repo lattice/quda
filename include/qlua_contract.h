@@ -147,6 +147,8 @@ namespace quda {
 
     GaugeU U;                   // Original Gauge Field
     GaugeU shfU;                // Shifted Gauge Field
+
+    bool csInit = false;
     
     qluaCntr_Type cntrType;     // contraction type
     int parity;                 // hard code to 0 for now
@@ -159,16 +161,29 @@ namespace quda {
     int volume;                 // full-site local volume
     bool preserveBasis;         // whether to preserve the gamma basis or not
 
-    TMDcontractState(){}
+    TMDcontractState () {}
+
+    TMDcontractState(ColorSpinorField **prop, GaugeField *U_, qluaCntr_Type cntrType, bool preserveBasis)
+      : cntrType(cntrType), preserveBasis(preserveBasis),
+	parity(0), nParity(prop[0]->SiteSubset()), nFace(1),
+    	dim{ (3-nParity) * prop[0]->X(0), prop[0]->X(1), prop[0]->X(2), prop[0]->X(3), 1 },
+        commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+        lL{prop[0]->X(0), prop[0]->X(1), prop[0]->X(2), prop[0]->X(3)},
+        volumeCB(prop[0]->VolumeCB()), volume(prop[0]->Volume())
+    {
+      if(U_==NULL) errorQuda("TMDcontractState: Gauge Field U is not allocated!\n");
+      U.init(*U_);
+      csInit = true;
+    }
     
     TMDcontractState(ColorSpinorField *fwdVec, ColorSpinorField *auxVec, int ivec,
     		     GaugeField *U_, GaugeField *shfU_,
     		     qluaCntr_Type cntrType, bool preserveBasis)
       : cntrType(cntrType), parity(0), nParity(fwdVec->SiteSubset()), nFace(1),
     	dim{ (3-nParity) * fwdVec->X(0), fwdVec->X(1), fwdVec->X(2), fwdVec->X(3), 1 },
-      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      lL{fwdVec->X(0), fwdVec->X(1), fwdVec->X(2), fwdVec->X(3)},
-      volumeCB(fwdVec->VolumeCB()), volume(fwdVec->Volume()), preserveBasis(preserveBasis)
+        commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+        lL{fwdVec->X(0), fwdVec->X(1), fwdVec->X(2), fwdVec->X(3)},
+        volumeCB(fwdVec->VolumeCB()), volume(fwdVec->Volume()), preserveBasis(preserveBasis)
     {
       fwdProp[ivec].init(*fwdVec);
       auxProp[ivec].init(*auxVec);
@@ -176,37 +191,25 @@ namespace quda {
       if(shfU_ == NULL) errorQuda("TMDcontractState: Gauge Field shfU is not allocated!\n");
       U.init(*U_);
       shfU.init(*shfU_);
+      csInit = true;
     }
 
-    void shfInit(ColorSpinorField *fwdVec, ColorSpinorField *auxVec, int ivec,
-		 GaugeField *U_, GaugeField *shfU_,
-		 qluaCntr_Type cntrType_, bool preserveBasis_){      
-
+    void initPropShf(ColorSpinorField *fwdVec, ColorSpinorField *auxVec, int ivec){
+      if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
       fwdProp[ivec].init(*fwdVec);
       auxProp[ivec].init(*auxVec);
+    }//-- initPropShf
+    
+    void initGaugeShf(GaugeField *U_, GaugeField *shfU_){      
+      if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
       if(U_    == NULL) errorQuda("TMDcontractState: Gauge Field U    is not allocated!\n");
       if(shfU_ == NULL) errorQuda("TMDcontractState: Gauge Field shfU is not allocated!\n");
       U.init(*U_);
       shfU.init(*shfU_);
-
-      cntrType = cntrType_;
-      preserveBasis = preserveBasis_;
-      parity = 0;
-      nFace  = 1;
-      nParity = fwdVec->SiteSubset();
-      volumeCB = fwdVec->VolumeCB();
-      volume = fwdVec->Volume();
-      for(int i=0;i<4;i++){
-	dim[i] = fwdVec->X(i);
-	commDim[i] = comm_dim_partitioned(i);
-	lL[i] = fwdVec->X(i);
-      }
-      dim[0] *= (3-nParity);
-      dim[4] = 1;
-
-    }//-- shfInit
+    }//-- initGaugeShf
 
     void initBwdProp(ColorSpinorField **bwdProp_){
+      if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
         bwdProp[ivec].init(*bwdProp_[ivec]);
     }

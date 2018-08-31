@@ -282,9 +282,6 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
-    TMDcontractState TMDcs;
-    TMDcontractState *TMDcs_dev;
-
     double t5 = MPI_Wtime();
     switch(mpParam.cntrType){
     case what_baryon_sigma_UUS: {
@@ -318,6 +315,10 @@ namespace quda {
        * hence TMDcs accepts (and returns) elements of the cudaColorSpinorField propagators.
        * The shifted propagator is placed into cudaProp3.
        */
+
+      TMDcontractState TMDcs(cudaProp1, U, mpParam.cntrType, paramAPI.preserveBasis);
+      TMDcontractState *TMDcs_dev;
+
       cudaMalloc((void**)&(TMDcs_dev), sizeof(TMDcontractState) );
       checkCudaError();
 
@@ -331,7 +332,7 @@ namespace quda {
       double t7 = MPI_Wtime();
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
 	qcExchangeGhostVec(cudaProp1, ivec);
-	TMDcs.shfInit(cudaProp1[ivec], cudaProp3[ivec], ivec, U, shfU, mpParam.cntrType, paramAPI.preserveBasis);
+	TMDcs.initPropShf(cudaProp1[ivec], cudaProp3[ivec], ivec);
 	perform_ShiftVectorOnAxis(TMDcs_dev, &TMDcs, ivec, shfDir, shfSgn, shfType);
       }
       double t8 = MPI_Wtime();
@@ -340,12 +341,12 @@ namespace quda {
       qcSwapCudaProp(cudaProp1, cudaProp3);
       qcSwapStateProp(TMDcs.fwdProp, TMDcs.auxProp);
 
-      //      qcSwapVector(&TMDcs.fwdProp[ivec], &TMDcs.auxProp[ivec]);
-
       cudaMemcpy(TMDcs_dev, &TMDcs, sizeof(TMDcontractState), cudaMemcpyHostToDevice);    
       checkCudaError();
 
       qtmd_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, TMDcs_dev);
+
+      cudaFree(TMDcs_dev);
     } break;
     case what_qpdf_g_F_B:
     default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[mpParam.cntrType]);
@@ -358,7 +359,6 @@ namespace quda {
     //-- Clean-up
     free(func_name);
     cudaFree(arg_dev);
-    if(mpParam.cntrType == what_tmd_g_F_B) cudaFree(TMDcs_dev);
 
   }//-- function
   
@@ -366,3 +366,5 @@ namespace quda {
 
 
 
+
+      //      qcSwapVector(&TMDcs.fwdProp[ivec], &TMDcs.auxProp[ivec]);
