@@ -669,6 +669,53 @@ namespace quda {
     QC(ax_py_P)(1., tmpP1,1, r,r_stride);
   }
 
+
+  /* gres[is,js] <- Tr_c[u . x . y] = \sum_{ic,kc,jc,ks} u[ic,jc] * x[jc,is,kc,ks] * y[kc,ks,kc,is] */
+  INFUNC_ DEVFUNC_ void 
+  QC(G_peqa_colortrace_U_dot_P_dot_P)(
+				      QC_CPLX *gres, int gres_stride, QC_CPLX a,
+				      const QC_CPLX *u, int u_stride,
+				      const QC_CPLX *x, int x_stride,
+				      const QC_CPLX *y, int y_stride) 
+  {
+#pragma unroll
+    for (int is = 0 ; is < QC_Ns ; is++)
+#pragma unroll
+      for (int js = 0 ; js < QC_Ns ; js++) {
+	QC_CPLX s = 0;
+#pragma unroll
+	for (int ic = 0 ; ic < QC_Nc ; ic++)
+#pragma unroll
+	  for (int jc = 0 ; jc < QC_Nc ; jc++) {
+	    QC_CPLX t = 0;
+#pragma unroll
+	    for (int kc = 0 ; kc < QC_Nc ; kc++)
+#pragma unroll
+	      for (int ks = 0 ; ks < QC_Ns ; ks++) {
+		t += x[x_stride*QC_LIDX_P(jc, is, kc, ks)] 
+		  * y[y_stride*QC_LIDX_P(kc, ks, ic, js)];
+	      }
+	    s += u[u_stride*QC_LIDX_M(ic, jc)] * t;
+	  }
+	gres[gres_stride * QC_LIDX_G(is, js)] += a*s;
+      }
+  }
+
+  /* compute res[gn] = Tr [Gamma[gn] * F * B] */
+  DEVFUNC_ void 
+  QC(contract_tr_g_U_P_P)(
+			  QC_CPLX *gres, int gres_stride,
+			  const QC_CPLX *U, int U_stride,
+			  const QC_CPLX *F, int F_stride,
+			  const QC_CPLX *B, int B_stride)
+  {
+    QC_CPLX tmpG1[QC_LEN_G];
+    QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
+    QC(G_peqa_colortrace_U_dot_P_dot_P)(tmpG1,1, 1., U,U_stride, F,F_stride, B,B_stride);
+    QC(gvec_eq_trace_gamma_dot_G)(gres,gres_stride, tmpG1,1);
+  }
+  
+
   DEVFUNC_ void 
     QC(baryon_sigma_seqsource_d)(
 				 QC_CPLX *r, int r_stride,

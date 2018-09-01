@@ -209,6 +209,11 @@ namespace quda {
 					     const QC_CPLX *Fu, int Fu_stride, 
 					     const QC_CPLX *Fd, int Fd_stride,
 					     const QC_CPLX *T_gvec);
+  DEVFUNC_ void QC(contract_tr_g_U_P_P)(
+					QC_CPLX *gres, int gres_stride,
+					const QC_CPLX *U, int U_stride,
+					const QC_CPLX *F, int F_stride,
+					const QC_CPLX *B, int B_stride);
   DEVFUNC_ void QC(baryon_sigma_seqsource_d)(
 					     QC_CPLX *r, int r_stride,
 					     const QC_CPLX *Fu1, int Fu1_stride,
