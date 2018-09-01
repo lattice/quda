@@ -138,19 +138,9 @@ namespace quda {
   };//-- Structure definition
   //---------------------------------------------------------------------------
 
-  //- Additional structure required for the TMD contractions
-  struct TMDcontractState {
 
-    Propagator fwdProp[QUDA_PROP_NVEC];  // This will be a pointer to the (shifted) forward propagator
-    Propagator bwdProp[QUDA_PROP_NVEC];  // This will be a pointer to the backward propagator
-    Propagator auxProp[QUDA_PROP_NVEC];  // This will be an auxilliary propagator
-
-    GaugeU U;                   // Original Gauge Field
-    GaugeU auxU;                // Auxilliary Gauge Field
-
-    bool csInit = false;
+  struct ArgGeom {
     
-    qluaCntr_Type cntrType;     // contraction type
     int parity;                 // hard code to 0 for now
     int nParity;                // number of parities we're working on
     int nFace;                  // hard code to 1 for now
@@ -159,69 +149,97 @@ namespace quda {
     int lL[4];                  // 4-d local lattice dimensions
     int volumeCB;               // checkerboarded volume
     int volume;                 // full-site local volume
-    bool preserveBasis;         // whether to preserve the gamma basis or not
+    
+    ArgGeom () {}
 
-    TMDcontractState () {}
-
-    TMDcontractState(ColorSpinorField **prop, GaugeField *U_, qluaCntr_Type cntrType, bool preserveBasis)
-      : cntrType(cntrType), preserveBasis(preserveBasis),
-	parity(0), nParity(prop[0]->SiteSubset()), nFace(1),
-    	dim{ (3-nParity) * prop[0]->X(0), prop[0]->X(1), prop[0]->X(2), prop[0]->X(3), 1 },
+    ArgGeom(ColorSpinorField *x)
+      : parity(0), nParity(x->SiteSubset()), nFace(1),
+    	dim{ (3-nParity) * x->X(0), x->X(1), x->X(2), x->X(3), 1 },
         commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-        lL{prop[0]->X(0), prop[0]->X(1), prop[0]->X(2), prop[0]->X(3)},
-        volumeCB(prop[0]->VolumeCB()), volume(prop[0]->Volume())
-    {
-      if(U_==NULL) errorQuda("TMDcontractState: Gauge Field U is not allocated!\n");
-      U.init(*U_);
-      csInit = true;
-    }
-    
-    TMDcontractState(ColorSpinorField *fwdVec, ColorSpinorField *auxVec, int ivec,
-    		     GaugeField *U_, GaugeField *auxU_,
-    		     qluaCntr_Type cntrType, bool preserveBasis)
-      : cntrType(cntrType), parity(0), nParity(fwdVec->SiteSubset()), nFace(1),
-    	dim{ (3-nParity) * fwdVec->X(0), fwdVec->X(1), fwdVec->X(2), fwdVec->X(3), 1 },
+        lL{x->X(0), x->X(1), x->X(2), x->X(3)},
+        volumeCB(x->VolumeCB()), volume(x->Volume())
+    {}
+
+    ArgGeom(cudaGaugeField *u) 
+      : parity(0), nParity(u->SiteSubset()), nFace(1),
+	dim{ (3-nParity) * u->X()[0], u->X()[1], u->X()[2], u->X()[3], 1 },
         commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-        lL{fwdVec->X(0), fwdVec->X(1), fwdVec->X(2), fwdVec->X(3)},
-        volumeCB(fwdVec->VolumeCB()), volume(fwdVec->Volume()), preserveBasis(preserveBasis)
+        lL{u->X()[0], u->X()[1], u->X()[2], u->X()[3]},
+        volumeCB(u->VolumeCB()), volume(u->Volume())
+    {}
+  };//-- ArgGeom
+
+
+  struct Arg_ShiftCudaVec_nonCov : public ArgGeom {
+    
+    Propagator src, dst;
+    
+    Arg_ShiftCudaVec_nonCov(ColorSpinorField *dst_, ColorSpinorField *src_)
+      : ArgGeom(src_)
     {
-      fwdProp[ivec].init(*fwdVec);
-      auxProp[ivec].init(*auxVec);
-      if(U_    == NULL) errorQuda("TMDcontractState: Gauge Field U    is not allocated!\n");
-      if(auxU_ == NULL) errorQuda("TMDcontractState: Gauge Field auxU is not allocated!\n");
-      U.init(*U_);
-      auxU.init(*auxU_);
-      csInit = true;
+      src.init(*src_);
+      dst.init(*dst_);
     }
+  };
 
-    void initPropShf(ColorSpinorField *fwdVec, ColorSpinorField *auxVec, int ivec){
-      if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
-      fwdProp[ivec].init(*fwdVec);
-      auxProp[ivec].init(*auxVec);
-    }//-- initPropShf
-    
-    void initGaugeShf(GaugeField *U_, GaugeField *auxU_){
-      if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
-      if(U_    == NULL) errorQuda("TMDcontractState: Gauge Field U    is not allocated!\n");
-      if(auxU_ == NULL) errorQuda("TMDcontractState: Gauge Field auxU is not allocated!\n");
-      U.init(*U_);
-      auxU.init(*auxU_);
-    }//-- initGaugeShf
-    
-    void initGaugeShf(GaugeField *auxU_){
-      if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
-      if(auxU_ == NULL) errorQuda("TMDcontractState: Gauge Field auxU is not allocated!\n");
-      auxU.init(*auxU_);
-    }//-- initGaugeShf
+  struct Arg_ShiftCudaVec_Cov : public Arg_ShiftCudaVec_nonCov {
 
-    void initBwdProp(ColorSpinorField **bwdProp_){
-      if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
-        bwdProp[ivec].init(*bwdProp_[ivec]);
+    Propagator src, dst;
+    GaugeU U;
+
+    Arg_ShiftCudaVec_Cov(ColorSpinorField *dst_, ColorSpinorField *src_, 
+			 cudaGaugeField *gf_) 
+      : Arg_ShiftCudaVec_nonCov(dst_, src_)
+    {
+      U.init(*gf_);
     }
+  };
+  //---------------------------------------------------------------------
+  
 
-  };//-- Structure definition
-  //---------------------------------------------------------------------------
+  struct Arg_ShiftGauge_nonCov : public ArgGeom {
+
+    GaugeU src, dst;
+
+    Arg_ShiftGauge_nonCov(cudaGaugeField *dst_, cudaGaugeField *src_)
+      : ArgGeom(src_)
+    {
+      src.init(*src_);
+      dst.init(*dst_);
+    }
+  };
+  
+  struct Arg_ShiftLink_Cov : public ArgGeom {
+
+    int i_src, i_dst;
+    GaugeU src, dst;
+    GaugeU U;
+
+    Arg_ShiftLink_Cov(cudaGaugeField *dst_, int i_dst_,
+		      cudaGaugeField *src_, int i_src_, 
+		      cudaGaugeField *gf_)
+      : ArgGeom(gf_), i_src(i_src_), i_dst(i_dst_)
+    {
+      src.init(*src_);
+      dst.init(*dst_);
+      U.init(*gf_);
+    }
+  };
+
+  struct Arg_ShiftLink_AdjSplitCov : public Arg_ShiftLink_Cov {
+
+    GaugeU U2;
+
+    Arg_ShiftLink_AdjSplitCov(cudaGaugeField *dst_, int i_dst_,
+			      cudaGaugeField *src_, int i_src_,
+			      cudaGaugeField *gf_, cudaGaugeField *gf2_)
+      : Arg_ShiftLink_Cov(dst_, i_dst_, src_, i_src_, gf_)
+    {
+      U2.init(*gf2_);
+    }
+  };
+  //---------------------------------------------------------------------
+
 
   const int nShiftFlag = 20;
   const int nShiftType = 2;
@@ -271,13 +289,13 @@ namespace quda {
   } qcTMD_ShiftDir;
 
   typedef enum qcTMD_DimU_s {
-    qcDimU_None = -1,
+    qcShfDimU_None = -1,
     qcDimU_x = 0,
     qcDimU_y = 1,
     qcDimU_z = 2,
     qcDimU_t = 3,
     qcDimAll = 10
-  } qcTMD_DimU;
+  } qcTMD_ShiftDimU;
 
   typedef enum qcTMD_ShiftSgn_s {
     qcShfSgnNone  = -1,
@@ -295,3 +313,89 @@ namespace quda {
 
 
 #endif //-- QLUA_CONTRACT_H__
+
+
+  // //- Additional structure required for the TMD contractions
+  // struct TMDcontractState {
+
+  //   Propagator fwdProp[QUDA_PROP_NVEC];  // This will be a pointer to the (shifted) forward propagator
+  //   Propagator bwdProp[QUDA_PROP_NVEC];  // This will be a pointer to the backward propagator
+  //   Propagator auxProp[QUDA_PROP_NVEC];  // This will be an auxilliary propagator
+
+  //   GaugeU U;                   // Original Gauge Field
+  //   GaugeU auxU;                // Auxilliary Gauge Field
+
+  //   bool csInit = false;
+    
+  //   qluaCntr_Type cntrType;     // contraction type
+  //   int parity;                 // hard code to 0 for now
+  //   int nParity;                // number of parities we're working on
+  //   int nFace;                  // hard code to 1 for now
+  //   int dim[5];                 // full lattice dimensions
+  //   int commDim[4];             // whether a given dimension is partitioned or not
+  //   int lL[4];                  // 4-d local lattice dimensions
+  //   int volumeCB;               // checkerboarded volume
+  //   int volume;                 // full-site local volume
+  //   bool preserveBasis;         // whether to preserve the gamma basis or not
+
+  //   TMDcontractState () {}
+
+  //   TMDcontractState(ColorSpinorField **prop, GaugeField *U_, qluaCntr_Type cntrType, bool preserveBasis)
+  //     : cntrType(cntrType), preserveBasis(preserveBasis),
+  // 	parity(0), nParity(prop[0]->SiteSubset()), nFace(1),
+  //   	dim{ (3-nParity) * prop[0]->X(0), prop[0]->X(1), prop[0]->X(2), prop[0]->X(3), 1 },
+  //       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+  //       lL{prop[0]->X(0), prop[0]->X(1), prop[0]->X(2), prop[0]->X(3)},
+  //       volumeCB(prop[0]->VolumeCB()), volume(prop[0]->Volume())
+  //   {
+  //     if(U_==NULL) errorQuda("TMDcontractState: Gauge Field U is not allocated!\n");
+  //     U.init(*U_);
+  //     csInit = true;
+  //   }
+    
+  //   TMDcontractState(ColorSpinorField *fwdVec, ColorSpinorField *auxVec, int ivec,
+  //   		     GaugeField *U_, GaugeField *auxU_,
+  //   		     qluaCntr_Type cntrType, bool preserveBasis)
+  //     : cntrType(cntrType), parity(0), nParity(fwdVec->SiteSubset()), nFace(1),
+  //   	dim{ (3-nParity) * fwdVec->X(0), fwdVec->X(1), fwdVec->X(2), fwdVec->X(3), 1 },
+  //       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+  //       lL{fwdVec->X(0), fwdVec->X(1), fwdVec->X(2), fwdVec->X(3)},
+  //       volumeCB(fwdVec->VolumeCB()), volume(fwdVec->Volume()), preserveBasis(preserveBasis)
+  //   {
+  //     fwdProp[ivec].init(*fwdVec);
+  //     auxProp[ivec].init(*auxVec);
+  //     if(U_    == NULL) errorQuda("TMDcontractState: Gauge Field U    is not allocated!\n");
+  //     if(auxU_ == NULL) errorQuda("TMDcontractState: Gauge Field auxU is not allocated!\n");
+  //     U.init(*U_);
+  //     auxU.init(*auxU_);
+  //     csInit = true;
+  //   }
+
+  //   void initPropShf(ColorSpinorField *fwdVec, ColorSpinorField *auxVec, int ivec){
+  //     if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
+  //     fwdProp[ivec].init(*fwdVec);
+  //     auxProp[ivec].init(*auxVec);
+  //   }//-- initPropShf
+    
+  //   void initGaugeShf(GaugeField *U_, GaugeField *auxU_){
+  //     if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
+  //     if(U_    == NULL) errorQuda("TMDcontractState: Gauge Field U    is not allocated!\n");
+  //     if(auxU_ == NULL) errorQuda("TMDcontractState: Gauge Field auxU is not allocated!\n");
+  //     U.init(*U_);
+  //     auxU.init(*auxU_);
+  //   }//-- initGaugeShf
+    
+  //   void initGaugeShf(GaugeField *auxU_){
+  //     if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
+  //     if(auxU_ == NULL) errorQuda("TMDcontractState: Gauge Field auxU is not allocated!\n");
+  //     auxU.init(*auxU_);
+  //   }//-- initGaugeShf
+
+  //   void initBwdProp(ColorSpinorField **bwdProp_){
+  //     if(!csInit) errorQuda("TMDcontractState: Need to initialize first!\n");
+  //     for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
+  //       bwdProp[ivec].init(*bwdProp_[ivec]);
+  //   }
+
+  // };//-- Structure definition
+  // //---------------------------------------------------------------------------

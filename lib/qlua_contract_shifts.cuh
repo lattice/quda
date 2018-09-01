@@ -9,21 +9,20 @@
 
 namespace quda {
 
-  __device__ void ShiftVectorOnAxis_dev(Vector &shfVec, TMDcontractState *TMDcs, int ivec,
-					qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
-					int x_cb, int pty);
+  __global__ void ShiftCudaVec_nonCov_kernel(Arg_ShiftCudaVec_nonCov *arg,
+                                             qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
 
-  __global__ void ShiftVectorOnAxis_kernel(TMDcontractState *TMDcs, int ivec,
-					   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType);
+  __global__ void ShiftCudaVec_Cov_kernel(Arg_ShiftCudaVec_Cov *arg,
+					  qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
 
+  __global__ void ShiftGauge_nonCov_kernel(Arg_ShiftGauge_nonCov *arg,
+                                           qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
 
+  __global__ void ShiftLink_Cov_kernel(Arg_ShiftLink_Cov *arg,
+				       qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
 
-  __device__ void ShiftGauge_dev(Link &shfGauge, TMDcontractState *TMDcs, qcTMD_DimU muSrc,
-                                 qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
-                                 int x_cb, int pty);
-
-  __global__ void ShiftGauge_kernel(TMDcontractState *TMDcs, qcTMD_DimU muDst, qcTMD_DimU muSrc,
-  				    qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType);
+  __global__ void ShiftLink_AdjSplitCov_kernel(Arg_ShiftLink_AdjSplitCov *arg,
+                                               qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn);
 
 } //- namespace quda
 

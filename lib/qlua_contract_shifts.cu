@@ -8,172 +8,255 @@
 
 namespace quda {
 
-  /* This function performs Forward and Backward covariant and non-covariant shifts of vectors (cudaColorSpinorFields)
-   * within the forward propagator in any direction.
-   * One needs to properly have the ghosts loaded in the input propagator before calling this function.
-   * This is the main function that will be used in TMD contractions.
-   */
-  __device__ void ShiftVectorOnAxis_dev(Vector &shfVec, TMDcontractState *TMDcs, int ivec,
-					qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
-					int x_cb, int pty){
 
-    const int nbrPty = (TMDcs->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
+  __global__ void ShiftCudaVec_nonCov_kernel(Arg_ShiftCudaVec_nonCov *arg,
+					     qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+    
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+
+    pty = (arg->nParity == 2) ? pty : arg->parity;
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+
+    const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
     int coord[5];
-    getCoords(coord, x_cb, TMDcs->dim, pty);
+    getCoords(coord, x_cb, arg->dim, pty);
     coord[4] = 0;
 
     int dir = (int)shfDir; //-- Direction of the shift
 
-    if(shfSgn == qcShfSgnPlus){ // Forward shift
-      Vector vIn;
-      const int fwdIdx = linkIndexP1(coord, TMDcs->dim, dir);
+    Vector shfVec;
+    if(shfSgn == qcShfSgnPlus){ // Forward shift  y(x) <- y(x+\mu)
+      const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
 
-      if( TMDcs->commDim[dir] && (coord[dir] + TMDcs->nFace >= TMDcs->dim[dir]) ){
-	const int ghostIdx = ghostFaceIndex<1>(coord, TMDcs->dim, dir, TMDcs->nFace);      
-	vIn = TMDcs->fwdProp[ivec].Ghost(dir, 1, ghostIdx, nbrPty);
+      if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
+	const int ghostIdx = ghostFaceIndex<1>(coord, arg->dim, dir, arg->nFace);      
+	shfVec = arg->src.Ghost(dir, 1, ghostIdx, nbrPty);
       }
-      else vIn = TMDcs->fwdProp[ivec](fwdIdx, nbrPty);
-
-      if(shfType == qcCovShift){
-	const Link U = TMDcs->U(dir, x_cb, pty);
-	shfVec = U * vIn;                             //-- y(x) <- U_\mu(x) * y(x+\mu)
-      }
-      else if(shfType == qcNonCovShift) shfVec = vIn; //-- y(x) <- y(x+\mu)
+      else shfVec = arg->src(fwdIdx, nbrPty);
     }
-    else if(shfSgn == qcShfSgnMinus){ // Backward shift
-      const int bwdIdx = linkIndexM1(coord, TMDcs->dim, dir);
+    else if(shfSgn == qcShfSgnMinus){ // Backward shift   y(x) <- y(x-\mu)
+      const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
 
-      if ( TMDcs->commDim[dir] && (coord[dir] - TMDcs->nFace < 0) ) {
-	const int ghostIdx = ghostFaceIndex<0>(coord, TMDcs->dim, dir, TMDcs->nFace);
-	const Vector vIn = TMDcs->fwdProp[ivec].Ghost(dir, 0, ghostIdx, nbrPty);
-
-	if(shfType == qcCovShift){
-	  const Link U = TMDcs->U.Ghost(dir, ghostIdx, 1-pty);
-	  shfVec = conj(U) * vIn;                           //-- y(x) <- U_\mu^\dag(x-\mu) * y(x-\mu)
-	}
-	else if(shfType == qcNonCovShift) shfVec = vIn;     //-- y(x) <- y(x-\mu)
+      if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
+	const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);
+	shfVec = arg->src.Ghost(dir, 0, ghostIdx, nbrPty);
       }
-      else{
-	const Vector vIn = TMDcs->fwdProp[ivec](bwdIdx, nbrPty);
-
-	if(shfType == qcCovShift){
-	  const Link U = TMDcs->U(dir, bwdIdx, 1-pty);
-	  shfVec = conj(U) * vIn;                           //-- y(x) <- U_\mu^\dag(x-\mu) * y(x-\mu)
-	}
-	else if(shfType == qcNonCovShift) shfVec = vIn;     //-- y(x) <- y(x-\mu)
-      }
-    }
-    else{
-      if(x_cb == 0) printf("ShiftVectorOnAxis_dev - ERROR: Got invalid Shift Sign = %d\n", (int)shfSgn);
-      return;
+      else shfVec = arg->src(bwdIdx, nbrPty);
     }
 
-  }//- ShiftVectorOnAxis_dev
-  //------------------------------------------------------------------------------------------
+    arg->dst(x_cb, pty) = shfVec;
+  }//- ShiftCudaVec_nonCov_kernel
 
-  __global__ void ShiftVectorOnAxis_kernel(TMDcontractState *TMDcs, int ivec,
-					   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
+
+  __global__ void ShiftCudaVec_Cov_kernel(Arg_ShiftCudaVec_Cov *arg,
+					  qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
     
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
 
-    pty = (TMDcs->nParity == 2) ? pty : TMDcs->parity;
-    if (x_cb >= TMDcs->volumeCB) return;
-    if (pty >= TMDcs->nParity) return;
+    pty = (arg->nParity == 2) ? pty : arg->parity;
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
 
-    Vector shfVec;
-
-    ShiftVectorOnAxis_dev(shfVec, TMDcs, ivec, shfDir, shfSgn, shfType, x_cb, pty);
-
-    TMDcs->auxProp[ivec](x_cb, pty) = shfVec;
-
-  }//- ShiftVectorOnAxis_kernel
-  //------------------------------------------------------------------------------------------
-
-
-
-  /* This function performs Forward and Backward covariant and non-covariant shifts of 
-   * gauge fields in any direction and dimension.
-   * One needs to properly have the ghosts loaded in the input gauge field before calling this function.
-   */
-  __device__ void ShiftGauge_dev(Link &shfGauge, TMDcontractState *TMDcs, qcTMD_DimU muSrc,
-  				 qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType,
-  				 int x_cb, int pty){
-    
-    const int nbrPty = (TMDcs->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
+    const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
     int coord[5];
-    getCoords(coord, x_cb, TMDcs->dim, pty);
+    getCoords(coord, x_cb, arg->dim, pty);
     coord[4] = 0;
 
-    int nu = (int)shfDir;     //-- Direction of the shift
-    int srcDim = (int)muSrc;  //-- Lorentz index of input (source) gauge field
+    int dir = (int)shfDir; //-- Direction of the shift
 
-    if(shfSgn == qcShfSgnPlus){ // Forward shift
-      const int fwdIdx = linkIndexP1(coord, TMDcs->dim, nu);
+    Vector shfVec;
+    if(shfSgn == qcShfSgnPlus){ // Forward shift   y(x) <- U_\mu(x) * y(x+\mu)
+      const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
 
-      Link Usrc;
-      if( TMDcs->commDim[nu] && (coord[nu] + TMDcs->nFace >= TMDcs->dim[nu]) ){
-  	const int ghostIdx = ghostFaceIndex<1>(coord, TMDcs->dim, nu, TMDcs->nFace);      
-  	Usrc = TMDcs->U.Ghost(srcDim, ghostIdx, nbrPty);
+      Vector vIn;
+      if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
+	const int ghostIdx = ghostFaceIndex<1>(coord, arg->dim, dir, arg->nFace);      
+	vIn = arg->src.Ghost(dir, 1, ghostIdx, nbrPty);
       }
-      else Usrc = TMDcs->U(srcDim, fwdIdx, nbrPty);
+      else vIn = arg->src(fwdIdx, nbrPty);
 
-      if(shfType == qcCovShift){
-  	const Link U = TMDcs->U(nu, x_cb, pty);
-  	shfGauge = U * Usrc;                              //-- U(x) <- U_\nu(x) * U_src(x+\nu)
-      }
-      else if(shfType == qcNonCovShift) shfGauge = Usrc;  //-- U(x) <- U_src(x+\nu)
+      const Link U = arg->U(dir, x_cb, pty);
+      shfVec = U * vIn;
     }
-    else if(shfSgn == qcShfSgnMinus){ // Backward shift
-      const int bwdIdx = linkIndexM1(coord, TMDcs->dim, nu);
+    else if(shfSgn == qcShfSgnMinus){ // Backward shift   y(x) <- U_\mu^\dag(x-\mu) * y(x-\mu)
+      Vector vIn;
+      Link U;
 
-      if ( TMDcs->commDim[nu] && (coord[nu] - TMDcs->nFace < 0) ) {
-  	const int ghostIdx = ghostFaceIndex<0>(coord, TMDcs->dim, nu, TMDcs->nFace);
-  	const Link Usrc = TMDcs->U.Ghost(srcDim, ghostIdx, nbrPty);
-
-  	if(shfType == qcCovShift){
-  	  const Link U = TMDcs->U.Ghost(nu, ghostIdx, nbrPty);
-  	  shfGauge = conj(U) * Usrc;                           //-- U(x) <- U_\nu^\dag(x-\nu) * U_src(x-\nu)
-  	}
-  	else if(shfType == qcNonCovShift) shfGauge = Usrc;     //-- U(x) <- U_src(x-\nu)
+      if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
+	const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);
+	vIn = arg->src.Ghost(dir, 0, ghostIdx, nbrPty);
+        U = arg->U.Ghost(dir, ghostIdx, nbrPty);
       }
       else{
-  	const Link Usrc = TMDcs->U(srcDim, bwdIdx, nbrPty);
-
-  	if(shfType == qcCovShift){
-  	  const Link U = TMDcs->U(nu, bwdIdx, nbrPty);
-  	  shfGauge = conj(U) * Usrc;                           //-- U(x) <- U_\nu^\dag(x-\nu) * U_src(x-\nu)
-  	}
-  	else if(shfType == qcNonCovShift) shfGauge = Usrc;     //-- y(x) <- U_src(x-\nu)
+        const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
+	vIn = arg->src(bwdIdx, nbrPty);
+        U = arg->U(dir, bwdIdx, nbrPty);
       }
-    }
-    else{
-      if(x_cb == 0) printf("ShiftGauge_dev - ERROR: Got invalid Shift Sign = %d\n", (int)shfSgn);
-      return;
+
+      shfVec = conj(U) * vIn;
     }
 
-  }//- ShiftGauge_dev
-  //------------------------------------------------------------------------------------------
+    arg->dst(x_cb, pty) = shfVec;
+  }//-- ShiftCudaVec_Cov_kernel
 
 
-  __global__ void ShiftGauge_kernel(TMDcontractState *TMDcs, qcTMD_DimU muDst, qcTMD_DimU muSrc,
-                                    qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
+  __global__ void ShiftGauge_nonCov_kernel(Arg_ShiftGauge_nonCov *arg,
+					   qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+
+    pty = (arg->nParity == 2) ? pty : arg->parity;
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+
+    const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
+    int coord[5];
+    getCoords(coord, x_cb, arg->dim, pty);
+    coord[4] = 0;
+
+    int dir = (int)shfDir; //-- Direction of the shift
+
+    for (int mu=0;mu<4;mu++){
+      Link shfU;
+
+      if(shfSgn == qcShfSgnPlus){ // Forward shift     U(x) <- U_src(x+\nu)
+        const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
+	
+        if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
+          const int ghostIdx = ghostFaceIndex<1>(coord, arg->dim, dir, arg->nFace);      
+          shfU = arg->src.Ghost(mu, ghostIdx, nbrPty);
+        }
+        else shfU = arg->src(mu, fwdIdx, nbrPty);
+      }
+      else if(shfSgn == qcShfSgnMinus){ // Backward shift     U(x) <- U_src(x+-nu)
+        if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
+          const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);
+          shfU = arg->src.Ghost(mu, ghostIdx, nbrPty);
+        }
+        else{
+          const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
+          shfU = arg->src(mu, bwdIdx, nbrPty);
+        }
+      }
+      
+      arg->dst(mu, x_cb, pty) = shfU;
+    }//-- for mu
+
+  }//-- ShiftGauge_nonCov_kernel
+
+
+  __global__ void ShiftLink_Cov_kernel(Arg_ShiftLink_Cov *arg,
+				       qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
     
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
 
-    pty = (TMDcs->nParity == 2) ? pty : TMDcs->parity;
-    if (x_cb >= TMDcs->volumeCB) return;
-    if (pty >= TMDcs->nParity) return;
+    pty = (arg->nParity == 2) ? pty : arg->parity;
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
 
-    Link shfGauge;
-    int mu = (int)muDst;      //-- Lorentz index of output (destination) gauge field
+    const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
+    int coord[5];
+    getCoords(coord, x_cb, arg->dim, pty);
+    coord[4] = 0;
 
-    ShiftGauge_dev(shfGauge, TMDcs, muSrc, shfDir, shfSgn, shfType, x_cb, pty);
+    int dir = (int)shfDir; //-- Direction of the shift
 
-    TMDcs->auxU(mu, x_cb, pty) = shfGauge;
+    Link shfU;
+    if(shfSgn == qcShfSgnPlus){ // Forward shift  U(x) <- U_\nu(x) * U_src(x+\nu)
+      const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
 
-  }//- ShiftGauge_kernel
+      Link Usrc;
+      if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
+	const int ghostIdx = ghostFaceIndex<1>(coord, arg->dim, dir, arg->nFace);      
+	Usrc = arg->src.Ghost(arg->i_src, ghostIdx, nbrPty);
+      }
+      else Usrc = arg->src(arg->i_src, fwdIdx, nbrPty);
+
+      const Link U = arg->U(dir, x_cb, pty);
+      shfU = U * Usrc;
+    }
+    else if(shfSgn == qcShfSgnMinus){ // Backward shift     U(x) <- U_\nu^\dag(x-\nu) * U_src(x-\nu)
+      Link Usrc;
+      Link U;
+
+      if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
+	const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);
+	Usrc = arg->src.Ghost(arg->i_src, ghostIdx, nbrPty);
+        U = arg->U.Ghost(dir, ghostIdx, nbrPty);
+      }
+      else{
+        const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
+	Usrc = arg->src(arg->i_src, bwdIdx, nbrPty);
+        U = arg->U(dir, bwdIdx, nbrPty);
+      }
+
+      shfU = conj(U) * Usrc;
+    }
+
+    arg->dst(arg->i_dst, x_cb, pty) = shfU;
+  }//-- perform_ShiftLink_Cov
+
+
+  __global__ void ShiftLink_AdjSplitCov_kernel(Arg_ShiftLink_AdjSplitCov *arg,
+					       qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){ 
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+
+    pty = (arg->nParity == 2) ? pty : arg->parity;
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+
+    const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
+    int coord[5];
+    getCoords(coord, x_cb, arg->dim, pty);
+    coord[4] = 0;
+
+    int dir = (int)shfDir; //-- Direction of the shift
+
+    Link shfU;
+    if(shfSgn == qcShfSgnPlus){ // Forward shift
+      const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
+
+      Link Usrc;
+      if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
+	const int ghostIdx = ghostFaceIndex<1>(coord, arg->dim, dir, arg->nFace);      
+	Usrc = arg->src.Ghost(arg->i_src, ghostIdx, nbrPty);
+      }
+      else Usrc = arg->src(arg->i_src, fwdIdx, nbrPty);
+
+      const Link U = arg->U(dir, x_cb, pty);
+      const Link U2= arg->U2(dir, x_cb, pty);
+      shfU = U * Usrc * conj(U2);
+    }
+    else if(shfSgn == qcShfSgnMinus){ // Backward shift
+      Link Usrc;
+      Link U, U2;
+
+      if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
+	const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);
+	Usrc = arg->src.Ghost(arg->i_src, ghostIdx, nbrPty);
+        U   = arg->U.Ghost(dir, ghostIdx, nbrPty);
+        U2  = arg->U2.Ghost(dir, ghostIdx, nbrPty);
+      }
+      else{
+        const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
+	Usrc = arg->src(arg->i_src, bwdIdx, nbrPty);
+        U   = arg->U(dir, bwdIdx, nbrPty);
+        U2  = arg->U2(dir, bwdIdx, nbrPty);
+      }
+
+      shfU = conj(U) * Usrc * U2;
+    }
+ 
+    arg->dst(arg->i_dst, x_cb, pty) = shfU;
+  }
+  //------------------------------------------------------------------------------------------
 
 
 } //- namespace quda

@@ -189,95 +189,177 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
-  void perform_ShiftVectorOnAxis(TMDcontractState *TMDcs_dev, TMDcontractState *TMDcs, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
-
-    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
-      printfQuda("perform_ShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis %s shift in the %s%s direction\n",
-		 ivec, qcTMD_ShiftTypeArray[(int)shfType], qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
-    else
-      errorQuda("perform_ShiftVectorOnAxis: Got invalid shfDir and/or shfSgn and/or shfType.\n");
-
-    cudaMemcpy(TMDcs_dev, TMDcs, sizeof(TMDcontractState), cudaMemcpyHostToDevice);    
-    checkCudaError();
-    
-    dim3 blockDim(THREADS_PER_BLOCK, TMDcs->nParity, 1);
-    dim3 gridDim((TMDcs->volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-
-    ShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDcs_dev, ivec, shfDir, shfSgn, shfType);
-    cudaDeviceSynchronize();
-    checkCudaError();
-
-    cudaMemcpy(TMDcs, TMDcs_dev, sizeof(TMDcontractState), cudaMemcpyDeviceToHost);    
-    checkCudaError();
-  }//-- perform_ShiftVectorOnAxis
-  //---------------------------------------------------------------------------
-
-  void perform_ShiftGauge(TMDcontractState *TMDcs_dev,TMDcontractState *TMDcs,
-			  qcTMD_DimU muDst, qcTMD_DimU muSrc,
-			  qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
-
-    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
-      printfQuda("perform_ShiftGauge: Will perform an On-Axis %s shift in the %s%s direction\n",
-		 qcTMD_ShiftTypeArray[(int)shfType], qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
-    else
-      errorQuda("perform_ShiftGauge: Got invalid shfDir and/or shfSgn and/or shfType.\n");
-
-    cudaMemcpy(TMDcs_dev, TMDcs, sizeof(TMDcontractState), cudaMemcpyHostToDevice);    
-    checkCudaError();
-
-    dim3 blockDim(THREADS_PER_BLOCK, TMDcs->nParity, 1);
-    dim3 gridDim((TMDcs->volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-
-    //-- C.K. For the Non-covariant case, we shift all dimensions, with the source and destination
-    //-- dimensions the same
-    if( (muDst==qcDimU_None) && (muSrc==qcDimU_None) ){
-      if(shfType==qcCovShift) errorQuda("perform_ShiftGauge: Got contradicting options.\n");
-      for(int i=0;i<4;i++){
-	qcTMD_DimU mu = (qcTMD_DimU)i;
-	ShiftGauge_kernel<<<gridDim,blockDim>>>(TMDcs_dev, mu, mu, shfDir, shfSgn, shfType);
-	cudaDeviceSynchronize();
-	checkCudaError();
-      }
-    }
-
-    cudaMemcpy(TMDcs, TMDcs_dev, sizeof(TMDcontractState), cudaMemcpyDeviceToHost);    
-    checkCudaError();
-
-  }//-- perform_ShiftGauge
-  //---------------------------------------------------------------------------
-
-
-  void qcExchangeGhostVec(ColorSpinorField **prop, int ivec){
+  void qcExchangeGhostVec(ColorSpinorField *x){
     const int nFace  = 1;
-    prop[ivec]->exchangeGhost((QudaParity)(1), nFace, 0); //- first argument is redundant when nParity = 2. nFace MUST be 1 for now.
+    x->exchangeGhost((QudaParity)(1), nFace, 0); //- first argument is redundant when nParity = 2. nFace MUST be 1 for now.
   }
-  void qcExchangeGhostProp(ColorSpinorField **prop){
+  void qcExchangeGhostProp(ColorSpinorField **x){
     for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-      qcExchangeGhostVec(prop,ivec);
+      qcExchangeGhostVec(x[ivec]);
     }
   }
   //---------------------------------------------------------------------------
   
-  void qcSwapCudaVec(void *fwdVec, void *auxVec){
-    void *Vtmp = fwdVec;
-    fwdVec = auxVec;
-    auxVec = Vtmp;
+  void qcSwapCudaVec(ColorSpinorField *x1, ColorSpinorField *x2){
+    ColorSpinorField *xtmp = x1;
+    x1 = x2;
+    x2 = xtmp;
   }
-  void qcSwapCudaProp(ColorSpinorField **fwdProp, ColorSpinorField **auxProp){
+  void qcSwapCudaProp(ColorSpinorField **x1, ColorSpinorField **x2){
     for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
-      qcSwapCudaVec((void*)(fwdProp[ivec]), (void*)(auxProp[ivec]));
+      qcSwapCudaVec(x1[ivec], x2[ivec]);
   }
   //---------------------------------------------------------------------------
 
-  void qcSwapStateVec(Propagator *fwdVec, Propagator *auxVec){
-    Propagator *Vtmp = fwdVec;
-    *fwdVec = *auxVec;
-    *auxVec = *Vtmp;
-  }
-  void qcSwapStateProp(Propagator *fwdProp, Propagator *auxProp){
-    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
-      qcSwapStateVec(&fwdProp[ivec], &auxProp[ivec]);
-  }
+
+  void perform_ShiftCudaVec_nonCov(ColorSpinorField *dst, ColorSpinorField *src, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+
+    const char *funcname = "perform_ShiftCS_noncov";
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
+      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    else
+      errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
+    
+    qcExchangeGhostVec(src);
+
+    Arg_ShiftCudaVec_nonCov arg(dst, src);
+    Arg_ShiftCudaVec_nonCov *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(arg));
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
+    checkCudaError();
+
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    ShiftCudaVec_nonCov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
+    cudaDeviceSynchronize();
+    checkCudaError();
+    
+    cudaFree(arg_dev);
+  }//-- perform_ShiftCudaVec_nonCov
+
+
+  void perform_ShiftCudaVec_Cov(ColorSpinorField *dst, ColorSpinorField *src, cudaGaugeField *gf,
+				qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+
+    const char *funcname = "perform_ShiftCudaVec_Cov";
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
+      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    else
+      errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
+
+    qcExchangeGhostVec(src);
+
+    Arg_ShiftCudaVec_Cov arg(dst, src, gf);
+    Arg_ShiftCudaVec_Cov *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(arg));
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);
+    checkCudaError();
+
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    ShiftCudaVec_Cov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
+    cudaDeviceSynchronize();
+    checkCudaError();
+
+    cudaFree(arg_dev);
+  }//-- perform_ShiftCudaVec_Cov
+
+
+  void perform_ShiftGauge_nonCov(cudaGaugeField *dst, cudaGaugeField *src,
+				 qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+
+    const char *funcname = "perform_ShiftGF_noncov";
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
+      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    else
+      errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
+    
+    Arg_ShiftGauge_nonCov arg(dst, src);
+    Arg_ShiftGauge_nonCov *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(arg));
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);
+    checkCudaError();
+
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    ShiftGauge_nonCov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
+    cudaDeviceSynchronize();
+    checkCudaError();
+
+    dst->exchangeGhost();
+
+    cudaFree(arg_dev);
+  }//-- perform_ShiftGauge_nonCov
+
+
+  void perform_ShiftLink_Cov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
+			     cudaGaugeField *gf, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+
+    const char *funcname = "perform_ShiftLink_Cov";
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
+      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    else
+      errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
+    
+    Arg_ShiftLink_Cov arg(dst, i_dst, src, i_src, gf);
+    Arg_ShiftLink_Cov *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(arg));
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);
+    checkCudaError();
+
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    ShiftLink_Cov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
+    cudaDeviceSynchronize();
+    checkCudaError();
+
+    dst->exchangeGhost();
+
+    cudaFree(arg_dev);
+  }//-- perform_ShiftLink_Cov
+
+
+  void perform_ShiftLink_AdjSplitCov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
+				     cudaGaugeField *gf, cudaGaugeField *gf2,
+				     qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+
+    const char *funcname = "perform_ShiftLink_AdjSplitCov";
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
+      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    else
+      errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
+    
+    Arg_ShiftLink_AdjSplitCov arg(dst, i_dst, src, i_src, gf, gf2);
+    Arg_ShiftLink_AdjSplitCov *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(arg));
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);
+    checkCudaError();
+
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    ShiftLink_AdjSplitCov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
+    cudaDeviceSynchronize();
+    checkCudaError();
+
+    dst->exchangeGhost();
+
+    cudaFree(arg_dev);
+  }//-- ShiftLink_AdjSplitCov
   //---------------------------------------------------------------------------
 
   
@@ -337,64 +419,22 @@ namespace quda {
     case what_meson_F_hB: {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
-    case what_tmd_g_F_B: {
-      //-- TODO: Fix commentary
-      /* C.K: Perform exchange ghost and shifts in the TMD case
-       * Here we exchange ghosts vector by vector within the 
-       * forward propagator (cudaProp1).
-       * Then a shift takes place, again vector by vector,
-       * hence TMDcs accepts (and returns) elements of the cudaColorSpinorField propagators.
-       * The shifted propagator is placed into cudaProp3.
-       */
-
-      TMDcontractState TMDcs(cudaProp1, U, mpParam.cntrType, paramAPI.preserveBasis);
-      TMDcontractState *TMDcs_dev;
-
-      cudaMalloc((void**)&(TMDcs_dev), sizeof(TMDcontractState) );
-      checkCudaError();
-
-      TMDcs.initBwdProp(cudaProp2);
-	
+    case what_tmd_g_F_B: {	
       qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(paramAPI.shfFlag);
       qcTMD_ShiftType propShfType = TMDparseShiftType(paramAPI.shfType);
       qcTMD_ShiftDir  propShfDir  = TMDparseShiftDirection(shfFlag);
       qcTMD_ShiftSgn  propShfSgn  = TMDparseShiftSign(shfFlag);     
 
 
-      
       double t7 = MPI_Wtime();
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-	qcExchangeGhostVec(cudaProp1, ivec);
-	TMDcs.initPropShf(cudaProp1[ivec], cudaProp3[ivec], ivec);
-	perform_ShiftVectorOnAxis(TMDcs_dev, &TMDcs, ivec, propShfDir, propShfSgn, propShfType);
+        perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
+	qcSwapCudaVec(cudaProp1[ivec], cudaProp3[ivec]);
       }
       double t8 = MPI_Wtime();
-      printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t8-t7);	
+      printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t8-t7);
 
-      //-- C.K. After the propagator shift, auxProp is the shifted propagator
-      //-- By swapping them, fwdProp is the shifted one, and it will be used
-      //-- as input for the contractions, as well as for the next shift.
-      qcSwapCudaProp(cudaProp1, cudaProp3);
-      qcSwapStateProp(TMDcs.fwdProp, TMDcs.auxProp);
-
-      //-- C.K. The same holds here for the Gauge field shifts
-      qcTMD_DimU muSrc = qcDimU_None;
-      qcTMD_DimU muDst = qcDimU_None;
-      qcTMD_ShiftDir UshfDir = propShfDir;
-      qcTMD_ShiftSgn UshfSgn = propShfSgn;
-      qcTMD_ShiftType UshfType = propShfType;
-
-      TMDcs.initGaugeShf(auxU);
-      perform_ShiftGauge(TMDcs_dev, &TMDcs, muDst, muSrc, UshfDir, UshfSgn, UshfType);
-      //      qcSwapCudaGauge(U, auxU);
-      //      qcSwapStateGauge(U, auxU);
-
-      cudaMemcpy(TMDcs_dev, &TMDcs, sizeof(TMDcontractState), cudaMemcpyHostToDevice);    
-      checkCudaError();
-
-      qtmd_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, TMDcs_dev);
-
-      cudaFree(TMDcs_dev);
+      //      qtmd_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, TMDcs_dev);
     } break;
     case what_qpdf_g_F_B:
     default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[mpParam.cntrType]);
@@ -415,4 +455,65 @@ namespace quda {
 
 
 
-      //      qcSwapVector(&TMDcs.fwdProp[ivec], &TMDcs.auxProp[ivec]);
+//-- LEGACY CODE
+
+//      ColorSpinorField *ptmp = cudaProp1[ivec]; cudaProp1[ivec] = cudaProp3[ivec]; cudaProp3[ivec] = ptmp;
+//      qcSwapVector(&TMDcs.fwdProp[ivec], &TMDcs.auxProp[ivec]);
+
+
+  // void perform_ShiftGauge(TMDcontractState *TMDcs_dev,TMDcontractState *TMDcs,
+  // 			  qcTMD_ShiftDir muDst, qcTMD_ShiftDir muSrc,
+  // 			  qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
+
+  //   if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
+  //     printfQuda("perform_ShiftGauge: Will perform an On-Axis %s shift in the %s%s direction\n",
+  // 		 qcTMD_ShiftTypeArray[(int)shfType], qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+  //   else
+  //     errorQuda("perform_ShiftGauge: Got invalid shfDir and/or shfSgn and/or shfType.\n");
+
+  //   cudaMemcpy(TMDcs_dev, TMDcs, sizeof(TMDcontractState), cudaMemcpyHostToDevice);    
+  //   checkCudaError();
+
+  //   dim3 blockDim(THREADS_PER_BLOCK, TMDcs->nParity, 1);
+  //   dim3 gridDim((TMDcs->volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+  //   //-- C.K. For the Non-covariant case, we shift all dimensions, with the source and destination
+  //   //-- dimensions the same
+  //   if(shfType == qcNonCovShift){
+  //     for(int mu=0;mu<4;mu++){
+  // 	ShiftGauge_kernel<<<gridDim,blockDim>>>(TMDcs_dev, mu, mu, shfDir, shfSgn, shfType);
+  // 	cudaDeviceSynchronize();
+  // 	checkCudaError();
+  //     }
+  //   }
+
+
+  //   cudaMemcpy(TMDcs, TMDcs_dev, sizeof(TMDcontractState), cudaMemcpyDeviceToHost);    
+  //   checkCudaError();
+
+  // }//-- perform_ShiftGauge
+  // //---------------------------------------------------------------------------
+
+
+
+  // void perform_ShiftVectorOnAxis(TMDcontractState *TMDcs_dev, TMDcontractState *TMDcs, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
+
+  //   if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
+  //     printfQuda("perform_ShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis %s shift in the %s%s direction\n",
+  // 		 ivec, qcTMD_ShiftTypeArray[(int)shfType], qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+  //   else
+  //     errorQuda("perform_ShiftVectorOnAxis: Got invalid shfDir and/or shfSgn and/or shfType.\n");
+
+  //   cudaMemcpy(TMDcs_dev, TMDcs, sizeof(TMDcontractState), cudaMemcpyHostToDevice);    
+  //   checkCudaError();
+    
+  //   dim3 blockDim(THREADS_PER_BLOCK, TMDcs->nParity, 1);
+  //   dim3 gridDim((TMDcs->volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+  //   ShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDcs_dev, ivec, shfDir, shfSgn, shfType);
+  //   cudaDeviceSynchronize();
+  //   checkCudaError();
+
+  //   cudaMemcpy(TMDcs, TMDcs_dev, sizeof(TMDcontractState), cudaMemcpyDeviceToHost);    
+  //   checkCudaError();
+  // }//-- perform_ShiftVectorOnAxis
