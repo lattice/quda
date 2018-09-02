@@ -160,8 +160,6 @@ namespace quda {
     Propagator prop2[QUDA_PROP_NVEC]; // Propagators
     Propagator prop3[QUDA_PROP_NVEC]; //
     
-    GaugeU U;                         // Gauge Field
-    
     const qluaCntr_Type cntrType;     // contraction type
     const int parity;                 // hard code to 0 for now
     const int nParity;                // number of parities we're working on
@@ -176,7 +174,6 @@ namespace quda {
     QluaContractArg(ColorSpinorField **propIn1,
 		    ColorSpinorField **propIn2,
 		    ColorSpinorField **propIn3,
-		    GaugeField *Uin,
 		    qluaCntr_Type cntrType, bool preserveBasis)
       : cntrType(cntrType), parity(0), nParity(propIn1[0]->SiteSubset()), nFace(1),
 	dim{ (3-nParity) * propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3), 1 },
@@ -194,16 +191,6 @@ namespace quda {
         for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
           prop3[ivec].init(*propIn3[ivec]);
       }
-      
-      if((cntrType == what_qpdf_g_F_B) || (cntrType == what_tmd_g_F_B)){
-        if(propIn3 == NULL) errorQuda("QluaContractArg: Input propagator-3 is not allocated!\n");
-        for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
-          prop3[ivec].init(*propIn3[ivec]);
-
-	if(Uin == NULL) errorQuda("QluaContractArg: Gauge Field is not allocated!\n");
-	U.init(*Uin);
-      }
-      
     }
 
   };//-- Structure definition
@@ -319,13 +306,14 @@ namespace quda {
     GaugeU U;
 
     bool preserveBasis;
-    qcTMD_DimU shfDir;    
+    qluaCntr_Type cntrType;
+    int i_mu;
     
     qcTMD_State () {}
     
     qcTMD_State(ColorSpinorField **fwdProp_, ColorSpinorField **bwdProp_,
-		cudaGaugeField *U_, qcTMD_DimU shfDir_, bool preserveBasis_)
-      : ArgGeom(fwdProp_[0]), shfDir(shfDir_), preserveBasis(preserveBasis_)
+		GaugeField *U_, int i_mu_, qluaCntr_Type cntrType_, bool preserveBasis_)
+      : ArgGeom(fwdProp_[0]), i_mu(i_mu_), cntrType(cntrType_), preserveBasis(preserveBasis_)
     {
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
 	fwdProp[ivec].init(*fwdProp_[ivec]);

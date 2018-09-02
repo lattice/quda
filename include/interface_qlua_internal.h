@@ -65,14 +65,19 @@ namespace quda {
                              momProjParam param,
                              int localL[], int totalL[]);
 
+  void QuarkContractStd_GPU(complex<QUDA_REAL> *corrQuda_dev,
+                            ColorSpinorField **cudaProp1,
+                            ColorSpinorField **cudaProp2,
+                            ColorSpinorField **cudaProp3,
+                            complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
+                            qudaAPI_Param paramAPI);
 
-  void QuarkContract_GPU(complex<QUDA_REAL> *corrQuda_dev,
-			 ColorSpinorField **cudaProp1,
-			 ColorSpinorField **cudaProp2,
-			 ColorSpinorField **cudaProp3,
-			 GaugeField *U, GaugeField *shfU,
-			 complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1, qudaAPI_Param paramAPI);
-
+  void QuarkContractTMD_GPU(complex<QUDA_REAL> *corrQuda_dev,
+                            ColorSpinorField **cudaProp1,
+                            ColorSpinorField **cudaProp2,
+                            ColorSpinorField **cudaProp3,
+                            GaugeField *U, GaugeField *auxU1, GaugeField *auxU2,
+                            qudaAPI_Param paramAPI);
   
 } //- namespace quda
   

@@ -232,7 +232,7 @@ namespace quda {
   void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
 
   __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, Vector *vec, bool preserveBasis);
-
+  __device__ void prepareDeviceLinkSite(complex<QC_REAL> *devLink, Link U);
 
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);

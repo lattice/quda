@@ -363,15 +363,21 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
-  void perform_Std_Contract(complex<QUDA_REAL> *corrQuda_dev, QluaContractArg *arg_dev, qluaCntr_Type cntrType, int vCB, int nPty){
+  void perform_Std_Contract(complex<QUDA_REAL> *corrQuda_dev, QluaContractArg arg){
 
     const char *func_name = "perform_Std_Contract";
+    
+    QluaContractArg *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);    
+    checkCudaError();
 
-    dim3 blockDim(THREADS_PER_BLOCK, nPty, 1);
-    dim3 gridDim((vCB + blockDim.x -1)/blockDim.x, 1, 1);
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
     double t1 = MPI_Wtime();
-    switch(cntrType){
+    switch(arg.cntrType){
     case what_baryon_sigma_UUS: {
       baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
@@ -393,65 +399,105 @@ namespace quda {
     case what_meson_F_hB: {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
+    case what_tmd_g_F_B: {
+      errorQuda("%s: No support for TMD contractions! Did you intent to call \'perform_TMD_Contract\' instead?\n", func_name);
+    } break;
     case what_qpdf_g_F_B:
-    default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[cntrType]);
+    default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[arg.cntrType]);
     }//- switch
     cudaDeviceSynchronize();
     checkCudaError();
     double t2 = MPI_Wtime();
-    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[cntrType], t2-t1);
-      
+    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[arg.cntrType], t2-t1);
+
+    cudaFree(arg_dev);
   }//-- perform_Std_Contract
+  //---------------------------------------------------------------------------
+
+
+  void perform_TMD_Contract(complex<QUDA_REAL> *corrQuda_dev, qcTMD_State argState){
+
+    const char *func_name = "perform_TMD_Contract";
+
+    if(argState.cntrType != what_tmd_g_F_B)
+      errorQuda("%s: Supports only TMD contractions! Did you intent to call \'perform_Std_Contract\' instead?\n", func_name);
+    
+    qcTMD_State *argState_dev;
+    cudaMalloc((void**)&(argState_dev), sizeof(qcTMD_State) );
+    checkCudaError();
+    cudaMemcpy(argState_dev, &argState, sizeof(qcTMD_State), cudaMemcpyHostToDevice);    
+    checkCudaError();
+
+    dim3 blockDim(THREADS_PER_BLOCK, argState.nParity, 1);
+    dim3 gridDim((argState.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    double t1 = MPI_Wtime();
+    tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, argState_dev);
+    cudaDeviceSynchronize();
+    checkCudaError();
+    double t2 = MPI_Wtime();
+    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[argState.cntrType], t2-t1);
+
+    cudaFree(argState_dev);
+  }//-- perform_TMD_Contract
 
   
   //-Top-level function in GPU contractions
-  void QuarkContract_GPU(complex<QUDA_REAL> *corrQuda_dev,
-			 ColorSpinorField **cudaProp1,
-			 ColorSpinorField **cudaProp2,
-			 ColorSpinorField **cudaProp3,
-			 GaugeField *U, GaugeField *auxU,
-			 complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
-			 qudaAPI_Param paramAPI){    
+  void QuarkContractStd_GPU(complex<QUDA_REAL> *corrQuda_dev,
+			    ColorSpinorField **cudaProp1,
+			    ColorSpinorField **cudaProp2,
+			    ColorSpinorField **cudaProp3,
+			    complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
+			    qudaAPI_Param paramAPI){    
 
-    const char *func_name = "QuarkContract_GPU";
+    const char *func_name = "QuarkContractStd_GPU";
     
     if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
 
     momProjParam mpParam = paramAPI.mpParam;
 
-    if(mpParam.cntrType == what_tmd_g_F_B){
-      qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(paramAPI.shfFlag);
-      qcTMD_ShiftType propShfType = TMDparseShiftType(paramAPI.shfType);
-      qcTMD_ShiftDir  propShfDir  = TMDparseShiftDirection(shfFlag);
-      qcTMD_ShiftSgn  propShfSgn  = TMDparseShiftSign(shfFlag);     
+    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, mpParam.cntrType, paramAPI.preserveBasis); 
+    if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
+    if(mpParam.cntrType == what_baryon_sigma_UUS) copySmatricesToSymbol(S2, S1);
 
-      double t1 = MPI_Wtime();
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-        perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
-	qcSwapCudaVec(cudaProp1[ivec], cudaProp3[ivec]);
-      }
-      double t2 = MPI_Wtime();
-      printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
-      
-      //      qtmd_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, TMDcs_dev);
+    perform_Std_Contract(corrQuda_dev, arg);
+
+  }//-- QuarkContractStd_GPU
+
+
+  //-Top-level function in GPU contractions
+  void QuarkContractTMD_GPU(complex<QUDA_REAL> *corrQuda_dev,
+			    ColorSpinorField **cudaProp1,
+			    ColorSpinorField **cudaProp2,
+			    ColorSpinorField **cudaProp3,
+			    GaugeField *U, GaugeField *auxU1, GaugeField *auxU2,
+			    qudaAPI_Param paramAPI){
+
+    const char *func_name = "QuarkContractTMD_GPU";
+    
+    if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
+
+    qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(paramAPI.shfFlag);
+    qcTMD_ShiftType propShfType = TMDparseShiftType(paramAPI.shfType);
+    qcTMD_ShiftDir  propShfDir  = TMDparseShiftDirection(shfFlag);
+    qcTMD_ShiftSgn  propShfSgn  = TMDparseShiftSign(shfFlag);     
+
+    double t1 = MPI_Wtime();
+    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+      perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
+      qcSwapCudaVec(cudaProp1[ivec], cudaProp3[ivec]);
     }
-    else{
-      QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, U, mpParam.cntrType, paramAPI.preserveBasis); 
-      if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
-      QluaContractArg *arg_dev;
-      cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
-      checkCudaError();
-      cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);    
-      checkCudaError();
+    double t2 = MPI_Wtime();
+    printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
 
-      if(mpParam.cntrType == what_baryon_sigma_UUS) copySmatricesToSymbol(S2, S1);
-      perform_Std_Contract(corrQuda_dev, arg_dev, mpParam.cntrType, arg.volumeCB, arg.nParity);
-      cudaFree(arg_dev);
-    }
+    int i_mu = 0;
 
+    qcTMD_State argState(cudaProp1, cudaProp2, U, i_mu, paramAPI.mpParam.cntrType, paramAPI.preserveBasis);
+ 
+    perform_TMD_Contract(corrQuda_dev, argState);
 
-  }//-- QuarkContract_GPU
-  
+  }//-- QuarkContractTMD_GPU
+
 } //-namespace quda
 
 
@@ -462,60 +508,3 @@ namespace quda {
 //      ColorSpinorField *ptmp = cudaProp1[ivec]; cudaProp1[ivec] = cudaProp3[ivec]; cudaProp3[ivec] = ptmp;
 //      qcSwapVector(&TMDcs.fwdProp[ivec], &TMDcs.auxProp[ivec]);
 
-
-  // void perform_ShiftGauge(TMDcontractState *TMDcs_dev,TMDcontractState *TMDcs,
-  // 			  qcTMD_ShiftDir muDst, qcTMD_ShiftDir muSrc,
-  // 			  qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
-
-  //   if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
-  //     printfQuda("perform_ShiftGauge: Will perform an On-Axis %s shift in the %s%s direction\n",
-  // 		 qcTMD_ShiftTypeArray[(int)shfType], qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
-  //   else
-  //     errorQuda("perform_ShiftGauge: Got invalid shfDir and/or shfSgn and/or shfType.\n");
-
-  //   cudaMemcpy(TMDcs_dev, TMDcs, sizeof(TMDcontractState), cudaMemcpyHostToDevice);    
-  //   checkCudaError();
-
-  //   dim3 blockDim(THREADS_PER_BLOCK, TMDcs->nParity, 1);
-  //   dim3 gridDim((TMDcs->volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-
-  //   //-- C.K. For the Non-covariant case, we shift all dimensions, with the source and destination
-  //   //-- dimensions the same
-  //   if(shfType == qcNonCovShift){
-  //     for(int mu=0;mu<4;mu++){
-  // 	ShiftGauge_kernel<<<gridDim,blockDim>>>(TMDcs_dev, mu, mu, shfDir, shfSgn, shfType);
-  // 	cudaDeviceSynchronize();
-  // 	checkCudaError();
-  //     }
-  //   }
-
-
-  //   cudaMemcpy(TMDcs, TMDcs_dev, sizeof(TMDcontractState), cudaMemcpyDeviceToHost);    
-  //   checkCudaError();
-
-  // }//-- perform_ShiftGauge
-  // //---------------------------------------------------------------------------
-
-
-
-  // void perform_ShiftVectorOnAxis(TMDcontractState *TMDcs_dev, TMDcontractState *TMDcs, int ivec, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn, qcTMD_ShiftType shfType){
-
-  //   if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4) && ((int)shfType==0 || (int)shfType==1)  )
-  //     printfQuda("perform_ShiftVectorOnAxis - ivec = %2d: Will perform an On-Axis %s shift in the %s%s direction\n",
-  // 		 ivec, qcTMD_ShiftTypeArray[(int)shfType], qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
-  //   else
-  //     errorQuda("perform_ShiftVectorOnAxis: Got invalid shfDir and/or shfSgn and/or shfType.\n");
-
-  //   cudaMemcpy(TMDcs_dev, TMDcs, sizeof(TMDcontractState), cudaMemcpyHostToDevice);    
-  //   checkCudaError();
-    
-  //   dim3 blockDim(THREADS_PER_BLOCK, TMDcs->nParity, 1);
-  //   dim3 gridDim((TMDcs->volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-
-  //   ShiftVectorOnAxis_kernel<<<gridDim,blockDim>>>(TMDcs_dev, ivec, shfDir, shfSgn, shfType);
-  //   cudaDeviceSynchronize();
-  //   checkCudaError();
-
-  //   cudaMemcpy(TMDcs, TMDcs_dev, sizeof(TMDcontractState), cudaMemcpyDeviceToHost);    
-  //   checkCudaError();
-  // }//-- perform_ShiftVectorOnAxis

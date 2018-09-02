@@ -1112,14 +1112,16 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   setVerbosity(paramAPI.verbosity);
 
   //-- Load the gauge field, if applicable
-  GaugeField *cuda_gf     = NULL;
-  GaugeField *cuda_gf_shf = NULL;
+  GaugeField *cuda_gf      = NULL;
+  GaugeField *cuda_gf_aux1 = NULL;
+  GaugeField *cuda_gf_aux2 = NULL;
   if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
     double t3 = MPI_Wtime();
     for(int mu=0;mu<qS->rank;mu++)
       if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
-    cuda_gf     = new_cudaGaugeField(gp, h_gauge);
-    cuda_gf_shf = new_cudaGaugeField(gp, h_gauge);
+    cuda_gf      = new_cudaGaugeField(gp, h_gauge);
+    cuda_gf_aux1 = new_cudaGaugeField(gp, h_gauge);
+    cuda_gf_aux2 = new_cudaGaugeField(gp, h_gauge);
     double t4 = MPI_Wtime();
     printfQuda("TIMING - %s: Cuda Gauge Fields loaded in %f sec.\n", func_name, t4-t3);
   }
@@ -1173,12 +1175,22 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   checkCudaErrorNoSync();
   cudaMemset(corrQuda_dev, 0, corrSize);
 
-  double t5 = MPI_Wtime();
-  QuarkContract_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3, cuda_gf, cuda_gf_shf,
-		    (complex<QUDA_REAL>*)S2, (complex<QUDA_REAL>*)S1,
-		    paramAPI);
-  double t6 = MPI_Wtime();
-  printfQuda("TIMING - %s: Function \'QuarkContract_GPU\' completed in %f sec.\n", func_name, t6-t5);
+  if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
+    double t5 = MPI_Wtime();
+    QuarkContractTMD_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3,
+			 cuda_gf, cuda_gf_aux1, cuda_gf_aux2,
+			 paramAPI);
+    double t6 = MPI_Wtime();
+    printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' completed in %f sec.\n", func_name, t6-t5);
+  }
+  else{
+    double t5 = MPI_Wtime();
+    QuarkContractStd_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3,
+			 (complex<QUDA_REAL>*)S2, (complex<QUDA_REAL>*)S1,
+			 paramAPI);
+    double t6 = MPI_Wtime();
+    printfQuda("TIMING - %s: Function \'QuarkContractStd_GPU\' completed in %f sec.\n", func_name, t6-t5);
+  }
   /* --------------------------------------------------------------------------------------- */
 
   
@@ -1208,7 +1220,8 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   }
   if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
     delete cuda_gf;  
-    delete cuda_gf_shf;  
+    delete cuda_gf_aux1;
+    delete cuda_gf_aux2;
   }
   cudaFree(corrQuda_dev);
   

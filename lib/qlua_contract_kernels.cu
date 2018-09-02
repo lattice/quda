@@ -849,13 +849,13 @@ namespace quda {
   }//-- prepareDevicePropSite
 
 
-  __device__ void prepareDeviceLinkSite(complex<QC_REAL> *devLink, Link U, bool preserveBasis){
+  __device__ void prepareDeviceLinkSite(complex<QC_REAL> *devLink, Link U){
 
     const int Nc = QC_Nc;
 
     for(int ic = 0; ic < Nc; ic++){
       for(int jc = 0; jc < Nc; jc++){
-	int uIdx = QC_QUDA_LIDX_M(ic,jc);
+	int uIdx = QC_QUDA_LIDX_M(ic, jc);
 	devLink[uIdx] = U(ic,jc);
       }
     }
@@ -1099,9 +1099,8 @@ namespace quda {
     prepareDevicePropSite(dev_prop1, vec1, TMDcs->preserveBasis);
     prepareDevicePropSite(dev_prop2, vec2, TMDcs->preserveBasis);
 
-    int dir = (int)(TMDcs->shfDir);
-    Link U = TMDcs->U(dir, x_cb, pty);
-    prepareDeviceLinkSite(dev_link, U, TMDcs->preserveBasis);
+    Link U = TMDcs->U(TMDcs->i_mu, x_cb, pty);
+    prepareDeviceLinkSite(dev_link, U);
 
 
     qc_quda_contract_tr_g_U_P_P(Corr_dev + tid, lV,
