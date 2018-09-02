@@ -849,6 +849,19 @@ namespace quda {
   }//-- prepareDevicePropSite
 
 
+  __device__ void prepareDeviceLinkSite(complex<QC_REAL> *devLink, Link U, bool preserveBasis){
+
+    const int Nc = QC_Nc;
+
+    for(int ic = 0; ic < Nc; ic++){
+      for(int jc = 0; jc < Nc; jc++){
+	int uIdx = QC_QUDA_LIDX_M(ic,jc);
+	devLink[uIdx] = U(ic,jc);
+      }
+    }
+
+  }//-- prepareDeviceLinkSite
+
 
   //--------------------------------------------------------------------------------------
   //--------------------------------------------------------------------------------------
@@ -1062,33 +1075,40 @@ namespace quda {
   }
   //------------------------------------------------------------------------------------------
 
-  // __global__ void qtmd_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, TMDcontractState *TMDcs){
+  __global__ void tmd_g_U_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, qcTMD_State *TMDcs){
 
-  //   int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-  //   int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-  //   int tid  = x_cb + pty * TMDcs->volumeCB;
-  //   int lV   = TMDcs->volume;
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * TMDcs->volumeCB;
+    int lV   = TMDcs->volume;
 
-  //   if (x_cb >= TMDcs->volumeCB) return;
-  //   if (pty >= TMDcs->nParity) return;
-  //   if(tid >= lV) return;
+    if (x_cb >= TMDcs->volumeCB) return;
+    if (pty >= TMDcs->nParity) return;
+    if(tid >= lV) return;
 
-  //   complex<QC_REAL> dev_prop1[QC_LEN_P];
-  //   complex<QC_REAL> dev_prop2[QC_LEN_P];
+    complex<QC_REAL> dev_prop1[QC_LEN_P];
+    complex<QC_REAL> dev_prop2[QC_LEN_P];
+    complex<QC_REAL> dev_link[QC_LEN_M];
 
-  //   Vector vec1[QUDA_PROP_NVEC];
-  //   Vector vec2[QUDA_PROP_NVEC];
-  //   for(int i=0;i<QUDA_PROP_NVEC;i++){
-  //     vec1[i] = TMDcs->fwdProp[i](x_cb, pty);
-  //     vec2[i] = TMDcs->bwdProp[i](x_cb, pty);
-  //   }
-  //   prepareDevicePropSite(dev_prop1, vec1, TMDcs->preserveBasis);
-  //   prepareDevicePropSite(dev_prop2, vec2, TMDcs->preserveBasis);
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = TMDcs->fwdProp[i](x_cb, pty);
+      vec2[i] = TMDcs->bwdProp[i](x_cb, pty);
+    }
+    prepareDevicePropSite(dev_prop1, vec1, TMDcs->preserveBasis);
+    prepareDevicePropSite(dev_prop2, vec2, TMDcs->preserveBasis);
 
-  //   qc_quda_contract_tr_g_P_P(Corr_dev + tid, lV,
-  // 			      dev_prop1, 1,
-  // 			      dev_prop2, 1);
-  // }
+    int dir = (int)(TMDcs->shfDir);
+    Link U = TMDcs->U(dir, x_cb, pty);
+    prepareDeviceLinkSite(dev_link, U, TMDcs->preserveBasis);
+
+
+    qc_quda_contract_tr_g_U_P_P(Corr_dev + tid, lV,
+				dev_link,  1,
+				dev_prop1, 1,
+				dev_prop2, 1);
+  }
   //------------------------------------------------------------------------------------------
 
 } //- namespace quda

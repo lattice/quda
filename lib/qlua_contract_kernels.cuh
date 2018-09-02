@@ -241,9 +241,9 @@ namespace quda {
   __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
-  //  __global__ void qtmd_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, TMDcontractState *TMDcs);
+  __global__ void tmd_g_U_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, qcTMD_State *TMDcs);
   /* ----------------------------------------------------------------------------------------------- */
- 
+
 } //- namespace quda
 
 #endif/*QLUA_CONTRACT_KERNELS_H__*/

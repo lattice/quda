@@ -23,6 +23,77 @@ namespace quda {
   typedef ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> Vector;
   typedef Matrix<complex<QUDA_REAL>,QUDA_Nc> Link;
 
+
+
+  const int nShiftFlag = 20;
+  const int nShiftType = 2;
+
+  static const char *qcTMD_ShiftFlagArray[nShiftFlag] = {
+    "X", "x", "Y", "y", "Z", "z", "T", "t", "Q", "q",
+    "R", "r", "S", "s", "U", "u", "V", "v", "W", "w"};
+
+  static const char *qcTMD_ShiftTypeArray[nShiftType] = {
+    "Covariant",
+    "Non-Covariant"};
+
+  static const char *qcTMD_ShiftDirArray[4] = {"x", "y", "z", "t"};
+  static const char *qcTMD_ShiftSgnArray[2] = {"-", "+"};
+
+
+  typedef enum qcTMD_ShiftFlag_s {
+    qcShfStr_None = -1,
+    qcShfStr_X = 0,  // +x
+    qcShfStr_x = 1,  // -x
+    qcShfStr_Y = 2,  // +y
+    qcShfStr_y = 3,  // -y
+    qcShfStr_Z = 4,  // +z
+    qcShfStr_z = 5,  // -z
+    qcShfStr_T = 6,  // +t
+    qcShfStr_t = 7,  // -t
+    qcShfStr_Q = 8,  // +x+y
+    qcShfStr_q = 9,  // -x-y
+    qcShfStr_R = 10, // -x+y
+    qcShfStr_r = 11, // +x-y
+    qcShfStr_S = 12, // +y+z
+    qcShfStr_s = 13, // -y-z
+    qcShfStr_U = 14, // -y+z
+    qcShfStr_u = 15, // +y-z
+    qcShfStr_V = 16, // +x+z
+    qcShfStr_v = 17, // -x-z
+    qcShfStr_W = 18, // +x-z
+    qcShfStr_w = 19  // -x+z
+  } qcTMD_ShiftFlag;
+
+  typedef enum qcTMD_ShiftDir_s {
+    qcShfDirNone = -1,
+    qcShfDir_x = 0,
+    qcShfDir_y = 1,
+    qcShfDir_z = 2,
+    qcShfDir_t = 3
+  } qcTMD_ShiftDir;
+
+  typedef enum qcTMD_DimU_s {
+    qcShfDimU_None = -1,
+    qcDimU_x = 0,
+    qcDimU_y = 1,
+    qcDimU_z = 2,
+    qcDimU_t = 3,
+    qcDimAll = 10
+  } qcTMD_DimU;
+
+  typedef enum qcTMD_ShiftSgn_s {
+    qcShfSgnNone  = -1,
+    qcShfSgnMinus =  0,
+    qcShfSgnPlus  =  1
+  } qcTMD_ShiftSgn;
+
+  typedef enum qcTMD_ShiftType_s {
+    qcInvalidShift = -1,
+    qcCovShift = 0,      //-- Covariant Shift (involving a gauge link)
+    qcNonCovShift = 1    //-- Non-covariant shift
+  } qcTMD_ShiftType;
+
+
   /** C.K.
      When copying ColorSpinorFields to GPU, Quda rotates the fields to another basis using a rotation matrix.
      This function is required in order to rotate the ColorSpinorFields between the Quda and the QDP bases.
@@ -241,73 +312,31 @@ namespace quda {
   //---------------------------------------------------------------------
 
 
-  const int nShiftFlag = 20;
-  const int nShiftType = 2;
+  struct qcTMD_State : public ArgGeom {
 
-  static const char *qcTMD_ShiftFlagArray[nShiftFlag] = {
-    "X", "x", "Y", "y", "Z", "z", "T", "t", "Q", "q",
-    "R", "r", "S", "s", "U", "u", "V", "v", "W", "w"};
+    Propagator fwdProp[QUDA_PROP_NVEC];
+    Propagator bwdProp[QUDA_PROP_NVEC];
+    GaugeU U;
 
-  static const char *qcTMD_ShiftTypeArray[nShiftType] = {
-    "Covariant",
-    "Non-Covariant"};
+    bool preserveBasis;
+    qcTMD_DimU shfDir;    
+    
+    qcTMD_State () {}
+    
+    qcTMD_State(ColorSpinorField **fwdProp_, ColorSpinorField **bwdProp_,
+		cudaGaugeField *U_, qcTMD_DimU shfDir_, bool preserveBasis_)
+      : ArgGeom(fwdProp_[0]), shfDir(shfDir_), preserveBasis(preserveBasis_)
+    {
+      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+	fwdProp[ivec].init(*fwdProp_[ivec]);
+	bwdProp[ivec].init(*bwdProp_[ivec]);
+      }
+      U.init(*U_);
+    }
 
-  static const char *qcTMD_ShiftDirArray[4] = {"x", "y", "z", "t"};
-  static const char *qcTMD_ShiftSgnArray[2] = {"-", "+"};
+  };
+  //---------------------------------------------------------------------
 
-
-  typedef enum qcTMD_ShiftFlag_s {
-    qcShfStr_None = -1,
-    qcShfStr_X = 0,  // +x
-    qcShfStr_x = 1,  // -x
-    qcShfStr_Y = 2,  // +y
-    qcShfStr_y = 3,  // -y
-    qcShfStr_Z = 4,  // +z
-    qcShfStr_z = 5,  // -z
-    qcShfStr_T = 6,  // +t
-    qcShfStr_t = 7,  // -t
-    qcShfStr_Q = 8,  // +x+y
-    qcShfStr_q = 9,  // -x-y
-    qcShfStr_R = 10, // -x+y
-    qcShfStr_r = 11, // +x-y
-    qcShfStr_S = 12, // +y+z
-    qcShfStr_s = 13, // -y-z
-    qcShfStr_U = 14, // -y+z
-    qcShfStr_u = 15, // +y-z
-    qcShfStr_V = 16, // +x+z
-    qcShfStr_v = 17, // -x-z
-    qcShfStr_W = 18, // +x-z
-    qcShfStr_w = 19  // -x+z
-  } qcTMD_ShiftFlag;
-
-  typedef enum qcTMD_ShiftDir_s {
-    qcShfDirNone = -1,
-    qcShfDir_x = 0,
-    qcShfDir_y = 1,
-    qcShfDir_z = 2,
-    qcShfDir_t = 3
-  } qcTMD_ShiftDir;
-
-  typedef enum qcTMD_DimU_s {
-    qcShfDimU_None = -1,
-    qcDimU_x = 0,
-    qcDimU_y = 1,
-    qcDimU_z = 2,
-    qcDimU_t = 3,
-    qcDimAll = 10
-  } qcTMD_ShiftDimU;
-
-  typedef enum qcTMD_ShiftSgn_s {
-    qcShfSgnNone  = -1,
-    qcShfSgnMinus =  0,
-    qcShfSgnPlus  =  1
-  } qcTMD_ShiftSgn;
-
-  typedef enum qcTMD_ShiftType_s {
-    qcInvalidShift = -1,
-    qcCovShift = 0,      //-- Covariant Shift (involving a gauge link)
-    qcNonCovShift = 1    //-- Non-covariant shift
-  } qcTMD_ShiftType;
   
 }//-- namespace quda
 
