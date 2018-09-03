@@ -200,14 +200,14 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
   
-  void qcSwapCudaVec(ColorSpinorField *x1, ColorSpinorField *x2){
-    ColorSpinorField *xtmp = x1;
-    x1 = x2;
-    x2 = xtmp;
+  void qcSwapCudaVec(ColorSpinorField **x1, ColorSpinorField **x2){
+    ColorSpinorField *xtmp = *x1;
+    *x1 = *x2;
+    *x2 = xtmp;
   }
   void qcSwapCudaProp(ColorSpinorField **x1, ColorSpinorField **x2){
     for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
-      qcSwapCudaVec(x1[ivec], x2[ivec]);
+      qcSwapCudaVec(&x1[ivec], &x2[ivec]);
   }
   //---------------------------------------------------------------------------
 
@@ -216,11 +216,11 @@ namespace quda {
 
     const char *funcname = "perform_ShiftCS_noncov";
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+      printfQuda("%s: Will perform an On-Axis Non-Covariant shift in the %s%s direction\n",
 		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
-    
+
     qcExchangeGhostVec(src);
 
     Arg_ShiftCudaVec_nonCov arg(dst, src);
@@ -241,12 +241,12 @@ namespace quda {
   }//-- perform_ShiftCudaVec_nonCov
 
 
-  void perform_ShiftCudaVec_Cov(ColorSpinorField *dst, ColorSpinorField *src, cudaGaugeField *gf,
+  void perform_ShiftCudaVec_Cov(ColorSpinorField *dst, ColorSpinorField *src, GaugeField *gf,
 				qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
 
     const char *funcname = "perform_ShiftCudaVec_Cov";
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+      printfQuda("%s: Will perform an On-Axis Covariant shift in the %s%s direction\n",
 		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
@@ -271,7 +271,7 @@ namespace quda {
   }//-- perform_ShiftCudaVec_Cov
 
 
-  void perform_ShiftGauge_nonCov(cudaGaugeField *dst, cudaGaugeField *src,
+  void perform_ShiftGauge_nonCov(GaugeField *dst, GaugeField *src,
 				 qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
 
     const char *funcname = "perform_ShiftGF_noncov";
@@ -301,8 +301,8 @@ namespace quda {
   }//-- perform_ShiftGauge_nonCov
 
 
-  void perform_ShiftLink_Cov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
-			     cudaGaugeField *gf, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+  void perform_ShiftLink_Cov(GaugeField *dst, int i_dst, GaugeField *src, int i_src,
+			     GaugeField *gf, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
 
     const char *funcname = "perform_ShiftLink_Cov";
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
@@ -331,8 +331,8 @@ namespace quda {
   }//-- perform_ShiftLink_Cov
 
 
-  void perform_ShiftLink_AdjSplitCov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
-				     cudaGaugeField *gf, cudaGaugeField *gf2,
+  void perform_ShiftLink_AdjSplitCov(GaugeField *dst, int i_dst, GaugeField *src, int i_src,
+				     GaugeField *gf, GaugeField *gf2,
 				     qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
 
     const char *funcname = "perform_ShiftLink_AdjSplitCov";
@@ -484,8 +484,9 @@ namespace quda {
 
     double t1 = MPI_Wtime();
     for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-      perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
-      qcSwapCudaVec(cudaProp1[ivec], cudaProp3[ivec]);
+      if(propShfType == qcCovShift)     perform_ShiftCudaVec_Cov(cudaProp3[ivec], cudaProp1[ivec], U, propShfDir, propShfSgn);
+      if(propShfType == qcNonCovShift)	perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
+      qcSwapCudaVec(&(cudaProp1[ivec]), &(cudaProp3[ivec]));
     }
     double t2 = MPI_Wtime();
     printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
