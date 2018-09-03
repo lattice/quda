@@ -79,6 +79,10 @@
 
 #pragma once
 
+#ifndef JITIFY_THREAD_SAFE
+#define JITIFY_THREAD_SAFE 1
+#endif
+
 #include <typeinfo>
 #include <string>
 #include <cstring> // For strtok_r etc.
@@ -94,6 +98,9 @@
 #include <stdint.h>
 #include <dlfcn.h>
 #include <memory>
+#if JITIFY_THREAD_SAFE
+#include <mutex>
+#endif
 #if __cplusplus >= 201103L
   #define JITIFY_UNIQUE_PTR std::unique_ptr
   #define JITIFY_DEFINE_AUTO_PTR_COPY_WAR(cls)
@@ -425,7 +432,7 @@ inline std::vector<std::string> split_string(std::string str,
 	}
 	// Note: +1 to include NULL-terminator
 	std::vector<char> v_str(str.c_str(), str.c_str()+(str.size()+1));
-	char* c_str   = &v_str[0];
+	char* c_str   = v_str.data();
 	char* saveptr = c_str;
 	char* token;
 	for( long i=0; i!=maxsplit; ++i ) {
@@ -438,7 +445,7 @@ inline std::vector<std::string> split_string(std::string str,
 	}
 	// Check if there's a final piece
 	token += ::strlen(token) + 1;
-	if( token - &v_str[0] < (ptrdiff_t)str.size() ) {
+	if( token - v_str.data() < (ptrdiff_t)str.size() ) {
 		// Find the start of the final piece
 		token += ::strspn(token, delims.c_str());
 		if( *token ) {
@@ -676,6 +683,25 @@ struct type_reflection<NonType<T,VALUE> > {
 
 //! \endcond
 
+/*! Create an Instance object that contains a const reference to the
+ *  value.  We use this to wrap abstract objects from which we want to extract
+ *  their type at runtime (e.g., derived type).  This is used to facilitate
+ *  templating on derived type when all we know at compile time is abstract type.
+*/
+template<typename T>
+struct Instance {
+const T &value;
+	Instance( const T &value ) : value(value) {}
+};
+
+/*! Create an Instance object from which we can extract the value's run-time type.
+ *  \param value The const value to be captured.
+ */
+template<typename T>
+inline Instance<T const> instance_of(T const& value) {
+	return Instance<T const>(value);
+}
+
 /*! A wrapper used for representing types as values.
  */
 template<typename T>
@@ -721,6 +747,17 @@ template<typename T, T N> inline std::string reflect() {
  */
 template<typename T> inline std::string reflect(jitify::reflection::Type<T> ) {
 	return reflect<T>();
+}
+
+/*! Generate a code-string for a type wrapped as an Instance instance.
+ *  \code{.cpp}reflect(Instance<float>(3.1f)) --> "float"\endcode
+ *  or more simply when passed to a instance_of helper
+ *  \code{.cpp}reflect(instance_of(3.1f)) --> "float"\endcodei
+ *  This is specifically for the case where we want to extract the run-time type,
+ *  e.g., derived type, of an object pointer.
+ */
+template<typename T> inline std::string reflect(jitify::reflection::Instance<T> &value) {
+	return detail::demangle(typeid(value.value).name());
 }
 
 // Type from value
@@ -802,9 +839,9 @@ class CUDAKernel {
 	                          void** optvals=0) {
 		if( link_files.empty() ) {
 			cuda_safe_call(cuModuleLoadDataEx(&_module, _ptx.c_str(),
-			                                  _opts.size(), &_opts[0], optvals));
+			                                  _opts.size(), _opts.data(), optvals));
 		} else {
-			cuda_safe_call(cuLinkCreate(_opts.size(), &_opts[0], optvals,
+			cuda_safe_call(cuLinkCreate(_opts.size(), _opts.data(), optvals,
 			                            &_link_state));
 			cuda_safe_call(cuLinkAddData(_link_state, CU_JIT_INPUT_PTX,
 			                             (void*)_ptx.c_str(), _ptx.size(),
@@ -900,7 +937,7 @@ public:
 		                      grid.x, grid.y, grid.z,
 		                      block.x, block.y, block.z,
 		                      smem, stream,
-		                      &arg_ptrs[0], NULL);
+		                      arg_ptrs.data(), NULL);
 	}
 };
 
@@ -1626,8 +1663,8 @@ inline nvrtcResult compile_kernel(std::string program_name,
 	                                program_source.c_str(),
 	                                program_name.c_str(),
 	                                num_headers,
-	                                &header_sources_c[0],
-	                                &header_names_c[0]) );
+	                                header_sources_c.data(),
+	                                header_names_c.data()) );
 	
 #if CUDA_VERSION >= 8000
 	if( !instantiation.empty() ) {
@@ -1637,13 +1674,13 @@ inline nvrtcResult compile_kernel(std::string program_name,
 #endif
 	
 	nvrtcResult ret = nvrtcCompileProgram(nvrtc_program,
-	                                      options_c.size(), &options_c[0]);
+	                                      options_c.size(), options_c.data());
 	if( log ) {
 		size_t logsize;
 		CHECK_NVRTC( nvrtcGetProgramLogSize(nvrtc_program, &logsize) );
 		std::vector<char> vlog(logsize, 0);
-		CHECK_NVRTC( nvrtcGetProgramLog(nvrtc_program, &vlog[0]) );
-		log->assign(&vlog[0], logsize);
+		CHECK_NVRTC( nvrtcGetProgramLog(nvrtc_program, vlog.data()) );
+		log->assign(vlog.data(), logsize);
 		if( ret != NVRTC_SUCCESS ) {
 			return ret;
 		}
@@ -1653,8 +1690,8 @@ inline nvrtcResult compile_kernel(std::string program_name,
 		size_t ptxsize;
 		CHECK_NVRTC( nvrtcGetPTXSize(nvrtc_program, &ptxsize) );
 		std::vector<char> vptx(ptxsize);
-		CHECK_NVRTC( nvrtcGetPTX(nvrtc_program, &vptx[0]) );
-		ptx->assign(&vptx[0], ptxsize);
+		CHECK_NVRTC( nvrtcGetPTX(nvrtc_program, vptx.data()) );
+		ptx->assign(vptx.data(), ptxsize);
 	}
 	
 	if( !instantiation.empty() && mangled_instantiation ) {
@@ -1705,6 +1742,10 @@ class JitCache_impl {
 	jitify::ObjectCache<key_type,detail::CUDAKernel> _kernel_cache;
 	jitify::ObjectCache<key_type,ProgramConfig>      _program_config_cache;
 	std::vector<std::string> _options;
+#if JITIFY_THREAD_SAFE
+	std::mutex _kernel_cache_mutex;
+	std::mutex _program_cache_mutex;
+#endif
 public:
 	inline JitCache_impl(size_t cache_size)
 		: _kernel_cache(cache_size),
@@ -1789,6 +1830,7 @@ public:
 	inline KernelInstantiation_impl(KernelInstantiation_impl const&) = default;
 	inline KernelInstantiation_impl(KernelInstantiation_impl&&) = default;
 #endif
+	detail::CUDAKernel const& cuda_kernel() const { return *_cuda_kernel; }
 };
 
 class KernelLauncher_impl {
@@ -1881,12 +1923,45 @@ public:
 	 *
 	 *  \param grid   The thread grid dimensions for the launch.
 	 *  \param block  The thread block dimensions for the launch.
-	 *  \param smem   The amount of shared memory to dynamically allocate.
+	 *  \param smem   The amount of shared memory to dynamically allocate, in bytes.
 	 *  \param stream The CUDA stream to launch the kernel in.
 	 */
 	inline KernelLauncher configure(dim3 grid, dim3 block,
 	                                size_t smem=0, cudaStream_t stream=0) const {
 		return KernelLauncher(*this, grid, block, smem, stream);
+	}
+	/*! Configure the kernel launch with a 1-dimensional block and grid chosen
+	 *  automatically to maximise occupancy.
+	 *
+	 * \param max_block_size  The upper limit on the block size, or 0 for no limit.
+	 * \param smem            The amount of shared memory to dynamically allocate, in bytes.
+	 * \param smem_callback   A function returning smem for a given block size (overrides \p smem).
+	 * \param stream          The CUDA stream to launch the kernel in.
+	 * \param flags           The flags to pass to cuOccupancyMaxPotentialBlockSizeWithFlags.
+	 */
+	inline KernelLauncher configure_1d_max_occupancy(int max_block_size=0,
+	                                                 size_t smem=0,
+	                                                 CUoccupancyB2DSize smem_callback=0,
+	                                                 cudaStream_t stream=0,
+	                                                 unsigned int flags=0) const {
+		int grid;
+		int block;
+		CUfunction func = _impl->cuda_kernel();
+		if( !func ) {
+			throw std::runtime_error(
+				"Kernel pointer is NULL; you may need to define JITIFY_THREAD_SAFE 1");
+		}
+		CUresult res = cuOccupancyMaxPotentialBlockSizeWithFlags(
+		    &grid, &block, func, smem_callback, smem, max_block_size, flags);
+		if( res != CUDA_SUCCESS ) {
+			const char* msg;
+			cuGetErrorName(res, &msg);
+			throw std::runtime_error(msg);
+		}
+		if( smem_callback ) {
+			smem = smem_callback(block);
+		}
+		return this->configure(grid, block, smem, stream);
 	}
 };
 
@@ -2094,6 +2169,10 @@ inline CUresult KernelLauncher_impl::launch(jitify::detail::vector<void*> arg_pt
 	          << "(" << arg_types_string << ")"
 	          << std::endl;
 #endif
+	if( !_kernel_inst._cuda_kernel ) {
+		throw std::runtime_error(
+			"Kernel pointer is NULL; you may need to define JITIFY_THREAD_SAFE 1");
+	}
 	return _kernel_inst._cuda_kernel->launch(_grid, _block, _smem, _stream,
 	                                          arg_ptrs);
 }
@@ -2109,6 +2188,9 @@ inline KernelInstantiation_impl::KernelInstantiation_impl(Kernel_impl const& ker
 	_hash = hash_combine(_hash, hash_larson64(_template_inst.c_str()));
 	JitCache_impl& cache = _kernel._program._cache;
 	uint64_t cache_key = _hash;
+#if JITIFY_THREAD_SAFE
+	std::lock_guard<std::mutex> lock(cache._kernel_cache_mutex);
+#endif
 	if( cache._kernel_cache.contains(cache_key) ) {
 #if JITIFY_PRINT_INSTANTIATION
 		std::cout << "Found ";
@@ -2219,6 +2301,9 @@ Program_impl::Program_impl(JitCache_impl& cache,
 	               _cache._options.begin(),
 	               _cache._options.end());
 	// Load sources
+#if JITIFY_THREAD_SAFE
+	std::lock_guard<std::mutex> lock(cache._program_cache_mutex);
+#endif
 	if( !cache._program_config_cache.contains(_hash) ) {
 		_config = &cache._program_config_cache.insert(_hash);
 		this->load_sources(source, headers, options, file_callback);
