@@ -292,6 +292,7 @@ namespace quda {
 
     GaugeU src, dst;
     GaugeU U, U2;
+    int i_src, i_dst;
 
     Arg_ShiftLink_AdjSplitCov(GaugeField *dst_, int i_dst_,
 			      GaugeField *src_, int i_src_,
