@@ -1102,7 +1102,6 @@ namespace quda {
     Link U = TMDcs->U(TMDcs->i_mu, x_cb, pty);
     prepareDeviceLinkSite(dev_link, U);
 
-
     qc_quda_contract_tr_g_U_P_P(Corr_dev + tid, lV,
 				dev_link,  1,
 				dev_prop1, 1,
@@ -1111,3 +1110,14 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
 } //- namespace quda
+
+
+    // //-- Define a Unity Gauge for test purposes
+    // complex<QUDA_REAL> unityU[QC_Nc*QC_Nc];
+    // for(int ic=0;ic<QC_Nc;ic++){
+    //   for(int jc=0;jc<QC_Nc;jc++){
+    // 	if(ic==jc) unityU[jc + QC_Nc*ic] = complex<QC_REAL> {1.0,0.0};
+    // 	else unityU[jc + QC_Nc*ic] = complex<QC_REAL> {0.0,0.0};
+    //   }
+    // }
+    // Link U(unityU);
