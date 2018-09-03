@@ -200,6 +200,11 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
   
+  void qcSwapCudaGauge(GaugeField **x1, GaugeField **x2){
+    GaugeField *xtmp = *x1;
+    *x1 = *x2;
+    *x2 = xtmp;
+  }
   void qcSwapCudaVec(ColorSpinorField **x1, ColorSpinorField **x2){
     ColorSpinorField *xtmp = *x1;
     *x1 = *x2;
@@ -214,7 +219,7 @@ namespace quda {
 
   void perform_ShiftCudaVec_nonCov(ColorSpinorField *dst, ColorSpinorField *src, qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
 
-    const char *funcname = "perform_ShiftCS_noncov";
+    const char *funcname = "perform_ShiftCudaVec_nonCov";
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
       printfQuda("%s: Will perform an On-Axis Non-Covariant shift in the %s%s direction\n",
 		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
@@ -229,6 +234,8 @@ namespace quda {
     checkCudaError();
     cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
     checkCudaError();
+
+    if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", funcname);
 
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
@@ -260,6 +267,8 @@ namespace quda {
     cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);
     checkCudaError();
 
+    if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", funcname);
+
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
@@ -274,9 +283,9 @@ namespace quda {
   void perform_ShiftGauge_nonCov(GaugeField *dst, GaugeField *src,
 				 qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
 
-    const char *funcname = "perform_ShiftGF_noncov";
+    const char *funcname = "perform_ShiftGauge_nonCov";
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+      printfQuda("%s: Will perform a Gauge Link Non-Covariant shift in the %s%s direction\n",
 		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
@@ -288,12 +297,16 @@ namespace quda {
     cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);
     checkCudaError();
 
+    if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", funcname);
+
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
     ShiftGauge_nonCov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
     cudaDeviceSynchronize();
     checkCudaError();
+
+    src->bufferIndex = (1 - src->bufferIndex);
 
     dst->exchangeGhost();
 
@@ -306,7 +319,7 @@ namespace quda {
 
     const char *funcname = "perform_ShiftLink_Cov";
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+      printfQuda("%s: Will perform a Gauge Link Covariant shift in the %s%s direction\n",
 		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
@@ -317,6 +330,8 @@ namespace quda {
     checkCudaError();
     cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);
     checkCudaError();
+
+    if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", funcname);
 
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
@@ -348,6 +363,8 @@ namespace quda {
     checkCudaError();
     cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);
     checkCudaError();
+
+    if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", funcname);
 
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
@@ -482,17 +499,39 @@ namespace quda {
     qcTMD_ShiftDir  propShfDir  = TMDparseShiftDirection(shfFlag);
     qcTMD_ShiftSgn  propShfSgn  = TMDparseShiftSign(shfFlag);     
 
-    double t1 = MPI_Wtime();
-    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-      if(propShfType == qcCovShift)     perform_ShiftCudaVec_Cov(cudaProp3[ivec], cudaProp1[ivec], U, propShfDir, propShfSgn);
-      if(propShfType == qcNonCovShift)	perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
-      qcSwapCudaVec(&(cudaProp1[ivec]), &(cudaProp3[ivec]));
+    // double t1 = MPI_Wtime();
+    // for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+    //   if(propShfType == qcCovShift)     perform_ShiftCudaVec_Cov(cudaProp3[ivec], cudaProp1[ivec], U, propShfDir, propShfSgn);
+    //   if(propShfType == qcNonCovShift)	perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
+    //   qcSwapCudaVec(&(cudaProp1[ivec]), &(cudaProp3[ivec]));
+    // }
+    // double t2 = MPI_Wtime();
+    // printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
+
+    qcTMD_ShiftDir GaugeShfDir  = propShfDir;
+    qcTMD_ShiftSgn GaugepropShfSgn  = propShfSgn;
+    qcTMD_ShiftType GaugeShfType = propShfType;
+
+    int i_src = 0;
+    int i_dst = 0;
+    double t3 = MPI_Wtime();
+    if(GaugeShfType == qcNonCovShift){
+      i_dst = 1;
+      perform_ShiftGauge_nonCov(auxU1, U, GaugeShfDir, GaugepropShfSgn);
+      qcSwapCudaGauge(&U, &auxU1);
     }
-    double t2 = MPI_Wtime();
-    printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
-
-    int i_mu = 0;
-
+    else if(GaugeShfType == qcCovShift){
+      i_src = 0;
+      i_dst = 1;
+      
+      perform_ShiftLink_Cov(auxU1, i_dst, auxU2, i_src,
+    			    U, GaugeShfDir, GaugepropShfSgn);
+      qcSwapCudaGauge(&U, &auxU1);
+    }
+    double t4 = MPI_Wtime();
+    printfQuda("TIMING - %s: Gauge field shift done in %f sec.\n", func_name, t4-t3);
+    
+    int i_mu = i_dst;
     qcTMD_State argState(cudaProp1, cudaProp2, U, i_mu, paramAPI.mpParam.cntrType, paramAPI.preserveBasis);
  
     perform_TMD_Contract(corrQuda_dev, argState);
@@ -507,5 +546,4 @@ namespace quda {
 //-- LEGACY CODE
 
 //      ColorSpinorField *ptmp = cudaProp1[ivec]; cudaProp1[ivec] = cudaProp3[ivec]; cudaProp3[ivec] = ptmp;
-//      qcSwapVector(&TMDcs.fwdProp[ivec], &TMDcs.auxProp[ivec]);
 
