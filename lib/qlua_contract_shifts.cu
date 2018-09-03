@@ -88,12 +88,12 @@ namespace quda {
       if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
 	const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);
 	vIn = arg->src.Ghost(dir, 0, ghostIdx, nbrPty);
-        U = arg->U.Ghost(dir, ghostIdx, nbrPty);
+	U = arg->U.Ghost(dir, ghostIdx, nbrPty);
       }
       else{
         const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
 	vIn = arg->src(bwdIdx, nbrPty);
-        U = arg->U(dir, bwdIdx, nbrPty);
+	U = arg->U(dir, bwdIdx, nbrPty);
       }
 
       shfVec = conj(U) * vIn;

@@ -218,7 +218,7 @@ namespace quda {
         volumeCB(x->VolumeCB()), volume(x->Volume())
     {}
 
-    ArgGeom(cudaGaugeField *u) 
+    ArgGeom(GaugeField *u) 
       : parity(0), nParity(u->SiteSubset()), nFace(1),
 	dim{ (3-nParity) * u->X()[0], u->X()[1], u->X()[2], u->X()[3], 1 },
         commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
@@ -230,7 +230,8 @@ namespace quda {
 
   struct Arg_ShiftCudaVec_nonCov : public ArgGeom {
     
-    Propagator src, dst;
+    Propagator src;
+    Propagator dst;
     
     Arg_ShiftCudaVec_nonCov(ColorSpinorField *dst_, ColorSpinorField *src_)
       : ArgGeom(src_)
@@ -240,15 +241,18 @@ namespace quda {
     }
   };
 
-  struct Arg_ShiftCudaVec_Cov : public Arg_ShiftCudaVec_nonCov {
+  struct Arg_ShiftCudaVec_Cov : public ArgGeom {
 
-    Propagator src, dst;
+    Propagator src;
+    Propagator dst;
     GaugeU U;
 
     Arg_ShiftCudaVec_Cov(ColorSpinorField *dst_, ColorSpinorField *src_, 
-			 cudaGaugeField *gf_) 
-      : Arg_ShiftCudaVec_nonCov(dst_, src_)
+			 GaugeField *gf_) 
+      : ArgGeom(src_)
     {
+      src.init(*src_);
+      dst.init(*dst_);
       U.init(*gf_);
     }
   };
@@ -259,7 +263,7 @@ namespace quda {
 
     GaugeU src, dst;
 
-    Arg_ShiftGauge_nonCov(cudaGaugeField *dst_, cudaGaugeField *src_)
+    Arg_ShiftGauge_nonCov(GaugeField *dst_, GaugeField *src_)
       : ArgGeom(src_)
     {
       src.init(*src_);
@@ -273,9 +277,9 @@ namespace quda {
     GaugeU src, dst;
     GaugeU U;
 
-    Arg_ShiftLink_Cov(cudaGaugeField *dst_, int i_dst_,
-		      cudaGaugeField *src_, int i_src_, 
-		      cudaGaugeField *gf_)
+    Arg_ShiftLink_Cov(GaugeField *dst_, int i_dst_,
+		      GaugeField *src_, int i_src_, 
+		      GaugeField *gf_)
       : ArgGeom(gf_), i_src(i_src_), i_dst(i_dst_)
     {
       src.init(*src_);
@@ -284,15 +288,19 @@ namespace quda {
     }
   };
 
-  struct Arg_ShiftLink_AdjSplitCov : public Arg_ShiftLink_Cov {
+  struct Arg_ShiftLink_AdjSplitCov : public ArgGeom {
 
-    GaugeU U2;
+    GaugeU src, dst;
+    GaugeU U, U2;
 
-    Arg_ShiftLink_AdjSplitCov(cudaGaugeField *dst_, int i_dst_,
-			      cudaGaugeField *src_, int i_src_,
-			      cudaGaugeField *gf_, cudaGaugeField *gf2_)
-      : Arg_ShiftLink_Cov(dst_, i_dst_, src_, i_src_, gf_)
+    Arg_ShiftLink_AdjSplitCov(GaugeField *dst_, int i_dst_,
+			      GaugeField *src_, int i_src_,
+			      GaugeField *gf_, GaugeField *gf2_)
+      : ArgGeom(gf_), i_src(i_src_), i_dst(i_dst_)
     {
+      src.init(*src_);
+      dst.init(*dst_);
+      U.init(*gf_);
       U2.init(*gf2_);
     }
   };
