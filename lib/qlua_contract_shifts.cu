@@ -122,7 +122,7 @@ namespace quda {
     for (int mu=0;mu<4;mu++){
       Link shfU;
 
-      if(shfSgn == qcShfSgnPlus){ // Forward shift     U(x) <- U_src(x+\nu)
+      if(shfSgn == qcShfSgnPlus){ // Forward shift     U_\mu(x) <- U_\mu(x+\nu)
         const int fwdIdx = linkIndexP1(coord, arg->dim, dir);
 	
         if( arg->commDim[dir] && (coord[dir] + arg->nFace >= arg->dim[dir]) ){
@@ -131,15 +131,14 @@ namespace quda {
         }
         else shfU = arg->src(mu, fwdIdx, nbrPty);
       }
-      else if(shfSgn == qcShfSgnMinus){ // Backward shift     U(x) <- U_src(x+-nu)
-        if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
+      else if(shfSgn == qcShfSgnMinus){ // Backward shift     U_\mu(x) <- U_\mu(x+-nu)
+	const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
+	
+	if ( arg->commDim[dir] && (coord[dir] - arg->nFace < 0) ) {
           const int ghostIdx = ghostFaceIndex<0>(coord, arg->dim, dir, arg->nFace);
           shfU = arg->src.Ghost(mu, ghostIdx, nbrPty);
         }
-        else{
-          const int bwdIdx = linkIndexM1(coord, arg->dim, dir);
-          shfU = arg->src(mu, bwdIdx, nbrPty);
-        }
+        else shfU = arg->src(mu, bwdIdx, nbrPty);
       }
       
       arg->dst(mu, x_cb, pty) = shfU;
