@@ -114,9 +114,8 @@ namespace quda {
     if (pty >= arg->nParity) return;
 
     const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
-    int coord[5];
+    int coord[4];
     getCoords(coord, x_cb, arg->dim, pty);
-    coord[4] = 0;
 
     int dir = (int)shfDir; //-- Direction of the shift
 
@@ -160,9 +159,8 @@ namespace quda {
     if (pty >= arg->nParity) return;
 
     const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
-    int coord[5];
+    int coord[4];
     getCoords(coord, x_cb, arg->dim, pty);
-    coord[4] = 0;
 
     int dir = (int)shfDir; //-- Direction of the shift
 
@@ -213,9 +211,8 @@ namespace quda {
     if (pty >= arg->nParity) return;
 
     const int nbrPty = (arg->nParity == 2) ? 1-pty : 0; // Parity of neighboring site
-    int coord[5];
+    int coord[4];
     getCoords(coord, x_cb, arg->dim, pty);
-    coord[4] = 0;
 
     int dir = (int)shfDir; //-- Direction of the shift
 
