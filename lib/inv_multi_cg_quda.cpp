@@ -454,14 +454,14 @@ namespace quda {
       num_offset_now -= converged;
 
       // exit early so that we can finish of shift 0 using CG and allowing for mixed precison refinement
-      if(num_offset_now==1){
+      if(param->compute_true_res and num_offset_now==1){
         exit_early=true;
         num_offset_now--;
       }
 
       // this ensure we do the update on any shifted systems that
       // happen to converge when the un-shifted system converges
-      if ( (convergence(r2, stop, num_offset_now) || exit_early|| k == param.maxiter) && aux_update == true) {
+      if ( (convergence(r2, stop, num_offset_now) || exit_early || k == param.maxiter) && aux_update == true) {
 	if (getVerbosity() >= QUDA_VERBOSE) 
 	  printfQuda("Convergence of unshifted system so trigger shiftUpdate\n");
 	

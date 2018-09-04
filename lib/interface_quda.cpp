@@ -3652,19 +3652,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField r(*b, cudaParam);
     profileMulti.TPSTOP(QUDA_PROFILE_INIT);
-// profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
-//   delete d;
-//   delete dSloppy;
-//   delete dPre;
-//   freeSloppyGaugeQuda();
-//   loadSloppyGaugeQuda(param->cuda_prec_refinement_sloppy, param->cuda_prec_precondition);
-//   loadSloppyCloverQuda(param->cuda_prec_refinement_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy);
   QudaInvertParam refineparam = *param;
   refineparam.cuda_prec_sloppy = param->cuda_prec_refinement_sloppy;
-  // createDirac(d, dSloppy, dPre, refineparam, pc_solve);
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dRefine;
-// profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);  
 
 #define REFINE_INCREASING_MASS
 #ifdef REFINE_INCREASING_MASS
