@@ -497,49 +497,52 @@ namespace quda {
     param.gflops = gflops;
     param.iter += k;
 
-    if (param.compute_true_res) {
+    if (param.compute_true_res){
       // only allocate temporaries if necessary
       csParam.setPrecision(param.precision);
       ColorSpinorField *tmp4_p = reliable ? y[0] : tmp1.Precision() == x[0]->Precision() ? &tmp1 : ColorSpinorField::Create(csParam);
       ColorSpinorField *tmp5_p = mat.isStaggered() ? tmp4_p :
-	reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
+      reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
 
-      for(int i=0; i < num_offset; i++) {
-        if(param.precision == param.precision_sloppy || i ==0){
-	mat(*r, *x[i], *tmp4_p, *tmp5_p);
-	if (r->Nspin()==4) {
-	  blas::axpy(offset[i], *x[i], *r); // Offset it.
-	} else if (i!=0) {
-	  blas::axpy(offset[i]-offset[0], *x[i], *r); // Offset it.
-	}
-	double true_res = blas::xmyNorm(b, *r);
-	param.true_res_offset[i] = sqrt(true_res/b2);
-	param.iter_res_offset[i] = sqrt(r2[i]/b2);
-	param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
-      } else
-      {
-        param.iter_res_offset[i] = sqrt(r2[i]/b2);
-      }
+      for (int i = 0; i < num_offset; i++) {
+        // only calculate true residual if we do not need to
+        // we did not exit early and shift is 0
+        // for higher shifts if requested tolerance is larger than the precision of the sloppy solve, i.e. we might not need to refine 
+        if ((i>0 and not mixed) or (i == 0 and not exit_early) {
+          mat(*r, *x[i], *tmp4_p, *tmp5_p);
+          if (r->Nspin() == 4) {
+            blas::axpy(offset[i], *x[i], *r); // Offset it.
+          } else if (i != 0) {
+            blas::axpy(offset[i] - offset[0], *x[i], *r); // Offset it.
+          }
+          double true_res = blas::xmyNorm(b, *r);
+          param.true_res_offset[i] = sqrt(true_res / b2);
+          param.iter_res_offset[i] = sqrt(r2[i] / b2);
+          param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
+        } else {
+          param.iter_res_offset[i] = sqrt(r2[i] / b2);
+        }
       }
 
-      if (getVerbosity() >= QUDA_SUMMARIZE){
-	printfQuda("MultiShift CG: Converged after %d iterations\n", k);
-	for(int i=0; i < num_offset; i++) {
-	  printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e, true = %e\n",
-		     i, iter[i], param.iter_res_offset[i], param.true_res_offset[i]);
-	}
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        printfQuda("MultiShift CG: Converged after %d iterations\n", k);
+        for (int i = 0; i < num_offset; i++) {
+          printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e, true = %e\n",
+                     i, iter[i], param.iter_res_offset[i], param.true_res_offset[i]);
+        }
       }
 
       if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && (reliable ? tmp5_p != y[1] : 1)) delete tmp5_p;
       if (tmp4_p != &tmp1 && (reliable ? tmp4_p != y[0] : 1)) delete tmp4_p;
     } else {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-	printfQuda("MultiShift CG: Converged after %d iterations\n", k);
-	for(int i=0; i < num_offset; i++) {
-	  param.iter_res_offset[i] = sqrt(r2[i]/b2);
-	  printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e\n",
-		     i, iter[i], param.iter_res_offset[i]);
-	}
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+      {
+        printfQuda("MultiShift CG: Converged after %d iterations\n", k);
+        for (int i = 0; i < num_offset; i++) {
+          param.iter_res_offset[i] = sqrt(r2[i] / b2);
+          printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e\n",
+          i, iter[i], param.iter_res_offset[i]);
+        }
       }
     }
 
