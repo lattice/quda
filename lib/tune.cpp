@@ -726,7 +726,10 @@ namespace quda {
 	  printfQuda("Tuning %s with %s at vol=%s\n", key.name, key.aux, key.volume);
 	}
 
-	tunable.initTuneParam(param);
+        Timer tune_timer;
+        tune_timer.Start(__func__, __FILE__, __LINE__);
+
+        tunable.initTuneParam(param);
 	while (tuning) {
 	  cudaDeviceSynchronize();
 	  cudaGetLastError(); // clear error counter
@@ -772,7 +775,9 @@ namespace quda {
 	  tuning = tunable.advanceTuneParam(param);
 	}
 
-	if (best_time == FLT_MAX) {
+        tune_timer.Stop(__func__, __FILE__, __LINE__);
+
+        if (best_time == FLT_MAX) {
 	  errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
 	}
 	if (verbosity >= QUDA_VERBOSE) {
@@ -780,7 +785,8 @@ namespace quda {
 		     tunable.perfString(best_time).c_str(), key.name, key.aux);
 	}
 	time(&now);
-	best_param.comment = "# " + tunable.perfString(best_time) + ", tuned ";
+	best_param.comment = "# " + tunable.perfString(best_time);
+        best_param.comment += ", tuning took " + std::to_string(tune_timer.Last()) + " seconds at ";
 	best_param.comment += ctime(&now); // includes a newline
 	best_param.time = best_time;
 
