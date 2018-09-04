@@ -182,7 +182,7 @@ namespace quda {
     // this is the limit of precision possible
 
     bool exit_early = false;
-    bool mixed = param.precision_sloppy == param.precision;
+    bool mixed = param.precision_sloppy != param.precision;
     const double sloppy_tol= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() : pow(2.,-17));
     const double fine_tol = pow(10.,(-2*(int)b.Precision()+1));
     std::unique_ptr<double[]> prec_tol(new double[num_offset]);
@@ -454,7 +454,7 @@ namespace quda {
       num_offset_now -= converged;
 
       // exit early so that we can finish of shift 0 using CG and allowing for mixed precison refinement
-      if(param->compute_true_res and num_offset_now==1){
+      if(mixed and param.compute_true_res and num_offset_now==1){
         exit_early=true;
         num_offset_now--;
       }
@@ -508,7 +508,8 @@ namespace quda {
         // only calculate true residual if we do not need to
         // we did not exit early and shift is 0
         // for higher shifts if requested tolerance is larger than the precision of the sloppy solve, i.e. we might not need to refine 
-        if ((i>0 and not mixed) or (i == 0 and not exit_early) {
+        if ((i>0 and not mixed) or (i == 0 and not exit_early)) {
+          std::cout << "calc true res " << std::endl;
           mat(*r, *x[i], *tmp4_p, *tmp5_p);
           if (r->Nspin() == 4) {
             blas::axpy(offset[i], *x[i], *r); // Offset it.
