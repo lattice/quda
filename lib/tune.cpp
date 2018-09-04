@@ -765,17 +765,20 @@ namespace quda {
 	    best_param = param;
 	  }
 	  if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-	    if (error == cudaSuccess && tunable.jitifyError() == CUDA_SUCCESS)
+	    if (error == cudaSuccess && tunable.jitifyError() == CUDA_SUCCESS) {
 	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
 			 tunable.perfString(elapsed_time).c_str());
-	    else
+            } else {
 	      if (tunable.jitifyError() == CUDA_SUCCESS) {
+                // if not jitify error must be regular error
 		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
 	      } else {
+                // else is a jitify error
 		const char *str;
 		cuGetErrorString(tunable.jitifyError(), &str);
 		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), str);
 	      }
+            }
 	  }
 	  tuning = tunable.advanceTuneParam(param);
 	  tunable.jitifyError() = CUDA_SUCCESS;
