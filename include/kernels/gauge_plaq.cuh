@@ -65,44 +65,9 @@ namespace quda {
 	plaq.y += plaquette<Float>(arg, x, parity, mu, 3);
       }
     }
+
     // perform final inter-block reduction and write out result
     reduce2d<blockSize,2>(arg, plaq);
-  }
-
-  // alternative implementation that templates over x and y block
-  // dimensions and splits the calculation over more threads
-  // x - checker-boarded spacetime
-  // y - parity
-  // z - spatial / temporal plaquettes
-  template<int block_x, int block_y, typename Float, typename Gauge>
-  __global__ void computePlaq2(GaugePlaqArg<Gauge> arg){
-    int idx    = threadIdx.x + blockIdx.x*blockDim.x;
-    int parity = threadIdx.y + blockIdx.y*blockDim.y;
-    int z      = blockIdx.z;
-
-    double plaq = 0.0;
-
-    if (idx < arg.threads) {
-      int x[4];
-      getCoords(x, idx, arg.X, parity);
-      for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
-
-      switch(z) {
-      case 0:
-	plaq += plaquette<Float>(arg, x, parity, 0, 1);
-	plaq += plaquette<Float>(arg, x, parity, 0, 2);
-	plaq += plaquette<Float>(arg, x, parity, 1, 2);
-	break;
-      case 1:
-	plaq += plaquette<Float>(arg, x, parity, 0, 3);
-	plaq += plaquette<Float>(arg, x, parity, 1, 3);
-	plaq += plaquette<Float>(arg, x, parity, 2, 3);
-	break;
-      }
-    }
-
-    // perform final inter-block reduction and write out result
-    reduce2d<block_x,block_y,double,true>(arg, plaq, blockIdx.z);
   }
 
 } // namespace quda

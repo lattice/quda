@@ -37,7 +37,7 @@
 #include <vector>
 
 // Use bindless texture on Kepler
-#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+#if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300)
 #define USE_TEXTURE_OBJECTS
 #endif
 
