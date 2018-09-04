@@ -167,7 +167,7 @@ init_QudaGaugeParam_generic(QudaGaugeParam& gp, const qudaLattice *qS, const int
 
 
 //-- load the gauge field
-static GaugeField*
+static cudaGaugeField*
 new_cudaGaugeField(QudaGaugeParam& gp, QUDA_REAL *hbuf_u[])
 {
 
@@ -182,7 +182,7 @@ new_cudaGaugeField(QudaGaugeParam& gp, QUDA_REAL *hbuf_u[])
   gf_param.order          = QUDA_FLOAT2_GAUGE_ORDER;
   gf_param.setPrecision(QUDA_DOUBLE_PRECISION);
 
-  GaugeField *cuda_gf = NULL;
+  cudaGaugeField *cuda_gf = NULL;
   cuda_gf = new cudaGaugeField(gf_param);
   if (NULL == cuda_gf) return NULL;
 
@@ -194,6 +194,34 @@ new_cudaGaugeField(QudaGaugeParam& gp, QUDA_REAL *hbuf_u[])
   
   return cuda_gf;
 }
+
+static cudaGaugeField*
+new_ExtendedcudaGaugeField(cudaGaugeField &in, bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID){
+  
+  int R[4];
+  for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
+  
+  int y[4];
+  for (int dir=0;dir<4;dir++) y[dir] = in.X()[dir] + 2*R[dir];
+  int pad = 0;
+  
+  GaugeFieldParam gParamEx(y, in.Precision(), recon != QUDA_RECONSTRUCT_INVALID ? recon : in.Reconstruct(), pad,
+                           in.Geometry(), QUDA_GHOST_EXCHANGE_EXTENDED);
+  gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+  gParamEx.order = in.Order();
+  gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+  gParamEx.t_boundary = in.TBoundary();
+  gParamEx.nFace = 1;
+  gParamEx.tadpole = in.Tadpole();
+  for (int d=0; d<4; d++) gParamEx.r[d] = R[d];
+  
+  cudaGaugeField *out = new cudaGaugeField(gParamEx);
+  copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
+  out->exchangeExtendedGhost(R, redundant_comms);
+  
+  return out;
+}
+
 
 //-- load a ColorSpinorField
 static cudaColorSpinorField*
@@ -1112,21 +1140,26 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   setVerbosity(paramAPI.verbosity);
 
   //-- Load the gauge field, if applicable
-  GaugeField *cuda_gf      = NULL;
-  GaugeField *cuda_gf_aux1 = NULL;
-  GaugeField *cuda_gf_aux2 = NULL;
+  cudaGaugeField *cuda_gf = NULL;
+  cudaGaugeField *cuda_gf_ext  = NULL;
+  cudaGaugeField *cuda_gf_ext1 = NULL;
+  cudaGaugeField *cuda_gf_ext2 = NULL;
+  cudaGaugeField *cuda_gf_ext3 = NULL;
   if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
     double t3 = MPI_Wtime();
     for(int mu=0;mu<qS->rank;mu++)
       if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
-    cuda_gf      = new_cudaGaugeField(gp, h_gauge);
-    cuda_gf_aux1 = new_cudaGaugeField(gp, h_gauge);
-    cuda_gf_aux2 = new_cudaGaugeField(gp, h_gauge);
+    cuda_gf = new_cudaGaugeField(gp, h_gauge); //- The original, regular gauge field
+
+    cuda_gf_ext  = new_ExtendedcudaGaugeField(*cuda_gf); //- The original gauge field, but extended
+    cuda_gf_ext1 = new_ExtendedcudaGaugeField(*cuda_gf_ext); //- Auxilliary extended
+    cuda_gf_ext2 = new_ExtendedcudaGaugeField(*cuda_gf); //- gauge field required
+    cuda_gf_ext3 = new_ExtendedcudaGaugeField(*cuda_gf); //- for the shifts
     double t4 = MPI_Wtime();
     printfQuda("TIMING - %s: Cuda Gauge Fields loaded in %f sec.\n", func_name, t4-t3);
   }
   //------------------------------------------------------------------------------------------
-  
+
   //-- Load the propagators into cuda-CSFs
   int nVec = QUDA_PROP_NVEC;
   LONG_T fieldLgh = paramAPI.mpParam.locvol * Nc * Ns * 2;
@@ -1177,8 +1210,8 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
 
   if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
     double t5 = MPI_Wtime();
-    QuarkContractTMD_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3,
-			 cuda_gf, cuda_gf_aux1, cuda_gf_aux2,
+    QuarkContractTMD_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3, cuda_gf,
+			 cuda_gf_ext, cuda_gf_ext1, cuda_gf_ext2, cuda_gf_ext3,
 			 paramAPI);
     double t6 = MPI_Wtime();
     printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' completed in %f sec.\n", func_name, t6-t5);
@@ -1220,8 +1253,10 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   }
   if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
     delete cuda_gf;  
-    delete cuda_gf_aux1;
-    delete cuda_gf_aux2;
+    delete cuda_gf_ext;
+    delete cuda_gf_ext1;
+    delete cuda_gf_ext2;
+    delete cuda_gf_ext3;
   }
   cudaFree(corrQuda_dev);
   

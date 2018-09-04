@@ -10,6 +10,8 @@
 
 namespace quda {
 
+  const bool QCredundantComms = false; //- Same as interface_quda.cpp
+
   struct QluaUtilArg {
 
     const int nParity;            // number of parities we're working on
@@ -76,7 +78,8 @@ namespace quda {
                             ColorSpinorField **cudaProp1,
                             ColorSpinorField **cudaProp2,
                             ColorSpinorField **cudaProp3,
-                            GaugeField *U, GaugeField *auxU1, GaugeField *auxU2,
+                            cudaGaugeField *U, cudaGaugeField *extU,
+                            cudaGaugeField *extU1, cudaGaugeField *extU2, cudaGaugeField *extU3,
                             qudaAPI_Param paramAPI);
   
 } //- namespace quda

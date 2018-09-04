@@ -196,7 +196,6 @@ namespace quda {
   };//-- Structure definition
   //---------------------------------------------------------------------------
 
-
   struct ArgGeom {
     
     int parity;                 // hard code to 0 for now
@@ -207,6 +206,9 @@ namespace quda {
     int lL[4];                  // 4-d local lattice dimensions
     int volumeCB;               // checkerboarded volume
     int volume;                 // full-site local volume
+
+    int dimEx[4]; // extended Gauge field dimensions
+    int brd[4];   // Border of extended gauge field (size of extended halos)
     
     ArgGeom () {}
 
@@ -218,13 +220,25 @@ namespace quda {
         volumeCB(x->VolumeCB()), volume(x->Volume())
     {}
 
-    ArgGeom(GaugeField *u) 
+    ArgGeom(cudaGaugeField *u) 
       : parity(0), nParity(u->SiteSubset()), nFace(1),
-	dim{ (3-nParity) * u->X()[0], u->X()[1], u->X()[2], u->X()[3], 1 },
         commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
         lL{u->X()[0], u->X()[1], u->X()[2], u->X()[3]},
         volumeCB(u->VolumeCB()), volume(u->Volume())
-    {}
+    {
+      if(u->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED){
+	for(int dir=0;dir<4;dir++){
+	  dim[dir] = u->X()[dir] - 2*u->R()[dir];   //-- Actual lattice dimensions (NOT extended)
+	  dimEx[dir] = dim[dir] + 2*u->R()[dir];    //-- Extended lattice dimensions
+	  brd[dir] = u->R()[dir];
+	}
+      }
+      else{
+	for(int dir=0;dir<4;dir++) dim[dir] = u->X()[dir];
+	dim[0] *= (3-nParity);
+      }
+      dim[4] = 1;
+    }
   };//-- ArgGeom
 
 
@@ -247,10 +261,13 @@ namespace quda {
     Propagator dst;
     GaugeU U;
 
-    Arg_ShiftCudaVec_Cov(ColorSpinorField *dst_, ColorSpinorField *src_, 
-			 GaugeField *gf_) 
-      : ArgGeom(src_)
+    bool extendedGauge;
+
+    Arg_ShiftCudaVec_Cov(ColorSpinorField *dst_, ColorSpinorField *src_, cudaGaugeField *gf_) 
+      : extendedGauge((gf_->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) ? true : false),
+	ArgGeom(gf_)
     {
+      if(!extendedGauge) errorQuda("Arg_ShiftCudaVec_Cov: No support for non-extended Gauge fields for now\n");
       src.init(*src_);
       dst.init(*dst_);
       U.init(*gf_);
@@ -263,7 +280,7 @@ namespace quda {
 
     GaugeU src, dst;
 
-    Arg_ShiftGauge_nonCov(GaugeField *dst_, GaugeField *src_)
+    Arg_ShiftGauge_nonCov(cudaGaugeField *dst_, cudaGaugeField *src_)
       : ArgGeom(src_)
     {
       src.init(*src_);
@@ -275,34 +292,34 @@ namespace quda {
 
     int i_src, i_dst;
     GaugeU src, dst;
-    GaugeU U;
+    GaugeU gf_u;
 
-    Arg_ShiftLink_Cov(GaugeField *dst_, int i_dst_,
-		      GaugeField *src_, int i_src_, 
-		      GaugeField *gf_)
-      : ArgGeom(gf_), i_src(i_src_), i_dst(i_dst_)
+    Arg_ShiftLink_Cov(cudaGaugeField *dst_, int i_dst_,
+		      cudaGaugeField *src_, int i_src_, 
+		      cudaGaugeField *gf_u_)
+      : ArgGeom(gf_u_), i_src(i_src_), i_dst(i_dst_)
     {
       src.init(*src_);
       dst.init(*dst_);
-      U.init(*gf_);
+      gf_u.init(*gf_u_);
     }
   };
 
   struct Arg_ShiftLink_AdjSplitCov : public ArgGeom {
 
     GaugeU src, dst;
-    GaugeU U, U2;
+    GaugeU gf_u, bsh_u;
     int i_src, i_dst;
 
-    Arg_ShiftLink_AdjSplitCov(GaugeField *dst_, int i_dst_,
-			      GaugeField *src_, int i_src_,
-			      GaugeField *gf_, GaugeField *gf2_)
-      : ArgGeom(gf_), i_src(i_src_), i_dst(i_dst_)
+    Arg_ShiftLink_AdjSplitCov(cudaGaugeField *dst_, int i_dst_,
+			      cudaGaugeField *src_, int i_src_,
+			      cudaGaugeField *gf_u_, cudaGaugeField *bsh_u_)
+      : ArgGeom(gf_u_), i_src(i_src_), i_dst(i_dst_)
     {
       src.init(*src_);
       dst.init(*dst_);
-      U.init(*gf_);
-      U2.init(*gf2_);
+      gf_u.init(*gf_u_);
+      bsh_u.init(*bsh_u_);
     }
   };
   //---------------------------------------------------------------------
@@ -321,7 +338,7 @@ namespace quda {
     qcTMD_State () {}
     
     qcTMD_State(ColorSpinorField **fwdProp_, ColorSpinorField **bwdProp_,
-		GaugeField *U_, int i_mu_, qluaCntr_Type cntrType_, bool preserveBasis_)
+		cudaGaugeField *U_, int i_mu_, qluaCntr_Type cntrType_, bool preserveBasis_)
       : ArgGeom(fwdProp_[0]), i_mu(i_mu_), cntrType(cntrType_), preserveBasis(preserveBasis_)
     {
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
