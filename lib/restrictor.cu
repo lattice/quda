@@ -21,7 +21,7 @@ namespace quda {
       Kernel argument struct
   */
   template <typename Float, typename vFloat, int fineSpin, int fineColor,
-	    int coarseSpin, int coarseColor, QudaFieldOrder order>
+            int coarseSpin, int coarseColor, QudaFieldOrder order>
   struct RestrictArg {
 
     FieldOrderCB<Float,coarseSpin,coarseColor,1,order> out;
@@ -35,9 +35,9 @@ namespace quda {
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
 
     RestrictArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
-		const int *fine_to_coarse, const int *coarse_to_fine, int parity)
+                const int *fine_to_coarse, const int *coarse_to_fine, int parity)
       : out(out), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-	spin_map(), parity(parity), nParity(in.SiteSubset()), swizzle(1)
+        spin_map(), parity(parity), nParity(in.SiteSubset()), swizzle(1)
     { }
 
     RestrictArg(const RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,order> &arg) :
@@ -51,10 +51,10 @@ namespace quda {
      Rotates from the fine-color basis into the coarse-color basis.
   */
   template <typename Float, int fineSpin, int fineColor, int coarseColor, int coarse_colors_per_thread,
-	    class FineColor, class Rotator>
+            class FineColor, class Rotator>
   __device__ __host__ inline void rotateCoarseColor(complex<Float> out[fineSpin*coarse_colors_per_thread],
-						    const FineColor &in, const Rotator &V,
-						    int parity, int nParity, int x_cb, int coarse_color_block) {
+                                                    const FineColor &in, const Rotator &V,
+                                                    int parity, int nParity, int x_cb, int coarse_color_block) {
     const int spinor_parity = (nParity == 2) ? parity : 0;
     const int v_parity = (V.Nparity() == 2) ? parity : 0;
 
@@ -62,7 +62,7 @@ namespace quda {
     for (int s=0; s<fineSpin; s++)
 #pragma unroll
       for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
-	out[s*coarse_colors_per_thread+coarse_color_local] = 0.0;
+        out[s*coarse_colors_per_thread+coarse_color_local] = 0.0;
       }
 
 #pragma unroll
@@ -71,21 +71,21 @@ namespace quda {
 #pragma unroll
       for (int s=0; s<fineSpin; s++) {
 
-	constexpr int color_unroll = fineColor == 3 ? 3 : 2;
+        constexpr int color_unroll = fineColor == 3 ? 3 : 2;
 
-	complex<Float> partial[color_unroll];
+        complex<Float> partial[color_unroll];
 #pragma unroll
-	for (int k=0; k<color_unroll; k++) partial[k] = 0.0;
-
-#pragma unroll
-	for (int j=0; j<fineColor; j+=color_unroll) {
-#pragma unroll
-	  for (int k=0; k<color_unroll; k++)
-	    partial[k] += conj(V(v_parity, x_cb, s, j+k, i)) * in(spinor_parity, x_cb, s, j+k);
-	}
+        for (int k=0; k<color_unroll; k++) partial[k] = 0.0;
 
 #pragma unroll
-	for (int k=0; k<color_unroll; k++) out[s*coarse_colors_per_thread + coarse_color_local] += partial[k];
+        for (int j=0; j<fineColor; j+=color_unroll) {
+#pragma unroll
+          for (int k=0; k<color_unroll; k++)
+            partial[k] += conj(V(v_parity, x_cb, s, j+k, i)) * in(spinor_parity, x_cb, s, j+k);
+        }
+
+#pragma unroll
+        for (int k=0; k<color_unroll; k++) out[s*coarse_colors_per_thread + coarse_color_local] += partial[k];
       }
     }
 
@@ -95,9 +95,9 @@ namespace quda {
   void Restrict(Arg arg) {
     for (int parity_coarse=0; parity_coarse<2; parity_coarse++) 
       for (int x_coarse_cb=0; x_coarse_cb<arg.out.VolumeCB(); x_coarse_cb++)
-	for (int s=0; s<coarseSpin; s++) 
-	  for (int c=0; c<coarseColor; c++)
-	    arg.out(parity_coarse, x_coarse_cb, s, c) = 0.0;
+        for (int s=0; s<coarseSpin; s++) 
+          for (int c=0; c<coarseColor; c++)
+            arg.out(parity_coarse, x_coarse_cb, s, c) = 0.0;
 
     // loop over fine degrees of freedom
     for (int parity=0; parity<arg.nParity; parity++) {
@@ -105,24 +105,24 @@ namespace quda {
 
       for (int x_cb=0; x_cb<arg.in.VolumeCB(); x_cb++) {
 
-	int x = parity*arg.in.VolumeCB() + x_cb;
-	int x_coarse = arg.fine_to_coarse[x];
-	int parity_coarse = (x_coarse >= arg.out.VolumeCB()) ? 1 : 0;
-	int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
-	
-	for (int coarse_color_block=0; coarse_color_block<coarseColor; coarse_color_block+=coarse_colors_per_thread) {
-	  complex<Float> tmp[fineSpin*coarse_colors_per_thread];
-	  rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>
-	    (tmp, arg.in, arg.V, parity, arg.nParity, x_cb, coarse_color_block);
+        int x = parity*arg.in.VolumeCB() + x_cb;
+        int x_coarse = arg.fine_to_coarse[x];
+        int parity_coarse = (x_coarse >= arg.out.VolumeCB()) ? 1 : 0;
+        int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
+        
+        for (int coarse_color_block=0; coarse_color_block<coarseColor; coarse_color_block+=coarse_colors_per_thread) {
+          complex<Float> tmp[fineSpin*coarse_colors_per_thread];
+          rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>
+            (tmp, arg.in, arg.V, parity, arg.nParity, x_cb, coarse_color_block);
 
-	  for (int s=0; s<fineSpin; s++) {
-	    for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
-	      int c = coarse_color_block + coarse_color_local;
-	      arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s,parity),c) += tmp[s*coarse_colors_per_thread+coarse_color_local];
-	    }
-	  }
+          for (int s=0; s<fineSpin; s++) {
+            for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+              int c = coarse_color_block + coarse_color_local;
+              arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s,parity),c) += tmp[s*coarse_colors_per_thread+coarse_color_local];
+            }
+          }
 
-	}
+        }
       }
     }
 
@@ -161,7 +161,7 @@ namespace quda {
      each fine grid point.
   */
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int coarse_colors_per_thread,
-	    typename Arg, int block_size>
+            typename Arg, int block_size>
   __global__ void RestrictKernel(Arg arg) {
 
 #ifdef SWIZZLE
@@ -209,7 +209,7 @@ namespace quda {
     // first lets coarsen spin locally
     for (int s=0; s<fineSpin; s++) {
       for (int v=0; v<coarse_colors_per_thread; v++) {
-	reduced[arg.spin_map(s,parity)*coarse_colors_per_thread+v] += tmp[s*coarse_colors_per_thread+v];
+        reduced[arg.spin_map(s,parity)*coarse_colors_per_thread+v] += tmp[s*coarse_colors_per_thread+v];
       }
     }
 
@@ -232,16 +232,16 @@ namespace quda {
 
     if (threadIdx.x==0 && threadIdx.y == 0) {
       for (int s=0; s<coarseSpin; s++) {
-	for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
-	  int v = coarse_color_block + coarse_color_local;
-	  arg.out(parity_coarse, x_coarse_cb, s, v) = reduced[s*coarse_colors_per_thread+coarse_color_local];
-	}
+        for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+          int v = coarse_color_block + coarse_color_local;
+          arg.out(parity_coarse, x_coarse_cb, s, v) = reduced[s*coarse_colors_per_thread+coarse_color_local];
+        }
       }
     }
   }
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
-	    int coarse_colors_per_thread>
+            int coarse_colors_per_thread>
   class RestrictLaunch : public Tunable {
 
   protected:
@@ -263,9 +263,9 @@ namespace quda {
 
   public:
     RestrictLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		   const int *fine_to_coarse, const int *coarse_to_fine, int parity)
+                   const int *fine_to_coarse, const int *coarse_to_fine, int parity)
       : out(out), in(in), v(v), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-	parity(parity), location(checkLocation(out,in,v)), block_size(in.VolumeCB()/(2*out.VolumeCB()))
+        parity(parity), location(checkLocation(out,in,v)), block_size(in.VolumeCB()/(2*out.VolumeCB()))
     {
       strcpy(vol, out.VolString());
       strcat(vol, ",");
@@ -279,98 +279,98 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	  RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
-	    arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-	  Restrict<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread>(arg);
-	} else {
-	  errorQuda("Unsupported field order %d", out.FieldOrder());
-	}
+        if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+          RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
+            arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+          Restrict<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread>(arg);
+        } else {
+          errorQuda("Unsupported field order %d", out.FieldOrder());
+        }
       } else {
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-	if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-	  typedef RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_FLOAT2_FIELD_ORDER> Arg;
-	  Arg arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-	  arg.swizzle = tp.aux.x;
+        if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+          typedef RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_FLOAT2_FIELD_ORDER> Arg;
+          Arg arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+          arg.swizzle = tp.aux.x;
 
-	  if (block_size == 4) {          // for 2x2x2x1 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,4>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 6) {   // for 2x2x3x1 aggregates
-      RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,6>
-        <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-    } else if (block_size == 8) {   // for 2x2x2x2 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,8>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 9) {   // for 3x3x2x1 aggregates
-      RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,9>
-        <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-    } else if (block_size == 12) {  // for 2x2x2x3 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,12>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 16) {  // for 4x2x2x2 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,16>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 27) {  // for 3x3x3x2 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,27>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 32) {  // for 4x4x2x2 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,32>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 36) {  // for 3x3x2x4 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,36>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 54) {  // for 3x3x3x4 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,54>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 64) {  // for 2x4x4x4 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,64>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 81) {  // for 3x3x3x6 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,81>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 96) {  // for 4x4x3x4 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,96>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 100) {  // for 5x5x2x4 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,100>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 108) {  // for 3x3x3x8 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,108>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 128) { // for 4x4x4x4 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,128>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 144) {  // for 4x4x3x6 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,144>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          if (block_size == 4) {          // for 2x2x2x1 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,4>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 6) {   // for 2x2x3x1 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,6>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 8) {   // for 2x2x2x2 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,8>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 9) {   // for 3x3x2x1 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,9>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 12) {  // for 2x2x2x3 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,12>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 16) {  // for 4x2x2x2 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,16>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 27) {  // for 3x3x3x2 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,27>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 32) {  // for 4x4x2x2 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,32>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 36) {  // for 3x3x2x4 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,36>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 54) {  // for 3x3x3x4 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,54>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 64) {  // for 2x4x4x4 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,64>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 81) {  // for 3x3x3x6 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,81>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 96) {  // for 4x4x3x4 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,96>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 100) {  // for 5x5x2x4 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,100>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 108) {  // for 3x3x3x8 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,108>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 128) { // for 4x4x4x4 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,128>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 144) {  // for 4x4x3x6 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,144>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #if __COMPUTE_CAPABILITY__ >= 300
-	  } else if (block_size == 192) {  // for 4x4x3x8 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,192>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 200) { // for 5x5x2x8  aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,200>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 256) { // for 4x4x4x8  aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,256>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 432) { // for 6x6x6x4 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,432>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 500) { // 5x5x5x8 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,500>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	  } else if (block_size == 512) { // 4x4x8x8 aggregates
-	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,512>
-	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 192) {  // for 4x4x3x8 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,192>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 200) { // for 5x5x2x8  aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,200>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 256) { // for 4x4x4x8  aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,256>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 432) { // for 6x6x6x4 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,432>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 500) { // 5x5x5x8 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,500>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          } else if (block_size == 512) { // 4x4x8x8 aggregates
+            RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,512>
+              <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #endif
-	  } else {
-	    errorQuda("Block size %d not instantiated", block_size);
-	  }
-	} else {
-	  errorQuda("Unsupported field order %d", out.FieldOrder());
-	}
+          } else {
+            errorQuda("Block size %d not instantiated", block_size);
+          }
+        } else {
+          errorQuda("Unsupported field order %d", out.FieldOrder());
+        }
       }
     }
 
@@ -384,20 +384,20 @@ namespace quda {
     {
       // let's try to advance spin/block-color
       while(param.block.z <= coarseColor/coarse_colors_per_thread) {
-	param.block.z++;
-	if ( (coarseColor/coarse_colors_per_thread) % param.block.z == 0) {
-	  param.grid.z = (coarseColor/coarse_colors_per_thread) / param.block.z;
-	  break;
-	}
+        param.block.z++;
+        if ( (coarseColor/coarse_colors_per_thread) % param.block.z == 0) {
+          param.grid.z = (coarseColor/coarse_colors_per_thread) / param.block.z;
+          break;
+        }
       }
 
       // we can advance spin/block-color since this is valid
       if (param.block.z <= (coarseColor/coarse_colors_per_thread) ) { //
-	return true;
+        return true;
       } else { // we have run off the end so let's reset
-	param.block.z = 1;
-	param.grid.z = coarseColor/coarse_colors_per_thread;
-	return false;
+        param.block.z = 1;
+        param.grid.z = coarseColor/coarse_colors_per_thread;
+        return false;
       }
     }
 
@@ -408,10 +408,10 @@ namespace quda {
 #ifdef SWIZZLE
       if (param.aux.x < 2*deviceProp.multiProcessorCount) {
         param.aux.x++;
-	return true;
+        return true;
       } else {
         param.aux.x = 1;
-	return false;
+        return false;
       }
 #else
       return false;
@@ -447,7 +447,7 @@ namespace quda {
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		const int *fine_to_coarse, const int *coarse_to_fine, int parity) {
+                const int *fine_to_coarse, const int *coarse_to_fine, int parity) {
 
     // for fine grids (Nc=3) have more parallelism so can use more coarse strategy
     constexpr int coarse_colors_per_thread = fineColor != 3 ? 2 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
@@ -455,11 +455,11 @@ namespace quda {
 
     if (v.Precision() == QUDA_HALF_PRECISION) {
       RestrictLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread>
-	restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       restrictor.apply(0);
     } else if (v.Precision() == in.Precision()) {
       RestrictLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread>
-	restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       restrictor.apply(0);
     } else {
       errorQuda("Unsupported V precision %d", v.Precision());
@@ -470,7 +470,7 @@ namespace quda {
 
   template <typename Float, int fineSpin>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		int nVec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity) {
+                int nVec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity) {
 
     if (out.Nspin() != 2) errorQuda("Unsupported nSpin %d", out.Nspin());
     const int coarseSpin = 2;
@@ -486,61 +486,61 @@ namespace quda {
     if (in.Ncolor() == 3) { // standard QCD
       const int fineColor = 3;
       if (nVec == 4) {
-	Restrict<Float,fineSpin,fineColor,coarseSpin,4>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,4>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 6) { // free field Wilson
-  Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 24) {
-	Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 32) {
-	Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else {
-	errorQuda("Unsupported nVec %d", nVec);
+        errorQuda("Unsupported nVec %d", nVec);
       }
     } else if (in.Ncolor() == 6) { // Coarsen coarsened Wilson free field
       const int fineColor = 6;
       if (nVec == 6) { 
-  Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else {
-  errorQuda("Unsupported nVec %d", nVec);
+        errorQuda("Unsupported nVec %d", nVec);
       }
     } else if (in.Ncolor() == 24) { // to keep compilation under control coarse grids have same or more colors
       const int fineColor = 24;
       if (nVec == 24) {
-	Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 32) {
-	Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 #ifdef GPU_STAGGERED_DIRAC
       } else if (nVec == 64) {
-  Restrict<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 96) {
-  Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 #endif
       } else {
-	errorQuda("Unsupported nVec %d", nVec);
+        errorQuda("Unsupported nVec %d", nVec);
       }
     } else if (in.Ncolor() == 32) {
       const int fineColor = 32;
       if (nVec == 32) {
-	Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else {
-	errorQuda("Unsupported nVec %d", nVec);
+        errorQuda("Unsupported nVec %d", nVec);
       }
 #ifdef GPU_STAGGERED_DIRAC
     } else if (in.Ncolor() == 64) {
       const int fineColor = 64;
       if (nVec == 64) {
-  Restrict<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 96) {
-  Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else {
-  errorQuda("Unsupported nVec %d", nVec);
+        errorQuda("Unsupported nVec %d", nVec);
       }
     } else if (in.Ncolor() == 96) {
       const int fineColor = 96;
       if (nVec == 96) {
-  Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else {
-  errorQuda("Unsupported nVec %d", nVec);
+        errorQuda("Unsupported nVec %d", nVec);
       }
 #endif
     } else {
@@ -550,7 +550,7 @@ namespace quda {
 
   template <typename Float>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity) {
+                int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity) {
 
     if (in.Nspin() == 2) {
       Restrict<Float,2>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
@@ -570,12 +570,12 @@ namespace quda {
 #endif // GPU_MULTIGRID
 
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity) {
+                int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity) {
 
 #ifdef GPU_MULTIGRID
-    if (out.FieldOrder() != in.FieldOrder() ||	out.FieldOrder() != v.FieldOrder())
+    if (out.FieldOrder() != in.FieldOrder() ||        out.FieldOrder() != v.FieldOrder())
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)",
-		out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
+                out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
 
     QudaPrecision precision = checkPrecision(out, in);
 
