@@ -1099,17 +1099,17 @@ namespace quda {
     prepareDevicePropSite(dev_prop1, vec1, TMDcs->preserveBasis);
     prepareDevicePropSite(dev_prop2, vec2, TMDcs->preserveBasis);
 
-    //    Link U = TMDcs->U(TMDcs->i_mu, x_cb, pty);
-
-    //-- Define a Unity Gauge for test purposes
-    complex<QUDA_REAL> unityU[QC_Nc*QC_Nc];
-    for(int ic=0;ic<QC_Nc;ic++){
-      for(int jc=0;jc<QC_Nc;jc++){
-    	if(ic==jc) unityU[jc + QC_Nc*ic] = complex<QC_REAL> {1.0,0.0};
-    	else unityU[jc + QC_Nc*ic] = complex<QC_REAL> {0.0,0.0};
-      }
+    Link U;
+    if(TMDcs->extendedGauge){
+      int crd[5];
+      getCoords(crd, x_cb, arg->dim, pty);
+      crd[4] = 0;
+      int c2[5] = {0,0,0,0,0};
+      for(int i=0;i<4;i++) c2[i] = crd[i] + TMDcs->brd[i];
+	
+      U = TMDcs->U(TMDcs->i_mu, linkIndex(c2, TMDcs->dimEx), pty);
     }
-    Link U(unityU);
+    else U = TMDcs->U(TMDcs->i_mu, x_cb, pty);
 
     prepareDeviceLinkSite(dev_link, U);
 

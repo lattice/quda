@@ -225,23 +225,27 @@ namespace quda {
     ArgGeom(cudaGaugeField *u) 
       : parity(0), nParity(u->SiteSubset()), nFace(1),
         commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-        lL{u->X()[0], u->X()[1], u->X()[2], u->X()[3]},
-        volume(u->Volume())
+        lL{u->X()[0], u->X()[1], u->X()[2], u->X()[3]}
     {
       if(u->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED){
 	printfQuda("ArgGeom: Initializing Geometry with an extended Gauge Field!\n");
-	volumeCB = 1;
+	volume = 1;
 	for(int dir=0;dir<4;dir++){
 	  dim[dir] = u->X()[dir] - 2*u->R()[dir];   //-- Actual lattice dimensions (NOT extended)
 	  dimEx[dir] = dim[dir] + 2*u->R()[dir];    //-- Extended lattice dimensions
 	  brd[dir] = u->R()[dir];
-	  volumeCB *= dim[dir];
+	  volume *= dim[dir];
 	}
-	volumeCB /= 2;
+	volumeCB = volume/2;
       }
       else{
 	printfQuda("ArgGeom: Initializing Geometry with a regular Gauge Field!\n");
-	for(int dir=0;dir<4;dir++) dim[dir] = u->X()[dir];
+	volume = 1;
+	for(int dir=0;dir<4;dir++){
+	  dim[dir] = u->X()[dir];
+	  volume *= dim[dir];
+	}
+	volumeCB = volume/2;
 	dim[0] *= (3-nParity);
       }
       dim[4] = 1;
@@ -339,12 +343,14 @@ namespace quda {
     bool preserveBasis;
     qluaCntr_Type cntrType;
     int i_mu;
-    
+    bool extendedGauge;
+
     qcTMD_State () {}
     
     qcTMD_State(ColorSpinorField **fwdProp_, ColorSpinorField **bwdProp_,
 		cudaGaugeField *U_, int i_mu_, qluaCntr_Type cntrType_, bool preserveBasis_)
-      : ArgGeom(fwdProp_[0]), i_mu(i_mu_), cntrType(cntrType_), preserveBasis(preserveBasis_)
+      : ArgGeom(U_), i_mu(i_mu_), cntrType(cntrType_), preserveBasis(preserveBasis_),
+	extendedGauge((U_->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) ? true : false)
     {
       for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
 	fwdProp[ivec].init(*fwdProp_[ivec]);
