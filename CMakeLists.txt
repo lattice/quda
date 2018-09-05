@@ -196,9 +196,11 @@ find_package(PythonInterp)
 ## QUDA depends on Eigen
 ## this part makes sure we can download eigen if it is not found
 if (QUDA_DOWNLOAD_EIGEN)
-  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2)
-  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2)
-  set(EIGEN_SHA dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6)
+  set(EIGEN_VERSION 3.3.5)
+
+  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
+  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
+  set(EIGEN_SHA 7352bff3ea299e4c7d7fbe31c504f8eb9149d7e685dec5a12fbaa26379f603e2)
   if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION} )
     message(STATUS "Checking for Eigen tarball and downloading if necessary.")
   endif()
@@ -211,7 +213,7 @@ if (QUDA_DOWNLOAD_EIGEN)
 
   include(ExternalProject)
   ExternalProject_Add(Eigen
-    URL ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2
+    URL ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2
     URL_HASH SHA256=${EIGEN_SHA}
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
     CONFIGURE_COMMAND ""

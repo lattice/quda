@@ -75,8 +75,14 @@ void initComms(int argc, char **argv, const int *commDims)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
 
-  // FIXME? - tests crash without this
-  QMP_declare_logical_topology(commDims, 4);
+  // make sure the QMP logical ordering matches QUDA's
+  if (rank_order == 0) {
+    int map[] = { 3, 1, 2, 0 };
+    QMP_declare_logical_topology_map(commDims, 4, map, 4);
+  } else {
+    int map[] = { 0, 1, 2, 3 };
+    QMP_declare_logical_topology_map(commDims, 4, map, 4);
+  }
 
 #elif defined(MPI_COMMS)
 #ifdef PTHREADS
@@ -95,12 +101,6 @@ void initComms(int argc, char **argv, const int *commDims)
   printfQuda("Rank order is %s major (%s running fastest)\n",
 	     rank_order == 0 ? "column" : "row", rank_order == 0 ? "t" : "x");
 
-#ifdef HAVE_QIO
-  int partitioned = 0;
-  for (int i=0; i<4; i++) if (comm_dim(i) > 1) partitioned++;
-  if (rank_order == 0 && partitioned > 1)
-    errorQuda("Use of QIO is not supported with column-major process ordering, use row-major instead (--rank-order row)");
-#endif
 }
 
 

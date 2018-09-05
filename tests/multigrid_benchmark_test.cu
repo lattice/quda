@@ -46,6 +46,8 @@ cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
 int Nspin;
 int Ncolor;
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+
 void
 display_test_info()
 {
@@ -142,8 +144,8 @@ void initFields(QudaPrecision prec)
   int z_face_size = gParam.x[0]*gParam.x[1]*gParam.x[3]/2;
   int t_face_size = gParam.x[0]*gParam.x[1]*gParam.x[2]/2;
   int pad = MAX(x_face_size, y_face_size);
-  pad = MAX(pad_size, z_face_size);
-  pad = MAX(pad_size, t_face_size);
+  pad = MAX(pad, z_face_size);
+  pad = MAX(pad, t_face_size);
   gParam.pad = gParam.nFace * pad * 2;
 
   gParam.setPrecision(prec_sloppy);

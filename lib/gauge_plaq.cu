@@ -64,12 +64,10 @@ namespace quda {
   }
 
   double3 plaquette(const GaugeField& data, QudaFieldLocation location) {
-
     double2 plq;
     INSTANTIATE_PRECISION(plaquette, data, plq, location);
     double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
     return plaq;
-
   }
 
 } // namespace quda
