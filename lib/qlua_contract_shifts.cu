@@ -55,10 +55,8 @@ namespace quda {
     if (qcShfSgnPlus == shfSgn)
       shfU = F(dir, linkIndexShift(c2, dx1, dimEx), newPty);
     else{
-      // shfU = conj(F(dir, linkIndexShift(c2, dx1, dimEx), newPty)); // THIS IS A BUG
-
-      const Link U2 = F(dir, linkIndexShift(c2, dx1, dimEx), newPty); // THIS
-      shfU = conj(U2);                                                // WORKS!!!
+      const Link U2 = F(dir, linkIndexShift(c2, dx1, dimEx), newPty);
+      shfU = conj(U2);
     }
     
     return shfU;
@@ -85,11 +83,13 @@ namespace quda {
     else if(shfSgn == qcShfSgnMinus){
       if (commDim[dir] && (coord[dir] - nFace < 0)) {
 	const int ghostIdx = ghostFaceIndex<0>(coord, dim, dir, nFace);
-        shfU = conj(F.Ghost(dir, ghostIdx, nbrPty));
+	const Link U2 = F.Ghost(dir, ghostIdx, nbrPty);
+        shfU = conj(U2);
       }
       else{
         const int bwdIdx = linkIndexM1(coord, dim, dir);
-        shfU = conj(F(dir, bwdIdx, nbrPty));
+	const Link U2 = F(dir, bwdIdx, nbrPty);
+        shfU = conj(U2);
       }
     }
     return shfU;
