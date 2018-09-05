@@ -1152,7 +1152,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
     cuda_gf = new_cudaGaugeField(gp, h_gauge); //- The original, regular gauge field
 
     cuda_gf_ext  = new_ExtendedcudaGaugeField(*cuda_gf); //- The original gauge field, but extended
-    cuda_gf_ext1 = new_ExtendedcudaGaugeField(*cuda_gf_ext); //- Auxilliary extended
+    cuda_gf_ext1 = new_ExtendedcudaGaugeField(*cuda_gf); //- Auxilliary extended
     cuda_gf_ext2 = new_ExtendedcudaGaugeField(*cuda_gf); //- gauge field required
     cuda_gf_ext3 = new_ExtendedcudaGaugeField(*cuda_gf); //- for the shifts
     double t4 = MPI_Wtime();
