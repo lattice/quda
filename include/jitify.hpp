@@ -679,9 +679,18 @@ inline std::string demangle(const char* mangled_name) {
 inline std::string demangle(const char* mangled_name) {
   size_t bufsize = 1024;
   char* buf = (char*)malloc(bufsize);
+  std::string demangled_name;
   int status;
-  std::string demangled_name =
-      abi::__cxa_demangle(mangled_name, buf, &bufsize, &status);
+  char *demangled_ptr = abi::__cxa_demangle(mangled_name, buf, &bufsize, &status);
+  if (status == 0) {
+    demangled_name = demangled_ptr; // all worked as expected
+  } else if (status == -2) {
+    demangled_name = mangled_name;  // we interpret this as plain C name
+  } else if (status == -1) {
+    throw std::runtime_error(std::string("memory allocation failure in __cxa_demangle"));
+  } else if (status == -3) {
+    throw std::runtime_error(std::string("invalid argument to __cxa_demangle"));
+  }
   free(buf);
   return demangled_name;
 }
@@ -869,9 +878,10 @@ class CUDAKernel {
   CUfunction _kernel;
   std::string _func_name;
   std::string _ptx;
+  std::map<std::string,std::string> _constant;
   std::vector<CUjit_option> _opts;
 
-  inline void cuda_safe_call(CUresult res) {
+  inline void cuda_safe_call(CUresult res) const {
     if (res != CUDA_SUCCESS) {
       const char* msg;
       cuGetErrorName(res, &msg);
@@ -932,6 +942,32 @@ class CUDAKernel {
     _module = 0;
   }
 
+  // create a map of constants in the ptx file mapping demangled to mangled name
+  inline void create_constant() {
+    size_t pos = 0;
+    while (pos < _ptx.size()) {
+      pos = _ptx.find(".const .align", pos);
+      if (pos == std::string::npos) break;
+      size_t end = _ptx.find(";", pos);
+      std::string line = _ptx.substr(pos,end-pos);
+      size_t constant_start = line.find_last_of(" ") + 1;
+      size_t constant_end = line.find_last_of("[");
+      std::string entry = line.substr(constant_start,constant_end-constant_start);
+
+      std::string key = reflection::detail::demangle(entry.c_str());
+
+      // C++ demangled names include the filename so remove manually
+      size_t filename_end = key.find_first_of("::");
+      if (filename_end != std::string::npos) {
+        std::cout << filename_end << std::endl;
+        key = key.substr( filename_end + 2);
+      }
+
+      _constant[key] = entry;
+      pos = end;
+    }
+  }
+
  public:
   inline CUDAKernel() : _link_state(0), _module(0), _kernel(0) {}
   inline CUDAKernel(const CUDAKernel& other) = delete;
@@ -945,6 +981,7 @@ class CUDAKernel {
     _ptx = ptx;
     _opts.assign(opts, opts + nopts);
     this->create_module(link_files, link_paths, optvals);
+    this->create_constant();
   }
   inline CUDAKernel& set(const char* func_name, const char* ptx,
                          std::vector<std::string> link_files,
@@ -956,6 +993,7 @@ class CUDAKernel {
     _ptx = ptx;
     _opts.assign(opts, opts + nopts);
     this->create_module(link_files, link_paths, optvals);
+    this->create_constant();
     return *this;
   }
   inline ~CUDAKernel() { this->destroy_module(); }
@@ -966,6 +1004,18 @@ class CUDAKernel {
     return cuLaunchKernel(_kernel, grid.x, grid.y, grid.z, block.x, block.y,
                           block.z, smem, stream, arg_ptrs.data(), NULL);
   }
+
+  inline CUdeviceptr get_constant_ptr(const char *name) const {
+    CUdeviceptr const_ptr = 0;
+    auto constant = _constant.find(name);
+    if (constant != _constant.end()) {
+      cuda_safe_call(cuModuleGetGlobal(&const_ptr, 0, _module, constant->second.c_str()));
+    } else {
+      throw std::runtime_error(std::string("failed to look up constant ") + name);
+    }
+    return const_ptr;
+  }
+
 };
 
 static const char* jitsafe_header_preinclude_h = R"(
@@ -1180,20 +1230,74 @@ static const char* jitsafe_header_type_traits = R"(
     #pragma once
     #if __cplusplus >= 201103L
     namespace __jitify_type_traits_ns {
+
     template<bool B, class T = void> struct enable_if {};
     template<class T>                struct enable_if<true, T> { typedef T type; };
+    #if __cplusplus >= 201402L
+    template< bool B, class T = void > using enable_if_t = typename enable_if<B,T>::type
+    #endif
 
-    struct true_type  { enum { value = true }; };
-    struct false_type { enum { value = false }; };
+    struct true_type  {
+      enum { value = true };
+      operator bool() const { return true; }
+    };
+    struct false_type {
+      enum { value = false };
+      operator bool() const { return false; }
+    };
+
     template<typename T> struct is_floating_point    : false_type {};
     template<> struct is_floating_point<float>       :  true_type {};
     template<> struct is_floating_point<double>      :  true_type {};
     template<> struct is_floating_point<long double> :  true_type {};
 
+    template<class T> struct is_integral              : false_type {};
+    template<> struct is_integral<bool>               :  true_type {};
+    template<> struct is_integral<char>               :  true_type {};
+    template<> struct is_integral<signed char>        :  true_type {};
+    template<> struct is_integral<unsigned char>      :  true_type {};
+    template<> struct is_integral<short>              :  true_type {};
+    template<> struct is_integral<unsigned short>     :  true_type {};
+    template<> struct is_integral<int>                :  true_type {};
+    template<> struct is_integral<unsigned int>       :  true_type {};
+    template<> struct is_integral<long>               :  true_type {};
+    template<> struct is_integral<unsigned long>      :  true_type {};
+    template<> struct is_integral<long long>          :  true_type {};
+    template<> struct is_integral<unsigned long long> :  true_type {};
+
+    template<typename T> struct is_signed    : false_type {};
+    template<> struct is_signed<float>       :  true_type {};
+    template<> struct is_signed<double>      :  true_type {};
+    template<> struct is_signed<long double> :  true_type {};
+    template<> struct is_signed<signed char> :  true_type {};
+    template<> struct is_signed<short>       :  true_type {};
+    template<> struct is_signed<int>         :  true_type {};
+    template<> struct is_signed<long>        :  true_type {};
+    template<> struct is_signed<long long>   :  true_type {};
+
+    template<typename T> struct is_unsigned             : false_type {};
+    template<> struct is_unsigned<unsigned char>      :  true_type {};
+    template<> struct is_unsigned<unsigned short>     :  true_type {};
+    template<> struct is_unsigned<unsigned int>       :  true_type {};
+    template<> struct is_unsigned<unsigned long>      :  true_type {};
+    template<> struct is_unsigned<unsigned long long> :  true_type {};
+
     template<typename T, typename U> struct is_same      : false_type {};
     template<typename T>             struct is_same<T,T> :  true_type {};
-    template<class>
-    struct result_of;
+
+    template<class T> struct is_array : false_type {};
+    template<class T> struct is_array<T[]> : true_type {};
+    template<class T, size_t N> struct is_array<T[N]> : true_type {};
+
+    //partial implementation only of is_function
+    template<class> struct is_function : false_type { };
+    template<class Ret, class... Args> struct is_function<Ret(Args...)> : true_type {}; //regular
+    template<class Ret, class... Args> struct is_function<Ret(Args......)> : true_type {}; // variadic
+    #if __cplusplus >= 201402L
+    template< class T > inline constexpr bool is_function_v = is_function<T>::value;
+    #endif
+
+    template<class> struct result_of;
     template<class F, typename... Args>
     struct result_of<F(Args...)> {
     // TODO: This is a hack; a proper implem is quite complicated.
@@ -1203,20 +1307,56 @@ static const char* jitsafe_header_type_traits = R"(
     template <class T> struct remove_reference { typedef T type; };
     template <class T> struct remove_reference<T&> { typedef T type; };
     template <class T> struct remove_reference<T&&> { typedef T type; };
+    #if __cplusplus >= 201402L
+    template< class T > using remove_reference_t = typename remove_reference<T>::type;
+    #endif
 
-    template <class T> struct is_integral { static const bool value = false; };
-    template <bool> struct is_integral { static bool value = true; };
-    template <char> struct is_integral { static bool value = true; };
-    template <signed char> struct is_integral { static bool value = true; };
-    template <unsigned char> struct is_integral { static bool value = true; };
-    template <short> struct is_integral { static bool value = true; };
-    template <unsigned short> struct is_integral { static bool value = true; };
-    template <int> struct is_integral { static bool value = true; };
-    template <unsigned int> struct is_integral { static bool value = true; };
-    template <long> struct is_integral { static bool value = true; };
-    template <unsigned long> struct is_integral { static bool value = true; };
-    template <long long> struct is_integral { static bool value = true; };
-    template <unsigned long long> struct is_integral { static bool value = true; };
+    template<class T> struct remove_extent { typedef T type; };
+    template<class T> struct remove_extent<T[]> { typedef T type; };
+    template<class T, size_t N> struct remove_extent<T[N]> { typedef T type; };
+    #if __cplusplus >= 201402L
+    template< class T > using remove_extent_t = typename remove_extent<T>::type;
+    #endif
+
+    template< class T > struct remove_const          { typedef T type; };
+    template< class T > struct remove_const<const T> { typedef T type; };
+    template< class T > struct remove_volatile             { typedef T type; };
+    template< class T > struct remove_volatile<volatile T> { typedef T type; };
+    template< class T > struct remove_cv { typedef typename remove_volatile<typename remove_const<T>::type>::type type; };
+    #if __cplusplus >= 201402L
+    template< class T > using remove_cv_t       = typename remove_cv<T>::type;
+    template< class T > using remove_const_t    = typename remove_const<T>::type;
+    template< class T > using remove_volatile_t = typename remove_volatile<T>::type;
+    #endif
+
+    template<bool B, class T, class F> struct conditional { typedef T type; };
+    template<class T, class F> struct conditional<false, T, F> { typedef F type; };
+    #if __cplusplus >= 201402L
+    template< bool B, class T, class F > using conditional_t = typename conditional<B,T,F>::type;
+    #endif
+
+    namespace __jitify_detail {
+    template< class T, bool is_function_type = false > struct add_pointer { using type = typename remove_reference<T>::type*; };
+    template< class T > struct add_pointer<T, true> { using type = T; };
+    template< class T, class... Args > struct add_pointer<T(Args...), true> { using type = T(*)(Args...); };
+    template< class T, class... Args > struct add_pointer<T(Args..., ...), true> { using type = T(*)(Args..., ...); };
+    }
+    template< class T > struct add_pointer : __jitify_detail::add_pointer<T, is_function<T>::value> {};
+    #if __cplusplus >= 201402L
+    template< class T > using add_pointer_t = typename add_pointer<T>::type
+    #endif
+
+    template< class T > struct decay {
+    private:
+      typedef typename remove_reference<T>::type U;
+    public:
+      typedef typename conditional<is_array<U>::value, typename remove_extent<U>::type*,
+        typename conditional<is_function<U>::value,typename add_pointer<U>::type,typename remove_cv<U>::type
+        >::type>::type type;
+    };
+    #if __cplusplus >= 201402L
+    template< class T > using decay_t = typename decay<T>::type;
+    #endif
 
     } // namespace __jtiify_type_traits_ns
     namespace std { using namespace __jitify_type_traits_ns; }
@@ -2053,6 +2193,8 @@ class KernelInstantiation {
     }
     return this->configure(grid, block, smem, stream);
   }
+
+  inline CUdeviceptr get_constant_ptr(const char *name) const { return _impl->cuda_kernel().get_constant_ptr(name); }
 };
 
 /*! An object representing a kernel made up of a Program, a name and options.

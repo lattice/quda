@@ -31,6 +31,7 @@ namespace quda {
 	for (int i=0; i<2; i++) ((double*)arg.result_h)[i] = 0.0;
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
+        using namespace jitify::reflection;
         jitify_error = program->kernel("quda::computePlaq")
           .instantiate((int)tp.block.x,Type<Float>(),Type<Gauge>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);

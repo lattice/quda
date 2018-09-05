@@ -30,18 +30,19 @@
 
 namespace quda {
 
-  using namespace jitify;
-  using namespace jitify::reflection;
-
-  static JitCache *kernel_cache;
-  static Program *program;
+  static jitify::JitCache *kernel_cache;
+  static jitify::Program *program;
   static bool jitify_init = false;
 
-  void create_jitify_program(const char *file) {
+  static void create_jitify_program(const char *file) {
     if (!jitify_init) {
-      kernel_cache = new JitCache;
+      kernel_cache = new jitify::JitCache;
+#ifdef DEVICE_DEBUG
+      std::vector<std::string> options = {"-std=c++11", "-ftz=true", "-prec-div=false", "-prec-sqrt=false", "-G"};
+#else
       std::vector<std::string> options = {"-std=c++11", "-ftz=true", "-prec-div=false", "-prec-sqrt=false"};
-      program = new Program(kernel_cache->program("kernels/gauge_plaq.cuh", 0, options));
+#endif
+      program = new jitify::Program(kernel_cache->program(file, 0, options));
       jitify_init = true;
     }
   }
