@@ -218,22 +218,29 @@ namespace quda {
         commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
         lL{x->X(0), x->X(1), x->X(2), x->X(3)},
         volumeCB(x->VolumeCB()), volume(x->Volume())
-    {}
+    {
+      printfQuda("ArgGeom: Initializing Geometry with a ColorSpinorField!\n");
+    }
 
     ArgGeom(cudaGaugeField *u) 
       : parity(0), nParity(u->SiteSubset()), nFace(1),
         commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
         lL{u->X()[0], u->X()[1], u->X()[2], u->X()[3]},
-        volumeCB(u->VolumeCB()), volume(u->Volume())
+        volume(u->Volume())
     {
       if(u->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED){
+	printfQuda("ArgGeom: Initializing Geometry with an extended Gauge Field!\n");
+	volumeCB = 1;
 	for(int dir=0;dir<4;dir++){
 	  dim[dir] = u->X()[dir] - 2*u->R()[dir];   //-- Actual lattice dimensions (NOT extended)
 	  dimEx[dir] = dim[dir] + 2*u->R()[dir];    //-- Extended lattice dimensions
 	  brd[dir] = u->R()[dir];
+	  volumeCB *= dim[dir];
 	}
+	volumeCB /= 2;
       }
       else{
+	printfQuda("ArgGeom: Initializing Geometry with a regular Gauge Field!\n");
 	for(int dir=0;dir<4;dir++) dim[dir] = u->X()[dir];
 	dim[0] *= (3-nParity);
       }
@@ -264,10 +271,8 @@ namespace quda {
     bool extendedGauge;
 
     Arg_ShiftCudaVec_Cov(ColorSpinorField *dst_, ColorSpinorField *src_, cudaGaugeField *gf_) 
-      : extendedGauge((gf_->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) ? true : false),
-	ArgGeom(gf_)
+      :	ArgGeom(gf_), extendedGauge((gf_->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) ? true : false)
     {
-      if(!extendedGauge) errorQuda("Arg_ShiftCudaVec_Cov: No support for non-extended Gauge fields for now\n");
       src.init(*src_);
       dst.init(*dst_);
       U.init(*gf_);
