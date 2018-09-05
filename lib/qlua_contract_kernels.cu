@@ -1102,7 +1102,7 @@ namespace quda {
     Link U;
     if(TMDcs->extendedGauge){
       int crd[5];
-      getCoords(crd, x_cb, arg->dim, pty);
+      getCoords(crd, x_cb, TMDcs->dim, pty);
       crd[4] = 0;
       int c2[5] = {0,0,0,0,0};
       for(int i=0;i<4;i++) c2[i] = crd[i] + TMDcs->brd[i];
