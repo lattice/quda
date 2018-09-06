@@ -1,119 +1,14 @@
 #include <gauge_field.h>
-#include <gauge_field_order.h>
-#include <complex_quda.h>
-#include <index_helper.cuh>
 #include <blas_cublas.h>
 #include <blas_quda.h>
 #include <tune_quda.h>
 
+#include <jitify_helper.cuh>
+#include <kernels/coarse_op_preconditioned.cuh>
+
 namespace quda {
 
 #ifdef GPU_MULTIGRID
-
-  template <typename PreconditionedGauge, typename Gauge, int n>
-  struct CalculateYhatArg {
-    PreconditionedGauge Yhat;
-    const Gauge Y;
-    const Gauge Xinv;
-    int dim[QUDA_MAX_DIM];
-    int comm_dim[QUDA_MAX_DIM];
-    int nFace;
-    const int coarseVolumeCB;   /** Coarse grid volume */
-
-    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim, const int *comm_dim, int nFace)
-      : Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), coarseVolumeCB(Y.VolumeCB()) {
-      for (int i=0; i<4; i++) {
-	this->comm_dim[i] = comm_dim[i];
-	this->dim[i] = dim[i];
-      }
-    }
-  };
-
-  // complex multiply-add with optimal use of fma
-  template<typename Float>
-  inline __device__ __host__ void caxpy(const complex<Float> &a, const complex<Float> &x, complex<Float> &y) {
-    y.x += a.x*x.x;
-    y.x -= a.y*x.y;
-    y.y += a.y*x.x;
-    y.y += a.x*x.y;
-  }
-
-  template<typename Float, int n, typename Arg>
-  inline __device__ __host__ void computeYhat(Arg &arg, int d, int x_cb, int parity, int i) {
-
-    int coord[5];
-    getCoords(coord, x_cb, arg.dim, parity);
-    coord[4] = 0;
-
-    const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-
-    // first do the backwards links Y^{+\mu} * X^{-\dagger}
-    if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
-
-#pragma unroll
-      for (int j = 0; j<n; j++) {
-	complex<Float> yHat = 0.0;
-#pragma unroll
-	for(int k = 0; k<n; k++) {
-	  caxpy(arg.Y.Ghost(d,1-parity,ghost_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
-	}
-	arg.Yhat.Ghost(d,1-parity,ghost_idx,i,j) = yHat;
-      }
-
-    } else {
-      const int back_idx = linkIndexM1(coord, arg.dim, d);
-
-#pragma unroll
-      for (int j = 0; j<n; j++) {
-	complex<Float> yHat = 0.0;
-#pragma unroll
-	for (int k = 0; k<n; k++) {
-	  caxpy(arg.Y(d,1-parity,back_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
-	}
-	arg.Yhat(d,1-parity,back_idx,i,j) = yHat;
-      }
-
-    }
-
-    // now do the forwards links X^{-1} * Y^{-\mu}
-#pragma unroll
-    for(int j = 0; j<n; j++) {
-      complex<Float> yHat = 0.0;
-#pragma unroll
-      for (int k = 0; k<n; k++) {
-	caxpy(arg.Xinv(0,parity,x_cb,i,k), arg.Y(d+4,parity,x_cb,k,j), yHat);
-      }
-      arg.Yhat(d+4,parity,x_cb,i,j) = yHat;
-    }
-
-  }
-
-  template<typename Float, int n, typename Arg>
-  void CalculateYhatCPU(Arg &arg) {
-
-    for (int d=0; d<4; d++) {
-      for (int parity=0; parity<2; parity++) {
-#pragma omp parallel for
-	for (int x_cb=0; x_cb<arg.Y.VolumeCB(); x_cb++) {
-	  for (int i=0; i<n; i++) computeYhat<Float,n>(arg, d, x_cb, parity, i);
-	} // x_cb
-      } //parity
-    } // dimension
-  }
-
-  template<typename Float, int n, typename Arg>
-  __global__ void CalculateYhatGPU(Arg arg) {
-    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.coarseVolumeCB) return;
-    int i_parity = blockDim.y*blockIdx.y + threadIdx.y;
-    if (i_parity >= 2*n) return;
-    int d = blockDim.z*blockIdx.z + threadIdx.z;
-    if (d >= 4) return;
-
-    int i = i_parity % n;
-    int parity = i_parity / n;
-    computeYhat<Float,n>(arg, d, x_cb, parity, i);
-  }
 
   template <typename Float, int n, typename Arg>
   class CalculateYhat : public TunableVectorYZ {
@@ -123,16 +18,26 @@ namespace quda {
     const LatticeField &meta;
 
     long long flops() const { return 2l * arg.coarseVolumeCB * 8 * n * n * (8*n-2); } // 8 from dir, 8 from complexity,
-    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + 8*arg.Yhat.Bytes()); }
+    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + 8*arg.Yhat.Bytes()) * n; }
 
     unsigned int minThreads() const { return arg.coarseVolumeCB; }
 
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
-    CalculateYhat(Arg &arg, const LatticeField &meta) : TunableVectorYZ(2*n,4), arg(arg), meta(meta)
+    CalculateYhat(Arg &arg, const LatticeField &meta) : TunableVectorYZ(2*n,4*n), arg(arg), meta(meta)
     {
-      strcpy(aux,comm_dim_partitioned_string());
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+#ifdef JITIFY
+        create_jitify_program("kernels/coarse_op_preconditioned.cuh");
+#endif
+        strcpy(aux, "GPU-");
+        strcat(aux, compile_type_str);
+        strcat(aux,",");
+      } else {
+        strcpy(aux, "CPU,");
+      }
+      strcat(aux,comm_dim_partitioned_string());
     }
     virtual ~CalculateYhat() { }
 
@@ -141,7 +46,14 @@ namespace quda {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	CalculateYhatCPU<Float,n,Arg>(arg);
       } else {
+#ifdef JITIFY
+        using namespace jitify::reflection;
+        jitify_error = program->kernel("quda::CalculateYhatGPU")
+          .instantiate(Type<Float>(),n,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
 	CalculateYhatGPU<Float,n,Arg> <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#endif
       }
     }
 
