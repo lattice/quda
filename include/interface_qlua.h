@@ -145,7 +145,60 @@ typedef enum RotateType_s {
   QLUA_qdp2quda = 1,
   QLUA_quda2qdp = 2
 } RotateType;
+//----------------------------------------------------------------
 
+
+//- C.K. Structure holding the current state,
+//- required for TMD contractions
+struct QuarkTMD_state {
+
+  //- contraction type
+  qluaCntr_Type cntrType;
+
+  //- whether to return position space correlator (true) or not
+  int push_res;
+
+  //- current link paths
+  char v_lpath[1024];
+  char b_lpath[1024];
+
+  //- Phase matrix, dev, host: Which one is allocated is controlled with an option
+  complex<QUDA_REAL> *phaseMatrix_host = NULL;
+  complex<QUDA_REAL> *phaseMatrix_dev  = NULL;
+
+  //- Momentum projected data buffer, CK-TODO: might not need that
+  complex<QUDA_REAL> *momproj_data;
+
+  //- host forward propagator, constant throughout, will be used for resetting cudaPropFrw_bsh
+  QUDA_REAL *hostPropFrw;
+
+  //- device forward (shifted) propagator, backward propagator
+  //- cudaPropAux: used for shifts, will be getting swapped with cudaPropFrw_bsh
+  cudaColorSpinorField *cudaPropFrw_bsh[QUDA_PROP_NVEC];
+  cudaColorSpinorField *cudaPropBkw[QUDA_PROP_NVEC];
+  cudaColorSpinorField *cudaPropAux;
+
+  /* device gauge fields
+   * gf_u -> Original gauge field
+   * bsh_u -> Gauge field shifted in the b-direction
+   * aux_u -> Gauge field used for non-covariant shifts of gauge fields, will be getting swapped with bsh_u
+   * wlinks -> Gauge field used as 'ColorMatrices' to store shifted links in the b and vbv directions.
+   * The indices i_wl_b, i_wl_vbv, i_wl_tmp control which 'Lorentz' index of wlinks will be used for the shifts
+   */
+  cudaGaugeField *gf_u;
+  cudaGaugeField *bsh_u;
+  cudaGaugeField *aux_u;    /* for shifts of bsh_u */
+  cudaGaugeField *wlinks;   /* store w_b, w_vbv */
+  int i_wl_b, i_wl_vbv, i_wl_tmp;
+
+  //- Structure holding the parameters of the contractions / momentum projection
+  qudaAPI_Param paramAPI;
+};
+//----------------------------------------------------------------
+
+
+//---------- Functions in interface_qlua.cpp ----------//
+//------- These functions are called within Qlua ------//
 
 EXTRN_C
 QudaVerbosity parseVerbosity(const char *v);
@@ -197,5 +250,16 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrPosSpc, const 
 			   QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3, QUDA_REAL *h_gauge[],
 			   XTRN_CPLX *S2, XTRN_CPLX *S1,
 			   int Nc, int Ns, qudaAPI_Param paramAPI);
+
+
+
+//----- TMD related functions -----//
+
+EXTRN_C int
+QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
+                  const int *momlist,
+                  QUDA_REAL *qluaPropFrw_host, QUDA_REAL *qluaPropBkw_host,
+                  QUDA_REAL *qluaGauge_host[],
+                  qudaAPI_Param paramAPI)
 
 #endif/*INTERFACE_QLUA_H__*/

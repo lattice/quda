@@ -196,7 +196,7 @@ new_cudaGaugeField(QudaGaugeParam& gp, QUDA_REAL *hbuf_u[])
 }
 
 static cudaGaugeField*
-new_ExtendedcudaGaugeField(cudaGaugeField &in, bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID){
+new_ExtendedcudaGaugeField(cudaGaugeField &in, bool copyGauge, bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID){
   
   int R[4];
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
@@ -216,9 +216,12 @@ new_ExtendedcudaGaugeField(cudaGaugeField &in, bool redundant_comms=false, QudaR
   for (int d=0; d<4; d++) gParamEx.r[d] = R[d];
   
   cudaGaugeField *out = new cudaGaugeField(gParamEx);
-  copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
-  out->exchangeExtendedGhost(R, redundant_comms);
-  
+
+  if(copyGauge){
+    copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
+    out->exchangeExtendedGhost(R, redundant_comms);
+  }
+
   return out;
 }
 
@@ -963,11 +966,11 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   convertSiteOrder_QudaQDP_to_momProj(corrInp_dev, corrQuda_dev, utilArg);  
 
   //-- Copy the output correlator to device
-  //-- If not using GPU for creating the phase matrix copy it to device, otherwise it's already on device
   stat = cublasSetMatrix(Nmoms, Ndata*Lt, sizeof(complex<QUDA_REAL>), corrOut_host, Nmoms, corrOut_dev, Nmoms);
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("%s: corrOut data copy to GPU failed!\n", func_name);
 
+  //-- If not using GPU for creating the phase matrix copy it to device, otherwise it's already on device
   if(!GPU_phaseMatrix){
     stat = cublasSetMatrix(V3, Nmoms, sizeof(complex<QUDA_REAL>), phaseMatrix_host, V3, phaseMatrix_dev, V3);
     if(stat != CUBLAS_STATUS_SUCCESS)
@@ -1105,7 +1108,7 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
 }
 
 
-
+//-- CK-TODO: Make this function support only Standard contractions
 EXTRN_C int
 QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qudaLattice *qS, const int *momlist,
 			   QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3, QUDA_REAL *h_gauge[],
@@ -1265,5 +1268,156 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   printfQuda("%s: Returning...\n", func_name);
   free(func_name);
   
+  return status;
+}
+
+
+//-----------------------------------------------------------------//
+//------ T M D   R E L A T E D   I M P L E M E N T A T I O N ------//
+//-----------------------------------------------------------------//
+
+
+//- C.K. Initialize the TMD contract State
+EXTRN_C int
+QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
+		  const int *momlist,
+		  QUDA_REAL *qluaPropFrw_host, QUDA_REAL *qluaPropBkw_host,
+		  QUDA_REAL *qluaGauge_host[],
+		  qudaAPI_Param paramAPI){
+  int status = 0;
+
+  if (check_quda_comms(qS))
+    return 1;
+
+  const char *func_name = "QuarkTMDinit_Quda";
+
+  if(paramAPI.mpParam.cntrType != what_tmd_g_F_B)
+    errorQuda("%s: Contraction type not parsed correctly or not supported!\n", func_name);
+
+  //-- Check-print parameters
+  int Nc = QUDA_Nc;
+  int Ns = QUDA_Ns;
+
+  bool preserveBasis = paramAPI.preserveBasis == 1 ? true : false;
+  bool GPU_phaseMatrix = (paramAPI.mpParam.GPU_phaseMatrix == 1 ? true : false);
+  LONG_T locvol = paramAPI.mpParam.locvol;
+  int Nmoms     = paramAPI.mpParam.Nmoms;
+  int Ndata     = paramAPI.mpParam.Ndata;
+  double bc_t   = paramAPI.mpParam.bc_t;
+  int expSgn    = paramAPI.mpParam.expSgn;
+  if(expSgn != 1 && expSgn != -1)
+    errorQuda("%s: Got invalid exponential sign, expSgn = %d!\n", func_name, expSgn);
+
+  printfQuda("%s:\n", func_name);
+  printfQuda("  Will create phase matrix on %s\n", GPU_phaseMatrix == true ? "GPU" : "CPU"); 
+  printfQuda("  Got locvol = %lld\n", locvol);
+  printfQuda("  Got Nmoms  = %d\n", Nmoms);
+  printfQuda("  Got Ndata  = %d\n", Ndata);
+  printfQuda("  Got bc_t   = %f\n", bc_t);
+  printfQuda("  Got expSgn = %s\n", expSgn == 1 ? "PLUS" : "MINUS");
+  //-------------------------------------------------------------
+
+  
+  //-- Load the parameters required for the ColorSpinorFields and GaugeFields
+  QudaGaugeParam gp;
+  int tBoundaryGauge = -1;
+  init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
+  
+  QudaInvertParam ip;
+  init_QudaInvertParam_generic(ip, gp, paramAPI, preserveBasis);
+  setVerbosity(paramAPI.verbosity);
+
+  //-- Initialize generic variables of qcs
+  qcs->cntrType = cntrType;
+  qcs->push_res = push_res;
+  qcs->paramAPI = paramAPI;
+  //-------------------------------------------------------------
+
+  //- Allocate and create Phase Matrix
+  char *CPUorGPU;
+  if(paramAPI.mpParam.GPU_phaseMatrix){
+    CPUorGPU = "GPU";
+    cudaMalloc( (void**)qcd->phaseMatrix_dev, sizeof(complex<QUDA_REAL>)*V3*Nmoms );
+    checkCudaErrorNoSync();
+    cudaMemset(phaseMatrix_dev, 0, sizeof(complex<QUDA_REAL>)*V3*Nmoms);
+    createPhaseMatrix_GPU(phaseMatrix_dev, momlist, paramAPI.mpParam, localL, totalL);
+  }
+  else{
+    CPUorGPU = "CPU";
+    phaseMatrix_host = (complex<QUDA_REAL>*) calloc(V3*Nmoms, sizeof(complex<QUDA_REAL>));
+    if(phaseMatrix_host == NULL) errorQuda("%s: Cannot allocate phaseMatrix on host. Exiting.\n", func_name);
+    createPhaseMatrix_CPU(phaseMatrix_host, momlist, paramAPI.mpParam, localL, totalL);
+  }
+  printfQuda("%s: Phase matrix created on %s.\n", func_name, CPUorGPU);
+  //-------------------------------------------------------------
+
+  //- Load the gauge fields
+  double t1 = MPI_Wtime();
+
+  bool copyGauge_no  = false;
+  bool copyGauge_yes = true;
+
+  cudaGaugeField cuda_gf;
+  
+  qcs->gf_u = NULL;
+  qcs->bsh_u = NULL;
+  qcs->aux_u = NULL;
+  qcs->wlinks = NULL;
+  for(int mu=0;mu<qS->rank;mu++)
+    if(qluaGauge_host[mu] == NULL)
+      errorQuda("%s: Got NULL host qlua gauge field [%d]\n", func_name, mu);
+  cuda_gf = new_cudaGaugeField(gp, h_gauge); //- The original, regular gauge field
+
+  //- Extended gauge field, copy of original, extendedGhosts are already exchanged
+  qcs->gf_u = new_ExtendedcudaGaugeField(*cuda_gf, copyGauge_yes);
+
+  //- Extended auxilliary gauge fields, initialized to zero, extendedGhosts are NOT exchanged
+  qcs->bsh_u  = new_ExtendedcudaGaugeField(*cuda_gf, copyGauge_no);
+  qcs->aux_u  = new_ExtendedcudaGaugeField(*cuda_gf, copyGauge_no);
+  qcs->wlinks = new_ExtendedcudaGaugeField(*cuda_gf, copyGauge_no);
+
+  double t2 = MPI_Wtime();
+  printfQuda("TIMING - %s: Cuda Gauge Fields loaded in %f sec.\n", func_name, t4-t3);
+
+  //- Setup the indices of the wlinks Color-Matrices
+  qcs->i_wl_b   = 0;
+  qcs->i_wl_vbv = 1;
+  qcs->i_wl_tmp = 2;
+
+  //- Initialize link paths, set to zero
+  qcs->v_lpath[0] = '\0';
+  qcs->b_lpath[0] = '\0';
+  //-------------------------------------------------------------
+
+
+  //-- Load the propagators into cuda-CSFs
+  double t3 = MPI_Wtime();
+
+  int nVec = QUDA_PROP_NVEC;
+  LONG_T csVecLgh = locvol * Nc * Ns * 2;
+
+  //- Allocate and copy Contract State host Propagator 
+  qcs->hostPropFrw = (QUDA_REAL*) calloc(csVecLgh, sizeof(QUDA_REAL));
+  if(qcs->hostPropFrw == NULL) errorQuda("%s: Cannot allocate Contract State host Propagator. Exiting.\n", func_name);
+  memcpy(qcs->hostPropFrw, qluaPropFrw_host, sizeof(QUDA_REAL)*csVecLgh);
+
+
+  //- Allocate device pointers of Forward and Backward propagators
+  for(int ivec=0;ivec<nVec;ivec++){
+    cudaPropFrw_bsh[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropFrw_host[ivec * csVecLgh]) );
+    cudaPropBkw[ivec]     = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropBkw_host[ivec * csVecLgh]) );
+    if( (cudaPropFrw_bsh[ivec] == NULL) || (cudaPropBkw[ivec] == NULL) )
+      errorQuda("%s: Cannot allocate forward and/or backward propagators. Exiting.\n", func_name);
+  }
+
+  //- Allocate auxilliary vector, initialize to zero
+  cudaPropAux = new_cudaColorSpinorField(gp, ip, Nc, Ns, NULL);
+  if(cudaPropAux == NULL)
+    errorQuda("%s: Cannot allocate auxilliary cuda Vector. Exiting.\n", func_name);
+
+  double t4 = MPI_Wtime();
+  printfQuda("TIMING - %s: Cuda Color-Spinor fields loaded in %f sec.\n", func_name, t2-t1);
+  //-------------------------------------------------------------
+
   return status;
 }
