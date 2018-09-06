@@ -4,12 +4,12 @@
 #include <typeinfo>
 #include <vector>
 #include <assert.h>
+#include <integer_sequence.hpp> // C++11 version of this C++14 feature
+
 #include <launch_kernel.cuh>
 
 #include <jitify_helper.cuh>
 #include <kernels/block_orthogonalize.cuh>
-
-#include <integer_sequence.hpp> // C++11 version of this C++14 feature
 
 namespace quda {
 
