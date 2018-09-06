@@ -683,7 +683,7 @@ momentumProjectionPropagator_Quda(
     
   double t1 = MPI_Wtime();
   if(GPU_phaseMatrix){
-    createPhaseMatrix_GPU(phaseMatrix_dev, momMatrix, paramAPI.mpParam, localL, totalL);
+    createPhaseMatrix_GPU(phaseMatrix_dev, momMatrix, paramAPI.mpParam, qS);
   }
   else{
     phaseMatrix_host = (complex<QUDA_REAL>*) calloc(V3*Nmoms, sizeof(complex<QUDA_REAL>));
@@ -923,7 +923,7 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   cudaMemset(phaseMatrix_dev, 0, sizeof(complex<QUDA_REAL>)*V3*Nmoms);
     
   if(GPU_phaseMatrix){
-    createPhaseMatrix_GPU(phaseMatrix_dev, momlist, paramAPI.mpParam, localL, totalL);
+    createPhaseMatrix_GPU(phaseMatrix_dev, momlist, paramAPI.mpParam, qS);
   }
   else{
     phaseMatrix_host = (complex<QUDA_REAL>*) calloc(V3*Nmoms, sizeof(complex<QUDA_REAL>));
@@ -1293,11 +1293,13 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
 
   if(paramAPI.mpParam.cntrType != what_tmd_g_F_B)
     errorQuda("%s: Contraction type not parsed correctly or not supported!\n", func_name);
+  if(paramAPI.mpParam.GPU_phaseMatrix != 1)
+    errorQuda("%s: Supports creating phase matrix only on GPU!\n", func_name);
 
-  //-- Check-print parameters
+
+  //-- Set-Check-Print parameters
   int Nc = QUDA_Nc;
   int Ns = QUDA_Ns;
-
   bool preserveBasis = paramAPI.preserveBasis == 1 ? true : false;
   bool GPU_phaseMatrix = (paramAPI.mpParam.GPU_phaseMatrix == 1 ? true : false);
   LONG_T locvol = paramAPI.mpParam.locvol;
@@ -1316,7 +1318,6 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
   printfQuda("  Got bc_t   = %f\n", bc_t);
   printfQuda("  Got expSgn = %s\n", expSgn == 1 ? "PLUS" : "MINUS");
   //-------------------------------------------------------------
-
   
   //-- Load the parameters required for the ColorSpinorFields and GaugeFields
   QudaGaugeParam gp;
@@ -1333,48 +1334,38 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
   qcs->paramAPI = paramAPI;
   //-------------------------------------------------------------
 
+
   //- Allocate and create Phase Matrix
-  char *CPUorGPU;
-  if(paramAPI.mpParam.GPU_phaseMatrix){
-    CPUorGPU = "GPU";
-    cudaMalloc( (void**)qcd->phaseMatrix_dev, sizeof(complex<QUDA_REAL>)*V3*Nmoms );
-    checkCudaErrorNoSync();
-    cudaMemset(phaseMatrix_dev, 0, sizeof(complex<QUDA_REAL>)*V3*Nmoms);
-    createPhaseMatrix_GPU(phaseMatrix_dev, momlist, paramAPI.mpParam, localL, totalL);
-  }
-  else{
-    CPUorGPU = "CPU";
-    phaseMatrix_host = (complex<QUDA_REAL>*) calloc(V3*Nmoms, sizeof(complex<QUDA_REAL>));
-    if(phaseMatrix_host == NULL) errorQuda("%s: Cannot allocate phaseMatrix on host. Exiting.\n", func_name);
-    createPhaseMatrix_CPU(phaseMatrix_host, momlist, paramAPI.mpParam, localL, totalL);
-  }
+  cudaMalloc( (void**)qcd->phaseMatrix_dev, sizeof(complex<QUDA_REAL>)*V3*Nmoms );
+  checkCudaErrorNoSync();
+  cudaMemset(phaseMatrix_dev, 0, sizeof(complex<QUDA_REAL>)*V3*Nmoms);
+  createPhaseMatrix_GPU(phaseMatrix_dev, momlist, paramAPI.mpParam, qS);
   printfQuda("%s: Phase matrix created on %s.\n", func_name, CPUorGPU);
   //-------------------------------------------------------------
+
 
   //- Load the gauge fields
   double t1 = MPI_Wtime();
 
   bool copyGauge_no  = false;
   bool copyGauge_yes = true;
-
-  cudaGaugeField cuda_gf;
-  
-  qcs->gf_u = NULL;
-  qcs->bsh_u = NULL;
-  qcs->aux_u = NULL;
-  qcs->wlinks = NULL;
+  qcs->cuda_gf = NULL;
+  qcs->gf_u    = NULL;
+  qcs->bsh_u   = NULL;
+  qcs->aux_u   = NULL;
+  qcs->wlinks  = NULL;
   for(int mu=0;mu<qS->rank;mu++)
     if(qluaGauge_host[mu] == NULL)
       errorQuda("%s: Got NULL host qlua gauge field [%d]\n", func_name, mu);
-  cuda_gf = new_cudaGaugeField(gp, h_gauge); //- The original, regular gauge field
+  qcs->cuda_gf = new_cudaGaugeField(gp, h_gauge); //- The original, regular gauge field
 
   //- Extended gauge field, copy of original, extendedGhosts are already exchanged
-  qcs->gf_u = new_ExtendedcudaGaugeField(*cuda_gf, copyGauge_yes);
+  qcs->gf_u = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), copyGauge_yes);
 
   //- Extended auxilliary gauge fields, initialized to zero, extendedGhosts are NOT exchanged
-  qcs->bsh_u  = new_ExtendedcudaGaugeField(*cuda_gf, copyGauge_no);
-  qcs->aux_u  = new_ExtendedcudaGaugeField(*cuda_gf, copyGauge_no);
-  qcs->wlinks = new_ExtendedcudaGaugeField(*cuda_gf, copyGauge_no);
+  qcs->bsh_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), copyGauge_no);
+  qcs->aux_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), copyGauge_no);
+  qcs->wlinks = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), copyGauge_no);
 
   double t2 = MPI_Wtime();
   printfQuda("TIMING - %s: Cuda Gauge Fields loaded in %f sec.\n", func_name, t4-t3);
@@ -1407,7 +1398,7 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
     cudaPropFrw_bsh[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropFrw_host[ivec * csVecLgh]) );
     cudaPropBkw[ivec]     = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropBkw_host[ivec * csVecLgh]) );
     if( (cudaPropFrw_bsh[ivec] == NULL) || (cudaPropBkw[ivec] == NULL) )
-      errorQuda("%s: Cannot allocate forward and/or backward propagators. Exiting.\n", func_name);
+      errorQuda("%s: Cannot allocate forward and/or backward propagators for ivec = %d. Exiting.\n", func_name, ivec);
   }
 
   //- Allocate auxilliary vector, initialize to zero
@@ -1418,6 +1409,35 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
   double t4 = MPI_Wtime();
   printfQuda("TIMING - %s: Cuda Color-Spinor fields loaded in %f sec.\n", func_name, t2-t1);
   //-------------------------------------------------------------
+
+  return status;
+}//- QuarkTMDinit_Quda
+//---------------------------------------------------------------
+
+
+EXTRN_C int
+QuarkTMDfree_Quda(QuarkTMD_state *qcs){
+
+  int status = 0;
+
+  //- Delete gauge fields
+  if(qcs->cuda_gf != NULL) delete qcs->cuda_gf;
+  if(qcs->gf_u    != NULL) delete qcs->gf_u;
+  if(qcs->bsh_u   != NULL) delete qcs->bsh_u;
+  if(qcs->aux_u   != NULL) delete qcs->aux_u;
+  if(qcs->wlinks  != NULL) delete qcs->wlinks;
+
+  //- Delete propagators
+  for(int i=0;i<QUDA_PROP_NVEC;i++){
+    if(qcs->cudaPropFrw_bsh[i] != NULL) delete qcs->cudaPropFrw_bsh[i];
+    if(qcs->cudaPropBkw_bsh[i] != NULL) delete qcs->cudaPropBkw_bsh[i];
+  }
+  if(qcs->cudaPropAux != NULL) delete qcs->cudaPropAux;
+
+  free(qcs->hostPropFrw);
+
+  //- Delete phase matrix
+  cudaFree(phaseMatrix_dev);
 
   return status;
 }
