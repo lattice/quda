@@ -458,7 +458,7 @@ namespace quda {
   }
 
   template <typename Float, typename yFloat, typename ghostFloat, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool dagger, DslashType type>
-  class DslashCoarse : public Tunable {
+  class DslashCoarse : public TunableVectorY {
 
   protected:
     ColorSpinorField &out;
@@ -490,47 +490,35 @@ namespace quda {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); } // 4-d volume since this x threads only
-    unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (dim_threads * 2 * nParity); }
 
     bool advanceBlockDim(TuneParam &param) const
     {
-      dim3 block = param.block;
       dim3 grid = param.grid;
-      bool ret = Tunable::advanceBlockDim(param);
-      param.block.y = block.y; param.block.z = block.z;
-      param.grid.y = grid.y; param.grid.z = grid.z;
+      bool ret = TunableVectorY::advanceBlockDim(param);
+      param.grid.z = grid.z;
 
       if (ret) { // we advanced the block.x so we're done
 	return true;
       } else { // block.x (spacetime) was reset
 
-	if (param.block.y < (unsigned int)(nParity * nSrc)) { // advance parity / 5th dimension
-	  param.block.y++;
-	  param.grid.y = (nParity * nSrc + param.block.y - 1) / param.block.y;
-	  return true;
-	} else {
-	  // reset parity / 5th dimension
-	  param.block.y = 1;
-	  param.grid.y = nParity * nSrc;
+        // let's try to advance spin/block-color
+        while(param.block.z <= (unsigned int)(dim_threads * 2 * 2 * (Nc/Mc))) {
+          param.block.z+=dim_threads * 2;
+          if ( (dim_threads*2*2*(Nc/Mc)) % param.block.z == 0) {
+            param.grid.z = (dim_threads * 2 * 2 * (Nc/Mc)) / param.block.z;
+            break;
+          }
+        }
 
-	  // let's try to advance spin/block-color
-	  while(param.block.z <= (unsigned int)(dim_threads * 2 * 2 * (Nc/Mc))) {
-	    param.block.z+=dim_threads * 2;
-	    if ( (dim_threads*2*2*(Nc/Mc)) % param.block.z == 0) {
-	      param.grid.z = (dim_threads * 2 * 2 * (Nc/Mc)) / param.block.z;
-	      break;
-	    }
-	  }
-
-	  // we can advance spin/block-color since this is valid
-	  if (param.block.z <= (unsigned int)(dim_threads * 2 * 2 * (Nc/Mc)) &&
-	      param.block.z <= (unsigned int)deviceProp.maxThreadsDim[2] ) { //
-	    return true;
-	  } else { // we have run off the end so let's reset
-	    param.block.z = dim_threads * 2;
-	    param.grid.z = 2 * (Nc/Mc);
-	    return false;
-	  }
+        // we can advance spin/block-color since this is valid
+        if (param.block.z <= (unsigned int)(dim_threads * 2 * 2 * (Nc/Mc)) &&
+            param.block.z <= (unsigned int)deviceProp.maxThreadsDim[2] &&
+            param.block.x*param.block.y*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock ) { //
+          return true;
+        } else { // we have run off the end so let's reset
+          param.block.z = dim_threads * 2;
+          param.grid.z = 2 * (Nc/Mc);
+          return false;
         }
       }
     }
@@ -569,7 +557,8 @@ namespace quda {
       // recompute grid size since minThreads() has now been updated
       param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
 
-      if (2*param.aux.y <= nDim) {
+      if (2*param.aux.y <= nDim &&
+          param.block.x*param.block.y*dim_threads*2 <= (unsigned int)deviceProp.maxThreadsPerBlock) {
 	param.aux.y *= 2;
 	dim_threads = param.aux.y;
 
@@ -605,9 +594,7 @@ namespace quda {
       color_col_stride = param.aux.x;
       dim_threads = param.aux.y;
 
-      Tunable::initTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = nParity * nSrc;
+      TunableVectorY::initTuneParam(param);
       param.block.z = dim_threads * 2;
       param.grid.z = 2*(Nc/Mc);
       param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y*param.block.z > sharedBytesPerBlock(param) ?
@@ -621,12 +608,10 @@ namespace quda {
       color_col_stride = param.aux.x;
       dim_threads = param.aux.y;
 
-      Tunable::defaultTuneParam(param);
+      TunableVectorY::defaultTuneParam(param);
       // ensure that the default x block size is divisible by the warpSize
       param.block.x = deviceProp.warpSize;
       param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
-      param.block.y = 1;
-      param.grid.y = nParity * nSrc;
       param.block.z = dim_threads * 2;
       param.grid.z = 2*(Nc/Mc);
       param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y*param.block.z > sharedBytesPerBlock(param) ?
@@ -637,7 +622,8 @@ namespace quda {
     inline DslashCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 			const GaugeField &Y, const GaugeField &X, double kappa, int parity,
                         MemoryLocation *halo_location)
-      : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
+      : TunableVectorY(out.SiteSubset() * (out.Ndim()==5 ? out.X(4) : 1)),
+        out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
         nParity(out.SiteSubset()), nSrc(out.Ndim()==5 ? out.X(4) : 1)
     {
       strcpy(aux, "policy_kernel,");
@@ -679,7 +665,7 @@ namespace quda {
 	coarseDslash<Float,nDim,Ns,Nc,Mc,dslash,clover,dagger,type>(arg);
       } else {
 
-        const TuneParam &tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE /*getVerbosity()*/);
+        const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	if (out.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || Y.FieldOrder() != QUDA_FLOAT2_GAUGE_ORDER)
 	  errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
@@ -998,7 +984,7 @@ namespace quda {
         if (Y.Precision() == QUDA_SINGLE_PRECISION) {
           if (halo_precision == QUDA_SINGLE_PRECISION) {
             ApplyCoarse<float,float,float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                           dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+                                         dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else {
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
           }
