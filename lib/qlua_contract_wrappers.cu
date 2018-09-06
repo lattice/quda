@@ -131,6 +131,7 @@ namespace quda {
 	break;
       }
     }
+    if(shfType==qcInvalidShift) errorQuda("TMDparseShiftType: Cannot parse given shift type, typeStr = %s.\n", typeStr);
     return shfType;
   }
 
@@ -350,7 +351,7 @@ namespace quda {
 
     const char *funcname = "perform_ShiftLink_AdjSplitCov";
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform an On-Axis shift in the %s%s direction\n",
+      printfQuda("%s: Will perform a Gauge Link AdjSplitCov shift in the %s%s direction\n",
 		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
@@ -462,8 +463,8 @@ namespace quda {
 			    ColorSpinorField **cudaProp1,
 			    ColorSpinorField **cudaProp2,
 			    ColorSpinorField **cudaProp3,
-			    cudaGaugeField *U, cudaGaugeField *extU, // U is NOT an extended GaugeField!!!
-			    cudaGaugeField *extU1, cudaGaugeField *extU2, cudaGaugeField *extU3,
+			    cudaGaugeField *U, cudaGaugeField *auxU, // U is NOT an extended GaugeField!!!
+			    cudaGaugeField *auxU1, cudaGaugeField *auxU2, cudaGaugeField *auxU3,
 			    qudaAPI_Param paramAPI){
 
     const char *func_name = "QuarkContractTMD_GPU";
@@ -475,42 +476,49 @@ namespace quda {
     qcTMD_ShiftDir  propShfDir  = TMDparseShiftDirection(shfFlag);
     qcTMD_ShiftSgn  propShfSgn  = TMDparseShiftSign(shfFlag);     
 
-    double t1 = MPI_Wtime();
-    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-      if(propShfType == qcCovShift)     perform_ShiftCudaVec_Cov(cudaProp3[ivec], cudaProp1[ivec], extU, propShfDir, propShfSgn);
-      if(propShfType == qcNonCovShift)	perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
-      qcSwapCudaVec(&(cudaProp1[ivec]), &(cudaProp3[ivec]));
+    // double t1 = MPI_Wtime();
+    // for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+    //   if(propShfType == qcCovShift)     perform_ShiftCudaVec_Cov(cudaProp3[ivec], cudaProp1[ivec], auxU, propShfDir, propShfSgn);
+    //   if(propShfType == qcNonCovShift)	perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
+    //   qcSwapCudaVec(&(cudaProp1[ivec]), &(cudaProp3[ivec]));
+    // }
+    // double t2 = MPI_Wtime();
+    // printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
+
+    qcTMD_ShiftDir gaugeShfDir   = TMDparseShiftDirection(shfFlag);
+    qcTMD_ShiftSgn gaugeShfSgn   = TMDparseShiftSign(shfFlag);
+    qcTMD_ShiftType gaugeShfType = TMDparseShiftType(paramAPI.shfType);
+
+    int i_src = 0;
+    int i_dst = 0;
+    double t3 = MPI_Wtime();
+    if(gaugeShfType == qcNonCovShift){
+      i_dst = 2;
+      perform_ShiftGauge_nonCov(auxU1, auxU, gaugeShfDir, gaugeShfSgn);
+      qcSwapCudaGauge(&auxU, &auxU1);
     }
-    double t2 = MPI_Wtime();
-    printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
-
-    // qcTMD_ShiftDir GaugeShfDir  = propShfDir;
-    // qcTMD_ShiftSgn GaugepropShfSgn  = propShfSgn;
-    // qcTMD_ShiftType GaugeShfType = propShfType;
-
-    // int i_src = 0;
-    // int i_dst = 0;
-    // double t3 = MPI_Wtime();
-    // if(GaugeShfType == qcNonCovShift){
-    //   i_dst = 1;
-    //   perform_ShiftGauge_nonCov(extU1, extU, GaugeShfDir, GaugepropShfSgn);
-    //   qcSwapCudaGauge(&extU, &extU1);
-    // }
-    // else if(GaugeShfType == qcCovShift){
-    //   i_src = 0;
-    //   i_dst = 1;
+    else if(gaugeShfType == qcCovShift){
+      i_src = 0;
+      i_dst = 2;
       
-    //   perform_ShiftLink_Cov(extU1, i_dst, extU2, i_src,
-    // 			    extU, GaugeShfDir, GaugepropShfSgn);
-    //   qcSwapCudaGauge(&extU, &extU1);
-    // }
-    // double t4 = MPI_Wtime();
-    // printfQuda("TIMING - %s: Gauge field shift done in %f sec.\n", func_name, t4-t3);
+      perform_ShiftLink_Cov(auxU1, i_dst, auxU2, i_src,
+    			    auxU, gaugeShfDir, gaugeShfSgn);
+      qcSwapCudaGauge(&auxU, &auxU1);
+    }
+    else if(gaugeShfType == qcAdjSplitCovShift){
+      i_src = 0;
+      i_dst = 2;
 
-    // int i_mu = i_dst;
-    int i_mu = 0;
+      perform_ShiftLink_AdjSplitCov(auxU1, i_dst, auxU2, i_src,
+				    auxU, auxU3, gaugeShfDir, gaugeShfSgn);
+      qcSwapCudaGauge(&auxU, &auxU1);
+    }
+    double t4 = MPI_Wtime();
+    printfQuda("TIMING - %s: Gauge field shift done in %f sec.\n", func_name, t4-t3);
 
-    qcTMD_State argState(cudaProp1, cudaProp2, extU, i_mu, paramAPI.mpParam.cntrType, paramAPI.preserveBasis);
+    int i_mu = i_dst;
+
+    qcTMD_State argState(cudaProp1, cudaProp2, auxU, i_mu, paramAPI.mpParam.cntrType, paramAPI.preserveBasis);
  
     perform_TMD_Contract(corrQuda_dev, argState);
 

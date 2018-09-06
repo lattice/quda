@@ -26,7 +26,7 @@ namespace quda {
 
 
   const int nShiftFlag = 20;
-  const int nShiftType = 2;
+  const int nShiftType = 3;
 
   static const char *qcTMD_ShiftFlagArray[nShiftFlag] = {
     "X", "x", "Y", "y", "Z", "z", "T", "t", "Q", "q",
@@ -34,7 +34,8 @@ namespace quda {
 
   static const char *qcTMD_ShiftTypeArray[nShiftType] = {
     "Covariant",
-    "Non-Covariant"};
+    "Non-Covariant",
+    "AdjSplitCov"};
 
   static const char *qcTMD_ShiftDirArray[4] = {"x", "y", "z", "t"};
   static const char *qcTMD_ShiftSgnArray[2] = {"-", "+"};
@@ -89,8 +90,9 @@ namespace quda {
 
   typedef enum qcTMD_ShiftType_s {
     qcInvalidShift = -1,
-    qcCovShift = 0,      //-- Covariant Shift (involving a gauge link)
-    qcNonCovShift = 1    //-- Non-covariant shift
+    qcCovShift = 0,
+    qcNonCovShift = 1,
+    qcAdjSplitCovShift = 2
   } qcTMD_ShiftType;
 
 
