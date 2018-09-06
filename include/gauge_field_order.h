@@ -13,7 +13,6 @@
 #else
 #define DISABLE_TROVE
 #endif
-#include <gauge_field.h>
 #include <assert.h>
 #include <type_traits>
 

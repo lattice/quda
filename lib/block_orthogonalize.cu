@@ -4,6 +4,7 @@
 #include <typeinfo>
 #include <vector>
 #include <assert.h>
+#include <launch_kernel.cuh>
 
 #include <jitify_helper.cuh>
 #include <kernels/block_orthogonalize.cuh>
@@ -99,8 +100,7 @@ namespace quda {
       jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
       cudaMemcpyToSymbolAsync(B_array_d, B_array_h, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, stream);
-      LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg)
-	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
 #endif
     }
 
