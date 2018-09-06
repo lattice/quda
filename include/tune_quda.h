@@ -136,7 +136,7 @@ namespace quda {
     }
 
     /**
-     * @brief For reason this can't be queried from the device properties, so
+     * @brief For some reason this can't be queried from the device properties, so
      * here we set set this.  Based on Table 14 of the CUDA
      * Programming Guide 9.0 (Technical Specifications per Compute Capability)
      * @return The maximum number of simultaneously resident blocks per SM
