@@ -68,14 +68,25 @@ namespace quda {
 
   void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix_dev,
 			     const int *momMatrix,
-			     momProjParam param,
-			     int localL[], int totalL[])
-  {
+			     momProjParam param, const qudaLattice *qS){
+
+    //-- Define useful topology quantities
+    int nDim = qS->rank;
+    int localL[nDim];
+    int totalL[nDim];
+    for(int mu=0; mu<nDim; mu++){
+      localL[mu] = qS->site_coord_hi[mu] - qS->site_coord_lo[mu];
+      totalL[mu] = localL[mu] * comm_dim(mu);
+    }
+
     printfQuda("createPhaseMatrix_GPU:\n");
     printfQuda("  Got Nmoms  = %d\n", param.Nmoms);
     printfQuda("  Got V3     = %d\n", param.V3);
     printfQuda("  Got momDim = %d\n", param.momDim);
     printfQuda("  Got expSgn = %d\n", param.expSgn);
+    printfQuda("  Got localL = (%d,%d,%d,%d)\n", localL[0], localL[1], localL[2], localL[3]);
+    printfQuda("  Got totalL = (%d,%d,%d,%d)\n", totalL[0], totalL[1], totalL[2], totalL[3]);
+
 
     int *momMatrix_dev;
     cudaMalloc((void**)&momMatrix_dev, sizeof(int)*param.momDim*param.Nmoms );

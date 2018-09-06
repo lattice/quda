@@ -64,8 +64,7 @@ namespace quda {
   
   void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix,
 			     const int *momMatrix,
-                             momProjParam param,
-                             int localL[], int totalL[]);
+                             momProjParam param,  const qudaLattice *qS);
 
   void QuarkContractStd_GPU(complex<QUDA_REAL> *corrQuda_dev,
                             ColorSpinorField **cudaProp1,
