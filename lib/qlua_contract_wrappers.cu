@@ -476,14 +476,14 @@ namespace quda {
     qcTMD_ShiftDir  propShfDir  = TMDparseShiftDirection(shfFlag);
     qcTMD_ShiftSgn  propShfSgn  = TMDparseShiftSign(shfFlag);     
 
-    // double t1 = MPI_Wtime();
-    // for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-    //   if(propShfType == qcCovShift)     perform_ShiftCudaVec_Cov(cudaProp3[ivec], cudaProp1[ivec], auxU, propShfDir, propShfSgn);
-    //   if(propShfType == qcNonCovShift)	perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
-    //   qcSwapCudaVec(&(cudaProp1[ivec]), &(cudaProp3[ivec]));
-    // }
-    // double t2 = MPI_Wtime();
-    // printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
+    double t1 = MPI_Wtime();
+    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+      if(propShfType == qcCovShift)     perform_ShiftCudaVec_Cov(cudaProp3[ivec], cudaProp1[ivec], auxU, propShfDir, propShfSgn);
+      if(propShfType == qcNonCovShift)	perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
+      qcSwapCudaVec(&(cudaProp1[ivec]), &(cudaProp3[ivec]));
+    }
+    double t2 = MPI_Wtime();
+    printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
 
     qcTMD_ShiftDir gaugeShfDir   = TMDparseShiftDirection(shfFlag);
     qcTMD_ShiftSgn gaugeShfSgn   = TMDparseShiftSign(shfFlag);
