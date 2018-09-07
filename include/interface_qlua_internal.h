@@ -50,6 +50,57 @@ namespace quda {
     }//-- constructor
   };//-- Structure definition
 
+
+
+  //- C.K. Structure holding the current state,
+  //- required for TMD contractions
+  struct QuarkTMD_state {
+    
+    //- contraction type
+    qluaCntr_Type cntrType;
+    
+    //- whether to return position space correlator (true) or not
+    int push_res;
+
+    //- current link paths
+    char v_lpath[1024];
+    char b_lpath[1024];
+
+    //- Phase matrix on device
+    complex<QUDA_REAL> *phaseMatrix_dev  = NULL;
+
+    //- Momentum projected data buffer on device, CK-TODO: might not need that
+    complex<QUDA_REAL> *momproj_data;
+
+    //- host forward propagator, constant throughout, will be used for resetting cudaPropFrw_bsh
+    QUDA_REAL *hostPropFrw;
+
+    //- device forward (shifted) propagator, backward propagator
+    //- cudaPropAux: used for shifts, will be getting swapped with cudaPropFrw_bsh
+    cudaColorSpinorField *cudaPropFrw_bsh[QUDA_PROP_NVEC];
+    cudaColorSpinorField *cudaPropBkw[QUDA_PROP_NVEC];
+    cudaColorSpinorField *cudaPropAux;
+
+    /* device gauge fields
+     * cuda_gf: Original gauge field
+     * gf_u:    Original gauge field, extended version
+     * bsh_u:   Extended Gauge field shifted in the b-direction
+     * aux_u:   Extended Gauge field used for non-covariant shifts of gauge fields, will be getting swapped with bsh_u
+     * wlinks:  Extended Gauge field used as 'ColorMatrices' to store shifted links in the b and vbv directions.
+     * The indices i_wl_b, i_wl_vbv, i_wl_tmp control which 'Lorentz' index of wlinks will be used for the shifts
+     */
+    cudaGaugeField *cuda_gf;
+    cudaGaugeField *gf_u;
+    cudaGaugeField *bsh_u;
+    cudaGaugeField *aux_u;    /* for shifts of bsh_u */
+    cudaGaugeField *wlinks;   /* store w_b, w_vbv */
+    int i_wl_b, i_wl_vbv, i_wl_tmp;
+
+    //- Structure holding the parameters of the contractions / momentum projection
+    qudaAPI_Param paramAPI;
+  };
+
+
   
   __device__ int d_crdChkVal = 0;
   int QluaSiteOrderCheck(QluaUtilArg utilArg);
@@ -68,7 +119,7 @@ namespace quda {
   
   void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix,
 			     const int *momMatrix,
-                             momProjParam param,  const qudaLattice *qS);
+                             momProjParam param);
 
   void QuarkContractStd_GPU(complex<QUDA_REAL> *corrQuda_dev,
                             ColorSpinorField **cudaProp1,

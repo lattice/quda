@@ -68,24 +68,15 @@ namespace quda {
 
   void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix_dev,
 			     const int *momMatrix,
-			     momProjParam param, const qudaLattice *qS){
-
-    //-- Define useful topology quantities
-    int nDim = qS->rank;
-    int localL[nDim];
-    int totalL[nDim];
-    for(int mu=0; mu<nDim; mu++){
-      localL[mu] = qS->site_coord_hi[mu] - qS->site_coord_lo[mu];
-      totalL[mu] = localL[mu] * comm_dim(mu);
-    }
+			     momProjParam param){
 
     printfQuda("createPhaseMatrix_GPU:\n");
-    printfQuda("  Got Nmoms  = %d\n", param.Nmoms);
-    printfQuda("  Got V3     = %d\n", param.V3);
-    printfQuda("  Got momDim = %d\n", param.momDim);
-    printfQuda("  Got expSgn = %d\n", param.expSgn);
-    printfQuda("  Got localL = (%d,%d,%d,%d)\n", localL[0], localL[1], localL[2], localL[3]);
-    printfQuda("  Got totalL = (%d,%d,%d,%d)\n", totalL[0], totalL[1], totalL[2], totalL[3]);
+    printfQuda("  Got Nmoms  = %d\n"  , param.Nmoms);
+    printfQuda("  Got V3     = %lld\n", param.V3);
+    printfQuda("  Got momDim = %d\n"  , param.momDim);
+    printfQuda("  Got expSgn = %d\n"  , param.expSgn);
+    printfQuda("  Got localL = (%d,%d,%d,%d)\n", param.localL[0], param.localL[1], param.localL[2], param.localL[3]);
+    printfQuda("  Got totalL = (%d,%d,%d,%d)\n", param.totalL[0], param.totalL[1], param.totalL[2], param.totalL[3]);
 
 
     int *momMatrix_dev;
@@ -93,7 +84,7 @@ namespace quda {
     checkCudaErrorNoSync();
     cudaMemcpy(momMatrix_dev, momMatrix, sizeof(int)*param.momDim*param.Nmoms, cudaMemcpyHostToDevice);
     
-    MomProjArg arg(param, localL, totalL);
+    MomProjArg arg(param, param.localL, param.totalL);
     MomProjArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(MomProjArg) );
     checkCudaErrorNoSync();
