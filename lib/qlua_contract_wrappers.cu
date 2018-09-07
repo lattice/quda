@@ -190,6 +190,19 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
+  void qcCopyExtendedGaugeField(cudaGaugeField *dst, cudaGaugeField *src, const int *R){
+
+    if( (dst->GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) ||
+	(src->GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) )
+      errorQuda("qcCopyExtendedGaugeField: Support only extended Gauge Fields!\n");
+
+    copyExtendedGauge(*dst, *src, QUDA_CUDA_FIELD_LOCATION);
+    dst->exchangeExtendedGhost(R, QCredundantComms);
+  }
+  //---------------------------------------------------------------------------
+
+
+
   __global__ void qcSetGaugeToUnity_kernel(Arg_SetUnityLink *arg){
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;

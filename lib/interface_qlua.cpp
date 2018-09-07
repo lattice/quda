@@ -197,10 +197,7 @@ new_cudaGaugeField(QudaGaugeParam& gp, QUDA_REAL *hbuf_u[])
 }
 
 static cudaGaugeField*
-new_ExtendedcudaGaugeField(cudaGaugeField &in, bool copyGauge=true, bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID){
-  
-  int R[4];
-  for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
+new_ExtendedcudaGaugeField(cudaGaugeField &in, const int *R, bool copyGauge=true, bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID){
   
   int y[4];
   for (int dir=0;dir<4;dir++) y[dir] = in.X()[dir] + 2*R[dir];
@@ -855,6 +852,9 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   setVerbosity(paramAPI.verbosity);
 
   //-- Load the gauge field, if applicable
+  for (int d=0;d<4;d++)
+    qcR[d] = 2 * (QCredundantComms || commDimPartitioned(d));
+
   cudaGaugeField *cuda_gf = NULL;
   cudaGaugeField *cuda_gf_ext  = NULL;
   cudaGaugeField *cuda_gf_ext1 = NULL;
@@ -866,10 +866,10 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
       if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
     cuda_gf = new_cudaGaugeField(gp, h_gauge); //- The original, regular gauge field
 
-    cuda_gf_ext  = new_ExtendedcudaGaugeField(*cuda_gf); //- The original gauge field, but extended
-    cuda_gf_ext1 = new_ExtendedcudaGaugeField(*cuda_gf); //- Auxilliary extended
-    cuda_gf_ext2 = new_ExtendedcudaGaugeField(*cuda_gf); //- gauge field required
-    cuda_gf_ext3 = new_ExtendedcudaGaugeField(*cuda_gf); //- for the shifts
+    cuda_gf_ext  = new_ExtendedcudaGaugeField(*cuda_gf, qcR); //- The original gauge field, but extended
+    cuda_gf_ext1 = new_ExtendedcudaGaugeField(*cuda_gf, qcR); //- Auxilliary extended
+    cuda_gf_ext2 = new_ExtendedcudaGaugeField(*cuda_gf, qcR); //- gauge field required
+    cuda_gf_ext3 = new_ExtendedcudaGaugeField(*cuda_gf, qcR); //- for the shifts
     double t4 = MPI_Wtime();
     printfQuda("TIMING - %s: Cuda Gauge Fields loaded in %f sec.\n", func_name, t4-t3);
   }
@@ -1129,6 +1129,12 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
 
   bool copyGauge_no  = false;
   bool copyGauge_yes = true;
+
+  for (int d=0;d<4;d++){
+    qcR[d] = 2 * (QCredundantComms || commDimPartitioned(d));
+    qcs->qcR[d] = qcR[d];
+  }
+
   qcs->cuda_gf = NULL;
   qcs->gf_u    = NULL;
   qcs->bsh_u   = NULL;
@@ -1140,12 +1146,12 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
   qcs->cuda_gf = new_cudaGaugeField(gp, qluaGauge_host); //- The original, regular gauge field
 
   //- Extended gauge field, copy of original, extendedGhosts are already exchanged
-  qcs->gf_u = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), copyGauge_yes);
+  qcs->gf_u = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcR, copyGauge_yes);
 
   //- Extended auxilliary gauge fields, initialized to zero, extendedGhosts are NOT exchanged
-  qcs->bsh_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), copyGauge_no);
-  qcs->aux_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), copyGauge_no);
-  qcs->wlinks = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), copyGauge_no);
+  qcs->bsh_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcR, copyGauge_no);
+  qcs->aux_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcR, copyGauge_no);
+  qcs->wlinks = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcR, copyGauge_no);
 
   double t2 = MPI_Wtime();
   printfQuda("TIMING - %s: Cuda Gauge Fields loaded in %f sec.\n", func_name, t2-t1);
@@ -1260,14 +1266,10 @@ QuarkTMDstep_momProj_Quda(QuarkTMD_state *qcs,
     b_lpath_inc = b_lpath;
     b_lpath_ptr = qcs->b_lpath;
     memset(b_lpath_ptr, 0, sizeof(qcs->b_lpath));
-
-    //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
-    qcResetFrwProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);
-
-    //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
-    qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b);
-
-    /* TODO (re)set qcs->bsh_u to qcs->gf_u */
+    
+    qcResetFrwProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
+    qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b);                //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
+    qcCopyExtendedGaugeField(qcs->bsh_u, qcs->gf_u, qcs->qcR);  //- (re)set qcs->bsh_u to qcs->gf_u
   }
 
   /* build up b_lpath */

@@ -12,6 +12,9 @@ namespace quda {
 
   const bool QCredundantComms = false; //- Same as interface_quda.cpp
 
+  //- Length of Halos in extended Gauge Field
+  static int qcR[4];
+
   //- Required for TMD contractions
   static const char ldir_list[] = "xXyYzZtTqQrRsSuUvVwW";
   static const char ldir_inv [] = "XxYyZzTtQqRrSsUuVvWw";
@@ -99,6 +102,8 @@ namespace quda {
     cudaGaugeField *wlinks;   /* store w_b, w_vbv */
     int i_wl_b, i_wl_vbv, i_wl_tmp;
 
+    int qcR[4]; //- Length of extended halos
+
     //- Structure holding the parameters of the contractions / momentum projection
     qudaAPI_Param paramAPI;
   };
@@ -109,6 +114,7 @@ namespace quda {
   void qcResetFrwProp(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
 
   void qcSetGaugeToUnity(cudaGaugeField *U, int mu);
+  void qcCopyExtendedGaugeField(cudaGaugeField *dst, cudaGaugeField *src, const int *R);
   
   __device__ int d_crdChkVal = 0;
   int QluaSiteOrderCheck(QluaUtilArg utilArg);
