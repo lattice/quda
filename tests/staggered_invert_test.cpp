@@ -662,6 +662,9 @@ invert_test(void)
         axpy(2*mass, out->V(), ref->V(), ref->Length(), gaugeParam.cpu_prec);
       }
 
+      // Reference debugging code: print the first component
+      // of the even and odd partities within a solution vector.
+      /*
       printfQuda("\nLength: %lu\n", ref->Length());
 
       // for verification
@@ -675,7 +678,8 @@ invert_test(void)
       printfQuda("Soln: %f\n", ((double*)(out->Odd().V()))[0]);
       printfQuda("CPU:  %f\n", ((double*)(ref->Odd().V()))[0]);
       printfQuda("\n\n");
-
+      */
+      
       mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
