@@ -181,17 +181,14 @@ namespace quda {
   qcTMD_ShiftFlag TMDparseShiftFlag(char flagStr);
 
 
-  void qcCPUtoCUDAVec(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
-  void qcCPUtoCUDAProp(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
+  void qcCPUtoCUDAVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec);
+  void qcCPUtoCUDAProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp);
   void qcSetGaugeToUnity(cudaGaugeField *U, int mu);
   void qcCopyExtendedGaugeField(cudaGaugeField *dst, cudaGaugeField *src, const int *R);
 
 
-  template <typename F>
-  void qcSwapCudaVec(F *x1, F *x2);
-
-  template <typename G>
-  void qcSwapCudaGauge(G *x1, G *x2);
+  void qcSwapCudaVec(cudaColorSpinorField *x1, cudaColorSpinorField *x2);
+  void qcSwapCudaGauge(cudaGaugeField *x1, cudaGaugeField *x2);
 
 
   void perform_ShiftCudaVec_nonCov(ColorSpinorField *dst, ColorSpinorField *src,

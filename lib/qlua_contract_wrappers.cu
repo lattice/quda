@@ -241,16 +241,6 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
-  void qcCPUtoCUDAVec(cudaColorSpinorField cudaVec, cpuColorSpinorField cpuVec){
-    cudaVec = cpuVec;
-  }  
-  void qcCPUtoCUDAProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
-    for(int i=0;i<QUDA_PROP_NVEC;i++)
-      qcCPUtoCUDAVec(&cudaProp[i], &cpuProp[i]);
-  }
-  //---------------------------------------------------------------------------
-
-
   void qcExchangeGhostVec(ColorSpinorField *x){
     const int nFace  = 1;
     x->exchangeGhost((QudaParity)(1), nFace, 0); //- first argument is redundant when nParity = 2. nFace MUST be 1 for now.
@@ -261,19 +251,26 @@ namespace quda {
     }
   }
   //---------------------------------------------------------------------------
+
   
-  template <typename G>
-  void qcSwapCudaGauge(G *x1, G *x2){
-    G *xtmp = *x1;
-    *x1 = *x2;
-    *x2 = xtmp;
+  void qcSwapCudaGauge(cudaGaugeField *x1, cudaGaugeField *x2){
+    cudaGaugeField *xtmp = x1;
+    x1 = x2;
+    x2 = xtmp;
   }
 
-  template <typename F>
-  void qcSwapCudaVec(F *x1, F *x2){
-    F *xtmp = x1;
+  void qcSwapCudaVec(cudaColorSpinorField *x1, cudaColorSpinorField *x2){
+    cudaColorSpinorField *xtmp = x1;
     *x1 = *x2;
     *x2 = *xtmp;
+  }
+
+  void qcCPUtoCUDAVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec){
+    *cudaVec = *cpuVec;
+  }  
+  void qcCPUtoCUDAProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
+    for(int i=0;i<QUDA_PROP_NVEC;i++)
+      qcCPUtoCUDAVec(cudaProp[i], cpuProp[i]);
   }
   //---------------------------------------------------------------------------
 
