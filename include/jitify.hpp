@@ -958,10 +958,7 @@ class CUDAKernel {
 
       // C++ demangled names include the filename so remove manually
       size_t filename_end = key.find_first_of("::");
-      if (filename_end != std::string::npos) {
-        std::cout << filename_end << std::endl;
-        key = key.substr( filename_end + 2);
-      }
+      if (filename_end != std::string::npos) key = key.substr( filename_end + 2);
 
       _constant[key] = entry;
       pos = end;
@@ -2586,6 +2583,7 @@ inline void Program_impl::load_sources(std::string source,
   std::vector<std::string> linker_paths;
   detail::split_compiler_and_linker_options(options, &compiler_options,
                                             &linker_files, &linker_paths);
+  detail::detect_and_add_cuda_arch(compiler_options);
 
   std::string log;
   nvrtcResult ret;
