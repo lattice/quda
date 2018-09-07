@@ -1075,15 +1075,15 @@ namespace quda {
   }
   //------------------------------------------------------------------------------------------
 
-  __global__ void tmd_g_U_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, qcTMD_State *TMDcs){
+  __global__ void tmd_g_U_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-    int tid  = x_cb + pty * TMDcs->volumeCB;
-    int lV   = TMDcs->volume;
+    int tid  = x_cb + pty * arg->volumeCB;
+    int lV   = arg->volume;
 
-    if (x_cb >= TMDcs->volumeCB) return;
-    if (pty >= TMDcs->nParity) return;
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
     if(tid >= lV) return;
 
     complex<QC_REAL> dev_prop1[QC_LEN_P];
@@ -1093,23 +1093,23 @@ namespace quda {
     Vector vec1[QUDA_PROP_NVEC];
     Vector vec2[QUDA_PROP_NVEC];
     for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec1[i] = TMDcs->fwdProp[i](x_cb, pty);
-      vec2[i] = TMDcs->bwdProp[i](x_cb, pty);
+      vec1[i] = arg->fwdProp[i](x_cb, pty);
+      vec2[i] = arg->bwdProp[i](x_cb, pty);
     }
-    prepareDevicePropSite(dev_prop1, vec1, TMDcs->preserveBasis);
-    prepareDevicePropSite(dev_prop2, vec2, TMDcs->preserveBasis);
+    prepareDevicePropSite(dev_prop1, vec1, arg->preserveBasis);
+    prepareDevicePropSite(dev_prop2, vec2, arg->preserveBasis);
 
     Link U;
-    if(TMDcs->extendedGauge){
+    if(arg->extendedGauge){
       int crd[5];
-      getCoords(crd, x_cb, TMDcs->dim, pty);
+      getCoords(crd, x_cb, arg->dim, pty);
       crd[4] = 0;
       int c2[5] = {0,0,0,0,0};
-      for(int i=0;i<4;i++) c2[i] = crd[i] + TMDcs->brd[i];
+      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
 	
-      U = TMDcs->U(TMDcs->i_mu, linkIndex(c2, TMDcs->dimEx), pty);
+      U = arg->U(arg->i_mu, linkIndex(c2, arg->dimEx), pty);
     }
-    else U = TMDcs->U(TMDcs->i_mu, x_cb, pty);
+    else U = arg->U(arg->i_mu, x_cb, pty);
 
     prepareDeviceLinkSite(dev_link, U);
 

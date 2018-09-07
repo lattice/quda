@@ -74,9 +74,8 @@ namespace quda {
     qcAdjSplitCovShift = 2
   } qcTMD_ShiftType;
 
-
   struct QluaUtilArg {
-
+    
     const int nParity;            // number of parities we're working on
     const int volumeCB;           // checkerboarded volume
     const int lL[4];              // 4-d local lattice dimensions
@@ -86,14 +85,15 @@ namespace quda {
     int nFldSrc;                  // Number of fields in correlator from contractions (source)
     int sp_stride[4];             // stride in spatial volume
     int sp_locvol;                // spatial volume
-    
-  QluaUtilArg(ColorSpinorField **propIn, int nFldDst, int nFldSrc, int t_axis, size_t rec_size)
-  :   nParity(propIn[0]->SiteSubset()), volumeCB(propIn[0]->VolumeCB()),
-      lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
-      t_axis(t_axis), rec_size(rec_size), nFldDst(nFldDst), nFldSrc(nFldSrc),
-      sp_stride{0,0,0,0}, sp_locvol(0)
-    {
+    bool init;
 
+    QluaUtilArg(cudaColorSpinorField **propIn, int nFldDst, int nFldSrc, int t_axis, size_t rec_size)
+      : nParity(propIn[0]->SiteSubset()), volumeCB(propIn[0]->VolumeCB()),
+	lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
+        t_axis(t_axis), rec_size(rec_size), nFldDst(nFldDst), nFldSrc(nFldSrc),
+        sp_stride{0,0,0,0}, sp_locvol(0)
+    {
+      
       if(0 <= t_axis){
         int sp_mul = 1;
         for(int i = 0; i < 4; i++){
@@ -105,8 +105,11 @@ namespace quda {
           sp_locvol = sp_mul;
         }//-for
       }//-if
-
+      
     }//-- constructor
+
+    ~QluaUtilArg() {}
+
   };//-- Structure definition
 
 
@@ -114,6 +117,8 @@ namespace quda {
   //- C.K. Structure holding the current state,
   //- required for TMD contractions
   struct QuarkTMD_state {
+
+    QluaUtilArg *utilArg;
 
     //- contraction type
     qluaCntr_Type cntrType;
@@ -125,11 +130,9 @@ namespace quda {
     char v_lpath[1024];
     char b_lpath[1024];
 
-    //- Phase matrix on device
-    complex<QUDA_REAL> *phaseMatrix_dev  = NULL;
-
-    //- Momentum projected data buffer on device, CK-TODO: might not need that
-    complex<QUDA_REAL> *momproj_data;
+    //- Correlator and momentum-projection related buffers
+    complex<QUDA_REAL> *phaseMatrix_dev;
+    complex<QUDA_REAL> *corrQuda_dev;
 
     //- host forward propagator, constant throughout, will be used for resetting cudaPropFrw_bsh
     QUDA_REAL *hostPropFrw;
@@ -173,8 +176,8 @@ namespace quda {
   qcTMD_ShiftFlag TMDparseShiftFlag(char flagStr);
 
 
-  void qcResetFrwVec(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
-  void qcResetFrwProp(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
+  void qcCPUtoCUDAVec(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
+  void qcCPUtoCUDAProp(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
   void qcSetGaugeToUnity(cudaGaugeField *U, int mu);
   void qcCopyExtendedGaugeField(cudaGaugeField *dst, cudaGaugeField *src, const int *R);
 
@@ -202,27 +205,30 @@ namespace quda {
   		      ColorSpinorField **propIn2,
   		      int parity, int Nc, int Ns,
   		      cntrQQParam cParam);
-
   
   void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix,
 			     const int *momMatrix,
                              momProjParam param);
 
   void QuarkContractStd_GPU(complex<QUDA_REAL> *corrQuda_dev,
-                            ColorSpinorField **cudaProp1,
-                            ColorSpinorField **cudaProp2,
-                            ColorSpinorField **cudaProp3,
+                            cudaColorSpinorField **cudaProp1,
+                            cudaColorSpinorField **cudaProp2,
+                            cudaColorSpinorField **cudaProp3,
                             complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
                             qudaAPI_Param paramAPI);
 
-  void QuarkContractTMD_GPU(complex<QUDA_REAL> *corrQuda_dev,
-                            ColorSpinorField **cudaProp1,
-                            ColorSpinorField **cudaProp2,
-                            ColorSpinorField **cudaProp3,
-                            cudaGaugeField *U, cudaGaugeField *extU,
-                            cudaGaugeField *extU1, cudaGaugeField *extU2, cudaGaugeField *extU3,
-                            qudaAPI_Param paramAPI);
+  void QuarkContractTMD_GPU(QuarkTMD_state *qcs);
   
 } //- namespace quda
   
 #endif/*INTERFACE_QLUA_INT_H__*/
+
+
+//- LEGACY Code
+  // void QuarkContractTMD_GPU(complex<QUDA_REAL> *corrQuda_dev,
+  //                           ColorSpinorField **cudaProp1,
+  //                           ColorSpinorField **cudaProp2,
+  //                           ColorSpinorField **cudaProp3,
+  //                           cudaGaugeField *U, cudaGaugeField *extU,
+  //                           cudaGaugeField *extU1, cudaGaugeField *extU2, cudaGaugeField *extU3,
+  //                           qudaAPI_Param paramAPI);

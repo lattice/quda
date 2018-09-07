@@ -241,12 +241,12 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
-  void qcResetFrwVec(cudaColorSpinorField cudaVec, cpuColorSpinorField cpuVec){
+  void qcCPUtoCUDAVec(cudaColorSpinorField cudaVec, cpuColorSpinorField cpuVec){
     cudaVec = cpuVec;
   }  
-  void qcResetFrwProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
+  void qcCPUtoCUDAProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
     for(int i=0;i<QUDA_PROP_NVEC;i++)
-      qcResetFrwVec(&cudaProp[i], &cpuProp[i]);
+      qcCPUtoCUDAVec(&cudaProp[i], &cpuProp[i]);
   }
   //---------------------------------------------------------------------------
 
@@ -489,11 +489,7 @@ namespace quda {
     case what_meson_F_hB: {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
-    case what_tmd_g_F_B: {
-      errorQuda("%s: No support for TMD contractions! Did you intent to call \'perform_TMD_Contract\' instead?\n", func_name);
-    } break;
-    case what_qpdf_g_F_B:
-    default: errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[arg.cntrType]);
+    default: errorQuda("%s: Contraction type \'%s\' not implemented!\n", func_name, qc_contractTypeStr[arg.cntrType]);
     }//- switch
     cudaDeviceSynchronize();
     checkCudaError();
@@ -502,41 +498,12 @@ namespace quda {
 
     cudaFree(arg_dev);
   }//-- perform_Std_Contract
-  //---------------------------------------------------------------------------
 
-
-  void perform_TMD_Contract(complex<QUDA_REAL> *corrQuda_dev, qcTMD_State argState){
-
-    const char *func_name = "perform_TMD_Contract";
-
-    if(argState.cntrType != what_tmd_g_F_B)
-      errorQuda("%s: Supports only TMD contractions! Did you intent to call \'perform_Std_Contract\' instead?\n", func_name);
-    
-    qcTMD_State *argState_dev;
-    cudaMalloc((void**)&(argState_dev), sizeof(qcTMD_State) );
-    checkCudaError();
-    cudaMemcpy(argState_dev, &argState, sizeof(qcTMD_State), cudaMemcpyHostToDevice);    
-    checkCudaError();
-
-    dim3 blockDim(THREADS_PER_BLOCK, argState.nParity, 1);
-    dim3 gridDim((argState.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-
-    double t1 = MPI_Wtime();
-    tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, argState_dev);
-    cudaDeviceSynchronize();
-    checkCudaError();
-    double t2 = MPI_Wtime();
-    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[argState.cntrType], t2-t1);
-
-    cudaFree(argState_dev);
-  }//-- perform_TMD_Contract
-
-
-  //-Top-level function in GPU contractions
+  //-Top-level function
   void QuarkContractStd_GPU(complex<QUDA_REAL> *corrQuda_dev,
-			    ColorSpinorField **cudaProp1,
-			    ColorSpinorField **cudaProp2,
-			    ColorSpinorField **cudaProp3,
+			    cudaColorSpinorField **cudaProp1,
+			    cudaColorSpinorField **cudaProp2,
+			    cudaColorSpinorField **cudaProp3,
 			    complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
 			    qudaAPI_Param paramAPI){    
 
@@ -544,15 +511,50 @@ namespace quda {
     
     if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
 
-    momProjParam mpParam = paramAPI.mpParam;
+    if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) )
+      errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
-    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, mpParam.cntrType, paramAPI.preserveBasis); 
+    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, paramAPI.mpParam.cntrType, paramAPI.preserveBasis); 
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
-    if(mpParam.cntrType == what_baryon_sigma_UUS) copySmatricesToSymbol(S2, S1);
+    if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS) copySmatricesToSymbol(S2, S1);
 
     perform_Std_Contract(corrQuda_dev, arg);
 
   }//-- QuarkContractStd_GPU
+  //---------------------------------------------------------------------------
+
+
+  //-Top-level function
+  void QuarkContractTMD_GPU(QuarkTMD_state *qcs){
+
+    const char *func_name = "QuarkContractTMD_GPU";
+
+    if(qcs->cntrType != what_tmd_g_F_B)
+      errorQuda("%s: This function supports only TMD contractions!\n", func_name);
+
+    qcTMD_Arg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, qcs->wlinks, qcs->i_wl_vbv, qcs->paramAPI.preserveBasis);    
+    qcTMD_Arg *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(qcTMD_Arg) );
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(qcTMD_Arg), cudaMemcpyHostToDevice);    
+    checkCudaError();
+
+    if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
+
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    double t1 = MPI_Wtime();
+    tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
+    cudaDeviceSynchronize();
+    checkCudaError();
+    double t2 = MPI_Wtime();
+    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
+
+    cudaFree(arg_dev);
+  }//-- QuarkContractTMD_GPU
+
+
 
 
 } //-namespace quda
