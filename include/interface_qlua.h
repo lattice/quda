@@ -211,14 +211,23 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrPosSpc, const 
 
 //----- TMD related functions -----//
 
-// EXTRN_C int
-// QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
-//                   const int *momlist,
-//                   QUDA_REAL *qluaPropFrw_host, QUDA_REAL *qluaPropBkw_host,
-//                   QUDA_REAL *qluaGauge_host[],
-//                   qudaAPI_Param paramAPI);
+EXTRN_C int
+QuarkTMDinit_Quda(void *Vqcs, const qudaLattice *qS,
+                  const int *momlist,
+                  QUDA_REAL *qluaPropFrw_host, QUDA_REAL *qluaPropBkw_host,
+                  QUDA_REAL *qluaGauge_host[],
+                  qudaAPI_Param paramAPI);
 
-// EXTRN_C int
-// QuarkTMDfree_Quda(QuarkTMD_state *qcs);
+EXTRN_C int
+QuarkTMDfree_Quda(void *Vqcs);
+
+
+EXTRN_C int
+QuarkTMDstep_momProj_Quda(void *Vqcs,
+                          XTRN_CPLX *momproj_buf,     /* output in Pspace */
+                          XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
+                          const char *b_lpath, const char *v_lpath,
+                          const qudaLattice *qS);
+
 
 #endif/*INTERFACE_QLUA_H__*/

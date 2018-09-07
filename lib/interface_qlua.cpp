@@ -1013,12 +1013,14 @@ int string_prefix(const char *p, const char *str){
 
 //- C.K. Initialize the TMD contract State
 EXTRN_C int
-QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
+QuarkTMDinit_Quda(void *Vqcs, const qudaLattice *qS,
 		  const int *momlist,
 		  QUDA_REAL *qluaPropFrw_host, QUDA_REAL *qluaPropBkw_host,
 		  QUDA_REAL *qluaGauge_host[],
 		  qudaAPI_Param paramAPI){
   int status = 0;
+
+  QuarkTMD_state *qcs = (QuarkTMD_state*)Vqcs;
 
   if (check_quda_comms(qS))
     return 1;
@@ -1247,9 +1249,11 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
 
 //- C.K. Destroy the TMD contract State
 EXTRN_C int
-QuarkTMDfree_Quda(QuarkTMD_state *qcs){
+QuarkTMDfree_Quda(void *Vqcs){
 
   int status = 0;
+
+  QuarkTMD_state *qcs = (QuarkTMD_state*)Vqcs;
 
   //- Delete gauge fields
   if(qcs->cuda_gf != NULL) delete qcs->cuda_gf;
@@ -1440,13 +1444,15 @@ int momentumProjectTMDCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
 
 //- C.K. Main function which performs propagator/gauge shifts and performs TMD contractions
 EXTRN_C int
-QuarkTMDstep_momProj_Quda(QuarkTMD_state *qcs,
+QuarkTMDstep_momProj_Quda(void *Vqcs,
 			  XTRN_CPLX *momproj_buf,     /* output in Pspace */
 			  XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
 			  const char *b_lpath, const char *v_lpath,
 			  const qudaLattice *qS){
 
   int status = 0;
+
+  QuarkTMD_state *qcs = (QuarkTMD_state*)Vqcs;
 
   const char *func_name = "QuarkTMDstep_momProj_Quda";
   
