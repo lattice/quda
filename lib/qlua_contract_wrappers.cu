@@ -189,10 +189,49 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
-  
-  void qcResetFrwProp(QuarkTMD_state *qcs){
+
+  __global__ void qcSetGaugeToUnity_kernel(Arg_SetUnityLink *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    pty = (arg->nParity == 2) ? pty : arg->parity;
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+
+    Link unitU(arg->unityU); //- That's a 3x3 unity matrix
+
+    arg->U(arg->mu, x_cb, pty) = unitU;
+  }
+
+  void qcSetGaugeToUnity(cudaGaugeField *U, int mu){
+
+    Arg_SetUnityLink arg(U, mu);
+    Arg_SetUnityLink *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(arg));
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
+    checkCudaError();
+
+    if(arg.nParity != 2) errorQuda("qcResetGaugeToUnity: This function supports only Full Site Subset fields!\n");
+
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    qcSetGaugeToUnity_kernel<<<gridDim,blockDim>>>(arg_dev);
+    cudaDeviceSynchronize();
+    checkCudaError();
+    
+    cudaFree(arg_dev);
+  }
+  //---------------------------------------------------------------------------
+
+
+  void qcResetFrwVec(cudaColorSpinorField cudaVec, cpuColorSpinorField cpuVec){
+    cudaVec = cpuVec;
+  }  
+  void qcResetFrwProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
     for(int i=0;i<QUDA_PROP_NVEC;i++)
-      *(qcs->cudaPropFrw_bsh[i]) = *(qcs->cpuPropFrw[i]);
+      qcResetFrwVec(&cudaProp[i], &cpuProp[i]);
   }
 
 

@@ -105,9 +105,10 @@ namespace quda {
 
 
 
-  void qcResetFrwProp(QuarkTMD_state *qcs);
+  void qcResetFrwVec(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
+  void qcResetFrwProp(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
 
-
+  void qcSetGaugeToUnity(cudaGaugeField *U, int mu);
   
   __device__ int d_crdChkVal = 0;
   int QluaSiteOrderCheck(QluaUtilArg utilArg);

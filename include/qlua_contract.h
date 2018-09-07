@@ -336,6 +336,29 @@ namespace quda {
   //---------------------------------------------------------------------
 
 
+  struct Arg_SetUnityLink : public ArgGeom {
+
+    GaugeU U;
+    int mu;
+
+    complex<QUDA_REAL> unityU[QUDA_Nc*QUDA_Nc];
+
+    Arg_SetUnityLink(cudaGaugeField *U_, int mu_)
+      : ArgGeom(U_), mu(mu_)
+    {
+      U.init(*U_);
+      
+      for(int ic=0;ic<QUDA_Nc;ic++){
+        for(int jc=0;jc<QUDA_Nc;jc++){
+	  if(ic==jc) unityU[jc + QUDA_Nc*ic] = complex<QUDA_REAL> {1.0,0.0};
+	  else unityU[jc + QUDA_Nc*ic] = complex<QUDA_REAL> {0.0,0.0};
+        }
+      }
+    }
+  };
+
+
+
   struct qcTMD_State : public ArgGeom {
 
     Propagator fwdProp[QUDA_PROP_NVEC];

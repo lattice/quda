@@ -1250,22 +1250,22 @@ QuarkTMDstep_momProj_Quda(QuarkTMD_state *qcs,
   int v_reset = 0;
 
 
-  /* b_lpath: increment or reset? */
-  if (0 < cur_blen && string_prefix(qcs->b_lpath, b_lpath)) {
+  //- b_lpath: increment or reset?
+  if( 0 < cur_blen && string_prefix(qcs->b_lpath, b_lpath) ){
     b_lpath_inc = b_lpath + cur_blen;
     b_lpath_ptr = qcs->b_lpath + cur_blen;
-  } else {
+  }
+  else{
     b_reset = 1;
     b_lpath_inc = b_lpath;
     b_lpath_ptr = qcs->b_lpath;
     memset(b_lpath_ptr, 0, sizeof(qcs->b_lpath));
 
+    //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
+    qcResetFrwProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);
 
-    /* TODO-DONE (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw */
-    qcResetFrwProp(qcs);
-
-    /* TODO (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix */
-
+    //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
+    qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b);
 
     /* TODO (re)set qcs->bsh_u to qcs->gf_u */
   }
