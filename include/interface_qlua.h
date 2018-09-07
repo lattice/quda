@@ -119,6 +119,7 @@ typedef struct {
   LONG_T totV3;
   int tAxis;
   int Tdim;
+  int Lt;
   double bc_t;
   int csrc[QUDA_DIM];
   LONG_T locvol;

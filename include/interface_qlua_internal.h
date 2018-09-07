@@ -131,8 +131,13 @@ namespace quda {
     char b_lpath[1024];
 
     //- Correlator and momentum-projection related buffers
-    complex<QUDA_REAL> *phaseMatrix_dev;
-    complex<QUDA_REAL> *corrQuda_dev;
+    complex<QUDA_REAL> *phaseMatrix_dev;  //-- Device Phase Matrix buffer
+    complex<QUDA_REAL> *corrQuda_dev;     //-- Device Position space correlator
+    complex<QUDA_REAL> *corrInp_dev;      //-- Device Input buffer to cuBlas
+    complex<QUDA_REAL> *corrOut_dev;      //-- Device output buffer of cuBlas
+    complex<QUDA_REAL> *corrOut_proj;     //-- Host Final result (global summed, gathered) of momentum projection
+    complex<QUDA_REAL> *corrOut_glob;     //-- Host Globally summed momentum projection buffer
+    complex<QUDA_REAL> *corrOut_host;     //-- Host (local) output of cuBlas momentum projection
 
     //- host forward propagator, constant throughout, will be used for resetting cudaPropFrw_bsh
     QUDA_REAL *hostPropFrw;
