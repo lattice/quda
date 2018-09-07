@@ -941,8 +941,6 @@ int main(int argc, char** argv)
     if (solve_type == QUDA_INVALID_SOLVE) {
       if (test_type == 0) {
         solve_type = QUDA_DIRECT_SOLVE;
-      } else if (test_type == 5 || test_type == 6) {
-        solve_type = QUDA_NORMOP_PC_SOLVE; // Dirty hack to get multishift to work
       } else {
         solve_type = QUDA_DIRECT_PC_SOLVE;
       }
@@ -958,10 +956,8 @@ int main(int argc, char** argv)
 
     if (test_type == 0 || test_type == 1 || test_type == 2) {
       solution_type = QUDA_MAT_SOLUTION;
-    } else if (test_type == 3 || test_type == 4) {
+    } else {
       solution_type = QUDA_MATPC_SOLUTION;
-    } else if (test_type == 5 || test_type == 6) {
-      solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; // Dirty hack to get multishift to work
     }
   }
 

@@ -3468,9 +3468,13 @@ for(int i=0; i < param->num_src; i++) {
  * Generic version of the multi-shift solver. Should work for
  * most fermions. Note that offset[0] is not folded into the mass parameter.
  *
- * At present, the solution_type must be MATDAG_MAT or MATPCDAG_MATPC,
- * and solve_type must be NORMOP or NORMOP_PC.  The solution and solve
+ * For Wilson-type fermions, the solution_type must be MATDAG_MAT or MATPCDAG_MATPC,
+ * and solve_type must be NORMOP or NORMOP_PC. The solution and solve
  * preconditioning have to match.
+ * 
+ * For Staggered-type fermions, the solution_type must be MATPC, and the
+ * solve type must be DIRECT_PC. This difference in convention is because
+ * preconditioned staggered operator is normal, unlike with Wilson-type fermions.
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
@@ -3501,17 +3505,32 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
-  if (mat_solution) {
-    errorQuda("Multi-shift solver does not support MAT or MATPC solution types");
-  }
-  if (direct_solve) {
-    errorQuda("Multi-shift solver does not support DIRECT or DIRECT_PC solve types");
-  }
-  if (pc_solution & !pc_solve) {
-    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
-  }
-  if (!pc_solution & pc_solve) {
-    errorQuda("In multi-shift solver, a preconditioned (PC) solve_type requires a PC solution_type");
+
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+
+    if (param->solution_type != QUDA_MATPC_SOLUTION) {
+      errorQuda("For Staggered-type fermions, multi-shift solver only suports MATPC solution type");
+    }
+
+    if (param->solve_type != QUDA_DIRECT_PC_SOLVE) {
+      errorQuda("For Staggered-type fermions, multi-shift solver only supports DIRECT_PC solve types");
+    }
+
+  } else { // Wilson type
+
+    if (mat_solution) {
+      errorQuda("For Wilson-type fermions, multi-shift solver does not support MAT or MATPC solution types");
+    }
+    if (direct_solve) {
+      errorQuda("For Wilson-type fermions, multi-shift solver does not support DIRECT or DIRECT_PC solve types");
+    }
+    if (pc_solution & !pc_solve) {
+      errorQuda("For Wilson-type fermions, preconditioned (PC) solution_type requires a PC solve_type");
+    }
+    if (!pc_solution & pc_solve) {
+      errorQuda("For Wilson-type fermions, in multi-shift solver, a preconditioned (PC) solve_type requires a PC solution_type");
+    }
   }
 
   // Timing and FLOP counters
@@ -3636,15 +3655,26 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   massRescale(*b, *param);
   profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
-  // use multi-shift CG
-  {
-    DiracMdagM m(dirac), mSloppy(diracSloppy);
-    SolverParam solverParam(*param);
-    MultiShiftCG cg_m(m, mSloppy, solverParam, profileMulti);
-    cg_m(x, *b, p, r2_old.get());
-    // cg_m(x, *b);
-    solverParam.updateInvertParam(*param);
-  }
+  DiracMatrix *m, *mSloppy;
+
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    m = new DiracM(dirac);
+    mSloppy = new DiracM(diracSloppy);
+  } else {
+    m = new DiracMdagM(dirac);
+    mSloppy = new DiracMdagM(diracSloppy);
+  } 
+
+
+  SolverParam solverParam(*param);
+  MultiShiftCG cg_m(*m, *mSloppy, solverParam, profileMulti);
+  cg_m(x, *b, p, r2_old.get());
+  // cg_m(x, *b);
+  solverParam.updateInvertParam(*param);
+
+  delete m;
+  delete mSloppy;
 
   if (param->compute_true_res) {
     // check each shift has the desired tolerance and use sequential CG to refine
@@ -3701,13 +3731,23 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     dirac.setMass(sqrt(param->offset[i]/4));
     diracSloppy.setMass(sqrt(param->offset[i]/4));
   }
-	DiracMdagM m(dirac), mSloppy(diracSloppy);
+
+  DiracMatrix *m, *mSloppy;
+
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    m = new DiracM(dirac);
+    mSloppy = new DiracM(diracSloppy);
+  } else {
+    m = new DiracMdagM(dirac);
+    mSloppy = new DiracMdagM(diracSloppy);
+  } 
 
 	// need to curry in the shift if we are not doing staggered
 	if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
 	    param->dslash_type != QUDA_STAGGERED_DSLASH) {
-	  m.shift = param->offset[i];
-	  mSloppy.shift = param->offset[i];
+	  m->shift = param->offset[i];
+	  mSloppy->shift = param->offset[i];
 	}
 
 	if (0) { // experimenting with Minimum residual extrapolation
@@ -3740,7 +3780,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	  bool orthogonal = true;
 	  bool apply_mat = true;
           bool hermitian = true;
-	  MinResExt mre(m, orthogonal, apply_mat, hermitian, profileMulti);
+	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
 	  blas::copy(tmp, *b);
 	  mre(*x[i], tmp, z, q);
 
@@ -3756,21 +3796,24 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
 	solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
 
-	CG cg(m, mSloppy, solverParam, profileMulti);
+	CG cg(*m, *mSloppy, solverParam, profileMulti);
   if(i==0) 
     cg(*x[i], *b, p[i], r2_old[i]);
   else
     cg(*x[i], *b);
   
-	solverParam.true_res_offset[i] = solverParam.true_res;
-	solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
-	solverParam.updateInvertParam(*param,i);
+  solverParam.true_res_offset[i] = solverParam.true_res;
+  solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
+  solverParam.updateInvertParam(*param,i);
 
-	if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
-	    param->dslash_type == QUDA_STAGGERED_DSLASH) {
-	  dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
-	  diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
-	}
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
+    diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
+  }
+
+  delete m;
+  delete mSloppy;
 
       }
     }

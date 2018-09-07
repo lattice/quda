@@ -180,9 +180,7 @@ namespace quda {
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    // Necessary for this to work with multishift (for now)
-    M(out,in);
-    //errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead.\n");
+    errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead.\n");
     /*
     // need extra temporary because for multi-gpu the input
     // and output fields cannot alias
