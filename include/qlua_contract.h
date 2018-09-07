@@ -41,59 +41,59 @@ namespace quda {
   static const char *qcTMD_ShiftSgnArray[2] = {"-", "+"};
 
 
-  typedef enum qcTMD_ShiftFlag_s {
-    qcShfStr_None = -1,
-    qcShfStr_X = 0,  // +x
-    qcShfStr_x = 1,  // -x
-    qcShfStr_Y = 2,  // +y
-    qcShfStr_y = 3,  // -y
-    qcShfStr_Z = 4,  // +z
-    qcShfStr_z = 5,  // -z
-    qcShfStr_T = 6,  // +t
-    qcShfStr_t = 7,  // -t
-    qcShfStr_Q = 8,  // +x+y
-    qcShfStr_q = 9,  // -x-y
-    qcShfStr_R = 10, // -x+y
-    qcShfStr_r = 11, // +x-y
-    qcShfStr_S = 12, // +y+z
-    qcShfStr_s = 13, // -y-z
-    qcShfStr_U = 14, // -y+z
-    qcShfStr_u = 15, // +y-z
-    qcShfStr_V = 16, // +x+z
-    qcShfStr_v = 17, // -x-z
-    qcShfStr_W = 18, // +x-z
-    qcShfStr_w = 19  // -x+z
-  } qcTMD_ShiftFlag;
+  // typedef enum qcTMD_ShiftFlag_s {
+  //   qcShfStr_None = -1,
+  //   qcShfStr_X = 0,  // +x
+  //   qcShfStr_x = 1,  // -x
+  //   qcShfStr_Y = 2,  // +y
+  //   qcShfStr_y = 3,  // -y
+  //   qcShfStr_Z = 4,  // +z
+  //   qcShfStr_z = 5,  // -z
+  //   qcShfStr_T = 6,  // +t
+  //   qcShfStr_t = 7,  // -t
+  //   qcShfStr_Q = 8,  // +x+y
+  //   qcShfStr_q = 9,  // -x-y
+  //   qcShfStr_R = 10, // -x+y
+  //   qcShfStr_r = 11, // +x-y
+  //   qcShfStr_S = 12, // +y+z
+  //   qcShfStr_s = 13, // -y-z
+  //   qcShfStr_U = 14, // -y+z
+  //   qcShfStr_u = 15, // +y-z
+  //   qcShfStr_V = 16, // +x+z
+  //   qcShfStr_v = 17, // -x-z
+  //   qcShfStr_W = 18, // +x-z
+  //   qcShfStr_w = 19  // -x+z
+  // } qcTMD_ShiftFlag;
 
-  typedef enum qcTMD_ShiftDir_s {
-    qcShfDirNone = -1,
-    qcShfDir_x = 0,
-    qcShfDir_y = 1,
-    qcShfDir_z = 2,
-    qcShfDir_t = 3
-  } qcTMD_ShiftDir;
+  // typedef enum qcTMD_ShiftDir_s {
+  //   qcShfDirNone = -1,
+  //   qcShfDir_x = 0,
+  //   qcShfDir_y = 1,
+  //   qcShfDir_z = 2,
+  //   qcShfDir_t = 3
+  // } qcTMD_ShiftDir;
 
-  typedef enum qcTMD_DimU_s {
-    qcShfDimU_None = -1,
-    qcDimU_x = 0,
-    qcDimU_y = 1,
-    qcDimU_z = 2,
-    qcDimU_t = 3,
-    qcDimAll = 10
-  } qcTMD_DimU;
+  // typedef enum qcTMD_DimU_s {
+  //   qcShfDimU_None = -1,
+  //   qcDimU_x = 0,
+  //   qcDimU_y = 1,
+  //   qcDimU_z = 2,
+  //   qcDimU_t = 3,
+  //   qcDimAll = 10
+  // } qcTMD_DimU;
 
-  typedef enum qcTMD_ShiftSgn_s {
-    qcShfSgnNone  = -1,
-    qcShfSgnMinus =  0,
-    qcShfSgnPlus  =  1
-  } qcTMD_ShiftSgn;
+  // typedef enum qcTMD_ShiftSgn_s {
+  //   qcShfSgnNone  = -1,
+  //   qcShfSgnMinus =  0,
+  //   qcShfSgnPlus  =  1
+  // } qcTMD_ShiftSgn;
 
-  typedef enum qcTMD_ShiftType_s {
-    qcInvalidShift = -1,
-    qcCovShift = 0,
-    qcNonCovShift = 1,
-    qcAdjSplitCovShift = 2
-  } qcTMD_ShiftType;
+  // typedef enum qcTMD_ShiftType_s {
+  //   qcInvalidShift = -1,
+  //   qcCovShift = 0,
+  //   qcNonCovShift = 1,
+  //   qcAdjSplitCovShift = 2
+  // } qcTMD_ShiftType;
 
 
   /** C.K.

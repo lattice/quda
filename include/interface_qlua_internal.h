@@ -19,6 +19,62 @@ namespace quda {
   static const char ldir_list[] = "xXyYzZtTqQrRsSuUvVwW";
   static const char ldir_inv [] = "XxYyZzTtQqRrSsUuVvWw";
 
+
+  typedef enum qcTMD_ShiftFlag_s {
+    qcShfStr_None = -1,
+    qcShfStr_X = 0,  // +x
+    qcShfStr_x = 1,  // -x
+    qcShfStr_Y = 2,  // +y
+    qcShfStr_y = 3,  // -y
+    qcShfStr_Z = 4,  // +z
+    qcShfStr_z = 5,  // -z
+    qcShfStr_T = 6,  // +t
+    qcShfStr_t = 7,  // -t
+    qcShfStr_Q = 8,  // +x+y
+    qcShfStr_q = 9,  // -x-y
+    qcShfStr_R = 10, // -x+y
+    qcShfStr_r = 11, // +x-y
+    qcShfStr_S = 12, // +y+z
+    qcShfStr_s = 13, // -y-z
+    qcShfStr_U = 14, // -y+z
+    qcShfStr_u = 15, // +y-z
+    qcShfStr_V = 16, // +x+z
+    qcShfStr_v = 17, // -x-z
+    qcShfStr_W = 18, // +x-z
+    qcShfStr_w = 19  // -x+z
+  } qcTMD_ShiftFlag;
+
+  typedef enum qcTMD_ShiftDir_s {
+    qcShfDirNone = -1,
+    qcShfDir_x = 0,
+    qcShfDir_y = 1,
+    qcShfDir_z = 2,
+    qcShfDir_t = 3
+  } qcTMD_ShiftDir;
+
+  typedef enum qcTMD_DimU_s {
+    qcShfDimU_None = -1,
+    qcDimU_x = 0,
+    qcDimU_y = 1,
+    qcDimU_z = 2,
+    qcDimU_t = 3,
+    qcDimAll = 10
+  } qcTMD_DimU;
+
+  typedef enum qcTMD_ShiftSgn_s {
+    qcShfSgnNone  = -1,
+    qcShfSgnMinus =  0,
+    qcShfSgnPlus  =  1
+  } qcTMD_ShiftSgn;
+
+  typedef enum qcTMD_ShiftType_s {
+    qcInvalidShift = -1,
+    qcCovShift = 0,
+    qcNonCovShift = 1,
+    qcAdjSplitCovShift = 2
+  } qcTMD_ShiftType;
+
+
   struct QluaUtilArg {
 
     const int nParity;            // number of parities we're working on
@@ -108,19 +164,34 @@ namespace quda {
     qudaAPI_Param paramAPI;
   };
 
+  
+  __device__ int d_crdChkVal = 0;
+  int QluaSiteOrderCheck(QluaUtilArg utilArg);
+  void convertSiteOrder_QudaQDP_to_momProj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg);
+
+
+  qcTMD_ShiftFlag TMDparseShiftFlag(char flagStr);
 
 
   void qcResetFrwVec(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
   void qcResetFrwProp(cudaColorSpinorField **cudaVec, cpuColorSpinorField **cpuVec);
-
   void qcSetGaugeToUnity(cudaGaugeField *U, int mu);
   void qcCopyExtendedGaugeField(cudaGaugeField *dst, cudaGaugeField *src, const int *R);
-  
-  __device__ int d_crdChkVal = 0;
-  int QluaSiteOrderCheck(QluaUtilArg utilArg);
 
-  
-  void convertSiteOrder_QudaQDP_to_momProj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg);
+
+  template <typename F>
+  void qcSwapCudaVec(F *x1, F *x2);
+
+  template <typename G>
+  void qcSwapCudaGauge(G *x1, G *x2);
+
+
+  void perform_ShiftCudaVec_nonCov(ColorSpinorField *dst, ColorSpinorField *src,
+				   qcTMD_ShiftFlag shfFlag);
+  void perform_ShiftLink_Cov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
+                             cudaGaugeField *gf, qcTMD_ShiftFlag shfFlag);
+  void perform_ShiftGauge_nonCov(cudaGaugeField *dst, cudaGaugeField *src,
+                                 qcTMD_ShiftFlag shfFlag);
 
   
   void cudaContractQQ(
