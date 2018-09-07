@@ -189,6 +189,12 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
+  
+  void qcResetFrwProp(QuarkTMD_state *qcs){
+    for(int i=0;i<QUDA_PROP_NVEC;i++)
+      *(qcs->cudaPropFrw_bsh[i]) = *(qcs->cpuPropFrw[i]);
+  }
+
 
   void qcExchangeGhostVec(ColorSpinorField *x){
     const int nFace  = 1;
