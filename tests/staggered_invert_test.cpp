@@ -73,7 +73,8 @@ extern bool kernel_pack_t;
 
 // Dirac operator type
 extern QudaDslashType dslash_type;
-
+extern QudaMatPCType matpc_type; // preconditioning type
+QudaSolutionType solution_type; // solution type
 
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
@@ -111,7 +112,7 @@ static void end();
 
 template<typename Float>
 void constructSpinorField(Float *res) {
-  const int vol = (test_type == 2) ? V : Vh;
+  const int vol = (solution_type == QUDA_MAT_SOLUTION) ? V : Vh;
   for(int src=0; src<Nsrc; src++) {
     for(int i = 0; i < vol; i++) {
       for (int s = 0; s < 1; s++) {
@@ -230,16 +231,10 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // Specify Krylov sub-size for GCR, BICGSTAB(L)
   inv_param->gcrNkrylov = gcrNkrylov;
 
-  //inv_param->solution_type = dslash_type == QUDA_LAPLACE_DSLASH ? QUDA_MAT_SOLUTION : QUDA_MATPCDAG_MATPC_SOLUTION;
-  //inv_param->solve_type = dslash_type == QUDA_LAPLACE_DSLASH ? solve_type : QUDA_NORMOP_PC_SOLVE;
-  if (dslash_type == QUDA_LAPLACE_DSLASH) {
-    inv_param->solution_type = QUDA_MAT_SOLUTION;
-    inv_param->solve_type = QUDA_DIRECT_SOLVE;
-  } else {
-    inv_param->solution_type = (solve_type == QUDA_DIRECT_PC_SOLVE) ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MAT_SOLUTION; // temp due to staggeredPC convention
-    inv_param->solve_type = (solve_type == QUDA_DIRECT_PC_SOLVE) ? QUDA_NORMOP_PC_SOLVE : solve_type;
-  }
-  inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
+
+  inv_param->solution_type = solution_type;
+  inv_param->solve_type = solve_type;
+  inv_param->matpc_type = matpc_type;
   inv_param->dagger = QUDA_DAG_NO;
   inv_param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
@@ -625,11 +620,69 @@ invert_test(void)
   double src2=0;
   int ret = 0;
 
-  int len = (test_type == 2 ? V : Vh)*Nsrc;
-
+  int len = 0;
+  if (solution_type == QUDA_MAT_SOLUTION) {
+    len = V*Nsrc;
+  } else {
+    len = Vh*Nsrc;
+  }
+  
   switch(test_type){
-    case 0: //even
-      inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+    case 0: // full parity solution
+
+      if (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER) {
+        if (dslash_type != QUDA_LAPLACE_DSLASH) {
+          errorQuda("The full spinor staggered operator can't be inverted with (P)CG.\n");
+        }
+      }
+
+    case 1: // solving prec system, reconstructing
+    case 2:
+
+
+
+      invertQuda(out->V(), in->V(), &inv_param);  
+      time0 += clock(); // stop the timer
+      time0 /= CLOCKS_PER_SEC;
+
+#ifdef MULTI_GPU
+      // Not sure about the QUDA_DAG_YES...
+      staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Even()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+       reinterpret_cast<cpuColorSpinorField*>(&out->Odd()), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+      staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Odd()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+       reinterpret_cast<cpuColorSpinorField*>(&out->Even()), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+#else
+      staggered_dslash(ref->Even().V(), qdp_fatlink, qdp_longlink, out->Odd().V(), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+      staggered_dslash(ref->Odd().V(), qdp_fatlink, qdp_longlink, out->Even().V(), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+#endif    
+      if (dslash_type == QUDA_LAPLACE_DSLASH) {
+        xpay(out->V(), kappa, ref->V(), ref->Length(), gaugeParam.cpu_prec);
+        ax(0.5/kappa, ref->V(), ref->Length(), gaugeParam.cpu_prec);
+      } else {
+        axpy(2*mass, out->V(), ref->V(), ref->Length(), gaugeParam.cpu_prec);
+      }
+
+      printfQuda("\nLength: %lu\n", ref->Length());
+
+      // for verification
+      printfQuda("\n\nEven:\n");
+      printfQuda("CUDA: %f\n", ((double*)(in->Even().V()))[0]);
+      printfQuda("Soln: %f\n", ((double*)(out->Even().V()))[0]);
+      printfQuda("CPU:  %f\n", ((double*)(ref->Even().V()))[0]);
+
+      printfQuda("\n\nOdd:\n");
+      printfQuda("CUDA: %f\n", ((double*)(in->Odd().V()))[0]);
+      printfQuda("Soln: %f\n", ((double*)(out->Odd().V()))[0]);
+      printfQuda("CPU:  %f\n", ((double*)(ref->Odd().V()))[0]);
+      printfQuda("\n\n");
+
+      mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+      nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+      src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+
+      break;
+
+    case 3: //even
 
       invertQuda(out->V(), in->V(), &inv_param);
 
@@ -655,8 +708,7 @@ invert_test(void)
 
       break;
 
-    case 1: //odd
-      inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
+    case 4: //odd
       invertQuda(out->V(), in->V(), &inv_param);	
       time0 += clock(); // stop the timer
       time0 /= CLOCKS_PER_SEC;
@@ -673,47 +725,8 @@ invert_test(void)
 
       break;
 
-    case 2: //full spinor
-
-      if (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER) {
-        if (dslash_type != QUDA_LAPLACE_DSLASH) {
-          errorQuda("The full spinor staggered operator can't be inverted with (P)CG.\n");
-        }
-      }
-
-      invertQuda(out->V(), in->V(), &inv_param);  
-      time0 += clock(); // stop the timer
-      time0 /= CLOCKS_PER_SEC;
-
-#ifdef MULTI_GPU
-      // Not sure about the QUDA_DAG_YES...
-      staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Even()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-       reinterpret_cast<cpuColorSpinorField*>(&out->Odd()), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-      staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Odd()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-       reinterpret_cast<cpuColorSpinorField*>(&out->Even()), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-#else
-      staggered_dslash(ref->Even().V(), qdp_fatlink, qdp_longlink, out->Odd().V(), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-      staggered_dslash(ref->Odd().V(), qdp_fatlink, qdp_longlink, out->Even().V(), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-#endif    
-      if (dslash_type == QUDA_LAPLACE_DSLASH) {
-        xpay(out->V(), kappa, ref->V(), ref->Length(), gaugeParam.cpu_prec);
-        ax(0.5/kappa, ref->V(), ref->Length(), gaugeParam.cpu_prec);
-      } else {
-        axpy(2*mass, out->V(), ref->V(), ref->Length(), gaugeParam.cpu_prec);
-      }
-
-      // for verification
-      //printfQuda("\n\nCUDA: %f\n\n", ((double*)(in->V()))[0]);
-      //printfQuda("\n\nCPU:  %f\n\n", ((double*)(ref->V()))[0]);
-
-      mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-      nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-      src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-
-      break;
-
-    case 3: //multi mass CG, even
-    case 4:
+    case 5: //multi mass CG, even
+    case 6:
 
 #define NUM_OFFSETS 12
 
@@ -736,12 +749,6 @@ invert_test(void)
         for(int i=0;i < inv_param.num_offset; i++){
           outArray[i] = spinorOutArray[i]->V();
           inv_param.offset[i] = 4*masses[i]*masses[i];
-        }
-
-        if (test_type == 3) {
-          inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
-        } else {
-          inv_param.matpc_type = QUDA_MATPC_ODD_ODD;      
         }
 
         invertMultiShiftQuda(outArray, in->V(), &inv_param);	
@@ -802,7 +809,7 @@ invert_test(void)
 
   }//switch
 
-  if (test_type <=2){
+  if (test_type <=4){
 
     double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
     double l2r = sqrt(nrm2/src2);
@@ -850,6 +857,7 @@ end(void)
 }
 
 
+
   void
 display_test_info()
 {
@@ -859,7 +867,7 @@ display_test_info()
   printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n",
       get_prec_str(prec),get_prec_str(prec_sloppy),
       get_recon_str(link_recon), 
-      get_recon_str(link_recon_sloppy), get_test_type(test_type), xdim, ydim, zdim, tdim);     
+      get_recon_str(link_recon_sloppy), get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);     
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -876,12 +884,15 @@ display_test_info()
 usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1>                             # Test method\n");
-  printfQuda("                                                0: Even even spinor CG inverter\n");
-  printfQuda("                                                1: Odd odd spinor CG inverter\n");
-  printfQuda("                                                3: Even even spinor multishift CG inverter\n");
-  printfQuda("                                                4: Odd odd spinor multishift CG inverter\n");
-  printfQuda("    --cpu_prec <double/single/half>          # Set CPU precision\n");
+  printfQuda("    --test <0/1/2/3/4/5/6>                      # Test method\n");
+  printfQuda("                                                0: Full parity inverter\n");
+  printfQuda("                                                1: Even even spinor CG inverter, reconstruct to full parity\n");
+  printfQuda("                                                2: Odd odd spinor CG inverter, reconstruct to full parity\n");
+  printfQuda("                                                3: Even even spinor CG inverter\n");
+  printfQuda("                                                4: Odd odd spinor CG inverter\n");
+  printfQuda("                                                5: Even even spinor multishift CG inverter\n");
+  printfQuda("                                                6: Odd odd spinor multishift CG inverter\n");
+  printfQuda("    --cpu_prec <double/single/half>             # Set CPU precision\n");
 
   return ;
 }
@@ -912,21 +923,45 @@ int main(int argc, char** argv)
     usage(argv);
   }
 
+  if (test_type < 0 || test_type > 6) {
+    errorQuda("Test type %d is outside the valid range.\n", test_type);
+  }
+
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      if (test_type != 2) {
-        errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type);
-      }
+    if (test_type != 0) {
+      errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type);
     }
 
-  if (solve_type == QUDA_INVALID_SOLVE) {
-    if (test_type == 2) {
-      solve_type = QUDA_DIRECT_SOLVE;
-    } else {
-      if (dslash_type == QUDA_LAPLACE_DSLASH) {
+    solve_type = QUDA_DIRECT_SOLVE;
+    solution_type = QUDA_MAT_SOLUTION;
+    matpc_type = QUDA_MATPC_EVEN_EVEN; // doesn't matter
+
+  } else {
+
+    if (solve_type == QUDA_INVALID_SOLVE) {
+      if (test_type == 0) {
         solve_type = QUDA_DIRECT_SOLVE;
+      } else if (test_type == 5 || test_type == 6) {
+        solve_type = QUDA_NORMOP_PC_SOLVE; // Dirty hack to get multishift to work
       } else {
         solve_type = QUDA_DIRECT_PC_SOLVE;
       }
+    }
+
+    if (test_type == 1 || test_type == 3 || test_type == 5) {
+      matpc_type = QUDA_MATPC_EVEN_EVEN;
+    } else if (test_type == 2 || test_type == 4 || test_type == 6) {
+      matpc_type = QUDA_MATPC_ODD_ODD;
+    } else if (test_type == 0) {
+      matpc_type = QUDA_MATPC_EVEN_EVEN; // it doesn't matter
+    }
+
+    if (test_type == 0 || test_type == 1 || test_type == 2) {
+      solution_type = QUDA_MAT_SOLUTION;
+    } else if (test_type == 3 || test_type == 4) {
+      solution_type = QUDA_MATPC_SOLUTION;
+    } else if (test_type == 5 || test_type == 6) {
+      solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; // Dirty hack to get multishift to work
     }
   }
 
@@ -941,8 +976,8 @@ int main(int argc, char** argv)
     link_recon_sloppy = link_recon;
   }
 
-  if(inv_type != QUDA_CG_INVERTER) {
-    if(test_type != 0 && test_type != 1 && test_type != 2) errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
+  if(inv_type != QUDA_CG_INVERTER && (test_type == 5 || test_type == 6)) {
+    errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
   }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)

@@ -540,13 +540,12 @@ void init()
     csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
     csParam.setPrecision(inv_param.cpu_prec);
+    inv_param.solution_type = QUDA_MAT_SOLUTION;
     csParam.pad = 0;
     if (test_type < 2 && dslash_type != QUDA_LAPLACE_DSLASH) {
-      inv_param.solution_type = QUDA_MATPC_SOLUTION;
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /= 2;
     } else {
-      inv_param.solution_type = QUDA_MAT_SOLUTION;
       csParam.siteSubset = QUDA_FULL_SITE_SUBSET; 
     }
 
@@ -562,7 +561,7 @@ void init()
 
     // printfQuda("Randomizing fields ...\n");
 
-    spinor->Source(QUDA_CONSTANT_SOURCE,1);
+    spinor->Source(QUDA_RANDOM_SOURCE);
 
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     csParam.pad = inv_param.sp_pad;
@@ -589,7 +588,8 @@ void init()
     //csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     tmp = new cudaColorSpinorField(csParam);
 
-    bool pc = (test_type != 2);
+    bool pc = (test_type == 1); // For test_type 0, can use either pc or not pc
+                                // because both call the same "Dslash" directly.
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
 
@@ -681,7 +681,7 @@ DslashTime dslashCUDA(int niter) {
         if (transfer){
             //MatPCDagMatPcQuda(spinorOdd, spinorEven, &inv_param);
         } else {
-          dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+          dirac->M(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case 2:
