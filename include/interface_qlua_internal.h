@@ -12,6 +12,10 @@ namespace quda {
 
   const bool QCredundantComms = false; //- Same as interface_quda.cpp
 
+  //- Required for TMD contractions
+  static const char ldir_list[] = "xXyYzZtTqQrRsSuUvVwW";
+  static const char ldir_inv [] = "XxYyZzTtQqRrSsUuVvWw";
+
   struct QluaUtilArg {
 
     const int nParity;            // number of parities we're working on

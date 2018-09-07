@@ -1277,6 +1277,29 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
 //-----------------------------------------------------------------//
 
 
+//- Helper functions
+int string_prefix(const char *p, const char *str){
+  for(; *p ; p++, str++)
+    if (*p != *str)
+      return 0;
+  return 1;
+}
+int shift_ldir2idx(char c){
+  const char *s;
+  int i;
+  for(i = 0, s = ldir_list; '\0' != *s ; s++, i++)
+    if (*s == c)
+      return i;
+  return -1;
+}
+char invshift_ldir(char ldir){
+  int i = shift_ldir2idx(ldir);
+  if (i < 0) return '\0';
+  else return ldir_inv[i];
+}
+//-------------------------------------------------------------
+
+
 //- C.K. Initialize the TMD contract State
 EXTRN_C int
 QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
