@@ -68,6 +68,7 @@ namespace quda {
     for (int k = 0; k<n; k++) {
       caxpy(arg.Xinv(0,parity,x_cb,i,k), arg.Y(d+4,parity,x_cb,k,j), yHat);
     }
+    arg.Yhat(d+4,parity,x_cb,i,j) = yHat;
 
   }
 
