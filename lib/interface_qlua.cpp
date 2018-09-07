@@ -1245,6 +1245,8 @@ QuarkTMDstep_momProj_Quda(QuarkTMD_state *qcs,
 			  const qudaLattice *qS){
 
   int status = 0;
+
+  const char *func_name = "QuarkTMDstep_momProj_Quda";
   
   const char *b_lpath_inc = NULL;
   const char *v_lpath_inc = NULL;
@@ -1275,26 +1277,41 @@ QuarkTMDstep_momProj_Quda(QuarkTMD_state *qcs,
   /* build up b_lpath */
   for (; *b_lpath_inc ; b_lpath_inc++, b_lpath_ptr++) {
     char c = *b_lpath_inc;
+    qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(c);
 
-    /* TODO NONCOV shift of qcs->cudaPropFrw_bsh in dir 'c'
-     * use/flip with qcs->cudaPropAux as temp */
+    //- Non-Covariant shift of qcs->cudaPropFrw_bsh in dir 'c'
+    double t1 = MPI_Wtime();
+    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+      perform_ShiftCudaVec_nonCov(qcs->cudaPropAux, qcs->cudaPropFrw_bsh[ivec], shfFlag);
+      qcSwapCudaVec(qcs->cudaPropFrw_bsh[ivec], qcs->cudaPropAux);
+    }
+    double t2 = MPI_Wtime();
+    printfQuda("TIMING - %s: Non-Cov Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
 
-    /* TODO COV shift of qcs->wlinks[i_wl_b] {Wb} in dir 'c';
-     * use/flip with qcs->wlinks[i_wl_tmp] */
 
-    /* TODO NONCOV shift of qcs->bsh_u in dir 'c'
-     * use/flip with qcs->aux_u */
+    //- Covariant shift of qcs->wlinks[i_wl_b] {Wb} in dir 'c';
+    perform_ShiftLink_Cov(qcs->wlinks, qcs->i_wl_tmp, qcs->wlinks, qcs->i_wl_b, qcs->gf_u, shfFlag);
+    int itmp = qcs->i_wl_tmp;
+    qcs->i_wl_tmp = qcs->i_wl_b;
+    qcs->i_wl_b = itmp;
 
-    /* memorize */
+
+    //- Non-covariant shift of qcs->bsh_u in dir 'c'
+    perform_ShiftGauge_nonCov(qcs->aux_u, qcs->bsh_u, shfFlag);
+    qcSwapCudaGauge(qcs->bsh_u, qcs->aux_u);
+
+
+    //- memorize
     *b_lpath_ptr = c;
   }
   *b_lpath_ptr = '\0';
 
   /* v_lpath: increment or reset? */
-  if (!b_reset && 0 < cur_vlen && string_prefix(qcs->v_lpath, v_lpath)) {
+  if( !b_reset && 0 < cur_vlen && string_prefix(qcs->v_lpath, v_lpath) ){
     v_lpath_inc = v_lpath + cur_vlen;
     v_lpath_ptr = qcs->v_lpath + cur_vlen;
-  } else {
+  }
+  else{
     v_reset = 1;
     v_lpath_inc = v_lpath;
     v_lpath_ptr = qcs->v_lpath;
