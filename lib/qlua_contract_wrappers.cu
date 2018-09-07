@@ -164,7 +164,7 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
-  qcTMD_ShiftSgn TMDparseShiftSign(qcTMD_ShiftFlag shfFlag){
+  qcTMD_ShiftSgn TMDparseShiftSign(qcTMD_ShiftFlag shfFlag, bool flipShfSgn=false){
 
     printfQuda("TMDparseShiftSign: Got shfFlag = %s\n", qcTMD_ShiftFlagArray[(int)shfFlag]);
 
@@ -174,13 +174,15 @@ namespace quda {
     case qcShfStr_Y:
     case qcShfStr_Z:
     case qcShfStr_T: {
-      shfSgn = qcShfSgnPlus;
+      if(!flipShfSgn) shfSgn = qcShfSgnPlus;
+      else shfSgn = qcShfSgnMinus;
     } break;
     case qcShfStr_x:
     case qcShfStr_y:
     case qcShfStr_z:
     case qcShfStr_t: {
-      shfSgn = qcShfSgnMinus;
+      if(!flipShfSgn) shfSgn = qcShfSgnMinus;
+      else shfSgn = qcShfSgnPlus;
     } break;
     default: errorQuda("TMDparseShiftSign: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<nShiftFlag) ? qcTMD_ShiftFlagArray[(int)shfFlag] : "None");
     }//-- switch    
@@ -416,9 +418,12 @@ namespace quda {
 
   void perform_ShiftLink_AdjSplitCov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
 				     cudaGaugeField *gf, cudaGaugeField *gf2,
-				     qcTMD_ShiftDir shfDir, qcTMD_ShiftSgn shfSgn){
+				     qcTMD_ShiftFlag shfFlag, bool flipShfSgn){
 
     const char *funcname = "perform_ShiftLink_AdjSplitCov";
+
+    qcTMD_ShiftDir  shfDir  = TMDparseShiftDirection(shfFlag);
+    qcTMD_ShiftSgn  shfSgn  = TMDparseShiftSign(shfFlag, flipShfSgn);
     if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
       printfQuda("%s: Will perform a Gauge Link AdjSplitCov shift in the %s%s direction\n",
 		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);

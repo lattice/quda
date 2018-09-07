@@ -1317,17 +1317,30 @@ QuarkTMDstep_momProj_Quda(QuarkTMD_state *qcs,
     v_lpath_ptr = qcs->v_lpath;
     memset(v_lpath_ptr, 0, sizeof(qcs->v_lpath));
 
-    /* TODO (re)set qcs->wlinks[i_wl_vbv] {Wvbv} to qcs->wlinks[i_wl_b] {Wb} */
+    //- (re)set qcs->wlinks[i_wl_vbv] {Wvbv} to qcs->wlinks[i_wl_b] {Wb}
+    //-- CK-TODO: Check if this is correct
+    int itmp = qcs->i_wl_vbv;
+    qcs->i_wl_vbv = qcs->i_wl_b;
+    qcs->i_wl_b = itmp;
   }
 
   /* build up v_lpath */
   for (; *v_lpath_inc ; v_lpath_inc++, v_lpath_ptr++) {
     char c = *v_lpath_inc;
-    /* TODO ADJSPLITCOV shift qcs->wlinks[i_wl_vbv] {Wvbv} with qcs->gf_u, qcs->bsh_u
-     *    in dir OPPOSITE to 'c'
-     * use/flip with qcs->wlinks[i_wl_tmp] */
+    qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(c);
 
-    /* memorize */
+
+    //- AdjSplitCov shift of qcs->wlinks[i_wl_vbv] {Wvbv} with qcs->gf_u, qcs->bsh_u
+    //- in opposite direction of 'c'
+    bool flipShfSgn = true;    
+    perform_ShiftLink_AdjSplitCov(qcs->wlinks, qcs->i_wl_tmp, qcs->wlinks, qcs->i_wl_vbv,
+				  qcs->gf_u, qcs->bsh_u, shfFlag, flipShfSgn);
+    int itmp = qcs->i_wl_tmp;
+    qcs->i_wl_tmp = qcs->i_wl_vbv;
+    qcs->i_wl_vbv = itmp;
+
+
+    //- memorize
     *v_lpath_ptr = c;
   }
   *v_lpath_ptr = '\0';

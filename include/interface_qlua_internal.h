@@ -192,7 +192,9 @@ namespace quda {
                              cudaGaugeField *gf, qcTMD_ShiftFlag shfFlag);
   void perform_ShiftGauge_nonCov(cudaGaugeField *dst, cudaGaugeField *src,
                                  qcTMD_ShiftFlag shfFlag);
-
+  void perform_ShiftLink_AdjSplitCov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
+                                     cudaGaugeField *gf, cudaGaugeField *gf2,
+                                     qcTMD_ShiftFlag shfFlag, bool flipShfSgn);
   
   void cudaContractQQ(
   		      ColorSpinorField **propOut,
