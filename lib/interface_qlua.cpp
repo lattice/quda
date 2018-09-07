@@ -226,8 +226,24 @@ new_ExtendedcudaGaugeField(cudaGaugeField &in, bool copyGauge=true, bool redunda
   return out;
 }
 
+//-- load a cpu ColorSpinorField
+static cpuColorSpinorField*
+new_cpuColorSpinorField(QudaGaugeParam& gp, QudaInvertParam& ip,
+			int nColor, int nSpin,
+			QUDA_REAL *hbuf_x)
+{
+  ColorSpinorParam cpuParam(hbuf_x, ip, gp.X, false, QUDA_CPU_FIELD_LOCATION); // false stands for the pc_solution
 
-//-- load a ColorSpinorField
+  cpuColorSpinorField *cpu_x;
+  if (NULL == hbuf_x)
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+  
+  cpu_x = new cpuColorSpinorField(cpuParam);
+
+  return cpu_x;
+}
+
+//-- load a cuda ColorSpinorField
 static cudaColorSpinorField*
 new_cudaColorSpinorField(QudaGaugeParam& gp, QudaInvertParam& ip,
 			 int nColor, int nSpin,
@@ -1159,10 +1175,15 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
 
   //- Allocate device pointers of Forward and Backward propagators
   for(int ivec=0;ivec<nVec;ivec++){
+    qcs->cpuPropFrw[ivec]  = new_cpuColorSpinorField(gp, ip, Nc, Ns, &(qluaPropFrw_host[ivec * csVecLgh]) );
+    if(qcs->cpuPropFrw[ivec] == NULL)
+      errorQuda("%s: Cannot allocate cpu forward propagator for ivec = %d. Exiting.\n", func_name, ivec);
+
+
     qcs->cudaPropFrw_bsh[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropFrw_host[ivec * csVecLgh]) );
     qcs->cudaPropBkw[ivec]     = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropBkw_host[ivec * csVecLgh]) );
     if( (qcs->cudaPropFrw_bsh[ivec] == NULL) || (qcs->cudaPropBkw[ivec] == NULL) )
-      errorQuda("%s: Cannot allocate forward and/or backward propagators for ivec = %d. Exiting.\n", func_name, ivec);
+      errorQuda("%s: Cannot allocate cuda forward and/or backward propagators for ivec = %d. Exiting.\n", func_name, ivec);
   }
 
   //- Allocate auxilliary vector, initialize to zero
@@ -1179,6 +1200,7 @@ QuarkTMDinit_Quda(QuarkTMD_state *qcs, const qudaLattice *qS,
 //---------------------------------------------------------------
 
 
+//- C.K. Initialize the TMD contract State
 EXTRN_C int
 QuarkTMDfree_Quda(QuarkTMD_state *qcs){
 
@@ -1193,6 +1215,7 @@ QuarkTMDfree_Quda(QuarkTMD_state *qcs){
 
   //- Delete propagators
   for(int i=0;i<QUDA_PROP_NVEC;i++){
+    if(qcs->cpuPropFrw[i]      != NULL) delete qcs->cpuPropFrw[i];
     if(qcs->cudaPropFrw_bsh[i] != NULL) delete qcs->cudaPropFrw_bsh[i];
     if(qcs->cudaPropBkw[i]     != NULL) delete qcs->cudaPropBkw[i];
   }
@@ -1207,12 +1230,99 @@ QuarkTMDfree_Quda(QuarkTMD_state *qcs){
 }
 
 
+//- C.K. Main function which performs propagator/gauge shifts and performs TMD contractions
+EXTRN_C int
+QuarkTMDstep_momProj_Quda(QuarkTMD_state *qcs,
+			  XTRN_CPLX *momproj_buf,     /* output in Pspace */
+			  XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
+			  const char *b_lpath, const char *v_lpath,
+			  const qudaLattice *qS){
+
+  int status = 0;
+  
+  const char *b_lpath_inc = NULL;
+  const char *v_lpath_inc = NULL;
+  char *b_lpath_ptr = NULL;
+  char *v_lpath_ptr = NULL;
+  int cur_blen = strlen(qcs->b_lpath);
+  int cur_vlen = strlen(qcs->v_lpath);
+  int b_reset = 0;
+  int v_reset = 0;
+
+
+  /* b_lpath: increment or reset? */
+  if (0 < cur_blen && string_prefix(qcs->b_lpath, b_lpath)) {
+    b_lpath_inc = b_lpath + cur_blen;
+    b_lpath_ptr = qcs->b_lpath + cur_blen;
+  } else {
+    b_reset = 1;
+    b_lpath_inc = b_lpath;
+    b_lpath_ptr = qcs->b_lpath;
+    memset(b_lpath_ptr, 0, sizeof(qcs->b_lpath));
+
+
+    /* TODO-DONE (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw */
+    qcResetFrwProp(qcs);
+
+    /* TODO (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix */
+
+
+    /* TODO (re)set qcs->bsh_u to qcs->gf_u */
+  }
+
+  /* build up b_lpath */
+  for (; *b_lpath_inc ; b_lpath_inc++, b_lpath_ptr++) {
+    char c = *b_lpath_inc;
+
+    /* TODO NONCOV shift of qcs->cudaPropFrw_bsh in dir 'c'
+     * use/flip with qcs->cudaPropAux as temp */
+
+    /* TODO COV shift of qcs->wlinks[i_wl_b] {Wb} in dir 'c';
+     * use/flip with qcs->wlinks[i_wl_tmp] */
+
+    /* TODO NONCOV shift of qcs->bsh_u in dir 'c'
+     * use/flip with qcs->aux_u */
+
+    /* memorize */
+    *b_lpath_ptr = c;
+  }
+  *b_lpath_ptr = '\0';
+
+  /* v_lpath: increment or reset? */
+  if (!b_reset && 0 < cur_vlen && string_prefix(qcs->v_lpath, v_lpath)) {
+    v_lpath_inc = v_lpath + cur_vlen;
+    v_lpath_ptr = qcs->v_lpath + cur_vlen;
+  } else {
+    v_reset = 1;
+    v_lpath_inc = v_lpath;
+    v_lpath_ptr = qcs->v_lpath;
+    memset(v_lpath_ptr, 0, sizeof(qcs->v_lpath));
+
+    /* TODO (re)set qcs->wlinks[i_wl_vbv] {Wvbv} to qcs->wlinks[i_wl_b] {Wb} */
+  }
+
+  /* build up v_lpath */
+  for (; *v_lpath_inc ; v_lpath_inc++, v_lpath_ptr++) {
+    char c = *v_lpath_inc;
+    /* TODO ADJSPLITCOV shift qcs->wlinks[i_wl_vbv] {Wvbv} with qcs->gf_u, qcs->bsh_u
+     *    in dir OPPOSITE to 'c'
+     * use/flip with qcs->wlinks[i_wl_tmp] */
+
+    /* memorize */
+    *v_lpath_ptr = c;
+  }
+  *v_lpath_ptr = '\0';
 
 
 
+  /* TODO contraction */
 
+  /* TODO momentum projection using qcs->momphase */
 
+  /* TODO fill corrQuda with Xspace data from GPU */
 
+  return status;
+}
 
 
 

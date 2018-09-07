@@ -55,7 +55,7 @@ namespace quda {
   //- C.K. Structure holding the current state,
   //- required for TMD contractions
   struct QuarkTMD_state {
-    
+
     //- contraction type
     qluaCntr_Type cntrType;
     
@@ -74,6 +74,9 @@ namespace quda {
 
     //- host forward propagator, constant throughout, will be used for resetting cudaPropFrw_bsh
     QUDA_REAL *hostPropFrw;
+
+    //- host forward propagator, will be used to reset device forward propagator
+    cpuColorSpinorField *cpuPropFrw[QUDA_PROP_NVEC];
 
     //- device forward (shifted) propagator, backward propagator
     //- cudaPropAux: used for shifts, will be getting swapped with cudaPropFrw_bsh
@@ -99,6 +102,10 @@ namespace quda {
     //- Structure holding the parameters of the contractions / momentum projection
     qudaAPI_Param paramAPI;
   };
+
+
+
+  void qcResetFrwProp(QuarkTMD_state *qcs);
 
 
   
