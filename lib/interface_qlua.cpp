@@ -837,6 +837,8 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
 
   if(paramAPI.mpParam.cntrType == what_none)
     errorQuda("%s: Contraction type not parsed correctly or not supported!\n", func_name);
+  else if(paramAPI.mpParam.cntrType == what_tmd_g_F_B)
+    errorQuda("%s: This function does not support TMD contractions!\n", func_name);
   else
     printfQuda("%s: Got Contraction type \'%s\'\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
@@ -850,29 +852,6 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   QudaInvertParam ip;
   init_QudaInvertParam_generic(ip, gp, paramAPI, preserveBasis);
   setVerbosity(paramAPI.verbosity);
-
-  //-- Load the gauge field, if applicable
-  for (int d=0;d<4;d++)
-    qcR[d] = 2 * (QCredundantComms || commDimPartitioned(d));
-
-  cudaGaugeField *cuda_gf = NULL;
-  cudaGaugeField *cuda_gf_ext  = NULL;
-  cudaGaugeField *cuda_gf_ext1 = NULL;
-  cudaGaugeField *cuda_gf_ext2 = NULL;
-  cudaGaugeField *cuda_gf_ext3 = NULL;
-  if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
-    double t3 = MPI_Wtime();
-    for(int mu=0;mu<qS->rank;mu++)
-      if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
-    cuda_gf = new_cudaGaugeField(gp, h_gauge); //- The original, regular gauge field
-
-    cuda_gf_ext  = new_ExtendedcudaGaugeField(*cuda_gf, qcR); //- The original gauge field, but extended
-    cuda_gf_ext1 = new_ExtendedcudaGaugeField(*cuda_gf, qcR); //- Auxilliary extended
-    cuda_gf_ext2 = new_ExtendedcudaGaugeField(*cuda_gf, qcR); //- gauge field required
-    cuda_gf_ext3 = new_ExtendedcudaGaugeField(*cuda_gf, qcR); //- for the shifts
-    double t4 = MPI_Wtime();
-    printfQuda("TIMING - %s: Cuda Gauge Fields loaded in %f sec.\n", func_name, t4-t3);
-  }
   //------------------------------------------------------------------------------------------
 
   //-- Load the propagators into cuda-CSFs
@@ -891,12 +870,11 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
       errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
   }
 
-  if( (paramAPI.mpParam.cntrType == what_baryon_sigma_UUS) || (paramAPI.mpParam.cntrType == what_tmd_g_F_B) ){
-    if( (hprop3 == NULL) && (paramAPI.mpParam.cntrType == what_baryon_sigma_UUS) )
+  if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS){
+    if(hprop3 == NULL)
       errorQuda("%s: Got hprop3 = NULL for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
     for(int ivec=0;ivec<nVec;ivec++){
-      QUDA_REAL *propPtr = (paramAPI.mpParam.cntrType == what_baryon_sigma_UUS) ? &(hprop3[ivec * fieldLgh]) : NULL;
-      cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, propPtr);
+      cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop3[ivec * fieldLgh]));
       if(cudaProp3[ivec] == NULL) errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
     }//-ivec
   }
@@ -922,16 +900,6 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   cudaMalloc((void**)&corrQuda_dev, corrSize);
   checkCudaErrorNoSync();
   cudaMemset(corrQuda_dev, 0, corrSize);
-
-  // if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
-  //   double t5 = MPI_Wtime();
-  //   QuarkContractTMD_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3, cuda_gf,
-  // 			 cuda_gf_ext, cuda_gf_ext1, cuda_gf_ext2, cuda_gf_ext3,
-  // 			 paramAPI);
-  //   double t6 = MPI_Wtime();
-  //   printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' completed in %f sec.\n", func_name, t6-t5);
-  // }
-  // else{
   double t5 = MPI_Wtime();
   QuarkContractStd_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3,
 		       (complex<QUDA_REAL>*)S2, (complex<QUDA_REAL>*)S1,
@@ -961,16 +929,9 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
     delete cudaProp1[ivec];
     delete cudaProp2[ivec];
   }  
-  if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS || paramAPI.mpParam.cntrType == what_tmd_g_F_B){
+  if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS){
     for(int ivec=0;ivec<nVec;ivec++)
       delete cudaProp3[ivec];
-  }
-  if(paramAPI.mpParam.cntrType == what_tmd_g_F_B){
-    delete cuda_gf;  
-    delete cuda_gf_ext;
-    delete cuda_gf_ext1;
-    delete cuda_gf_ext2;
-    delete cuda_gf_ext3;
   }
   cudaFree(corrQuda_dev);
   
