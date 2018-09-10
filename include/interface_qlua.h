@@ -212,14 +212,14 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrPosSpc, const 
 //----- TMD related functions -----//
 
 EXTRN_C int
-QuarkTMDinit_Quda(void *Vqcs, const qudaLattice *qS,
+QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
                   const int *momlist,
                   QUDA_REAL *qluaPropFrw_host, QUDA_REAL *qluaPropBkw_host,
                   QUDA_REAL *qluaGauge_host[],
                   qudaAPI_Param paramAPI);
 
 EXTRN_C int
-QuarkTMDfree_Quda(void *Vqcs);
+QuarkTMDfree_Quda(void **Vqcs);
 
 
 EXTRN_C int

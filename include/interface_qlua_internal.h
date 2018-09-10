@@ -178,7 +178,7 @@ namespace quda {
   void convertSiteOrder_QudaQDP_to_momProj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg);
 
 
-  qcTMD_ShiftFlag TMDparseShiftFlag(char flagStr);
+  qcTMD_ShiftFlag TMDparseShiftFlag(char *flagStr);
 
 
   void qcCPUtoCUDAVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec);

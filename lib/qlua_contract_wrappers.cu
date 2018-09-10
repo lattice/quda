@@ -110,15 +110,16 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
-  qcTMD_ShiftFlag TMDparseShiftFlag(char flagStr){
+  qcTMD_ShiftFlag TMDparseShiftFlag(char *flagStr){
     
     qcTMD_ShiftFlag shfFlag = qcShfStr_None;
     for(int iopt=0;iopt<nShiftFlag;iopt++){
-      if( strcmp(&flagStr,qcTMD_ShiftFlagArray[iopt])==0 ){
+      if( strcmp(flagStr,qcTMD_ShiftFlagArray[iopt])==0 ){
 	shfFlag = (qcTMD_ShiftFlag)iopt;
 	break;
       }
     }
+    if(shfFlag==qcShfStr_None) errorQuda("TMDparseShiftFlag: Cannot parse given shift flag, flagStr = %c.\n", *flagStr);
     return shfFlag;
   }
 
@@ -136,8 +137,6 @@ namespace quda {
   }
 
   qcTMD_ShiftDir TMDparseShiftDirection(qcTMD_ShiftFlag shfFlag){
-
-    printfQuda("TMDparseShiftDirection: Got shfFlag = %s\n", qcTMD_ShiftFlagArray[(int)shfFlag]);
 
     qcTMD_ShiftDir shfDir = qcShfDirNone;
     switch(shfFlag){
@@ -165,8 +164,6 @@ namespace quda {
   //---------------------------------------------------------------------------
 
   qcTMD_ShiftSgn TMDparseShiftSign(qcTMD_ShiftFlag shfFlag, bool flipShfSgn=false){
-
-    printfQuda("TMDparseShiftSign: Got shfFlag = %s\n", qcTMD_ShiftFlagArray[(int)shfFlag]);
 
     qcTMD_ShiftSgn shfSgn = qcShfSgnNone;
     switch(shfFlag){
