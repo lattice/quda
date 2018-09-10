@@ -259,17 +259,29 @@ namespace quda {
   }
 
   void ColorSpinorField::setTuningString() {
-    LatticeField::setTuningString();
-    int aux_string_n = TuneKey::aux_n / 2;
-    char aux_tmp[aux_string_n];
-    int check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d,Ns=%d,Nc=%d",
-		     volume, stride, precision, nSpin, nColor);
-    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+    {
+      //LatticeField::setTuningString(); // FIXME - LatticeField needs correct dims for single-parity
+      char vol_tmp[TuneKey::volume_n];
+      int check  = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
+      if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
+      for (int d=1; d<nDim; d++) {
+        strcpy(vol_tmp, vol_string);
+        check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_tmp, x[d]);
+        if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
+      }
+    }
 
-    if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
-      strcpy(aux_tmp, aux_string);
-      check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
+    {
+      int aux_string_n = TuneKey::aux_n / 2;
+      char aux_tmp[aux_string_n];
+      int check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d,Ns=%d,Nc=%d",
+                           volume, stride, precision, nSpin, nColor);
       if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
+        strcpy(aux_tmp, aux_string);
+        check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
+        if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+      }
     }
   }
 
