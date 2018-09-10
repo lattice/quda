@@ -1408,8 +1408,7 @@ EXTRN_C int
 QuarkTMDstep_momProj_Quda(void *Vqcs,
 			  XTRN_CPLX *momproj_buf,     /* output in Pspace */
 			  XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
-			  const char *b_lpath, const char *v_lpath,
-			  const qudaLattice *qS){
+			  const char *b_lpath, const char *v_lpath){
 
   int status = 0;
 
