@@ -100,12 +100,8 @@ namespace quda {
       cudaGaugeField Xinv_(param);
       X_.copy(X);
       blas::flops += cublas::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
-      if (Xinv.Precision() < QUDA_SINGLE_PRECISION) {
-        typedef typename gauge::FieldOrder<Float,N,1,QUDA_MILC_GAUGE_ORDER> G;
-        G x(X_);
-        G xinv(Xinv_);
-        Xinv.Scale(xinv.abs_max());
-      }
+
+      if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_.abs_max() );
 
       Xinv.copy(Xinv_);
 
@@ -134,7 +130,7 @@ namespace quda {
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gPreconditionedCoarse yHatAccessor(const_cast<GaugeField&>(Yhat));
       gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", xInvAccessor.norm2(0));
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
 
       int comm_dim[4];
       for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
@@ -142,7 +138,7 @@ namespace quda {
       yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
 
       if (Yhat.Precision() == QUDA_HALF_PRECISION) {
-	double max = 3.0 * arg.Y.abs_max() * arg.Xinv.abs_max();
+	double max = 3.0 * Y.abs_max() * Xinv.abs_max();
 	Yhat.Scale(max);
 	arg.Yhat.resetScale(max);
       }
@@ -151,9 +147,9 @@ namespace quda {
       yHat.apply(0);
 
       if (getVerbosity() >= QUDA_VERBOSE)
-	for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, arg.Yhat.norm2(d),
-					   arg.Yhat.abs_max(d), arg.Y.abs_max(d) * arg.Xinv.abs_max(0),
-					   arg.Y.abs_max(d), arg.Xinv.abs_max(0));
+	for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d),
+					   Yhat.abs_max(d), Y.abs_max(d) * Xinv.abs_max(0),
+					   Y.abs_max(d), Xinv.abs_max(0));
 
     }
 
