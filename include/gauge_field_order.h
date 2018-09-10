@@ -13,7 +13,9 @@
 #else
 #define DISABLE_TROVE
 #endif
+#ifndef __CUDACC_RTC__
 #include <assert.h>
+#endif
 #include <type_traits>
 
 #include <register_traits.h>

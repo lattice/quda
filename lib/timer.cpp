@@ -1,4 +1,5 @@
 #include <quda_internal.h>
+#include <timer.h>
 
 namespace quda {
 
