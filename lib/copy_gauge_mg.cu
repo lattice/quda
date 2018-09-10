@@ -22,7 +22,7 @@ namespace quda {
 	out.Scale(in.Scale());
       } else {
 	InOrder in_(const_cast<GaugeField&>(in));
-	out.Scale(in_.abs_max());
+	out.Scale( in.abs_max() );
       }
     }
 #endif

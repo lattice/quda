@@ -27,8 +27,8 @@ namespace quda {
   /**
      Generic CPU gauge reordering and packing
   */
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-  void copyGauge(CopyGaugeArg<OutOrder,InOrder> arg) {
+  template <typename FloatOut, typename FloatIn, int length, typename Arg>
+  void copyGauge(Arg &arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
@@ -58,7 +58,7 @@ namespace quda {
      Check whether the field contains Nans
   */
   template <typename Float, int length, typename Arg>
-  void checkNan(Arg arg) {
+  void checkNan(Arg &arg) {
     typedef typename mapper<Float>::type RegType;
 
     for (int parity=0; parity<2; parity++) {
@@ -91,8 +91,8 @@ namespace quda {
       Generic CUDA gauge reordering and packing.  Adopts a similar form as
       the CPU version, using the same inlined functions.
   */
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-  __global__ void copyGaugeKernel(CopyGaugeArg<OutOrder,InOrder> arg) {
+  template <typename FloatOut, typename FloatIn, int length, typename Arg>
+  __global__ void copyGaugeKernel(Arg arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
@@ -120,8 +120,8 @@ namespace quda {
   /**
      Generic CPU gauge ghost reordering and packing
   */
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-    void copyGhost(CopyGaugeArg<OutOrder,InOrder> arg) {
+  template <typename FloatOut, typename FloatIn, int length, typename Arg>
+  void copyGhost(Arg &arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
@@ -150,8 +150,8 @@ namespace quda {
      Generic CUDA kernel for copying the ghost zone.  Adopts a similar form as
      the CPU version, using the same inlined functions.
   */
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-  __global__ void copyGhostKernel(CopyGaugeArg<OutOrder,InOrder> arg) {
+  template <typename FloatOut, typename FloatIn, int length, typename Arg>
+  __global__ void copyGhostKernel(Arg arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 

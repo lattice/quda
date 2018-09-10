@@ -7,9 +7,9 @@ namespace quda {
 
   using namespace gauge;
 
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+  template <typename FloatOut, typename FloatIn, int length, typename Arg>
   class CopyGauge : TunableVectorYZ {
-    CopyGaugeArg<OutOrder,InOrder> arg;
+    Arg arg;
     int size;
     const GaugeField &meta;
     QudaFieldLocation location;
@@ -23,32 +23,26 @@ namespace quda {
     unsigned int minThreads() const { return size; }
 
 public:
-    CopyGauge(CopyGaugeArg<OutOrder,InOrder> &arg, const GaugeField &out, const GaugeField &in, QudaFieldLocation location)
+    CopyGauge(Arg &arg, const GaugeField &out, const GaugeField &in, QudaFieldLocation location)
 #ifndef FINE_GRAINED_ACCESS
-      : TunableVectorYZ(1, (is_ghost ? arg.nDim : in.Geometry()) * 2),
+      : TunableVectorYZ(1, in.Geometry()* 2),
 #else
-      : TunableVectorYZ(Ncolor(length), (is_ghost ? arg.nDim : in.Geometry()) * 2),
+      : TunableVectorYZ(Ncolor(length), in.Geometry() * 2),
 #endif
         arg(arg), meta(in), location(location), is_ghost(false) {
 
       set_ghost(is_ghost); // initial state is not ghost
 
-#ifndef FINE_GRAINED_ACCESS
-      int n = writeAuxString("out_stride=%d,in_stride=%d,geometry=%d",arg.out.stride, arg.in.stride, meta.Geometry());
-      if (out.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
-	n = snprintf(aux+n,TuneKey::aux_n,",in_siteoffset=%lu,out_sitesize=%lu",out.SiteOffset(),out.SiteSize());
-	if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
-      }
-      if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
-	n = snprintf(aux+n,TuneKey::aux_n,",in_siteoffset=%lu,in_sitesize=%lu",in.SiteOffset(),in.SiteSize());
-	if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
-      }
-#else
-      writeAuxString("fine-grained,geometry=%d", (int)meta.Geometry());
+      strcpy(aux, location == QUDA_CUDA_FIELD_LOCATION ? compile_type_str : "CPU");
+      strcat(aux, ",out:");
+      strcat(aux, out.AuxString());
+      strcat(aux, ",in:");
+      strcat(aux, in.AuxString());
+
+#ifdef FINE_GRAINED_ACCESS
+      strcat(aux,",fine-grained,");
 #endif
 
-      strcat(aux,",");
-      strcat(aux, compile_type_str);
 #ifdef JITIFY
 #ifdef FINE_GRAINED_ACCESS
       std::vector<std::string> macro = { "-DFINE_GRAINED_ACCESS" }; // need to pass macro to jitify
@@ -92,14 +86,14 @@ public:
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel(!is_ghost ? "quda::copyGaugeKernel" : "quda::copyGhostKernel")
-          .instantiate(Type<FloatOut>(),Type<FloatIn>(),length,Type<OutOrder>(),Type<InOrder>())
+          .instantiate(Type<FloatOut>(),Type<FloatIn>(),length,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (!is_ghost) {
-          copyGaugeKernel<FloatOut, FloatIn, length, OutOrder, InOrder>
+          copyGaugeKernel<FloatOut, FloatIn, length, Arg>
             <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         } else {
-          copyGhostKernel<FloatOut, FloatIn, length, OutOrder, InOrder>
+          copyGhostKernel<FloatOut, FloatIn, length, Arg>
             <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         }
 #endif
@@ -135,7 +129,7 @@ public:
 		   QudaFieldLocation location, int type) {
 
     CopyGaugeArg<OutOrder,InOrder> arg(outOrder, inOrder, in);
-    CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder> gaugeCopier(arg, out, in, location);
+    CopyGauge<FloatOut, FloatIn, length, CopyGaugeArg<OutOrder,InOrder> > gaugeCopier(arg, out, in, location);
 
 #ifdef HOST_DEBUG
     if (location == QUDA_CPU_FIELD_LOCATION) checkNan<FloatIn, length>(arg);
