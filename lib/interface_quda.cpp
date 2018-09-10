@@ -1374,7 +1374,7 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
 void freeSloppyCloverQuda(void)
 {
   if (!initialized) errorQuda("QUDA not initialized");
-  if (cloverRefinement != cloverPrecondition && cloverRefinement) delete cloverRefinement;
+  if (cloverRefinement != cloverSloppy && cloverRefinement) delete cloverRefinement;
   if (cloverPrecondition != cloverSloppy && cloverPrecondition) delete cloverPrecondition;
   if (cloverSloppy != cloverPrecise && cloverSloppy) delete cloverSloppy;
   
@@ -2174,15 +2174,17 @@ void checkClover(QudaInvertParam *param) {
     errorQuda("Solve precision %d doesn't match clover precision %d", param->cuda_prec, cloverPrecise->Precision());
   }
 
-  if ((!cloverSloppy || param->cuda_prec_sloppy != cloverSloppy->Precision()) ||
-      (!cloverPrecondition || param->cuda_prec_precondition != cloverPrecondition->Precision())) {
+  if ( (!cloverSloppy || param->cuda_prec_sloppy != cloverSloppy->Precision()) ||
+       (!cloverPrecondition || param->cuda_prec_precondition != cloverPrecondition->Precision()) ||
+       (!cloverRefinement || param->cuda_prec_refinement_sloppy != cloverRefinement->Precision()) ) {
     freeSloppyCloverQuda();
     loadSloppyCloverQuda(param->cuda_prec_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy);
   }
 
-  if (cloverPrecise == nullptr) errorQuda("Precise gauge field doesn't exist");
-  if (cloverSloppy == nullptr) errorQuda("Sloppy gauge field doesn't exist");
-  if (cloverPrecondition == nullptr) errorQuda("Precondition gauge field doesn't exist");
+  if (cloverPrecise == nullptr) errorQuda("Precise clover field doesn't exist");
+  if (cloverSloppy == nullptr) errorQuda("Sloppy clover field doesn't exist");
+  if (cloverPrecondition == nullptr) errorQuda("Precondition clover field doesn't exist");
+  if (cloverRefinement == nullptr) errorQuda("Refinement clover field doesn't exist");
 }
 
 quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
@@ -2464,8 +2466,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
 
-  cudaGaugeField *cudaGauge = checkGauge(param);
   checkMultigridParam(&mg_param);
+  cudaGaugeField *cudaGauge = checkGauge(param);
 
   // check MG params (needs to go somewhere else)
   if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
@@ -2570,7 +2572,6 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   checkMultigridParam(mg_param);
 
   QudaInvertParam *param = mg_param->invert_param;
-  checkInvertParam(param);
   // check the gauge fields have been created and set the precision as needed
   checkGauge(param);
 
