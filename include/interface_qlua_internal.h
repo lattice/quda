@@ -12,8 +12,6 @@ namespace quda {
 
   const bool QCredundantComms = false; //- Same as interface_quda.cpp
 
-  //- Length of Halos in extended Gauge Field
-  static int qcR[4];
 
   //- Required for TMD contractions
   static const char ldir_list[] = "xXyYzZtTqQrRsSuUvVwW";
@@ -116,7 +114,7 @@ namespace quda {
 
   //- C.K. Structure holding the current state,
   //- required for TMD contractions
-  struct QuarkTMD_state {
+  struct QuarkTMD_state_s {
 
     QluaUtilArg *utilArg;
 
@@ -171,6 +169,8 @@ namespace quda {
     //- Structure holding the parameters of the contractions / momentum projection
     qudaAPI_Param paramAPI;
   };
+
+  typedef struct QuarkTMD_state_s QuarkTMD_state;
 
   
   __device__ int d_crdChkVal = 0;
