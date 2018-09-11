@@ -41,16 +41,16 @@ namespace quda {
   }//-- function
 
   
-  int QluaSiteOrderCheck(QluaUtilArg utilArg){
+  int QluaSiteOrderCheck(QluaUtilArg *utilArg){
     int crdChkVal;
 
     QluaUtilArg *utilArg_dev;
     cudaMalloc((void**)&(utilArg_dev), sizeof(QluaUtilArg));
     checkCudaErrorNoSync();
-    cudaMemcpy(utilArg_dev, &utilArg,  sizeof(QluaUtilArg), cudaMemcpyHostToDevice);
+    cudaMemcpy(utilArg_dev, utilArg,  sizeof(QluaUtilArg), cudaMemcpyHostToDevice);
     
-    dim3 blockDim(THREADS_PER_BLOCK, utilArg.nParity, 1);
-    dim3 gridDim((utilArg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+    dim3 blockDim(THREADS_PER_BLOCK, utilArg->nParity, 1);
+    dim3 gridDim((utilArg->volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
     
     QluaSiteOrderCheck_kernel<<<gridDim,blockDim>>>(utilArg_dev);
     cudaDeviceSynchronize();
@@ -250,16 +250,16 @@ namespace quda {
   //---------------------------------------------------------------------------
 
   
-  void qcSwapCudaGauge(cudaGaugeField *x1, cudaGaugeField *x2){
-    cudaGaugeField *xtmp = x1;
-    x1 = x2;
-    x2 = xtmp;
+  void qcSwapCudaGauge(cudaGaugeField **x1, cudaGaugeField **x2){
+    cudaGaugeField *xtmp = *x1;
+    *x1 = *x2;
+    *x2 = xtmp;
   }
 
-  void qcSwapCudaVec(cudaColorSpinorField *x1, cudaColorSpinorField *x2){
-    cudaColorSpinorField *xtmp = x1;
+  void qcSwapCudaVec(cudaColorSpinorField **x1, cudaColorSpinorField **x2){
+    cudaColorSpinorField *xtmp = *x1;
     *x1 = *x2;
-    *x2 = *xtmp;
+    *x2 = xtmp;
   }
 
   void qcCPUtoCUDAVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec){

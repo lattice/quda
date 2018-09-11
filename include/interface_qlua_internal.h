@@ -174,7 +174,7 @@ namespace quda {
 
   
   __device__ int d_crdChkVal = 0;
-  int QluaSiteOrderCheck(QluaUtilArg utilArg);
+  int QluaSiteOrderCheck(QluaUtilArg *utilArg);
   void convertSiteOrder_QudaQDP_to_momProj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg);
 
 
@@ -187,8 +187,8 @@ namespace quda {
   void qcCopyExtendedGaugeField(cudaGaugeField *dst, cudaGaugeField *src, const int *R);
 
 
-  void qcSwapCudaVec(cudaColorSpinorField *x1, cudaColorSpinorField *x2);
-  void qcSwapCudaGauge(cudaGaugeField *x1, cudaGaugeField *x2);
+  void qcSwapCudaVec(cudaColorSpinorField **x1, cudaColorSpinorField **x2);
+  void qcSwapCudaGauge(cudaGaugeField **x1, cudaGaugeField **x2);
 
 
   void perform_ShiftCudaVec_nonCov(ColorSpinorField *dst, ColorSpinorField *src,
