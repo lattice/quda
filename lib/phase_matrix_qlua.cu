@@ -22,11 +22,11 @@ namespace quda {
     const int totalL[QUDA_DIM];
     const int commCoord[QUDA_DIM];
     
-  MomProjArg(momProjParam param, int localL[], int totalL[])
+  MomProjArg(momProjParam param)
   :   V3(param.V3), momDim(param.momDim), Nmoms(param.Nmoms), expSgn(param.expSgn),
       csrc{param.csrc[0],param.csrc[1],param.csrc[2],param.csrc[3]},
-      localL{localL[0],localL[1],localL[2],localL[3]},
-      totalL{totalL[0],totalL[1],totalL[2],totalL[3]},
+      localL{param.localL[0],param.localL[1],param.localL[2],param.localL[3]},
+      totalL{param.totalL[0],param.totalL[1],param.totalL[2],param.totalL[3]},
       commCoord{comm_coord(0),comm_coord(1),comm_coord(2),comm_coord(3)}
     { }
   }; //-- structure
@@ -84,7 +84,7 @@ namespace quda {
     checkCudaErrorNoSync();
     cudaMemcpy(momMatrix_dev, momMatrix, sizeof(int)*param.momDim*param.Nmoms, cudaMemcpyHostToDevice);
     
-    MomProjArg arg(param, param.localL, param.totalL);
+    MomProjArg arg(param);
     MomProjArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(MomProjArg) );
     checkCudaErrorNoSync();
