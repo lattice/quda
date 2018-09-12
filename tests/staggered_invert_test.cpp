@@ -927,6 +927,9 @@ int main(int argc, char** argv)
     usage(argv);
   }
 
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
+
   if (test_type < 0 || test_type > 6) {
     errorQuda("Test type %d is outside the valid range.\n", test_type);
   }
@@ -989,8 +992,6 @@ int main(int argc, char** argv)
     errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
   }
 
-  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
-  initComms(argc, argv, gridsize_from_cmdline);
 
   // Set n_naiks to 2 if eps_naik != 0.0
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
