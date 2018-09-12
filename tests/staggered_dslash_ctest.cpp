@@ -282,6 +282,7 @@ void init(int precision, QudaReconstructType link_recon) {
   inv_param.mass = mass;
   inv_param.kappa = kappa = 1.0/(8.0+mass); // for laplace
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+  inv_param.dslash_type = dslash_type;
 
   /*if (test_type < 2) {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
@@ -902,8 +903,10 @@ public:
 
     double deviation = 1.0;
     double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-9 :
-      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 
+      (inv_param.cuda_prec == QUDA_HALF_PRECISION ? 1e-1 : 2.0))); // catches case where we skip a test
     bool failed = false; // for the nan catch
+
 
     // check for skip_kernel
     if (spinorRef != nullptr) {
