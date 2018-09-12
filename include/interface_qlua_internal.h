@@ -12,12 +12,6 @@ namespace quda {
 
   const bool QCredundantComms = false; //- Same as interface_quda.cpp
 
-
-  //- Required for TMD contractions
-  static const char ldir_list[] = "xXyYzZtTqQrRsSuUvVwW";
-  static const char ldir_inv [] = "XxYyZzTtQqRrSsUuVvWw";
-
-
   typedef enum qcTMD_ShiftFlag_s {
     qcShfStr_None = -1,
     qcShfStr_X = 0,  // +x
@@ -224,13 +218,3 @@ namespace quda {
 } //- namespace quda
   
 #endif/*INTERFACE_QLUA_INT_H__*/
-
-
-//- LEGACY Code
-  // void QuarkContractTMD_GPU(complex<QUDA_REAL> *corrQuda_dev,
-  //                           ColorSpinorField **cudaProp1,
-  //                           ColorSpinorField **cudaProp2,
-  //                           ColorSpinorField **cudaProp3,
-  //                           cudaGaugeField *U, cudaGaugeField *extU,
-  //                           cudaGaugeField *extU1, cudaGaugeField *extU2, cudaGaugeField *extU3,
-  //                           qudaAPI_Param paramAPI);

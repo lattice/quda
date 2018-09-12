@@ -93,5 +93,4 @@ namespace quda {
   }
 
 
-
 }//-- namespace quda

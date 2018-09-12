@@ -157,9 +157,7 @@ namespace quda {
         commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
         lL{x->X(0), x->X(1), x->X(2), x->X(3)},
         volumeCB(x->VolumeCB()), volume(x->Volume())
-    {
-      //      printfQuda("ArgGeom: Initializing Geometry with a ColorSpinorField!\n");
-    }
+    { }
 
     ArgGeom(cudaGaugeField *u) 
       : parity(0), nParity(u->SiteSubset()), nFace(1),
@@ -167,7 +165,6 @@ namespace quda {
         lL{u->X()[0], u->X()[1], u->X()[2], u->X()[3]}
     {
       if(u->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED){
-	//	printfQuda("ArgGeom: Initializing Geometry with an extended Gauge Field!\n");
 	volume = 1;
 	for(int dir=0;dir<4;dir++){
 	  dim[dir] = u->X()[dir] - 2*u->R()[dir];   //-- Actual lattice dimensions (NOT extended)
@@ -178,7 +175,6 @@ namespace quda {
 	volumeCB = volume/2;
       }
       else{
-	//	printfQuda("ArgGeom: Initializing Geometry with a regular Gauge Field!\n");
 	volume = 1;
 	for(int dir=0;dir<4;dir++){
 	  dim[dir] = u->X()[dir];

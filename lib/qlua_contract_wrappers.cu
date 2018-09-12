@@ -13,20 +13,21 @@
 #include <qlua_contract_shifts.cuh>
 
 namespace quda {  
-    const int nShiftFlag = 20;
-    const int nShiftType = 3;
 
-    const char *qcTMD_ShiftFlagArray = "XxYyZzTtQqRrSsUuVvWw" ;
-    const char *qcTMD_ShiftTypeArray[] = {
-            "Covariant",
-            "Non-Covariant",
-            "AdjSplitCov"};
-
-    const char *qcTMD_ShiftDirArray[] = {"x", "y", "z", "t"};
-    const char *qcTMD_ShiftSgnArray[] = {"-", "+"};
-
+  const int nShiftFlag = 20;
+  const int nShiftType = 3;
+  
+  const char *qcTMD_ShiftFlagArray = "XxYyZzTtQqRrSsUuVvWw" ;
+  const char *qcTMD_ShiftTypeArray[] = {
+    "Covariant",
+    "Non-Covariant",
+    "AdjSplitCov"};
+  
+  const char *qcTMD_ShiftDirArray[] = {"x", "y", "z", "t"};
+  const char *qcTMD_ShiftSgnArray[] = {"-", "+"};
+  
   __global__ void QluaSiteOrderCheck_kernel(QluaUtilArg *utilArg){
-
+    
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;    
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
 
@@ -621,91 +622,4 @@ namespace quda {
   }//-- QuarkContractTMD_GPU
 
 
-
-
 } //-namespace quda
-
-  
-
-
-//-- LEGACY CODE
-//      ColorSpinorField *ptmp = cudaProp1[ivec]; cudaProp1[ivec] = cudaProp3[ivec]; cudaProp3[ivec] = ptmp;
-
-
-  // void qcSwapCudaVec(ColorSpinorField **x1, ColorSpinorField **x2){
-  //   ColorSpinorField *xtmp = *x1;
-  //   *x1 = *x2;
-  //   *x2 = xtmp;
-  // }
-  // void qcSwapCudaProp(ColorSpinorField **x1, ColorSpinorField **x2){
-  //   for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
-  //     qcSwapCudaVec(&x1[ivec], &x2[ivec]);
-  // }
-
-  //-Top-level function in GPU contractions
-  // void QuarkContractTMD_GPU(complex<QUDA_REAL> *corrQuda_dev,
-  // 			    ColorSpinorField **cudaProp1,
-  // 			    ColorSpinorField **cudaProp2,
-  // 			    ColorSpinorField **cudaProp3,
-  // 			    cudaGaugeField *U, cudaGaugeField *auxU, // U is NOT an extended GaugeField!!!
-  // 			    cudaGaugeField *auxU1, cudaGaugeField *auxU2, cudaGaugeField *auxU3,
-  // 			    qudaAPI_Param paramAPI){
-
-  //   const char *func_name = "QuarkContractTMD_GPU";
-    
-  //   if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
-
-  //   qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(paramAPI.shfFlag);
-  //   qcTMD_ShiftType propShfType = TMDparseShiftType(paramAPI.shfType);
-  //   qcTMD_ShiftDir  propShfDir  = TMDparseShiftDirection(shfFlag);
-  //   qcTMD_ShiftSgn  propShfSgn  = TMDparseShiftSign(shfFlag);     
-
-  //   double t1 = MPI_Wtime();
-  //   for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-  //     if(propShfType == qcCovShift)     perform_ShiftCudaVec_Cov(cudaProp3[ivec], cudaProp1[ivec], auxU, propShfDir, propShfSgn);
-  //     if(propShfType == qcNonCovShift)	perform_ShiftCudaVec_nonCov(cudaProp3[ivec], cudaProp1[ivec], propShfDir, propShfSgn);
-  //     qcSwapCudaVec(&(cudaProp1[ivec]), &(cudaProp3[ivec]));
-  //   }
-  //   double t2 = MPI_Wtime();
-  //   printfQuda("TIMING - %s: Propagator ghost exchange and shift done in %f sec.\n", func_name, t2-t1);
-
-  //   qcTMD_ShiftDir gaugeShfDir   = TMDparseShiftDirection(shfFlag);
-  //   qcTMD_ShiftSgn gaugeShfSgn   = TMDparseShiftSign(shfFlag);
-  //   qcTMD_ShiftType gaugeShfType = TMDparseShiftType(paramAPI.shfType);
-
-  //   int i_src = 0;
-  //   int i_dst = 0;
-  //   double t3 = MPI_Wtime();
-  //   if(gaugeShfType == qcNonCovShift){
-  //     i_dst = 2;
-  //     perform_ShiftGauge_nonCov(auxU1, auxU, gaugeShfDir, gaugeShfSgn);
-  //     qcSwapCudaGauge(&auxU, &auxU1);
-  //   }
-  //   else if(gaugeShfType == qcCovShift){
-  //     i_src = 0;
-  //     i_dst = 2;
-      
-  //     perform_ShiftLink_Cov(auxU1, i_dst, auxU2, i_src,
-  //   			    auxU, gaugeShfDir, gaugeShfSgn);
-  //     qcSwapCudaGauge(&auxU, &auxU1);
-  //   }
-  //   else if(gaugeShfType == qcAdjSplitCovShift){
-  //     i_src = 0;
-  //     i_dst = 2;
-
-  //     perform_ShiftLink_AdjSplitCov(auxU1, i_dst, auxU2, i_src,
-  // 				    auxU, auxU3, gaugeShfDir, gaugeShfSgn);
-  //     qcSwapCudaGauge(&auxU, &auxU1);
-  //   }
-  //   double t4 = MPI_Wtime();
-  //   printfQuda("TIMING - %s: Gauge field shift done in %f sec.\n", func_name, t4-t3);
-
-  //   int i_mu = i_dst;
-
-  //   qcTMD_State argState(cudaProp1, cudaProp2, auxU, i_mu, paramAPI.mpParam.cntrType, paramAPI.preserveBasis);
- 
-  //   perform_TMD_Contract(corrQuda_dev, argState);
-
-  // }//-- QuarkContractTMD_GPU
-
-

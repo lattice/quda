@@ -1121,14 +1121,3 @@ namespace quda {
   //------------------------------------------------------------------------------------------
 
 } //- namespace quda
-
-
-    // //-- Define a Unity Gauge for test purposes
-    // complex<QUDA_REAL> unityU[QC_Nc*QC_Nc];
-    // for(int ic=0;ic<QC_Nc;ic++){
-    //   for(int jc=0;jc<QC_Nc;jc++){
-    // 	if(ic==jc) unityU[jc + QC_Nc*ic] = complex<QC_REAL> {1.0,0.0};
-    // 	else unityU[jc + QC_Nc*ic] = complex<QC_REAL> {0.0,0.0};
-    //   }
-    // }
-    // Link U(unityU);
