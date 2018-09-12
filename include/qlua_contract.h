@@ -278,10 +278,12 @@ namespace quda {
     GaugeU U;
     int mu;
 
+    bool extendedGauge;
+
     complex<QUDA_REAL> unityU[QUDA_Nc*QUDA_Nc];
 
     Arg_SetUnityLink(cudaGaugeField *U_, int mu_)
-      : ArgGeom(U_), mu(mu_)
+      : ArgGeom(U_), mu(mu_), extendedGauge((U_->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) ? true : false)
     {
       U.init(*U_);
       

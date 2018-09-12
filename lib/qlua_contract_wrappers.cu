@@ -222,7 +222,17 @@ namespace quda {
 
     Link unitU(arg->unityU); //- That's a 3x3 unity matrix
 
-    arg->U(arg->mu, x_cb, pty) = unitU;
+    if(arg->extendedGauge){
+      int crd[5];
+      getCoords(crd, x_cb, arg->dim, pty);
+      crd[4] = 0;
+      int c2[5] = {0,0,0,0,0};
+      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
+
+      arg->U(arg->mu, linkIndex(c2, arg->dimEx), pty) = unitU;
+    }
+    else arg->U(arg->mu, x_cb, pty) = unitU;
+
   }
 
   void qcSetGaugeToUnity(cudaGaugeField *U, int mu){
