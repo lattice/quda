@@ -20,13 +20,10 @@
 #endif
 
 namespace quda{
-namespace {
-  #include <svd_quda.h>
-}
 
-namespace { // anonymous
+  namespace { // anonymous
 #include <svd_quda.h>
-}
+  }
 
 #define HISQ_UNITARIZE_PI 3.14159265358979323846
 #define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0
@@ -610,7 +607,7 @@ namespace { // anonymous
       UnitarizeForce<Float,UnitarizeForceArg<Gauge,Gauge> > unitarizeForce(arg, meta);
       unitarizeForce.apply(0);
       qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
-      if(flops) *flops = unitarizeForce.flops(); 
+      if (flops) *flops += unitarizeForce.flops();
       checkCudaError();
     }
 

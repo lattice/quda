@@ -318,6 +318,13 @@ namespace quda {
     return nrm1;
   }
 
+  // Return the L2 norm squared of the gauge field
+  void ax(const double &a, GaugeField &u) {
+    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(u));
+    blas::ax(a, *b);
+    delete b;
+  }
+
   uint64_t GaugeField::checksum(bool mini) const {
     return Checksum(*this, mini);
   }
