@@ -24,20 +24,13 @@ namespace quda {
   typedef Matrix<complex<QUDA_REAL>,QUDA_Nc> Link;
 
 
-  const int nShiftFlag = 20;
-  const int nShiftType = 3;
+  extern const int nShiftFlag;
+  extern const int nShiftType;
+  extern const char *qcTMD_ShiftFlagArray;
 
-  static const char *qcTMD_ShiftFlagArray[nShiftFlag] = {
-    "X", "x", "Y", "y", "Z", "z", "T", "t", "Q", "q",
-    "R", "r", "S", "s", "U", "u", "V", "v", "W", "w"};
-
-  static const char *qcTMD_ShiftTypeArray[nShiftType] = {
-    "Covariant",
-    "Non-Covariant",
-    "AdjSplitCov"};
-
-  static const char *qcTMD_ShiftDirArray[4] = {"x", "y", "z", "t"};
-  static const char *qcTMD_ShiftSgnArray[2] = {"-", "+"};
+  extern const char *qcTMD_ShiftTypeArray[];
+  extern const char *qcTMD_ShiftDirArray[];
+  extern const char *qcTMD_ShiftSgnArray[];
 
 
   /** C.K.

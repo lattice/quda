@@ -13,8 +13,18 @@
 #include <qlua_contract_shifts.cuh>
 
 namespace quda {  
+    const int nShiftFlag = 20;
+    const int nShiftType = 3;
 
-  
+    const char *qcTMD_ShiftFlagArray = "XxYyZzTtQqRrSsUuVvWw" ;
+    const char *qcTMD_ShiftTypeArray[] = {
+            "Covariant",
+            "Non-Covariant",
+            "AdjSplitCov"};
+
+    const char *qcTMD_ShiftDirArray[] = {"x", "y", "z", "t"};
+    const char *qcTMD_ShiftSgnArray[] = {"-", "+"};
+
   __global__ void QluaSiteOrderCheck_kernel(QluaUtilArg *utilArg){
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;    
@@ -110,16 +120,16 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
-  qcTMD_ShiftFlag TMDparseShiftFlag(char *flagStr){
+  qcTMD_ShiftFlag TMDparseShiftFlag(char flagStr){
     
     qcTMD_ShiftFlag shfFlag = qcShfStr_None;
     for(int iopt=0;iopt<nShiftFlag;iopt++){
-      if( strcmp(flagStr,qcTMD_ShiftFlagArray[iopt])==0 ){
+      if( flagStr == qcTMD_ShiftFlagArray[iopt] ){
 	shfFlag = (qcTMD_ShiftFlag)iopt;
 	break;
       }
     }
-    if(shfFlag==qcShfStr_None) errorQuda("TMDparseShiftFlag: Cannot parse given shift flag, flagStr = %c.\n", *flagStr);
+    if(shfFlag==qcShfStr_None) errorQuda("TMDparseShiftFlag: Cannot parse given shift flag, flagStr = %c.\n", flagStr);
     return shfFlag;
   }
 
@@ -156,7 +166,7 @@ namespace quda {
     case qcShfStr_T: {
       shfDir = qcShfDir_t;
     } break;
-    default: errorQuda("TMDparseShiftDirection: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<nShiftFlag) ? qcTMD_ShiftFlagArray[(int)shfFlag] : "None");
+    default: errorQuda("TMDparseShiftDirection: Unsupported shift flag, shfFlag = %c.\n", (shfFlag >=0 && shfFlag<nShiftFlag) ? qcTMD_ShiftFlagArray[(int)shfFlag] : '?');
     }//-- switch    
 
     return shfDir;
@@ -181,7 +191,7 @@ namespace quda {
       if(!flipShfSgn) shfSgn = qcShfSgnMinus;
       else shfSgn = qcShfSgnPlus;
     } break;
-    default: errorQuda("TMDparseShiftSign: Unsupported shift flag, shfFlag = %s.\n", (shfFlag >=0 && shfFlag<nShiftFlag) ? qcTMD_ShiftFlagArray[(int)shfFlag] : "None");
+    default: errorQuda("TMDparseShiftSign: Unsupported shift flag, shfFlag = %c.\n", (shfFlag >=0 && shfFlag<nShiftFlag) ? qcTMD_ShiftFlagArray[(int)shfFlag] : '?');
     }//-- switch    
 
     return shfSgn;
