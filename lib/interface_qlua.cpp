@@ -991,15 +991,6 @@ int momentumProjectTMDCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
   int totT    = qcs->paramAPI.mpParam.Tdim;
   int tsrc    = qcs->paramAPI.mpParam.csrc[3];
   double bc_t = qcs->paramAPI.mpParam.bc_t;
-
-  printfQuda("%s:\n", func_name);
-  printfQuda("  Got Ndata = %d\n", Ndata);
-  printfQuda("  Got locT  = %d\n", locT);
-  printfQuda("  Got Nmoms = %d\n", Nmoms);
-  printfQuda("  Got V3    = %lld\n", V3);
-  printfQuda("  Got totT  = %d\n", totT);
-  printfQuda("  Got tsrc  = %d\n", tsrc);
-  printfQuda("  Got bc_t  = %f\n", bc_t);  
   
   cublasHandle_t handle;
   cublasStatus_t stat = cublasCreate(&handle);
@@ -1472,7 +1463,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     memset(b_lpath_ptr, 0, sizeof(qcs->b_lpath));
     
     qcCPUtoCUDAProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
-    qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b);                 //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
+    qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b, qcs->qcR);       //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
     qcCopyExtendedGaugeField(qcs->bsh_u, qcs->gf_u, qcs->qcR);   //- (re)set qcs->bsh_u to qcs->gf_u
   }
 
@@ -1535,7 +1526,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     //- AdjSplitCov shift of qcs->wlinks[i_wl_vbv] {Wvbv} with qcs->gf_u, qcs->bsh_u
     //- in opposite direction of 'c'
     double t7 = MPI_Wtime();
-    bool flipShfSgn = true;    
+    bool flipShfSgn = true;
     perform_ShiftLink_AdjSplitCov(qcs->wlinks, qcs->i_wl_tmp, qcs->wlinks, qcs->i_wl_vbv,
 				  qcs->gf_u, qcs->bsh_u, shfFlag, flipShfSgn);
     int itmp = qcs->i_wl_tmp;

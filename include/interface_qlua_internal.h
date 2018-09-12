@@ -183,7 +183,7 @@ namespace quda {
 
   void qcCPUtoCUDAVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec);
   void qcCPUtoCUDAProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp);
-  void qcSetGaugeToUnity(cudaGaugeField *U, int mu);
+  void qcSetGaugeToUnity(cudaGaugeField *U, int mu, const int *R);
   void qcCopyExtendedGaugeField(cudaGaugeField *dst, cudaGaugeField *src, const int *R);
 
 

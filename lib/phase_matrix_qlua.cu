@@ -69,16 +69,6 @@ namespace quda {
   void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix_dev,
 			     const int *momMatrix,
 			     momProjParam param){
-
-    printfQuda("createPhaseMatrix_GPU:\n");
-    printfQuda("  Got Nmoms  = %d\n"  , param.Nmoms);
-    printfQuda("  Got V3     = %lld\n", param.V3);
-    printfQuda("  Got momDim = %d\n"  , param.momDim);
-    printfQuda("  Got expSgn = %+d\n" , param.expSgn);
-    printfQuda("  Got localL = (%d,%d,%d,%d)\n", param.localL[0], param.localL[1], param.localL[2], param.localL[3]);
-    printfQuda("  Got totalL = (%d,%d,%d,%d)\n", param.totalL[0], param.totalL[1], param.totalL[2], param.totalL[3]);
-
-
     int *momMatrix_dev;
     cudaMalloc((void**)&momMatrix_dev, sizeof(int)*param.momDim*param.Nmoms );
     checkCudaErrorNoSync();

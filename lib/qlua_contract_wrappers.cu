@@ -235,7 +235,7 @@ namespace quda {
 
   }
 
-  void qcSetGaugeToUnity(cudaGaugeField *U, int mu){
+  void qcSetGaugeToUnity(cudaGaugeField *U, int mu, const int *R){
 
     Arg_SetUnityLink arg(U, mu);
     Arg_SetUnityLink *arg_dev;
@@ -252,6 +252,8 @@ namespace quda {
     qcSetGaugeToUnity_kernel<<<gridDim,blockDim>>>(arg_dev);
     cudaDeviceSynchronize();
     checkCudaError();
+
+    U->exchangeExtendedGhost(R, QCredundantComms);
     
     cudaFree(arg_dev);
   }
@@ -284,6 +286,7 @@ namespace quda {
 
   void qcCPUtoCUDAVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec){
     *cudaVec = *cpuVec;
+    qcExchangeGhostVec(cudaVec);
   }  
   void qcCPUtoCUDAProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
     for(int i=0;i<QUDA_PROP_NVEC;i++)
