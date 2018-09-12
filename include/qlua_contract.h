@@ -298,6 +298,32 @@ namespace quda {
   //---------------------------------------------------------------------
 
 
+  struct Arg_CopyCudaLink : public ArgGeom {
+
+    GaugeU Udst;
+    GaugeU Usrc;
+    int i_dst, i_src;
+
+    bool extendedGauge_dst;
+    bool extendedGauge_src;
+    bool extendedGauge;
+
+    Arg_CopyCudaLink(cudaGaugeField *Udst_, int i_dst_, cudaGaugeField *Usrc_, int i_src_)
+      : ArgGeom(Usrc_), i_dst(i_dst_), i_src(i_src_),
+	extendedGauge_src((Usrc_->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) ? true : false),
+	extendedGauge_dst((Udst_->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) ? true : false)
+    {
+      if(extendedGauge_src != extendedGauge_dst)
+	errorQuda("Arg_CopyCudaLink: Source and Destination GaugeFields ghost properties differ!\n");
+      extendedGauge = extendedGauge_src;
+      
+      Udst.init(*Udst_);
+      Usrc.init(*Usrc_);
+    }
+  };
+  //---------------------------------------------------------------------
+
+
   struct qcTMD_Arg : public ArgGeom {
 
     Propagator fwdProp[QUDA_PROP_NVEC];

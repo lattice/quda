@@ -1462,7 +1462,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     b_lpath_ptr = qcs->b_lpath;
     memset(b_lpath_ptr, 0, sizeof(qcs->b_lpath));
     
-    qcCPUtoCUDAProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
+    qcCPUtoCudaProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
     qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b, qcs->qcR);       //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
     qcCopyExtendedGaugeField(qcs->bsh_u, qcs->gf_u, qcs->qcR);   //- (re)set qcs->bsh_u to qcs->gf_u
   }
@@ -1514,8 +1514,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     memset(v_lpath_ptr, 0, sizeof(qcs->v_lpath));
 
     //- (re)set qcs->wlinks[i_wl_vbv] {Wvbv} to qcs->wlinks[i_wl_b] {Wb}
-    //-- CK-TODO: Check if this is correct
-    qcs->i_wl_vbv = qcs->i_wl_b;
+    qcCopyCudaLink(qcs->wlinks, qcs->i_wl_vbv, qcs->wlinks, qcs->i_wl_b, qcs->qcR);
   }
 
   /* build up v_lpath */

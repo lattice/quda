@@ -211,6 +211,55 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
+  __global__ void qcCopyCudaLink_kernel(Arg_CopyCudaLink *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    pty = (arg->nParity == 2) ? pty : arg->parity;
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+
+    if(arg->extendedGauge){
+      int crd[5];
+      getCoords(crd, x_cb, arg->dim, pty);
+      crd[4] = 0;
+      int c2[5] = {0,0,0,0,0};
+      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
+
+      Link srcU = arg->Usrc(arg->i_src, linkIndex(c2, arg->dimEx), pty);
+      arg->Udst(arg->i_dst, linkIndex(c2, arg->dimEx), pty) = srcU;
+    }
+    else{
+      Link srcU = arg->Usrc(arg->i_src, x_cb, pty);
+      arg->Udst(arg->i_dst, x_cb, pty) = srcU;
+    }
+
+  }
+  
+  void qcCopyCudaLink(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src, const int *R){
+
+    Arg_CopyCudaLink arg(dst, i_dst, src, i_src);
+    Arg_CopyCudaLink *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(arg));
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);
+    checkCudaError();
+
+    if(arg.nParity != 2) errorQuda("qcCopyCudaLink: This function supports only Full Site Subset fields!\n");
+
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    qcCopyCudaLink_kernel<<<gridDim,blockDim>>>(arg_dev);
+    cudaDeviceSynchronize();
+    checkCudaError();
+
+    dst->exchangeExtendedGhost(R, QCredundantComms);
+
+    cudaFree(arg_dev);
+  }
+  //---------------------------------------------------------------------------
+
 
   __global__ void qcSetGaugeToUnity_kernel(Arg_SetUnityLink *arg){
 
@@ -284,13 +333,13 @@ namespace quda {
     *x2 = xtmp;
   }
 
-  void qcCPUtoCUDAVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec){
+  void qcCPUtoCudaVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec){
     *cudaVec = *cpuVec;
     qcExchangeGhostVec(cudaVec);
   }  
-  void qcCPUtoCUDAProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
+  void qcCPUtoCudaProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
     for(int i=0;i<QUDA_PROP_NVEC;i++)
-      qcCPUtoCUDAVec(cudaProp[i], cpuProp[i]);
+      qcCPUtoCudaVec(cudaProp[i], cpuProp[i]);
   }
   //---------------------------------------------------------------------------
 
