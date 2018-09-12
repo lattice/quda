@@ -47,7 +47,7 @@ endif()
 #
 # PROJECT is QUDA
 #
-project("QUDA" VERSION 0.9.0)
+project("QUDA" VERSION 0.9.0 LANGUAGES)
 
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
@@ -136,6 +136,7 @@ set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on 
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template for multi-blas /-reduce")
+set(QUDA_CTEST_SEP_DSLASH_POLICIES OFF CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
 
 # NVTX options
@@ -160,6 +161,7 @@ mark_as_advanced(QUDA_FERMI_DBLE_TEX)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
+mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -219,9 +221,40 @@ endif()
 include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 ## Now we hopefully found some way to get eigen to work
 
-# We need threads
-find_package(Threads REQUIRED)
 
+
+#define CXX FLAGS
+set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
+"Flags used by the C++ compiler during regular development builds.")
+set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
+"Flags used by the C++ compiler during strict jenkins builds.")
+set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -march=native -w" CACHE STRING
+    "Flags used by the C++ compiler during release builds.")
+set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
+    "Flags used by the C++ compiler during host-debug builds.")
+set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas ${CLANG_FORCE_COLOR}" CACHE STRING
+    "Flags used by the C++ compiler during device-debug builds.")
+set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
+    "Flags used by the C++ compiler during full (host+device) debug builds.")
+enable_language(CXX)
+
+
+#define C FLAGS
+set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
+    "Flags used by the C compiler during regular development builds.")
+set(CMAKE_C_FLAGS_STRICT "-Wall -O3 -Werror -Wno-error=unused-private-field"  CACHE STRING
+    "Flags used by the C compiler during strict jenkins builds.")
+set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING
+    "Flags used by the C compiler during release builds.")
+set(CMAKE_C_FLAGS_HOSTDEBUG "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
+    "Flags used by the C compiler during host-debug builds.")
+set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
+"Flags used by the C compiler during device-debug builds.")
+set(CMAKE_C_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+    "Flags used by the C compiler during full (host+device) debug builds.")
+
+
+enable_language(C)
 # do all the build definitions
 #
 
@@ -490,38 +523,6 @@ if(QUDA_CONTRACT)
 endif(QUDA_CONTRACT)
 
 
-#define CXX FLAGS
-set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
-"Flags used by the C++ compiler during regular development builds." FORCE)
-set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
-"Flags used by the C++ compiler during strict jenkins builds.")
-set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
-    "Flags used by the C++ compiler during release builds.")
-set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
-    "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas ${CLANG_FORCE_COLOR}" CACHE STRING
-    "Flags used by the C++ compiler during device-debug builds.")
-set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
-    "Flags used by the C++ compiler during full (host+device) debug builds.")
-
-enable_language(CXX)
-
-#define C FLAGS
-set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
-    "Flags used by the C compiler during regular development builds.")
-set(CMAKE_C_FLAGS_STRICT "-Wall -O3 -Werror -Wno-error=unused-private-field"  CACHE STRING
-    "Flags used by the C compiler during strict jenkins builds.")
-set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING
-    "Flags used by the C compiler during release builds.")
-set(CMAKE_C_FLAGS_HOSTDEBUG "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
-    "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
-"Flags used by the C compiler during device-debug builds.")
-set(CMAKE_C_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
-    "Flags used by the C compiler during full (host+device) debug builds.")
-
-
-enable_language(C)
 #define FORTRAN FLAGS
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
 
@@ -602,6 +603,10 @@ set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
 endif()
 
 
+# We need threads
+find_package(Threads REQUIRED)
+
+
 # COMPILER OPTIONS and BUILD types
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
@@ -673,6 +678,8 @@ mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 
 mark_as_advanced(CMAKE_F_FLAGS)
 
+set(BUILDNAME ${HASH})
+include( CTest )
 ### add tests and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
