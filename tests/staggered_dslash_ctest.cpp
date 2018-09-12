@@ -66,6 +66,15 @@ void *qdp_fatlink_cpu[4], *qdp_longlink_cpu[4];
 void **ghost_fatlink_cpu, **ghost_longlink_cpu;
 #endif
 
+// To speed up the unit test, build the CPU field once per partition
+#ifdef MULTI_GPU
+void *qdp_fatlink_cpu_backup[16][4]; void *qdp_longlink_cpu_backup[16][4]; void *qdp_inlink_backup[16][4];
+#else
+void *qdp_fatlink_cpu_backup[1][4]; void *qdp_longlink_cpu_backup[1][4]; void *qdp_inlink_backup[1][4];
+#endif
+bool global_skip = true; // hack to skip tests
+
+
 QudaParity parity = QUDA_EVEN_PARITY;
 extern QudaDagType dagger;
 int transfer = 0; // include transfer time in the benchmark?
@@ -200,18 +209,27 @@ bool skip_kernel(int prec, QudaReconstructType link_recon) {
   if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong) {
     if (prec == 0 /* half */) {
       warningQuda("Half precision unsupported in fat/long compute, skipping...");
+      global_skip = true;
+      return true;
+    }
+    if (link_recon == QUDA_RECONSTRUCT_8) {
+      warningQuda("Reconstruct 9 is unsupported in fat/long compute, skipping...");
+      global_skip = true;
       return true;
     }
   }
+
   if (dslash_type == QUDA_LAPLACE_DSLASH && prec == 0) {
+    global_skip = true;
     warningQuda("Half precision unsupported for Laplace operator.\n");
     return true;
   }
 
+  global_skip = false;
   return false;
 }
 
-void init(int precision, QudaReconstructType link_recon) {
+void init(int precision, QudaReconstructType link_recon, int partition) {
 
   auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
 
@@ -441,18 +459,36 @@ void init(int precision, QudaReconstructType link_recon) {
       double* act_paths[3] = { act_path_coeff_1, act_path_coeff_2, act_path_coeff_3 };
 
       // defined in "llfat_reference.cpp"
-      computeHISQLinksCPU(qdp_fatlink_cpu, qdp_longlink_cpu, 
-                          (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
-                          (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr,
-                          qdp_inlink, &gaugeParam, act_paths, eps_naik);
+      if (qdp_fatlink_cpu_backup[partition][0] == nullptr) { // direction 0 is arbitrary
+        computeHISQLinksCPU(qdp_fatlink_cpu, qdp_longlink_cpu, 
+                            (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
+                            (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr,
+                            qdp_inlink, &gaugeParam, act_paths, eps_naik);
 
-      if (n_naiks == 2) {
-        // Override the naik fields into the fat/long link fields
+        if (n_naiks == 2) {
+          // Override the naik fields into the fat/long link fields
+          for (int dir = 0; dir < 4; dir++) {
+            memcpy(qdp_fatlink_cpu[dir],qdp_fatlink_naik_temp[dir], V*gaugeSiteSize*gSize);
+            memcpy(qdp_longlink_cpu[dir],qdp_longlink_naik_temp[dir], V*gaugeSiteSize*gSize);
+            memset(qdp_fatlink_naik_temp[dir],0,V*gaugeSiteSize*gSize);
+            memset(qdp_longlink_naik_temp[dir],0,V*gaugeSiteSize*gSize);
+          }
+        }
+
+        // backup value for the partition
         for (int dir = 0; dir < 4; dir++) {
-          memcpy(qdp_fatlink_cpu[dir],qdp_fatlink_naik_temp[dir], V*gaugeSiteSize*gSize);
-          memcpy(qdp_longlink_cpu[dir],qdp_longlink_naik_temp[dir], V*gaugeSiteSize*gSize);
-          memset(qdp_fatlink_naik_temp[dir],0,V*gaugeSiteSize*gSize);
-          memset(qdp_longlink_naik_temp[dir],0,V*gaugeSiteSize*gSize);
+          qdp_inlink_backup[partition][dir] = malloc(V*gaugeSiteSize*gSize);
+          qdp_fatlink_cpu_backup[partition][dir] = malloc(V*gaugeSiteSize*gSize);
+          qdp_longlink_cpu_backup[partition][dir] = malloc(V*gaugeSiteSize*gSize);
+          memcpy(qdp_inlink_backup[partition][dir], qdp_inlink[dir], V*gaugeSiteSize*gSize);
+          memcpy(qdp_fatlink_cpu_backup[partition][dir], qdp_fatlink_cpu[dir], V*gaugeSiteSize*gSize);
+          memcpy(qdp_longlink_cpu_backup[partition][dir], qdp_longlink_cpu[dir], V*gaugeSiteSize*gSize);
+        }
+      } else { // we've done the compute for this partitioning before
+        for (int dir = 0; dir < 4; dir++) {
+          memcpy(qdp_inlink[dir], qdp_inlink_backup[partition][dir], V*gaugeSiteSize*gSize);
+          memcpy(qdp_fatlink_cpu[dir], qdp_fatlink_cpu_backup[partition][dir], V*gaugeSiteSize*gSize);
+          memcpy(qdp_longlink_cpu[dir], qdp_longlink_cpu_backup[partition][dir], V*gaugeSiteSize*gSize);
         }
       }
 
@@ -880,7 +916,7 @@ public:
     tmpCpu = nullptr;
 
     if (!skip_kernel(prec,recon)) {
-      init(prec, recon);
+      init(prec, recon, value);
     }
     display_test_info(prec, recon);
   }
@@ -905,6 +941,9 @@ public:
     double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-9 :
       (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 
       (inv_param.cuda_prec == QUDA_HALF_PRECISION ? 1e-1 : 2.0))); // catches case where we skip a test
+
+    if (global_skip) { tol = 2.0; }
+
     bool failed = false; // for the nan catch
 
 
@@ -991,6 +1030,19 @@ TEST_P(StaggeredDslashTest, benchmark) {
     argc_copy = argc;
     argv_copy = argv;
 
+    // initialize CPU field backup
+#ifdef MULTI_GPU
+    for (int p = 0; p < 16; p++) {
+#else
+    for (int p = 0; p < 1; p++) {
+#endif
+      for (int d = 0; d < 4; d++) {
+        qdp_fatlink_cpu_backup[p][d] = nullptr;
+        qdp_longlink_cpu_backup[p][d] = nullptr;
+        qdp_inlink_backup[p][d] = nullptr;
+      }
+    }
+
   // initalize google test
     ::testing::InitGoogleTest(&argc, argv);
     for (int i=1 ;i < argc; i++){
@@ -1045,6 +1097,19 @@ TEST_P(StaggeredDslashTest, benchmark) {
     // Clean up loaded gauge field
     for (int dir = 0; dir < 4; dir++) {
       if (qdp_inlink[dir] != nullptr) { free(qdp_inlink[dir]); qdp_inlink[dir] = nullptr; }
+    }
+
+    // Clean up per-partition backup
+    #ifdef MULTI_GPU
+for (int p = 0; p < 16; p++) {
+#else
+    for (int p = 0; p < 1; p++) {
+#endif
+      for (int d = 0; d < 4; d++) {
+        if (qdp_inlink_backup[p][d] != nullptr) { free(qdp_inlink_backup[p][d]); qdp_inlink_backup[p][d] = nullptr; }
+        if (qdp_fatlink_cpu_backup[p][d] != nullptr) { free(qdp_fatlink_cpu_backup[p][d]); qdp_fatlink_cpu_backup[p][d] = nullptr; }
+        if (qdp_longlink_cpu_backup[p][d] != nullptr) { free(qdp_longlink_cpu_backup[p][d]); qdp_longlink_cpu_backup[p][d] = nullptr; }
+      }
     }
 
     finalizeComms();
