@@ -1002,6 +1002,15 @@ TEST_P(StaggeredDslashTest, benchmark) {
 
     initComms(argc, argv, gridsize_from_cmdline);
 
+    // Ensure a reasonable default
+    // ensure that the default is improved staggered
+    if (dslash_type != QUDA_STAGGERED_DSLASH &&
+        dslash_type != QUDA_ASQTAD_DSLASH &&
+        dslash_type != QUDA_LAPLACE_DSLASH) {
+      warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
+      dslash_type = QUDA_ASQTAD_DSLASH;
+    }
+
     // Sanity checkL: if you pass in a gauge field, want to test the asqtad/hisq dslash, and don't
     // ask to build the fat/long links... it doesn't make sense.
     if (strcmp(latfile,"") && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -1010,11 +1019,13 @@ TEST_P(StaggeredDslashTest, benchmark) {
     }
 
     // Set n_naiks to 2 if eps_naik != 0.0
-    if (eps_naik != 0.0) {
-      n_naiks = 2;
-      printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
-    } else {
-      printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      if (eps_naik != 0.0) {
+        n_naiks = 2;
+        printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
+      } else {
+        printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
+      }
     }
 
     if (dslash_type == QUDA_LAPLACE_DSLASH) {

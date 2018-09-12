@@ -931,6 +931,15 @@ int main(int argc, char** argv)
     errorQuda("Test type %d is outside the valid range.\n", test_type);
   }
 
+// Ensure a reasonable default
+    // ensure that the default is improved staggered
+  if (dslash_type != QUDA_STAGGERED_DSLASH &&
+      dslash_type != QUDA_ASQTAD_DSLASH &&
+      dslash_type != QUDA_LAPLACE_DSLASH) {
+    warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
+    dslash_type = QUDA_ASQTAD_DSLASH;
+  }
+
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     if (test_type != 0) {
       errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type);
@@ -984,11 +993,13 @@ int main(int argc, char** argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   // Set n_naiks to 2 if eps_naik != 0.0
-  if (eps_naik != 0.0) {
-    n_naiks = 2;
-    printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
-  } else {
-    printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    if (eps_naik != 0.0) {
+      n_naiks = 2;
+      printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
+    } else {
+      printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
+    }
   }
 
   display_test_info();
