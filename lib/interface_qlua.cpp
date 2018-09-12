@@ -231,7 +231,7 @@ new_cpuColorSpinorField(QudaGaugeParam& gp, QudaInvertParam& ip,
 {
   ColorSpinorParam cpuParam(hbuf_x, ip, gp.X, false, QUDA_CPU_FIELD_LOCATION); // false stands for the pc_solution
 
-  cpuColorSpinorField *cpu_x;
+  cpuColorSpinorField *cpu_x = NULL;
   if (NULL == hbuf_x)
     cpuParam.create = QUDA_ZERO_FIELD_CREATE;
   
@@ -628,7 +628,7 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   complex<QUDA_REAL> *phaseMatrix_dev  = NULL;
   
   cudaMalloc( (void**)&phaseMatrix_dev, sizeof(complex<QUDA_REAL>)*V3*Nmoms );
-  checkCudaErrorNoSync();
+  checkCudaError();
   cudaMemset(phaseMatrix_dev, 0, sizeof(complex<QUDA_REAL>)*V3*Nmoms);
     
   if(GPU_phaseMatrix){
@@ -669,7 +669,7 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   
   cudaMalloc( (void**)&corrInp_dev, sizeof(complex<QUDA_REAL>)*V3*Ndata*Lt );
   cudaMalloc( (void**)&corrOut_dev, sizeof(complex<QUDA_REAL>)*Nmoms*Ndata*Lt );
-  checkCudaErrorNoSync();
+  checkCudaError();
 
   //-- Change volume site order from Quda-QDP to Qlua-QDP  
   convertSiteOrder_QudaQDP_to_momProj(corrInp_dev, corrQuda_dev, utilArg);  
@@ -887,7 +887,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   QluaUtilArg utilArg(cudaProp1, paramAPI.mpParam.Ndata, paramAPI.mpParam.Ndata, paramAPI.mpParam.tAxis, sizeof(complex<QUDA_REAL>));
 
   //-- Check Site order conventions
-  int crdChkVal = QluaSiteOrderCheck(utilArg);  
+  int crdChkVal = QluaSiteOrderCheck(&utilArg);  
   if(crdChkVal == -1) errorQuda("%s: Site mismatch! Exiting.\n", func_name);
   else if (crdChkVal == 0) printfQuda("%s: Site order check PASSED.\n", func_name);
   /* --------------------------------------------------------------------------------------- */
@@ -898,7 +898,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
 
   complex<QUDA_REAL> *corrQuda_dev = NULL;
   cudaMalloc((void**)&corrQuda_dev, corrSize);
-  checkCudaErrorNoSync();
+  checkCudaError();
   cudaMemset(corrQuda_dev, 0, corrSize);
   double t5 = MPI_Wtime();
   QuarkContractStd_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3,
@@ -912,7 +912,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   //-- Copy the position space correlator back to CPU if required
   if(paramAPI.mpParam.push_res){
     cudaMemcpy(corrQuda, corrQuda_dev, corrSize, cudaMemcpyDeviceToHost);
-    checkCudaErrorNoSync();
+    checkCudaError();
   }
   
   
@@ -985,12 +985,21 @@ int momentumProjectTMDCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
   setVerbosity(qcs->paramAPI.verbosity);
 
   int Ndata   = qcs->paramAPI.mpParam.Ndata;
-  int Lt      = qcs->paramAPI.mpParam.Lt;
+  int locT    = qcs->paramAPI.mpParam.locT;
   int Nmoms   = qcs->paramAPI.mpParam.Nmoms;
   LONG_T V3   = qcs->paramAPI.mpParam.V3;
   int totT    = qcs->paramAPI.mpParam.Tdim;
   int tsrc    = qcs->paramAPI.mpParam.csrc[3];
   double bc_t = qcs->paramAPI.mpParam.bc_t;
+
+  printfQuda("%s:\n", func_name);
+  printfQuda("  Got Ndata = %d\n", Ndata);
+  printfQuda("  Got locT  = %d\n", locT);
+  printfQuda("  Got Nmoms = %d\n", Nmoms);
+  printfQuda("  Got V3    = %lld\n", V3);
+  printfQuda("  Got totT  = %d\n", totT);
+  printfQuda("  Got tsrc  = %d\n", tsrc);
+  printfQuda("  Got bc_t  = %f\n", bc_t);  
   
   cublasHandle_t handle;
   cublasStatus_t stat = cublasCreate(&handle);
@@ -1002,27 +1011,27 @@ int momentumProjectTMDCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
   convertSiteOrder_QudaQDP_to_momProj(qcs->corrInp_dev, qcs->corrQuda_dev, *(qcs->utilArg));  
 
   //-- Copy the output correlator to device
-  stat = cublasSetMatrix(Nmoms, Ndata*Lt, sizeof(complex<QUDA_REAL>), qcs->corrOut_host, Nmoms, qcs->corrOut_dev, Nmoms);
+  //-- CK-TODO: This is not needed actually
+  stat = cublasSetMatrix(Nmoms, Ndata*locT, sizeof(complex<QUDA_REAL>), qcs->corrOut_host, Nmoms, qcs->corrOut_dev, Nmoms);
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("%s: corrOut data copy to GPU failed!\n", func_name);
   
   //-- Perform momentum projection
   /* Matrix Multiplication Out = PH^T * In.
    * phaseMatrix_dev=(V3,Nmoms) is the phase matrix in column-major format, its transpose is used for multiplication
-   * corrInp_dev=(V3,Ndata*Lt) is the input correlation matrix
-   * corrOut_dev=(Nmoms,Ndata*Lt) is the output matrix in column-major format
+   * corrInp_dev=(V3,Ndata*locT) is the input correlation matrix
+   * corrOut_dev=(Nmoms,Ndata*locT) is the output matrix in column-major format
    */
-  double t3 = MPI_Wtime();
   if(typeid(QUDA_REAL) == typeid(double)){
     printfQuda("%s: Performing momentum projection in double precision.\n", func_name);
-    stat = cublasZgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*Lt, V3,
+    stat = cublasZgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*locT, V3,
 		       &al, qcs->phaseMatrix_dev, V3,
 		       qcs->corrInp_dev , V3, &be,
 		       qcs->corrOut_dev, Nmoms);
   }
   else if(typeid(QUDA_REAL) == typeid(float)){
     printfQuda("%s: Performing momentum projection in single precision.\n", func_name);
-    stat = cublasCgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*Lt, V3,
+    stat = cublasCgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*locT, V3,
 		       (cuComplex*)&al, (cuComplex*)qcs->phaseMatrix_dev, V3,
 		       (cuComplex*)qcs->corrInp_dev , V3, (cuComplex*)&be,
 		       (cuComplex*)qcs->corrOut_dev, Nmoms);
@@ -1031,12 +1040,9 @@ int momentumProjectTMDCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
   
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("%s: Momentum projection failed!\n", func_name);
-  double t4 = MPI_Wtime();
-  printfQuda("%s: cuBlas projection completed in %f sec.\n", func_name, t4-t3);
-
   
   //-- extract the result from GPU to CPU  
-  stat = cublasGetMatrix(Nmoms, Ndata*Lt, sizeof(complex<QUDA_REAL>), qcs->corrOut_dev, Nmoms, qcs->corrOut_host, Nmoms);
+  stat = cublasGetMatrix(Nmoms, Ndata*locT, sizeof(complex<QUDA_REAL>), qcs->corrOut_dev, Nmoms, qcs->corrOut_host, Nmoms);
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("%s: corrOut data copy to CPU failed!\n", func_name);
   /* --------------------------------------------------------------------------------------- */
@@ -1084,11 +1090,11 @@ int momentumProjectTMDCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
   else if( typeid(QUDA_REAL) == typeid(double)) dataTypeMPI = MPI_DOUBLE_COMPLEX;
 
   
-  MPI_Reduce(qcs->corrOut_host, qcs->corrOut_glob, Nmoms*Ndata*Lt, dataTypeMPI, MPI_SUM, 0, COMM_SPACE);  
+  MPI_Reduce(qcs->corrOut_host, qcs->corrOut_glob, Nmoms*Ndata*locT, dataTypeMPI, MPI_SUM, 0, COMM_SPACE);  
 
   
-  MPI_Gather(qcs->corrOut_glob, Nmoms*Ndata*Lt, dataTypeMPI,
-	     qcs->corrOut_proj, Nmoms*Ndata*Lt, dataTypeMPI,
+  MPI_Gather(qcs->corrOut_glob, Nmoms*Ndata*locT, dataTypeMPI,
+	     qcs->corrOut_proj, Nmoms*Ndata*locT, dataTypeMPI,
 	     0, COMM_TIME);
   
   MPI_Bcast(qcs->corrOut_proj, Nmoms*Ndata*totT, dataTypeMPI, 0, MPI_COMM_WORLD);
@@ -1120,7 +1126,7 @@ int momentumProjectTMDCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
   
   saveTuneCache();
 
-  printfQuda("%s: Returning...\n", func_name);
+  printfQuda("%s: Momentum projection Done. Returning...\n", func_name);
   
   return status;
 }
@@ -1139,14 +1145,10 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   double t5 = MPI_Wtime();
 
   int status = 0;
-
   const char *func_name = "QuarkTMDinit_Quda";
 
-  if (check_quda_comms(qS))
-    return 1;
-
-  if (NULL == Vqcs) 
-      return 1;
+  if (check_quda_comms(qS)) return 1;
+  if (NULL == Vqcs) return 1;
 
   *Vqcs = malloc(sizeof(QuarkTMD_state));
   if(NULL == *Vqcs) {
@@ -1163,6 +1165,7 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
     paramAPI.mpParam.GPU_phaseMatrix = 1;
   }
 
+
   //-- Define useful topology quantities, put them in paramAPI
   int nDim = qS->rank;
   int momDim = nDim - 1;
@@ -1172,7 +1175,7 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
     paramAPI.mpParam.totalL[mu] = paramAPI.mpParam.localL[mu] * comm_dim(mu);
     Qlocvol *= paramAPI.mpParam.localL[mu];
   }
-  paramAPI.mpParam.Lt = paramAPI.mpParam.localL[QUDA_TIME_AXIS];
+  paramAPI.mpParam.locT = paramAPI.mpParam.localL[QUDA_TIME_AXIS];
 
   LONG_T totV3 = 1;
   LONG_T V3 = 1;
@@ -1193,25 +1196,18 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   if(paramAPI.mpParam.expSgn != 1 && paramAPI.mpParam.expSgn != -1)
     errorQuda("%s: Got invalid exponential sign, expSgn = %d!\n", func_name, paramAPI.mpParam.expSgn);
 
-
   //-- Print parameters
   printfQuda("%s:\n", func_name);
   printfQuda("  Got local lattice (x,y,z,t) = (%d,%d,%d,%d)\n",
-	     paramAPI.mpParam.localL[0],
-	     paramAPI.mpParam.localL[1],
-	     paramAPI.mpParam.localL[2],
-	     paramAPI.mpParam.localL[3]);
+	     paramAPI.mpParam.localL[0], paramAPI.mpParam.localL[1],
+	     paramAPI.mpParam.localL[2], paramAPI.mpParam.localL[3]);
   printfQuda("  Got global lattice (x,y,z,t) = (%d,%d,%d,%d)\n",
-	     paramAPI.mpParam.totalL[0],
-	     paramAPI.mpParam.totalL[1],
-	     paramAPI.mpParam.totalL[2],
-	     paramAPI.mpParam.totalL[3]);
+	     paramAPI.mpParam.totalL[0], paramAPI.mpParam.totalL[1],
+	     paramAPI.mpParam.totalL[2], paramAPI.mpParam.totalL[3]);
   printfQuda("  Got source-coords (x,y,z,t) = (%d,%d,%d,%d)\n",
-	     paramAPI.mpParam.csrc[0],
-	     paramAPI.mpParam.csrc[1],
-	     paramAPI.mpParam.csrc[2],
-	     paramAPI.mpParam.csrc[3]);
-  printfQuda("  Got cntrType = %s\n", qc_contractTypeStr[paramAPI.mpParam.cntrType]);
+	     paramAPI.mpParam.csrc[0], paramAPI.mpParam.csrc[1],
+	     paramAPI.mpParam.csrc[2], paramAPI.mpParam.csrc[3]);
+  printfQuda("  Got cntrType = %s\n"  , qc_contractTypeStr[paramAPI.mpParam.cntrType]);
   printfQuda("  Got locvol   = %lld\n", paramAPI.mpParam.locvol);
   printfQuda("  Got V3       = %lld\n", paramAPI.mpParam.V3);
   printfQuda("  Got totV3    = %lld\n", paramAPI.mpParam.totV3);
@@ -1220,7 +1216,7 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   printfQuda("  Got Nmoms    = %d\n",   paramAPI.mpParam.Nmoms);
   printfQuda("  Got Ndata    = %d\n",   paramAPI.mpParam.Ndata);
   printfQuda("  Got bc_t     = %f\n",   paramAPI.mpParam.bc_t);
-  printfQuda("  Got expSgn   = %s\n",   paramAPI.mpParam.expSgn == 1 ? "PLUS" : "MINUS");
+  printfQuda("  Got expSgn   = %+d\n",  paramAPI.mpParam.expSgn);
   printfQuda("  Got push_r   = %s\n",   paramAPI.mpParam.push_res == 1 ? "YES" : "NO");
   printfQuda("  Will create phase matrix on %s\n", paramAPI.mpParam.GPU_phaseMatrix == 1 ? "GPU" : "CPU"); 
   //-------------------------------------------------------------
@@ -1256,10 +1252,11 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   printfQuda("%s: Invert-Gauge-Generic parameters set!\n", func_name);
   //-------------------------------------------------------------
 
+
   //- Load the gauge fields
   double t1 = MPI_Wtime();
 
-  bool copyGauge_no  = false;
+  //  bool copyGauge_no  = false;
   bool copyGauge_yes = true;
 
   for (int d=0;d<4;d++){
@@ -1279,11 +1276,15 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   //- Extended gauge field, copy of original, extendedGhosts are already exchanged
   qcs->gf_u = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_yes);
 
-  //- Extended auxilliary gauge fields, initialized to zero, extendedGhosts are NOT exchanged
-  qcs->bsh_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_no);
-  qcs->aux_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_no);
-  qcs->wlinks = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_no);
+  //- Extended auxilliary gauge fields. If copyGayge_no: initialized to zero, extendedGhosts are NOT exchanged
+  qcs->bsh_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_yes);
+  qcs->aux_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_yes);
+  qcs->wlinks = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_yes);
 
+  if( (qcs->cuda_gf == NULL) || (qcs->gf_u   == NULL) || (qcs->bsh_u == NULL) ||
+      (qcs->aux_u   == NULL) || (qcs->wlinks == NULL) )
+    errorQuda("%s: Cannot allocate Gauge Fields! Exiting.\n", func_name);
+    
   double t2 = MPI_Wtime();
   printfQuda("TIMING - %s: Cuda Gauge Fields loaded in %f sec.\n", func_name, t2-t1);
   //-------------------------------------------------------------
@@ -1293,20 +1294,19 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   double t3 = MPI_Wtime();
 
   int nVec = QUDA_PROP_NVEC;
-  LONG_T csVecLgh = paramAPI.mpParam.locvol * Nc * Ns * 2;
+  LONG_T csVecLgh  = paramAPI.mpParam.locvol * Nc * Ns * 2;
+  LONG_T csPropLgh = csVecLgh * nVec;
 
   //- Allocate and copy Contract State host Propagator 
-  qcs->hostPropFrw = (QUDA_REAL*) calloc(csVecLgh*nVec, sizeof(QUDA_REAL));
+  qcs->hostPropFrw = (QUDA_REAL*) calloc(csPropLgh, sizeof(QUDA_REAL));
   if(qcs->hostPropFrw == NULL) errorQuda("%s: Cannot allocate Contract State host Propagator. Exiting.\n", func_name);
-  memcpy(qcs->hostPropFrw, qluaPropFrw_host, sizeof(QUDA_REAL)*csVecLgh*nVec);
-
+  memcpy(qcs->hostPropFrw, qluaPropFrw_host, sizeof(QUDA_REAL) * csPropLgh);
 
   //- Allocate device pointers of Forward and Backward propagators
   for(int ivec=0;ivec<nVec;ivec++){
     qcs->cpuPropFrw[ivec]  = new_cpuColorSpinorField(gp, ip, Nc, Ns, &(qluaPropFrw_host[ivec * csVecLgh]) );
     if(qcs->cpuPropFrw[ivec] == NULL)
       errorQuda("%s: Cannot allocate cpu forward propagator for ivec = %d. Exiting.\n", func_name, ivec);
-
 
     qcs->cudaPropFrw_bsh[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropFrw_host[ivec * csVecLgh]) );
     qcs->cudaPropBkw[ivec]     = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropBkw_host[ivec * csVecLgh]) );
@@ -1326,54 +1326,55 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
 
   //----- Allocate and create correlator and momentum-projection related buffers -----//
   LONG_T locvol = paramAPI.mpParam.locvol;
-  int Lt    = paramAPI.mpParam.localL[QUDA_TIME_AXIS];
-  int totT  = paramAPI.mpParam.totalL[QUDA_TIME_AXIS];
-  int Ndata = paramAPI.mpParam.Ndata;
   int tAxis = paramAPI.mpParam.tAxis;
+  int locT  = paramAPI.mpParam.localL[tAxis];
+  int totT  = paramAPI.mpParam.totalL[tAxis];
+  int Ndata = paramAPI.mpParam.Ndata;
   int Nmoms = paramAPI.mpParam.Nmoms;
   size_t SizeCplxReal = sizeof(complex<QUDA_REAL>);
 
-  //- Create a utility structure (required in momentum projection as well).
-  //- Passing paramAPI.mpParam.Ndata twice is NOT a bug!
-  QluaUtilArg utilArg(qcs->cudaPropFrw_bsh, Ndata, Ndata, tAxis, SizeCplxReal);
-
+  //- Create a utility structure (required in momentum projection as well). Passing Ndata twice is NOT a bug!
+  qcs->utilArg = new QluaUtilArg(qcs->cudaPropFrw_bsh, Ndata, Ndata, tAxis, SizeCplxReal);
+  if(qcs->utilArg == NULL)
+    errorQuda("%s: Cannot allocate Utility Structure! Exiting.\n", func_name);
+  
   //-- Check Site order conventions
-  int crdChkVal = QluaSiteOrderCheck(utilArg);
+  int crdChkVal = QluaSiteOrderCheck(qcs->utilArg);
   if(crdChkVal == -1) errorQuda("%s: Site mismatch! Exiting.\n", func_name);
   else if (crdChkVal == 0) printfQuda("%s: Site order check PASSED.\n", func_name);
-  qcs->utilArg = new QluaUtilArg(qcs->cudaPropFrw_bsh, Ndata, Ndata, tAxis, SizeCplxReal);
+  //-------------------------------------------------------------
 
 
-  //- Device coorelator in position space
-  size_t corrSize = SizeCplxReal * locvol * Ndata;
-  cudaMalloc((void**)&(qcs->corrQuda_dev), corrSize);
-  checkCudaErrorNoSync();
-  cudaMemset(qcs->corrQuda_dev, 0, corrSize);
-
+  //- Host/Device coorelator in position space
+  LONG_T corrLgh = locvol * Ndata;
+  size_t corrByteSize = SizeCplxReal * corrLgh;
+  cudaMalloc((void**)&(qcs->corrQuda_dev), corrByteSize);
+  checkCudaError();
+  cudaMemset(qcs->corrQuda_dev, 0, corrByteSize);
 
   //- Phase matrix
   size_t pMSize = SizeCplxReal * V3 * Nmoms;
   cudaMalloc( (void**)&(qcs->phaseMatrix_dev), pMSize);
-  checkCudaErrorNoSync();
+  checkCudaError();
   cudaMemset(qcs->phaseMatrix_dev, 0, pMSize);
   createPhaseMatrix_GPU(qcs->phaseMatrix_dev, momlist, paramAPI.mpParam);
   printfQuda("%s: Phase matrix created.\n", func_name);
 
-
   //-- Prepare momentum projection buffers
   qcs->corrOut_proj = (complex<QUDA_REAL>*) calloc(Nmoms*Ndata*totT, SizeCplxReal); //-- Final result (global summed, gathered) of momentum projection
-  qcs->corrOut_glob = (complex<QUDA_REAL>*) calloc(Nmoms*Ndata*Lt  , SizeCplxReal); //-- Globally summed momentum projection buffer		     
-  qcs->corrOut_host = (complex<QUDA_REAL>*) calloc(Nmoms*Ndata*Lt  , SizeCplxReal); //-- Host (local) output of cuBlas momentum projection
+  qcs->corrOut_glob = (complex<QUDA_REAL>*) calloc(Nmoms*Ndata*locT, SizeCplxReal); //-- Globally summed momentum projection buffer		     
+  qcs->corrOut_host = (complex<QUDA_REAL>*) calloc(Nmoms*Ndata*locT, SizeCplxReal); //-- Host (local) output of cuBlas momentum projection
   if((qcs->corrOut_proj == NULL) || (qcs->corrOut_glob == NULL) || (qcs->corrOut_host == NULL))
-    errorQuda("%s: Cannot allocate Mom-Proj Output correlation function buffers\n", func_name);
+    errorQuda("%s: Cannot allocate Mom-Proj Output correlation function buffers.\n", func_name);
 
-  cudaMalloc( (void**)&(qcs->corrInp_dev), SizeCplxReal*V3*Ndata*Lt);
-  cudaMalloc( (void**)&(qcs->corrOut_dev), SizeCplxReal*Nmoms*Ndata*Lt);
-  checkCudaErrorNoSync();
+  cudaMalloc( (void**)&(qcs->corrInp_dev), SizeCplxReal*V3*Ndata*locT);
+  cudaMalloc( (void**)&(qcs->corrOut_dev), SizeCplxReal*Nmoms*Ndata*locT);
+  checkCudaError();
+  printfQuda("%s: Momentum projection buffers allocated.\n", func_name);
   //-------------------------------------------------------------
 
   double t6 = MPI_Wtime();
-  printfQuda("%s: GPU TMD contract state initialized successfully in %f sec. Returning...\n", func_name, t6-t5);
+  printfQuda("%s: GPU TMD contract state initialized successfully in %f sec. Returning...\n\n\n", func_name, t6-t5);
   
   return status;
 }//- QuarkTMDinit_Quda
@@ -1427,7 +1428,7 @@ QuarkTMDfree_Quda(void **Vqcs){
   *Vqcs = NULL;
 
   double t2 = MPI_Wtime();
-  printfQuda("%s: GPU TMD contract state destroyed successfully in %f sec. Returning...\n", func_name, t2-t1);
+  printfQuda("%s: GPU TMD contract state destroyed successfully in %f sec. Returning...\n\n\n", func_name, t2-t1);
 
   return status;
 }
@@ -1446,8 +1447,8 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   int status = 0;
   const char *func_name = "QuarkTMDstep_momProj_Quda";
 
-  printfQuda("%s: Has been called!\n", func_name);
-  
+  printfQuda("\n\n\n%s: Has been called!\n", func_name);
+
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state *>(Vqcs));
   
   const char *b_lpath_inc = NULL;
@@ -1478,17 +1479,16 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   /* build up b_lpath */
   for (; *b_lpath_inc ; b_lpath_inc++, b_lpath_ptr++) {
     char c = *b_lpath_inc;
-    qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(&c);
+    qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(c);
 
     //- Non-Covariant shift of qcs->cudaPropFrw_bsh in dir 'c'
     double t1 = MPI_Wtime();
     for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
       perform_ShiftCudaVec_nonCov(qcs->cudaPropAux, qcs->cudaPropFrw_bsh[ivec], shfFlag);
-      qcSwapCudaVec(qcs->cudaPropFrw_bsh[ivec], qcs->cudaPropAux);
+      qcSwapCudaVec(&(qcs->cudaPropFrw_bsh[ivec]), &(qcs->cudaPropAux));
     }
     double t2 = MPI_Wtime();
     printfQuda("TIMING - %s: Non-Cov Propagator shift done in %f sec.\n", func_name, t2-t1);
-
 
     //- Covariant shift of qcs->wlinks[i_wl_b] {Wb} in dir 'c';
     double t3 = MPI_Wtime();
@@ -1499,14 +1499,12 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     double t4 = MPI_Wtime();
     printfQuda("TIMING - %s: Covariant Gauge shift done in %f sec.\n", func_name, t4-t3);
 
-
     //- Non-covariant shift of qcs->bsh_u in dir 'c'
     double t5 = MPI_Wtime();
     perform_ShiftGauge_nonCov(qcs->aux_u, qcs->bsh_u, shfFlag);
-    qcSwapCudaGauge(qcs->bsh_u, qcs->aux_u);
+    qcSwapCudaGauge(&(qcs->bsh_u), &(qcs->aux_u));
     double t6 = MPI_Wtime();
     printfQuda("TIMING - %s: Non-Cov Gauge shift done in %f sec.\n", func_name, t6-t5);
-
 
     //- memorize
     *b_lpath_ptr = c;
@@ -1532,8 +1530,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   /* build up v_lpath */
   for (; *v_lpath_inc ; v_lpath_inc++, v_lpath_ptr++) {
     char c = *v_lpath_inc;
-    qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(&c);
-
+    qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(c);
 
     //- AdjSplitCov shift of qcs->wlinks[i_wl_vbv] {Wvbv} with qcs->gf_u, qcs->bsh_u
     //- in opposite direction of 'c'
@@ -1547,7 +1544,6 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     double t8 = MPI_Wtime();
     printfQuda("TIMING - %s: AdjSplitCov Gauge shift done in %f sec.\n", func_name, t8-t7);
 
-
     //- memorize
     *v_lpath_ptr = c;
   }
@@ -1559,26 +1555,33 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   double t10 = MPI_Wtime();
   printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' done in %f sec.\n", func_name, t10-t9);
 
-
   //- Perform Momentum Projection
   double t11 = MPI_Wtime();
   int mpStat = momentumProjectTMDCorr_Quda(qcs, momproj_buf);
-  if(mpStat != 0) return 1;
+  if(mpStat != 0) {
+    errorQuda("mpStat=%d\n", mpStat);
+    return 1;
+  }
   double t12 = MPI_Wtime();
   printfQuda("TIMING - %s: Function \'momentumProjectTMDCorr_Quda\' done in %f sec.\n", func_name, t12-t11);
 
-
   //-- Copy the position space correlator back to CPU if required
   if(qcs->push_res){
-    size_t corrSize = sizeof(complex<QUDA_REAL>) * qcs->paramAPI.mpParam.locvol * qcs->paramAPI.mpParam.Ndata;
-    cudaMemcpy(corrQuda, qcs->corrQuda_dev, corrSize, cudaMemcpyDeviceToHost);
-    checkCudaErrorNoSync();
+    LONG_T lV = qcs->paramAPI.mpParam.locvol;
+    int Ndata = qcs->paramAPI.mpParam.Ndata;
+    size_t corrByteSize = sizeof(complex<QUDA_REAL>) * lV * Ndata;
+    printfQuda("%s: Will copy the position-space correlator to CPU. Got lV = %lld, Ndata = %d, corrByteSize = %zd\n",
+	       func_name, lV, Ndata, corrByteSize);
+    cudaMemcpy(corrQuda, qcs->corrQuda_dev, corrByteSize, cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    checkCudaError();
+    printfQuda("%s: Position-space correlator copied to CPU.\n", func_name);
   }
 
   saveTuneCache();
 
   double t15 = MPI_Wtime();
-  printfQuda("%s: GPU TMD step finished successfully in %f sec. Returning...\n", func_name, t15-t14);
+  printfQuda("%s: GPU TMD step finished successfully in %f sec. Returning...\n\n\n", func_name, t15-t14);
 
   return status;
 }
