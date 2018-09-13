@@ -379,7 +379,7 @@ invert_test(void)
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       construct_gauge_field(qdp_inlink, 1, gaugeParam.cpu_prec, &gaugeParam);
     } else {
-      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gaugeParam.cpu_prec,&gaugeParam,dslash_type);
+      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gaugeParam.cpu_prec,&gaugeParam,compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
     //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
   }
@@ -629,13 +629,6 @@ invert_test(void)
   
   switch(test_type){
     case 0: // full parity solution
-
-      if (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER) {
-        if (dslash_type != QUDA_LAPLACE_DSLASH) {
-          errorQuda("The full spinor staggered operator can't be inverted with (P)CG.\n");
-        }
-      }
-
     case 1: // solving prec system, reconstructing
     case 2:
 
@@ -953,6 +946,11 @@ int main(int argc, char** argv)
     matpc_type = QUDA_MATPC_EVEN_EVEN; // doesn't matter
 
   } else {
+
+    if (test_type == 0 && (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER) && solve_type != QUDA_NORMOP_SOLVE) {
+      warningQuda("The full spinor staggered operator (test 0) can't be inverted with (P)CG. Switching to BiCGstab.\n");
+      inv_type = QUDA_BICGSTAB_INVERTER;
+    }
 
     if (solve_type == QUDA_INVALID_SOLVE) {
       if (test_type == 0) {
