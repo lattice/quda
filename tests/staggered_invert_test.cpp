@@ -621,7 +621,7 @@ invert_test(void)
   int ret = 0;
 
   int len = 0;
-  if (solution_type == QUDA_MAT_SOLUTION) {
+  if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
     len = V*Nsrc;
   } else {
     len = Vh*Nsrc;
@@ -638,8 +638,11 @@ invert_test(void)
       time0 += clock(); // stop the timer
       time0 /= CLOCKS_PER_SEC;
 
+      //In QUDA, the full staggered operator has the sign convention
+      //{{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
+      //have the minus sign. Passing in QUDA_DAG_YES solves this
+      //discrepancy
 #ifdef MULTI_GPU
-      // Not sure about the QUDA_DAG_YES...
       staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Even()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
        reinterpret_cast<cpuColorSpinorField*>(&out->Odd()), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
       staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Odd()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
@@ -947,7 +950,8 @@ int main(int argc, char** argv)
 
   } else {
 
-    if (test_type == 0 && (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER) && solve_type != QUDA_NORMOP_SOLVE) {
+    if (test_type == 0 && (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER) &&
+        solve_type != QUDA_NORMOP_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
       warningQuda("The full spinor staggered operator (test 0) can't be inverted with (P)CG. Switching to BiCGstab.\n");
       inv_type = QUDA_BICGSTAB_INVERTER;
     }
