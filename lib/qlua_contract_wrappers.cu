@@ -336,7 +336,6 @@ namespace quda {
 
   void qcCPUtoCudaVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec){
     *cudaVec = *cpuVec;
-    qcExchangeGhostVec(cudaVec);
   }  
   void qcCPUtoCudaProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
     for(int i=0;i<QUDA_PROP_NVEC;i++)
