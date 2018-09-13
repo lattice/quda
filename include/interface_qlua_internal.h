@@ -144,14 +144,12 @@ namespace quda {
     cudaColorSpinorField *cudaPropAux;
 
     /* device gauge fields
-     * cuda_gf: Original gauge field
      * gf_u:    Original gauge field, extended version
      * bsh_u:   Extended Gauge field shifted in the b-direction
      * aux_u:   Extended Gauge field used for non-covariant shifts of gauge fields, will be getting swapped with bsh_u
      * wlinks:  Extended Gauge field used as 'ColorMatrices' to store shifted links in the b and vbv directions.
      * The indices i_wl_b, i_wl_vbv, i_wl_tmp control which 'Lorentz' index of wlinks will be used for the shifts
      */
-    cudaGaugeField *cuda_gf;
     cudaGaugeField *gf_u;
     cudaGaugeField *bsh_u;
     cudaGaugeField *aux_u;    /* for shifts of bsh_u */

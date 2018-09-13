@@ -1230,14 +1230,14 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   //- Load the gauge fields
   double t1 = MPI_Wtime();
 
-  //  bool copyGauge_no  = false;
+  bool copyGauge_no  = false;
   bool copyGauge_yes = true;
 
   for (int d=0;d<4;d++){
     qcs->qcR[d] = 2 * (QCredundantComms || commDimPartitioned(d));
   }
 
-  qcs->cuda_gf = NULL;
+  cudaGaugeField *cuda_gf = NULL;
   qcs->gf_u    = NULL;
   qcs->bsh_u   = NULL;
   qcs->aux_u   = NULL;
@@ -1245,20 +1245,24 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   for(int mu=0;mu<qS->rank;mu++)
     if(qluaGauge_host[mu] == NULL)
       errorQuda("%s: Got NULL host qlua gauge field [%d]\n", func_name, mu);
-  qcs->cuda_gf = new_cudaGaugeField(gp, qluaGauge_host); //- The original, regular gauge field
+  cuda_gf = new_cudaGaugeField(gp, qluaGauge_host); //- The original, regular gauge field
+  if(cuda_gf == NULL)
+    errorQuda("%s: Cannot allocate Original Gauge Field! Exiting.\n", func_name);
 
   //- Extended gauge field, copy of original, extendedGhosts are already exchanged
-  qcs->gf_u = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_yes);
-
+  qcs->gf_u = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_yes);
   //- Extended auxilliary gauge fields. If copyGayge_no: initialized to zero, extendedGhosts are NOT exchanged
-  qcs->bsh_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_yes);
-  qcs->aux_u  = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_yes);
-  qcs->wlinks = new_ExtendedcudaGaugeField(*(qcs->cuda_gf), qcs->qcR, copyGauge_yes);
+  qcs->bsh_u  = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_no);
+  qcs->aux_u  = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_no);
+  qcs->wlinks = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_no);
 
-  if( (qcs->cuda_gf == NULL) || (qcs->gf_u   == NULL) || (qcs->bsh_u == NULL) ||
-      (qcs->aux_u   == NULL) || (qcs->wlinks == NULL) )
-    errorQuda("%s: Cannot allocate Gauge Fields! Exiting.\n", func_name);
+  if((qcs->gf_u  == NULL) || (qcs->bsh_u  == NULL) ||
+     (qcs->aux_u == NULL) || (qcs->wlinks == NULL) )
+    errorQuda("%s: Cannot allocate Extended Gauge Fields! Exiting.\n", func_name);
     
+  delete cuda_gf;
+  cuda_gf = NULL;
+  
   double t2 = MPI_Wtime();
   printfQuda("TIMING - %s: Cuda Gauge Fields loaded in %f sec.\n", func_name, t2-t1);
   //-------------------------------------------------------------
@@ -1371,7 +1375,6 @@ QuarkTMDfree_Quda(void **Vqcs){
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state*>(*Vqcs));
 
   //- Delete gauge fields
-  if(qcs->cuda_gf != NULL) delete qcs->cuda_gf;
   if(qcs->gf_u    != NULL) delete qcs->gf_u;
   if(qcs->bsh_u   != NULL) delete qcs->bsh_u;
   if(qcs->aux_u   != NULL) delete qcs->aux_u;
