@@ -1273,12 +1273,6 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
 
   int nVec = QUDA_PROP_NVEC;
   LONG_T csVecLgh  = paramAPI.mpParam.locvol * Nc * Ns * 2;
-  LONG_T csPropLgh = csVecLgh * nVec;
-
-  //- Allocate and copy Contract State host Propagator 
-  qcs->hostPropFrw = (QUDA_REAL*) calloc(csPropLgh, sizeof(QUDA_REAL));
-  if(qcs->hostPropFrw == NULL) errorQuda("%s: Cannot allocate Contract State host Propagator. Exiting.\n", func_name);
-  memcpy(qcs->hostPropFrw, qluaPropFrw_host, sizeof(QUDA_REAL) * csPropLgh);
 
   //- Allocate device pointers of Forward and Backward propagators
   for(int ivec=0;ivec<nVec;ivec++){
@@ -1387,7 +1381,6 @@ QuarkTMDfree_Quda(void **Vqcs){
     if(qcs->cudaPropBkw[i]     != NULL) delete qcs->cudaPropBkw[i];
   }
   if(qcs->cudaPropAux != NULL) delete qcs->cudaPropAux;
-  free(qcs->hostPropFrw);
 
   //- Delete correlators and momentum-projection related buffers
   cudaFree(qcs->phaseMatrix_dev);
@@ -1435,7 +1428,6 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   int cur_blen = strlen(qcs->b_lpath);
   int cur_vlen = strlen(qcs->v_lpath);
   int b_reset = 0;
-  int v_reset = 0;
 
   //- b_lpath: increment or reset?
   if( 0 < cur_blen && string_prefix(qcs->b_lpath, b_lpath) ){
@@ -1494,7 +1486,6 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     v_lpath_ptr = qcs->v_lpath + cur_vlen;
   }
   else{
-    v_reset = 1;
     v_lpath_inc = v_lpath;
     v_lpath_ptr = qcs->v_lpath;
     memset(v_lpath_ptr, 0, sizeof(qcs->v_lpath));

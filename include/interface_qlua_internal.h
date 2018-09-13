@@ -131,14 +131,12 @@ namespace quda {
     complex<QUDA_REAL> *corrOut_glob;     //-- Host Globally summed momentum projection buffer
     complex<QUDA_REAL> *corrOut_host;     //-- Host (local) output of cuBlas momentum projection
 
-    //- host forward propagator, constant throughout, will be used for resetting cudaPropFrw_bsh
-    QUDA_REAL *hostPropFrw;
 
-    //- host forward propagator, will be used to reset device forward propagator
+    //- cpuPropFrw: host forward propagator, will be used to reset device forward propagator
+    //- cudaPropFrw_bsh: Device forward (shifted) propagator
+    //- cudaPropBkw: Device backward propagator
+    //- cudaPropAux: Device vector used for shifts, will be getting swapped with cudaPropFrw_bsh
     cpuColorSpinorField *cpuPropFrw[QUDA_PROP_NVEC];
-
-    //- device forward (shifted) propagator, backward propagator
-    //- cudaPropAux: used for shifts, will be getting swapped with cudaPropFrw_bsh
     cudaColorSpinorField *cudaPropFrw_bsh[QUDA_PROP_NVEC];
     cudaColorSpinorField *cudaPropBkw[QUDA_PROP_NVEC];
     cudaColorSpinorField *cudaPropAux;
