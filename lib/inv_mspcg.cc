@@ -68,6 +68,9 @@ namespace quda {
     memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
     memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
     
+    if(inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC || inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC){
+      errorQuda("Currently MSPCG does NOT support asymmetric preconditioning.\n"); 
+    }
     diracParam.matpcType = inv_param->matpc_type;
     diracParam.dagger = inv_param->dagger;
     diracParam.gauge = gaugePrecise;
@@ -142,8 +145,10 @@ namespace quda {
     cudaGetDeviceProperties( &device_prop, 0 );
     if(device_prop.major < 7){
       tc = false;
+      printfQuda("It seems you are NOT RICH enough to have tensor cores. :_( \n(will NOT use tensor core implementations)\n");
     }else{
       tc = true;
+      printfQuda("WOW you are RICH enough to have tensor cores! :_) \n(will use tensor core implementations)\n");
     }
 
     int gR[4] = {2*R[0], R[1], R[2], R[3]}; 
@@ -164,9 +169,9 @@ namespace quda {
       dirac_param_precondition.commDim[i] = 0;
     }
 
-    dirac_param.print();
-    dirac_param_sloppy.print();
-    dirac_param_precondition.print();
+//    dirac_param.print();
+//    dirac_param_sloppy.print();
+//    dirac_param_precondition.print();
     
     mat = new DiracMobiusPC(dirac_param);
     nrm_op = new DiracMdagM(mat);
@@ -322,7 +327,7 @@ namespace quda {
     double dd = xmyNorm(*tt, *tx);
     printfQuda("%% diff      x2 = %16.12e (This number is SUPPOSED to be tiny).\n", dd);
     
-    if(tc){
+    if(tc and b.Precision() == QUDA_HALF_PRECISION){
       mat_precondition->Dagger(QUDA_DAG_YES);
       mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
       mat_precondition->dslash5inv_sm_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
@@ -344,65 +349,28 @@ namespace quda {
   }
 
   void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in ){
-    
-    
-    int odd_bit = 0; // Even-Even
+    int odd_bit = (mat_precondition->getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
     mat_precondition->Dagger(QUDA_DAG_NO);
     
-//    blas::zero(*iftmp);
-//    mat_precondition->Dslash4pre(*iftmp, in, parity[1]);                                // +0
     mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);        // +0
     
-    // TODO: Test
-//    mat_precondition->Dslash4(*ifset, *iftmp, parity[0]);                               // +1
-//    mat_precondition->Dslash4Partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});       // +1
     mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});
-//    mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len2, RR2, Xs2, false, {2,2,2,2});
-//    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[0]);                            // +1
-//    mat_precondition->Dslash5invPartial(*iftmp, *ifset, parity[0], sp_len1, RR1, Xs1);    // +1
-//    blas::copy(*iftmp, *ifset);
-    // TODO: Test
-
-//    mat_precondition->Dslash4pre(*ifset, *iftmp, parity[0]);                            // +1
-//    mat_precondition->Dslash4prePartial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1);    // +1
-//    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
-//    mat_precondition->Dslash4(*iftmp, *ifset, parity[1]);                      // +2
-//    mat_precondition->Dslash4Partial(*iftmp, *ifset, parity[1], sp_len2, RR2, Xs2, true, {1,1,1,1});                      // +2
-//    mat_precondition->Dslash5invXpay(*ifset, *iftmp, parity[1], in, -1.0);      // +2
 
     mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
-//    blas::copy(*ifset, *iftmp);    
-    mat_precondition->Dagger(QUDA_DAG_YES);
     
-//    mat_precondition->Dslash5inv(*iftmp, *ifset, parity[1]);                  // +2
-//    mat_precondition->Dslash5inv(out, *iftmp, parity[1]);                  // +2
-    if(tc){
+    mat_precondition->Dagger(QUDA_DAG_YES);
+    if(tc and out.Precision() == QUDA_HALF_PRECISION){
       mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
     }else{
       mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
     }
-
     mat_precondition->Dagger(QUDA_DAG_NO);
+    
     mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
-
-//    mat_precondition->Dslash4(out, *iftmp, parity[0]);
-//    mat_precondition->Dslash4Partial(out, *ifset, parity[0], sp_len1, RR1, Xs1); // +1
-//    mat_precondition->Dslash4pre(*iftmp, out, parity[0]);                 // +1
-//    mat_precondition->Dslash4prePartial(*ifset, out, parity[0], sp_len1, RR1, Xs1);                 // +1
-//    mat_precondition->Dslash5inv(out, *iftmp, parity[0]);                 // +1
-//    mat_precondition->Dslash5invPartial(out, *ifset, parity[0], sp_len1, RR1, Xs1);                 // +1
-
-//    blas::copy(out, *ifset);  
-//    mat_precondition->Dagger(QUDA_DAG_YES);
-//    mat_precondition->Dslash4(*iftmp, out, parity[1]);
-//    mat_precondition->Dslash4Partial(*ifset, out, parity[1], sp_len0, RR0, Xs0); // +0
-//    mat_precondition->Dagger(QUDA_DAG_NO);
+    
     mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   
-//    mat_precondition->Dslash4preXpay(out, *iftmp, parity[1], *ifset, -1.0);   // +0
-//    mat_precondition->Dagger(QUDA_DAG_YES);
-//    mat_precondition->Dslash4preXpayPartial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   // +0
   }
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib )
@@ -442,8 +410,8 @@ namespace quda {
       //xpay(ib, beta, *ip);
       axpyZpbx(alpha, *ip, ix, ib, beta);
 
-      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
-          local_loop_count, rk2, alpha, beta, Mpk2);
+//      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
+//          local_loop_count, rk2, alpha, beta, Mpk2);
     }
 
     commGlobalReductionSet(true);
@@ -621,7 +589,7 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type);
 
-    test_dslash(db);
+//    test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
@@ -797,7 +765,7 @@ namespace quda {
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
     double stop = stopping(param.tol, b2, param.residual_type);
 
-    test_dslash(db);
+//    test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
@@ -810,6 +778,7 @@ namespace quda {
     (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2); // r = MdagM * x
     double r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
     printfQuda("True precise residual is %8.4e\n", r2);
+    printfQuda("Using a sophisticated reliable update scheme.\n");
 
     double r2_max = r2;
     int num_reliable_updates = 0;
