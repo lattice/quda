@@ -117,10 +117,10 @@ using index_sequence_for = make_index_sequence<sizeof...(T)>;
 
 namespace std {
 
-// using kos::integer_sequence;
-// using kos::index_sequence;
-// using kos::make_integer_sequence;
-// using kos::make_index_sequence;
-// using kos::index_sequence_for;
+using kos::integer_sequence;
+using kos::index_sequence;
+using kos::make_integer_sequence;
+using kos::make_index_sequence;
+using kos::index_sequence_for;
 
 }
