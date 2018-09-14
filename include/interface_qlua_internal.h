@@ -110,6 +110,8 @@ namespace quda {
   //- required for TMD contractions
   struct QuarkTMD_state_s {
 
+    int iStep;
+
     QluaUtilArg *utilArg;
 
     //- contraction type

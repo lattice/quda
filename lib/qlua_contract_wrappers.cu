@@ -70,7 +70,8 @@ namespace quda {
     checkCudaErrorNoSync();
     
     cudaFree(utilArg_dev);
-    
+    utilArg_dev = NULL;
+
     return crdChkVal;
   }//-- function
   //---------------------------------------------------------------------------
@@ -118,6 +119,7 @@ namespace quda {
     checkCudaError();
     
     cudaFree(utilArg_dev);
+    utilArg_dev = NULL;
   }
   //---------------------------------------------------------------------------
 
@@ -258,6 +260,7 @@ namespace quda {
     dst->exchangeExtendedGhost(R, QCredundantComms);
 
     cudaFree(arg_dev);
+    arg_dev = NULL;
   }
   //---------------------------------------------------------------------------
 
@@ -306,6 +309,7 @@ namespace quda {
     U->exchangeExtendedGhost(R, QCredundantComms);
     
     cudaFree(arg_dev);
+    arg_dev = NULL;
   }
   //---------------------------------------------------------------------------
 
@@ -375,6 +379,7 @@ namespace quda {
     checkCudaError();
     
     cudaFree(arg_dev);
+    arg_dev = NULL;
   }//-- perform_ShiftCudaVec_nonCov
   
   void perform_ShiftCudaVec_Cov(ColorSpinorField *dst, ColorSpinorField *src, cudaGaugeField *gf,
@@ -409,6 +414,7 @@ namespace quda {
     checkCudaError();
 
     cudaFree(arg_dev);
+    arg_dev = NULL;
   }//-- perform_ShiftCudaVec_Cov
 
 
@@ -444,6 +450,7 @@ namespace quda {
     dst->exchangeExtendedGhost(dst->R(), QCredundantComms);
 
     cudaFree(arg_dev);
+    arg_dev = NULL;
   }//-- perform_ShiftGauge_nonCov
 
 
@@ -479,6 +486,7 @@ namespace quda {
     dst->exchangeExtendedGhost(dst->R(), QCredundantComms);
 
     cudaFree(arg_dev);
+    arg_dev = NULL;
   }//-- perform_ShiftLink_Cov
 
 
@@ -515,6 +523,7 @@ namespace quda {
     dst->exchangeExtendedGhost(dst->R(), QCredundantComms);
 
     cudaFree(arg_dev);
+    arg_dev = NULL;
   }//-- ShiftLink_AdjSplitCov
   //---------------------------------------------------------------------------
 
@@ -563,6 +572,7 @@ namespace quda {
     printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[arg.cntrType], t2-t1);
 
     cudaFree(arg_dev);
+    arg_dev = NULL;
   }//-- perform_Std_Contract
 
   //-Top-level function
@@ -600,9 +610,9 @@ namespace quda {
 
     qcTMD_Arg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, qcs->wlinks, qcs->i_wl_vbv, qcs->paramAPI.preserveBasis);    
     qcTMD_Arg *arg_dev;
-    cudaMalloc((void**)&(arg_dev), sizeof(qcTMD_Arg) );
+    cudaMalloc((void**)&(arg_dev), sizeof(arg) );
     checkCudaError();
-    cudaMemcpy(arg_dev, &arg, sizeof(qcTMD_Arg), cudaMemcpyHostToDevice);    
+    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
     checkCudaError();
 
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
@@ -618,6 +628,7 @@ namespace quda {
     printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
 
     cudaFree(arg_dev);
+    arg_dev = NULL;
   }//-- QuarkContractTMD_GPU
 
 

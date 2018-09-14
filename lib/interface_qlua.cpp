@@ -21,6 +21,18 @@
 using namespace quda;
 
 
+void printGPUMemInfo(){
+  size_t freeGPUMem, totalGPUMem;
+  if(cudaMemGetInfo(&freeGPUMem, &totalGPUMem) != cudaSuccess)
+    errorQuda("  GPUMemInfo: Memory-related error occured!\n");
+  else{
+    printfQuda("  GPUMemInfo: Total GPU Memory/GPU: %zd MBytes.\n", totalGPUMem/(1<<20));
+    printfQuda("  GPUMemInfo: Free  GPU Memory/GPU: %zd MBytes.\n", freeGPUMem/(1<<20));
+    printfQuda("  GPUMemInfo: Used  GPU Memory/GPU: %zd MBytes.\n", (totalGPUMem-freeGPUMem)/(1<<20));
+  }
+}
+
+
 QudaVerbosity parseVerbosity(const char *v){
 
   QudaVerbosity verbosity = QUDA_INVALID_VERBOSITY;
@@ -1139,6 +1151,8 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
     paramAPI.mpParam.GPU_phaseMatrix = 1;
   }
 
+  printfQuda("%s: Initial Memory Report (before memory allocations):\n", func_name);
+  printGPUMemInfo();
 
   //-- Define useful topology quantities, put them in paramAPI
   int nDim = qS->rank;
@@ -1222,6 +1236,7 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   //- Initialize link paths, set to zero
   qcs->v_lpath[0] = '\0';
   qcs->b_lpath[0] = '\0';
+  qcs->iStep = 0;
 
   printfQuda("%s: Invert-Gauge-Generic parameters set!\n", func_name);
   //-------------------------------------------------------------
@@ -1342,8 +1357,13 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   cudaMalloc( (void**)&(qcs->corrInp_dev), SizeCplxReal*V3*Ndata*locT);
   cudaMalloc( (void**)&(qcs->corrOut_dev), SizeCplxReal*Nmoms*Ndata*locT);
   checkCudaError();
+  cudaMemset(qcs->corrInp_dev, 0, SizeCplxReal*V3*Ndata*locT);
+  cudaMemset(qcs->corrOut_dev, 0, SizeCplxReal*Nmoms*Ndata*locT);
   printfQuda("%s: Momentum projection buffers allocated.\n", func_name);
   //-------------------------------------------------------------
+
+  printfQuda("%s: Final Memory Report (after memory allocations):\n", func_name);
+  printGPUMemInfo();
 
   double t6 = MPI_Wtime();
   printfQuda("%s: GPU TMD contract state initialized successfully in %f sec. Returning...\n\n\n", func_name, t6-t5);
@@ -1359,7 +1379,7 @@ QuarkTMDfree_Quda(void **Vqcs){
 
   double t1 = MPI_Wtime();
   int status = 0;
-  const char *func_name = "momentumProjectTMDCorr_Quda";
+  const char *func_name = "QuarkTMDfree_Quda";
 
   if (NULL == Vqcs || NULL == *Vqcs)
       return 1;
@@ -1368,34 +1388,57 @@ QuarkTMDfree_Quda(void **Vqcs){
 
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state*>(*Vqcs));
 
+  printfQuda("%s: Memory Report before freeing memory:\n", func_name);
+  printGPUMemInfo();
+
   //- Delete gauge fields
-  if(qcs->gf_u    != NULL) delete qcs->gf_u;
-  if(qcs->bsh_u   != NULL) delete qcs->bsh_u;
-  if(qcs->aux_u   != NULL) delete qcs->aux_u;
-  if(qcs->wlinks  != NULL) delete qcs->wlinks;
+  delete qcs->gf_u;
+  delete qcs->bsh_u;
+  delete qcs->aux_u;
+  delete qcs->wlinks;
+  qcs->gf_u   = NULL;
+  qcs->bsh_u  = NULL;
+  qcs->aux_u  = NULL;
+  qcs->wlinks = NULL;
 
   //- Delete propagators
   for(int i=0;i<QUDA_PROP_NVEC;i++){
-    if(qcs->cpuPropFrw[i]      != NULL) delete qcs->cpuPropFrw[i];
-    if(qcs->cudaPropFrw_bsh[i] != NULL) delete qcs->cudaPropFrw_bsh[i];
-    if(qcs->cudaPropBkw[i]     != NULL) delete qcs->cudaPropBkw[i];
+    delete qcs->cpuPropFrw[i];
+    delete qcs->cudaPropFrw_bsh[i];
+    delete qcs->cudaPropBkw[i];
+    qcs->cpuPropFrw[i] = NULL;
+    qcs->cudaPropFrw_bsh[i] = NULL;
+    qcs->cudaPropBkw[i] = NULL;
   }
-  if(qcs->cudaPropAux != NULL) delete qcs->cudaPropAux;
+  delete qcs->cudaPropAux;
+  qcs->cudaPropAux = NULL;
 
   //- Delete correlators and momentum-projection related buffers
   cudaFree(qcs->phaseMatrix_dev);
   cudaFree(qcs->corrQuda_dev);
   cudaFree(qcs->corrInp_dev);
   cudaFree(qcs->corrOut_dev);
+  cudaDeviceSynchronize();
+  checkCudaError();
+  qcs->phaseMatrix_dev = NULL;
+  qcs->corrQuda_dev = NULL;
+  qcs->corrInp_dev = NULL;
+  qcs->corrOut_dev = NULL;
 
   free(qcs->corrOut_proj);
   free(qcs->corrOut_glob);
   free(qcs->corrOut_host);
+  qcs->corrOut_proj = NULL;
+  qcs->corrOut_glob = NULL;
+  qcs->corrOut_host = NULL;
 
   delete qcs->utilArg;
 
   free(*Vqcs);
   *Vqcs = NULL;
+
+  printfQuda("%s: Memory Report after freeing memory:\n", func_name);
+  printGPUMemInfo();
 
   double t2 = MPI_Wtime();
   printfQuda("%s: GPU TMD contract state destroyed successfully in %f sec. Returning...\n\n\n", func_name, t2-t1);
@@ -1417,9 +1460,9 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   int status = 0;
   const char *func_name = "QuarkTMDstep_momProj_Quda";
 
-  printfQuda("\n\n\n%s: Has been called!\n", func_name);
-
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state *>(Vqcs));
+
+  printfQuda("\n\n\n%s: Performing TMD-step %d...\n", func_name, ++qcs->iStep);
   
   const char *b_lpath_inc = NULL;
   const char *v_lpath_inc = NULL;
@@ -1444,6 +1487,9 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b, qcs->qcR);       //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
     qcCopyExtendedGaugeField(qcs->bsh_u, qcs->gf_u, qcs->qcR);   //- (re)set qcs->bsh_u to qcs->gf_u
   }
+
+  printfQuda("%s: Memory report after increment/reset b_path:\n", func_name);
+  printGPUMemInfo();
 
   /* build up b_lpath */
   for (; *b_lpath_inc ; b_lpath_inc++, b_lpath_ptr++) {
@@ -1480,6 +1526,9 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   }
   *b_lpath_ptr = '\0';
 
+  printfQuda("%s: Memory report after building b_path:\n", func_name);
+  printGPUMemInfo();
+
   /* v_lpath: increment or reset? */
   if( !b_reset && 0 < cur_vlen && string_prefix(qcs->v_lpath, v_lpath) ){
     v_lpath_inc = v_lpath + cur_vlen;
@@ -1493,6 +1542,9 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     //- (re)set qcs->wlinks[i_wl_vbv] {Wvbv} to qcs->wlinks[i_wl_b] {Wb}
     qcCopyCudaLink(qcs->wlinks, qcs->i_wl_vbv, qcs->wlinks, qcs->i_wl_b, qcs->qcR);
   }
+
+  printfQuda("%s: Memory report after increment/reset v_path:\n", func_name);
+  printGPUMemInfo();
 
   /* build up v_lpath */
   for (; *v_lpath_inc ; v_lpath_inc++, v_lpath_ptr++) {
@@ -1516,11 +1568,17 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   }
   *v_lpath_ptr = '\0';
 
+  printfQuda("%s: Memory report after building v_path:\n", func_name);
+  printGPUMemInfo();
+
   //- Perform TMD contractions
   double t9 = MPI_Wtime();
   QuarkContractTMD_GPU(qcs);
   double t10 = MPI_Wtime();
   printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' done in %f sec.\n", func_name, t10-t9);
+
+  printfQuda("%s: Memory report after TMD contractions:\n", func_name);
+  printGPUMemInfo();
 
   //- Perform Momentum Projection
   double t11 = MPI_Wtime();
@@ -1531,6 +1589,9 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   }
   double t12 = MPI_Wtime();
   printfQuda("TIMING - %s: Function \'momentumProjectTMDCorr_Quda\' done in %f sec.\n", func_name, t12-t11);
+
+  printfQuda("%s: Memory report after Momentum Projection:\n", func_name);
+  printGPUMemInfo();
 
   //-- Copy the position space correlator back to CPU if required
   if(qcs->push_res){
@@ -1547,8 +1608,11 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
 
   saveTuneCache();
 
+  printfQuda("%s: Memory Report after TMD step %d:\n", func_name, qcs->iStep);
+  printGPUMemInfo();
+  
   double t15 = MPI_Wtime();
-  printfQuda("%s: GPU TMD step finished successfully in %f sec. Returning...\n\n\n", func_name, t15-t14);
+  printfQuda("%s: GPU TMD step %d finished successfully in %f sec. Returning...\n\n\n", func_name, qcs->iStep, t15-t14);
 
   return status;
 }
