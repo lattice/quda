@@ -968,6 +968,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
+  checkInvertParam(inv_param);
+
   if (!initialized) errorQuda("QUDA not initialized");
 
   if ( (!h_clover && !h_clovinv) || inv_param->compute_clover ) {
@@ -1190,12 +1192,11 @@ void loadSloppyCloverQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondi
 
     // create the mirror preconditioner clover field
     if (clover_param.Precision() != cloverSloppy->Precision()) {
-      cloverPrecondition = new cudaCloverField(clover_param);
-      cloverPrecondition->copy(*cloverSloppy, clover_param.inverse);
+      cloverRefinement = new cudaCloverField(clover_param);
+      cloverRefinement->copy(*cloverSloppy, clover_param.inverse);
     } else {
-      cloverPrecondition = cloverSloppy;
+      cloverRefinement = cloverSloppy;
     }
-
   }
 
 }
@@ -1373,7 +1374,7 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
 void freeSloppyCloverQuda()
 {
   if (!initialized) errorQuda("QUDA not initialized");
-  if (cloverRefinement != cloverPrecondition && cloverRefinement) delete cloverRefinement;
+  if (cloverRefinement != cloverSloppy && cloverRefinement) delete cloverRefinement;
   if (cloverPrecondition != cloverSloppy && cloverPrecondition) delete cloverPrecondition;
   if (cloverSloppy != cloverPrecise && cloverSloppy) delete cloverSloppy;
   
@@ -2173,15 +2174,17 @@ void checkClover(QudaInvertParam *param) {
     errorQuda("Solve precision %d doesn't match clover precision %d", param->cuda_prec, cloverPrecise->Precision());
   }
 
-  if ((!cloverSloppy || param->cuda_prec_sloppy != cloverSloppy->Precision()) ||
-      (!cloverPrecondition || param->cuda_prec_precondition != cloverPrecondition->Precision())) {
+  if ( (!cloverSloppy || param->cuda_prec_sloppy != cloverSloppy->Precision()) ||
+       (!cloverPrecondition || param->cuda_prec_precondition != cloverPrecondition->Precision()) ||
+       (!cloverRefinement || param->cuda_prec_refinement_sloppy != cloverRefinement->Precision()) ) {
     freeSloppyCloverQuda();
     loadSloppyCloverQuda(param->cuda_prec_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy);
   }
 
-  if (cloverPrecise == nullptr) errorQuda("Precise gauge field doesn't exist");
-  if (cloverSloppy == nullptr) errorQuda("Sloppy gauge field doesn't exist");
-  if (cloverPrecondition == nullptr) errorQuda("Precondition gauge field doesn't exist");
+  if (cloverPrecise == nullptr) errorQuda("Precise clover field doesn't exist");
+  if (cloverSloppy == nullptr) errorQuda("Sloppy clover field doesn't exist");
+  if (cloverPrecondition == nullptr) errorQuda("Precondition clover field doesn't exist");
+  if (cloverRefinement == nullptr) errorQuda("Refinement clover field doesn't exist");
 }
 
 quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
@@ -2463,8 +2466,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
 
-  cudaGaugeField *cudaGauge = checkGauge(param);
   checkMultigridParam(&mg_param);
+  cudaGaugeField *cudaGauge = checkGauge(param);
 
   // check MG params (needs to go somewhere else)
   if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
@@ -2569,7 +2572,6 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   checkMultigridParam(mg_param);
 
   QudaInvertParam *param = mg_param->invert_param;
-  checkInvertParam(param);
   // check the gauge fields have been created and set the precision as needed
   checkGauge(param);
 
@@ -3468,9 +3470,13 @@ for(int i=0; i < param->num_src; i++) {
  * Generic version of the multi-shift solver. Should work for
  * most fermions. Note that offset[0] is not folded into the mass parameter.
  *
- * At present, the solution_type must be MATDAG_MAT or MATPCDAG_MATPC,
- * and solve_type must be NORMOP or NORMOP_PC.  The solution and solve
+ * For Wilson-type fermions, the solution_type must be MATDAG_MAT or MATPCDAG_MATPC,
+ * and solve_type must be NORMOP or NORMOP_PC. The solution and solve
  * preconditioning have to match.
+ * 
+ * For Staggered-type fermions, the solution_type must be MATPC, and the
+ * solve type must be DIRECT_PC. This difference in convention is because
+ * preconditioned staggered operator is normal, unlike with Wilson-type fermions.
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
@@ -3501,17 +3507,32 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
-  if (mat_solution) {
-    errorQuda("Multi-shift solver does not support MAT or MATPC solution types");
-  }
-  if (direct_solve) {
-    errorQuda("Multi-shift solver does not support DIRECT or DIRECT_PC solve types");
-  }
-  if (pc_solution & !pc_solve) {
-    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
-  }
-  if (!pc_solution & pc_solve) {
-    errorQuda("In multi-shift solver, a preconditioned (PC) solve_type requires a PC solution_type");
+
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+
+    if (param->solution_type != QUDA_MATPC_SOLUTION) {
+      errorQuda("For Staggered-type fermions, multi-shift solver only suports MATPC solution type");
+    }
+
+    if (param->solve_type != QUDA_DIRECT_PC_SOLVE) {
+      errorQuda("For Staggered-type fermions, multi-shift solver only supports DIRECT_PC solve types");
+    }
+
+  } else { // Wilson type
+
+    if (mat_solution) {
+      errorQuda("For Wilson-type fermions, multi-shift solver does not support MAT or MATPC solution types");
+    }
+    if (direct_solve) {
+      errorQuda("For Wilson-type fermions, multi-shift solver does not support DIRECT or DIRECT_PC solve types");
+    }
+    if (pc_solution & !pc_solve) {
+      errorQuda("For Wilson-type fermions, preconditioned (PC) solution_type requires a PC solve_type");
+    }
+    if (!pc_solution & pc_solve) {
+      errorQuda("For Wilson-type fermions, in multi-shift solver, a preconditioned (PC) solve_type requires a PC solution_type");
+    }
   }
 
   // Timing and FLOP counters
@@ -3636,15 +3657,26 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   massRescale(*b, *param);
   profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
-  // use multi-shift CG
-  {
-    DiracMdagM m(dirac), mSloppy(diracSloppy);
-    SolverParam solverParam(*param);
-    MultiShiftCG cg_m(m, mSloppy, solverParam, profileMulti);
-    cg_m(x, *b, p, r2_old.get());
-    // cg_m(x, *b);
-    solverParam.updateInvertParam(*param);
-  }
+  DiracMatrix *m, *mSloppy;
+
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    m = new DiracM(dirac);
+    mSloppy = new DiracM(diracSloppy);
+  } else {
+    m = new DiracMdagM(dirac);
+    mSloppy = new DiracMdagM(diracSloppy);
+  } 
+
+
+  SolverParam solverParam(*param);
+  MultiShiftCG cg_m(*m, *mSloppy, solverParam, profileMulti);
+  cg_m(x, *b, p, r2_old.get());
+  // cg_m(x, *b);
+  solverParam.updateInvertParam(*param);
+
+  delete m;
+  delete mSloppy;
 
   if (param->compute_true_res) {
     // check each shift has the desired tolerance and use sequential CG to refine
@@ -3701,13 +3733,23 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     dirac.setMass(sqrt(param->offset[i]/4));
     diracSloppy.setMass(sqrt(param->offset[i]/4));
   }
-	DiracMdagM m(dirac), mSloppy(diracSloppy);
+
+  DiracMatrix *m, *mSloppy;
+
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    m = new DiracM(dirac);
+    mSloppy = new DiracM(diracSloppy);
+  } else {
+    m = new DiracMdagM(dirac);
+    mSloppy = new DiracMdagM(diracSloppy);
+  } 
 
 	// need to curry in the shift if we are not doing staggered
 	if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
 	    param->dslash_type != QUDA_STAGGERED_DSLASH) {
-	  m.shift = param->offset[i];
-	  mSloppy.shift = param->offset[i];
+	  m->shift = param->offset[i];
+	  mSloppy->shift = param->offset[i];
 	}
 
 	if (false) { // experimenting with Minimum residual extrapolation
@@ -3740,7 +3782,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	  bool orthogonal = true;
 	  bool apply_mat = true;
           bool hermitian = true;
-	  MinResExt mre(m, orthogonal, apply_mat, hermitian, profileMulti);
+	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
 	  blas::copy(tmp, *b);
 	  mre(*x[i], tmp, z, q);
 
@@ -3756,21 +3798,24 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
 	solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
 
-	CG cg(m, mSloppy, solverParam, profileMulti);
+	CG cg(*m, *mSloppy, solverParam, profileMulti);
   if(i==0) 
     cg(*x[i], *b, p[i], r2_old[i]);
   else
     cg(*x[i], *b);
   
-	solverParam.true_res_offset[i] = solverParam.true_res;
-	solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
-	solverParam.updateInvertParam(*param,i);
+  solverParam.true_res_offset[i] = solverParam.true_res;
+  solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
+  solverParam.updateInvertParam(*param,i);
 
-	if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
-	    param->dslash_type == QUDA_STAGGERED_DSLASH) {
-	  dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
-	  diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
-	}
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
+    diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
+  }
+
+  delete m;
+  delete mSloppy;
 
       }
     }
@@ -3962,7 +4007,6 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   if (qudaGaugeParam->use_resident_gauge) {
     if (!gaugePrecise) errorQuda("No resident gauge field to use");
     cudaSiteLink = gaugePrecise;
-    profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
   } else {
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.reconstruct = qudaGaugeParam->reconstruct;

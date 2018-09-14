@@ -43,7 +43,13 @@ namespace quda {
 #undef GPU_CLOVER_DIRAC
 #undef GPU_DOMAIN_WALL_DIRAC
 #define DD_IMPROVED 0
+
+#define DD_DAG 0
 #include <staggered_dslash_def.h> // staggered Dslash kernels
+#undef DD_DAG
+#define DD_DAG 1
+#include <staggered_dslash_def.h> // staggered Dslash dagger kernels
+
 #undef DD_IMPROVED
 
 #include <dslash_quda.cuh>

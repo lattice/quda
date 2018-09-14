@@ -1,4 +1,5 @@
 #include <quda_arpack_interface.h>
+#include <thrust/sort.h>
 
 #if (defined (QMP_COMMS) || defined (MPI_COMMS))
 #include <mpi.h>
@@ -241,8 +242,8 @@ namespace quda{
       errorQuda("\nSorting option is not supported.\n");
     }
 
-    if(SortEvals::small_values) std::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortEvals::SelectSmall );
-    else                        std::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortEvals::SelectLarge );
+    if(SortEvals::small_values) thrust::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortEvals::SelectSmall );
+    else                        thrust::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortEvals::SelectLarge );
 
     cpuColorSpinorField *cpu_tmp = nullptr;
     int ev_id = 0;
