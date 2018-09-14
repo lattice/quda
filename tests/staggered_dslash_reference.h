@@ -14,10 +14,10 @@ using namespace quda;
 void setDims(int *);
 
 void staggered_dslash(void *res, void ** fatlink, void** longlink, void *spinorField,
-		      int oddBit, int daggerBit, QudaPrecision sPrecision, QudaPrecision gPrecision);
+		      int oddBit, int daggerBit, QudaPrecision sPrecision, QudaPrecision gPrecision, bool isLaplace=false);
 void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink, 
 			     void** ghost_longlink, cpuColorSpinorField* in, int oddBit, int daggerBit,
-			     QudaPrecision sPrecision, QudaPrecision gPrecision);  
+			     QudaPrecision sPrecision, QudaPrecision gPrecision, bool isLaplace=false);  
 
 void mat(void *out, void **fatlink, void** longlink, void *in, double kappa, int daggerBit,
 	 QudaPrecision sPrecision, QudaPrecision gPrecision);

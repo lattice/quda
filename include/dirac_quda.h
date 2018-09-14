@@ -1063,10 +1063,10 @@ namespace quda {
     const Dirac *dirac;
 
   public:
-    DiracMatrix(const Dirac &d) : dirac(&d) { }
-    DiracMatrix(const Dirac *d) : dirac(d) { }
-    DiracMatrix(const DiracMatrix &mat) : dirac(mat.dirac) { }
-    DiracMatrix(const DiracMatrix *mat) : dirac(mat->dirac) { }
+    DiracMatrix(const Dirac &d) : dirac(&d), shift(0.0) { }
+    DiracMatrix(const Dirac *d) : dirac(d), shift(0.0) { }
+    DiracMatrix(const DiracMatrix &mat) : dirac(mat.dirac), shift(mat.shift) { }
+    DiracMatrix(const DiracMatrix *mat) : dirac(mat->dirac), shift(mat->shift) { }
     virtual ~DiracMatrix() { }
 
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
@@ -1093,6 +1093,9 @@ namespace quda {
     }
     
     const Dirac* Expose() { return dirac; }
+
+    //! Shift term added onto operator (M/M^dag M/M M^dag + shift)
+    double shift;
   };
 
   class DiracM : public DiracMatrix {
@@ -1104,6 +1107,7 @@ namespace quda {
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->M(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
@@ -1111,6 +1115,7 @@ namespace quda {
       bool reset1 = false;
       if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
       dirac->M(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
       if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
@@ -1122,6 +1127,7 @@ namespace quda {
       if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
       if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
       dirac->M(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
       if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
       if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
@@ -1135,11 +1141,10 @@ namespace quda {
   class DiracMdagM : public DiracMatrix {
 
   public:
-    DiracMdagM(const Dirac &d) : DiracMatrix(d), shift(0.0) { }
-    DiracMdagM(const Dirac *d) : DiracMatrix(d), shift(0.0) { }
+    DiracMdagM(const Dirac &d) : DiracMatrix(d) { }
+    DiracMdagM(const Dirac *d) : DiracMatrix(d) { }
 
-    //! Shift term added onto operator (M^dag M + shift)
-    double shift;
+    
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
@@ -1176,11 +1181,8 @@ namespace quda {
   class DiracMMdag : public DiracMatrix {
 
   public:
-    DiracMMdag(const Dirac &d) : DiracMatrix(d), shift(0.0) { }
-    DiracMMdag(const Dirac *d) : DiracMatrix(d), shift(0.0) { }
-
-    //! Shift term added onto operator (M^dag M + shift)
-    double shift;
+    DiracMMdag(const Dirac &d) : DiracMatrix(d) { }
+    DiracMMdag(const Dirac *d) : DiracMatrix(d) { }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
@@ -1222,12 +1224,14 @@ namespace quda {
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->Mdag(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       dirac->tmp1 = &tmp;
       dirac->Mdag(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
       dirac->tmp1 = NULL;
     }
 
@@ -1237,6 +1241,7 @@ namespace quda {
       dirac->tmp1 = &Tmp1;
       dirac->tmp2 = &Tmp2;
       dirac->Mdag(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }

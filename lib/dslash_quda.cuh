@@ -175,10 +175,18 @@
 
 // macro used for staggered dslash
 #define STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param)	\
-  GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param)
+  if (!dagger) {                                                        \
+    GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) \
+      } else {                                                          \
+    GENERIC_DSLASH(staggeredDslash, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
+      }
 
 #define IMPROVED_STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param) \
-  GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) 
+  if (!dagger) {                                                        \
+    GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) \
+      } else {                                                          \
+    GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
+      }
 
 #define EVEN_MORE_GENERIC_ASYM_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (reconstruct == QUDA_RECONSTRUCT_NO) {				\

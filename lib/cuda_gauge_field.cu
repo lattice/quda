@@ -28,7 +28,7 @@ namespace quda {
 	int minimum_pad = nFace*surfaceCB[i] * (geometry == QUDA_COARSE_GEOMETRY ? 2 : 1);
 	if (pad < minimum_pad) pad_check = false;
 	if (!pad_check)
-	  errorQuda("cudaGaugeField being constructed with insufficient padding (%d < %d)\n", pad, minimum_pad);
+	  errorQuda("cudaGaugeField being constructed with insufficient padding in dim %d (%d < %d)\n", i, pad, minimum_pad);
       }
     }
 #endif
