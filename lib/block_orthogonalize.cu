@@ -4,7 +4,13 @@
 #include <typeinfo>
 #include <vector>
 #include <assert.h>
+
+// ensure compatibilty with C++11 
+#if __cplusplus >= 201402L
+#include <utility>
+#else
 #include <integer_sequence.hpp> // C++11 version of this C++14 feature
+#endif 
 
 #include <launch_kernel.cuh>
 

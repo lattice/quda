@@ -320,7 +320,11 @@ namespace quda {
   // print out the vector at volume point x
   template <typename Float, QudaFieldOrder order>
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
-    if (a.Ncolor() == 3 && a.Nspin() == 4)  {
+    if (a.Ncolor() == 3 && a.Nspin() == 1)  {
+      FieldOrderCB<Float,1,3,1,order> A(a);
+      print_vector(A, x);
+    }
+    else if (a.Ncolor() == 3 && a.Nspin() == 4)  {
       FieldOrderCB<Float,4,3,1,order> A(a);
       print_vector(A, x);
     }

@@ -35,6 +35,7 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern int niter;
 
+extern double tadpole_factor;
 // relativistic correction for naik term
 extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
@@ -58,47 +59,6 @@ static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
 
-
-// CPU-style BLAS routines
-void cpu_axy(QudaPrecision prec, double a, void* x, void* y, int size)
-{
-  if (prec == QUDA_DOUBLE_PRECISION) {
-    double* dst = (double*)y;
-    double* src = (double*)x;
-    for (int i = 0; i < size; i++)
-    {
-      dst[i] = a*src[i];
-    }
-  } else { // QUDA_SINGLE_PRECISION
-    float* dst = (float*)y;
-    float* src = (float*)x;
-    for (int i = 0; i < size; i++)
-    {
-      dst[i] = a*src[i];
-    }
-  }
-}
-
-void cpu_xpy(QudaPrecision prec, void* x, void* y, int size)
-{
-  if (prec == QUDA_DOUBLE_PRECISION) {
-    double* dst = (double*)y;
-    double* src = (double*)x;
-    for (int i = 0; i < size; i++)
-    {
-      dst[i] += src[i];
-    }
-  } else { // QUDA_SINGLE_PRECISION
-    float* dst = (float*)y;
-    float* src = (float*)x;
-    for (int i = 0; i < size; i++)
-    {
-      dst[i] += src[i];
-    }
-  }
-}
-
-
 /*--------------------------------------------------------------------*/
 // Some notation:
 // U -- original link, SU(3), copied to "field" from "site"
@@ -114,11 +74,20 @@ static void hisq_test()
 
   initQuda(device);
 
+  if (prec == QUDA_HALF_PRECISION || prec == QUDA_QUARTER_PRECISION) {
+    errorQuda("Precision %d is unsupported in some link fattening routines\n",prec);
+  }
+
   cpu_prec = prec;
   gSize = cpu_prec;  
   qudaGaugeParam = newQudaGaugeParam();
 
   qudaGaugeParam.anisotropy = 1.0;
+
+  // Fix me: must always be set to 1.0 for reasons not yet discerned. 
+  // The tadpole coefficient gets encoded directly into the fat link
+  // construct coefficents.
+  qudaGaugeParam.tadpole_coeff = 1.0;
 
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
@@ -152,16 +121,22 @@ static void hisq_test()
   // Set up the coefficients for each part of the HISQ stencil //
   ///////////////////////////////////////////////////////////////
   
-  // Reference: "generic_ks/imp_actions/hisq/hisq_action.h"
+  // Reference: "generic_ks/imp_actions/hisq/hisq_action.h",
+  // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
 
-  // First path: create V, W links 
+  double u1 = 1.0/tadpole_factor;
+  double u2 = u1*u1;
+  double u4 = u2*u2;
+  double u6 = u4*u2;
+
+  // First path: create V, W links
   double act_path_coeff_1[6] = {
-    ( 1.0/8.0),                 /* one link */
-      0.0,                      /* Naik */
-    (-1.0/8.0)*0.5,             /* simple staple */
-    ( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
-    (-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
-      0.0                       /* Lepage term */
+       ( 1.0/8.0),                 /* one link */
+    u2*( 0.0),                     /* Naik */
+    u2*(-1.0/8.0)*0.5,             /* simple staple */
+    u4*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
+    u6*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
+    u4*( 0.0)                      /* Lepage term */
   };
 
   // Second path: create X, long links
@@ -204,18 +179,9 @@ static void hisq_test()
   void* sitelink[4];
   for(int i=0;i < 4;i++) sitelink[i] = pinned_malloc(V*gaugeSiteSize*gSize);
 
-  void* sitelink_ex[4];
-  for(int i=0;i < 4;i++) sitelink_ex[i] = pinned_malloc(V_ex*gaugeSiteSize*gSize);
-
   void* milc_sitelink;
   milc_sitelink = (void*)safe_malloc(4*V*gaugeSiteSize*gSize);
 
-#ifdef MULTI_GPU
-  void* ghost_sitelink[4];
-  void* ghost_sitelink_diag[16];
-  void* ghost_wlink[4];
-  void* ghost_wlink_diag[16];
-#endif
 
   // Note: this could be replaced with loading a gauge field
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 0); // 0 -> no phases
@@ -287,373 +253,35 @@ static void hisq_test()
 
   double secs = TDIFF(t0,t1);
 
-  ////////////////////
-  // Begin CPU test //
-  ////////////////////
+  ///////////////////////
+  // Perform CPU Build //
+  ///////////////////////
 
-
-  ///////////////////////////////
-  // Create extended CPU field //
-  ///////////////////////////////
-  int X1=Z[0];
-  int X2=Z[1];
-  int X3=Z[2];
-  int X4=Z[3];
-
-  for(int i=0; i < V_ex; i++){
-    int sid = i;
-    int oddBit=0;
-    if(i >= Vh_ex){
-      sid = i - Vh_ex;
-      oddBit = 1;
-    }
-
-    int za = sid/E1h;
-    int x1h = sid - za*E1h;
-    int zb = za/E2;
-    int x2 = za - zb*E2;
-    int x4 = zb/E3;
-    int x3 = zb - x4*E3;
-    int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-    int x1 = 2*x1h + x1odd;
-
-
-    if( x1< 2 || x1 >= X1 +2
-        || x2< 2 || x2 >= X2 +2
-        || x3< 2 || x3 >= X3 +2
-        || x4< 2 || x4 >= X4 +2){
-#ifdef MULTI_GPU
-      continue;
-#endif
-    }
-
-
-
-    x1 = (x1 - 2 + X1) % X1;
-    x2 = (x2 - 2 + X2) % X2;
-    x3 = (x3 - 2 + X3) % X3;
-    x4 = (x4 - 2 + X4) % X4;
-
-    int idx = (x4*X3*X2*X1+x3*X2*X1+x2*X1+x1)>>1;
-    if(oddBit){
-      idx += Vh;
-    }
-    for(int dir= 0; dir < 4; dir++){
-      char* src = (char*)sitelink[dir];
-      char* dst = (char*)sitelink_ex[dir];
-      memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
-    }//dir
-  }//i
-
-  /////////////////////////////////////
-  // Allocate all CPU intermediaries //
-  /////////////////////////////////////
-
-  void* v_reflink[4];         // V link -- fat7 smeared link
-  void* w_reflink[4];         // unitarized V link
-  void* w_reflink_ex[4];      // extended W link
-  void* long_reflink[4];      // Final long link
-  void* fat_reflink[4];       // Final fat link
-  void* long_reflink_eps[4];  // Long link for fermion with non-zero epsilon
-  void* fat_reflink_eps[4];   // Fat link for fermion with non-zero epsilon
-  for(int i=0;i < 4;i++){
-    v_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    w_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    w_reflink_ex[i] = safe_malloc(V_ex*gaugeSiteSize*gSize);
+  void* long_reflink[4];  // Long link for fermion with zero epsilon
+  void* fat_reflink[4];   // Fat link for fermion with zero epsilon
+  for(int i=0;i < 4;i++) {
     long_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
     fat_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    if (n_naiks > 1) {
+  }
+
+  void* long_reflink_eps[4];  // Long link for fermion with non-zero epsilon
+  void* fat_reflink_eps[4];   // Fat link for fermion with non-zero epsilon
+  if (n_naiks > 1) {
+    for(int i=0;i < 4;i++) {
       long_reflink_eps[i] = safe_malloc(V*gaugeSiteSize*gSize);
       fat_reflink_eps[i] = safe_malloc(V*gaugeSiteSize*gSize);
     }
   }
 
-  // Copy of V link needed for CPU unitarization routines
-  void* v_sitelink = pinned_malloc(4*V*gaugeSiteSize*gSize);
+  if (verify_results) {
 
+    double* act_paths[3] = { act_path_coeff_1, act_path_coeff_2, act_path_coeff_3 };
 
-  if (verify_results){
+    computeHISQLinksCPU(fat_reflink, long_reflink, 
+                        fat_reflink_eps, long_reflink_eps,
+                        sitelink, &qudaGaugeParam, act_paths, eps_naik);
 
-    //FIXME: we have this complication because references takes coeff as float/double
-    //        depending on the precision while the GPU code aways take coeff as double
-    void* coeff;
-    double coeff_dp[6];
-    float  coeff_sp[6];
-
-    /////////////////////////////////////////////////////
-    // Create V links (fat7 links), 1st path table set //
-    /////////////////////////////////////////////////////
-
-    for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeff_1[i];
-    coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
-
-    // Only need fat links.
-#ifdef MULTI_GPU
-    int optflag = 0;
-    //we need x,y,z site links in the back and forward T slice
-    // so it is 3*2*Vs_t
-    int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
-    for (int i=0; i < 4; i++) ghost_sitelink[i] = safe_malloc(8*Vs[i]*gaugeSiteSize*gSize);
-
-    /*
-       nu |     |
-          |_____|
-            mu
-       */
-
-    for(int nu=0;nu < 4;nu++){
-      for(int mu=0; mu < 4;mu++){
-        if(nu == mu){
-          ghost_sitelink_diag[nu*4+mu] = NULL;
-        }else{
-          //the other directions
-          int dir1, dir2;
-          for(dir1= 0; dir1 < 4; dir1++){
-            if(dir1 !=nu && dir1 != mu){
-              break;
-            }
-          }
-          for(dir2=0; dir2 < 4; dir2++){
-            if(dir2 != nu && dir2 != mu && dir2 != dir1){
-              break;
-            }
-          }
-          ghost_sitelink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-          memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-        }
-
-      }
-    }
-    exchange_cpu_sitelink(qudaGaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
-    llfat_reference_mg(v_reflink, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, coeff);
-#else
-    llfat_reference(v_reflink, sitelink, qudaGaugeParam.cpu_prec, coeff);
-#endif
-
-    /////////////////////////////////////////
-    // Create W links (unitarized V links) //
-    /////////////////////////////////////////
-
-    // This is based on "unitarize_link_test.cpp"
-
-    // Format change
-    if (prec == QUDA_DOUBLE_PRECISION){
-      double* link = reinterpret_cast<double*>(v_sitelink);
-      for(int dir=0; dir<4; ++dir){
-        double* slink = reinterpret_cast<double*>(v_reflink[dir]);
-        for(int i=0; i<V; ++i){
-          for(int j=0; j<gaugeSiteSize; j++){
-            link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
-          }
-        }
-      }
-    } else if(prec == QUDA_SINGLE_PRECISION){
-      float* link = reinterpret_cast<float*>(v_sitelink);
-      for(int dir=0; dir<4; ++dir){
-        float* slink = reinterpret_cast<float*>(v_reflink[dir]);
-        for(int i=0; i<V; ++i){
-          for(int j=0; j<gaugeSiteSize; j++){
-            link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
-          }
-        }
-      }
-    }
-
-    // Prepare cpuGaugeFields for unitarization
-    gParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    gParam.gauge = v_sitelink;
-    cpuGaugeField* cpuVLink = new cpuGaugeField(gParam);
-
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    cpuGaugeField* cpuWLink = new cpuGaugeField(gParam);
-
-    // unitarize
-    unitarizeLinksCPU(*cpuWLink, *cpuVLink);
-
-    // Copy back into "w_reflink"
-    if (prec == QUDA_DOUBLE_PRECISION){
-      double* link = reinterpret_cast<double*>(cpuWLink->Gauge_p());
-      for(int dir=0; dir<4; ++dir){
-        double* slink = reinterpret_cast<double*>(w_reflink[dir]);
-        for(int i=0; i<V; ++i){
-          for(int j=0; j<gaugeSiteSize; j++){
-            slink[i*gaugeSiteSize + j] = link[(i*4 + dir)*gaugeSiteSize + j];
-          }
-        }
-      }
-    } else if(prec == QUDA_SINGLE_PRECISION){
-      float* link = reinterpret_cast<float*>(cpuWLink->Gauge_p());
-      for(int dir=0; dir<4; ++dir){
-        float* slink = reinterpret_cast<float*>(w_reflink[dir]);
-        for(int i=0; i<V; ++i){
-          for(int j=0; j<gaugeSiteSize; j++){
-            slink[i*gaugeSiteSize + j] = link[(i*4 + dir)*gaugeSiteSize + j];
-          }
-        }
-      }
-    }
-
-
-    // Clean up cpuGaugeFields, we don't need them anymore.
-
-    delete cpuVLink;
-    delete cpuWLink;
-
-    ///////////////////////////////////
-    // Prepare for extended W fields //
-    ///////////////////////////////////
-
-    for(int i=0; i < V_ex; i++) {
-      int sid = i;
-      int oddBit=0;
-      if(i >= Vh_ex){
-        sid = i - Vh_ex;
-        oddBit = 1;
-      }
-
-      int za = sid/E1h;
-      int x1h = sid - za*E1h;
-      int zb = za/E2;
-      int x2 = za - zb*E2;
-      int x4 = zb/E3;
-      int x3 = zb - x4*E3;
-      int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-      int x1 = 2*x1h + x1odd;
-
-
-      if( x1< 2 || x1 >= X1 +2
-          || x2< 2 || x2 >= X2 +2
-          || x3< 2 || x3 >= X3 +2
-          || x4< 2 || x4 >= X4 +2){
-  #ifdef MULTI_GPU
-        continue;
-  #endif
-      }
-
-
-
-      x1 = (x1 - 2 + X1) % X1;
-      x2 = (x2 - 2 + X2) % X2;
-      x3 = (x3 - 2 + X3) % X3;
-      x4 = (x4 - 2 + X4) % X4;
-
-      int idx = (x4*X3*X2*X1+x3*X2*X1+x2*X1+x1)>>1;
-      if(oddBit){
-        idx += Vh;
-      }
-      for(int dir= 0; dir < 4; dir++){
-        char* src = (char*)w_reflink[dir];
-        char* dst = (char*)w_reflink_ex[dir];
-        memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
-      }//dir
-    }//i
-
-    //////////////////////////////
-    // Create extended W fields //
-    //////////////////////////////
-
-#ifdef MULTI_GPU
-    optflag = 0;
-    //we need x,y,z site links in the back and forward T slice
-    // so it is 3*2*Vs_t
-    for (int i=0; i < 4; i++) ghost_wlink[i] = safe_malloc(8*Vs[i]*gaugeSiteSize*gSize);
-
-    /*
-       nu |     |
-          |_____|
-            mu
-       */
-
-    for(int nu=0;nu < 4;nu++){
-      for(int mu=0; mu < 4;mu++){
-        if(nu == mu){
-          ghost_wlink_diag[nu*4+mu] = NULL;
-        }else{
-          //the other directions
-          int dir1, dir2;
-          for(dir1= 0; dir1 < 4; dir1++){
-            if(dir1 !=nu && dir1 != mu){
-              break;
-            }
-          }
-          for(dir2=0; dir2 < 4; dir2++){
-            if(dir2 != nu && dir2 != mu && dir2 != dir1){
-              break;
-            }
-          }
-          ghost_wlink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-          memset(ghost_wlink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-        }
-
-      }
-    }
-#endif
-
-    ////////////////////////////////////////////
-    // Prepare to create Naiks, 3rd table set //
-    ////////////////////////////////////////////
-
-    if (n_naiks > 1) {
-
-      for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeff_3[i];
-      coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
-
-  #ifdef MULTI_GPU
-
-      exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
-      llfat_reference_mg(fat_reflink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
-    
-      {
-        int R[4] = {2,2,2,2};
-        exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
-        computeLongLinkCPU(long_reflink, w_reflink_ex, qudaGaugeParam.cpu_prec, coeff);
-      }
-  #else
-      llfat_reference(fat_reflink, w_reflink, qudaGaugeParam.cpu_prec, coeff);
-      computeLongLinkCPU(long_reflink, w_reflink, qudaGaugeParam.cpu_prec, coeff);
-  #endif
-
-      // Rescale fat and long links into eps links
-      for (int i = 0; i < 4; i++) {
-        cpu_axy(prec, eps_naik, fat_reflink[i], fat_reflink_eps[i], V*gaugeSiteSize);
-        cpu_axy(prec, eps_naik, long_reflink[i], long_reflink_eps[i], V*gaugeSiteSize);
-      }
-    }
-
-    /////////////////////////////////////////////////////////////
-    // Prepare to create X links and long links, 2nd table set //
-    /////////////////////////////////////////////////////////////
-
-    for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeff_2[i];
-    coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
-
-#ifdef MULTI_GPU
-    optflag = 0;
-
-    // We've already built the extended W fields.
-
-    exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
-    llfat_reference_mg(fat_reflink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
-  
-    {
-      int R[4] = {2,2,2,2};
-      exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
-      computeLongLinkCPU(long_reflink, w_reflink_ex, qudaGaugeParam.cpu_prec, coeff);
-    }
-#else
-    llfat_reference(fat_reflink, w_reflink, qudaGaugeParam.cpu_prec, coeff);
-    computeLongLinkCPU(long_reflink, w_reflink, qudaGaugeParam.cpu_prec, coeff);
-#endif
-
-    if (n_naiks > 1) {
-      // Accumulate into eps links.
-      for (int i = 0; i < 4; i++) {
-        cpu_xpy(prec, fat_reflink[i], fat_reflink_eps[i], V*gaugeSiteSize);
-        cpu_xpy(prec, long_reflink[i], long_reflink_eps[i], V*gaugeSiteSize);
-      }
-    }
-
-  }//verify_results
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Layout change for fatlink, fatlink_eps, longlink, longlink_eps //
@@ -780,30 +408,11 @@ static void hisq_test()
     }
   }
 
-#ifdef MULTI_GPU
-  if (verify_results){
-    for(int i=0; i<4; i++){
-      host_free(ghost_sitelink[i]);
-      host_free(ghost_wlink[i]);
-      for(int j=0;j <4; j++){
-        if (i==j) continue;
-        host_free(ghost_sitelink_diag[i*4+j]);
-        host_free(ghost_wlink_diag[i*4+j]);
-      }
-    }
-  }
-#endif
-
 
   for(int i=0; i < 4; i++){
     host_free(sitelink[i]);
-    host_free(sitelink_ex[i]);
-    host_free(v_reflink[i]);
-    host_free(w_reflink[i]);
-    host_free(w_reflink_ex[i]);
     host_free(fat_reflink[i]);
     host_free(long_reflink[i]);
-
     if (n_naiks > 1) {
       host_free(fat_reflink_eps[i]);
       host_free(long_reflink_eps[i]);
@@ -812,7 +421,6 @@ static void hisq_test()
 
   // Clean up GPU compute links
   host_free(vlink);
-  host_free(v_sitelink);
   host_free(wlink);
   host_free(fatlink);
   host_free(longlink);
