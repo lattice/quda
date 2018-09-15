@@ -899,6 +899,7 @@ void qudaMultishiftInvert(int external_precision,
       gaugeParam.type = QUDA_THREE_LINKS;
       gaugeParam.ga_pad = long_pad;
       getReconstruct(gaugeParam.reconstruct, gaugeParam.reconstruct_sloppy);
+      gaugeParam.reconstruct_refinement_sloppy = gaugeParam.reconstruct_sloppy;
       loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     }
     invalidate_quda_gauge = false;
