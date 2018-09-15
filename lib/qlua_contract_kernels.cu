@@ -9,35 +9,35 @@ namespace quda {
   
   /* elementary actions on gamma matrices */
   /* a <- a^\dag */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(gvec_adj)(QC_CPLX *a_gvec)
   {
     for (int i = 0 ; i < QC_LEN_G ; i++)
       a_gvec[i] = conj(a_gvec[i]) * (QC_CPLX)(1 - 2 * qc_gamma_adj_parity(i));
   }
   /* a <- a^T */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(gvec_transp)(QC_CPLX *a_gvec)
   {
     for (int i = 0 ; i < QC_LEN_G ; i++)
       a_gvec[i] = a_gvec[i] * (QC_CPLX)(1 - 2 * qc_gamma_transp_parity(i));
   }
   /* a <- conj(a) */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(gvec_conj)(QC_CPLX *a_gvec)
   {
     for (int i = 0 ; i < QC_LEN_G ; i++)
       a_gvec[i] = conj(a_gvec[i]) * (QC_CPLX)(1 - 2 * qc_gamma_conj_parity(i));
   }
   /* a <- G(ng)^dag . a . G(ng) */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(gvec_uni_transf)(QC_CPLX *a_gvec, int ng)
   {
     for (int i = 0 ; i < QC_LEN_G ; i++)
       a_gvec[i] = a_gvec[i] * (QC_CPLX)(1 - 2 * qc_gamma_uni_parity(i, ng));
   }
   /* a <- G(ng)^T . a . G(ng) */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(gvec_sim_transf)(QC_CPLX *a_gvec, int ng)
   {
     for (int i = 0 ; i < QC_LEN_G ; i++)
@@ -50,7 +50,7 @@ namespace quda {
      having general b is ok since extra MADD cost in negl. on GPU 
   */
 
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(agx_pby_gind_D)(
 		       QC_CPLX a, int ng, const QC_CPLX *x, int x_stride,
 		       QC_CPLX b, QC_CPLX *y, int y_stride)
@@ -64,7 +64,7 @@ namespace quda {
         y[yi] = b * y[yi] + a * gik * x[xi];
       }
   }
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(agTx_pby_gind_D)(
 			QC_CPLX a, int ng, const QC_CPLX *x, int x_stride,
 			QC_CPLX b, QC_CPLX *y, int y_stride)
@@ -78,7 +78,7 @@ namespace quda {
         y[yi] = b * y[yi] + a * gik * x[xi];
       }
   }
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(agx_pby_gind_P)(
 		       QC_CPLX a, int ng, const QC_CPLX *x, int x_stride,
 		       QC_CPLX b, QC_CPLX *y, int y_stride)
@@ -94,7 +94,7 @@ namespace quda {
 	    y[yi] = b * y[yi] + a * gik * x[xi];
 	  }
   }
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(agTx_pby_gind_P)(
 			QC_CPLX a, int ng, const QC_CPLX *x, int x_stride, 
 			QC_CPLX b, QC_CPLX *y, int y_stride)
@@ -110,7 +110,7 @@ namespace quda {
 	    y[yi] = b * y[yi] + a * gik * x[xi];
 	  }
   }
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(axg_pby_gind_P)(
 		       QC_CPLX a, int ng, const QC_CPLX *x, int x_stride,
 		       QC_CPLX b, QC_CPLX *y, int y_stride)
@@ -126,7 +126,7 @@ namespace quda {
 	    y[yi] = b * y[yi] + a * gik * x[xi];
 	  }
   }
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(axgT_pby_gind_P)(
 			QC_CPLX a, int ng, const QC_CPLX *x, int x_stride,
 			QC_CPLX b, QC_CPLX *y, int y_stride)
@@ -145,14 +145,14 @@ namespace quda {
 
 
   /* y <- 0 */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(cplx_vec_zero)(QC_CPLX *y, int y_stride, int len)
   {
     for (int i = len ; i-- ; y += y_stride) 
       *y = 0;
   }
   /* y <- x */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(cplx_vec_copy)(QC_CPLX *y, int y_stride, 
 		      const QC_CPLX *x, int x_stride, int len)
   {
@@ -160,14 +160,14 @@ namespace quda {
       *y = *x;
   }
   /* x <- a * x */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(cplx_vec_scal)(QC_CPLX *x, int x_stride, QC_CPLX a, int len)
   {
     for (int i = len ; i-- ; x += x_stride)
       *x *= a;
   }
   /* y <- a * x */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(cplx_vec_scal_copy)(QC_CPLX *y, int y_stride, 
 			   QC_CPLX a, const QC_CPLX *x, int x_stride, int len)
   {
@@ -175,7 +175,7 @@ namespace quda {
       *y = *x * a;
   }
   /* y <- conj(y) */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(cplx_vec_conj)(QC_CPLX *y, int y_stride, int len)
   {
     for (int i = len ; i-- ; y += y_stride) 
@@ -184,7 +184,7 @@ namespace quda {
 
 
 #define def_gvec_func(gvec_func, gind_func, len)			\
-  INFUNC_ DEVFUNC_ void gvec_func(					\
+  inline __device__ void gvec_func(					\
 				  QC_CPLX a, const QC_CPLX *gvec, const QC_CPLX *x, int x_stride, \
 				  QC_CPLX b, QC_CPLX *y, int y_stride) { \
     for (int ng = 0 ; ng < QC_LEN_G; ng++) {				\
@@ -205,7 +205,7 @@ namespace quda {
 
 
   /* quark contraction functions */
-#define def_quarkcontractMN(MN, A,B,C,D) INFUNC_ DEVFUNC_ void		\
+#define def_quarkcontractMN(MN, A,B,C,D) inline __device__ void		\
     QC(quarkContract##MN)(QC_CPLX *r, int r_stride,			\
 			  const QC_CPLX *q1, int q1_stride, const QC_CPLX *q2, int q2_stride) { \
     const int eps[3][3] = { { 0, 1, 2}, { 1, 2, 0}, { 2, 0, 1} };	\
@@ -240,7 +240,7 @@ namespace quda {
 
 
     /* r[ic,is,jc,js] = \delta{is==js} * \sum_{ks} x[ic,ks,jc,ks] */
-    INFUNC_ DEVFUNC_ void
+    inline __device__ void
     QC(P_eq_spintrace_P)(QC_CPLX *r, int r_stride, const QC_CPLX *x, int x_stride)
     {
       QC(cplx_vec_zero)(r, r_stride, QC_LEN_P);
@@ -254,7 +254,7 @@ namespace quda {
 	}
     }
   /* r[ic,is,jc,js] <- r[ic,js,jc,is] */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(spintranspose_P)(QC_CPLX *r, int r_stride)
   {
     for (int jc = 0 ; jc < QC_Nc ; jc++)
@@ -267,7 +267,7 @@ namespace quda {
 	  }
   }
   /* r[ic,is,jc,js] <- x[ic,js,jc,is] */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(P_eq_spintranspose_P)(QC_CPLX *r, int r_stride, QC_CPLX *x, int x_stride)
   {
     for (int jc = 0 ; jc < QC_Nc ; jc++)
@@ -278,7 +278,7 @@ namespace quda {
 	      x[x_stride * QC_LIDX_P(ic, is, jc, js)];  
   }
   /* r[ic,is,jc,js] <- x[jc,js,ic,is]^* */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(P_eq_aP)(QC_CPLX *r, int r_stride, const QC_CPLX *x, int x_stride)
   {
     for (int jc = 0 ; jc < QC_Nc ; jc++)
@@ -290,7 +290,7 @@ namespace quda {
 	  }
   }
   /* r[ic,is,jc,js] <- (g5.x^\dag.g5)[ic,is,jc,js] */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(P_eq_hP)(QC_CPLX *r, int r_stride, const QC_CPLX *x, int x_stride)
   {
     QC_CPLX tmpP1[QC_LEN_P];
@@ -301,7 +301,7 @@ namespace quda {
     QC(axg_pby_gind_P)(1., 15, tmpP1,1, 0., r,r_stride);
   }
   /* y <- a*x + y */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(ax_py_P)(QC_CPLX a, const QC_CPLX *x, int x_stride, QC_CPLX *y, int y_stride)
   {
     for (int jc = 0 ; jc < QC_Nc ; jc++)
@@ -313,7 +313,7 @@ namespace quda {
 	  }
   }
   /* y <- a*spintranspose(x) + y */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(axTs_py_P)(QC_CPLX a, const QC_CPLX *x, int x_stride, QC_CPLX *y, int y_stride)
   {
     for (int jc = 0 ; jc < QC_Nc ; jc++)
@@ -326,7 +326,7 @@ namespace quda {
 	  }
   }
   /* Tr[x . y] */
-  INFUNC_ DEVFUNC_ QC_CPLX 
+  inline __device__ QC_CPLX 
     QC(trace_P_dot_P)(
 		      const QC_CPLX *x, int x_stride,
 		      const QC_CPLX *y, int y_stride) 
@@ -342,7 +342,7 @@ namespace quda {
     return s;
   }
   /* Tr[x . y^\dag] */
-  INFUNC_ DEVFUNC_ QC_CPLX 
+  inline __device__ QC_CPLX 
     QC(trace_P_dot_aP)(
 		       const QC_CPLX *x, int x_stride,
 		       const QC_CPLX *y, int y_stride) 
@@ -358,7 +358,7 @@ namespace quda {
     return s;
   }
   /* Tr[x^\dag . y] ; FIXME reuse P_dot_aP instead */
-  INFUNC_ DEVFUNC_ QC_CPLX 
+  inline __device__ QC_CPLX 
     QC(trace_aP_dot_P)(
 		       const QC_CPLX *x, int x_stride,
 		       const QC_CPLX *y, int y_stride) 
@@ -374,7 +374,7 @@ namespace quda {
     return s;
   }
   /* Tr[x^\dag . y^\dag] ; FIXME reuse P_dot_P instead */
-  INFUNC_ DEVFUNC_ QC_CPLX 
+  inline __device__ QC_CPLX 
     QC(trace_aP_dot_aP)(
 			const QC_CPLX *x, int x_stride,
 			const QC_CPLX *y, int y_stride) 
@@ -391,7 +391,7 @@ namespace quda {
   }
 
   /* gres[is,js] <- Tr_c[x . y] = \sum_{ic,jc,ks} x[ic,is,jc,ks] * y[jc,ks,ic,js] */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(G_peqa_colortrace_P_dot_P)(
 				  QC_CPLX *gres, int gres_stride, QC_CPLX a,
 				  const QC_CPLX *x, int x_stride,
@@ -410,7 +410,7 @@ namespace quda {
       }
   }
   /* gres[is,js] <- Tr_c[x . y^\dag] = \sum_{ic,jc,ks} x[ic,is,jc,ks] * conj(y[ic,js,jc,ks]) */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(G_peqa_colortrace_P_dot_aP)(
 				   QC_CPLX *gres, int gres_stride, QC_CPLX a,
 				   const QC_CPLX *x, int x_stride,
@@ -430,7 +430,7 @@ namespace quda {
   }
   /* gres[is,js] <- Tr_c[x^\dag . y] = \sum_{ic,jc,ks} conj(x[jc,ks,ic,is]) * y[jc,ks,ic,js]
      FIXME reuse P_dot_aP + conj + transpose */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(G_peqa_colortrace_aP_dot_P)(
 				   QC_CPLX *gres, QC_CPLX a, int gres_stride,
 				   const QC_CPLX *x, int x_stride,
@@ -450,7 +450,7 @@ namespace quda {
   }
   /* gres[is,js] <- Tr_c[x^\dag . y] = \sum_{ic,jc,ks} conj(x[jc,ks,ic,is]) * conj(y[ic,js,jc,ks])
      FIXME reuse P_dot_P + conj + transpose */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(G_peqa_colortrace_aP_dot_aP)(
 				    QC_CPLX *gres, int gres_stride, QC_CPLX a,
 				    const QC_CPLX *x, int x_stride,
@@ -470,7 +470,7 @@ namespace quda {
   }
 
   /* Tr_s[Gamma[gn] . g1] */
-  INFUNC_ DEVFUNC_ QC_CPLX
+  inline __device__ QC_CPLX
     QC(trace_gamma_dot_G)(int ng, const QC_CPLX *g1, int g1_stride)
   {
     QC_CPLX s = 0;
@@ -481,7 +481,7 @@ namespace quda {
     return s;
   }
   /* res[ng] <- Tr_s[Gamma[ng].g1] */
-  INFUNC_ DEVFUNC_ void
+  inline __device__ void
     QC(gvec_eq_trace_gamma_dot_G)(
 				  QC_CPLX *gres, int gres_stride, 
 				  const QC_CPLX *g1, int g1_stride)
@@ -491,7 +491,7 @@ namespace quda {
   }
 
   /* compute res[gn] = Tr [Gamma[gn] * F * B] */
-  DEVFUNC_ void 
+  __device__ void 
     QC(contract_tr_g_P_P)(
 			  QC_CPLX *gres, int gres_stride,
 			  const QC_CPLX *F, int F_stride,
@@ -503,7 +503,7 @@ namespace quda {
     QC(gvec_eq_trace_gamma_dot_G)(gres,gres_stride, tmpG1,1);
   }
   /* compute res[gn] = Tr [Gamma[gn] * F * B^\dag] */
-  DEVFUNC_ void 
+  __device__ void 
     QC(contract_tr_g_P_aP)(
 			   QC_CPLX *gres, int gres_stride,
 			   const QC_CPLX *F, int F_stride,
@@ -515,7 +515,7 @@ namespace quda {
     QC(gvec_eq_trace_gamma_dot_G)(gres,gres_stride, tmpG1,1);
   }
   /* compute res[gn] = Tr [Gamma[gn] * F * g5.B^\dag.g5] */
-  DEVFUNC_ void 
+  __device__ void 
     QC(contract_tr_g_P_hP)(
 			   QC_CPLX *gres, int gres_stride,
 			   const QC_CPLX *F, int F_stride,
@@ -529,7 +529,7 @@ namespace quda {
     QC(gvec_eq_trace_gamma_dot_G)(gres,gres_stride, tmpG1,1);
   }
 
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(GG_eq_colortrace_P_P)(
 			     QC_CPLX *gg, int gg_stride, 
 			     const QC_CPLX *F, int F_stride, 
@@ -547,7 +547,7 @@ namespace quda {
 	    gg[gg_stride*QC_LIDX_GG(i1,i2,i3,i4)] = s;
 	  }
   }
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
     QC(G_eq_diag_GG)(
 		     QC_CPLX *g, int g_stride, 
 		     const QC_CPLX *gg, int gg_stride) {
@@ -569,7 +569,7 @@ namespace quda {
   }
 
   /* compute res[gn] = Tr [Gamma[gn] * F * (-g4.Gamma[gn]^\dag.g4) * B] */
-  DEVFUNC_ void
+  __device__ void
     QC(contract_tr_g_P_mgbar_P)(
 				QC_CPLX *gres, int gres_stride,
 				const QC_CPLX *F, int F_stride,
@@ -585,7 +585,7 @@ namespace quda {
     }
   }
   /* compute res[gn] = Tr [Gamma[gn] * F * (-g4.Gamma[gn]^\dag.g4) * B^\dag] */
-  DEVFUNC_ void
+  __device__ void
     QC(contract_tr_g_P_mgbar_aP)(
 				 QC_CPLX *gres, int gres_stride,
 				 const QC_CPLX *F, int F_stride,
@@ -596,7 +596,7 @@ namespace quda {
     QC(contract_tr_g_P_mgbar_P)(gres, gres_stride, F, F_stride, tmpP1,1);
   }
   /* compute res[gn] = Tr [Gamma[gn] * F * (-g4.Gamma[gn]^\dag.g4) * g5.B^\dag.g5] */
-  DEVFUNC_ void
+  __device__ void
     QC(contract_tr_g_P_mgbar_hP)(
 				 QC_CPLX *gres, int gres_stride,
 				 const QC_CPLX *F, int F_stride,
@@ -608,7 +608,7 @@ namespace quda {
   }
 
 
-  DEVFUNC_ void 
+  __device__ void 
     QC(baryon_sigma_seqsource_u)(
 				 QC_CPLX *r, int r_stride,
 				 const QC_CPLX *Fu, int Fu_stride, 
@@ -671,7 +671,7 @@ namespace quda {
 
 
   /* gres[is,js] <- Tr_c[u . x . y] = \sum_{ic,kc,jc,ks} u[ic,jc] * x[jc,is,kc,ks] * y[kc,ks,kc,is] */
-  INFUNC_ DEVFUNC_ void 
+  inline __device__ void 
   QC(G_peqa_colortrace_U_dot_P_dot_P)(
 				      QC_CPLX *gres, int gres_stride, QC_CPLX a,
 				      const QC_CPLX *u, int u_stride,
@@ -702,7 +702,7 @@ namespace quda {
   }
 
   /* compute res[gn] = Tr [Gamma[gn] * F * B] */
-  DEVFUNC_ void 
+  __device__ void 
   QC(contract_tr_g_U_P_P)(
 			  QC_CPLX *gres, int gres_stride,
 			  const QC_CPLX *U, int U_stride,
@@ -716,7 +716,7 @@ namespace quda {
   }
   
 
-  DEVFUNC_ void 
+  __device__ void 
     QC(baryon_sigma_seqsource_d)(
 				 QC_CPLX *r, int r_stride,
 				 const QC_CPLX *Fu1, int Fu1_stride,
@@ -764,7 +764,7 @@ namespace quda {
   }
 
 
-  DEVFUNC_ void 
+  __device__ void 
     QC(baryon_sigma_twopt_asymsrc_gvec)(
 					QC_CPLX *r, int r_stride,
 					const QC_CPLX *Fu1, int Fu1_stride,

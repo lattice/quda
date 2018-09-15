@@ -80,7 +80,7 @@
 // [G(n)^T . A]_{J(n)_k, j} = C(n)_k * A_{k,j}
 // [A . G(n)  ]_{i, J(n)_k} = A_{i,k} * C(n)_k
 // [A . G(n)^T]_{i,      j} = A_{i,J(n)_j} * C(n)_j
-INFUNC_ DEVFUNC_ QC_REAL gamma_left_coeff_Re(int m, int n, int c){
+inline __device__ QC_REAL gamma_left_coeff_Re(int m, int n, int c){
 
   CONSTVAR_ QC_REAL gamma_left_coeff_Re_[QC_LEN_G][QC_Ns][2] = {
     { {1,0}, {1,0}, {1,0}, {1,0} },             /* G0 = 1 */
@@ -104,7 +104,7 @@ INFUNC_ DEVFUNC_ QC_REAL gamma_left_coeff_Re(int m, int n, int c){
   return gamma_left_coeff_Re_[m][n][c];
 }
 
-INFUNC_ DEVFUNC_ int gamma_left_ind(int m, int n){
+inline __device__ int gamma_left_ind(int m, int n){
 
   CONSTVAR_ int gamma_left_ind_[QC_LEN_G][QC_Ns] = {
     { 0, 1, 2, 3 },             /* G0 = 1 */
@@ -130,7 +130,7 @@ INFUNC_ DEVFUNC_ int gamma_left_ind(int m, int n){
 
 
 /* bits (gammas) in 0..15 (in G0..G15) */
-INFUNC_ DEVFUNC_ int qc_bitcount16(int n){
+inline __device__ int qc_bitcount16(int n){
 
   CONSTVAR_ int qc_bitcount16_[QC_LEN_G] = { 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4 };
 
@@ -139,7 +139,7 @@ INFUNC_ DEVFUNC_ int qc_bitcount16(int n){
 
 /*  G(n)^\dag = (-1)**gamma_adj_parity[n] * G(n);
     G(n).G(n) = (-1)**gamma_adj_parity[n]  (since G(n)^\dag.G(n)=G(n).G(n)^\dag=1) */
-INFUNC_ DEVFUNC_ int qc_gamma_adj_parity(int n){
+inline __device__ int qc_gamma_adj_parity(int n){
 
   CONSTVAR_ int qc_gamma_adj_parity_[QC_LEN_G] = { 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0 };
 
@@ -147,7 +147,7 @@ INFUNC_ DEVFUNC_ int qc_gamma_adj_parity(int n){
 }
 
 /*  G(n)^* = (-1)**gamma_conj_parity[n] * G(n) */
-INFUNC_ DEVFUNC_ int qc_gamma_conj_parity(int n){
+inline __device__ int qc_gamma_conj_parity(int n){
 
   CONSTVAR_ int qc_gamma_conj_parity_[QC_LEN_G] = { 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0 };
 
@@ -155,7 +155,7 @@ INFUNC_ DEVFUNC_ int qc_gamma_conj_parity(int n){
 }
 
 /*  G(n)^T = (-1)**gamma_transp_parity[n] * G(n) */
-INFUNC_ DEVFUNC_ int qc_gamma_transp_parity(int n){
+inline __device__ int qc_gamma_transp_parity(int n){
 
   CONSTVAR_ int qc_gamma_transp_parity_[QC_LEN_G]={ 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0 };
 
@@ -163,13 +163,13 @@ INFUNC_ DEVFUNC_ int qc_gamma_transp_parity(int n){
 }
 
 /* G(n)^\dag . G(m) . G(n) = (-1)**gamma_uni_parity(m,n) * G(m) */
-INFUNC_ DEVFUNC_ int qc_gamma_uni_parity(int m,int n){
+inline __device__ int qc_gamma_uni_parity(int m,int n){
 
   return ( qc_bitcount16(m) * qc_bitcount16(n) - qc_bitcount16(m&n) ) % 2;
 }
 
 /* G(n)^T . G(m) . G(n)    = (-1)**gamma_sim_parity(m,n) * G(m) */
-INFUNC_ DEVFUNC_ int qc_gamma_sim_parity(int m, int n){
+inline __device__ int qc_gamma_sim_parity(int m, int n){
 
   return ( qc_gamma_uni_parity(m,n) + qc_gamma_conj_parity(n) ) % 2;
 }
@@ -180,46 +180,46 @@ INFUNC_ DEVFUNC_ int qc_gamma_sim_parity(int m, int n){
 
 namespace quda { 
 
-  DEVFUNC_ void QC(contract_tr_g_P_P)(
+  __device__ void QC(contract_tr_g_P_P)(
 				      QC_CPLX *gres, int gres_stride,
 				      const QC_CPLX *F, int F_stride,
 				      const QC_CPLX *B, int B_stride);
-  DEVFUNC_ void QC(contract_tr_g_P_aP)(
+  __device__ void QC(contract_tr_g_P_aP)(
 				       QC_CPLX *gres, int gres_stride,
 				       const QC_CPLX *F, int F_stride,
 				       const QC_CPLX *B, int B_stride);
-  DEVFUNC_ void QC(contract_tr_g_P_hP)(
+  __device__ void QC(contract_tr_g_P_hP)(
 				       QC_CPLX *gres, int gres_stride,
 				       const QC_CPLX *F, int F_stride,
 				       const QC_CPLX *B, int B_stride);
-  DEVFUNC_ void QC(contract_tr_g_P_mgbar_P)(
+  __device__ void QC(contract_tr_g_P_mgbar_P)(
 					    QC_CPLX *gres, int gres_stride,
 					    const QC_CPLX *F, int F_stride,
 					    const QC_CPLX *B, int B_stride);
-  DEVFUNC_ void QC(contract_tr_g_P_mgbar_aP)(
+  __device__ void QC(contract_tr_g_P_mgbar_aP)(
 					     QC_CPLX *gres, int gres_stride,
 					     const QC_CPLX *F, int F_stride,
 					     const QC_CPLX *B, int B_stride);
-  DEVFUNC_ void QC(contract_tr_g_P_mgbar_hP)(
+  __device__ void QC(contract_tr_g_P_mgbar_hP)(
 					     QC_CPLX *gres, int gres_stride,
 					     const QC_CPLX *F, int F_stride,
 					     const QC_CPLX *B, int B_stride);
-  DEVFUNC_ void QC(baryon_sigma_seqsource_u)(
+  __device__ void QC(baryon_sigma_seqsource_u)(
 					     QC_CPLX *r, int r_stride,
 					     const QC_CPLX *Fu, int Fu_stride, 
 					     const QC_CPLX *Fd, int Fd_stride,
 					     const QC_CPLX *T_gvec);
-  DEVFUNC_ void QC(contract_tr_g_U_P_P)(
+  __device__ void QC(contract_tr_g_U_P_P)(
 					QC_CPLX *gres, int gres_stride,
 					const QC_CPLX *U, int U_stride,
 					const QC_CPLX *F, int F_stride,
 					const QC_CPLX *B, int B_stride);
-  DEVFUNC_ void QC(baryon_sigma_seqsource_d)(
+  __device__ void QC(baryon_sigma_seqsource_d)(
 					     QC_CPLX *r, int r_stride,
 					     const QC_CPLX *Fu1, int Fu1_stride,
 					     const QC_CPLX *Fu2, int Fu2_stride,
 					     const QC_CPLX *T_gvec);
-  DEVFUNC_ void QC(baryon_sigma_twopt_asymsrc_gvec)(
+  __device__ void QC(baryon_sigma_twopt_asymsrc_gvec)(
 						    QC_CPLX *r, int r_stride,
 						    const QC_CPLX *Fu1, int Fu1_stride,
 						    const QC_CPLX *Fu2, int Fu2_stride,
