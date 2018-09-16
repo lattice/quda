@@ -600,6 +600,49 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
+  //-- Class for TMD contractions, make it tunable
+  class qcTMD : public TunableVectorY {
+
+  protected:
+    qcTMD_Arg *arg_dev;
+    const cudaColorSpinorField *meta;
+    qluaCntr_Type cntrType;
+    complex<QUDA_REAL> *corrQuda_dev;
+    int Nc;
+    int Ns;
+    
+    long long flops() const{
+      return (long long)meta->VolumeCB() * meta->SiteSubset() * (Nc*Nc*Ns*Ns*(1+Nc*Ns) * 8 + Ns*Ns*Ns * 2);
+    }
+    long long bytes() const{
+      return (long long)meta->VolumeCB() * meta->SiteSubset() * (2*Ns*Ns*Nc*Nc + Nc*Nc) * 2*8;
+    }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return meta->VolumeCB(); }
+
+  public:
+    qcTMD(const cudaColorSpinorField *meta_, qcTMD_Arg *arg_dev_, complex<QUDA_REAL> *corrQuda_dev_, qluaCntr_Type cntrType_)
+      : TunableVectorY(meta_->SiteSubset()), meta(meta_),
+	arg_dev(arg_dev_), corrQuda_dev(corrQuda_dev_), cntrType(cntrType_), Nc(QUDA_Nc), Ns(QUDA_Ns)
+    {
+      strcpy(aux, meta_->AuxString());
+      strcat(aux, comm_dim_partitioned_string());
+    }
+    virtual ~qcTMD() { }
+
+    long long getFlops(){return flops();}
+    long long getBytes(){return bytes();}
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if(cntrType != what_tmd_g_F_B) errorQuda("qcTMD::apply(): Support only TMD contractions for now!\n");
+      tmd_g_U_P_P_gvec_kernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(corrQuda_dev, arg_dev);
+    }
+
+    TuneKey tuneKey() const { return TuneKey(meta->VolString(), typeid(*this).name(), aux); }
+  };
+
+
   //-Top-level function
   void QuarkContractTMD_GPU(QuarkTMD_state *qcs){
 
@@ -617,11 +660,18 @@ namespace quda {
 
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
 
-    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+    // dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    // dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    // double t1 = MPI_Wtime();
+    // tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
 
     double t1 = MPI_Wtime();
-    tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
+    qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType);
+    printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
+    printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
+    contractTMD.apply(0);
+
     cudaDeviceSynchronize();
     checkCudaError();
     double t2 = MPI_Wtime();
