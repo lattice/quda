@@ -815,6 +815,98 @@ namespace quda {
   }
 
 
+  /* uv[jc,is] <- u . v = \sum_{ic} u[jc,ic] * v[ic,is] */
+  //- Deprecated function
+//   inline __device__ void
+//   QC(D_eq_U_dot_D)(Vector& u_v, const Link& U, const Vector& v){
+
+//     for (int is = 0; is < QC_Ns ; is++)
+// #pragma unroll
+//       for (int jc = 0 ; jc < QC_Nc ; jc++) {
+//         QC_CPLX s = 0;
+// #pragma unroll
+//         for (int ic = 0 ; ic < QC_Nc ; ic++)
+//           s += U(jc, ic) * v.data[is + QC_Ns*ic];
+//         u_v.data[is + QC_Ns*jc] = s;
+//       }
+//   }
+
+
+  /* gres[is,js] <- Tr_c[x . y^H] = \sum_{ic} x[ic,is] * conj(y[ic,js]) */
+  //- Version 1
+  inline __device__ void
+  QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
+                                 const Vector& x, const Vector& y){
+    
+    for (int is = 0 ; is < QC_Ns ; is++)
+      for (int js = 0 ; js < QC_Ns ; js++){
+	QC_CPLX s = 0;
+#pragma unroll
+	for (int ic = 0 ; ic < QC_Nc ; ic++){
+	  QC_CPLX yD = y(js,ic);
+	  s += x(is,ic) * conj(y(js,ic));
+	}
+	gres[gres_stride * QC_LIDX_G(is, js)] += a*s;
+      }
+  }
+  //------------------------------------
+
+  //- Version 2
+//   inline __device__ void
+//   QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
+//                                  const Vector& x, const Vector& y){
+// #pragma unroll
+//     for (int ic = 0 ; ic < QC_Nc ; ic++)
+// #pragma unroll
+//       for (int is = 0 ; is < QC_Ns ; is++)
+// #pragma unroll
+// 	for (int js = 0 ; js < QC_Ns ; js++){
+// 	  gres[gres_stride * QC_LIDX_G(is, js)] += a * x(is,ic) * conj(y(js,ic));
+// 	             a * x.data[LIDX_Vector(ic,is)] * conj(y.data[LIDX_Vector(ic,js)]);
+// 	}
+//   }
+  //------------------------------------
+
+  //- Version 3
+//   inline __device__ void
+//   QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
+// 				 const Vector& x, const Vector& y){
+//     QC_CPLX gres1[QC_LEN_G];
+// #pragma unroll
+//     for (int i = 0 ; i < QC_LEN_G ; i++) 
+//       gres1[i] = 0;
+    
+// #pragma unroll
+//     for (int ic = 0 ; ic < QC_Nc ; ic++)
+// #pragma unroll
+//       for (int is = 0 ; is < QC_Ns ; is++)
+// #pragma unroll
+// 	for (int js = 0 ; js < QC_Ns ; js++) {
+// 	  gres1[gres_stride * QC_LIDX_G(is, js)] += x(is,ic) * conj(y(js,ic));
+// 	    //	    x.data[LIDX_Vector(ic,is)] * conj(y.data[LIDX_Vector(ic,js)]);
+// 	}
+    
+// #pragma unroll
+//     for (int i = 0 ; i < QC_LEN_G ; i++)
+//       gres[i] += a * gres1[i];
+//   }
+  //------------------------------------
+
+
+
+  /* gres[is,js] += (Tr_c[u . x . y^H] = \sum_{ic,jc} u[jc,ic] * x[ic,is] * conj(y[jc,js])) */
+  inline __device__ void
+  QC(G_peqa_colortrace_U_dot_D_dot_aD)(
+				       QC_CPLX *gres, int gres_stride, QC_CPLX a,
+				       const Link& U, const Vector& x, const Vector& y)
+  {
+    //    Vector u_x;
+    //    QC(D_eq_U_dot_D)(u_x, U, x);
+    /* TODO merge the two `is' cycles and reduce local storage Vector->QC_CPLX[QC_Nc]? */
+    Vector u_x = U * x;
+    QC(G_peqa_colortrace_D_dot_aD)(gres, gres_stride, a, u_x, y);
+  }
+
   //---------------------------------------------------------------------------//
   // U T I L I T Y   F U N C T I O N S   A N D   K E R N E L   W R A P P E R S //
   //---------------------------------------------------------------------------//
@@ -956,6 +1048,33 @@ namespace quda {
     qc_quda_contract_tr_g_P_aP(Corr_dev + tid, lV,
 			       prop1, 1,
 			       prop2, 1);
+  }
+  //------------------------------------------------------------------------------------------
+
+  /* local qbarq contractions */
+  __global__ void qbarq_g_P_aP_gvec_kernel_vecByVec_preserveBasisTrue(complex<QC_REAL> *Corr_dev, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+    int lV   = arg->volume;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    QC_CPLX tmpG1[QC_LEN_G];
+    QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
+
+    for(int i=0;i<QUDA_PROP_NVEC/*TODO replace with nvec for disconnected contractions*/;i++){
+      /* assuming the gamma basis is always correct */
+      Vector vec1 = arg->prop1[i](x_cb, pty);
+      Vector vec2 = arg->prop2[i](x_cb, pty);
+      QC(G_peqa_colortrace_D_dot_aD)(Corr_dev + tid, lV, 1., vec1, vec2);
+    }
+
+    /* project onto Gamma(n=0..15)-matrices */
+    QC(gvec_eq_trace_gamma_dot_G)(Corr_dev, lV, tmpG1, 1);
   }
   //------------------------------------------------------------------------------------------
 
@@ -1119,5 +1238,46 @@ namespace quda {
 				dev_prop2, 1);
   }
   //------------------------------------------------------------------------------------------
+
+  /* local qbarUq contractions for TMD */
+  __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+    int lV   = arg->volume;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    Link U;
+    if(arg->extendedGauge){ /* this condition is the same for all threads;
+			       can this cause thread divergence? */
+      int crd[5];
+      getCoords(crd, x_cb, arg->dim, pty);
+      crd[4] = 0;
+      int c2[5] = {0,0,0,0,0};
+      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
+
+      U = arg->U(arg->i_mu, linkIndex(c2, arg->dimEx), pty);
+    }
+    else U = arg->U(arg->i_mu, x_cb, pty);
+
+    QC_CPLX tmpG1[QC_LEN_G];
+    QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
+
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      Vector vec1 = arg->fwdProp[i](x_cb, pty);
+      Vector vec2 = arg->bwdProp[i](x_cb, pty);
+      //      QC(G_peqa_colortrace_U_dot_D_dot_aD)(Corr_dev + tid, lV, 1., U, vec1, vec2);
+      QC(G_peqa_colortrace_U_dot_D_dot_aD)(tmpG1, 1., 1., U, vec1, vec2);
+    }
+
+    /* project onto Gamma(n=0..15)-matrices */
+    QC(gvec_eq_trace_gamma_dot_G)(Corr_dev + tid, lV, tmpG1, 1);
+
+  }
+
 
 } //- namespace quda

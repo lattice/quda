@@ -62,6 +62,7 @@
 #define QC_LIDX_M(ic,jc)       QC_QUDA_LIDX_M(ic,jc)
 #define QC_LIDX_D(ic,is)       QC_QUDA_LIDX_D(ic,is)
 #define QC_LIDX_P(ic,is,jc,js) QC_QUDA_LIDX_P(ic,is,jc,js)
+#define LIDX_Vector(ic,is)     ( (ic) + QC_Nc*(is) )
 
 #define QC(x) qc_quda_##x
 
@@ -180,68 +181,20 @@ inline __device__ int qc_gamma_sim_parity(int m, int n){
 
 namespace quda { 
 
-  __device__ void QC(contract_tr_g_P_P)(
-				      QC_CPLX *gres, int gres_stride,
-				      const QC_CPLX *F, int F_stride,
-				      const QC_CPLX *B, int B_stride);
-  __device__ void QC(contract_tr_g_P_aP)(
-				       QC_CPLX *gres, int gres_stride,
-				       const QC_CPLX *F, int F_stride,
-				       const QC_CPLX *B, int B_stride);
-  __device__ void QC(contract_tr_g_P_hP)(
-				       QC_CPLX *gres, int gres_stride,
-				       const QC_CPLX *F, int F_stride,
-				       const QC_CPLX *B, int B_stride);
-  __device__ void QC(contract_tr_g_P_mgbar_P)(
-					    QC_CPLX *gres, int gres_stride,
-					    const QC_CPLX *F, int F_stride,
-					    const QC_CPLX *B, int B_stride);
-  __device__ void QC(contract_tr_g_P_mgbar_aP)(
-					     QC_CPLX *gres, int gres_stride,
-					     const QC_CPLX *F, int F_stride,
-					     const QC_CPLX *B, int B_stride);
-  __device__ void QC(contract_tr_g_P_mgbar_hP)(
-					     QC_CPLX *gres, int gres_stride,
-					     const QC_CPLX *F, int F_stride,
-					     const QC_CPLX *B, int B_stride);
-  __device__ void QC(baryon_sigma_seqsource_u)(
-					     QC_CPLX *r, int r_stride,
-					     const QC_CPLX *Fu, int Fu_stride, 
-					     const QC_CPLX *Fd, int Fd_stride,
-					     const QC_CPLX *T_gvec);
-  __device__ void QC(contract_tr_g_U_P_P)(
-					QC_CPLX *gres, int gres_stride,
-					const QC_CPLX *U, int U_stride,
-					const QC_CPLX *F, int F_stride,
-					const QC_CPLX *B, int B_stride);
-  __device__ void QC(baryon_sigma_seqsource_d)(
-					     QC_CPLX *r, int r_stride,
-					     const QC_CPLX *Fu1, int Fu1_stride,
-					     const QC_CPLX *Fu2, int Fu2_stride,
-					     const QC_CPLX *T_gvec);
-  __device__ void QC(baryon_sigma_twopt_asymsrc_gvec)(
-						    QC_CPLX *r, int r_stride,
-						    const QC_CPLX *Fu1, int Fu1_stride,
-						    const QC_CPLX *Fu2, int Fu2_stride,
-						    const QC_CPLX *Fd,  int Fd_stride);
-  
-  /* ----------------------------------------------------------------------------------------------- */
-  /* ----------------------------------------------------------------------------------------------- */
   //-- Forward declarations for contraction wrappers
 
   void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
 
-  __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, Vector *vec, bool preserveBasis);
-  __device__ void prepareDeviceLinkSite(complex<QC_REAL> *devLink, Link U);
-
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void qbarq_g_P_aP_gvec_kernel_vecByVec_preserveBasisTrue(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void tmd_g_U_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg);
+  __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg);
   /* ----------------------------------------------------------------------------------------------- */
 
 } //- namespace quda

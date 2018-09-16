@@ -636,7 +636,8 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if(cntrType != what_tmd_g_F_B) errorQuda("qcTMD::apply(): Support only TMD contractions for now!\n");
-      tmd_g_U_P_P_gvec_kernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(corrQuda_dev, arg_dev);
+      tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(corrQuda_dev, arg_dev);
+      //      tmd_g_U_P_P_gvec_kernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(corrQuda_dev, arg_dev);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta->VolString(), typeid(*this).name(), aux); }
@@ -660,17 +661,18 @@ namespace quda {
 
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
 
-    // dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-    // dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-
-    // double t1 = MPI_Wtime();
-    // tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
     double t1 = MPI_Wtime();
-    qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType);
-    printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
-    printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
-    contractTMD.apply(0);
+    // tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
+    tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
+
+    // double t1 = MPI_Wtime();
+    // qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType);
+    // printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
+    // printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
+    // contractTMD.apply(0);
 
     cudaDeviceSynchronize();
     checkCudaError();
