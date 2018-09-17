@@ -374,9 +374,12 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
+    double t1 = MPI_Wtime();
     ShiftCudaVec_nonCov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
     cudaDeviceSynchronize();
     checkCudaError();
+    double t2 = MPI_Wtime();
+    printfQuda("##### %s: Kernel done in %f sec.\n", funcname, t2-t1);
     
     cudaFree(arg_dev);
     arg_dev = NULL;
@@ -409,9 +412,12 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
+    double t1 = MPI_Wtime();
     ShiftCudaVec_Cov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
     cudaDeviceSynchronize();
     checkCudaError();
+    double t2 = MPI_Wtime();
+    printfQuda("##### %s: Kernel done in %f sec.\n", funcname, t2-t1);
 
     cudaFree(arg_dev);
     arg_dev = NULL;
@@ -443,9 +449,12 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
+    double t1 = MPI_Wtime();
     ShiftGauge_nonCov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
     cudaDeviceSynchronize();
     checkCudaError();
+    double t2 = MPI_Wtime();
+    printfQuda("##### %s: Kernel done in %f sec.\n", funcname, t2-t1);
 
     dst->exchangeExtendedGhost(dst->R(), QCredundantComms);
 
@@ -479,9 +488,12 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
+    double t1 = MPI_Wtime();
     ShiftLink_Cov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
     cudaDeviceSynchronize();
     checkCudaError();
+    double t2 = MPI_Wtime();
+    printfQuda("##### %s: Kernel done in %f sec.\n", funcname, t2-t1);
 
     dst->exchangeExtendedGhost(dst->R(), QCredundantComms);
 
@@ -516,9 +528,12 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
+    double t1 = MPI_Wtime();
     ShiftLink_AdjSplitCov_kernel<<<gridDim,blockDim>>>(arg_dev, shfDir, shfSgn);
     cudaDeviceSynchronize();
     checkCudaError();
+    double t2 = MPI_Wtime();
+    printfQuda("##### %s: Kernel done in %f sec.\n", funcname, t2-t1);
 
     dst->exchangeExtendedGhost(dst->R(), QCredundantComms);
 
