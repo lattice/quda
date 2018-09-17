@@ -681,13 +681,13 @@ namespace quda {
 
     double t1 = MPI_Wtime();
     // tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
-    tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
+    //    tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
 
-    // double t1 = MPI_Wtime();
-    // qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType);
-    // printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
-    // printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
-    // contractTMD.apply(0);
+    double t1 = MPI_Wtime();
+    qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType);
+    printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
+    printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
+    contractTMD.apply(0);
 
     cudaDeviceSynchronize();
     checkCudaError();
