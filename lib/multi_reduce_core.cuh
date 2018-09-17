@@ -191,23 +191,48 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
 			 MultiReduceArg<NXZ,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Reducer> &arg,
 			 const TuneParam &tp, const cudaStream_t &stream) {
 
-  if(tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
+  if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
   
-  // ESW: this is where the multireduce kernel is called...?
+  if (getFastReduce() && !commAsyncReduction()) {
+    // initialize the reduction values in 32-bit increments to INT_MIN
+    constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
+    void *h_reduce = getHostReduceBuffer();
+    for (unsigned int i=0; i<tp.grid.z*NXZ*arg.NYW*words; i++) {
+      reinterpret_cast<int32_t*>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
+    }
+  }
+
 #ifdef WARP_MULTI_REDUCE
   multiReduceKernel<ReduceType,FloatN,M,NXZ><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #else
   LAUNCH_KERNEL_LOCAL_PARITY(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ);
 #endif
-  
+
+  if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
-  if(deviceProp.canMapHostMemory){
-    qudaEventRecord(*getReduceEvent(), stream);
-    while(cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
-  } else
+    if (deviceProp.canMapHostMemory) {
+      if (getFastReduce()) {
+	constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
+	volatile int32_t *check = reinterpret_cast<int32_t*>(getHostReduceBuffer());
+	int count = 0;
+	for (unsigned int i=0; i<tp.grid.z*NXZ*arg.NYW*words; i++) {
+	  // spin-wait until all values have been updated
+	  while (check[i] == std::numeric_limits<int32_t>::min()) {
+	    if (count++ % 10000 == 0) { // check error every 10000 iterations
+	      // if there is an error in the kernel then we need to exit the spin-wait
+	      if (cudaSuccess != cudaPeekAtLastError()) break;
+	    }
+	  }
+	}
+      } else {
+	qudaEventRecord(*getReduceEvent(), stream);
+	while(cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
+      }
+    } else
 #endif
-    { qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
+      { qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
+  }
 
   // need to transpose for same order with vector thread reduction
   for (int i=0; i<NXZ; i++) {
@@ -265,7 +290,7 @@ template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M,
 
   // we only launch thread blocks up to size 512 since the autoner
   // tuner favours smaller blocks and this helps with compile time
-  unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / 2; }
+  unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / 2; }
 
 public:
   MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[],

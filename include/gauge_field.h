@@ -8,6 +8,8 @@
 namespace quda {
 
   struct GaugeFieldParam : public LatticeFieldParam {
+
+    QudaFieldLocation location; // where are we storing the field (CUDA or GPU)?
     int nColor;
     int nFace;
 
@@ -19,7 +21,6 @@ namespace quda {
 
     double anisotropy;
     double tadpole;
-    double scale;
     void *gauge; // used when we use a reference to an external field
 
     QudaFieldCreate create; // used to determine the type of field created
@@ -48,6 +49,7 @@ namespace quda {
 
     // Default constructor
   GaugeFieldParam(void* const h_gauge=NULL) : LatticeFieldParam(),
+      location(QUDA_INVALID_FIELD_LOCATION),
       nColor(3),
       nFace(0),
       reconstruct(QUDA_RECONSTRUCT_NO),
@@ -57,7 +59,6 @@ namespace quda {
       t_boundary(QUDA_INVALID_T_BOUNDARY),
       anisotropy(1.0),
       tadpole(1.0),
-      scale(1.0),
       gauge(h_gauge),
       create(QUDA_REFERENCE_FIELD_CREATE), 
       geometry(QUDA_VECTOR_GEOMETRY),
@@ -74,19 +75,21 @@ namespace quda {
   GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
 		  const int pad, const QudaFieldGeometry geometry,
 		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD) 
-    : LatticeFieldParam(4, x, pad, precision, ghostExchange), nColor(3), nFace(0), reconstruct(reconstruct),
+    : LatticeFieldParam(4, x, pad, precision, ghostExchange),
+      location(QUDA_INVALID_FIELD_LOCATION), nColor(3), nFace(0), reconstruct(reconstruct),
       order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO),
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0),
-      tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry),
+      tadpole(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry),
       compute_fat_link_max(false), staggeredPhaseType(QUDA_STAGGERED_PHASE_NO),
       staggeredPhaseApplied(false), i_mu(0.0), site_offset(0), site_size(0)
       { }
 
   GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS)
-    : LatticeFieldParam(param), nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
+    : LatticeFieldParam(param), location(QUDA_CPU_FIELD_LOCATION),
+      nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
       order(param.gauge_order), fixed(param.gauge_fix),
       link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type), t_boundary(param.t_boundary),
-      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge),
+      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), gauge(h_gauge),
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
       compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
       staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu),
@@ -110,10 +113,31 @@ namespace quda {
        field order for QUDA internal fields.
        @param precision The precision to use 
      */
-    void setPrecision(QudaPrecision precision) {
+    void setPrecision(QudaPrecision precision, bool force_native=false) {
+      // is the current status in native field order?
+      bool native = force_native ? true : false;
+      if (precision == QUDA_DOUBLE_PRECISION) {
+	if (order  == QUDA_FLOAT2_GAUGE_ORDER) native = true;
+      } else if (precision == QUDA_SINGLE_PRECISION ||
+		 precision == QUDA_HALF_PRECISION) {
+	if (reconstruct == QUDA_RECONSTRUCT_NO) {
+	  if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
+	} else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
+	  if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
+	} else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
+	  if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
+	} else if (reconstruct == QUDA_RECONSTRUCT_10) {
+	  if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
+	}
+      }
+
       this->precision = precision;
-      order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ? 
-	QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER; 
+      this->ghost_precision = precision;
+
+      if (native) {
+	order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ?
+	  QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+      }
     }
 
   };
@@ -142,7 +166,6 @@ namespace quda {
     double anisotropy;
     double tadpole;
     double fat_link_max;
-    double scale;
 
     QudaFieldCreate create; // used to determine the type of field created
 
@@ -188,8 +211,10 @@ namespace quda {
        @param[in] R Radius of the ghost zone
        @param[in] no_comms_fill If true we create a full halo
        regardless of partitioning
+       @param[in] bidir Is this a bi-directional exchange - if not
+       then we alias the fowards and backwards offsetss
     */
-    void createGhostZone(const int *R, bool no_comms_fill) const;
+    void createGhostZone(const int *R, bool no_comms_fill, bool bidir=true) const;
 
   public:
     GaugeField(const GaugeFieldParam &param);
@@ -204,7 +229,6 @@ namespace quda {
     QudaGaugeFieldOrder Order() const { return order; }
     double Anisotropy() const { return anisotropy; }
     double Tadpole() const { return tadpole; }
-    double Scale() const { return scale; }  
     QudaTboundary TBoundary() const { return t_boundary; }
     QudaLinkType LinkType() const { return link_type; }
     QudaGaugeFixed GaugeFixed() const { return fixed; }
@@ -293,14 +317,29 @@ namespace quda {
        @return checksum value
      */
     uint64_t checksum(bool mini=false) const;
+
+    /**
+       @brief Create the gauge field, with meta data specified in the
+       parameter struct.
+       @param param Parameter struct specifying the gauge field
+       @return Pointer to allcoated gauge field
+    */
+    static GaugeField* Create(const GaugeFieldParam &param);
+
   };
 
   class cudaGaugeField : public GaugeField {
 
   private:
     void *gauge;
+    void *gauge_h; // mapped-memory pointer when allocating on the host
     void *even;
     void *odd;
+
+    /**
+       @brief Initialize the padded region to 0
+     */
+    void zeroPad();
 
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
@@ -334,19 +373,24 @@ namespace quda {
 
     /**
        @brief Create the communication handlers and buffers
-       @param R The thickness of the extended region in each dimension
-       @param no_comms_fill Do local exchange to fill out the extended
+       @param[in] R The thickness of the extended region in each dimension
+       @param[in] no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
+       @param[in] bidir Whether to allocate communication buffers to
+       allow for simultaneous bi-directional exchange.  If false, then
+       the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(const int *R, bool no_comms_fill);
+    void createComms(const int *R, bool no_comms_fill, bool bidir=true);
 
     /**
        @brief Allocate the ghost buffers
-       @param R The thickness of the extended region in each dimension
-       @param no_comms_fill Do local exchange to fill out the extended
+       @param[in] R The thickness of the extended region in each dimension
+       @param[in] no_comms_fill Do local exchange to fill out the extended
+       @param[in] bidir Is this a bi-directional exchange - if not
+       then we alias the fowards and backwards offsetss
        region in non-partitioned dimensions
     */
-    void allocateGhostBuffer(const int *R, bool no_comms_fill) const;
+    void allocateGhostBuffer(const int *R, bool no_comms_fill, bool bidir=true) const;
 
     /**
        @brief Start the receive communicators

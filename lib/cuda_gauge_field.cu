@@ -28,19 +28,29 @@ namespace quda {
 	int minimum_pad = nFace*surfaceCB[i] * (geometry == QUDA_COARSE_GEOMETRY ? 2 : 1);
 	if (pad < minimum_pad) pad_check = false;
 	if (!pad_check)
-	  errorQuda("cudaGaugeField being constructed with insufficient padding (%d < %d)\n", pad, minimum_pad);
+	  errorQuda("cudaGaugeField being constructed with insufficient padding in dim %d (%d < %d)\n", i, pad, minimum_pad);
       }
     }
 #endif
 
-    if(create != QUDA_NULL_FIELD_CREATE &&
+    if (create != QUDA_NULL_FIELD_CREATE &&
         create != QUDA_ZERO_FIELD_CREATE &&
         create != QUDA_REFERENCE_FIELD_CREATE){
       errorQuda("ERROR: create type(%d) not supported yet\n", create);
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      gauge = pool_device_malloc(bytes);
+      switch(mem_type) {
+      case QUDA_MEMORY_DEVICE:
+	gauge = pool_device_malloc(bytes);
+	break;
+      case QUDA_MEMORY_MAPPED:
+        gauge_h = mapped_malloc(bytes);
+	cudaHostGetDevicePointer(&gauge, gauge_h, 0); // set the matching device pointer
+	break;
+      default:
+	errorQuda("Unsupported memory type %d", mem_type);
+      }
       if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
     } else {
       gauge = param.gauge;
@@ -59,7 +69,8 @@ namespace quda {
     }
 
     even = gauge;
-    odd = (char*)gauge + bytes/2; 
+    odd = static_cast<char*>(gauge) + bytes/2;
+    if (create != QUDA_ZERO_FIELD_CREATE && isNative() && ghostExchange == QUDA_GHOST_EXCHANGE_PAD) zeroPad();
 
 #ifdef USE_TEXTURE_OBJECTS
     createTexObject(tex, gauge, true);
@@ -76,10 +87,21 @@ namespace quda {
 
   }
 
+  void cudaGaugeField::zeroPad() {
+    size_t pad_bytes = (stride - volumeCB) * precision * order;
+    int Npad = (geometry * (reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2)) / order;
+
+    size_t pitch = stride*order*precision;
+    if (pad_bytes) {
+      cudaMemset2D(static_cast<char*>(even) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+      cudaMemset2D(static_cast<char*>(odd) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+    }
+  }
+
 #ifdef USE_TEXTURE_OBJECTS
   void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, bool full, bool isPhase) {
 
-    if( isNative() ){
+    if( isNative() && geometry != QUDA_COARSE_GEOMETRY ){
       // create the texture for the field components
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
@@ -123,6 +145,11 @@ namespace quda {
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/(!full ? 2 : 1) : (bytes-phase_bytes)/(!full ? 2 : 1);
 
+      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
+	errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+		  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+      }
+
       unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
       if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
 	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
@@ -130,7 +157,7 @@ namespace quda {
 
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
-      if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
       else texDesc.readMode = cudaReadModeElementType;
 
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
@@ -139,11 +166,11 @@ namespace quda {
   }
 
   void cudaGaugeField::destroyTexObject() {
-    if( isNative() ){
+    if ( isNative() && geometry != QUDA_COARSE_GEOMETRY ) {
       cudaDestroyTextureObject(tex);
       cudaDestroyTextureObject(evenTex);
       cudaDestroyTextureObject(oddTex);
-      if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13){
+      if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
         cudaDestroyTextureObject(phaseTex);
         cudaDestroyTextureObject(evenPhaseTex);
         cudaDestroyTextureObject(oddPhaseTex);
@@ -162,7 +189,16 @@ namespace quda {
     destroyComms();
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      if (gauge) pool_device_free(gauge);
+      switch(mem_type) {
+      case QUDA_MEMORY_DEVICE:
+        if (gauge) pool_device_free(gauge);
+        break;
+      case QUDA_MEMORY_MAPPED:
+        if (gauge_h) host_free(gauge_h);
+        break;
+      default:
+        errorQuda("Unsupported memory type %d", mem_type);
+      }
     }
 
     if ( !isNative() ) {
@@ -187,7 +223,8 @@ namespace quda {
     const int dir = 1; // sending forwards only
     const int R[] = {nFace, nFace, nFace, nFace};
     const bool no_comms_fill = true; // dslash kernels presently require this
-    createComms(R, true); // always need to allocate space for non-partitioned dimension for copyGenericGauge
+    const bool bidir = false; // communication is only ever done in one direction at once
+    createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
 
     // loop over backwards and forwards links
     const QudaLinkDirection directions[] = {QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS};
@@ -200,7 +237,7 @@ namespace quda {
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
 	// receive from backwards is first half of each ghost_recv_buffer
-	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
+	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; if (bidir) offset += ghost_face_bytes[d];
 	// send forwards is second half of each ghost_send_buffer
 	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
       }
@@ -271,7 +308,8 @@ namespace quda {
     const int dir = 0; // sending backwards only
     const int R[] = {nFace, nFace, nFace, nFace};
     const bool no_comms_fill = false; // injection never does no_comms_fill
-    createComms(R, true); // always need to allocate space for non-partitioned dimension for copyGenericGauge
+    const bool bidir = false; // communication is only ever done in one direction at once
+    createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
 
     // loop over backwards and forwards links (forwards links never sent but leave here just in case)
     const QudaLinkDirection directions[] = {QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS};
@@ -284,7 +322,7 @@ namespace quda {
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
 	// send backwards is first half of each ghost_send_buffer
-	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
+	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; if (bidir) offset += ghost_face_bytes[d];
 	// receive from forwards is the second half of each ghost_recv_buffer
 	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
       }
@@ -341,21 +379,22 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  void cudaGaugeField::allocateGhostBuffer(const int *R, bool no_comms_fill) const
+  void cudaGaugeField::allocateGhostBuffer(const int *R, bool no_comms_fill, bool bidir) const
   {
-    createGhostZone(R, no_comms_fill);
+    createGhostZone(R, no_comms_fill, bidir);
     LatticeField::allocateGhostBuffer(ghost_bytes);
   }
 
-  void cudaGaugeField::createComms(const int *R, bool no_comms_fill)
+  void cudaGaugeField::createComms(const int *R, bool no_comms_fill, bool bidir)
   {
-    allocateGhostBuffer(R, no_comms_fill); // allocate the ghost buffer if not yet allocated
+    allocateGhostBuffer(R, no_comms_fill, bidir); // allocate the ghost buffer if not yet allocated
 
     // ascertain if this instance needs it comms buffers to be updated
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
-      (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]); // pinned buffers
+      (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]) || // pinned buffers
+      ghost_bytes != ghost_bytes_old; // ghost buffer has been resized (e.g., bidir to unidir)
 
-    if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill);
+    if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill, bidir);
 
     if (ghost_field_reset) destroyIPCComms();
     createIPCComms();
@@ -591,7 +630,7 @@ namespace quda {
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
-      if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0) 
+      if ((precision == QUDA_HALF_PRECISION  || precision == QUDA_QUARTER_PRECISION) && fat_link_max == 0.0) 
         errorQuda("fat_link_max has not been computed");
     } else {
       fat_link_max = 1.0;

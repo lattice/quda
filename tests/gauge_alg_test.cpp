@@ -14,6 +14,14 @@
 #include <random_quda.h>
 #include <unitarization_links.h>
 
+#include <qio_field.h>
+
+#if defined(QMP_COMMS)
+#include <qmp.h>
+#elif defined(MPI_COMMS)
+#include <mpi.h>
+#endif
+
 
 #include <gtest.h>
 
@@ -25,8 +33,11 @@ extern int ydim;
 extern int zdim;
 extern int tdim;
 extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
+extern QudaPrecision prec_sloppy;
+extern QudaReconstructType link_recon;
+extern QudaReconstructType link_recon_sloppy;
+extern double anisotropy;
 extern char latfile[];
 
 int num_failures=0;
@@ -35,8 +46,46 @@ int *num_failures_dev;
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define DABS(a) ((a)<(0.)?(-(a)):(a))
 
+QudaPrecision &cpu_prec = prec;
+QudaPrecision &cuda_prec = prec;
+QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 
 
+void cpuSetGaugeParam(QudaGaugeParam &gauge_param) {
+
+  gauge_param.X[0] = xdim;
+  gauge_param.X[1] = ydim;
+  gauge_param.X[2] = zdim;
+  gauge_param.X[3] = tdim;
+
+  gauge_param.anisotropy = anisotropy;
+  gauge_param.type = QUDA_WILSON_LINKS;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  
+  gauge_param.cpu_prec = cpu_prec;
+
+  gauge_param.cuda_prec = cuda_prec;
+  gauge_param.reconstruct = link_recon;
+
+  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
+  gauge_param.ga_pad = 0;
+  // For multi-GPU, ga_pad must be large enough to store a time-slice
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
+  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  int pad_size =MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+  gauge_param.ga_pad = pad_size;    
+#endif
+}
 
 
 class GaugeAlgTest : public ::testing::Test {
@@ -183,7 +232,6 @@ class GaugeAlgTest : public ::testing::Test {
     printfQuda("Time Monte -> %.6f s\n", a1.Last());
     plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
     printfQuda("Plaq: %.16e , %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-
   }
 
   virtual void TearDown() {

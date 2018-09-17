@@ -3,6 +3,7 @@
 
 #include <quda_internal.h>
 #include <tune_quda.h>
+#include <dirac_quda.h>
 #include <gauge_field.h>
 
 #include <worker.h>
@@ -18,6 +19,9 @@ namespace quda {
     @return Whether the T dimension is kernel packed or not
     */
   bool getKernelPackT();
+
+  void pushKernelPackT(bool pack);
+  void popKernelPackT();
 
   /**
      Sets commDim array used in dslash_pack.cu

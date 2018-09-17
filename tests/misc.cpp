@@ -684,45 +684,50 @@ get_recon(char* s)
 QudaPrecision
 get_prec(char* s)
 {
-    QudaPrecision ret = QUDA_DOUBLE_PRECISION;
-    
-    if (strcmp(s, "double") == 0){
-	ret = QUDA_DOUBLE_PRECISION;
-    }else if (strcmp(s, "single") == 0){
-	ret = QUDA_SINGLE_PRECISION;
-    }else if (strcmp(s, "half") == 0){
-	ret = QUDA_HALF_PRECISION;
-    }else{
-	fprintf(stderr, "Error: invalid precision type\n");	
-	exit(1);
-    }
-    
-    return ret;
+  QudaPrecision ret = QUDA_DOUBLE_PRECISION;
+
+  if (strcmp(s, "double") == 0) {
+    ret = QUDA_DOUBLE_PRECISION;
+  } else if (strcmp(s, "single") == 0) {
+    ret = QUDA_SINGLE_PRECISION;
+  } else if (strcmp(s, "half") == 0) {
+    ret = QUDA_HALF_PRECISION;
+  } else if (strcmp(s, "half") == 0) {
+    ret = QUDA_HALF_PRECISION;
+  } else if (strcmp(s, "quarter") == 0) {
+    ret = QUDA_QUARTER_PRECISION;
+  } else {
+    fprintf(stderr, "Error: invalid precision type\n");
+    exit(1);
+  }
+
+  return ret;
 }
 
-const char* 
+const char*
 get_prec_str(QudaPrecision prec)
 {
-    const char* ret;
-    
-    switch( prec){
-	
-    case QUDA_DOUBLE_PRECISION:
-	ret=  "double";
-	break;
-    case QUDA_SINGLE_PRECISION:
-	ret= "single";
-	break;
-    case QUDA_HALF_PRECISION:
-	ret= "half";
-	break;
-    default:
-	ret = "unknown";	
-	break;
-    }
-    
-    
-    return ret;
+  const char* ret;
+
+  switch (prec) {
+  case QUDA_DOUBLE_PRECISION:
+    ret=  "double";
+    break;
+  case QUDA_SINGLE_PRECISION:
+    ret= "single";
+    break;
+  case QUDA_HALF_PRECISION:
+    ret= "half";
+    break;
+  case QUDA_QUARTER_PRECISION:
+    ret= "quarter";
+    break;
+  default:
+    ret = "unknown";
+    break;
+  }
+
+  return ret;
 }
 
 
@@ -820,6 +825,40 @@ get_test_type(int t)
     default:
 	ret = "unknown";
 	break;
+    }
+    
+    return ret;
+}
+
+const char*
+get_staggered_test_type(int t)
+{
+    const char* ret;
+    switch(t){
+    case 0:
+  ret = "full";
+  break;
+    case 1:
+  ret = "full_ee_prec";
+  break;
+    case 2:
+  ret = "full_oo_prec";
+  break;
+    case 3:
+  ret = "even";
+  break;
+    case 4:
+  ret = "odd";
+  break;
+    case 5:
+  ret = "mcg_even";
+  break;  
+    case 6:
+  ret = "mcg_odd";
+  break;  
+    default:
+  ret = "unknown";
+  break;
     }
     
     return ret;
@@ -1066,6 +1105,25 @@ get_solve_str(QudaSolveType type)
   return ret;
 }
 
+QudaSchwarzType
+get_schwarz_type(char* s)
+{
+  QudaSchwarzType ret = QUDA_INVALID_SCHWARZ;
+
+  if (strcmp(s, "false") == 0) {
+    ret = QUDA_INVALID_SCHWARZ;
+  } else if (strcmp(s, "add") == 0) {
+    ret = QUDA_ADDITIVE_SCHWARZ;
+  } else if (strcmp(s, "mul") == 0) {
+    ret = QUDA_MULTIPLICATIVE_SCHWARZ;
+  } else {
+    fprintf(stderr, "Error: invalid Schwarz type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
 QudaTwistFlavorType
 get_flavor_type(char* s)
 {
@@ -1154,8 +1212,18 @@ get_solver_type(char* s)
     ret = QUDA_CGNE_INVERTER;
   } else if (strcmp(s, "cgnr") == 0){
     ret = QUDA_CGNR_INVERTER;
+  } else if (strcmp(s, "cg3") == 0){
+    ret = QUDA_CG3_INVERTER;
+  } else if (strcmp(s, "cg3ne") == 0){
+    ret = QUDA_CG3NE_INVERTER;
+  } else if (strcmp(s, "cg3nr") == 0){
+    ret = QUDA_CG3NR_INVERTER;
+  } else if (strcmp(s, "ca-cg") == 0){
+    ret = QUDA_CA_CG_INVERTER;
+  } else if (strcmp(s, "ca-gcr") == 0){
+    ret = QUDA_CA_GCR_INVERTER;
   } else {
-    fprintf(stderr, "Error: invalid solver type\n");	
+    fprintf(stderr, "Error: invalid solver type %s\n", s);
     exit(1);
   }
   
@@ -1216,6 +1284,27 @@ get_solver_str(QudaInverterType type)
   case QUDA_BICGSTABL_INVERTER:
     ret = "bicgstab-l";
     break;
+  case QUDA_CGNE_INVERTER:
+    ret = "cgne";
+    break;
+  case QUDA_CGNR_INVERTER:
+    ret = "cgnr";
+    break;
+  case QUDA_CG3_INVERTER:
+    ret = "cg3";
+    break;
+  case QUDA_CG3NE_INVERTER:
+    ret = "cg3ne";
+    break;
+  case QUDA_CG3NR_INVERTER:
+    ret = "cg3nr";
+    break;
+  case QUDA_CA_CG_INVERTER:
+    ret = "ca-cg";
+    break;
+  case QUDA_CA_GCR_INVERTER:
+    ret = "ca-gcr";
+    break;
   default:
     ret = "unknown";
     errorQuda("Error: invalid solver type %d\n", type);
@@ -1258,16 +1347,16 @@ get_solve_ext_lib_type(char* s)
 }
 
 QudaFieldLocation
-get_df_location_ritz(char* s)
+get_location(char* s)
 {
   QudaFieldLocation ret = QUDA_INVALID_FIELD_LOCATION;
 
-  if (strcmp(s, "host") == 0) {
+  if (strcmp(s, "cpu") == 0 || strcmp(s, "host") == 0) {
     ret = QUDA_CPU_FIELD_LOCATION;
-  } else if (strcmp(s, "cuda") == 0) {
+  } else if (strcmp(s, "gpu") == 0 || strcmp(s, "cuda") == 0) {
     ret = QUDA_CUDA_FIELD_LOCATION;
   } else {
-    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    fprintf(stderr, "Error: invalid location %s\n", s);
     exit(1);
   }
 

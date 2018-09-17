@@ -78,7 +78,7 @@ extern double mass; // mass of Dirac operator
 extern double mu;
 extern void usage(char**);
 
-QudaVerbosity verbosity = QUDA_SUMMARIZE;
+extern QudaVerbosity verbosity;
 
 const char *prec_str[] = {"half", "single", "double"};
 const char *recon_str[] = {"r18", "r12", "r8"};
@@ -270,59 +270,59 @@ void init(int precision, QudaReconstructType link_recon) {
   if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
     dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
     csParam.PCtype = QUDA_4D_PC;
-} else {
-  csParam.PCtype = QUDA_5D_PC;
-}
-
-//ndeg_tm    
-if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-  csParam.twistFlavor = inv_param.twist_flavor;
-  csParam.nDim = (inv_param.twist_flavor == QUDA_TWIST_SINGLET) ? 4 : 5;
-  csParam.x[4] = inv_param.Ls;    
-}
-
-
-csParam.precision = inv_param.cpu_prec;
-csParam.pad = 0;
-
-if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-  csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  csParam.x[0] /= 2;
-} else {
-  if (test_type < 2 || test_type == 3) {
-    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-    csParam.x[0] /= 2;
   } else {
-    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    csParam.PCtype = QUDA_5D_PC;
   }
-}
 
-csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-csParam.gammaBasis = inv_param.gamma_basis;
-csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-spinor = new cpuColorSpinorField(csParam);
-spinorOut = new cpuColorSpinorField(csParam);
-spinorRef = new cpuColorSpinorField(csParam);
-spinorTmp = new cpuColorSpinorField(csParam);
-
-csParam.x[0] = gauge_param.X[0];
-
-// printfQuda("Randomizing fields... ");
+  //ndeg_tm
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    csParam.twistFlavor = inv_param.twist_flavor;
+    csParam.nDim = (inv_param.twist_flavor == QUDA_TWIST_SINGLET) ? 4 : 5;
+    csParam.x[4] = inv_param.Ls;
+  }
 
 
-//FIXME
-  // if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
-  //   read_gauge_field(latfile, hostGauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-  //   construct_gauge_field(hostGauge, 2, gauge_param.cpu_prec, &gauge_param);
-  // } else { // else generate a random SU(3) field
-construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
-  // }
+ csParam.setPrecision(inv_param.cpu_prec);
+ csParam.pad = 0;
 
-spinor->Source(QUDA_RANDOM_SOURCE, 0);
+ if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+   csParam.x[0] /= 2;
+ } else {
+   if (test_type < 2 || test_type == 3) {
+     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+     csParam.x[0] /= 2;
+   } else {
+     csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+   }
+ }
 
-if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+ csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+ csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+ csParam.gammaBasis = inv_param.gamma_basis;
+ csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+ spinor = new cpuColorSpinorField(csParam);
+ spinorOut = new cpuColorSpinorField(csParam);
+ spinorRef = new cpuColorSpinorField(csParam);
+ spinorTmp = new cpuColorSpinorField(csParam);
+
+ csParam.x[0] = gauge_param.X[0];
+
+ // printfQuda("Randomizing fields... ");
+
+
+ //FIXME
+ // if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
+ //   read_gauge_field(latfile, hostGauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+ //   construct_gauge_field(hostGauge, 2, gauge_param.cpu_prec, &gauge_param);
+ // } else { // else generate a random SU(3) field
+ construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
+ // }
+
+ spinor->Source(QUDA_RANDOM_SOURCE, 0);
+
+ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
     construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
@@ -356,8 +356,8 @@ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOV
   if (!transfer) {
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
-    csParam.precision = inv_param.cuda_prec;
-    if (csParam.precision == QUDA_DOUBLE_PRECISION ) {
+    csParam.setPrecision(inv_param.cuda_prec);
+    if (csParam.Precision() == QUDA_DOUBLE_PRECISION ) {
       csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     } else {
       /* Single and half */

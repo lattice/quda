@@ -313,7 +313,7 @@
     int major, minor, micro;
 
     magma_version( &major, &minor, &micro);
-    printfQuda("\nMAGMA library version: %d.%d\n\n", major,  minor);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("\nMAGMA library version: %d.%d\n\n", major,  minor);
 #else
     errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
 #endif

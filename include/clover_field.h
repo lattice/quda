@@ -22,6 +22,7 @@ namespace quda {
     QudaFieldCreate create;
     void setPrecision(QudaPrecision precision) {
       this->precision = precision;
+      this->ghost_precision = precision;
       order = (precision == QUDA_DOUBLE_PRECISION) ? 
 	QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
     }

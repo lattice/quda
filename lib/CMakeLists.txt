@@ -1,11 +1,13 @@
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
-  multigrid.cpp transfer.cpp transfer_util.cu inv_bicgstab_quda.cpp
+  coarse_op_preconditioned.cu
+  multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
+  inv_cg3_quda.cpp inv_cg3ne_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
@@ -30,14 +32,22 @@ set (QUDA_OBJS
   multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
-  extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_gauss.cu
+  extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
-  copy_color_spinor_dh.cu copy_color_spinor_ss.cu
-  copy_color_spinor_sd.cu copy_color_spinor_sh.cu
+  copy_color_spinor_dh.cu copy_color_spinor_dq.cu
+  copy_color_spinor_ss.cu copy_color_spinor_sd.cu
+  copy_color_spinor_sh.cu copy_color_spinor_sq.cu
   copy_color_spinor_hd.cu copy_color_spinor_hs.cu
-  copy_color_spinor_hh.cu copy_color_spinor_mg_dd.cu
-  copy_color_spinor_mg_ds.cu copy_color_spinor_mg_sd.cu
-  copy_color_spinor_mg_ss.cu copy_gauge_double.cu copy_gauge_single.cu
+  copy_color_spinor_hh.cu copy_color_spinor_hq.cu
+  copy_color_spinor_qd.cu copy_color_spinor_qs.cu
+  copy_color_spinor_qh.cu copy_color_spinor_qq.cu
+  copy_color_spinor_mg_dd.cu copy_color_spinor_mg_ds.cu
+  copy_color_spinor_mg_sd.cu copy_color_spinor_mg_ss.cu
+  copy_color_spinor_mg_sh.cu copy_color_spinor_mg_sq.cu
+  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
+  copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
+  copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
+  copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu
@@ -104,7 +114,7 @@ target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/inc
   $<INSTALL_INTERFACE:include>)
 
 # propagate CXX flags to CUDA host compiler
-if(USING_CUDA_LANG_SUPPORT AND ${QUDA_PROPAGATE_CXX_FLAGS})
+if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
     $<$<CONFIG:DEVEL>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVEL}>
     $<$<CONFIG:STRICT>:-Xcompiler ${CMAKE_CXX_FLAGS_STRICT}>
@@ -124,44 +134,45 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     endif()
 endif()
 
-target_link_libraries(quda ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
+target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
-  target_link_libraries(quda ${QIO_LIB} ${LIME_LIB})
+  target_link_libraries(quda INTERFACE ${QIO_LIB} ${LIME_LIB})
 endif()
 
 if(QUDA_QDPJIT)
-  target_link_libraries(quda ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_QMP)
-  target_link_libraries(quda ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_MPI)
-  target_link_libraries(quda ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_MAGMA)
-  target_link_libraries(quda ${MAGMA})
+  target_link_libraries(quda PRIVATE ${MAGMA})
 endif()
 
 if(QUDA_ARPACK)
-  target_link_libraries(quda ${PARPACK_OR_ARPACK})
+  target_link_libraries(quda PRIVATE ${PARPACK_OR_ARPACK})
+endif()
+
+if(QUDA_NVML)
+  target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
 endif()
 
 if(QUDA_NUMA_NVML)
-target_link_libraries(quda ${NVML_LIBRARY})
+  target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
 endif()
 
 
 # malloc.cpp uses both the driver and runtime api
 # So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub version
 # for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake 
-if(${CMAKE_VERSION} VERSION_LESS 3.8)
-  find_library(CUDA_cuda_LIBRARY cuda HINTS ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64 PATH_SUFFIXES stubs )
-endif()
-target_link_libraries(quda ${CUDA_cuda_LIBRARY})
+target_link_libraries(quda PUBLIC ${CUDA_cuda_LIBRARY})
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
 if (QUDA_DOWNLOAD_EIGEN)

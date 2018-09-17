@@ -63,6 +63,7 @@ static QudaSumFloat *d_reduce=0;
 static QudaSumFloat *h_reduce=0;
 static QudaSumFloat *hd_reduce=0;
 static cudaEvent_t reduceEnd;
+static bool fast_reduce_enabled = false;
 
 namespace quda {
   namespace blas {
@@ -73,6 +74,7 @@ namespace quda {
     void* getMappedHostReduceBuffer() { return hd_reduce; }
     void* getHostReduceBuffer() { return h_reduce; }
     cudaEvent_t* getReduceEvent() { return &reduceEnd; }
+    bool getFastReduce() { return fast_reduce_enabled; }
 
     void initReduce()
     {
@@ -127,6 +129,13 @@ namespace quda {
       }
 
       cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
+
+      // enable fast reductions with CPU spin waiting as opposed to using CUDA events
+      char *fast_reduce_env = getenv("QUDA_ENABLE_FAST_REDUCE");
+      if (fast_reduce_env && strcmp(fast_reduce_env,"1") == 0) {
+        warningQuda("Experimental fast reductions enabled");
+        fast_reduce_enabled = true;
+      }
 
       checkCudaError();
     }
@@ -429,27 +438,27 @@ namespace quda {
 
 
     /**
-       double cabxpyAxNorm(float a, complex b, float *x, float *y, n){}
-       First performs the operation y[i] += a*b*x[i]
+       double cabxpyzAxNorm(float a, complex b, float *x, float *y, float *z){}
+       First performs the operation z[i] = y[i] + a*b*x[i]
        Second performs x[i] *= a
        Third returns the norm of x
     */
     template <typename ReduceType, typename Float2, typename FloatN>
-    struct cabxpyaxnorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
+    struct cabxpyzaxnorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Float2 a;
       Float2 b;
-      cabxpyaxnorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      cabxpyzaxnorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { x *= a.x; Caxpy_(b, x, y); norm2_<ReduceType>(sum,y); }
+      { x *= a.x; Caxpy_(b, x, y); z = y; norm2_<ReduceType>(sum,z); }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 10; } //! flops per element
     };
 
 
-    double cabxpyAxNorm(const double &a, const Complex &b,
-			ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,cabxpyaxnorm,1,1,0,0,0,false>
-	(make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, x, x, x);
+    double cabxpyzAxNorm(const double &a, const Complex &b,
+			ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double,QudaSumFloat,cabxpyzaxnorm,1,0,1,0,0,false>
+	(make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, z, x, x);
     }
 
 
@@ -701,6 +710,8 @@ namespace quda {
     };
 
     double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r) {
+      // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
+      if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
       double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,HeavyQuarkResidualNorm_,0,0,0,0,0,true>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
@@ -741,6 +752,8 @@ namespace quda {
 
     double3 xpyHeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &y,
 				      ColorSpinorField &r) {
+      // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
+      if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
       double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,xpyHeavyQuarkResidualNorm_,0,0,0,0,0,true>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
@@ -795,6 +808,119 @@ namespace quda {
     }
 
 #endif
+
+    /**
+       double quadrupleCG3InitNorm(d a, d b, V x, V y, V z, V w, V v){}
+        z = x;
+        w = y;
+        x += a*y;
+        y -= a*v;
+        norm2(y);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct quadrupleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      quadrupleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+        z = x;
+        w = y;
+        x += a.x*y;
+        y -= a.x*v;
+        norm2_<ReduceType>(sum,y);
+      }
+      static int streams() { return 6; } //! total number of input and output streams
+      static int flops() { return 6; } //! flops per element check if it's right
+    };
+
+    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
+      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3InitNorm_,1,1,1,1,0,false>
+	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, w, v);
+    }
+
+
+    /**
+       double quadrupleCG3UpdateNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
+        tmpx = x;
+        tmpy = y;
+        x = b*(x + a*y) + (1-b)*z;
+        y = b*(y + a*v) + (1-b)*w;
+        z = tmpx;
+        w = tmpy;
+        norm2(y);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a,b;
+      quadrupleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      FloatN tmpx{}, tmpy{};
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+        tmpx = x;
+        tmpy = y;
+        x = b.x*(x + a.x*y) + b.y*z;
+        y = b.x*(y - a.x*v) + b.y*w;
+        z = tmpx;
+        w = tmpy;
+        norm2_<ReduceType>(sum,y);
+      }
+      static int streams() { return 7; } //! total number of input and output streams
+      static int flops() { return 16; } //! flops per element check if it's right
+    };
+
+    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
+      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3UpdateNorm_,1,1,1,1,0,false>
+	(make_double2(a, 0.0), make_double2(b, 1.-b), x, y, z, w, v);
+    }
+
+    /**
+       void doubleCG3InitNorm(d a, V x, V y, V z){}
+        y = x;
+        x -= a*z;
+        norm2(x);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct doubleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      doubleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+        y = x;
+        x -= a.x*z;
+        norm2_<ReduceType>(sum,x);
+      }
+      static int streams() { return 3; } //! total number of input and output streams
+      static int flops() { return 5; } //! flops per element
+    };
+
+    double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3InitNorm_,1,1,0,0,0,false>
+        (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, z, z);
+    }
+
+    /**
+       void doubleCG3UpdateNorm(d a, d b, V x, V y, V z){}
+        tmp = x;
+        x = b*(x-a*z) + (1-b)*y;
+        y = tmp;
+        norm2(x);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct doubleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a, b;
+      doubleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      FloatN tmp{};
+      __device__ __host__ void operator()(ReduceType &sum,FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
+        tmp = x;
+        x = b.x*(x-a.x*z) + b.y*y;
+        y = tmp;
+        norm2_<ReduceType>(sum,x);
+      }
+      static int streams() { return 4; } //! total number of input and output streams
+      static int flops() { return 9; } //! flops per element
+    };
+
+    double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3UpdateNorm_,1,1,0,0,0,false>
+        (make_double2(a, 0.0), make_double2(b, 1.0-b), x, y, z, z, z);
+    }
 
    } // namespace blas
 
