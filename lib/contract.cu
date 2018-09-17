@@ -1,4 +1,7 @@
+#include <typeinfo>
 #include <color_spinor_field.h>
+#include <gauge_field.h>
+#include <clover_field.h>
 #include <tune_quda.h>
 
 // these control the Wilson-type actions
