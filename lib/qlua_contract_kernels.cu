@@ -844,7 +844,7 @@ namespace quda {
 #pragma unroll
 	for (int ic = 0 ; ic < QC_Nc ; ic++){
 	  QC_CPLX yD = y(js,ic);
-	  s += x(is,ic) * conj(y(js,ic));
+	  s += x(is,ic) * conj(yD);
 	}
 	gres[gres_stride * QC_LIDX_G(is, js)] += a*s;
       }
@@ -1192,8 +1192,8 @@ namespace quda {
 				     prop1, 1,
 				     prop2, 1);
   }
-  //------------------------------------------------------------------------------------------
 
+  //------------------------------------------------------------------------------------------
   __global__ void tmd_g_U_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
@@ -1218,8 +1218,41 @@ namespace quda {
     prepareDevicePropSite(dev_prop1, vec1, arg->preserveBasis);
     prepareDevicePropSite(dev_prop2, vec2, arg->preserveBasis);
 
+    Link U = arg->U(arg->i_mu, x_cb, pty);
+
+    prepareDeviceLinkSite(dev_link, U);
+
+    qc_quda_contract_tr_g_U_P_P(Corr_dev + tid, lV,
+				dev_link,  1,
+				dev_prop1, 1,
+				dev_prop2, 1);
+  }
+  __global__ void tmd_g_U_P_P_gvec_kernel_gaugeExt(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+    int lV   = arg->volume;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    complex<QC_REAL> dev_prop1[QC_LEN_P];
+    complex<QC_REAL> dev_prop2[QC_LEN_P];
+    complex<QC_REAL> dev_link[QC_LEN_M];
+
+    Vector vec1[QUDA_PROP_NVEC];
+    Vector vec2[QUDA_PROP_NVEC];
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      vec1[i] = arg->fwdProp[i](x_cb, pty);
+      vec2[i] = arg->bwdProp[i](x_cb, pty);
+    }
+    prepareDevicePropSite(dev_prop1, vec1, arg->preserveBasis);
+    prepareDevicePropSite(dev_prop2, vec2, arg->preserveBasis);
+
     Link U;
-    if(arg->extendedGauge){
+    {      
       int crd[5];
       getCoords(crd, x_cb, arg->dim, pty);
       crd[4] = 0;
@@ -1228,7 +1261,6 @@ namespace quda {
 	
       U = arg->U(arg->i_mu, linkIndex(c2, arg->dimEx), pty);
     }
-    else U = arg->U(arg->i_mu, x_cb, pty);
 
     prepareDeviceLinkSite(dev_link, U);
 
@@ -1251,18 +1283,7 @@ namespace quda {
     if (pty >= arg->nParity) return;
     if(tid >= lV) return;
 
-    Link U;
-    if(arg->extendedGauge){ /* this condition is the same for all threads;
-			       can this cause thread divergence? */
-      int crd[5];
-      getCoords(crd, x_cb, arg->dim, pty);
-      crd[4] = 0;
-      int c2[5] = {0,0,0,0,0};
-      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
-
-      U = arg->U(arg->i_mu, linkIndex(c2, arg->dimEx), pty);
-    }
-    else U = arg->U(arg->i_mu, x_cb, pty);
+    Link U = arg->U(arg->i_mu, x_cb, pty);
 
     QC_CPLX tmpG1[QC_LEN_G];
     QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
@@ -1279,5 +1300,42 @@ namespace quda {
 
   }
 
+  __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+    int tid  = x_cb + pty * arg->volumeCB;
+    int lV   = arg->volume;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
+    if(tid >= lV) return;
+
+    Link U;
+    { /* this condition is the same for all threads;
+			       can this cause thread divergence? */
+      int crd[5];
+      getCoords(crd, x_cb, arg->dim, pty);
+      crd[4] = 0;
+      int c2[5] = {0,0,0,0,0};
+      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
+
+      U = arg->U(arg->i_mu, linkIndex(c2, arg->dimEx), pty);
+    }
+
+    QC_CPLX tmpG1[QC_LEN_G];
+    QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
+
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      Vector vec1 = arg->fwdProp[i](x_cb, pty);
+      Vector vec2 = arg->bwdProp[i](x_cb, pty);
+      //      QC(G_peqa_colortrace_U_dot_D_dot_aD)(Corr_dev + tid, lV, 1., U, vec1, vec2);
+      QC(G_peqa_colortrace_U_dot_D_dot_aD)(tmpG1, 1., 1., U, vec1, vec2);
+    }
+
+    /* project onto Gamma(n=0..15)-matrices */
+    QC(gvec_eq_trace_gamma_dot_G)(Corr_dev + tid, lV, tmpG1, 1);
+
+  }
 
 } //- namespace quda

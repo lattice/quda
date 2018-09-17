@@ -12,6 +12,8 @@
 #include <qlua_contract_kernels.cuh>
 #include <qlua_contract_shifts.cuh>
 
+
+
 namespace quda {  
 
   const int nShiftFlag = 20;
@@ -614,7 +616,6 @@ namespace quda {
   }//-- QuarkContractStd_GPU
   //---------------------------------------------------------------------------
 
-
   //-- Class for TMD contractions, make it tunable
   class qcTMD : public TunableVectorY {
 
@@ -622,6 +623,7 @@ namespace quda {
     qcTMD_Arg *arg_dev;
     const cudaColorSpinorField *meta;
     qluaCntr_Type cntrType;
+    bool extendedGauge;
     complex<QUDA_REAL> *corrQuda_dev;
     int Nc;
     int Ns;
@@ -636,9 +638,10 @@ namespace quda {
     unsigned int minThreads() const { return meta->VolumeCB(); }
 
   public:
-    qcTMD(const cudaColorSpinorField *meta_, qcTMD_Arg *arg_dev_, complex<QUDA_REAL> *corrQuda_dev_, qluaCntr_Type cntrType_)
+    qcTMD(const cudaColorSpinorField *meta_, qcTMD_Arg *arg_dev_, complex<QUDA_REAL> *corrQuda_dev_, 
+        qluaCntr_Type cntrType_, bool extendedGauge_)
       : TunableVectorY(meta_->SiteSubset()), meta(meta_),
-	arg_dev(arg_dev_), corrQuda_dev(corrQuda_dev_), cntrType(cntrType_), Nc(QUDA_Nc), Ns(QUDA_Ns)
+	arg_dev(arg_dev_), corrQuda_dev(corrQuda_dev_), cntrType(cntrType_), extendedGauge(extendedGauge_), Nc(QUDA_Nc), Ns(QUDA_Ns)
     {
       strcpy(aux, meta_->AuxString());
       strcat(aux, comm_dim_partitioned_string());
@@ -651,7 +654,10 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if(cntrType != what_tmd_g_F_B) errorQuda("qcTMD::apply(): Support only TMD contractions for now!\n");
-      tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(corrQuda_dev, arg_dev);
+      if (extendedGauge)
+        tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(corrQuda_dev, arg_dev);
+      else
+        tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(corrQuda_dev, arg_dev);
       //      tmd_g_U_P_P_gvec_kernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(corrQuda_dev, arg_dev);
     }
 
@@ -679,12 +685,15 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
-    //    double t1 = MPI_Wtime();
-    // tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
-    //    tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
+    double t1; 
+    //t1 = MPI_Wtime();
+    //if(arg.extendedGauge)
+    //  tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt <<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
+    //else
+    //  tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue <<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
 
-    double t1 = MPI_Wtime();
-    qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType);
+    t1 = MPI_Wtime();
+    qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType, arg.extendedGauge);
     printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
     printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
     contractTMD.apply(0);
