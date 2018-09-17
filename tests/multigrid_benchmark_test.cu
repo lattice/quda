@@ -12,6 +12,8 @@
 #include <dslash_util.h>
 #include <dirac_quda.h>
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+
 extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern int nvec;
@@ -141,10 +143,10 @@ void initFields(QudaPrecision prec)
   int y_face_size = gParam.x[0]*gParam.x[2]*gParam.x[3]/2;
   int z_face_size = gParam.x[0]*gParam.x[1]*gParam.x[3]/2;
   int t_face_size = gParam.x[0]*gParam.x[1]*gParam.x[2]/2;
-  int pad = MAX(x_face_size, y_face_size);
-  pad = MAX(pad_size, z_face_size);
-  pad = MAX(pad_size, t_face_size);
-  gParam.pad = gParam.nFace * pad * 2;
+  int pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+  gParam.pad = gParam.nFace * pad_size * 2;
 
   gParam.setPrecision(prec_sloppy);
 
