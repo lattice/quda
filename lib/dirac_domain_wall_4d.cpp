@@ -44,9 +44,13 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
+#if 1
+    ApplyDslash5(out, in, in, mass, 0.0, 0.0, nullptr, nullptr, dagger, DSLASH5_DWF);
+#else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, 0, mass, 0, 0, commDim, 1, profile);
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
