@@ -16,7 +16,7 @@
 #include <typeinfo>
 #include <cublas_v2.h>
 #include <interface_qlua_internal.h>
-
+#include <cuda_profiler_api.h>
 
 using namespace quda;
 
@@ -1456,6 +1456,8 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
 			  XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
 			  const char *b_lpath, const char *v_lpath){
 
+  cudaProfilerStart();
+
   double t14 = MPI_Wtime();
   int status = 0;
   const char *func_name = "QuarkTMDstep_momProj_Quda";
@@ -1595,6 +1597,8 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   
   double t15 = MPI_Wtime();
   printfQuda("%s: GPU TMD step %d finished successfully in %f sec. Returning...\n", func_name, qcs->iStep, t15-t14);
+
+  cudaProfilerStop();
 
   return status;
 }
