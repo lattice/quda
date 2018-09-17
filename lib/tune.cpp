@@ -700,6 +700,13 @@ namespace quda {
     if (enabled == QUDA_TUNE_NO) {
       tunable.defaultTuneParam(param);
       tunable.checkLaunchParam(param);
+      if (verbosity >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("Not tuning for %s, using block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
+                   key.name, param.block.x, param.block.y, param.block.z,
+                   param.grid.x, param.grid.y, param.grid.z,
+                   param.shared_bytes,
+                   param.aux.x, param.aux.y, param.aux.z);
+      }
     } else if (!tuning) {
 
       /* As long as global reductions are not disabled, only do the
