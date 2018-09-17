@@ -3709,7 +3709,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       const double iter_tol = (param->iter_res_offset[i] < prec_tol ? prec_tol : (param->iter_res_offset[i] *1.1));
       const double refine_tol = (param->tol_offset[i] == 0.0 ? iter_tol : param->tol_offset[i]);
       // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0
-      if ((param->cuda_prec != param->cuda_prec_sloppy) || param->true_res_offset[i] > refine_tol || rsd_hq > tol_hq) {
+      if (param->true_res_offset[i] > refine_tol || rsd_hq > tol_hq) {
 	if (getVerbosity() >= QUDA_SUMMARIZE)
 	  printfQuda("Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n",
 		     i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);

@@ -509,11 +509,9 @@ namespace quda {
 
       for (int i = 0; i < num_offset; i++) {
         // only calculate true residual if we need to:
-        // 1.) for higher shifts if requested tolerance is larger than
-        // the precision of the sloppy solve, i.e. we might not need
-        // to refine
-        // 2.) we did not exit early and shift is 0
-        if ( (i>0 and not mixed) or (i == 0 and not exit_early) ) {
+        // 1.) For shift 0 if we did not exit early  (we went to the full solution)
+        // 2.) For higher shifts if we did not use mixed precision
+        if ( (i > 0 and not mixed) or (i == 0 and not exit_early) ) {
           mat(*r, *x[i], *tmp4_p, *tmp5_p);
           if (r->Nspin() == 4) {
             blas::axpy(offset[i], *x[i], *r); // Offset it.
@@ -526,7 +524,8 @@ namespace quda {
           param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
         } else {
           param.iter_res_offset[i] = sqrt(r2[i] / b2);
-          param.true_res_offset[i] = param.iter_res_offset[i];
+          param.true_res_offset[i] = std::numeric_limits<double>::infinity();
+          param.true_res_hq_offset[i] = std::numeric_limits<double>::infinity();
         }
       }
 
