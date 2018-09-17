@@ -679,7 +679,7 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
-    double t1 = MPI_Wtime();
+    //    double t1 = MPI_Wtime();
     // tmd_g_U_P_P_gvec_kernel<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
     //    tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue<<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
 
