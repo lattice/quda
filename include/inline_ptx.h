@@ -15,6 +15,9 @@
 
 namespace quda {
 
+  // If you're bored...
+  // http://docs.nvidia.com/cuda/parallel-thread-execution/index.html#data-movement-and-conversion-instructions-st
+
   __device__ inline void load_streaming_double2(double2 &a, const double2* addr)
   {
     double x, y;

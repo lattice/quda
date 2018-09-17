@@ -7,6 +7,7 @@
 #include <comm_quda.h>
 #include <tune_key.h>
 
+
 /**
    @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
    @return If autotuning is enabled
@@ -34,6 +35,18 @@ bool getRankVerbosity();
 
 char *getPrintBuffer();
 
+/**
+   @brief Returns a string of the form
+   ",omp_threads=$OMP_NUM_THREADS", which can be used for storing the
+   number of OMP threads for CPU functions recorded in the tune cache.
+   @return Returns the string
+*/
+char* getOmpThreadStr();
+
+namespace quda {
+  // forward declaration
+  void saveTuneCache(bool error);
+}
 
 #define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0 &&		\
 		    threadIdx.y + blockDim.y*blockIdx.y==0 &&		\
@@ -64,6 +77,7 @@ char *getPrintBuffer();
 	  getOutputPrefix(), getLastTuneKey().name,			     \
 	  getLastTuneKey().volume, getLastTuneKey().aux);	             \
   fflush(getOutputFile());                                                   \
+  quda::saveTuneCache(true);						\
   comm_abort(1);                                                             \
 } while (0)
 
@@ -95,7 +109,8 @@ char *getPrintBuffer();
   fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
 	  getOutputPrefix(), getLastTuneKey().name,			     \
 	  getLastTuneKey().volume, getLastTuneKey().aux);		     \
-  comm_abort(1);								     \
+  quda::saveTuneCache(true);						\
+  comm_abort(1);							     \
 } while (0)
 
 #define warningQuda(...) do {                                 \

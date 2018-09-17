@@ -6,7 +6,6 @@
 
 #ifndef DD_LOOP
 #define DD_LOOP
-
 #define DD_AXPY 0
 #define DD_FAT_RECON 8
 #define DD_LONG_RECON 8
@@ -19,6 +18,12 @@
 #define DD_FNAME improvedStaggeredDslash
 #else
 #define DD_FNAME staggeredDslash
+#endif
+
+#if (DD_DAG==0) // no dagger
+#define DD_DAG_F
+#else           // dagger
+#define DD_DAG_F Dagger
 #endif
 
 #if (DD_AXPY==0) // no axpy
@@ -896,11 +901,11 @@
 
 #if (DD_IMPROVED==1)
 
-#define DD_CONCAT(n,p,r1,r2,x) n ## p ## r1 ## r2 ## x ## Kernel
-#define DD_FUNC(n,p,r1,r2,x) DD_CONCAT(n,p,r1,r2,x)
+#define DD_CONCAT(n,p,r1,r2,d,x) n ## p ## r1 ## r2 ## d ## x ## Kernel
+#define DD_FUNC(n,p,r1,r2,d,x) DD_CONCAT(n,p,r1,r2,d,x)
 
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_LONG_RECON_F, DD_AXPY_F)(const DslashParam param) {
+__global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_LONG_RECON_F, DD_DAG_F, DD_AXPY_F)(const DslashParam param) {
 #if defined(GPU_STAGGERED_DIRAC) && DD_FAT_RECON == 18 // improved staggered only supports no reconstruct fat-links 
   #include "staggered_dslash_core.h"
 #endif
@@ -908,7 +913,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_LONG_RECON_F, DD
 
 #ifdef MULTI_GPU
 template <>
-__global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_LONG_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>(const DslashParam param) {
+__global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_LONG_RECON_F, DD_DAG_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>(const DslashParam param) {
 #if defined(GPU_STAGGERED_DIRAC) && DD_FAT_RECON == 18 // improved staggered only supports no reconstruct fat-links 
   #include "staggered_fused_exterior_dslash_core.h"
 #endif
@@ -924,23 +929,23 @@ __global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_LONG_RECON_F, DD
 #undef READ_LONG_PHASE
 #define READ_LONG_PHASE(phase, dir, idx, stride)
 
-#define DD_CONCAT(n,p,r,x) n ## p ## r ## x ## Kernel
-#define DD_FUNC(n,p,r,x) DD_CONCAT(n,p,r,x)
+#define DD_CONCAT(n,p,r,d,x) n ## p ## r ## d ## x ## Kernel
+#define DD_FUNC(n,p,r,d,x) DD_CONCAT(n,p,r,d,x)
 
 #if (DD_LONG_RECON == 18) // avoid kernel aliasing over non-existant long-links
 
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_AXPY_F)(const DslashParam param) {
+__global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_DAG_F, DD_AXPY_F)(const DslashParam param) {
 #if defined(GPU_STAGGERED_DIRAC) && DD_FAT_RECON != 9 && DD_FAT_RECON != 13
-  #include "staggered_dslash_core.h"
+#include "staggered_dslash_core.h"
 #endif
 }
 
 #ifdef MULTI_GPU
 template <>
-__global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>(const DslashParam param) {
+__global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_DAG_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>(const DslashParam param) {
 #if defined(GPU_STAGGERED_DIRAC) && DD_FAT_RECON != 9 && DD_FAT_RECON != 13
-  #include "staggered_fused_exterior_dslash_core.h"
+#include "staggered_fused_exterior_dslash_core.h"
 #endif
 }
 #endif // MULTI_GPU
@@ -957,6 +962,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_AXPY_F)<EXTERIOR
 #undef DD_PREC_F
 #undef DD_FAT_RECON_F
 #undef DD_LONG_RECON_F
+#undef DD_DAG_F
 #undef DD_AXPY_F
 #undef DD_FNAME
 #undef DD_CONCAT
@@ -1044,8 +1050,6 @@ __global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_AXPY_F)<EXTERIOR
 #undef DD_PREC
 #define DD_PREC 2
 #else
-#undef DD_PREC
-#define DD_PREC 0
 
 #undef DD_LOOP
 #undef DD_AXPY

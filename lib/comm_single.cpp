@@ -56,6 +56,8 @@ void comm_allreduce(double* data) {}
 
 void comm_allreduce_max(double* data) {}
 
+void comm_allreduce_min(double* data) {}
+
 void comm_allreduce_array(double* data, size_t size) {}
 
 void comm_allreduce_int(int* data) {}

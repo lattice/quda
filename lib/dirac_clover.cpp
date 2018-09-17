@@ -76,7 +76,7 @@ namespace quda {
     if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
       ColorSpinorParam param(in);
       param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
+      param.fieldOrder =  param.Precision() == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
         (param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
       param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       In = ColorSpinorField::Create(param);
@@ -87,7 +87,7 @@ namespace quda {
     if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
       ColorSpinorParam param(out);
       param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
+      param.fieldOrder =  param.Precision() == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
         (param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
       param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       Out = ColorSpinorField::Create(param);
@@ -135,9 +135,10 @@ namespace quda {
     // do nothing
   }
 
-  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+				   double kappa, double mass, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
@@ -327,9 +328,10 @@ namespace quda {
 
   }
 
-  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+				     double kappa, double mass, double mu, double mu_factor) const {
     double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
+    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 
 } // namespace quda

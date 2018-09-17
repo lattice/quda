@@ -20,6 +20,7 @@ extern "C" {
 
   const char* get_gauge_order_str(QudaGaugeFieldOrder order);
   const char* get_test_type(int t);
+  const char* get_staggered_test_type(int t);
   const char* get_unitarization_str(bool svd_only);
 
   QudaMassNormalization get_mass_normalization_type(char* s);
@@ -33,6 +34,8 @@ extern "C" {
 
   QudaSolveType get_solve_type(char* s);
   const char* get_solve_str(QudaSolveType);
+
+  QudaSchwarzType get_schwarz_type(char* s);
 
   QudaTwistFlavorType get_flavor_type(char* s);
 
@@ -48,7 +51,7 @@ extern "C" {
 
   QudaExtLibType get_solve_ext_lib_type(char* s);
 
-  QudaFieldLocation get_df_location_ritz(char* s);
+  QudaFieldLocation get_location(char* s);
 
   QudaMemoryType get_df_mem_type_ritz(char* s);
 

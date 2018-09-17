@@ -119,7 +119,6 @@ void init()
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gaugeParam.gaugeGiB = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -150,7 +149,7 @@ void init()
   }
 //  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
-  csParam.precision = inv_param.cpu_prec;
+  csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;	
@@ -214,8 +213,8 @@ void init()
   if (!transfer) {
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
-    csParam.precision = inv_param.cuda_prec;
-    if (csParam.precision == QUDA_DOUBLE_PRECISION ) {
+    csParam.setPrecision(inv_param.cuda_prec);
+    if (csParam.Precision() == QUDA_DOUBLE_PRECISION ) {
       csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     } else {
       /* Single and half */

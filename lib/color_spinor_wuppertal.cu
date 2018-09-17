@@ -1,4 +1,3 @@
-#include <transfer.h>
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <gauge_field.h>
@@ -163,7 +162,6 @@ namespace quda {
     }
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
-    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / arg.nParity; }
 
   public:
     WuppertalSmearing(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)

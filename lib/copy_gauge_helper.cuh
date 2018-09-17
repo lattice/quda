@@ -13,8 +13,8 @@ namespace quda {
     const InOrder in;
     int volume;
     int faceVolumeCB[QUDA_MAX_DIM];
-    int nDim;
-    int geometry;
+    int_fastdiv nDim;
+    int_fastdiv geometry;
     int out_offset;
     int in_offset;
     CopyGaugeArg(const OutOrder &out, const InOrder &in, int volume, 
@@ -88,7 +88,7 @@ namespace quda {
     }
   }
 
-  /** 
+  /**
       Generic CUDA gauge reordering and packing.  Adopts a similar form as
       the CPU version, using the same inlined functions.
   */
@@ -97,24 +97,25 @@ namespace quda {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
-    for (int parity=0; parity<2; parity++) {
-      int x = blockIdx.x * blockDim.x + threadIdx.x;
-      int d = blockIdx.y * blockDim.y + threadIdx.y;
-      if (x >= arg.volume/2) return;
-      if (d >= arg.geometry) return;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int parity_d = blockIdx.z * blockDim.z + threadIdx.z; //parity_d = parity*geometry + d
+    int parity = parity_d / arg.geometry;
+    int d = parity_d % arg.geometry;
+
+    if (x >= arg.volume/2) return;
+    if (parity_d >= 2 * arg.geometry) return;
 
 #ifdef FINE_GRAINED_ACCESS
-      for (int i=0; i<Ncolor(length); i++)
-	for (int j=0; j<Ncolor(length); j++)
-	  arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    if (i >= Ncolor(length)) return;
+    for (int j=0; j<Ncolor(length); j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
 #else
-      RegTypeIn in[length];
-      RegTypeOut out[length];
-      arg.in.load(in, x, d, parity);
-      for (int i=0; i<length; i++) out[i] = in[i];
-      arg.out.save(out, x, d, parity);
+    RegTypeIn in[length];
+    RegTypeOut out[length];
+    arg.in.load(in, x, d, parity);
+    for (int i=0; i<length; i++) out[i] = in[i];
+    arg.out.save(out, x, d, parity);
 #endif
-    }
   }
 
   /**
@@ -128,19 +129,19 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
 
       for (int d=0; d<arg.nDim; d++) {
-	for (int x=0; x<arg.faceVolumeCB[d]; x++) {
+        for (int x=0; x<arg.faceVolumeCB[d]; x++) {
 #ifdef FINE_GRAINED_ACCESS
-	  for (int i=0; i<Ncolor(length); i++)
-	    for (int j=0; j<Ncolor(length); j++)
-	      arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
+          for (int i=0; i<Ncolor(length); i++)
+            for (int j=0; j<Ncolor(length); j++)
+              arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
 #else
-	  RegTypeIn in[length];
-	  RegTypeOut out[length];
-	  arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
-	  for (int i=0; i<length; i++) out[i] = in[i];
-	  arg.out.saveGhost(out, x, d+arg.out_offset, parity);
+      	  RegTypeIn in[length];
+      	  RegTypeOut out[length];
+      	  arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
+      	  for (int i=0; i<length; i++) out[i] = in[i];
+      	  arg.out.saveGhost(out, x, d+arg.out_offset, parity);
 #endif
-	}
+        }
       }
 
     }
@@ -156,29 +157,30 @@ namespace quda {
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int parity_d = blockIdx.z * blockDim.z + threadIdx.z; //parity_d = parity*nDim + d
+    int parity = parity_d / arg.nDim;
+    int d = parity_d % arg.nDim;
+    if (parity_d >= 2 * arg.nDim) return;
 
-    for (int parity=0; parity<2; parity++) {
-      for (int d=0; d<arg.nDim; d++) {
-	if (x < arg.faceVolumeCB[d]) {
+    if (x < arg.faceVolumeCB[d]) {
 #ifdef FINE_GRAINED_ACCESS
-	  for (int i=0; i<Ncolor(length); i++)
-	    for (int j=0; j<Ncolor(length); j++)
-	      arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    if (i >= Ncolor(length)) return;
+    for (int j=0; j<Ncolor(length); j++)
+      arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
 #else
-	  RegTypeIn in[length];
-	  RegTypeOut out[length];
-	  arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
-	  for (int i=0; i<length; i++) out[i] = in[i];
-	  arg.out.saveGhost(out, x, d+arg.out_offset, parity);
+      RegTypeIn in[length];
+      RegTypeOut out[length];
+      arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
+      for (int i=0; i<length; i++) out[i] = in[i];
+	arg.out.saveGhost(out, x, d+arg.out_offset, parity);
 #endif
-	}
-      }
-
     }
+
   }
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder, bool isGhost>
-  class CopyGauge : TunableVectorY {
+  class CopyGauge : TunableVectorYZ {
     CopyGaugeArg<OutOrder,InOrder> arg;
     int size;
     const GaugeField &meta;
@@ -192,8 +194,12 @@ namespace quda {
 
   public:
     CopyGauge(CopyGaugeArg<OutOrder,InOrder> &arg, const GaugeField &out, const GaugeField &in)
-      : TunableVectorY(arg.in.geometry), arg(arg), meta(out) {
-      int faceMax = 0;
+#ifndef FINE_GRAINED_ACCESS
+      : TunableVectorYZ(1, (isGhost ? arg.nDim : arg.geometry) * 2), arg(arg), meta(out) {
+#else
+      : TunableVectorYZ(Ncolor(length), (isGhost ? arg.nDim : arg.geometry) * 2), arg(arg), meta(out) {
+#endif
+	int faceMax = 0;
       for (int d=0; d<arg.nDim; d++) {
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
       }
@@ -213,7 +219,7 @@ namespace quda {
 	if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
       }
 #else
-      writeAuxString("fine-grained,geometry=%d", arg.in.geometry);
+      writeAuxString("fine-grained,geometry=%d", (int)arg.in.geometry);
 #endif
     }
 
@@ -270,7 +276,11 @@ namespace quda {
 	//else warningQuda("Cannot copy for %d geometry gauge field", geometry);
       }
 
-      // special copy that only copies the second set of links in the ghost zone for bi-directional link fields
+      // special copy that only copies the second set of links in the
+      // ghost zone for bi-directional link fields - at present this is
+      // only used in cudaGaugefield::exchangeGhost where we copy from
+      // the buffer into the field's ghost zone (padded
+      // region), so we only have the offset on the receiver
       if (type == 3) {
         if (geometry != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", geometry);
 	arg.out_offset = nDim;
@@ -294,7 +304,11 @@ namespace quda {
 	}
       }
 
-      // special copy that only copies the second set of links in the ghost zone for bi-directional link fields
+      // special copy that only copies the second set of links in the
+      // ghost zone for bi-directional link fields - at present this is
+      // only used in cudaGaugefield::exchangeGhost where we copy from
+      // the buffer into the field's ghost zone (padded
+      // region), so we only have the offset on the receiver
       if (type == 3) {
         if (geometry != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", geometry);
 	arg.out_offset = nDim;

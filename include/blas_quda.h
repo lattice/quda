@@ -78,7 +78,7 @@ namespace quda {
 		     ColorSpinorField &y, ColorSpinorField &z);
     double caxpyXmazNormX(const Complex &a, ColorSpinorField &x,
 			  ColorSpinorField &y, ColorSpinorField &z);
-    double cabxpyAxNorm(const double &a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
+    double cabxpyzAxNorm(const double &a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
     void caxpbypz(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &,
 		  ColorSpinorField &);
@@ -94,6 +94,15 @@ namespace quda {
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
+    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
+    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
+
+    void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+    void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+    double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+    double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
     /**
        @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes

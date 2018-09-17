@@ -36,33 +36,41 @@ namespace quda {
     double -> double
     float -> float
     short -> float
+    quarter -> float
     This allows us to wrap the encapsulate the register type into the storage template type
    */
   template<typename> struct mapper { };
   template<> struct mapper<double> { typedef double type; };
   template<> struct mapper<float> { typedef float type; };
   template<> struct mapper<short> { typedef float type; };
+  template<> struct mapper<char> { typedef float type; };
 
   template<> struct mapper<double2> { typedef double2 type; };
   template<> struct mapper<float2> { typedef float2 type; };
   template<> struct mapper<short2> { typedef float2 type; };
+  template<> struct mapper<char2> { typedef float2 type; };
 
   template<> struct mapper<double4> { typedef double4 type; };
   template<> struct mapper<float4> { typedef float4 type; };
   template<> struct mapper<short4> { typedef float4 type; };
+  template<> struct mapper<char4> { typedef float4 type; };
 
   template<typename,typename> struct bridge_mapper { };
   template<> struct bridge_mapper<double2,double2> { typedef double2 type; };
   template<> struct bridge_mapper<double2,float2> { typedef double2 type; };
   template<> struct bridge_mapper<double2,short2> { typedef float2 type; };
+  template<> struct bridge_mapper<double2,char2> { typedef float2 type; };
   template<> struct bridge_mapper<double2,float4> { typedef double4 type; };
   template<> struct bridge_mapper<double2,short4> { typedef float4 type; };
+  template<> struct bridge_mapper<double2,char4> { typedef float4 type; };
   template<> struct bridge_mapper<float4,double2> { typedef float2 type; };
   template<> struct bridge_mapper<float4,float4> { typedef float4 type; };
   template<> struct bridge_mapper<float4,short4> { typedef float4 type; };
+  template<> struct bridge_mapper<float4,char4> { typedef float4 type; };
   template<> struct bridge_mapper<float2,double2> { typedef float2 type; };
   template<> struct bridge_mapper<float2,float2> { typedef float2 type; };
   template<> struct bridge_mapper<float2,short2> { typedef float2 type; };
+  template<> struct bridge_mapper<float2,char2> { typedef float2 type; };
 
   template<typename> struct vec_length { static const int value = 0; };
   template<> struct vec_length<double4> { static const int value = 4; };
@@ -74,6 +82,9 @@ namespace quda {
   template<> struct vec_length<short4> { static const int value = 4; };
   template<> struct vec_length<short2> { static const int value = 2; };
   template<> struct vec_length<short> { static const int value = 1; };
+  template<> struct vec_length<char4> { static const int value = 4; };
+  template<> struct vec_length<char2> { static const int value = 2; };
+  template<> struct vec_length<char> { static const int value = 1; };
 
   template<typename, int N> struct vector { };
 
@@ -88,7 +99,14 @@ namespace quda {
     typedef float2 type;
     float2 a;
     vector(const double2 &a) { this->a.x = a.x; this->a.y = a.y; }
-    operator float2() const { return a; }
+    operator type() const { return a; }
+  };
+
+  template<> struct vector<int, 2> {
+    typedef int2 type;
+    int2 a;
+    vector(const int2 &a) { this->a.x = a.x; this->a.y = a.y; }
+    operator type() const { return a; }
   };
 
   template<typename> struct scalar { };
@@ -104,12 +122,31 @@ namespace quda {
   template<> struct scalar<short3> { typedef short type; };
   template<> struct scalar<short2> { typedef short type; };
   template<> struct scalar<short> { typedef short type; };
+  template<> struct scalar<char4> { typedef char type; };
+  template<> struct scalar<char3> { typedef char type; };
+  template<> struct scalar<char2> { typedef char type; };
+  template<> struct scalar<char> { typedef char type; };
 
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
   template<> struct isHalf<short>{ static const bool value = true; };
   template<> struct isHalf<short2>{ static const bool value = true; };
   template<> struct isHalf<short4>{ static const bool value = true; };
+
+  /* Traits used to determine if a variable is quarter precision or not */
+  template< typename T > struct isQuarter{ static const bool value = false; };
+  template<> struct isQuarter<char>{ static const bool value = true; };
+  template<> struct isQuarter<char2>{ static const bool value = true; };
+  template<> struct isQuarter<char4>{ static const bool value = true; };
+
+  /* Traits used to determine if a variable is fixed precision or not */
+  template< typename T > struct isFixed{ static const bool value = false; };
+  template<> struct isFixed<short>{ static const bool value = true; };
+  template<> struct isFixed<short2>{ static const bool value = true; };
+  template<> struct isFixed<short4>{ static const bool value = true; };
+  template<> struct isFixed<char>{ static const bool value = true; };
+  template<> struct isFixed<char2>{ static const bool value = true; };
+  template<> struct isFixed<char4>{ static const bool value = true; };
 
   template<typename T1, typename T2> __host__ __device__ inline void copy (T1 &a, const T2 &b) { a = b; }
 
@@ -129,10 +166,13 @@ namespace quda {
 #endif
   }
 
+  // specializations for char-float conversion
+  static inline __host__ __device__ float c2f(const char &a) { return static_cast<float>(a) * fixedInvMaxValue<char>::value; }
+  static inline __host__ __device__ double c2d(const char &a) { return static_cast<double>(a) * fixedInvMaxValue<char>::value; }
+
   // specializations for short-float conversion
-#define MAX_SHORT_INV 3.051850948e-5
-  static inline __host__ __device__ float s2f(const short &a) { return static_cast<float>(a) * MAX_SHORT_INV; }
-  static inline __host__ __device__ double s2d(const short &a) { return static_cast<double>(a) * MAX_SHORT_INV; }
+  static inline __host__ __device__ float s2f(const short &a) { return static_cast<float>(a) * fixedInvMaxValue<short>::value; }
+  static inline __host__ __device__ double s2d(const short &a) { return static_cast<double>(a) * fixedInvMaxValue<short>::value; }
 
   // Fast float to integer round
   __device__ __host__ inline int f2i(float f) {
@@ -153,14 +193,14 @@ namespace quda {
   }
 
   template<> __host__ __device__ inline void copy(float &a, const short &b) { a = s2f(b); }
-  template<> __host__ __device__ inline void copy(short &a, const float &b) { a = f2i(b*MAX_SHORT); }
+  template<> __host__ __device__ inline void copy(short &a, const float &b) { a = f2i(b*fixedMaxValue<short>::value); }
 
   template<> __host__ __device__ inline void copy(float2 &a, const short2 &b) {
     a.x = s2f(b.x); a.y = s2f(b.y);
   }
 
   template<> __host__ __device__ inline void copy(short2 &a, const float2 &b) {
-    a.x = f2i(b.x*MAX_SHORT); a.y = f2i(b.y*MAX_SHORT);
+    a.x = f2i(b.x*fixedMaxValue<short>::value); a.y = f2i(b.y*fixedMaxValue<short>::value);
   }
 
   template<> __host__ __device__ inline void copy(float4 &a, const short4 &b) {
@@ -168,14 +208,33 @@ namespace quda {
   }
 
   template<> __host__ __device__ inline void copy(short4 &a, const float4 &b) {
-    a.x = f2i(b.x*MAX_SHORT); a.y = f2i(b.y*MAX_SHORT); a.z = f2i(b.z*MAX_SHORT); a.w = f2i(b.w*MAX_SHORT);
+    a.x = f2i(b.x*fixedMaxValue<short>::value); a.y = f2i(b.y*fixedMaxValue<short>::value); a.z = f2i(b.z*fixedMaxValue<short>::value); a.w = f2i(b.w*fixedMaxValue<short>::value);
+  }
+
+  template<> __host__ __device__ inline void copy(float &a, const char &b) { a = c2f(b); }
+  template<> __host__ __device__ inline void copy(char &a, const float &b) { a = f2i(b*fixedMaxValue<char>::value); }
+
+  template<> __host__ __device__ inline void copy(float2 &a, const char2 &b) {
+    a.x = c2f(b.x); a.y = c2f(b.y);
+  }
+
+  template<> __host__ __device__ inline void copy(char2 &a, const float2 &b) {
+    a.x = f2i(b.x*fixedMaxValue<char>::value); a.y = f2i(b.y*fixedMaxValue<char>::value);
+  }
+
+  template<> __host__ __device__ inline void copy(float4 &a, const char4 &b) {
+    a.x = c2f(b.x); a.y = c2f(b.y); a.z = c2f(b.z); a.w = c2f(b.w);
+  }
+
+  template<> __host__ __device__ inline void copy(char4 &a, const float4 &b) {
+    a.x = f2i(b.x*fixedMaxValue<char>::value); a.y = f2i(b.y*fixedMaxValue<char>::value); a.z = f2i(b.z*fixedMaxValue<char>::value); a.w = f2i(b.w*fixedMaxValue<char>::value);
   }
 
   
   /**
      Generic wrapper for Trig functions
   */
-  template <bool isHalf, typename T>
+  template <bool isFixed, typename T>
     struct Trig {
       __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b); }
       __device__ __host__ static T Sin( const T &a ) { return sin(a); }
@@ -215,7 +274,7 @@ namespace quda {
   };
 
   /**
-     Specialization of Trig functions using shorts
+     Specialization of Trig functions using fixed b/c gauge reconstructs are -1 -> 1 instead of -Pi -> Pi
    */
   template <>
     struct Trig<true,float> {
@@ -254,6 +313,11 @@ namespace quda {
   template <> struct VectorType<short, 2>{typedef short2 type; };
   template <> struct VectorType<short, 4>{typedef short4 type; };
 
+  // quarter precision
+  template <> struct VectorType<char, 1>{typedef char type; };
+  template <> struct VectorType<char, 2>{typedef char2 type; };
+  template <> struct VectorType<char, 4>{typedef char4 type; };
+
   // This trait returns the matching texture type (needed for double precision)
   template <typename Float, int number> struct TexVectorType;
 
@@ -270,6 +334,11 @@ namespace quda {
   template <> struct TexVectorType<short, 1>{typedef short type; };
   template <> struct TexVectorType<short, 2>{typedef short2 type; };
   template <> struct TexVectorType<short, 4>{typedef short4 type; };
+
+  // quarter precision
+  template <> struct TexVectorType<char, 1>{typedef char type; };
+  template <> struct TexVectorType<char, 2>{typedef char2 type; };
+  template <> struct TexVectorType<char, 4>{typedef char4 type; };
 
   template <typename VectorType>
     __device__ __host__ inline VectorType vector_load(void *ptr, int idx) {
@@ -328,6 +397,28 @@ namespace quda {
     store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, value.x, value.y);
 #else
     reinterpret_cast<short2*>(ptr)[idx] = value;
+#endif
+  }
+
+  // A char4 is the same size as a short2
+  template <>
+    __device__ __host__ inline void vector_store(void *ptr, int idx, const char4 &value) {
+#if defined(__CUDA_ARCH__)
+
+    store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, reinterpret_cast<const short2*>(&value)->x, reinterpret_cast<const short2*>(&value)->y);
+#else
+    reinterpret_cast<char4*>(ptr)[idx] = value;
+    //reinterpret_cast<short2*>(ptr)[idx] = *reinterpret_cast<const short2*>(&value);
+#endif
+  }
+
+  template <>
+    __device__ __host__ inline void vector_store(void *ptr, int idx, const char2 &value) {
+#if defined(__CUDA_ARCH__)
+    vector_store(ptr, idx, *reinterpret_cast<const short*>(&value));
+    //store_streaming_char2(reinterpret_cast<char2*>(ptr)+idx, reinterpret_cast<const char2*>(&value)->x, reinterpret_cast<const char2*>(&value)->y);
+#else
+    reinterpret_cast<char2*>(ptr)[idx] = value;
 #endif
   }
 

@@ -149,7 +149,13 @@ static bool peer2peer_init = false;
 static bool intranode_enabled[2][4] = { {false,false,false,false},
 					{false,false,false,false} };
 
-static int enable_peer_to_peer = 3; // by default enable both copy engines and load/store access
+/** this records whether there is any peer-2-peer capability
+    (regardless whether it is enabled or not) */
+static bool peer2peer_present = false;
+
+/** by default enable both copy engines and load/store access */
+static int enable_peer_to_peer = 3; 
+
 
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
@@ -169,6 +175,9 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     case 1: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store)\n"); break;
     case 2: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines)\n"); break;
     case 3: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n"); break;
+    case 5: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n"); break;
+    case 6: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n"); break;
+    case 7: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n"); break;
     default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
     }
 
@@ -216,14 +225,14 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
 	  int accessRank[2] = { };
 #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
-	  if (canAccessPeer[0]*canAccessPeer[1]) {
+	  if (canAccessPeer[0] && canAccessPeer[1]) {
 	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
 	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
 	  }
 #endif
 
 	  // enable P2P if we can access the peer or if peer is self
-	  if (canAccessPeer[0]*canAccessPeer[1] || gpuid == neighbor_gpuid) {
+	  if ( (canAccessPeer[0] && canAccessPeer[1]) || gpuid == neighbor_gpuid) {
 	    peer2peer_enabled[dir][dim] = true;
 	    if (getVerbosity() > QUDA_SILENT) {
 	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, performance rank = (%d, %d)\n",
@@ -248,6 +257,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
   comm_barrier();
 
+  peer2peer_present = comm_peer2peer_enabled_global();
+
   // set gdr enablement
   if (comm_gdr_enabled()) {
     if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
@@ -259,6 +270,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   checkCudaErrorNoSync();
   return;
 }
+
+bool comm_peer2peer_present() { return peer2peer_present; }
 
 static bool enable_p2p = true;
 

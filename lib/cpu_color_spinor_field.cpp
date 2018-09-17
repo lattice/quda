@@ -133,6 +133,7 @@ namespace quda {
 
     if (pad != 0) errorQuda("Non-zero pad not supported");  
     if (precision == QUDA_HALF_PRECISION) errorQuda("Half precision not supported");
+    if (precision == QUDA_QUARTER_PRECISION) errorQuda("Quarter precision not supported");
 
     if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
 	fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
@@ -172,7 +173,7 @@ namespace quda {
 
       // need this hackery for the moment (need to locate the odd pointers half way into the full field)
       (dynamic_cast<cpuColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
-      if (precision == QUDA_HALF_PRECISION)
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
 	(dynamic_cast<cpuColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
 
       if (bytes != 2*even->Bytes() || bytes != 2*odd->Bytes())
@@ -309,7 +310,7 @@ namespace quda {
   }
 
   void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *dummy1,
-					  const MemoryLocation *dummy2, bool dummy3, bool dummy4) const
+					  const MemoryLocation *dummy2, bool dummy3, bool dummy4, QudaPrecision dummy5) const
   {
     // allocate ghost buffer if not yet allocated
     allocateGhostBuffer(nFace);

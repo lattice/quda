@@ -211,7 +211,7 @@ static void hisq_force_init()
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam_ex.precision = prec;
+  gParam_ex.setPrecision(prec);
   gParam_ex.reconstruct = link_recon;
   gParam_ex.pad = 0;
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;

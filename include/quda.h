@@ -45,6 +45,9 @@ extern "C" {
     QudaPrecision cuda_prec_sloppy; /**< The precision of the sloppy gauge field */
     QudaReconstructType reconstruct_sloppy; /**< The recontruction type of the sloppy gauge field */
 
+    QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
+    QudaReconstructType reconstruct_refinement_sloppy; /**< The recontruction type of the sloppy gauge field for the refinement step in multishift*/
+
     QudaPrecision cuda_prec_precondition; /**< The precision of the preconditioner gauge field */
     QudaReconstructType reconstruct_precondition; /**< The recontruction type of the preconditioner gauge field */
 
@@ -57,7 +60,6 @@ extern "C" {
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
-    double gaugeGiB;  /**< The storage used by the gauge fields */
 
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
@@ -190,6 +192,7 @@ extern "C" {
     QudaPrecision cpu_prec;                /**< The precision used by the input fermion fields */
     QudaPrecision cuda_prec;               /**< The precision used by the QUDA solver */
     QudaPrecision cuda_prec_sloppy;        /**< The precision used by the QUDA sloppy operator */
+    QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
     QudaPrecision cuda_prec_precondition;  /**< The precision used by the QUDA preconditioner */
 
     QudaDiracFieldOrder dirac_order;       /**< The order of the input and output fermion fields */
@@ -200,6 +203,7 @@ extern "C" {
     QudaPrecision clover_cpu_prec;         /**< The precision used for the input clover field */
     QudaPrecision clover_cuda_prec;        /**< The precision used for the clover field in the QUDA solver */
     QudaPrecision clover_cuda_prec_sloppy; /**< The precision used for the clover field in the QUDA sloppy operator */
+    QudaPrecision clover_cuda_prec_refinement_sloppy; /**< The precision of the sloppy clover field for the refinement step in multishift */
     QudaPrecision clover_cuda_prec_precondition; /**< The precision used for the clover field in the QUDA preconditioner */
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
@@ -222,8 +226,6 @@ extern "C" {
     int cl_pad;                            /**< The padding to use for the clover fields */
 
     int iter;                              /**< The number of iterations performed by the solver */
-    double spinorGiB;                      /**< The memory footprint of the fermion fields */
-    double cloverGiB;                      /**< The memory footprint of the clover fields */
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
 
@@ -316,16 +318,22 @@ extern "C" {
     int use_resident_solution;
 
     /** Whether to use the solution vector to augment the chronological basis */
-    int make_resident_chrono;
+    int chrono_make_resident;
+
+    /** Whether the solution should replace the last entry in the chronology */
+    int chrono_replace_last;
 
     /** Whether to use the resident chronological basis */
-    int use_resident_chrono;
+    int chrono_use_resident;
 
     /** The maximum length of the chronological history to store */
-    int max_chrono_dim;
+    int chrono_max_dim;
 
-    /** The index to indeicate which chrono history we are augmenting */
+    /** The index to indicate which chrono history we are augmenting */
     int chrono_index;
+
+    /** Precision to store the chronological basis in */
+    QudaPrecision chrono_precision;
 
     /** Which external library to use in the linear solvers (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
@@ -406,17 +414,68 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
+    /** Precision to store the null-space vectors in (post block orthogonalization) */
+    QudaPrecision precision_null[QUDA_MAX_MG_LEVEL];
+
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
 
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
 
+    /** Number of setup iterations */
+    int num_setup_iter[QUDA_MAX_MG_LEVEL];
+
     /** Tolerance to use in the setup phase */
     double setup_tol[QUDA_MAX_MG_LEVEL];
 
+    /** Maximum number of iterations for each setup solver */
+    int setup_maxiter[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum number of iterations for refreshing the null-space vectors */
+    int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
+
+    /** Null-space type to use in the setup phase */
+    QudaSetupType setup_type;
+
+    /** Pre orthonormalize vectors in the setup phase */
+    QudaBoolean pre_orthonormalize;
+
+    /** Post orthonormalize vectors in the setup phase */
+    QudaBoolean post_orthonormalize;
+
+    /** The solver that wraps around the coarse grid correction and smoother */
+    QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance to use for the smoother / solver on each level */
+    double smoother_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Number of pre-smoother applications on each level */
+    int nu_pre[QUDA_MAX_MG_LEVEL];
+
+    /** Number of post-smoother applications on each level */
+    int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Over/under relaxation factor for the smoother at each level */
+    double omega[QUDA_MAX_MG_LEVEL];
+
+    /** Precision to use for halo communication in the smoother */
+    QudaPrecision smoother_halo_precision[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to use additive or multiplicative Schwarz preconditioning in the smoother */
+    QudaSchwarzType smoother_schwarz_type[QUDA_MAX_MG_LEVEL];
+
+    /** Number of Schwarz cycles to apply */
+    int smoother_schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
     /** The type of residual to send to the next coarse grid, and thus the
 	type of solution to receive back from this coarse grid */
@@ -428,23 +487,19 @@ extern "C" {
     /** The type of multigrid cycle to perform at each level */
     QudaMultigridCycleType cycle_type[QUDA_MAX_MG_LEVEL];
 
-    /** Number of pre-smoother applications on each level */
-    int nu_pre[QUDA_MAX_MG_LEVEL];
-
-    /** Number of post-smoother applications on each level */
-    int nu_post[QUDA_MAX_MG_LEVEL];
-
-    /** Tolerance to use for the smoother / solver on each level */
-    double smoother_tol[QUDA_MAX_MG_LEVEL];
-
-    /** Over/under relaxation factor for the smoother at each level */
-    double omega[QUDA_MAX_MG_LEVEL];
-
     /** Whether to use global reductions or not for the smoother / solver at each level */
     QudaBoolean global_reduction[QUDA_MAX_MG_LEVEL];
 
     /** Location where each level should be done */
     QudaFieldLocation location[QUDA_MAX_MG_LEVEL];
+
+    /** Location where the coarse-operator construction will be computedn */
+    QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
+
+    /** Minimize device memory allocations during the adaptive setup,
+        placing temporary fields in mapped memory instad of device
+        memory */
+    QudaBoolean setup_minimize_memory;
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
@@ -997,6 +1052,13 @@ extern "C" {
    * @param Array for storing the averages (total, spatial, temporal)
    */
   void plaqQuda(double plaq[3]);
+
+  /*
+   * Performs a deep copy from the internal extendedGaugeResident field.
+   * @param Pointer to externalGaugeResident cudaGaugeField
+   * @param Location of gauge field
+   */
+  void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field 

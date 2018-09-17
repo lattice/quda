@@ -99,7 +99,7 @@ namespace quda {
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
-     @param[in,out] stream Stream which we are instructing to wait
+     @param[in,out] stream Stream which we are instructing to waitç∂
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
    */
@@ -116,7 +116,7 @@ namespace quda {
      @param[in] event Event which we are synchronizing with respect to
    */
   cudaError_t qudaEventSynchronize(cudaEvent_t &event);
-  
+
   /**
      @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
    */

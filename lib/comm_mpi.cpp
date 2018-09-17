@@ -293,6 +293,13 @@ void comm_allreduce_max(double* data)
   *data = recvbuf;
 }
 
+void comm_allreduce_min(double* data)
+{
+  double recvbuf;
+  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD) );
+  *data = recvbuf;
+}
+
 void comm_allreduce_array(double* data, size_t size)
 {
   double *recvbuf = new double[size];

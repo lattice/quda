@@ -388,8 +388,7 @@ namespace quda {
 
   void exchangeGhost(cudaColorSpinorField &a, int parity, int dag) {
     // need to enable packing in temporal direction to get spin-projector correct
-    bool pack_old = getKernelPackT();
-    setKernelPackT(true);
+    pushKernelPackT(true);
 
     // first transfer src1
     qudaDeviceSynchronize();
@@ -422,7 +421,7 @@ namespace quda {
     }
 
     qudaDeviceSynchronize();
-    setKernelPackT(pack_old); // restore packing state
+    popKernelPackT(); // restore packing state
 
     a.bufferIndex = (1 - a.bufferIndex);
     comm_barrier();
