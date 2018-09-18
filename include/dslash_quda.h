@@ -77,15 +77,15 @@ namespace quda {
      @param[in] x Auxilary input color-spinor field
      @param[in] m_f Fermion mass parameter
      @param[in] m_5 Wilson mass shift
-     @param[in] a Scale factor use in xpay operator
      @param[in] b_5 Mobius coefficient array (length Ls)
      @param[in] c_5 Mobius coefficient array (length Ls)
+     @param[in] a Scale factor use in xpay operator
      @param[in] dagger Whether this is for the dagger operator
      @param[in] type
   */
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-		    double m_f, double m_5, double a, const Complex *b_5, const Complex *c_5,
-		    bool dagger, Dslash5Type type);
+		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+		    double a, bool dagger, Dslash5Type type);
 
   // domain wall Dslash  
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,

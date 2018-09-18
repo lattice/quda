@@ -48,9 +48,16 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
+#if 1
+    Complex zb_5[QUDA_MAX_DWF_LS];
+    Complex zc_5[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { zb_5[i] = b_5[i]; zc_5[i] = c_5[i]; }
+    ApplyDslash5(out, in, in, mass, m5, zb_5, zc_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
+#else
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 1, profile);
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -64,9 +71,16 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
+#if 1
+    Complex zb_5[QUDA_MAX_DWF_LS];
+    Complex zc_5[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { zb_5[i] = b_5[i]; zc_5[i] = c_5[i]; }
+    ApplyDslash5(out, in, in, mass, m5, zb_5, zc_5, 0.0, dagger, DSLASH5_MOBIUS);
+#else
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 2, profile);
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -99,10 +113,17 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#if 1
+    Complex zb_5[QUDA_MAX_DWF_LS];
+    Complex zc_5[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { zb_5[i] = b_5[i]; zc_5[i] = c_5[i]; }
+    ApplyDslash5(out, in, x, mass, m5, zb_5, zc_5, k, dagger, DSLASH5_MOBIUS_PRE);
+#else
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
 		   mass, k, b_5, c_5, m5, commDim, 1, profile);
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -118,10 +139,17 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#if 1
+    Complex zb_5[QUDA_MAX_DWF_LS];
+    Complex zc_5[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { zb_5[i] = b_5[i]; zc_5[i] = c_5[i]; }
+    ApplyDslash5(out, in, x, mass, m5, zb_5, zc_5, k, dagger, DSLASH5_MOBIUS);
+#else
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
 		   mass, k, b_5, c_5, m5, commDim, 2, profile);
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);

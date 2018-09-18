@@ -3,6 +3,7 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <dslash_quda.h>
+#include <inline_ptx.h>
 
 namespace quda {
 
@@ -12,7 +13,7 @@ namespace quda {
      @brief Parameter structure for applying the Dslash
    */
   template <typename Float, int nColor>
-  struct DslashArg {
+  struct Dslash5Arg {
     typedef typename colorspinor_mapper<Float,4,nColor>::type F;
     typedef typename mapper<Float>::type real;
 
@@ -22,7 +23,7 @@ namespace quda {
     const int nParity;      // number of parities we're working on
     const int volume_cb;    // checkerboarded volume
     const int volume_4d_cb; // 4-d checkerboarded volume
-    const int Ls;           // length of 5th dimension
+    const int_fastdiv Ls;   // length of 5th dimension
 
     const real m_f;         // fermion mass parameter
     const real m_5;         // Wilson mass shift
@@ -30,21 +31,26 @@ namespace quda {
     const bool dagger;      // dagger
     const bool xpay;        // whether we are doing xpay or not
 
-    // Mobius / Zolotarev coefficients
+    // zMobius / Zolotarev coefficients
     complex<real> b_5[QUDA_MAX_DWF_LS];
     complex<real> c_5[QUDA_MAX_DWF_LS];
 
+    // real constant Mobius coefficient
+    double b;
+    double c;
+
     // xpay coefficients
+    real a;
     complex<real> a_5[QUDA_MAX_DWF_LS];
 
     Dslash5Type type;
 
-    DslashArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-	      double m_f, double m_5, double a, const Complex *b_5_, const Complex *c_5_,
-	      bool dagger, Dslash5Type type)
+    Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+               double m_f, double m_5, const Complex *b_5_, const Complex *c_5_,
+               double a, bool dagger, Dslash5Type type)
       : out(out), in(in), x(x), nParity(in.SiteSubset()),
 	volume_cb(in.VolumeCB()), volume_4d_cb(volume_cb/in.X(4)), Ls(in.X(4)),
-	m_f(m_f), m_5(m_5), dagger(dagger), xpay(in.V() == x.V() ? true : false), type(type)
+	m_f(m_f), m_5(m_5), a(a), dagger(dagger), xpay(in.V() == x.V() ? false: true), type(type)
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
@@ -53,32 +59,34 @@ namespace quda {
       case DSLASH5_DWF:
 	// xpay
 	for (int s=0; s<Ls; s++) {
-	  a_5[s] = 1.0;
+	  a_5[s] = a;
 	}
 	break;
       case DSLASH5_MOBIUS_PRE:
 	for (int s=0; s<Ls; s++) {
-	  b_5[s] = b_5_[s];
-	  c_5[s] = 0.5*c_5_[s];
+	  b_5[s] = b_5_[s].real();
+	  c_5[s] = 0.5*c_5_[s].real();
 
 	  // xpay
-	  a_5[s] = 0.5/(b_5_[s]*(m_5+4.0) + 1.0);
+	  a_5[s] = (0.5/(b_5_[s]*(m_5+4.0) + 1.0)).real();
 	  a_5[s] *= a_5[s] * static_cast<real>(a);
-	}
+        }
 	break;
       case DSLASH5_MOBIUS:
 	for (int s=0; s<Ls; s++) {
 	  b_5[s] = 1.0;
-	  c_5[s] = 0.5 * (c_5_[s] * (m_5 + 4.0) - 1.0) / (b_5_[s] * (m_5 + 4.0) + 1.0);
+	  c_5[s] = (0.5 * (c_5_[s] * (m_5 + 4.0) - 1.0) / (b_5_[s] * (m_5 + 4.0) + 1.0)).real();
 
 	  // axpy
-	  a_5[s] = 0.5/(b_5_[s]*(m_5+4.0) + 1.0);
+	  a_5[s] = (0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0)).real();
 	  a_5[s] *= a_5[s] * static_cast<real>(a);
 	}
 	break;
       default:
 	errorQuda("Unknown Dslash5Type %d", type);
       }
+      b = b_5[0].real();
+      c = c_5[0].real();
     }
   };
 
@@ -101,7 +109,7 @@ namespace quda {
     }
 
     { // backwards direction
-      const int back_idx = ((s - 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
+      const int back_idx = ((s + arg.Ls - 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
       const Vector in = arg.in(back_idx, parity);
       constexpr int proj_dir = dagger ? -1 : +1;
       if (s == 0) {
@@ -113,27 +121,31 @@ namespace quda {
 
     if (type == DSLASH5_DWF && xpay) {
       Vector x = arg.x(s*arg.volume_4d_cb + x_cb, parity);
-      out = x + arg.a_5[s]*out;
+      out = x + arg.a*out;
     } else if (type == DSLASH5_MOBIUS_PRE) {
       Vector diagonal = arg.in(s*arg.volume_4d_cb + x_cb, parity);
-      out = arg.c_5[s] * out + arg.b_5[s] * diagonal;
+      const complex<real> b = arg.b; // arg.b_5[s]
+      const complex<real> c = arg.c; // arg.c_5[s]
+      out = c * out + b * diagonal;
 
       if (xpay) {
 	Vector x = arg.x(s*arg.volume_4d_cb + x_cb, parity);
-	out = x + arg.a_5[s]*out;
+        complex<real> a = arg.a; // arg.a_5[s]
+	out = x + a*out;
       }
     } else if (type == DSLASH5_MOBIUS) {
       Vector diagonal = arg.in(s*arg.volume_4d_cb + x_cb, parity);
-      out = arg.c_5[s] * out + arg.b_5[s] * diagonal;
+      const complex<real> c = arg.c; // arg.c_5[s]
+      out = c * out + diagonal;
 
       if (xpay) { // really axpy
 	Vector x = arg.x(s*arg.volume_4d_cb + x_cb, parity);
-	out = arg.a_5[s]*x + out;
+        complex<real> a = arg.a; // arg.a_5[s]
+	out = a*x + out;
       }
     }
 
-
-    arg.out(s*arg.volume_4d_cb + x_cb, parity);
+    arg.out(s*arg.volume_4d_cb + x_cb, parity) = out;
   }
 
   // CPU kernel for applying the dslash operator
@@ -141,9 +153,9 @@ namespace quda {
   void dslash5CPU(Arg &arg)
   {
     for (int parity= 0; parity < arg.nParity; parity++) {
-      for (int ls=0; ls < arg.Ls; ls++) {
+      for (int s=0; s < arg.Ls; s++) {
 	for (int x_cb = 0; x_cb < arg.volume_4d_cb; x_cb++) { // 4-d volume
-	  dslash5<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, ls);
+	  dslash5<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, s);
 	}  // 4-d volumeCB
       } // ls
     } // parity
@@ -155,37 +167,76 @@ namespace quda {
   __global__ void dslash5GPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int ls = blockIdx.y*blockDim.y + threadIdx.y;
-    int parity = blockDim.z*blockIdx.z + threadIdx.z;
+    int s = blockIdx.y*blockDim.y + threadIdx.y;
+    int parity = blockIdx.z*blockDim.z + threadIdx.z;
 
     if (x_cb >= arg.volume_4d_cb) return;
-    if (ls >= arg.Ls) return;
+    if (s >= arg.Ls) return;
     if (parity >= arg.nParity) return;
 
-    dslash5<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, ls);
+    dslash5<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, s);
   }
 
   template <typename Float, int nColor, typename Arg>
-  class Dslash : public TunableVectorYZ {
+  class Dslash5 : public TunableVectorYZ {
 
   protected:
     Arg &arg;
     const ColorSpinorField &meta;
 
-    long long flops() const { return 0; }
-    long long bytes() const { return arg.out.Bytes() + 3*arg.in.Bytes(); }
+    long long flops() const {
+      long long Ls = meta.X(4);
+      long long bulk = (Ls-2)*(meta.Volume()/Ls);
+      long long wall = 2*meta.Volume()/Ls;
+      int n = meta.Ncolor() * meta.Nspin();
+      bool zMobius = false; // set to true when we have complexity
+
+      long long flops_ = 0;
+      switch (arg.type) {
+      case DSLASH5_DWF:
+        flops_ = n * (8ll*bulk + 10ll*wall + (arg.xpay ? 4ll * meta.Volume() : 0) );
+        break;
+      case DSLASH5_MOBIUS_PRE:
+        flops_ = n * (8ll*bulk + 10ll*wall + (zMobius ? 14ll : 6ll) * meta.Volume() +
+                      (arg.xpay ? (zMobius ? 8ll : 4ll) * meta.Volume() : 0) );
+        break;
+      case DSLASH5_MOBIUS:
+        flops_ = n * (8ll*bulk + 10ll*wall + (zMobius ? 8ll : 4ll) * meta.Volume() +
+                      (arg.xpay ? (zMobius ? 8ll : 4ll) * meta.Volume() : 0) );
+        break;
+      default:
+	errorQuda("Unknown Dslash5Type %d", arg.type);
+      }
+
+      return flops_;
+    }
+
+    long long bytes() const {
+      switch (arg.type) {
+      case DSLASH5_DWF:        return arg.out.Bytes() + 2*arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
+      case DSLASH5_MOBIUS_PRE: return arg.out.Bytes() + 3*arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
+      case DSLASH5_MOBIUS:     return arg.out.Bytes() + 3*arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
+      default: errorQuda("Unknown Dslash5Type %d", arg.type);
+      }
+      return 0ll;
+    }
+
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volume_4d_cb; }
+    int blockStep() const { return 8; }
+    int blockMin() const { return 8; }
 
   public:
-    Dslash(Arg &arg, const ColorSpinorField &meta)
+    Dslash5(Arg &arg, const ColorSpinorField &meta)
       : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
     {
       strcpy(aux, meta.AuxString());
       if (arg.dagger) strcat(aux, ",Dagger");
-      if (arg.xpay) strcat(aux,"xpay");
+      if (arg.xpay) strcat(aux,",xpay");
+      strcat(aux, arg.type == DSLASH5_DWF ? ",DSLASH5_DWF" :
+             arg.type == DSLASH5_MOBIUS_PRE ? ",DSLASH5_MOBIUS_PRE" : ",DSLASH5_MOBIUS");
     }
-    virtual ~Dslash() { }
+    virtual ~Dslash5() { }
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -244,22 +295,22 @@ namespace quda {
 
   template <typename Float, int nColor>
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-		    double m_f, double m_5, double a, const Complex *b_5, const Complex *c_5,
-		    bool dagger, Dslash5Type type)
+		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+		    double a, bool dagger, Dslash5Type type)
   {
-    DslashArg<Float,nColor> arg(out, in, x, m_f, m_5, a, b_5, c_5, dagger, type);
-    Dslash<Float,nColor,DslashArg<Float,nColor> > dslash(arg, in);
+    Dslash5Arg<Float,nColor> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+    Dslash5<Float,nColor,Dslash5Arg<Float,nColor> > dslash(arg, in);
     dslash.apply(streams[Nstream-1]);
   }
 
   // template on the number of colors
   template <typename Float>
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-		    double m_f, double m_5, double a, const Complex *b_5, const Complex *c_5,
-		    bool dagger, Dslash5Type type)
+		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+		    double a, bool dagger, Dslash5Type type)
   {
     switch(in.Ncolor()) {
-    case 3: ApplyDslash5<Float,3>(out, in, x, m_f, m_5, a, b_5, c_5, dagger, type); break;
+    case 3: ApplyDslash5<Float,3>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
     default: errorQuda("Unsupported number of colors %d\n", in.Ncolor());
     }
   }
@@ -269,17 +320,17 @@ namespace quda {
   //Apply the 5th dimension dslash operator to a colorspinor field
   //out = Dslash5*in
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-		    double m_f, double m_5, double a, const Complex *b_5, const Complex *c_5,
-		    bool dagger, Dslash5Type type)
+		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+		    double a, bool dagger, Dslash5Type type)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
     if (in.DWFPCtype() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");
     checkLocation(out, in);     // check all locations match
 
     switch(checkPrecision(out,in)) {
-    case QUDA_DOUBLE_PRECISION: ApplyDslash5<double>(out, in, x, m_f, m_5, a, b_5, c_5, dagger, type); break;
-    case QUDA_SINGLE_PRECISION: ApplyDslash5<float> (out, in, x, m_f, m_5, a, b_5, c_5, dagger, type); break;
-    case QUDA_HALF_PRECISION:   ApplyDslash5<short> (out, in, x, m_f, m_5, a, b_5, c_5, dagger, type); break;
+    case QUDA_DOUBLE_PRECISION: ApplyDslash5<double>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
+    case QUDA_SINGLE_PRECISION: ApplyDslash5<float> (out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
+    case QUDA_HALF_PRECISION:   ApplyDslash5<short> (out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
     default: errorQuda("Unsupported precision %d\n", in.Precision());
     }
 #else

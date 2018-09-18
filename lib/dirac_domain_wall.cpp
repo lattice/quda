@@ -5,10 +5,10 @@
 namespace quda {
 
   DiracDomainWall::DiracDomainWall(const DiracParam &param) : 
-    DiracWilson(param, 5), m5(param.m5), kappa5(0.5/(5.0 + m5)) { }
+    DiracWilson(param, 5), m5(param.m5), kappa5(0.5/(5.0 + m5)), Ls(param.Ls) { }
 
   DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) :
-    DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5.0 + m5)) { }
+    DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5.0 + m5)), Ls(dirac.Ls) { }
 
   DiracDomainWall::~DiracDomainWall() { }
 
@@ -22,10 +22,17 @@ namespace quda {
     return *this;
   }
 
+  void DiracDomainWall::checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    if (in.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, in.X(4));
+    if (out.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, out.X(4));
+  }
+
   void DiracDomainWall::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 			       const QudaParity parity) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(out, in);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
@@ -46,7 +53,7 @@ namespace quda {
 				   const QudaParity parity, const ColorSpinorField &x,
 				   const double &k) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(out, in);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -132,7 +139,7 @@ namespace quda {
   // Apply the even-odd preconditioned clover-improved Dirac operator
   void DiracDomainWallPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(out, in);
     double kappa2 = -kappa5*kappa5;
 
     bool reset = newTmp(&tmp1, in);

@@ -332,6 +332,7 @@ namespace quda {
     double m5;
     double kappa5;
     int Ls; // length of the fifth dimension
+    void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
 
   public:
     DiracDomainWall(const DiracParam &param);
