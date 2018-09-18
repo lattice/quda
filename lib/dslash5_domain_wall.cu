@@ -9,6 +9,20 @@ namespace quda {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
 
+  template <typename real>
+  struct coeff_5 {
+    // zMobius / Zolotarev coefficients
+    complex<real> a[QUDA_MAX_DWF_LS];
+    complex<real> b[QUDA_MAX_DWF_LS];
+    complex<real> c[QUDA_MAX_DWF_LS];
+  };
+
+  static __constant__ coeff_5<double> mobius_d_d;
+  static __constant__ coeff_5<float> mobius_s_d;
+
+  static coeff_5<double> mobius_d_h;
+  static coeff_5<float> mobius_s_h;
+
   /**
      @brief Parameter structure for applying the Dslash
    */
@@ -31,17 +45,9 @@ namespace quda {
     const bool dagger;      // dagger
     const bool xpay;        // whether we are doing xpay or not
 
-    // zMobius / Zolotarev coefficients
-    complex<real> b_5[QUDA_MAX_DWF_LS];
-    complex<real> c_5[QUDA_MAX_DWF_LS];
-
-    // real constant Mobius coefficient
-    double b;
-    double c;
-
-    // xpay coefficients
-    real a;
-    complex<real> a_5[QUDA_MAX_DWF_LS];
+    real b;                 // real constant Mobius coefficient
+    real c;                 // real constant Mobius coefficient
+    real a;                 // real xpay coefficient
 
     Dslash5Type type;
 
@@ -55,12 +61,14 @@ namespace quda {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
+      coeff_5<real> *coeff = in.Precision() == QUDA_DOUBLE_PRECISION ? reinterpret_cast<coeff_5<real>*>(&mobius_d_h) :
+        reinterpret_cast<coeff_5<real>*>(&mobius_s_h);
+      auto *a_5 =  coeff->a;
+      auto *b_5 =  coeff->b;
+      auto *c_5 =  coeff->c;
+
       switch(type) {
       case DSLASH5_DWF:
-	// xpay
-	for (int s=0; s<Ls; s++) {
-	  a_5[s] = a;
-	}
 	break;
       case DSLASH5_MOBIUS_PRE:
 	for (int s=0; s<Ls; s++) {
@@ -85,13 +93,76 @@ namespace quda {
       default:
 	errorQuda("Unknown Dslash5Type %d", type);
       }
+
+      if (type == DSLASH5_MOBIUS || type == DSLASH5_MOBIUS_PRE) {
+        switch (in.Precision()) {
+        case QUDA_DOUBLE_PRECISION:
+          cudaMemcpyToSymbolAsync(mobius_d_d, coeff, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
+          break;
+        case QUDA_SINGLE_PRECISION:
+        case QUDA_HALF_PRECISION:
+          cudaMemcpyToSymbolAsync(mobius_s_d, coeff, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
+          break;
+        default:
+          errorQuda("Unsupported precision %d\n", in.Precision());
+        }
+      }
+
       b = b_5[0].real();
       c = c_5[0].real();
     }
   };
 
+  template <typename real> inline __device__ __host__ complex<real> a_5(int s) {
+#ifdef __CUDA_ARCH__
+    return mobius_d_d.a[s];
+#else
+    return mobius_d_h.a[s];
+#endif
+  }
+
+  template <> inline __device__ __host__ complex<float> a_5<float>(int s) {
+#ifdef __CUDA_ARCH__
+    return mobius_s_d.a[s];
+#else
+    return mobius_s_h.a[s];
+#endif
+  }
+
+  template <typename real> inline __device__ __host__ complex<real> b_5(int s) {
+#ifdef __CUDA_ARCH__
+    return mobius_d_d.b[s];
+#else
+    return mobius_d_h.b[s];
+#endif
+  }
+
+  template <> inline __device__ __host__ complex<float> b_5<float>(int s) {
+#ifdef __CUDA_ARCH__
+    return mobius_s_d.b[s];
+#else
+    return mobius_s_h.b[s];
+#endif
+  }
+
+  template <typename real> inline __device__ __host__ complex<real> c_5(int s) {
+#ifdef __CUDA_ARCH__
+    return mobius_d_d.c[s];
+#else
+    return mobius_d_h.c[s];
+#endif
+  }
+
+  template <> inline __device__ __host__ complex<float> c_5<float>(int s) {
+#ifdef __CUDA_ARCH__
+    return mobius_s_d.c[s];
+#else
+    return mobius_s_h.c[s];
+#endif
+  }
+
   template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
-  __device__ __host__ inline void dslash5(Arg &arg, int parity, int x_cb, int s) {
+  __device__ __host__ inline void dslash5(const Arg &arg, int parity, int x_cb, int s) {
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,4> Vector;
 
@@ -124,28 +195,23 @@ namespace quda {
       out = x + arg.a*out;
     } else if (type == DSLASH5_MOBIUS_PRE) {
       Vector diagonal = arg.in(s*arg.volume_4d_cb + x_cb, parity);
-      const complex<real> b = arg.b; // arg.b_5[s]
-      const complex<real> c = arg.c; // arg.c_5[s]
-      out = c * out + b * diagonal;
+      out = c_5<real>(s) * out + b_5<real>(s) * diagonal;
 
       if (xpay) {
 	Vector x = arg.x(s*arg.volume_4d_cb + x_cb, parity);
-        complex<real> a = arg.a; // arg.a_5[s]
-	out = x + a*out;
+	out = x + a_5<real>(s)*out;
       }
     } else if (type == DSLASH5_MOBIUS) {
       Vector diagonal = arg.in(s*arg.volume_4d_cb + x_cb, parity);
-      const complex<real> c = arg.c; // arg.c_5[s]
-      out = c * out + diagonal;
+      out = c_5<real>(s) * out + diagonal;
 
       if (xpay) { // really axpy
 	Vector x = arg.x(s*arg.volume_4d_cb + x_cb, parity);
-        complex<real> a = arg.a; // arg.a_5[s]
-	out = a*x + out;
+	out = a_5<real>(s)*x + out;
       }
     }
 
-    arg.out(s*arg.volume_4d_cb + x_cb, parity) = out;
+    ((Arg*)&arg)->out(s*arg.volume_4d_cb + x_cb, parity) = out;
   }
 
   // CPU kernel for applying the dslash operator
@@ -164,7 +230,7 @@ namespace quda {
 
   // GPU Kernel for applying the dslash operator
   template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
-  __global__ void dslash5GPU(Arg arg)
+  __global__ void dslash5GPU(const Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int s = blockIdx.y*blockDim.y + threadIdx.y;
@@ -189,7 +255,7 @@ namespace quda {
       long long bulk = (Ls-2)*(meta.Volume()/Ls);
       long long wall = 2*meta.Volume()/Ls;
       int n = meta.Ncolor() * meta.Nspin();
-      bool zMobius = false; // set to true when we have complexity
+      bool zMobius = true; // set to true when we have complexity
 
       long long flops_ = 0;
       switch (arg.type) {
