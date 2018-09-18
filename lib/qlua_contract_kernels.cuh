@@ -181,8 +181,11 @@ inline __device__ int qc_gamma_sim_parity(int m, int n){
 
 namespace quda { 
 
-  //-- Forward declarations for contraction wrappers
+  //- C.K. Constant variable declarations
+  __constant__ QC_CPLX cS1_gvec[QC_LEN_G];
+  __constant__ QC_CPLX cS2_gvec[QC_LEN_G];
 
+  //-- Forward declarations for contraction wrappers
   void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
 
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);

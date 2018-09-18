@@ -3,8 +3,8 @@
 namespace quda {
 
   //- C.K. Constant variable declarations
-   __constant__ QC_CPLX cS1_gvec[QC_LEN_G];
-   __constant__ QC_CPLX cS2_gvec[QC_LEN_G];
+   // __constant__ QC_CPLX cS1_gvec[QC_LEN_G];
+   // __constant__ QC_CPLX cS2_gvec[QC_LEN_G];
 
   
   /* elementary actions on gamma matrices */
