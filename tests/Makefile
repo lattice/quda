@@ -34,10 +34,6 @@ ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
   GAUGE_FORCE_TEST=gauge_force_test
 endif
 
-ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
-  FERMION_FORCE_TEST=fermion_force_test
-endif
-
 ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
   HISQ_PATHS_FORCE_TEST=hisq_paths_force_test
   HISQ_UNITARIZE_FORCE_TEST=hisq_unitarize_force_test
@@ -47,12 +43,11 @@ ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
   GAUGE_ALG_TEST= gauge_alg_test
 endif
 
-TESTS = su3_test pack_test blas_test dslash_test invert_test		\
+TESTS = su3_test pack_test blas_test copy_test dslash_test invert_test		\
 	deflated_invert_test multigrid_invert_test multigrid_benchmark_test $(DIRAC_TEST)	\
 	$(STAGGERED_DIRAC_TEST) $(FATLINK_TEST) $(GAUGE_FORCE_TEST)	\
-	$(FERMION_FORCE_TEST) $(UNITARIZE_LINK_TEST)			\
+	$(GAUGE_ALG_TEST) $(UNITARIZE_LINK_TEST)			\
 	$(HISQ_PATHS_FORCE_TEST) $(HISQ_UNITARIZE_FORCE_TEST)		\
-	$(GAUGE_ALG_TEST)
 
 all: $(TESTS)
 
@@ -89,19 +84,19 @@ pack_test: pack_test.o test_util.o misc.o $(QUDA)
 blas_test: blas_test.o gtest-all.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
+copy_test: copy_test.o gtest-all.o test_util.o misc.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+
 llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o face_gauge.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o face_gauge.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
-fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
-
 unitarize_link_test: unitarize_link_test.o gtest-all.o test_util.o misc.o face_gauge.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o hisq_force_reference2.o fermion_force_reference.o test_util.o misc.o $(QUDA)
+hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o hisq_force_reference2.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o test_util.o misc.o $(QUDA)
@@ -110,8 +105,10 @@ hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o te
 clean:
 	-rm -f *.o dslash_test invert_test deflated_invert_test	\
 	staggered_dslash_test staggered_invert_test su3_test	\
+	pack_test blas_test copy_test llfat_test \
+	gauge_force_test hisq_paths_force_test	\
 	pack_test blas_test llfat_test gauge_force_test		\
-	fermion_force_test hisq_paths_force_test		\
+	hisq_paths_force_test					\
 	hisq_unitarize_force_test unitarize_link_test		\
 	multigrid_invert_test multigrid_benchmark_test
 

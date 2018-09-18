@@ -41,10 +41,12 @@ extern int gridsize_from_cmdline[];
 extern QudaPrecision prec;
 extern QudaPrecision  prec_sloppy;
 extern QudaPrecision  prec_precondition;
+extern QudaPrecision  prec_refinement_sloppy;
 extern QudaReconstructType link_recon;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern QudaInverterType  inv_type;
+extern double reliable_delta; // reliable update parameter
 extern QudaInverterType  precon_type;
 extern int nstep;
 extern int multishift; // whether to test multi-shift or standard solver
@@ -108,6 +110,7 @@ int main(int argc, char **argv)
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (prec_refinement_sloppy == QUDA_INVALID_PRECISION) prec_refinement_sloppy = prec_sloppy;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
@@ -133,6 +136,7 @@ int main(int argc, char **argv)
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = prec;
   QudaPrecision cuda_prec_sloppy = prec_sloppy;
+  QudaPrecision cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   QudaPrecision cuda_prec_precondition = prec_precondition;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
@@ -158,6 +162,9 @@ int main(int argc, char **argv)
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
   gauge_param.cuda_prec_precondition = cuda_prec_precondition;
   gauge_param.reconstruct_precondition = link_recon_precondition;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+  gauge_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
+
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.dslash_type = dslash_type;
@@ -219,7 +226,7 @@ int main(int argc, char **argv)
       dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
       dslash_type == QUDA_TWISTED_MASS_DSLASH || 
       dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
-      multishift || inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER || inv_type == QUDA_PIPEPCG_INVERTER || inv_type == QUDA_SRE_PCG_INVERTER || inv_type == QUDA_LRE_PCG_INVERTER || inv_type == QUDA_PIPE2PCG_INVERTER || inv_type == QUDA_CG3_INVERTER ) {
+      multishift || inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER || inv_type == QUDA_PIPEPCG_INVERTER || inv_type == QUDA_SRE_PCG_INVERTER || inv_type == QUDA_LRE_PCG_INVERTER || inv_type == QUDA_PIPE2PCG_INVERTER || inv_type == QUDA_CG3_INVERTER || inv_type == QUDA_CA_CG_INVERTER ) {
     inv_param.solution_type = QUDA_MAT_SOLUTION; 
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
@@ -250,7 +257,7 @@ int main(int argc, char **argv)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = reliable_delta;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.max_res_increase = 1;
@@ -269,6 +276,7 @@ int main(int argc, char **argv)
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;

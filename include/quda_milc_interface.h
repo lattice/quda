@@ -40,6 +40,10 @@ extern "C" {
     int make_resident_solution; /** Make the solution resident and don't copy back */
     int use_resident_solution; /** Use the resident solution */
     QudaInverterType solver_type; /** Type of solver to use */
+    double tadpole; /** Tadpole improvement factor - set to 1.0 for
+                        HISQ fermions since the tadpole factor is
+                        baked into the links during their construction */
+    double naik_epsilon; /** Naik epsilon parameter (HISQ fermions only).*/
   } QudaInvertArgs_t;
 
   /**
@@ -197,7 +201,6 @@ extern "C" {
    * @param inv_args Struct setting some solver metadata
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement facter
    * @param source Right-hand side source field
    * @param solution Solution spinor field
    */
@@ -206,7 +209,6 @@ extern "C" {
 		  QudaInvertArgs_t inv_args,
 		  const void* const milc_fatlink,
 		  const void* const milc_longlink,
-		  const double tadpole,
 		  void* source,
 		  void* solution,
 		  int* num_iters);
@@ -264,7 +266,6 @@ extern "C" {
    * @param target_relative_residual Target Fermilab residual
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement facter
    * @param source Right-hand side source field
    * @param solution Solution spinor field
    * @param final_residual True residual
@@ -279,7 +280,6 @@ extern "C" {
 		  double target_fermilab_residual,
 		  const void* const milc_fatlink,
 		  const void* const milc_longlink,
-		  const double tadpole,
 		  void* source,
 		  void* solution,
 		  double* const final_resid,
@@ -300,7 +300,6 @@ extern "C" {
    * @param target_relative_residual Target Fermilab residual
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement facter
    * @param source array of right-hand side source fields
    * @param solution array of solution spinor fields
    * @param final_residual True residual
@@ -316,7 +315,6 @@ extern "C" {
                       double target_fermilab_residual,
                       const void* const fatlink,
                       const void* const longlink,
-                      const double tadpole,
                       void** sourceArray,
                       void** solutionArray,
                       double* const final_residual,
@@ -342,7 +340,6 @@ extern "C" {
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement factor
    * @param source Right-hand side source field
    * @param solutionArray Array of solution spinor fields
    * @param final_residual Array of true residuals
@@ -359,7 +356,6 @@ extern "C" {
       const double* target_fermilab_residual,
       const void* const milc_fatlink,
       const void* const milc_longlink,
-      const double tadpole,
       void* source,
       void** solutionArray,
       double* const final_residual,
@@ -385,7 +381,6 @@ extern "C" {
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement factor
    * @param source Right-hand side source field
    * @param solution Array of solution spinor fields
    * @param eig_args contains info about deflation space
@@ -404,7 +399,6 @@ extern "C" {
       double target_fermilab_residual,
       const void* const fatlink,
       const void* const longlink,
-      const double tadpole,
       void* source,
       void* solution,
       QudaEigArgs_t eig_args,
@@ -602,47 +596,28 @@ extern "C" {
    * must match.
    *
    * @param precision       The precision of the fields
+   * @param num_terms The number of quark fields
+   * @param num_naik_terms The number of naik contributions
+   * @param coeff The coefficients multiplying the fermion fields in the outer product
+   * @param quark_field The input fermion field.
    * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
    * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
-   * @param staple_src      Quark outer-product for the staple.
-   * @param one_link_src    Quark outer-product for the one-link term in the action.
-   * @param naik_src        Quark outer-product for the three-hop term in the action.
    * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
    * @param v_link          Fat7 link variables.
    * @param u_link          SU(3) think link variables.
    * @param milc_momentum        The momentum contribution from the quark action.
    */
   void qudaHisqForce(int precision,
+                     int num_terms,
+                     int num_naik_terms,
+                     double** coeff,
+                     void** quark_field,
 		     const double level2_coeff[6],
 		     const double fat7_coeff[6],
-		     const void* const staple_src[4],
-		     const void* const one_link_src[4],
-		     const void* const naik_src[4],
 		     const void* const w_link,
 		     const void* const v_link,
 		     const void* const u_link,
 		     void* const milc_momentum);
-
-
-  /**
-   * Compute the fermion force for the Asqtad quark action.  All fields
-   * are host fields in MILC order, and the precision of these fields
-   * must match.
-   *
-   * @param precision       The precision of the fields
-   * @param act_path_coeff    The coefficients that define the asqtad action.
-   * @param one_link_src    Quark outer-product for the one-link term in the action.
-   * @param naik_src        Quark outer-product for the three-hop term in the action.
-   * @param link            The gauge field
-   * @param milc_momentum   The momentum contribution from the quark action.
-   */
-  void qudaAsqtadForce(int precision,
-		       const double act_path_coeff[6],
-		       const void* const one_link_src[4],
-		       const void* const naik_src[4],
-		       const void* const link,
-		       void* const milc_momentum);
-
 
   /**
    * Compute the gauge force and update the mometum field.  All fields
@@ -660,22 +635,6 @@ extern "C" {
 		      double milc_loop_coeff[3],
 		      double eb3,
 		      QudaMILCSiteArg_t *arg);
-
-  /**
-   * Compute the staggered quark-field outer product needed for gauge generation
-   *
-   * @param precision The precision of the field (2 - double, 1 - single)
-   * @param num_terms The number of quak fields
-   * @param coeff The coefficient multiplying the fermion fields in the outer product
-   * @param quark_field The input fermion field.
-   * @param oprod The outer product to be computed.
-   */
-  void qudaComputeOprod(int precision,
-			int num_terms,
-			double** coeff,
-			void** quark_field,
-			void* oprod[2]);
-
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field
@@ -891,6 +850,31 @@ extern "C" {
     unsigned int stopWtheta,
     void* milc_sitelink
     );
+
+  /* The below declarations are for removed functions from prior versions of QUDA. */
+
+  /**
+   * Note this interface function has been removed.  This stub remains
+   * for compatibility only.
+   */
+  void qudaAsqtadForce(int precision,
+		       const double act_path_coeff[6],
+		       const void* const one_link_src[4],
+		       const void* const naik_src[4],
+		       const void* const link,
+		       void* const milc_momentum);
+
+  /**
+   * Note this interface function has been removed.  This stub remains
+   * for compatibility only.
+   */
+  void qudaComputeOprod(int precision,
+			int num_terms,
+			int num_naik_terms,
+			double** coeff,
+                        double scale,
+			void** quark_field,
+			void* oprod[3]);
 
 
 #ifdef __cplusplus

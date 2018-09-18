@@ -5,25 +5,12 @@
 
 namespace quda {
 
-  namespace wilson {
-#include <dslash_init.cuh>
-  }
+  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param) { }
 
-  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param)
-    { 
-      wilson::initConstants(*param.gauge, profile);
-    }
+  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac) { }
 
-  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac)
-    { 
-      wilson::initConstants(*dirac.gauge, profile);
-    }
-
-  DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : Dirac(param)
-  { 
-    wilson::initConstants(*param.gauge, profile);
-    
-  }//temporal hack (for DW and TM operators) 
+  // hack (for DW and TM operators)
+  DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : Dirac(param) { } 
 
   DiracWilson::~DiracWilson() { }
 

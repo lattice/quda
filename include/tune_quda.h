@@ -77,11 +77,11 @@ namespace quda {
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
-	const unsigned int max_blocks = 2*deviceProp.multiProcessorCount;
+	const unsigned int max_blocks = maxGridSize();
 	const int step = 1;
 	param.grid.x += step;
 	if (param.grid.x > max_blocks) {
-	  param.grid.x = step;
+	  param.grid.x = minGridSize();
 	  return false;
 	} else {
 	  return true;
@@ -92,6 +92,8 @@ namespace quda {
     }
 
     virtual unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (param.block.y*param.block.z); }
+    virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
+    virtual unsigned int minGridSize() const { return 1; }
 
     virtual int blockStep() const { return deviceProp.warpSize; }
     virtual int blockMin() const { return deviceProp.warpSize; }
@@ -156,11 +158,11 @@ namespace quda {
     }
 
     /**
-     * The goal here is to throttle the number of thread blocks per SM by over-allocating shared memory (in order to improve
-     * L2 utilization, etc.).  Note that:
-     * - On Fermi/Kepler, requesting greater than 16 KB will switch the cache config, so we restrict ourselves to 16 KB for now.
-     *   We thus request the smallest amount of dynamic shared memory that guarantees throttling to a given number of blocks,
-     *   in order to allow some extra leeway.
+     * The goal here is to throttle the number of thread blocks per SM
+     * by over-allocating shared memory (in order to improve L2
+     * utilization, etc.).  We thus request the smallest amount of
+     * dynamic shared memory that guarantees throttling to a given
+     * number of blocks, in order to allow some extra leeway.
      */
     virtual bool advanceSharedBytes(TuneParam &param) const
     {
@@ -233,12 +235,13 @@ namespace quda {
     {
       const unsigned int max_threads = deviceProp.maxThreadsDim[0];
       const unsigned int max_blocks = deviceProp.maxGridSize[0];
+      const int min_grid_size = minGridSize();
       const int min_block_size = blockMin();
 
       if (tuneGridDim()) {
 	param.block = dim3(min_block_size,1,1);
 
-	param.grid = dim3(1,1,1);
+	param.grid = dim3(min_grid_size,1,1);
       } else {
 	// find the minimum valid blockDim
 	param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1);
@@ -351,11 +354,13 @@ namespace quda {
     virtual unsigned int sharedBytesPerThread() const { return 0; }
     virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-    unsigned int vector_length_y;
+    mutable unsigned int vector_length_y;
+    mutable unsigned int step_y;
     bool tune_block_x;
 
   public:
-  TunableVectorY(unsigned int vector_length_y) : vector_length_y(vector_length_y), tune_block_x(true) { }
+  TunableVectorY(unsigned int vector_length_y) : vector_length_y(vector_length_y),
+      step_y(1), tune_block_x(true) { }
 
     bool advanceBlockDim(TuneParam &param) const
     {
@@ -371,13 +376,13 @@ namespace quda {
 
 	// we can advance spin/block-color since this is valid
 	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
-	    param.block.x*(param.block.y+1) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
-	  param.block.y++;
+	    param.block.x*(param.block.y+step_y)*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+	  param.block.y += step_y;
 	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return true;
 	} else { // we have run off the end so let's reset
-	  param.block.y = 1;
-	  param.grid.y = vector_length_y;
+	  param.block.y = step_y;
+	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return false;
 	}
       }
@@ -386,29 +391,32 @@ namespace quda {
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = vector_length_y;
+      param.block.y = step_y;
+      param.grid.y = (vector_length_y + step_y - 1) / step_y;
     }
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = vector_length_y;
+      param.block.y = step_y;
+      param.grid.y = (vector_length_y + step_y - 1) / step_y;
     }
 
-    void resizeVector(int y) { vector_length_y = y;  }
+    void resizeVector(int y) const { vector_length_y = y; }
+    void resizeStep(int y) const { step_y = y; }
   };
 
   class TunableVectorYZ : public TunableVectorY {
 
     mutable unsigned vector_length_z;
+    mutable unsigned step_z;
     bool tune_block_y;
 
   public:
     TunableVectorYZ(unsigned int vector_length_y, unsigned int vector_length_z)
-      : TunableVectorY(vector_length_y), vector_length_z(vector_length_z), tune_block_y(true) { }
+      : TunableVectorY(vector_length_y), vector_length_z(vector_length_z),
+      step_z(1), tune_block_y(true) { }
 
     bool advanceBlockDim(TuneParam &param) const
     {
@@ -425,13 +433,13 @@ namespace quda {
 
 	// we can advance spin/block-color since this is valid
 	if (param.block.z < vector_length_z && param.block.z < (unsigned int)deviceProp.maxThreadsDim[2] &&
-	    param.block.x*param.block.y*(param.block.z+1) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
-	  param.block.z++;
+	    param.block.x*param.block.y*(param.block.z+step_z) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
+	  param.block.z += step_z;
 	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
 	  return true;
 	} else { // we have run off the end so let's reset
-	  param.block.z = 1;
-	  param.grid.z = vector_length_z;
+	  param.block.z = step_z;
+	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
 	  return false;
 	}
       }
@@ -440,20 +448,27 @@ namespace quda {
     void initTuneParam(TuneParam &param) const
     {
       TunableVectorY::initTuneParam(param);
-      param.block.z = 1;
-      param.grid.z = vector_length_z;
+      param.block.z = step_z;
+      param.grid.z = (vector_length_z + step_z - 1) / step_z;
     }
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const
     {
       TunableVectorY::defaultTuneParam(param);
-      param.block.z = 1;
-      param.grid.z = vector_length_z;
+      param.block.z = step_z;
+      param.grid.z = (vector_length_z + step_z - 1) / step_z;
     }
 
-    void resizeVector(int y, int z) { vector_length_z = z;  TunableVectorY::resizeVector(y); }
+    void resizeVector(int y, int z) const { vector_length_z = z;  TunableVectorY::resizeVector(y); }
+    void resizeStep(int y, int z) const { step_z = z;  TunableVectorY::resizeStep(y); }
   };
+
+  /**
+     @brief query if tuning is in progress
+     @return tuning in progress?
+  */
+  bool activeTuning();
 
   void loadTuneCache();
   void saveTuneCache(bool error = false);
@@ -470,6 +485,13 @@ namespace quda {
 
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
+  /**
+   * @brief Post an event in the trace, recording where it was posted
+   */
+  void postTrace_(const char *func, const char *file, int line);
+
 } // namespace quda
+
+#define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)
 
 #endif // _TUNE_QUDA_H

@@ -151,6 +151,13 @@ namespace quda {
       { return static_cast<ReduceType>(norm(x)); }
     };
 
+    template<typename ReduceType> struct square_<ReduceType,char> {
+      const ReduceType scale;
+      square_(const ReduceType scale) : scale(scale) { }
+      __host__ __device__ inline ReduceType operator()(const quda::complex<char> &x)
+      { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    };
+
     template<typename ReduceType> struct square_<ReduceType,short> {
       const ReduceType scale;
       square_(const ReduceType scale) : scale(scale) { }
@@ -168,6 +175,13 @@ namespace quda {
     template<typename Float, typename storeFloat> struct abs_ {
       abs_(const Float scale) { }
       __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
+    };
+
+    template<typename Float> struct abs_<Float,char> {
+      Float scale;
+      abs_(const Float scale) : scale(scale) { }
+      __host__ __device__ Float operator()(const quda::complex<char> &x)
+      { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
     template<typename Float> struct abs_<Float,short> {
@@ -215,8 +229,29 @@ namespace quda {
         __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
 	  : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
 
-	__device__ __host__ inline Float real() const { return scale_inv*static_cast<Float>(v[idx].real()); }
-	__device__ __host__ inline Float imag() const { return scale_inv*static_cast<Float>(v[idx].imag()); }
+	__device__ __host__ inline Float real() const {
+          if (!fixed) {
+            return v[idx].real();
+          } else {
+            return scale_inv*static_cast<Float>(v[idx].real());
+          }
+        }
+
+	__device__ __host__ inline Float imag() const {
+          if (!fixed) {
+            return v[idx].imag();
+          } else {
+            return scale_inv*static_cast<Float>(v[idx].imag());
+          }
+        }
+
+	/**
+	   @brief negation operator
+           @return negation of this complex number
+	*/
+	__device__ __host__ inline complex<Float> operator-() const {
+	  return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
+	}
 
 	/**
 	   @brief Assignment operator with fieldorder_wrapper instance as input
@@ -360,18 +395,20 @@ namespace quda {
 	{ return fieldorder_wrapper<Float,storeFloat>(u[d], parity*cb_offset + (x*nColor + row)*nColor + col,
 						      scale, scale_inv); }
 
-      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<Float> &val) const {
+      template<typename theirFloat>
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
+                                                 const complex<theirFloat> &val) const {
 #ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 	  atomicAdd(u2, (vec2&)val_);
 	} else {
 	  atomicAdd(u2, (vec2&)val);
 	}
 #else
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 #pragma omp atomic update
 	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].x += val_.x;
@@ -498,18 +535,19 @@ namespace quda {
 	{ return fieldorder_wrapper<Float,storeFloat>
 	    (u, (((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col, scale, scale_inv); }
 
-      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<Float> &val) const {
+      template <typename theirFloat>
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
 #ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 	  atomicAdd(u2, (vec2&)val_);
 	} else {
 	  atomicAdd(u2, (vec2&)val);
 	}
 #else
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 #pragma omp atomic update
 	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].x += val_.x;
@@ -524,23 +562,55 @@ namespace quda {
 #endif
       }
 
-      __host__ double device_norm2() const {
+      __host__ double device_norm2(int dim=-1) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
 	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	return thrust::transform_reduce(thrust::cuda::par(alloc),
-					ptr+0*volumeCB*geometry*nColor*nColor,
-					ptr+2*volumeCB*geometry*nColor*nColor,
-					square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	double even = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+(0*geometry+lower)*volumeCB*nColor*nColor,
+					       ptr+(0*geometry+upper)*volumeCB*nColor*nColor,
+					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	double odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+					       ptr+(1*geometry+lower)*volumeCB*nColor*nColor,
+                                               ptr+(1*geometry+upper)*volumeCB*nColor*nColor,
+					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	return even + odd;
       }
 
       __host__ double device_absmax(int dim=0) const {
-	errorQuda("Not implemented");
-	return 0.0;
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
+	thrust_allocator alloc;
+	thrust::device_ptr<complex<storeFloat> > ptr(u);
+	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
+                                              ptr+(0*geometry+lower)*volumeCB*nColor*nColor,
+                                              ptr+(0*geometry+upper)*volumeCB*nColor*nColor,
+                                              abs_<Float,storeFloat>(scale_inv), 0.0, thrust::maximum<Float>());
+	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+                                              ptr+(1*geometry+lower)*volumeCB*nColor*nColor,
+                                              ptr+(1*geometry+upper)*volumeCB*nColor*nColor,
+                                              abs_<Float,storeFloat>(scale_inv), 0.0, thrust::maximum<Float>());
+	return even + odd;
       }
 
       __host__ double device_absmin(int dim=0) const {
-	errorQuda("Not implemented");
-	return 0.0;
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
+	thrust_allocator alloc;
+	thrust::device_ptr<complex<storeFloat> > ptr(u);
+	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
+                                              ptr+(0*geometry+lower)*volumeCB*nColor*nColor,
+                                              ptr+(0*geometry+upper)*volumeCB*nColor*nColor,
+                                              abs_<Float,storeFloat>(scale_inv), 0.0, thrust::minimum<Float>());
+	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
+                                              ptr+(1*geometry+lower)*volumeCB*nColor*nColor,
+                                              ptr+(1*geometry+upper)*volumeCB*nColor*nColor,
+                                              abs_<Float,storeFloat>(scale_inv), 0.0, thrust::minimum<Float>());
+	return even + odd;
       }
     };
 
@@ -687,18 +757,19 @@ namespace quda {
 	return fieldorder_wrapper<Float,storeFloat>(u, index, scale, scale_inv);
       }
 
-      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<Float> &val) const {
+      template <typename theirFloat>
+      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
 #ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
-	if (fixed) {
+	if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 	  atomicAdd(u2, (vec2&)val_);
 	} else {
 	  atomicAdd(u2, (vec2&)val);
 	}
 #else
-	if (fixed) {
+        if (fixed && !match<storeFloat,theirFloat>()) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
 #pragma omp atomic update
 	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].x += val_.x;
@@ -713,87 +784,53 @@ namespace quda {
 #endif
       }
 
-      __host__ double device_norm2() const {
+      __host__ double device_norm2(int dim=-1) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
 	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
 	double even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					       ptr+0*offset_cb, ptr+0*offset_cb+geometry*stride*nColor*nColor,
+					       ptr+0*offset_cb+lower*stride*nColor*nColor,
+					       ptr+0*offset_cb+upper*stride*nColor*nColor,
 					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	double odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					       ptr+1*offset_cb, ptr+1*offset_cb+geometry*stride*nColor*nColor,
+					       ptr+1*offset_cb+lower*stride*nColor*nColor,
+					       ptr+1*offset_cb+upper*stride*nColor*nColor,
 					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	return even + odd;
       }
 
-      __host__ double device_norm2(int dim) const {
+      __host__ Float device_absmax(int dim=-1) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-	thrust_allocator alloc;
-	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	double even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					       ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
-					       ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
-					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-	double odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					       ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
-					       ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
-					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-	return even + odd;
-      }
-
-      __host__ Float device_absmax() const {
-	thrust_allocator alloc;
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
+        thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
 	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+0*offset_cb+0*stride*nColor*nColor,
-					      ptr+0*offset_cb+geometry*stride*nColor*nColor,
+					      ptr+0*offset_cb+lower*stride*nColor*nColor,
+					      ptr+0*offset_cb+upper*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
 	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+1*offset_cb+0*stride*nColor*nColor,
-					      ptr+1*offset_cb+geometry*stride*nColor*nColor,
+					      ptr+1*offset_cb+lower*stride*nColor*nColor,
+					      ptr+1*offset_cb+upper*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
 	return std::max(even,odd);
       }
 
-      __host__ Float device_absmax(int dim) const {
+      __host__ Float device_absmin(int dim=-1) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int lower = (dim == -1) ? 0 : dim;
+        int upper = (dim == -1) ? geometry : dim+1;
 	thrust_allocator alloc;
 	thrust::device_ptr<complex<storeFloat> > ptr(u);
 	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
-					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
-	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
-					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
-	return std::max(even,odd);
-      }
-
-      __host__ Float device_absmin() const {
-	thrust_allocator alloc;
-	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+0*offset_cb+0*stride*nColor*nColor,
-					      ptr+0*offset_cb+geometry*stride*nColor*nColor,
+					      ptr+0*offset_cb+lower*stride*nColor*nColor,
+					      ptr+0*offset_cb+upper*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
 	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+1*offset_cb+0*stride*nColor*nColor,
-					      ptr+1*offset_cb+geometry*stride*nColor*nColor,
-					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
-	return std::min(even,odd);
-      }
-
-      __host__ Float device_absmin(int dim) const {
-	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-	thrust_allocator alloc;
-	thrust::device_ptr<complex<storeFloat> > ptr(u);
-	Float even = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
-					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
-	Float odd  = thrust::transform_reduce(thrust::cuda::par(alloc),
-					      ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
+					      ptr+1*offset_cb+lower*stride*nColor*nColor,
+					      ptr+1*offset_cb+upper*stride*nColor*nColor,
 					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
 	return std::min(even,odd);
       }
@@ -885,7 +922,7 @@ namespace quda {
 	/** An internal reference to the actual field we are accessing */
 	const int volumeCB;
 	const int nDim;
-	const int geometry;
+	const int_fastdiv geometry;
 	const QudaFieldLocation location;
 	static constexpr int nColorCoarse = nColor / nSpinCoarse;
 
@@ -1023,8 +1060,9 @@ namespace quda {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
 
+        template <typename theirFloat>
 	__device__ __host__ inline void atomicAdd(int d, int parity, int x, int s_row, int s_col,
-						  int c_row, int c_col, const complex<Float> &val) {
+						  int c_row, int c_col, const complex<theirFloat> &val) {
 	  accessor.atomic_add(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col, val);
 	}
 
@@ -1412,7 +1450,7 @@ namespace quda {
 
 	// Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
+	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
 	Complex A(cos_sin[0], cos_sin[1]);
 
 	Out[6] *= A;
@@ -1460,8 +1498,8 @@ namespace quda {
       isLastTimeSlice(recon.isLastTimeSlice), ghostExchange(recon.ghostExchange) { }
 
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
-      out[0] = Trig<isHalf<Float>::value,RegType>::Atan2(in[1], in[0]);
-      out[1] = Trig<isHalf<Float>::value,RegType>::Atan2(in[13], in[12]);
+      out[0] = Trig<isFixed<Float>::value,RegType>::Atan2(in[1], in[0]);
+      out[1] = Trig<isFixed<Float>::value,RegType>::Atan2(in[13], in[12]);
 #pragma unroll
       for (int i=2; i<8; i++) out[i] = in[i];
     }
@@ -1484,7 +1522,7 @@ namespace quda {
       RegType diff = static_cast<RegType>(1.0)/(u0*u0) - row_sum;
       RegType U00_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      Out[0] = U00_mag * Complex(Trig<isHalf<Float>::value,RegType>::Cos(in[0]), Trig<isHalf<Float>::value,RegType>::Sin(in[0]));
+      Out[0] = U00_mag * Complex(Trig<isFixed<Float>::value,RegType>::Cos(in[0]), Trig<isFixed<Float>::value,RegType>::Sin(in[0]));
 
       // Now reconstruct first column
       Out[3] = In[3];
@@ -1493,7 +1531,7 @@ namespace quda {
       diff = static_cast<RegType>(1.0)/(u0*u0) - column_sum;
       RegType U20_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      Out[6] = U20_mag * Complex( Trig<isHalf<Float>::value,RegType>::Cos(in[1]), Trig<isHalf<Float>::value,RegType>::Sin(in[1]));
+      Out[6] = U20_mag * Complex( Trig<isFixed<Float>::value,RegType>::Cos(in[1]), Trig<isFixed<Float>::value,RegType>::Sin(in[1]));
       // First column now restored
 
       // finally reconstruct last elements from SU(2) rotation
@@ -1545,7 +1583,7 @@ namespace quda {
       __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
 	RegType phase = getPhase(in);
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
+	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
 	Complex su3[9];
 #pragma unroll
@@ -1558,7 +1596,7 @@ namespace quda {
 					     const RegType phase, const I *X, const int *R) const {
 	reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, scale);
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
+	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
 #pragma unroll
 	for (int i=0; i<9; i++) reinterpret_cast<Complex*>(out)[i] *= z;
@@ -2666,7 +2704,7 @@ namespace quda {
 	  for (int j=0; j<Nc; j++)
 	    for (int z=0; z<2; z++)
 	      v_.v[(j*Nc+i)*2+z] = (Float)(v[(i*Nc+j)*2+z]) * scale;
-	gauge_[(dir*2+parity)*exVolumeCB + y] = v_;
+  gauge_[(dir*2+parity)*exVolumeCB + y] = v_;
 #else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
@@ -2761,6 +2799,14 @@ namespace quda {
   template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N,stag,huge_alloc> { typedef gauge::FloatNOrder<short, N, 4, 12, stag, huge_alloc> type; };
   template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N,stag,huge_alloc> { typedef gauge::FloatNOrder<short, N, 4, 9, stag, huge_alloc> type; };
   template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N,stag,huge_alloc> { typedef gauge::FloatNOrder<short, N, 4, 8, stag, huge_alloc> type; };
+
+  // quarter precision
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_NO,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 2, N, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_13,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 13, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_12,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 12, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_9,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 9, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_8,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 8, stag, huge_alloc> type; };
+
 
   template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };

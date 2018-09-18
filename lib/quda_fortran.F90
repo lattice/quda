@@ -37,6 +37,8 @@ module quda_fortran
      QudaReconstructType :: reconstruct
      QudaPrecision :: cuda_prec_sloppy
      QudaReconstructType :: reconstruct_sloppy
+     QudaPrecision :: cuda_prec_refinement_sloppy
+     QudaReconstructType :: reconstruct_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
      QudaReconstructType :: reconstruct_precondition
      QudaGaugeFixed :: gauge_fix
@@ -153,6 +155,7 @@ module quda_fortran
      QudaPrecision :: cpu_prec
      QudaPrecision :: cuda_prec
      QudaPrecision :: cuda_prec_sloppy
+     QudaPrecision :: cuda_prec_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
 
      QudaDiracFieldOrder :: dirac_order
@@ -164,6 +167,7 @@ module quda_fortran
      QudaPrecision :: clover_cpu_prec
      QudaPrecision :: clover_cuda_prec
      QudaPrecision :: clover_cuda_prec_sloppy
+     QudaPrecision :: clover_cuda_prec_refinement_sloppy
      QudaPrecision :: clover_cuda_prec_precondition
 
      QudaCloverFieldOrder :: clover_order
@@ -237,10 +241,7 @@ module quda_fortran
      integer(4)::max_search_dim ! for magma library this parameter must be multiple 16?
      integer(4)::rhs_idx
      integer(4)::deflation_grid !total deflation space is nev*deflation_grid
-     integer(4)::use_reduced_vector_set ! eigCG: specifies whether to use reduced eigenvector set
      real(8):: eigenval_tol ! eigCG: selection criterion for the reduced eigenvector set
-     integer(4)::use_cg_updates ! mixed precision eigCG:whether to use cg refinement corrections in the incremental stage
-     real(8)::cg_iterref_tol ! mixed precision eigCG:  tolerance for cg refinement corrections in the incremental stage
      integer(4)::eigcg_max_restarts ! mixed precision eigCG tuning parameter:  minimum search vector space restarts
      integer(4)::max_restart_num     ! initCG tuning parameter:  maximum restarts
      real(8)::inc_tol     ! initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle
@@ -264,7 +265,10 @@ module quda_fortran
      ! The index to indeicate which chrono history we are augmenting */
      integer(4)::chrono_index
 
-     ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     ! Precision to store the chronological basis in
+     integer(4)::chrono_precision;
+
+    ! Which external library to use in the linear solvers (MAGMA or Eigen) */
      QudaExtLibType::extlib_type
 
   end type quda_invert_param

@@ -226,19 +226,19 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
 	  }
 	}
       } else {
-	cudaEventRecord(*getReduceEvent(), stream);
-	while(cudaSuccess != cudaEventQuery(*getReduceEvent())) {}
+	qudaEventRecord(*getReduceEvent(), stream);
+	while(cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
       }
     } else
 #endif
-      { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
+      { qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
   }
 
   // need to transpose for same order with vector thread reduction
   for (int i=0; i<NXZ; i++) {
     for (int j=0; j<arg.NYW; j++) {
       result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[j*NXZ+i]);
-      if (tp.grid.z==2) result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+j*NXZ+i]);
+      if (tp.grid.z==2) sum(result[i*arg.NYW+j], ((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+j*NXZ+i]);
     }
   }
 }
@@ -303,7 +303,10 @@ public:
     strcpy(name, num_to_string<NXZ>::value);
     strcat(name, std::to_string(NYW).c_str());
     strcat(name, typeid(arg.r).name());
-    return TuneKey(blasStrings.vol_str, name, blasStrings.aux_tmp);
+    char aux[TuneKey::aux_n];
+    strcpy(aux, "policy_kernel,");
+    strcat(aux,blasStrings.aux_tmp);
+    return TuneKey(blasStrings.vol_str, name, aux);
   }
 
   void apply(const cudaStream_t &stream){

@@ -14,12 +14,12 @@ template <int nDim, QudaDWFPCType type, int dim, int nLayers, int face_num, type
 static inline __device__ int indexFromFaceIndex(int face_idx, const Param &param)
 {
   // intrinsic parity of the face depends on offset of first element
-  int face_parity = (param.parity + face_num * (param.X[dim] - nLayers)) & 1;
+  int face_parity = (param.parity + face_num * (param.dc.X[dim] - nLayers)) & 1;
 
   // reconstruct full face index from index into the checkerboard
   face_idx *= 2;
 
-  if (!(param.face_X[dim] & 1)) { // face_X even
+  if (!(param.dc.face_X[dim] & 1)) { // face_X even
 
     //   int s = face_idx / face_XYZT;
     //   int t = (face_idx / face_XYZ) % face_T;
@@ -27,37 +27,37 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const Param &param
     //   int y = (face_idx / face_X) % face_Y;
     //   face_idx += (face_parity + s + t + z + y) & 1;
     // equivalent to the above, but with fewer divisions/mods:
-    int aux1 = face_idx / param.face_X[dim];
-    int aux2 = aux1 / param.face_Y[dim];
-    int aux3 = aux2 / param.face_Z[dim];
-    int aux4 = (nDim == 5 ? aux3 / param.face_T[dim] : 0);
+    int aux1 = face_idx / param.dc.face_X[dim];
+    int aux2 = aux1 / param.dc.face_Y[dim];
+    int aux3 = aux2 / param.dc.face_Z[dim];
+    int aux4 = (nDim == 5 ? aux3 / param.dc.face_T[dim] : 0);
 
-    int y = aux1 - aux2 * param.face_Y[dim];
-    int z = aux2 - aux3 * param.face_Z[dim];
-    int t = aux3 - aux4 * param.face_T[dim];
+    int y = aux1 - aux2 * param.dc.face_Y[dim];
+    int z = aux2 - aux3 * param.dc.face_Z[dim];
+    int t = aux3 - aux4 * param.dc.face_T[dim];
     int s = aux4;
 
     if (type == QUDA_5D_PC)      face_idx += (face_parity + s + t + z + y) & 1;
     else if (type == QUDA_4D_PC) face_idx += (face_parity + t + z + y) & 1;
 
-  } else if (!(param.face_Y[dim] & 1)) { // face_Y even
+  } else if (!(param.dc.face_Y[dim] & 1)) { // face_Y even
 
-    int s = face_idx / param.face_XYZT[dim];
-    int t = (nDim == 5 ? (face_idx / param.face_XYZ[dim]) % param.face_T[dim] : (face_idx / param.face_XYZ[dim]) );
-    int z = (face_idx / param.face_XY[dim]) % param.face_Z[dim];
+    int s = face_idx / param.dc.face_XYZT[dim];
+    int t = (nDim == 5 ? (face_idx / param.dc.face_XYZ[dim]) % param.dc.face_T[dim] : (face_idx / param.dc.face_XYZ[dim]) );
+    int z = (face_idx / param.dc.face_XY[dim]) % param.dc.face_Z[dim];
     if (type == QUDA_5D_PC)      face_idx += (face_parity + s + t + z) & 1;
     else if (type == QUDA_4D_PC) face_idx += (face_parity + t + z) & 1;
 
-  } else if (!(param.face_Z[dim] & 1)) { // face_Z even
+  } else if (!(param.dc.face_Z[dim] & 1)) { // face_Z even
 
-    int s = face_idx / param.face_XYZT[dim];
-    int t = (nDim == 5 ? (face_idx / param.face_XYZ[dim]) % param.face_T[dim] : (face_idx / param.face_XYZ[dim]) );
+    int s = face_idx / param.dc.face_XYZT[dim];
+    int t = (nDim == 5 ? (face_idx / param.dc.face_XYZ[dim]) % param.dc.face_T[dim] : (face_idx / param.dc.face_XYZ[dim]) );
     if (type == QUDA_5D_PC)      face_idx += (face_parity + s + t) & 1;
     else if (type == QUDA_4D_PC) face_idx += (face_parity + t) & 1;
 
-  } else if (!(param.face_T[dim]) && nDim == 5) {
+  } else if (!(param.dc.face_T[dim]) && nDim == 5) {
 
-    int s = face_idx / param.face_XYZT[dim];
+    int s = face_idx / param.dc.face_XYZT[dim];
     if (type == QUDA_5D_PC)      face_idx += (face_parity + s) & 1;
     else if (type == QUDA_4D_PC) face_idx += face_parity;
 
@@ -68,25 +68,25 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const Param &param
   }
 
   // compute index into the full local volume
-  int gap = param.X[dim] - nLayers;
+  int gap = param.dc.X[dim] - nLayers;
   int idx = face_idx;
   int aux;
   switch (dim) {
     case 0:
-      aux = face_idx / param.face_X[dim];
+      aux = face_idx / param.dc.face_X[dim];
       idx += (aux + face_num) * gap;
       break;
     case 1:
-      aux = face_idx / param.face_XY[dim];
-      idx += (aux + face_num) * gap * param.face_X[dim];
+      aux = face_idx / param.dc.face_XY[dim];
+      idx += (aux + face_num) * gap * param.dc.face_X[dim];
       break;
     case 2:
-      aux = face_idx / param.face_XYZ[dim];
-      idx += (aux + face_num) * gap * param.face_XY[dim];
+      aux = face_idx / param.dc.face_XYZ[dim];
+      idx += (aux + face_num) * gap * param.dc.face_XY[dim];
       break;
     case 3:
-      aux = (nDim == 5 ? face_idx / param.face_XYZT[dim] : 0);
-      idx += (aux + face_num) * gap * param.face_XYZ[dim];
+      aux = (nDim == 5 ? face_idx / param.dc.face_XYZT[dim] : 0);
+      idx += (aux + face_num) * gap * param.dc.face_XYZ[dim];
       break;
   }
 
@@ -109,7 +109,7 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const Param &param
 template <int dim, int nLayers, int face_num, typename Param>
 static inline __device__ int indexFromFaceIndexExtended(int face_idx, const Param &param)
 {
-  const auto *X = param.X;
+  const auto *X = param.dc.X;
   const auto *R = param.R;
 
   int face_X = X[0], face_Y = X[1], face_Z = X[2]; // face_T = X[3]
@@ -206,9 +206,9 @@ static inline __device__ int indexFromFaceIndexExtended(int face_idx, const Para
 template <int dim, int nLayers, int face_num, typename Param>
 static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const Param &param)
 {
-  const auto *X = param.X;              // grid dimension
-  const auto *dims = param.dims[dim];   // dimensions of the face
-  const auto &V4 = param.volume_4d;     // 4-d volume
+  const auto *X = param.dc.X;              // grid dimension
+  const auto *dims = param.dc.dims[dim];   // dimensions of the face
+  const auto &V4 = param.dc.volume_4d;     // 4-d volume
 
   // intrinsic parity of the face depends on offset of first element
   int face_parity = (param.parity + face_num *(X[dim] - nLayers)) & 1;
@@ -217,8 +217,8 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const 
   face_idx_in *= 2;
 
   // first compute src index, then find 4-d index from remainder
-  int s = face_idx_in / param.face_XYZT[dim];
-  int face_idx = face_idx_in - s*param.face_XYZT[dim];
+  int s = face_idx_in / param.dc.face_XYZT[dim];
+  int face_idx = face_idx_in - s*param.dc.face_XYZT[dim];
 
   /*y,z,t here are face indexes in new order*/
   int aux1 = face_idx / dims[0];
@@ -239,17 +239,17 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const 
       idx += (idx/V4)*(1-V4);
       break;
     case 1:
-      aux = face_idx / param.face_X[dim];
-      idx += face_num * gap * param.face_X[dim] + aux*(X[1]-1)*param.face_X[dim];
+      aux = face_idx / param.dc.face_X[dim];
+      idx += face_num * gap * param.dc.face_X[dim] + aux*(X[1]-1)*param.dc.face_X[dim];
       idx += (idx/V4)*(X[0]-V4);
       break;
     case 2:
-      aux = face_idx / param.face_XY[dim];
-      idx += face_num * gap * param.face_XY[dim] +aux*(X[2]-1)*param.face_XY[dim];
+      aux = face_idx / param.dc.face_XY[dim];
+      idx += face_num * gap * param.dc.face_XY[dim] +aux*(X[2]-1)*param.dc.face_XY[dim];
       idx += (idx/V4)*((X[1]*X[0])-V4);
       break;
     case 3:
-      idx += face_num * gap * param.face_XYZ[dim];
+      idx += face_num * gap * param.dc.face_XYZ[dim];
       break;
   }
 
@@ -349,7 +349,7 @@ static inline __device__ int2 compositeIndexFromFaceIndexStaggered(int face_idx_
 template <int dim, int nLayers, int face_num, typename Param>
 static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, const Param &param)
 {
-  const auto *X = param.X;
+  const auto *X = param.dc.X;
   const auto *R = param.R;
 
   // dimensions of the face
@@ -435,8 +435,8 @@ static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, c
 template<KernelType dim, int nLayers, int Dir, typename Param>
 static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, const Param &param)
 {
-  const auto *X = param.X;
-  const auto *Xh = param.Xh;
+  const auto *X = param.dc.X;
+  const auto *Xh = param.dc.Xh;
 
   int za, x1h, x0h, zb;
   switch(dim) {
@@ -509,7 +509,7 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
    @param idx[out] The full lattice coordinate
    @param cb_idx[out] The checkboarded lattice coordinate
    @param x[out] Coordinates we are computing
-   @param face_idx[in] Input checkerboarded face index
+   @param.dc.face_idx[in] Input checkerboarded face index
    @param[in] param Parameter struct with required meta data
  */
 template <int nDim, QudaDWFPCType type, int dim_, int nLayers, typename Int, typename Param>
@@ -518,17 +518,17 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int * c
 {
   constexpr int dim = (dim_ == INTERIOR_KERNEL) ? 0 : dim_; // silence compiler warning
 
-  const auto *X = param.X;
-  const auto &face_X = param.face_X[dim];
-  const auto &face_Y = param.face_Y[dim];
-  const auto &face_Z = param.face_Z[dim];
-  const auto &face_T = param.face_T[dim];
-  const auto &face_XYZT = param.face_XYZT[dim];
-  const auto &face_XYZ = param.face_XYZ[dim];
-  const auto &face_XY = param.face_XY[dim];
+  const auto *X = param.dc.X;
+  const auto &face_X = param.dc.face_X[dim];
+  const auto &face_Y = param.dc.face_Y[dim];
+  const auto &face_Z = param.dc.face_Z[dim];
+  const auto &face_T = param.dc.face_T[dim];
+  const auto &face_XYZT = param.dc.face_XYZT[dim];
+  const auto &face_XYZ = param.dc.face_XYZ[dim];
+  const auto &face_XY = param.dc.face_XY[dim];
 
   // intrinsic parity of the face depends on offset of first element
-  int face_parity = (param.parity + face_num * (param.X[dim] - nLayers)) & 1;
+  int face_parity = (param.parity + face_num * (param.dc.X[dim] - nLayers)) & 1;
 
   // compute coordinates from (checkerboard) face index
   face_idx *= 2;
@@ -683,11 +683,11 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, T *x, int &cb_i
   // as well as the cases where X, Y are odd and Z is even,
   // and X,Y,Z are all odd
 
-  const auto *X = param.X;
+  const auto *X = param.dc.X;
 
-  int XYZT = Vh << 1; // X[3]*X[2]*X[1]*X[0]
-  int XYZ = X3X2X1; // X[2]*X[1]*X[0]
-  int XY = X2X1; // X[1]*X[0]
+  int XYZT = param.dc.Vh << 1; // X[3]*X[2]*X[1]*X[0]
+  int XYZ = param.dc.X3X2X1; // X[2]*X[1]*X[0]
+  int XY = param.dc.X2X1; // X[1]*X[0]
 
   idx = 2*cb_idx;
   if (idxType == EVEN_X /*!(X[0] & 1)*/) { // X even
@@ -879,12 +879,12 @@ static inline __device__ bool isActive(const int threadDim, int offsetDim, int o
   @return dimension this face_idx corresponds to
 */
 template <int nDim=4, typename Param>
-__device__ inline int dimFromFaceIndex(int &face_idx, const Param &param){
+__device__ inline int dimFromFaceIndex(int &face_idx, const int tid, const Param &param){
 
   // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
-  const int s = (nDim == 5 ? face_idx/param.threads : 0);
+  const int s = (nDim == 5 ? tid/param.threads : 0);
 
-  face_idx = face_idx - s*param.threads; // face_idx = face_idx % param.threads
+  face_idx = tid - s*param.threads; // face_idx = face_idx % param.threads
 
   if (face_idx < param.threadDimMapUpper[0]){
     face_idx += s*param.threadDimMapUpper[0];
@@ -904,6 +904,8 @@ __device__ inline int dimFromFaceIndex(int &face_idx, const Param &param){
   }
 }
 
+template <int nDim=4, typename Param>
+__device__ inline int dimFromFaceIndex(int &face_idx, const Param &param) { return dimFromFaceIndex<nDim>(face_idx, face_idx, param); }
 
 /**
   @brief Compute the face index from the lattice coordinates.
@@ -917,7 +919,7 @@ __device__ inline int dimFromFaceIndex(int &face_idx, const Param &param){
 template<int nDim, int nLayers, typename I, typename Param>
 static inline __device__ void faceIndexFromCoords(int &face_idx, I * const x, int face_dim, const Param &param)
 {
-  int D[4] = {param.X[0], param.X[1], param.X[2], param.X[3]};
+  int D[4] = {param.dc.X[0], param.dc.X[1], param.dc.X[2], param.dc.X[3]};
   int y[5] = {x[0], x[1], x[2], x[3], (nDim==5 ? x[4] : 0)};
 
   y[face_dim] = (y[face_dim] < nLayers) ? y[face_dim] : y[face_dim] - (D[face_dim] - nLayers);

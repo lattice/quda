@@ -19,7 +19,7 @@ namespace quda {
 #ifdef GPU_MULTIGRID
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
-  void calculateYcoarse(GaugeField &Y, GaugeField &X,
+  void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
 			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
@@ -35,8 +35,8 @@ namespace quda {
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
       typedef typename colorspinor::FieldOrderCB<Float,2*fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder,true,vFloat> gFine;
-      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder> cFine;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
+      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder,true,vFloat> cFine;
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
@@ -48,13 +48,13 @@ namespace quda {
       cFine cInvAccessor(const_cast<GaugeField&>(cloverInv));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gCoarse xAccessor(const_cast<GaugeField&>(X));
-      gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Y));
-      gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(X));
+      gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Yatomic));
+      gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(Xatomic));
 
       calculateY<true,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic,
 	 uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor,
-	 Y, X, uv, const_cast<ColorSpinorField&>(v), v, kappa, mu, mu_factor, dirac, matpc,
+	 Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField&>(v), v, kappa, mu, mu_factor, dirac, matpc,
 	 T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
 
     } else {
@@ -69,8 +69,8 @@ namespace quda {
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
       typedef typename colorspinor::FieldOrderCB<Float,2*fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder,true,vFloat> gFine;
-      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder> cFine;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
+      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder,true,vFloat> cFine;
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
@@ -82,13 +82,13 @@ namespace quda {
       cFine cInvAccessor(const_cast<GaugeField&>(cloverInv));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gCoarse xAccessor(const_cast<GaugeField&>(X));
-      gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Y));
-      gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(X));
+      gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Yatomic));
+      gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(Xatomic));
 
       calculateY<true,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic,
 	 uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor,
-	 Y, X, uv, const_cast<ColorSpinorField&>(v), v, kappa, mu, mu_factor, dirac, matpc,
+	 Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField&>(v), v, kappa, mu, mu_factor, dirac, matpc,
 	 T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
 
     }
@@ -97,7 +97,7 @@ namespace quda {
 
   // template on the number of coarse degrees of freedom
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
-  void calculateYcoarse(GaugeField &Y, GaugeField &X,
+  void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
 			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
     if (T.Vectors().Nspin()/T.Spin_bs() != 2) 
@@ -106,17 +106,17 @@ namespace quda {
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
     if (coarseColor == 6) {
-      calculateYcoarse<Float,vFloat,fineColor,fineSpin,6,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,fineColor,fineSpin,6,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
 #if 0
     } else if (coarseColor == 8) {
-      calculateYcoarse<Float,vFloat,fineColor,fineSpin,8,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,fineColor,fineSpin,8,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 16) {
-      calculateYcoarse<Float,vFloat,fineColor,fineSpin,16,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,fineColor,fineSpin,16,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
 #endif
     } else if (coarseColor == 24) {
-      calculateYcoarse<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 32) {
-      calculateYcoarse<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -124,11 +124,11 @@ namespace quda {
 
   // template on fine spin
   template <typename Float, typename vFloat, int fineColor>
-  void calculateYcoarse(GaugeField &Y, GaugeField &X,
+  void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
 			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
     if (T.Vectors().Nspin() == 2) {
-      calculateYcoarse<Float,vFloat,fineColor,2>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,fineColor,2>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else {
       errorQuda("Unsupported number of spins %d\n", T.Vectors().Nspin());
     }
@@ -136,38 +136,38 @@ namespace quda {
 
   // template on fine colors
   template <typename Float, typename vFloat>
-  void calculateYcoarse(GaugeField &Y, GaugeField &X,
+  void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
 			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
     if (g.Ncolor()/T.Vectors().Nspin() == 6) { // free field Wilson
-      calculateYcoarse<Float,vFloat,6>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,6>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
 #if 0
     } else if (g.Ncolor()/T.Vectors().Nspin() == 8) {
-      calculateYcoarse<Float,vFloat,8>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,8>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 16) {
-      calculateYcoarse<Float,vFloat,16>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,16>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
 #endif
     } else if (g.Ncolor()/T.Vectors().Nspin() == 24) {
-      calculateYcoarse<Float,vFloat,24>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,24>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 32) {
-      calculateYcoarse<Float,vFloat,32>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      calculateYcoarse<Float,vFloat,32>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }
   }
 
   //Does the heavy lifting of creating the coarse color matrices Y
-  void calculateYcoarse(GaugeField &Y, GaugeField &X, ColorSpinorField &uv,
+  void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic, ColorSpinorField &uv,
 			const Transfer &T, const GaugeField &g, const GaugeField &clover, const GaugeField &cloverInv,
 			double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
-    checkPrecision(X, Y, clover, cloverInv);
-    checkPrecision(g, uv, T.Vectors(X.Location()));
+    checkPrecision(X, Y, g, clover, cloverInv, uv, T.Vectors(X.Location()));
+    checkPrecision(Xatomic, Yatomic);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
-	calculateYcoarse<double,double>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+	calculateYcoarse<double,double>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
       } else {
 	errorQuda("Unsupported precision %d\n", Y.Precision());
       }
@@ -176,9 +176,13 @@ namespace quda {
 #endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       if (T.Vectors(X.Location()).Precision() == QUDA_SINGLE_PRECISION) {
-	calculateYcoarse<float,float>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-      } else if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
-	calculateYcoarse<float,short>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+	calculateYcoarse<float,float>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+      } else {
+	errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
+      }
+    } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+      if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
+	calculateYcoarse<float,short>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
       } else {
 	errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
@@ -209,10 +213,27 @@ namespace quda {
     UVparam.location = location;
     UVparam.nSpin *= 2; // so nSpin == 4
     UVparam.setPrecision(T.Vectors(location).Precision());
+    UVparam.mem_type = Y.MemType(); // allocate temporaries to match coarse-grid link field
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 
-    calculateYcoarse(Y, X, *uv, T, gauge, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+    GaugeField *Yatomic = &Y;
+    GaugeField *Xatomic = &X;
+    if (Y.Precision() < QUDA_SINGLE_PRECISION) {
+      // we need to coarsen into single precision fields (float or int), so we allocate temporaries for this purpose
+      // else we can just coarsen directly into the original fields
+      GaugeFieldParam param(X); // use X since we want scalar geometry
+      param.location = location;
+      param.setPrecision(QUDA_SINGLE_PRECISION, location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+
+      Yatomic = GaugeField::Create(param);
+      Xatomic = GaugeField::Create(param);
+    }
+
+    calculateYcoarse(Y, X, *Yatomic, *Xatomic, *uv, T, gauge, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+
+    if (Yatomic != &Y) delete Yatomic;
+    if (Xatomic != &X) delete Xatomic;
 
     delete uv;
 #else

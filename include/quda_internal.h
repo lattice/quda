@@ -1,8 +1,7 @@
 #ifndef _QUDA_INTERNAL_H
 #define _QUDA_INTERNAL_H
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <quda_cuda_api.h>
 #include <sys/time.h>
 #include <string>
 #include <complex>
@@ -27,9 +26,6 @@
 #include <pthread.h>
 #endif
 
-#define MAX_SHORT 32767.0f
-#define MAX_CHAR 127.0f
-
 #define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
 #define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
 #include <enum_quda.h>
@@ -45,6 +41,11 @@
 #define USE_TEXTURE_OBJECTS
 #endif
 
+// if not using texture objects then we need to disable multi-blas support since these don't work with texture references
+#ifndef USE_TEXTURE_OBJECTS
+#undef MAX_MULTI_BLAS_N
+#define MAX_MULTI_BLAS_N 1
+#endif
 
 
 #ifdef INTERFACE_NVTX
@@ -94,6 +95,27 @@ extern "C" {
 namespace quda {
 
   typedef std::complex<double> Complex;
+
+  /**
+   * Traits for determining the maximum and inverse maximum
+   * value of a (signed) char and short. Relevant for
+   * fixed precision types. 
+   */
+  template< typename T > struct fixedMaxValue{ static constexpr float value = 0.0f; };
+  template<> struct fixedMaxValue<short>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<char>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
+
+  template< typename T > struct fixedInvMaxValue{ static constexpr double value = 3.402823e+38; };
+  template<> struct fixedInvMaxValue<short>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<short2>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<short4>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<char>{ static constexpr double value = 7.87401574e-3; };
+  template<> struct fixedInvMaxValue<char2>{ static constexpr double value = 7.87401574e-3; };
+  template<> struct fixedInvMaxValue<char4>{ static constexpr double value = 7.87401574e-3; };
 
   /**
    * Use this for recording a fine-grained profile of a QUDA
@@ -170,23 +192,36 @@ namespace quda {
     QUDA_PROFILE_COMMS, /**< synchronous communication */
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
+    QUDA_PROFILE_IO, /**< time spent on file i/o */
+    QUDA_PROFILE_CHRONO, /**< time spent on chronology */
+    QUDA_PROFILE_EIGEN, /**< time spent on host-side Eigen */
 
-    // lower level counters used in the dslash
-    QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers */
+    // lower level counters used in the dslash and api profiling
+    QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers which do not count towrads global time */
     QUDA_PROFILE_PACK_KERNEL, /**< face packing kernel */
     QUDA_PROFILE_DSLASH_KERNEL, /**< dslash kernel */
     QUDA_PROFILE_GATHER, /**< gather (device -> host) */
     QUDA_PROFILE_SCATTER, /**< scatter (host -> device) */
+
+    QUDA_PROFILE_LAUNCH_KERNEL, /**< cudaLaunchKernel */
     QUDA_PROFILE_EVENT_RECORD, /**< cuda event record  */
     QUDA_PROFILE_EVENT_QUERY, /**< cuda event querying */
     QUDA_PROFILE_STREAM_WAIT_EVENT, /**< stream waiting for event completion */
+    QUDA_PROFILE_FUNC_SET_ATTRIBUTE, /**< set function attribute */
+
+    QUDA_PROFILE_EVENT_SYNCHRONIZE, /**< event synchronization */
+    QUDA_PROFILE_STREAM_SYNCHRONIZE, /**< stream synchronization */
+    QUDA_PROFILE_DEVICE_SYNCHRONIZE, /**< device synchronization */
+
+    QUDA_PROFILE_MEMCPY_D2D_ASYNC, /**< device to device async copy */
+    QUDA_PROFILE_MEMCPY_D2H_ASYNC, /**< device to host async copy */
+    QUDA_PROFILE_MEMCPY2D_D2H_ASYNC, /**< device to host 2-d memcpy async copy*/
+    QUDA_PROFILE_MEMCPY_H2D_ASYNC, /**< host to device async copy */
 
     QUDA_PROFILE_COMMS_START, /**< initiating communication */
     QUDA_PROFILE_COMMS_QUERY, /**< querying communication */
 
     QUDA_PROFILE_CONSTANT, /**< time spent setting CUDA constant parameters */
-
-    QUDA_PROFILE_IO, /**< time spent on file i/o */
 
     QUDA_PROFILE_TOTAL, /**< The total time in seconds for the algorithm. Must be the penultimate type. */
     QUDA_PROFILE_COUNT /**< The total number of timers we have.  Must be last enum type. */
@@ -301,6 +336,8 @@ namespace quda {
 
     static void PrintGlobal();
 
+    bool isRunning(QudaProfileType idx) { return profile[idx].running; }
+
   };
 
 #define TPSTART(idx) Start_(__func__, __FILE__, __LINE__, idx)
@@ -317,39 +354,10 @@ namespace quda {
 #endif
 
   /**
-     @brief Wrapper around cudaMemcpy used for auto-profiling
-     @param dst Destination pointer
-     @param src Source pointer
-     @param count Size of transfer
-     @param kind Type of memory copy
-  */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-		   const char *func, const char *file, const char *line);
-
-  /**
-     @brief Wrapper around cudaMemcpyAsync used for auto-profiling
-     @param dst Destination pointer
-     @param src Source pointer
-     @param count Size of transfer
-     @param kind Type of memory copy
-     @param stream Which stream to launch copy into
-  */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-                        const cudaStream_t &stream, const char *func, const char *file, const char *line);
-
-} // namespace quda
-
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaMemcpyAsync(dst, src, count, kind, stream) ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-namespace quda{
-  /**
-     * Check that the resident gauge field is compatible with the requested inv_param
-     * @param inv_param   Contains all metadata regarding host and device storage
-     */
-bool canReuseResidentGauge(QudaInvertParam *inv_param);
+   * Check that the resident gauge field is compatible with the requested inv_param
+   * @param inv_param   Contains all metadata regarding host and device storage
+   */
+  bool canReuseResidentGauge(QudaInvertParam *inv_param);
 }
 
 #endif // _QUDA_INTERNAL_H

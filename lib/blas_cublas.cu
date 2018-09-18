@@ -83,7 +83,7 @@ namespace quda {
 	  if (info_array[i] < 0) {
 	    errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
 	  } else if (info_array[i] > 0) {
-	    warningQuda("%d factorization completed but the factor U is exactly singular", i);
+	    errorQuda("%d factorization completed but the factor U is exactly singular", i);
 	  }
 	}
     
@@ -120,7 +120,7 @@ namespace quda {
       pool_device_free(dinfo_array);
       pool_pinned_free(info_array);
 
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
       gettimeofday(&stop, NULL);
       long ds = stop.tv_sec - start.tv_sec;
       long dus = stop.tv_usec - start.tv_usec;

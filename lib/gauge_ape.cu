@@ -180,7 +180,7 @@ namespace quda {
     GaugeAPEArg<Float,GaugeOr,GaugeDs> arg(origin, dest, dataOr, alpha, dataOr.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL);
     GaugeAPE<Float,GaugeOr,GaugeDs> gaugeAPE(arg,dataOr);
     gaugeAPE.apply(0);
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   }
 
   template<typename Float>

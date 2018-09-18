@@ -11,7 +11,7 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <tune_quda.h>
-#include <algorithm> // for std::swap
+#include <utility> // for std::swap
 #include <random_quda.h>
 
 namespace quda {
@@ -161,12 +161,14 @@ namespace quda {
   {
     if (src.Ncolor() == 3) {
       spinorNoise<real,Ns,3>(src, randstates, type);
+    } else if (src.Ncolor() == 6) {
+      spinorNoise<real,Ns,6>(src, randstates, type);
     } else if (src.Ncolor() == 24) {
       spinorNoise<real,Ns,24>(src, randstates, type);
     } else if (src.Ncolor() == 32) {
       spinorNoise<real,Ns,32>(src, randstates, type);
     } else {
-      errorQuda("Nspin = %d not implemented", src.Nspin());
+      errorQuda("nColor = %d not implemented", src.Ncolor());
     }
   }
 

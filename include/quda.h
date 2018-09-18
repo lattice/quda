@@ -45,6 +45,9 @@ extern "C" {
     QudaPrecision cuda_prec_sloppy; /**< The precision of the sloppy gauge field */
     QudaReconstructType reconstruct_sloppy; /**< The recontruction type of the sloppy gauge field */
 
+    QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
+    QudaReconstructType reconstruct_refinement_sloppy; /**< The recontruction type of the sloppy gauge field for the refinement step in multishift*/
+
     QudaPrecision cuda_prec_precondition; /**< The precision of the preconditioner gauge field */
     QudaReconstructType reconstruct_precondition; /**< The recontruction type of the preconditioner gauge field */
 
@@ -189,6 +192,7 @@ extern "C" {
     QudaPrecision cpu_prec;                /**< The precision used by the input fermion fields */
     QudaPrecision cuda_prec;               /**< The precision used by the QUDA solver */
     QudaPrecision cuda_prec_sloppy;        /**< The precision used by the QUDA sloppy operator */
+    QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
     QudaPrecision cuda_prec_precondition;  /**< The precision used by the QUDA preconditioner */
 
     QudaDiracFieldOrder dirac_order;       /**< The order of the input and output fermion fields */
@@ -199,6 +203,7 @@ extern "C" {
     QudaPrecision clover_cpu_prec;         /**< The precision used for the input clover field */
     QudaPrecision clover_cuda_prec;        /**< The precision used for the clover field in the QUDA solver */
     QudaPrecision clover_cuda_prec_sloppy; /**< The precision used for the clover field in the QUDA sloppy operator */
+    QudaPrecision clover_cuda_prec_refinement_sloppy; /**< The precision of the sloppy clover field for the refinement step in multishift */
     QudaPrecision clover_cuda_prec_precondition; /**< The precision used for the clover field in the QUDA preconditioner */
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
@@ -324,8 +329,11 @@ extern "C" {
     /** The maximum length of the chronological history to store */
     int chrono_max_dim;
 
-    /** The index to indeicate which chrono history we are augmenting */
+    /** The index to indicate which chrono history we are augmenting */
     int chrono_index;
+
+    /** Precision to store the chronological basis in */
+    QudaPrecision chrono_precision;
 
     /** Which external library to use in the linear solvers (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
@@ -460,6 +468,9 @@ extern "C" {
     /** Over/under relaxation factor for the smoother at each level */
     double omega[QUDA_MAX_MG_LEVEL];
 
+    /** Precision to use for halo communication in the smoother */
+    QudaPrecision smoother_halo_precision[QUDA_MAX_MG_LEVEL];
+
     /** Whether to use additive or multiplicative Schwarz preconditioning in the smoother */
     QudaSchwarzType smoother_schwarz_type[QUDA_MAX_MG_LEVEL];
 
@@ -484,6 +495,11 @@ extern "C" {
 
     /** Location where the coarse-operator construction will be computedn */
     QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
+
+    /** Minimize device memory allocations during the adaptive setup,
+        placing temporary fields in mapped memory instad of device
+        memory */
+    QudaBoolean setup_minimize_memory;
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
@@ -620,6 +636,13 @@ extern "C" {
    * Finalize the library.
    */
   void endQuda(void);
+
+/**
+ * @brief update the radius for halos. 
+ * @details This should only be needed for automated testing when
+ * different partitioning is applied within a single run.
+ */
+  void updateR();
 
   /**
    * A new QudaGaugeParam should always be initialized immediately
@@ -978,17 +1001,6 @@ extern "C" {
 			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
 
   /**
-   * Compute the quark-field outer product needed for gauge generation
-   *
-   * @param oprod The outer product to be computed.
-   * @param quark The input fermion field.
-   * @param num The number of quark fields
-   * @param coeff The coefficient multiplying the fermion fields in the outer product
-   * @param param The parameters of the outer-product field.
-   */
-  void computeStaggeredOprodQuda(void** oprod, void** quark, int num, double** coeff, QudaGaugeParam* param);
-
-  /**
    * Compute the naive staggered force.  All fields must be in the same precision.
    *
    * @param mom Momentum field
@@ -1003,49 +1015,31 @@ extern "C" {
 				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
-   * Compute the fermion force for the asqtad quark action.
-   * @param momentum          The momentum contribution from the quark action.
-   * @param act_path_coeff    The coefficients that define the asqtad action.
-   * @param one_link_src      The quark field outer product corresponding to the one-link term in the action.
-   * @param naik_src          The quark field outer product corresponding to the naik term in the action.
-   * @param link              The gauge field.
-   * @param param             The field parameters.
-   */
-  void computeAsqtadForceQuda(void* const momentum,
-	long long* flops,
-        const double act_path_coeff[6],
-        const void* const one_link_src[4],
-        const void* const naik_src[4],
-        const void* const link,
-        const QudaGaugeParam* param);
-
-
-  /**
    * Compute the fermion force for the HISQ quark action.
    * @param momentum        The momentum contribution from the quark action.
    * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
    * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
-   * @param staple_src      Quark outer-product for the staple.
-   * @param one_link_src    Quark outer-product for the one-link term in the action.
-   * @param naik_src        Quark outer-product for the three-hop term in the action.
    * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
    * @param v_link          Fat7 link variables.
    * @param u_link          SU(3) think link variables.
+   * @param quark           The input fermion field.
+   * @param num             The number of quark fields
+   * @param num_naik        The number of naik contributions
+   * @param coeff           The coefficient multiplying the fermion fields in the outer product
    * @param param.          The field parameters.
    */
-
   void computeHISQForceQuda(void* momentum,
-    long long* flops,
-    const double level2_coeff[6],
-    const double fat7_coeff[6],
-    const void* const staple_src[4],
-    const void* const one_link_src[4],
-    const void* const naik_src[4],
-    const void* const w_link,
-    const void* const v_link,
-    const void* const u_link,
-    const QudaGaugeParam* param);
-
+                            long long* flops,
+                            const double level2_coeff[6],
+                            const double fat7_coeff[6],
+                            const void* const w_link,
+                            const void* const v_link,
+                            const void* const u_link,
+                            void** quark,
+                            int num,
+                            int num_naik,
+                            double** coeff,
+                            QudaGaugeParam* param);
 
   /**
    * Generate Gaussian distributed gauge field
@@ -1058,6 +1052,13 @@ extern "C" {
    * @param Array for storing the averages (total, spatial, temporal)
    */
   void plaqQuda(double plaq[3]);
+
+  /*
+   * Performs a deep copy from the internal extendedGaugeResident field.
+   * @param Pointer to externalGaugeResident cudaGaugeField
+   * @param Location of gauge field
+   */
+  void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field 

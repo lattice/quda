@@ -5,25 +5,11 @@
 
 namespace quda {
 
-  namespace twistedclover {
-#include <dslash_init.cuh>
-  }
-
-  namespace dslash_aux {
-#include <dslash_init.cuh>
-  }
-
   DiracTwistedClover::DiracTwistedClover(const DiracParam &param, const int nDim) 
-    : DiracWilson(param, nDim), mu(param.mu), epsilon(param.epsilon), clover(*(param.clover))
-  {
-    twistedclover::initConstants(*param.gauge,profile);
-  }
+    : DiracWilson(param, nDim), mu(param.mu), epsilon(param.epsilon), clover(*(param.clover)) { }
 
   DiracTwistedClover::DiracTwistedClover(const DiracTwistedClover &dirac) 
-    : DiracWilson(dirac), mu(dirac.mu), epsilon(dirac.epsilon), clover(dirac.clover)
-  {
-    twistedclover::initConstants(*dirac.gauge,profile);
-  }
+    : DiracWilson(dirac), mu(dirac.mu), epsilon(dirac.epsilon), clover(dirac.clover) { }
 
   DiracTwistedClover::~DiracTwistedClover() { }
 

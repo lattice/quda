@@ -2,11 +2,32 @@
 #define _MALLOC_QUDA_H
 
 #include <cstdlib>
+#include <enum_quda.h>
 
 namespace quda {
 
   void printPeakMemUsage();
   void assertAllMemFree();
+
+  /**
+     @return peak device memory allocated
+   */
+  long device_allocated_peak();
+
+  /**
+     @return peak pinned memory allocated
+   */
+  long pinned_allocated_peak();
+
+  /**
+     @return peak mapped memory allocated
+   */
+  long mapped_allocated_peak();
+
+  /**
+     @return peak host memory allocated
+   */
+  long host_allocated_peak();
 
   /*
    * The following functions should not be called directly.  Use the

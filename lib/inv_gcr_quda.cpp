@@ -24,7 +24,6 @@ namespace quda {
   // set the required parameters for the inner solver
   void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
     inner.tol = outer.tol_precondition;
-    inner.maxiter = outer.maxiter_precondition;
     inner.delta = 1e-20; // no reliable updates within the inner solver
   
     inner.precision = outer.precision_sloppy;
@@ -44,11 +43,20 @@ namespace quda {
     inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
 
     inner.use_init_guess = QUDA_USE_INIT_GUESS_NO;
-    inner.Nsteps = outer.precondition_cycle;
+
+    inner.maxiter = outer.maxiter_precondition;
+    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+      inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
+    } else {
+      inner.Nsteps = outer.precondition_cycle;
+    }
 
     inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
 
     inner.verbosity_precondition = outer.verbosity_precondition;
+
+    inner.compute_true_res = false;
+    inner.sloppy_converge = true;
   }
 
   void computeBeta(Complex **beta, std::vector<ColorSpinorField*> Ap, int i, int N, int k) {
@@ -101,13 +109,7 @@ namespace quda {
       }
       blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
       break;
-    case 2: // two-way pipelining
-    case 3: // three-way pipelining
-    case 4: // four-way pipelining
-    case 5: // five-way pipelining
-    case 6: // six-way pipelining
-    case 7: // seven-way pipelining
-    case 8: // eight-way pipelining
+    default:
       {
 	const int N = pipeline;
 	for (int i=0; i<k-(N-1); i+=N) {
@@ -126,8 +128,6 @@ namespace quda {
 	}
       }
       break;
-    default:
-      errorQuda("Pipeline length %d type not defined", pipeline);
     }
 
   }   
@@ -169,20 +169,22 @@ namespace quda {
 
     fillInnerSolveParam(Kparam, param);
 
-    if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
+    if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG solver
       K = new CG(matSloppy, matPrecon, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
+    else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab solver
       K = new BiCGstab(matSloppy, matPrecon, matPrecon, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
+    else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR solver
       K = new MR(matSloppy, matPrecon, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner SD preconditioner
+    else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner SD solver
       K = new SD(matSloppy, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unknown preconditioner
+    else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) // inner CA-GCR solver
+      K = new CAGCR(matSloppy, matPrecon, Kparam, profile);
+    else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unsupported
       K = NULL;
     else 
       errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
 
-    p.resize(nKrylov);
+    p.resize(nKrylov+1);
     Ap.resize(nKrylov);
 
     alpha = new Complex[nKrylov];
@@ -197,7 +199,7 @@ namespace quda {
     nKrylov(param.Nkrylov), init(false), rp(nullptr), yp(nullptr), tmpp(nullptr), y_sloppy(nullptr),
     r_sloppy(nullptr)
   {
-    p.resize(nKrylov);
+    p.resize(nKrylov+1);
     Ap.resize(nKrylov);
 
     alpha = new Complex[nKrylov];
@@ -220,10 +222,8 @@ namespace quda {
       if (r_sloppy && r_sloppy != rp) delete r_sloppy;
     }
 
-    for (int i=0; i<nKrylov; i++) {
-      if (p[i]) delete p[i];
-      if (Ap[i]) delete Ap[i];
-    }
+    for (int i=0; i<nKrylov+1; i++) if (p[i]) delete p[i];
+    for (int i=0; i<nKrylov; i++) if (Ap[i]) delete Ap[i];
 
     if (tmpp) delete tmpp;
     if (rp) delete rp;
@@ -252,10 +252,8 @@ namespace quda {
 
       // create sloppy fields used for orthogonalization
       csParam.setPrecision(param.precision_sloppy);
-      for (int i=0; i<nKrylov; i++) {
-	p[i] = ColorSpinorField::Create(csParam);
-	Ap[i] = ColorSpinorField::Create(csParam);
-      }
+      for (int i=0; i<nKrylov+1; i++) p[i] = ColorSpinorField::Create(csParam);
+      for (int i=0; i<nKrylov; i++) Ap[i] = ColorSpinorField::Create(csParam);
 
       csParam.setPrecision(param.precision_sloppy);
       tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
@@ -342,11 +340,14 @@ namespace quda {
     int pipeline = param.pipeline;
     // Vectorized dot product only has limited support so work around
     if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION || pipeline == 0) pipeline = 1;
+    if (pipeline > nKrylov) pipeline = nKrylov;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
+    int k_break = 0;
+
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
@@ -384,7 +385,7 @@ namespace quda {
       alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[(k+1)%nKrylov]);
+      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[k+1]);
 
       k++;
       total_iter++;
@@ -395,13 +396,13 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       if (k==nKrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
-	// update the solution vector
+        // update the solution vector
 	updateSolution(ySloppy, alpha, beta, gamma, k, p);
 
 	// recalculate residual in high precision
 	blas::xpy(ySloppy, x);
 
-	if (r2 < stop && param.sloppy_converge) break;
+	if ( (r2 < stop || total_iter==param.maxiter) && param.sloppy_converge) break;
 	mat(r, x, y);
 	r2 = blas::xmyNorm(b, r);  
 
@@ -421,6 +422,7 @@ namespace quda {
 	  resIncrease = 0;
 	}
 
+        k_break = k;
 	k = 0;
 
 	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
@@ -464,6 +466,10 @@ namespace quda {
 	param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
       else
 	param.true_res_hq = 0.0;
+
+      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
+    } else {
+      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, K ? rSloppy : *p[k_break]);
     }
 
     param.gflops += gflops;

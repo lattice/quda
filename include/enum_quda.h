@@ -56,6 +56,7 @@ extern "C" {
   } QudaTboundary;
 
   typedef enum QudaPrecision_s {
+    QUDA_QUARTER_PRECISION = 1,
     QUDA_HALF_PRECISION = 2,
     QUDA_SINGLE_PRECISION = 4,
     QUDA_DOUBLE_PRECISION = 8,
@@ -124,6 +125,8 @@ extern "C" {
     QUDA_PIPE2PCG_INVERTER,
     QUDA_SRE_PCG_INVERTER,
     QUDA_LRE_PCG_INVERTER,
+    QUDA_CA_CG_INVERTER,
+    QUDA_CA_GCR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 

@@ -8,6 +8,8 @@
 namespace quda {
 
   struct GaugeFieldParam : public LatticeFieldParam {
+
+    QudaFieldLocation location; // where are we storing the field (CUDA or GPU)?
     int nColor;
     int nFace;
 
@@ -47,6 +49,7 @@ namespace quda {
 
     // Default constructor
   GaugeFieldParam(void* const h_gauge=NULL) : LatticeFieldParam(),
+      location(QUDA_INVALID_FIELD_LOCATION),
       nColor(3),
       nFace(0),
       reconstruct(QUDA_RECONSTRUCT_NO),
@@ -72,7 +75,8 @@ namespace quda {
   GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
 		  const int pad, const QudaFieldGeometry geometry,
 		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD) 
-    : LatticeFieldParam(4, x, pad, precision, ghostExchange), nColor(3), nFace(0), reconstruct(reconstruct),
+    : LatticeFieldParam(4, x, pad, precision, ghostExchange),
+      location(QUDA_INVALID_FIELD_LOCATION), nColor(3), nFace(0), reconstruct(reconstruct),
       order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO),
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0),
       tadpole(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry),
@@ -81,7 +85,8 @@ namespace quda {
       { }
 
   GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS)
-    : LatticeFieldParam(param), nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
+    : LatticeFieldParam(param), location(QUDA_CPU_FIELD_LOCATION),
+      nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
       order(param.gauge_order), fixed(param.gauge_fix),
       link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type), t_boundary(param.t_boundary),
       anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), gauge(h_gauge),
@@ -108,9 +113,9 @@ namespace quda {
        field order for QUDA internal fields.
        @param precision The precision to use 
      */
-    void setPrecision(QudaPrecision precision) {
+    void setPrecision(QudaPrecision precision, bool force_native=false) {
       // is the current status in native field order?
-      bool native = false;
+      bool native = force_native ? true : false;
       if (precision == QUDA_DOUBLE_PRECISION) {
 	if (order  == QUDA_FLOAT2_GAUGE_ORDER) native = true;
       } else if (precision == QUDA_SINGLE_PRECISION ||
@@ -312,12 +317,22 @@ namespace quda {
        @return checksum value
      */
     uint64_t checksum(bool mini=false) const;
+
+    /**
+       @brief Create the gauge field, with meta data specified in the
+       parameter struct.
+       @param param Parameter struct specifying the gauge field
+       @return Pointer to allcoated gauge field
+    */
+    static GaugeField* Create(const GaugeFieldParam &param);
+
   };
 
   class cudaGaugeField : public GaugeField {
 
   private:
     void *gauge;
+    void *gauge_h; // mapped-memory pointer when allocating on the host
     void *even;
     void *odd;
 
@@ -410,13 +425,49 @@ namespace quda {
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     /**
+       @brief This does routine will populate the border / halo region
+       of a gauge field that has been created using copyExtendedGauge.
+       Overloaded variant that will start and stop a comms profile.
+       @param R The thickness of the extended region in each dimension
+       @param profile TimeProfile intance which will record the time taken
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimensions
+    */
+    void exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill=false);
+
+    /**
      * Generic gauge field copy
      * @param[in] src Source from which we are copying
      */
     void copy(const GaugeField &src);
 
-    void loadCPUField(const cpuGaugeField &);
-    void saveCPUField(cpuGaugeField &) const;
+    /**
+       @brief Download into this field from a CPU field
+       @param[in] cpu The CPU field source
+    */
+    void loadCPUField(const cpuGaugeField &cpu);
+
+    /**
+       @brief Download into this field from a CPU field.  Overloaded
+       variant that includes profiling
+       @param[in] cpu The CPU field source
+       @param[in] profile Time profile to record the transfer
+    */
+    void loadCPUField(const cpuGaugeField &cpu, TimeProfile &profile);
+
+    /**
+       @brief Upload from this field into a CPU field
+       @param[out] cpu The CPU field source
+    */
+    void saveCPUField(cpuGaugeField &cpu) const;
+
+    /**
+       @brief Upload from this field into a CPU field.  Overloaded
+       variant that includes profiling.
+       @param[out] cpu The CPU field source
+       @param[in] profile Time profile to record the transfer
+    */
+    void saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const;
 
     // (ab)use with care
     void* Gauge_p() { return gauge; }
@@ -500,6 +551,17 @@ namespace quda {
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     /**
+       @brief This does routine will populate the border / halo region of a
+       gauge field that has been created using copyExtendedGauge.
+       Overloaded variant that will start and stop a comms profile.
+       @param R The thickness of the extended region in each dimension
+       @param profile TimeProfile intance which will record the time taken
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimenions
+    */
+    void exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill=false);
+
+    /**
      * Generic gauge field copy
      * @param[in] src Source from which we are copying
      */
@@ -528,20 +590,27 @@ namespace quda {
   };
 
   /**
-     This is a debugging function, where we cast a gauge field into a
-     spinor field so we can compute its L1 norm.
+     @brief This is a debugging function, where we cast a gauge field
+     into a spinor field so we can compute its L1 norm.
      @param u The gauge field that we want the norm of
      @return The L1 norm of the gauge field
   */
   double norm1(const GaugeField &u);
 
   /**
-     This is a debugging function, where we cast a gauge field into a
-     spinor field so we can compute its L2 norm.
+     @brief This is a debugging function, where we cast a gauge field
+     into a spinor field so we can compute its L2 norm.
      @param u The gauge field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
   double norm2(const GaugeField &u);
+
+  /**
+     @brief Scale the gauge field by the scalar a.
+     @param[in] a scalar multiplier
+     @param[in] u The gauge field we want to multiply
+   */
+  void ax(const double &a, GaugeField &u);
 
   /**
      This function is used for  extracting the gauge ghost zone from a
