@@ -102,6 +102,33 @@ namespace quda {
     }
 
   protected:
+    
+    virtual bool tuneGridDim() const {         
+      if(DS_type == 9){
+        return true;
+      }
+      return false;
+    }
+    
+    virtual bool advanceGridDim(TuneParam &param) const
+    {
+      if (tuneGridDim()) {
+        const unsigned int max_blocks = maxGridSize();
+        const int step = deviceProp.multiProcessorCount/4;
+        param.grid.x += step;
+        if (param.grid.x > max_blocks) {
+          param.grid.x = minGridSize();
+          return false;
+        } else {
+          return true;
+        }
+      } else {
+        return false;
+      }
+    }
+
+    virtual unsigned int maxGridSize() const { return 32*deviceProp.multiProcessorCount; }
+
     bool advanceBlockDim(TuneParam &param) const
     {
 //      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
@@ -135,9 +162,12 @@ namespace quda {
       }
 
       if (advance[0] || advance[1]) {
-        param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
-			   (in->X(4)+param.block.y-1) / param.block.y, 1);
-
+        if(DS_type == 9){
+        
+        }else{
+          param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
+			      (in->X(4)+param.block.y-1) / param.block.y, 1);
+        }
         param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y);
         
         bool advance = true;
@@ -172,6 +202,11 @@ namespace quda {
 				return false;
       }
     }
+    
+//    virtual bool advanceTuneParam(TuneParam &param) const
+//    {
+//      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param) || advanceAux(param);
+//    }
 
     unsigned int sharedBytesPerThread() const { 
       if(DS_type >= 4){
@@ -355,6 +390,9 @@ namespace quda {
 //      if( (size_t)param.shared_bytes > (size_t)deviceProp.sharedMemPerBlock ) 
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			 (in->X(4)+param.block.y-1) / param.block.y, 1);
+      if(DS_type == 9){
+        param.grid = dim3(80,1,1);
+      }
       bool ok = true;
       if (!checkGrid(param)) ok = advanceBlockDim(param);
       if (!ok) errorQuda("Lattice volume is too large for even the largest blockDim");
@@ -373,6 +411,9 @@ namespace quda {
       param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y);
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			 (in->X(4)+param.block.y-1) / param.block.y, 1);
+      if(DS_type == 9){
+        param.grid = dim3(80,1,1);
+      }
       bool ok = true;
       if (!checkGrid(param)) ok = advanceBlockDim(param);
       if (!ok) errorQuda("Lattice volume is too large for even the largest blockDim");

@@ -327,7 +327,7 @@ namespace quda {
     double dd = xmyNorm(*tt, *tx);
     printfQuda("%% diff      x2 = %16.12e (This number is SUPPOSED to be tiny).\n", dd);
     
-    if(tc and b.Precision() == QUDA_HALF_PRECISION){
+    if(tc and fb->Precision() == QUDA_HALF_PRECISION){
       mat_precondition->Dagger(QUDA_DAG_YES);
       mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
       mat_precondition->dslash5inv_sm_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
@@ -765,7 +765,7 @@ namespace quda {
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
     double stop = stopping(param.tol, b2, param.residual_type);
 
-//    test_dslash(db);
+    test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
