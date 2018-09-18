@@ -834,37 +834,37 @@ namespace quda {
 
   /* gres[is,js] <- Tr_c[x . y^H] = \sum_{ic} x[ic,is] * conj(y[ic,js]) */
   //- Version 1
-  inline __device__ void
-  QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
-                                 const Vector& x, const Vector& y){
-    
-    for (int is = 0 ; is < QC_Ns ; is++)
-      for (int js = 0 ; js < QC_Ns ; js++){
-	QC_CPLX s = 0;
-#pragma unroll
-	for (int ic = 0 ; ic < QC_Nc ; ic++){
-	  QC_CPLX yD = y(js,ic);
-	  s += x(is,ic) * conj(yD);
-	}
-	gres[gres_stride * QC_LIDX_G(is, js)] += a*s;
-      }
-  }
-  //------------------------------------
-
-  //- Version 2
 //   inline __device__ void
 //   QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
 //                                  const Vector& x, const Vector& y){
+    
+//     for (int is = 0 ; is < QC_Ns ; is++)
+//       for (int js = 0 ; js < QC_Ns ; js++){
+// 	QC_CPLX s = 0;
 // #pragma unroll
-//     for (int ic = 0 ; ic < QC_Nc ; ic++)
-// #pragma unroll
-//       for (int is = 0 ; is < QC_Ns ; is++)
-// #pragma unroll
-// 	for (int js = 0 ; js < QC_Ns ; js++){
-// 	  gres[gres_stride * QC_LIDX_G(is, js)] += a * x(is,ic) * conj(y(js,ic));
-// 	             a * x.data[LIDX_Vector(ic,is)] * conj(y.data[LIDX_Vector(ic,js)]);
+// 	for (int ic = 0 ; ic < QC_Nc ; ic++){
+// 	  QC_CPLX yD = y(js,ic);
+// 	  s += x(is,ic) * conj(yD);
 // 	}
+// 	gres[gres_stride * QC_LIDX_G(is, js)] += a*s;
+//       }
 //   }
+  //------------------------------------
+
+  //- Version 2
+  inline __device__ void
+  QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
+                                 const Vector& x, const Vector& y){
+#pragma unroll
+    for (int ic = 0 ; ic < QC_Nc ; ic++)
+#pragma unroll
+      for (int is = 0 ; is < QC_Ns ; is++)
+#pragma unroll
+	for (int js = 0 ; js < QC_Ns ; js++){
+	  gres[gres_stride * QC_LIDX_G(is, js)] += a * x(is,ic) * conj(y(js,ic));
+	             a * x.data[LIDX_Vector(ic,is)] * conj(y.data[LIDX_Vector(ic,js)]);
+	}
+  }
   //------------------------------------
 
   //- Version 3
@@ -1326,10 +1326,10 @@ namespace quda {
     QC_CPLX tmpG1[QC_LEN_G];
     QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
 
+#pragma unroll
     for(int i=0;i<QUDA_PROP_NVEC;i++){
       Vector vec1 = arg->fwdProp[i](x_cb, pty);
       Vector vec2 = arg->bwdProp[i](x_cb, pty);
-      //      QC(G_peqa_colortrace_U_dot_D_dot_aD)(Corr_dev + tid, lV, 1., U, vec1, vec2);
       QC(G_peqa_colortrace_U_dot_D_dot_aD)(tmpG1, 1., 1., U, vec1, vec2);
     }
 
