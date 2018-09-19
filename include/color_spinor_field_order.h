@@ -872,6 +872,14 @@ namespace quda {
 	  }
 	}
 
+	
+	__device__ __host__ inline complex<Float> getData(int x_cb, int pty, int s, int c){
+	  complex<Float> data[Ns*Nc];
+	  load((RegType*)data, x_cb, pty);
+	  return data[c+Nc*s];
+	}
+
+
 	/**
 	   @brief This accessor routine returns a colorspinor_wrapper to this object,
 	   allowing us to overload various operators for manipulating at

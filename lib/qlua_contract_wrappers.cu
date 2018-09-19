@@ -681,22 +681,34 @@ namespace quda {
     checkCudaError();
 
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
-
+    double t1; 
+#if 0  /* no shmem */
+#  if 0 /* no tuning */
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-
-    double t1; 
-    //t1 = MPI_Wtime();
-    //if(arg.extendedGauge)
-    //  tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt <<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
-    //else
-    //  tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue <<<gridDim,blockDim>>>(qcs->corrQuda_dev, arg_dev);
-
+    t1 = MPI_Wtime();
+    if(arg.extendedGauge)
+      tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt <<< gridDim, blockDim >>>(qcs->corrQuda_dev, arg_dev);
+    else
+      tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue <<< gridDim, blockDim >>>(qcs->corrQuda_dev, arg_dev);
+#  else /* auto tuning*/
     t1 = MPI_Wtime();
     qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType, arg.extendedGauge);
     printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
     printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
     contractTMD.apply(0);
+#  endif
+#else /* shmem, no tuning */
+#  define SITES_PER_DIMX 16
+    dim3 blockDim(SITES_PER_DIMX, arg.nParity, QC_UDD_THREADS_PER_SITE); /* blockDim={16*nSitesPerBlock, arg.nParity, 1} */
+    dim3 gridDim((arg.volumeCB + blockDim.x - 1) / blockDim.x, 1, 1);
+    size_t shmem_size = blockDim.x * blockDim.y * QC_UDD_SHMEM_PER_SITE;
+    t1 = MPI_Wtime();
+    if(arg.extendedGauge)
+      tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue <<< gridDim, blockDim, shmem_size >>>(qcs->corrQuda_dev, arg_dev);
+    else
+      tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue <<< gridDim, blockDim, shmem_size >>>(qcs->corrQuda_dev, arg_dev);
+#endif
 
     cudaDeviceSynchronize();
     checkCudaError();

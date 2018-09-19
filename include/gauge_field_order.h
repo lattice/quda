@@ -1770,6 +1770,15 @@ namespace quda {
         }
       }
 
+
+      __device__ __host__ inline complex<Float> getData(int dir, int x_cb, int pty, int c1, int c2){
+	const int Nc = Ncolor(length);
+	complex<Float> data[Nc*Nc];
+	load((RegType*)data, x_cb, dir, pty);
+	return data[c2+Nc*c1];
+      }
+
+
       /**
 	 @brief This accessor routine returns a gauge_wrapper to this object,
 	 allowing us to overload various operators for manipulating at

@@ -2,9 +2,108 @@
 
 namespace quda {
 
-  //- C.K. Constant variable declarations
-   // __constant__ QC_CPLX cS1_gvec[QC_LEN_G];
-   // __constant__ QC_CPLX cS2_gvec[QC_LEN_G];
+
+  // hard-coded DeGrand-Rossi basis
+  // g{x,y,z,t} = g{1,2,3,4}
+  // gamma matrices are specified as either single linear element in the algebra
+  //    G(n) = g1^n0 . g2^n1 . g3^n2 . g4^n3, with n=n0*2^0+n1*2^1+n2*2^2+n3*2^3
+  // or a linear combination of them
+  //    G(v) = \sum_{n=0..15} v(n) G(n)
+
+  // parameterization of gamma matrices for efficient unrolling
+  // [G(n)]_{ij} = gamma_left_coeff[n][i] * (gamma_left_ind[n][i]==j ? 1 : 0)
+  //             = C(n)_i * delta(j==J(n)_i)
+  // Tr[A.G(n)] = \sum_j C(n)_j * A_{J(n)_j, j}
+  // [G(n)   . A]_{i,      j}       = C(n)_i * A_{J(n)_i,j}
+  // [G(n)^T . A]_{J(n)_k, j} = C(n)_k * A_{k,j}
+  // [A . G(n)  ]_{i, J(n)_k} = A_{i,k} * C(n)_k
+  // [A . G(n)^T]_{i,      j} = A_{i,J(n)_j} * C(n)_j
+  inline __device__ QC_REAL gamma_left_coeff_Re(int m, int n, int c){
+    CONSTVAR_ QC_REAL gamma_left_coeff_Re_[QC_LEN_G][QC_Ns][2] = {
+      { {1,0}, {1,0}, {1,0}, {1,0} },             /* G0 = 1 */
+      { {0,1}, {0,1},{0,-1},{0,-1} },             /* G1 = g1 */
+      {{-1,0}, {1,0}, {1,0},{-1,0} },             /* G2 = g2 */
+      {{0,-1}, {0,1},{0,-1}, {0,1} },             /* G3 = g1 g2 */
+      { {0,1},{0,-1},{0,-1}, {0,1} },             /* G4 = g3 */
+      {{-1,0}, {1,0},{-1,0}, {1,0} },             /* G5 = g1 g3 */
+      {{0,-1},{0,-1},{0,-1},{0,-1} },             /* G6 = g2 g3 */
+      { {1,0}, {1,0},{-1,0},{-1,0} },             /* G7 = g1 g2 g3 */
+      { {1,0}, {1,0}, {1,0}, {1,0} },             /* G8 = g4 */
+      { {0,1}, {0,1},{0,-1},{0,-1} },             /* G9 = g1 g4 */
+      {{-1,0}, {1,0}, {1,0},{-1,0} },             /* G10= g2 g4 */
+      {{0,-1}, {0,1},{0,-1}, {0,1} },             /* G11= g1 g2 g4 */
+      { {0,1},{0,-1},{0,-1}, {0,1} },             /* G12= g3 g4 */
+      {{-1,0}, {1,0},{-1,0}, {1,0} },             /* G13= g1 g3 g4 */
+      {{0,-1},{0,-1},{0,-1},{0,-1} },             /* G14= g2 g3 g4 */
+      { {1,0}, {1,0},{-1,0},{-1,0} },             /* G15= g1 g2 g3 g4 */
+    };
+    return gamma_left_coeff_Re_[m][n][c];
+  }
+
+  inline __device__ int gamma_left_ind(int m, int n){
+    CONSTVAR_ int gamma_left_ind_[QC_LEN_G][QC_Ns] = {
+      { 0, 1, 2, 3 },             /* G0 = 1 */
+      { 3, 2, 1, 0 },             /* G1 = g1 */
+      { 3, 2, 1, 0 },             /* G2 = g2 */
+      { 0, 1, 2, 3 },             /* G3 = g1 g2 */
+      { 2, 3, 0, 1 },             /* G4 = g3 */
+      { 1, 0, 3, 2 },             /* G5 = g1 g3 */
+      { 1, 0, 3, 2 },             /* G6 = g2 g3 */
+      { 2, 3, 0, 1 },             /* G7 = g1 g2 g3 */
+      { 2, 3, 0, 1 },             /* G8 = g4 */
+      { 1, 0, 3, 2 },             /* G9 = g1 g4 */
+      { 1, 0, 3, 2 },             /* G10= g2 g4 */
+      { 2, 3, 0, 1 },             /* G11= g1 g2 g4 */
+      { 0, 1, 2, 3 },             /* G12= g3 g4 */
+      { 3, 2, 1, 0 },             /* G13= g1 g3 g4 */
+      { 3, 2, 1, 0 },             /* G14= g2 g3 g4 */
+      { 0, 1, 2, 3 },             /* G15= g1 g2 g3 g4 */
+    };
+    return gamma_left_ind_[m][n];
+  }
+
+  /* bits (gammas) in 0..15 (in G0..G15) */
+  inline __device__ int qc_bitcount16(int n){
+    CONSTVAR_ int qc_bitcount16_[QC_LEN_G] = { 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4 };
+    return qc_bitcount16_[n];
+  }
+
+
+  /*  G(n)^\dag = (-1)**gamma_adj_parity[n] * G(n);
+      G(n).G(n) = (-1)**gamma_adj_parity[n]  (since G(n)^\dag.G(n)=G(n).G(n)^\dag=1) */
+  inline __device__ int qc_gamma_adj_parity(int n){
+    CONSTVAR_ int qc_gamma_adj_parity_[QC_LEN_G] = { 0, 0, 0, 1, 0, 1, 1, 1,
+						     0, 1, 1, 1, 1, 1, 1, 0};
+    return qc_gamma_adj_parity_[n];
+  }
+
+  /*  G(n)^* = (-1)**gamma_conj_parity[n] * G(n) */
+  inline __device__ int qc_gamma_conj_parity(int n){
+    CONSTVAR_ int qc_gamma_conj_parity_[QC_LEN_G] = { 0, 1, 0, 1, 1, 0, 1, 0,
+						      0, 1, 0, 1, 1, 0, 1, 0 };
+    return qc_gamma_conj_parity_[n];
+  }
+
+  /*  G(n)^T = (-1)**gamma_transp_parity[n] * G(n) */
+  inline __device__ int qc_gamma_transp_parity(int n){
+    CONSTVAR_ int qc_gamma_transp_parity_[QC_LEN_G]={ 0, 1, 0, 0, 1, 1, 0, 1,
+						      0, 0, 1, 0, 0, 1, 0, 0 };
+    return qc_gamma_transp_parity_[n];
+  }
+
+  /* G(n)^\dag . G(m) . G(n) = (-1)**gamma_uni_parity(m,n) * G(m) */
+  inline __device__ int qc_gamma_uni_parity(int m,int n){
+    return ( qc_bitcount16(m) * qc_bitcount16(n) - qc_bitcount16(m&n) ) % 2;
+  }
+
+  /* G(n)^T . G(m) . G(n)    = (-1)**gamma_sim_parity(m,n) * G(m) */
+  inline __device__ int qc_gamma_sim_parity(int m, int n){
+    return ( qc_gamma_uni_parity(m,n) + qc_gamma_conj_parity(n) ) % 2;
+  }
+
+
+#define gamma_left_coeff(m,n) (complex<QC_REAL>{gamma_left_coeff_Re(m,n,0), gamma_left_coeff_Re(m,n,1)})
+
 
   
   /* elementary actions on gamma matrices */
@@ -814,44 +913,29 @@ namespace quda {
     QC(gvec_eq_trace_gamma_dot_G)(r,r_stride, tmpG,1);
   }
 
-
-  /* uv[jc,is] <- u . v = \sum_{ic} u[jc,ic] * v[ic,is] */
-  //- Deprecated function
-//   inline __device__ void
-//   QC(D_eq_U_dot_D)(Vector& u_v, const Link& U, const Vector& v){
-
-//     for (int is = 0; is < QC_Ns ; is++)
-// #pragma unroll
-//       for (int jc = 0 ; jc < QC_Nc ; jc++) {
-//         QC_CPLX s = 0;
-// #pragma unroll
-//         for (int ic = 0 ; ic < QC_Nc ; ic++)
-//           s += U(jc, ic) * v.data[is + QC_Ns*ic];
-//         u_v.data[is + QC_Ns*jc] = s;
-//       }
-//   }
-
-
   /* gres[is,js] <- Tr_c[x . y^H] = \sum_{ic} x[ic,is] * conj(y[ic,js]) */
   //- Version 1
-//   inline __device__ void
-//   QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
-//                                  const Vector& x, const Vector& y){
+#if 0
+  inline __device__ void
+  QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
+                                 const Vector& x, const Vector& y){
     
-//     for (int is = 0 ; is < QC_Ns ; is++)
-//       for (int js = 0 ; js < QC_Ns ; js++){
-// 	QC_CPLX s = 0;
-// #pragma unroll
-// 	for (int ic = 0 ; ic < QC_Nc ; ic++){
-// 	  QC_CPLX yD = y(js,ic);
-// 	  s += x(is,ic) * conj(yD);
-// 	}
-// 	gres[gres_stride * QC_LIDX_G(is, js)] += a*s;
-//       }
-//   }
+    for (int is = 0 ; is < QC_Ns ; is++)
+      for (int js = 0 ; js < QC_Ns ; js++){
+	QC_CPLX s = 0;
+#pragma unroll
+	for (int ic = 0 ; ic < QC_Nc ; ic++){
+	  QC_CPLX yD = y(js,ic);
+	  s += x(is,ic) * conj(yD);
+	}
+	gres[gres_stride * QC_LIDX_G(is, js)] += a*s;
+      }
+  }
+#endif
   //------------------------------------
 
   //- Version 2
+#if 1
   inline __device__ void
   QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
                                  const Vector& x, const Vector& y){
@@ -862,34 +946,38 @@ namespace quda {
 #pragma unroll
 	for (int js = 0 ; js < QC_Ns ; js++){
 	  gres[gres_stride * QC_LIDX_G(is, js)] += a * x(is,ic) * conj(y(js,ic));
-	             a * x.data[LIDX_Vector(ic,is)] * conj(y.data[LIDX_Vector(ic,js)]);
+	  //	             a * x.data[LIDX_Vector(ic,is)] * conj(y.data[LIDX_Vector(ic,js)]);
 	}
   }
+#endif
   //------------------------------------
 
+
   //- Version 3
-//   inline __device__ void
-//   QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
-// 				 const Vector& x, const Vector& y){
-//     QC_CPLX gres1[QC_LEN_G];
-// #pragma unroll
-//     for (int i = 0 ; i < QC_LEN_G ; i++) 
-//       gres1[i] = 0;
+#if 0
+  inline __device__ void
+  QC(G_peqa_colortrace_D_dot_aD)(QC_CPLX *gres, int gres_stride, QC_CPLX a,
+				 const Vector& x, const Vector& y){
+    QC_CPLX gres1[QC_LEN_G];
+#pragma unroll
+    for (int i = 0 ; i < QC_LEN_G ; i++) 
+      gres1[i] = 0;
     
-// #pragma unroll
-//     for (int ic = 0 ; ic < QC_Nc ; ic++)
-// #pragma unroll
-//       for (int is = 0 ; is < QC_Ns ; is++)
-// #pragma unroll
-// 	for (int js = 0 ; js < QC_Ns ; js++) {
-// 	  gres1[gres_stride * QC_LIDX_G(is, js)] += x(is,ic) * conj(y(js,ic));
-// 	    //	    x.data[LIDX_Vector(ic,is)] * conj(y.data[LIDX_Vector(ic,js)]);
-// 	}
+#pragma unroll
+    for (int ic = 0 ; ic < QC_Nc ; ic++)
+#pragma unroll
+      for (int is = 0 ; is < QC_Ns ; is++)
+#pragma unroll
+	for (int js = 0 ; js < QC_Ns ; js++) {
+	  gres1[gres_stride * QC_LIDX_G(is, js)] += x(is,ic) * conj(y(js,ic));
+	    //	    x.data[LIDX_Vector(ic,is)] * conj(y.data[LIDX_Vector(ic,js)]);
+	}
     
-// #pragma unroll
-//     for (int i = 0 ; i < QC_LEN_G ; i++)
-//       gres[i] += a * gres1[i];
-//   }
+#pragma unroll
+    for (int i = 0 ; i < QC_LEN_G ; i++)
+      gres[i] += a * gres1[i];
+  }
+#endif
   //------------------------------------
 
 
@@ -900,9 +988,6 @@ namespace quda {
 				       QC_CPLX *gres, int gres_stride, QC_CPLX a,
 				       const Link& U, const Vector& x, const Vector& y)
   {
-    //    Vector u_x;
-    //    QC(D_eq_U_dot_D)(u_x, U, x);
-    /* TODO merge the two `is' cycles and reduce local storage Vector->QC_CPLX[QC_Nc]? */
     Vector u_x = U * x;
     QC(G_peqa_colortrace_D_dot_aD)(gres, gres_stride, a, u_x, y);
   }
@@ -1299,6 +1384,8 @@ namespace quda {
     QC(gvec_eq_trace_gamma_dot_G)(Corr_dev + tid, lV, tmpG1, 1);
 
   }
+  //------------------------------------------------------------------------------------------
+
 
   __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
 
@@ -1337,5 +1424,109 @@ namespace quda {
     QC(gvec_eq_trace_gamma_dot_G)(Corr_dev + tid, lV, tmpG1, 1);
 
   }
+  //------------------------------------------------------------------------------------------
+
+
+  extern __shared__ complex<QC_REAL> qc_U_D_aD_shared[];
+
+  /* local qbarUq contractions for TMD */
+  /* compute (res)[is,js] += a * \sum_{jc} conj(v2[jc,js]) * (\sum_{ic} u[jc,ic] v1[ic,is]) */
+  __global__ void tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue(
+									      complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg)
+  {
+    /* blockDim = {*SITES_PER_BLOCK, parity ...} */
+    /* site/parity */
+    int x_cb  = blockIdx.x*blockDim.x + threadIdx.x;    /* CB site within vol4loc */
+    int pty   = blockIdx.y*blockDim.y + threadIdx.y;    /* parity within vol4loc */
+    int tid   = x_cb + pty * arg->volumeCB;             /* index within result buffer */
+    int lV    = arg->volume;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty  >= arg->nParity) return;
+    if (tid  >= lV) return;
+
+    /* internal indices for threads working on this site */
+    const int i12   = threadIdx.z;
+    int i1    = i12 / QC_Ns ;
+    int i2    = i12 % QC_Ns ;
+
+    /* shmem storage for v1,v2,u,gres */
+    int isite_blk = threadIdx.y * blockDim.x + threadIdx.x;
+    complex<QC_REAL> *v1    = (complex<QC_REAL> *)&(
+			qc_U_D_aD_shared[QC_UDD_SITE_CPLXBUF * isite_blk]) ;
+    complex<QC_REAL> *v2    = v1 + QC_LEN_D ;
+    complex<QC_REAL> *u_v1  = v2 + QC_LEN_D ;
+    complex<QC_REAL> *gres  = u_v1 + QC_LEN_D ;
+    complex<QC_REAL> *umat  = gres + QC_LEN_G ;
+
+    /* index into GaugeField */
+    int ulink_idx;
+    { /* speculative calc for extendedGauge */
+      int crd[5];
+      getCoords(crd, x_cb, arg->dim, pty);
+      crd[4] = 0;
+      int c2[5] = {0,0,0,0,0};
+      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
+      ulink_idx = linkIndex(c2, arg->dimEx);
+    }
+    ulink_idx = arg->extendedGauge ? ulink_idx : x_cb;
+    
+    /* load umat */
+    if (i1 < QC_Nc && i2 < QC_Nc)
+      umat[QC_LIDX_M(i1,i2)] = arg->U.getData(arg->i_mu, ulink_idx, pty, i1, i2);
+    //__syncthreads(); /* no need until the 1st pair v1,v2 are also read */
+    
+    gres[QC_LIDX_G(i1, i2)] = 0.;
+    /* loop over vectors */
+    for (int i = 0 ; i < QUDA_PROP_NVEC /*TODO replace with nvec for disconnected contractions*/ ; i++){
+      /* load v1, v2 */
+      if (i1 < QC_Nc) {
+        // v1[QC_LIDX_D(i1,i2)] = arg->fwdProp[i](x_cb, pty)(i2, i1); /* sic! [color, spin] <- [spin, color] */
+        // v2[QC_LIDX_D(i1,i2)] = arg->bwdProp[i](x_cb, pty)(i2, i1); /* sic! [color, spin] <- [spin, color] */
+        v1[QC_LIDX_D(i1,i2)] = arg->fwdProp[i].getData(x_cb, pty, i2, i1); /* sic! [color, spin] <- [spin, color] */
+        v2[QC_LIDX_D(i1,i2)] = arg->bwdProp[i].getData(x_cb, pty, i2, i1); /* sic! [color, spin] <- [spin, color] */
+      }
+      __syncthreads();
+
+      /* compute u.v1 */
+      if (i1 < QC_Nc) {
+        complex<QC_REAL> s = 0;
+
+#pragma unroll
+        for (int kc = 0 ; kc < QC_Nc ; kc++)
+          s += umat[QC_LIDX_M(i1, kc)] * v1[QC_LIDX_D(kc,i2)];
+
+        u_v1[QC_LIDX_D(i1,i2)] = s;
+      }
+      __syncthreads();
+
+      /* compute v2^dag . u_v1 */
+      {
+        complex<QC_REAL> s = 0;
+
+        for (int kc = 0 ; kc < QC_Nc ; kc++)
+          s += conj(v2[QC_LIDX_D(kc, i2)]) * u_v1[QC_LIDX_D(kc,i1)];
+
+        gres[QC_LIDX_G(i1, i2)] += s;
+      }
+      __syncthreads(); /* sic! avoid overwrite v2 in the next iter; sync gres before Gamma proj */
+    }
+
+
+    /* proj on Gamma(ng) -> Corr_dev[tid + lV*ng] */
+    int ng  = i12;
+#if 1
+    QC_CPLX s = 0;
+    for (int is = 0 ; is < QC_Ns ; is++) {
+      int js = gamma_left_ind(ng, is);
+      s += gamma_left_coeff(ng, is) * gres[QC_LIDX_G(js, is)];
+    }
+    Corr_dev[tid + lV*ng] = s;
+#else
+    Corr_dev[tid + lV*ng] = gres[QC_LIDX_G(i1, i2)]; /* XXX skip Gamma-projection, for testing only! */
+#endif
+  }
+
+
 
 } //- namespace quda
