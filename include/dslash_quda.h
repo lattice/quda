@@ -65,7 +65,9 @@ namespace quda {
   enum Dslash5Type {
     DSLASH5_DWF,
     DSLASH5_MOBIUS_PRE,
-    DSLASH5_MOBIUS
+    DSLASH5_MOBIUS,
+    M5_INV_DWF,
+    M5_INV_MOBIUS
   };
 
   /**

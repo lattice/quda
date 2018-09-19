@@ -72,32 +72,45 @@ namespace quda {
 	break;
       case DSLASH5_MOBIUS_PRE:
 	for (int s=0; s<Ls; s++) {
-	  b_5[s] = b_5_[s].real();
-	  c_5[s] = 0.5*c_5_[s].real();
+	  b_5[s] = b_5_[s];
+	  c_5[s] = 0.5*c_5_[s];
 
 	  // xpay
-	  a_5[s] = (0.5/(b_5_[s]*(m_5+4.0) + 1.0)).real();
+	  a_5[s] = 0.5/(b_5_[s]*(m_5+4.0) + 1.0);
 	  a_5[s] *= a_5[s] * static_cast<real>(a);
         }
 	break;
       case DSLASH5_MOBIUS:
 	for (int s=0; s<Ls; s++) {
 	  b_5[s] = 1.0;
-	  c_5[s] = (0.5 * (c_5_[s] * (m_5 + 4.0) - 1.0) / (b_5_[s] * (m_5 + 4.0) + 1.0)).real();
+	  c_5[s] = 0.5 * (c_5_[s] * (m_5 + 4.0) - 1.0) / (b_5_[s] * (m_5 + 4.0) + 1.0);
 
 	  // axpy
-	  a_5[s] = (0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0)).real();
+	  a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
 	  a_5[s] *= a_5[s] * static_cast<real>(a);
 	}
 	break;
+      case M5_INV_DWF:
+        b = 2.0 * (0.5/(5.0 + m_5)); // 2  * kappa_5
+        c = 0.5 / ( 1.0 + std::pow(b,(int)Ls) * m_f );
+        break;
+      case M5_INV_MOBIUS:
+        for (int s=0; s<Ls; s++) {
+          b_5[s] = -(c_5_[s] * (4.0 + m_5) - 1.0) / (b_5_[s] * (4.0 + m_5) + 1.0);
+          c_5[s] = 0.5 / ( 1.0 + std::pow(b_5[s].real(),(int)Ls)*m_f );
+
+          a_5[s] = 0.5 * (b_5_[s] * (m_5 + 4.0) + 1.0);
+          a_5[s]*= a_5[s] * static_cast<real>(a);
+
+          //printfQuda("s = %d a = %e b = %e c = %e\n", s, a_5[s].real(), b_5[s].real(), c_5[s].real());
+        }
+        break;
       default:
 	errorQuda("Unknown Dslash5Type %d", type);
       }
 
       cudaMemcpyToSymbolAsync(mobius_d, mobius_h, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
 
-      b = b_5[0].real();
-      c = c_5[0].real();
     }
   };
 
@@ -111,7 +124,7 @@ namespace quda {
   }
 
   template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
-  __device__ __host__ inline void dslash5(const Arg &arg, int parity, int x_cb, int s) {
+  __device__ __host__ inline void dslash5(Arg &arg, int parity, int x_cb, int s) {
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,4> Vector;
 
@@ -162,7 +175,7 @@ namespace quda {
       }
     }
 
-    ((Arg*)&arg)->out(s*arg.volume_4d_cb + x_cb, parity) = out;
+    arg.out(s*arg.volume_4d_cb + x_cb, parity) = out;
   }
 
   // CPU kernel for applying the dslash operator
@@ -181,7 +194,7 @@ namespace quda {
 
   // GPU Kernel for applying the dslash operator
   template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
-  __global__ void dslash5GPU(const Arg arg)
+  __global__ void dslash5GPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int s = blockIdx.y*blockDim.y + threadIdx.y;
@@ -192,6 +205,99 @@ namespace quda {
     if (parity >= arg.nParity) return;
 
     dslash5<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, s);
+  }
+
+  /*
+    @brief Fast power function that works for negative "a" argument
+    @param a argument we want to raise to some power
+    @param b power that we want to raise a to
+    @return pow(a,b)
+  */
+  template<typename real>
+  __device__ __host__ inline real __fast_pow(real a, int b) {
+#ifdef __CUDA_ARCH__
+    if (sizeof(real) == sizeof(double)) {
+      return pow(a, b);
+    } else {
+      float sign = signbit(a) ? -1.0f : 1.0f;
+      float power = __powf(fabsf(a), b);
+      return b&1 ? sign * power : power;
+    }
+#else
+    return std::pow(a, b);
+#endif
+  }
+
+  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
+  __device__ __host__ inline void dslash5inv(Arg &arg, int parity, int x_cb, int s_) {
+    typedef typename mapper<Float>::type real;
+    typedef ColorSpinor<real,nColor,4> Vector;
+
+    Vector out;
+    auto *z = coeff<real>();
+    const auto k = type == M5_INV_DWF ? arg.b : z->b[s_].real();
+    const auto inv_d_n = type == M5_INV_DWF ? arg.c : z->c[s_].real();
+
+    for (int s=0; s<arg.Ls; s++) {
+
+      Vector in = arg.in(s*arg.volume_4d_cb + x_cb, parity);
+
+      {
+        int exp = s_ < s ? arg.Ls-s+s_ : s_-s;
+        real factorR = inv_d_n * __fast_pow(k,exp) * ( s_ < s ? -arg.m_f : static_cast<real>(1.0) );
+        constexpr int proj_dir = dagger ? -1 : +1;
+        out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+      }
+
+      {
+        int exp = s_ > s ? arg.Ls-s_+s : s-s_;
+        real factorL = inv_d_n * __fast_pow(k,exp) * ( s_ > s ? -arg.m_f : static_cast<real>(1.0));
+        constexpr int proj_dir = dagger ? +1 : -1;
+        out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+      }
+
+    }
+
+    if (xpay) {
+      Vector x = arg.x(s_*arg.volume_4d_cb + x_cb, parity);
+      if (type == M5_INV_DWF) {
+        out = x + arg.a*out;
+      } else if (type == M5_INV_MOBIUS) {
+        auto *z = coeff<real>();
+        out = x + z->a[s_] * out;
+      }
+    }
+
+    arg.out(s_*arg.volume_4d_cb + x_cb, parity) = out;
+  }
+
+  // CPU kernel for applying the dslash operator
+  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
+  void dslash5invCPU(Arg &arg)
+  {
+    for (int parity= 0; parity < arg.nParity; parity++) {
+      for (int s=0; s < arg.Ls; s++) {
+	for (int x_cb = 0; x_cb < arg.volume_4d_cb; x_cb++) { // 4-d volume
+	  dslash5inv<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, s);
+	}  // 4-d volumeCB
+      } // ls
+    } // parity
+
+  }
+
+  // GPU Kernel for applying the dslash operator
+  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
+  __global__ void dslash5invGPU(Arg arg)
+  {
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int s = blockIdx.y*blockDim.y + threadIdx.y;
+    int parity = blockIdx.z*blockDim.z + threadIdx.z;
+
+    if (x_cb >= arg.volume_4d_cb) return;
+    if (s >= arg.Ls) return;
+    if (parity >= arg.nParity) return;
+
+    dslash5inv<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, s);
   }
 
   template <typename Float, int nColor, typename Arg>
@@ -221,6 +327,12 @@ namespace quda {
         flops_ = n * (8ll*bulk + 10ll*wall + (zMobius ? 8ll : 4ll) * meta.Volume() +
                       (arg.xpay ? (zMobius ? 8ll : 4ll) * meta.Volume() : 0) );
         break;
+      case M5_INV_DWF:
+        flops_ = (n * n * Ls + (arg.xpay ? 4 : 0)) * meta.Volume();
+        break;
+      case M5_INV_MOBIUS:
+        flops_ = (n * n * Ls + (arg.xpay ? 4 : 0)) * meta.Volume();
+        break;
       default:
 	errorQuda("Unknown Dslash5Type %d", arg.type);
       }
@@ -229,10 +341,13 @@ namespace quda {
     }
 
     long long bytes() const {
+      long long Ls = meta.X(4);
       switch (arg.type) {
       case DSLASH5_DWF:        return arg.out.Bytes() + 2*arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
       case DSLASH5_MOBIUS_PRE: return arg.out.Bytes() + 3*arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
       case DSLASH5_MOBIUS:     return arg.out.Bytes() + 3*arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
+      case M5_INV_DWF:         return arg.out.Bytes() + Ls*arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
+      case M5_INV_MOBIUS:      return arg.out.Bytes() + Ls*arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
       default: errorQuda("Unknown Dslash5Type %d", arg.type);
       }
       return 0ll;
@@ -250,8 +365,14 @@ namespace quda {
       strcpy(aux, meta.AuxString());
       if (arg.dagger) strcat(aux, ",Dagger");
       if (arg.xpay) strcat(aux,",xpay");
-      strcat(aux, arg.type == DSLASH5_DWF ? ",DSLASH5_DWF" :
-             arg.type == DSLASH5_MOBIUS_PRE ? ",DSLASH5_MOBIUS_PRE" : ",DSLASH5_MOBIUS");
+      switch (arg.type) {
+      case DSLASH5_DWF:        strcat(aux, ",DSLASH5_DWF"); break;
+      case DSLASH5_MOBIUS_PRE: strcat(aux, ",DSLASH5_MOBIUS_PRE"); break;
+      case DSLASH5_MOBIUS:     strcat(aux, ",DSLASH5_MOBIUS"); break;
+      case M5_INV_DWF:         strcat(aux, ",M5_INV_DWF"); break;
+      case M5_INV_MOBIUS:      strcat(aux, ",M5_INV_MOBIUS"); break;
+      default: errorQuda("Unknown Dslash5Type %d", arg.type);
+      }
     }
     virtual ~Dslash5() { }
 
@@ -278,6 +399,20 @@ namespace quda {
 	  else          arg.dagger ?
 			  dslash5CPU<Float,nColor, true,false,DSLASH5_MOBIUS>(arg) :
 			  dslash5CPU<Float,nColor,false,false,DSLASH5_MOBIUS>(arg);
+	} else if (arg.type == M5_INV_DWF) {
+	  if (arg.xpay) arg.dagger ?
+			  dslash5invCPU<Float,nColor, true, true,M5_INV_DWF>(arg) :
+			  dslash5invCPU<Float,nColor,false, true,M5_INV_DWF>(arg);
+	  else          arg.dagger ?
+			  dslash5invCPU<Float,nColor, true,false,M5_INV_DWF>(arg) :
+			  dslash5invCPU<Float,nColor,false,false,M5_INV_DWF>(arg);
+	} else if (arg.type == M5_INV_MOBIUS) {
+	  if (arg.xpay) arg.dagger ?
+			  dslash5invCPU<Float,nColor, true, true,M5_INV_MOBIUS>(arg) :
+			  dslash5invCPU<Float,nColor,false, true,M5_INV_MOBIUS>(arg);
+	  else          arg.dagger ?
+			  dslash5invCPU<Float,nColor, true,false,M5_INV_MOBIUS>(arg) :
+			  dslash5invCPU<Float,nColor,false,false,M5_INV_MOBIUS>(arg);
 	}
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -302,6 +437,20 @@ namespace quda {
 	  else          arg.dagger ?
 			  dslash5GPU<Float,nColor, true,false,DSLASH5_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
 			  dslash5GPU<Float,nColor,false,false,DSLASH5_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	} else if (arg.type == M5_INV_DWF) {
+	  if (arg.xpay) arg.dagger ?
+			  dslash5invGPU<Float,nColor, true, true,M5_INV_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
+			  dslash5invGPU<Float,nColor,false, true,M5_INV_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  else          arg.dagger ?
+			  dslash5invGPU<Float,nColor, true,false,M5_INV_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
+			  dslash5invGPU<Float,nColor,false,false,M5_INV_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	} else if (arg.type == M5_INV_MOBIUS) {
+	  if (arg.xpay) arg.dagger ?
+			  dslash5invGPU<Float,nColor, true, true,M5_INV_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
+			  dslash5invGPU<Float,nColor,false, true,M5_INV_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  else          arg.dagger ?
+			  dslash5invGPU<Float,nColor, true,false,M5_INV_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
+			  dslash5invGPU<Float,nColor,false,false,M5_INV_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	}
       }
     }

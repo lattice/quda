@@ -31,7 +31,7 @@ namespace quda {
   void DiracMobius::Dslash4(ColorSpinorField &out, const ColorSpinorField &in,
 			    const QudaParity parity) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
@@ -44,7 +44,7 @@ namespace quda {
   
   void DiracMobius::Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
@@ -67,7 +67,7 @@ namespace quda {
 
   void DiracMobius::Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
@@ -92,8 +92,7 @@ namespace quda {
   void DiracMobius::Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
 				const QudaParity parity, const ColorSpinorField &x, const double &k) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -108,8 +107,7 @@ namespace quda {
   void DiracMobius::Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in,
 				   const QudaParity parity, const ColorSpinorField &x, const double &k) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -135,7 +133,7 @@ namespace quda {
   void DiracMobius::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
 				const QudaParity parity, const ColorSpinorField &x, const double &k) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -159,8 +157,6 @@ namespace quda {
 
   void DiracMobius::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
     bool reset = newTmp(&tmp1, in);
     checkFullSpinor(*tmp1, in);
 
@@ -228,15 +224,22 @@ namespace quda {
 
   void DiracMobiusPC::Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#if 1
+    Complex zb_5[QUDA_MAX_DWF_LS];
+    Complex zc_5[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { zb_5[i] = b_5[i]; zc_5[i] = c_5[i]; }
+    ApplyDslash5(out, in, in, mass, m5, zb_5, zc_5, 0.0, dagger, M5_INV_MOBIUS);
+
+#else
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 3, profile);
-
+#endif
+    
     long long Ls = in.X(4);
     flops += 144LL*(long long)in.Volume()*Ls + 3LL*Ls*(Ls-1LL);
   }
@@ -245,15 +248,21 @@ namespace quda {
   void DiracMobiusPC::Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
 					       const QudaParity parity, const ColorSpinorField &x, const double &k) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#if 1
+    Complex zb_5[QUDA_MAX_DWF_LS];
+    Complex zc_5[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { zb_5[i] = b_5[i]; zc_5[i] = c_5[i]; }
+    ApplyDslash5(out, in, in, mass, m5, zb_5, zc_5, k, dagger, M5_INV_MOBIUS);
+#else
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
 		   mass, k, b_5, c_5, m5, commDim, 3, profile);
+#endif
 
     long long Ls = in.X(4);
     flops +=  (144LL*Ls + 48LL)*(long long)in.Volume() + 3LL*Ls*(Ls-1LL);
@@ -263,8 +272,6 @@ namespace quda {
   //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
   void DiracMobiusPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
     bool reset1 = newTmp(&tmp1, in);
 
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
