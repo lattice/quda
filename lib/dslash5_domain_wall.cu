@@ -9,19 +9,19 @@ namespace quda {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
 
+  /**
+     @brief Structure containing zMobius / Zolotarev coefficients
+  */
   template <typename real>
   struct coeff_5 {
-    // zMobius / Zolotarev coefficients
-    complex<real> a[QUDA_MAX_DWF_LS];
+    complex<real> a[QUDA_MAX_DWF_LS]; // xpay coefficients
     complex<real> b[QUDA_MAX_DWF_LS];
     complex<real> c[QUDA_MAX_DWF_LS];
   };
 
-  static __constant__ coeff_5<double> mobius_d_d;
-  static __constant__ coeff_5<float> mobius_s_d;
-
-  static coeff_5<double> mobius_d_h;
-  static coeff_5<float> mobius_s_h;
+  constexpr int size = 4096;
+  static __constant__ char mobius_d[size]; // constant buffer used for Mobius coefficients for GPU kernel
+  static char mobius_h[size];              // constant buffer used for Mobius coefficients for CPU kernel
 
   /**
      @brief Parameter structure for applying the Dslash
@@ -61,8 +61,8 @@ namespace quda {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
-      coeff_5<real> *coeff = in.Precision() == QUDA_DOUBLE_PRECISION ? reinterpret_cast<coeff_5<real>*>(&mobius_d_h) :
-        reinterpret_cast<coeff_5<real>*>(&mobius_s_h);
+      if (sizeof(coeff_5<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(coeff_5<real>));
+      coeff_5<real> *coeff = reinterpret_cast<coeff_5<real>*>(&mobius_h);
       auto *a_5 =  coeff->a;
       auto *b_5 =  coeff->b;
       auto *c_5 =  coeff->c;
@@ -94,70 +94,19 @@ namespace quda {
 	errorQuda("Unknown Dslash5Type %d", type);
       }
 
-      if (type == DSLASH5_MOBIUS || type == DSLASH5_MOBIUS_PRE) {
-        switch (in.Precision()) {
-        case QUDA_DOUBLE_PRECISION:
-          cudaMemcpyToSymbolAsync(mobius_d_d, coeff, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
-          break;
-        case QUDA_SINGLE_PRECISION:
-        case QUDA_HALF_PRECISION:
-          cudaMemcpyToSymbolAsync(mobius_s_d, coeff, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
-          break;
-        default:
-          errorQuda("Unsupported precision %d\n", in.Precision());
-        }
-      }
+      cudaMemcpyToSymbolAsync(mobius_d, mobius_h, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
 
       b = b_5[0].real();
       c = c_5[0].real();
     }
   };
 
-  template <typename real> inline __device__ __host__ complex<real> a_5(int s) {
+  template <typename real>
+  inline __device__ __host__ const coeff_5<real>* coeff() {
 #ifdef __CUDA_ARCH__
-    return mobius_d_d.a[s];
+    return reinterpret_cast<const coeff_5<real>*>(mobius_d);
 #else
-    return mobius_d_h.a[s];
-#endif
-  }
-
-  template <> inline __device__ __host__ complex<float> a_5<float>(int s) {
-#ifdef __CUDA_ARCH__
-    return mobius_s_d.a[s];
-#else
-    return mobius_s_h.a[s];
-#endif
-  }
-
-  template <typename real> inline __device__ __host__ complex<real> b_5(int s) {
-#ifdef __CUDA_ARCH__
-    return mobius_d_d.b[s];
-#else
-    return mobius_d_h.b[s];
-#endif
-  }
-
-  template <> inline __device__ __host__ complex<float> b_5<float>(int s) {
-#ifdef __CUDA_ARCH__
-    return mobius_s_d.b[s];
-#else
-    return mobius_s_h.b[s];
-#endif
-  }
-
-  template <typename real> inline __device__ __host__ complex<real> c_5(int s) {
-#ifdef __CUDA_ARCH__
-    return mobius_d_d.c[s];
-#else
-    return mobius_d_h.c[s];
-#endif
-  }
-
-  template <> inline __device__ __host__ complex<float> c_5<float>(int s) {
-#ifdef __CUDA_ARCH__
-    return mobius_s_d.c[s];
-#else
-    return mobius_s_h.c[s];
+    return reinterpret_cast<const coeff_5<real>*>(mobius_h);
 #endif
   }
 
@@ -195,19 +144,21 @@ namespace quda {
       out = x + arg.a*out;
     } else if (type == DSLASH5_MOBIUS_PRE) {
       Vector diagonal = arg.in(s*arg.volume_4d_cb + x_cb, parity);
-      out = c_5<real>(s) * out + b_5<real>(s) * diagonal;
+      auto *z = coeff<real>();
+      out = z->c[s] * out + z->b[s] * diagonal;
 
       if (xpay) {
 	Vector x = arg.x(s*arg.volume_4d_cb + x_cb, parity);
-	out = x + a_5<real>(s)*out;
+	out = x + z->a[s] * out;
       }
     } else if (type == DSLASH5_MOBIUS) {
       Vector diagonal = arg.in(s*arg.volume_4d_cb + x_cb, parity);
-      out = c_5<real>(s) * out + diagonal;
+      auto *z = coeff<real>();
+      out = z->c[s] * out + diagonal;
 
       if (xpay) { // really axpy
 	Vector x = arg.x(s*arg.volume_4d_cb + x_cb, parity);
-	out = a_5<real>(s)*x + out;
+	out = z->a[s] * x + out;
       }
     }
 
