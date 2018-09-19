@@ -136,6 +136,8 @@ half* sm_a = (half*)(sm_c + M*(N_sm));
 
 } // Construct matrix A
 
+__syncthreads();
+
 // for(int offset = threadIdx.y*blockDim.x+threadIdx.x; offset*4 < M*M_sm*2; offset += blockDim.x*blockDim.y){
 //   memset((void*)(sm_a)+offset*4, 0, 4);
 // }
@@ -151,6 +153,46 @@ int s4_increment = gridDim.x * blockDim.x;
 
 int s4, sid;
 int X, coord[5], boundaryCrossing;
+
+// wmma.h
+
+const int WMMA_M = 16;
+const int WMMA_N = 16;
+const int WMMA_K = 16;
+
+const int tm_dim = M >> 4;
+const int tn_dim = N >> 4;
+const int tk_dim = K >> 4;
+
+// Set up the wmma stuff
+nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_frag[3];
+nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::row_major> b_frag;
+nvcuda::wmma::fragment<nvcuda::wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, half> c_frag;
+
+
+// The actual/physical warp assigned to each thread in this block
+//int phys_warp_n_dim = float(blockDim.x)/float(warpSize); // TODO: should make sure blockDim.x is AT LEAST 32.
+//int phys_warp_m_dim = blockDim.y;
+
+const int total_warp = (blockDim.x*blockDim.y) >> 5;
+const int this_warp = (threadIdx.y*blockDim.x+threadIdx.x) >> 5;
+
+//int phys_warp_n = float(threadIdx.x)/float(warpSize);
+//int phys_warp_m = threadIdx.y; 
+
+//int total_num_warp = phys_warp_n_dim*phys_warp_m_dim;
+const int total_tile = tm_dim*tn_dim;
+
+const int warp_cycle = float(total_tile)/total_warp;
+
+const int warp_m = float(this_warp)*warp_cycle/tn_dim;
+
+#pragma unroll
+for(int k = 0; k < 3; k++){
+  const int a_row = warp_m*WMMA_M;
+  const int a_col = k*WMMA_K;
+  nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a+a_row+a_col*M_sm, M_sm);
+}
 
 while(s4_base < param.threads){
 
@@ -225,55 +267,28 @@ while(s4_base < param.threads){
   {
     using namespace nvcuda;
 
-    const int WMMA_M = 16;
-    const int WMMA_N = 16;
-    const int WMMA_K = 16;
-
-    const int tm_dim = M >> 4;
-    const int tn_dim = N >> 4;
-    const int tk_dim = K >> 4;
-
-    // The actual/physical warp assigned to each thread in this block
-    //int phys_warp_n_dim = float(blockDim.x)/float(warpSize); // TODO: should make sure blockDim.x is AT LEAST 32.
-    //int phys_warp_m_dim = blockDim.y;
-
-    int total_warp = (blockDim.x*blockDim.y) >> 5;
-    int this_warp = (threadIdx.y*blockDim.x+threadIdx.x) >> 5;
-
-    //int phys_warp_n = float(threadIdx.x)/float(warpSize);
-    //int phys_warp_m = threadIdx.y; 
-
-    //int total_num_warp = phys_warp_n_dim*phys_warp_m_dim;
-    int total_tile = tm_dim*tn_dim;
-
-    int warp_cycle = float(total_tile)/total_warp;
-
-    // Set up the wmma stuff
-    wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> a_frag;
-    wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> b_frag;
-    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, half> c_frag;
-    // Zero the initial acc.
-
     for(int c = 0; c < warp_cycle; c++){
-      int phys_warp_index = this_warp + total_warp*c;
+      int phys_warp_index = this_warp*warp_cycle+c;
       // The logical warp assigned to each part of the matrix.
-      int warp_m = float(phys_warp_index)/tn_dim;
-      int warp_n = phys_warp_index-warp_m*tn_dim;
-      //
+// TODO: This is moved to other places
+//      int warp_m = float(phys_warp_index)/tn_dim;
+      const int warp_n = phys_warp_index-warp_m*tn_dim;
+      // Zero the initial acc.
       wmma::fill_fragment(c_frag, (half)0.0f);
-      for( int k = 0; k < tk_dim; k++ ){
+      #pragma unroll
+      for( int k = 0; k < 3; k++ ){
 
-        int a_row = warp_m*WMMA_M;
-        int a_col = k*WMMA_K;
-        int b_row = k*WMMA_K;
-        int b_col = warp_n*WMMA_N;
+        const int a_row = warp_m*WMMA_M;
+        const int a_col = k*WMMA_K;
+        const int b_row = k*WMMA_K;
+        const int b_col = warp_n*WMMA_N;
 
         //    if( a_row < M && a_col < K && b_row < K && b_col < N ){    
         // Load Matrix
-        wmma::load_matrix_sync(a_frag, sm_a+a_row+a_col*M_sm, M_sm);
+        // wmma::load_matrix_sync(a_frag, sm_a+a_row+a_col*M_sm, M_sm);
         wmma::load_matrix_sync(b_frag, sm_b+b_col+b_row*N_sm, N_sm);
         // Perform the matrix multiplication
-        wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+        wmma::mma_sync(c_frag, a_frag[k], b_frag, c_frag);
         //    }
         //    __syncthreads();
       } 
