@@ -59,6 +59,16 @@ namespace quda {
 	return *this;
       }
 
+
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator-=(const ColorSpinor<Float, Nc, Ns> &a) {
+	if (this != &a) {
+#pragma unroll
+	  for (int i=0; i<Nc*Ns; i++) {
+	    data[i] -= a.data[i];
+	  }
+	}
+	return *this;
+      }
       template<typename S>
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
 

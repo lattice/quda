@@ -63,6 +63,24 @@ namespace quda {
     return idx;
   }
 
+/**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] -n in the mu direction
+
+     @return 1-d checkerboard index
+     @param x 4-d lattice index
+     @param X Full lattice dimensions
+     @param mu direction in which to subtract 1
+   */
+  template <typename I, int n>
+  static __device__ __host__ inline int linkIndexDn(const int x[], const I X[4], const int mu) {
+    int y[4];
+#pragma unroll
+    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
+    y[mu] = (y[mu] +n + X[mu]) % X[mu];
+    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
+    return idx;
+  }
+
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] -1 in the mu direction
 
@@ -73,12 +91,12 @@ namespace quda {
    */
   template <typename I>
   static __device__ __host__ inline int linkIndexM1(const int x[], const I X[4], const int mu) {
-    int y[4];
-#pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
-    y[mu] = (y[mu] - 1 + X[mu]) % X[mu];
-    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
-    return idx;
+    return linkIndexDn<I,-1>(x, X, mu);
+  }
+
+  template <typename I>
+  static __device__ __host__ inline int linkIndexM3(const int x[], const I X[4], const int mu) {
+    return linkIndexDn<I,-3>(x, X, mu);
   }
 
   /**
@@ -109,12 +127,12 @@ namespace quda {
    */  
   template <typename I>
   static __device__ __host__ inline int linkIndexP1(const int x[], const I X[4], const int mu) {
-    int y[4];
-#pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
-    y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
-    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
-    return idx;
+    return linkIndexDn<I,1>(x, X, mu);
+  }
+
+  template <typename I>
+  static __device__ __host__ inline int linkIndexP3(const int x[], const I X[4], const int mu) {
+    return linkIndexDn<I,3>(x, X, mu);
   }
 
   /**
