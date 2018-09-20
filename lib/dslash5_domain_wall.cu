@@ -56,7 +56,7 @@ namespace quda {
                double a, bool dagger, Dslash5Type type)
       : out(out), in(in), x(x), nParity(in.SiteSubset()),
 	volume_cb(in.VolumeCB()), volume_4d_cb(volume_cb/in.X(4)), Ls(in.X(4)),
-	m_f(m_f), m_5(m_5), a(a), dagger(dagger), xpay(in.V() == x.V() ? false: true), type(type)
+	m_f(m_f), m_5(m_5), a(a), dagger(dagger), xpay(a == 0.0 /*in.V() == x.V()*/ ? false : true), type(type)
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
@@ -95,14 +95,19 @@ namespace quda {
         c = 0.5 / ( 1.0 + std::pow(b,(int)Ls) * m_f );
         break;
       case M5_INV_MOBIUS:
-        for (int s=0; s<Ls; s++) {
-          b_5[s] = -(c_5_[s] * (4.0 + m_5) - 1.0) / (b_5_[s] * (4.0 + m_5) + 1.0);
-          c_5[s] = 0.5 / ( 1.0 + std::pow(b_5[s].real(),(int)Ls)*m_f );
+        {
+          complex<double> k = 1.0;
+          for (int s=0; s<Ls; s++) {
+            b_5[s] = -(c_5_[s] * (4.0 + m_5) - 1.0) / (b_5_[s] * (4.0 + m_5) + 1.0);
+            k *= b_5[s];
+          }
 
-          a_5[s] = 0.5 * (b_5_[s] * (m_5 + 4.0) + 1.0);
-          a_5[s]*= a_5[s] * static_cast<real>(a);
+          for (int s=0; s<Ls; s++) {
+            c_5[s] = 0.5 / ( 1.0 + k * m_f );
 
-          //printfQuda("s = %d a = %e b = %e c = %e\n", s, a_5[s].real(), b_5[s].real(), c_5[s].real());
+            a_5[s] = 0.5 * (b_5_[s] * (m_5 + 4.0) + 1.0);
+            a_5[s]*= a_5[s] * static_cast<real>(a);
+          }
         }
         break;
       default:
@@ -228,19 +233,76 @@ namespace quda {
 #endif
   }
 
-  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
+  /**
+     @brief Class which wraps around a shared memory cache for a Vector type,
+     where each thread in the thread block stores a unique
+     Vector in the cache which any other thread can access.
+   */
+  template <typename real, typename Vector>
+  class VectorCache {
+
+    /**
+       @brief This is the handle to the shared memory
+       @return Shared memory pointer
+     */
+    __device__ inline real* cache() {
+      extern __shared__ int cache_[];
+      return reinterpret_cast<real*>(cache_);
+    }
+
+  public:
+
+    /**
+       @brief Save the vector into the 3-d shared memory cache.
+       Implicitly store the vector at coordinates given by threadIdx.
+       @param[in] a The vector to store in the shared memory cache
+     */
+    __device__ inline void save(const Vector &a) {
+#pragma unroll
+      for (int i=0; i<2*a.n; i++) {
+        int j = ((i*blockDim.z + threadIdx.z)*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
+        cache()[j] = *(reinterpret_cast<const real*>(a.data) + i);
+      }
+      __syncthreads();
+    }
+
+    /**
+       @brief Load a vector from the shared memory cache
+       @param[in] x The x index to use
+       @param[in] y The y index to use
+       @param[in] z The z index to use
+       @return The Vector at coordinates (x,y,z)
+     */
+    __device__ inline Vector load(int x, int y, int z) {
+      Vector a;
+#pragma unroll
+      for (int i=0; i<2*a.n; i++) {
+        int j = ((i*blockDim.z + z)*blockDim.y + y)*blockDim.x + x;
+        *(reinterpret_cast<real*>(a.data) + i) = cache()[j];
+      }
+      return a;
+    }
+
+  };
+
+  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, bool shared, typename Arg>
   __device__ __host__ inline void dslash5inv(Arg &arg, int parity, int x_cb, int s_) {
+    constexpr int nSpin = 4;
     typedef typename mapper<Float>::type real;
-    typedef ColorSpinor<real,nColor,4> Vector;
+    typedef ColorSpinor<real,nColor,nSpin> Vector;
 
     Vector out;
     auto *z = coeff<real>();
     const auto k = type == M5_INV_DWF ? arg.b : z->b[s_].real();
     const auto inv_d_n = type == M5_INV_DWF ? arg.c : z->c[s_].real();
 
+    // if using shared-memory caching then load spinor field for my site into cache
+    VectorCache<real,Vector> cache;
+    if (shared) cache.save(arg.in(s_*arg.volume_4d_cb + x_cb, parity));
+
     for (int s=0; s<arg.Ls; s++) {
 
-      Vector in = arg.in(s*arg.volume_4d_cb + x_cb, parity);
+      Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s*arg.volume_4d_cb + x_cb, parity);
 
       {
         int exp = s_ < s ? arg.Ls-s+s_ : s_-s;
@@ -275,10 +337,11 @@ namespace quda {
   template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
   void dslash5invCPU(Arg &arg)
   {
+    constexpr bool shared = false; // shared memory doesn't apply here
     for (int parity= 0; parity < arg.nParity; parity++) {
       for (int s=0; s < arg.Ls; s++) {
 	for (int x_cb = 0; x_cb < arg.volume_4d_cb; x_cb++) { // 4-d volume
-	  dslash5inv<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, s);
+	  dslash5inv<Float,nColor,dagger,xpay,type,shared>(arg, parity, x_cb, s);
 	}  // 4-d volumeCB
       } // ls
     } // parity
@@ -286,7 +349,7 @@ namespace quda {
   }
 
   // GPU Kernel for applying the dslash operator
-  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
+  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, bool shared, typename Arg>
   __global__ void dslash5invGPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
@@ -297,7 +360,7 @@ namespace quda {
     if (s >= arg.Ls) return;
     if (parity >= arg.nParity) return;
 
-    dslash5inv<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, s);
+    dslash5inv<Float,nColor,dagger,xpay,type,shared>(arg, parity, x_cb, s);
   }
 
   template <typename Float, int nColor, typename Arg>
@@ -306,6 +369,7 @@ namespace quda {
   protected:
     Arg &arg;
     const ColorSpinorField &meta;
+    static constexpr bool shared = true; // whether to use shared memory cache blocking for M5inv
 
     long long flops() const {
       long long Ls = meta.X(4);
@@ -355,8 +419,15 @@ namespace quda {
 
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volume_4d_cb; }
-    int blockStep() const { return 8; }
-    int blockMin() const { return 8; }
+    int blockStep() const { return 4; }
+    int blockMin() const { return 4; }
+    unsigned int sharedBytesPerThread() const {
+      if (shared && arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS) {
+        return 2*4*nColor*sizeof(typename mapper<Float>::type);
+      } else {
+        return 0;
+      }
+    }
 
   public:
     Dslash5(Arg &arg, const ColorSpinorField &meta)
@@ -439,19 +510,37 @@ namespace quda {
 			  dslash5GPU<Float,nColor,false,false,DSLASH5_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	} else if (arg.type == M5_INV_DWF) {
 	  if (arg.xpay) arg.dagger ?
-			  dslash5invGPU<Float,nColor, true, true,M5_INV_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false, true,M5_INV_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  dslash5invGPU<Float,nColor, true, true,M5_INV_DWF,shared> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
+			  dslash5invGPU<Float,nColor,false, true,M5_INV_DWF,shared> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	  else          arg.dagger ?
-			  dslash5invGPU<Float,nColor, true,false,M5_INV_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false,false,M5_INV_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  dslash5invGPU<Float,nColor, true,false,M5_INV_DWF,shared> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
+			  dslash5invGPU<Float,nColor,false,false,M5_INV_DWF,shared> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	} else if (arg.type == M5_INV_MOBIUS) {
 	  if (arg.xpay) arg.dagger ?
-			  dslash5invGPU<Float,nColor, true, true,M5_INV_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false, true,M5_INV_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  dslash5invGPU<Float,nColor, true, true,M5_INV_MOBIUS,shared> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
+			  dslash5invGPU<Float,nColor,false, true,M5_INV_MOBIUS,shared> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	  else          arg.dagger ?
-			  dslash5invGPU<Float,nColor, true,false,M5_INV_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false,false,M5_INV_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  dslash5invGPU<Float,nColor, true,false,M5_INV_MOBIUS,shared> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
+			  dslash5invGPU<Float,nColor,false,false,M5_INV_MOBIUS,shared> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	}
+      }
+    }
+
+    void initTuneParam(TuneParam &param) const {
+      TunableVectorYZ::initTuneParam(param);
+      if ( shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS) ) {
+        param.block.y = arg.Ls; // Ls must be contained in the block
+        param.grid.y = 1;
+        param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y*param.block.z;
+      }
+    }
+
+    void defaultTuneParam(TuneParam &param) const {
+      TunableVectorYZ::defaultTuneParam(param);
+      if ( shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS) ) {
+        param.block.y = arg.Ls; // Ls must be contained in the block
+        param.grid.y = 1;
+        param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y*param.block.z;
       }
     }
 
