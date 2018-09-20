@@ -18,7 +18,7 @@ namespace quda {
   // [G(n)^T . A]_{J(n)_k, j} = C(n)_k * A_{k,j}
   // [A . G(n)  ]_{i, J(n)_k} = A_{i,k} * C(n)_k
   // [A . G(n)^T]_{i,      j} = A_{i,J(n)_j} * C(n)_j
-  inline __device__ QC_REAL gamma_left_coeff_Re(int m, int n, int c){
+  inline __device__ __host__ QC_REAL gamma_left_coeff_Re(int m, int n, int c){
     CONSTVAR_ QC_REAL gamma_left_coeff_Re_[QC_LEN_G][QC_Ns][2] = {
       { {1,0}, {1,0}, {1,0}, {1,0} },             /* G0 = 1 */
       { {0,1}, {0,1},{0,-1},{0,-1} },             /* G1 = g1 */
@@ -40,7 +40,7 @@ namespace quda {
     return gamma_left_coeff_Re_[m][n][c];
   }
 
-  inline __device__ int gamma_left_ind(int m, int n){
+  inline __device__ __host__ int gamma_left_ind(int m, int n){
     CONSTVAR_ int gamma_left_ind_[QC_LEN_G][QC_Ns] = {
       { 0, 1, 2, 3 },             /* G0 = 1 */
       { 3, 2, 1, 0 },             /* G1 = g1 */
@@ -64,47 +64,11 @@ namespace quda {
 
 
   QC_REAL gamma_left_coeff_Re_cMem(int m, int n, int c){
-    CONSTVAR_ QC_REAL gamma_left_coeff_Re_[QC_LEN_G][QC_Ns][2] = {
-      { {1,0}, {1,0}, {1,0}, {1,0} },             /* G0 = 1 */
-      { {0,1}, {0,1},{0,-1},{0,-1} },             /* G1 = g1 */
-      {{-1,0}, {1,0}, {1,0},{-1,0} },             /* G2 = g2 */
-      {{0,-1}, {0,1},{0,-1}, {0,1} },             /* G3 = g1 g2 */
-      { {0,1},{0,-1},{0,-1}, {0,1} },             /* G4 = g3 */
-      {{-1,0}, {1,0},{-1,0}, {1,0} },             /* G5 = g1 g3 */
-      {{0,-1},{0,-1},{0,-1},{0,-1} },             /* G6 = g2 g3 */
-      { {1,0}, {1,0},{-1,0},{-1,0} },             /* G7 = g1 g2 g3 */
-      { {1,0}, {1,0}, {1,0}, {1,0} },             /* G8 = g4 */
-      { {0,1}, {0,1},{0,-1},{0,-1} },             /* G9 = g1 g4 */
-      {{-1,0}, {1,0}, {1,0},{-1,0} },             /* G10= g2 g4 */
-      {{0,-1}, {0,1},{0,-1}, {0,1} },             /* G11= g1 g2 g4 */
-      { {0,1},{0,-1},{0,-1}, {0,1} },             /* G12= g3 g4 */
-      {{-1,0}, {1,0},{-1,0}, {1,0} },             /* G13= g1 g3 g4 */
-      {{0,-1},{0,-1},{0,-1},{0,-1} },             /* G14= g2 g3 g4 */
-      { {1,0}, {1,0},{-1,0},{-1,0} },             /* G15= g1 g2 g3 g4 */
-    };
-    return gamma_left_coeff_Re_[m][n][c];
+    return gamma_left_coeff_Re(m,n,c);
   }
 
   int gamma_left_ind_cMem(int m, int n){
-    CONSTVAR_ int gamma_left_ind_[QC_LEN_G][QC_Ns] = {
-      { 0, 1, 2, 3 },             /* G0 = 1 */
-      { 3, 2, 1, 0 },             /* G1 = g1 */
-      { 3, 2, 1, 0 },             /* G2 = g2 */
-      { 0, 1, 2, 3 },             /* G3 = g1 g2 */
-      { 2, 3, 0, 1 },             /* G4 = g3 */
-      { 1, 0, 3, 2 },             /* G5 = g1 g3 */
-      { 1, 0, 3, 2 },             /* G6 = g2 g3 */
-      { 2, 3, 0, 1 },             /* G7 = g1 g2 g3 */
-      { 2, 3, 0, 1 },             /* G8 = g4 */
-      { 1, 0, 3, 2 },             /* G9 = g1 g4 */
-      { 1, 0, 3, 2 },             /* G10= g2 g4 */
-      { 2, 3, 0, 1 },             /* G11= g1 g2 g4 */
-      { 0, 1, 2, 3 },             /* G12= g3 g4 */
-      { 3, 2, 1, 0 },             /* G13= g1 g3 g4 */
-      { 3, 2, 1, 0 },             /* G14= g2 g3 g4 */
-      { 0, 1, 2, 3 },             /* G15= g1 g2 g3 g4 */
-    };
-    return gamma_left_ind_[m][n];
+    return gamma_left_ind(m,n);
   }
 
 
