@@ -105,8 +105,8 @@ namespace quda {
           for (int s=0; s<Ls; s++) {
             c_5[s] = 0.5 / ( 1.0 + k * m_f );
 
-            a_5[s] = 0.5 * (b_5_[s] * (m_5 + 4.0) + 1.0);
-            a_5[s]*= a_5[s] * static_cast<real>(a);
+            a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
+            a_5[s] *= a_5[s] * static_cast<real>(a);
           }
         }
         break;
@@ -300,6 +300,31 @@ namespace quda {
     VectorCache<real,Vector> cache;
     if (shared) cache.save(arg.in(s_*arg.volume_4d_cb + x_cb, parity));
 
+#if 0
+    int s = s_;
+    //real R = inv_d_n * 1.0;
+    //real L = inv_d_n * 1.0;
+    for (int s_count = 0; s_count<arg.Ls; s_count++) {
+
+      Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s*arg.volume_4d_cb + x_cb, parity);
+
+      {
+        int exp = (arg.Ls - s_count) % arg.Ls; //s_ < s ? arg.Ls-s+s_ : s_-s;
+        real factorR = inv_d_n * __fast_pow(k,exp) * ( s_ < s ? -arg.m_f : static_cast<real>(1.0) );
+        constexpr int proj_dir = dagger ? -1 : +1;
+        out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+      }
+
+      {
+        int exp = s_count;//s_ > s ? arg.Ls-s_+s : s-s_;
+        real factorL = inv_d_n * __fast_pow(k,exp) * ( s_ > s ? -arg.m_f : static_cast<real>(1.0));
+        constexpr int proj_dir = dagger ? +1 : -1;
+        out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+      }
+
+      s = (s + 1)%arg.Ls;
+    }
+#else
     for (int s=0; s<arg.Ls; s++) {
 
       Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s*arg.volume_4d_cb + x_cb, parity);
@@ -319,6 +344,7 @@ namespace quda {
       }
 
     }
+#endif
 
     if (xpay) {
       Vector x = arg.x(s_*arg.volume_4d_cb + x_cb, parity);

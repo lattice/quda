@@ -1029,9 +1029,10 @@ namespace quda {
     ColorSpinor<Float,Nc,Ns> operator*(const HMatrix<Float,Nc*Ns> &A, const ColorSpinor<Float,Nc,Ns> &x) {
 
     ColorSpinor<Float,Nc,Ns> y;
+    constexpr int N = Nc*Ns;
 
 #pragma unroll
-    for (int i=0; i<A.n; i++) {
+    for (int i=0; i<N; i++) {
       if (i==0) {
 	y.data[i].x  = A(i,0).real() * x.data[0].real();
 	y.data[i].y  = A(i,0).real() * x.data[0].imag();
@@ -1042,7 +1043,7 @@ namespace quda {
 	y.data[i].y += A(i,0).imag() * x.data[0].real();
       }
 #pragma unroll
-      for (int j=1; j<A.n; j++) {
+      for (int j=1; j<N; j++) {
 	if (i==j) {
 	  y.data[i].x += A(i,j).real() * x.data[j].real();
 	  y.data[i].y += A(i,j).real() * x.data[j].imag();
