@@ -65,6 +65,7 @@ namespace quda {
     flops += 72LL*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
   }
 
+  // Unlike DWF-4d, the Mobius variant here applies the full M5 operator and not just D5
   void DiracMobius::Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkDWF(in, out);
@@ -256,7 +257,7 @@ namespace quda {
     Complex zb_5[QUDA_MAX_DWF_LS];
     Complex zc_5[QUDA_MAX_DWF_LS];
     for (int i=0; i<Ls; i++) { zb_5[i] = b_5[i]; zc_5[i] = c_5[i]; }
-    ApplyDslash5(out, in, in, mass, m5, zb_5, zc_5, k, dagger, M5_INV_MOBIUS);
+    ApplyDslash5(out, in, x, mass, m5, zb_5, zc_5, k, dagger, M5_INV_MOBIUS);
 #else
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),

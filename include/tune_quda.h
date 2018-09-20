@@ -122,7 +122,8 @@ namespace quda {
 
       param.block.x += blockStep();
       int nthreads = param.block.x*param.block.y*param.block.z;
-      if (param.block.x > max_threads || sharedBytesPerThread()*nthreads > max_shared) {
+      if (param.block.x > max_threads || sharedBytesPerThread()*nthreads > max_shared ||
+          sharedBytesPerBlock(param) > max_shared) {
 	resetBlockDim(param);
 	ret = false;
       } else {
@@ -177,8 +178,8 @@ namespace quda {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
 	  int nthreads = next.block.x * next.block.y * next.block.z;
-	  param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-	    sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+	  param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(next) ?
+	    sharedBytesPerThread()*nthreads : sharedBytesPerBlock(next);
 	  return false;
 	} else {
 	  return true;
