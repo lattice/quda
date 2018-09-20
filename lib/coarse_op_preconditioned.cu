@@ -7,6 +7,8 @@
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
+
   template <typename PreconditionedGauge, typename Gauge, int n>
   struct CalculateYhatArg {
     PreconditionedGauge Yhat;
@@ -285,8 +287,12 @@ namespace quda {
     }
   }
 
+#endif
+
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
+
+#ifdef GPU_MULTIGRID
     QudaPrecision precision = checkPrecision(Xinv, Y, X);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Yhat field......\n");
 
@@ -314,6 +320,9 @@ namespace quda {
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Yhat field\n");
+#else
+      errorQuda("Multigrid has not been built");
+#endif
   }
 
 } //namespace quda
