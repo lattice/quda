@@ -770,8 +770,6 @@ namespace quda {
     checkCudaError();
     cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
     checkCudaError();
-
-    if(qcs->iStep == 1) qcCopyGammaToConstMem();
     
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
     double t1; 

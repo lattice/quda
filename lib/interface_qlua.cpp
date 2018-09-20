@@ -1363,8 +1363,7 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   //-------------------------------------------------------------
 
   //- Copy the gamma matrix related objects to __constant__ GPU memory
-  //- CK-TODO: Comment for now, it would be better if called here
-  //  qcCopyGammaToConstMem();
+  qcCopyGammaToConstMem();
 
 
   printfQuda("%s: Final Memory Report (after memory allocations):\n", func_name);
@@ -1480,9 +1479,12 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   int b_reset = 0;
 
   //- b_lpath: increment or reset?
+  double t20 = MPI_Wtime();
   if( 0 < cur_blen && string_prefix(qcs->b_lpath, b_lpath) ){
     b_lpath_inc = b_lpath + cur_blen;
     b_lpath_ptr = qcs->b_lpath + cur_blen;
+    double t21 = MPI_Wtime();
+    printfQuda("TIMING - %s: b_path increment done in %f sec.\n", func_name, t21-t20);
   }
   else{
     b_reset = 1;
@@ -1493,6 +1495,8 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     qcCPUtoCudaProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
     qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b, qcs->qcR);       //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
     qcCopyExtendedGaugeField(qcs->bsh_u, qcs->gf_u, qcs->qcR);   //- (re)set qcs->bsh_u to qcs->gf_u
+    double t21 = MPI_Wtime();
+    printfQuda("TIMING - %s: b_path reset done in %f sec.\n", func_name, t21-t20);
   }
 
   /* build up b_lpath */
@@ -1531,9 +1535,12 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   *b_lpath_ptr = '\0';
 
   /* v_lpath: increment or reset? */
+  double t22 = MPI_Wtime();
   if( !b_reset && 0 < cur_vlen && string_prefix(qcs->v_lpath, v_lpath) ){
     v_lpath_inc = v_lpath + cur_vlen;
     v_lpath_ptr = qcs->v_lpath + cur_vlen;
+    double t23 = MPI_Wtime();
+    printfQuda("TIMING - %s: v_path incerement done in %f sec.\n", func_name, t23-t22);
   }
   else{
     v_lpath_inc = v_lpath;
@@ -1542,6 +1549,8 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
 
     //- (re)set qcs->wlinks[i_wl_vbv] {Wvbv} to qcs->wlinks[i_wl_b] {Wb}
     qcCopyCudaLink(qcs->wlinks, qcs->i_wl_vbv, qcs->wlinks, qcs->i_wl_b, qcs->qcR);
+    double t23 = MPI_Wtime();
+    printfQuda("TIMING - %s: v_path reset done in %f sec.\n", func_name, t23-t22);
   }
 
   /* build up v_lpath */
@@ -1584,6 +1593,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
 
   //-- Copy the position space correlator back to CPU if required
   if(qcs->push_res){
+    double t24 = MPI_Wtime();
     LONG_T lV = qcs->paramAPI.mpParam.locvol;
     int Ndata = qcs->paramAPI.mpParam.Ndata;
     size_t corrByteSize = sizeof(complex<QUDA_REAL>) * lV * Ndata;
@@ -1592,7 +1602,8 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     cudaMemcpy(corrQuda, qcs->corrQuda_dev, corrByteSize, cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     checkCudaError();
-    printfQuda("%s: Position-space correlator copied to CPU.\n", func_name);
+    double t25 = MPI_Wtime();
+    printfQuda("%s: Position-space correlator copied to CPU in %f sec.\n", func_name, t25-t24);
   }
 
   saveTuneCache();
