@@ -599,8 +599,8 @@ static void setInvertParams(const int dim[4],
   invertParam->cuda_prec = cuda_prec;
   invertParam->cuda_prec_sloppy = cuda_prec_sloppy;
 
-  invertParam->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-  invertParam->solve_type = QUDA_NORMEQ_PC_SOLVE;
+  invertParam->solution_type = QUDA_MATPC_SOLUTION;
+  invertParam->solve_type = QUDA_DIRECT_PC_SOLVE;
   invertParam->preserve_source = QUDA_PRESERVE_SOURCE_YES;
   invertParam->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not used, but required by the code.
   invertParam->dirac_order = QUDA_DIRAC_ORDER;
@@ -1280,7 +1280,6 @@ void qudaEigCGInvert(int external_precision,
   QudaEigParam  df_param = newQudaEigParam();
   df_param.invert_param = &invertParam;
 
-  invertParam.solve_type = QUDA_NORMOP_PC_SOLVE;
   invertParam.nev                = eig_args.nev;
   invertParam.max_search_dim     = eig_args.max_search_dim;
   invertParam.deflation_grid     = eig_args.deflation_grid;

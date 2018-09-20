@@ -9,7 +9,7 @@
 #include "misc.h"
 #include <string.h>
 
-#include "llfat_reference.h"
+#include <llfat_reference.h>
 
 #include <quda_internal.h>
 #include <complex>
@@ -809,6 +809,9 @@ llfat_reference_mg(void** fatlink, void** sitelink, void** ghost_sitelink,
 
 }
 
+
+#endif
+
 // CPU-style BLAS routines
 void cpu_axy(QudaPrecision prec, double a, void* x, void* y, int size)
 {
@@ -1318,5 +1321,3 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
 
 }
 
-
-#endif

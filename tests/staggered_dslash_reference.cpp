@@ -44,7 +44,7 @@ void display_link_internal(Float* link)
 
 template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink, sFloat *spinorField, 
-		     int oddBit, int daggerBit) 
+		     int oddBit, int daggerBit, bool isLaplace) 
 {
   const int nSrc = Ls; // Ls should already be set
 
@@ -67,25 +67,33 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink, sFloat *s
       int offset = mySpinorSiteSize*sid;
 
       for (int dir = 0; dir < 8; dir++) {
-	gFloat* fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
-	gFloat* longlnk = gaugeLink(i, dir, oddBit, longlinkEven, longlinkOdd, 3);
+        gFloat* fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
+        gFloat* longlnk = gaugeLink(i, dir, oddBit, longlinkEven, longlinkOdd, 3);
 
-	sFloat *first_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 1, mySpinorSiteSize);
-	sFloat *third_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 3, mySpinorSiteSize);
+        sFloat *first_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 1, mySpinorSiteSize);
+        sFloat *third_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 3, mySpinorSiteSize);
 
-	sFloat gaugedSpinor[mySpinorSiteSize];
+        sFloat gaugedSpinor[mySpinorSiteSize];
 
-	if (dir % 2 == 0){
-	  su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
-	  sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
-	  su3Mul(gaugedSpinor, longlnk, third_neighbor_spinor);
-	  sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
-	} else {
-	  su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
-	  sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
-	  su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
-	  sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
-	}
+        if (dir % 2 == 0){
+          su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+          sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          su3Mul(gaugedSpinor, longlnk, third_neighbor_spinor);
+          sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+        } else {
+          su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+          if (isLaplace) {
+            sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          } else {
+            sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          }
+          su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
+          if (isLaplace) {
+            sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          } else {
+            sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          }
+        }
       }
 
       if (daggerBit) negx(&res[offset], mySpinorSiteSize);
@@ -98,20 +106,20 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink, sFloat *s
 
 
 void staggered_dslash(void *res, void **fatlink, void** longlink, void *spinorField, int oddBit, int daggerBit,
-		      QudaPrecision sPrecision, QudaPrecision gPrecision) {
+		      QudaPrecision sPrecision, QudaPrecision gPrecision, bool isLaplace) {
     
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION){
-      dslashReference((double*)res, (double**)fatlink, (double**)longlink, (double*)spinorField, oddBit, daggerBit);
+      dslashReference((double*)res, (double**)fatlink, (double**)longlink, (double*)spinorField, oddBit, daggerBit, isLaplace);
     }else{
-      dslashReference((double*)res, (float**)fatlink, (float**)longlink, (double*)spinorField, oddBit, daggerBit);
+      dslashReference((double*)res, (float**)fatlink, (float**)longlink, (double*)spinorField, oddBit, daggerBit, isLaplace);
     }
   }
   else{
     if (gPrecision == QUDA_DOUBLE_PRECISION){
-      dslashReference((float*)res, (double**)fatlink, (double**)longlink, (float*)spinorField, oddBit, daggerBit);
+      dslashReference((float*)res, (double**)fatlink, (double**)longlink, (float*)spinorField, oddBit, daggerBit, isLaplace);
     }else{
-      dslashReference((float*)res, (float**)fatlink, (float**)longlink, (float*)spinorField, oddBit, daggerBit);
+      dslashReference((float*)res, (float**)fatlink, (float**)longlink, (float*)spinorField, oddBit, daggerBit, isLaplace);
     }
   }
 }
@@ -128,8 +136,8 @@ void Mat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat ka
   sFloat *outOdd = out + Vh*mySpinorSiteSize;
     
   // full dslash operator
-  dslashReference(outOdd, fatlink, longlink, inEven, 1, daggerBit);
-  dslashReference(outEven, fatlink, longlink, inOdd, 0, daggerBit);
+  dslashReference(outOdd, fatlink, longlink, inEven, 1, daggerBit, false);
+  dslashReference(outEven, fatlink, longlink, inOdd, 0, daggerBit, false);
     }
 
 
@@ -170,8 +178,8 @@ Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat m
     {
       sFloat *inEven = in;
       sFloat *outEven = out;
-      dslashReference(tmp, fatlink, longlink, inEven, 1, daggerBit);
-      dslashReference(outEven, fatlink, longlink, tmp, 0, daggerBit);
+      dslashReference(tmp, fatlink, longlink, inEven, 1, daggerBit, false);
+      dslashReference(outEven, fatlink, longlink, tmp, 0, daggerBit, false);
 	    
       // lastly apply the mass term
       axmy(inEven, msq_x4, outEven, Ls*Vh*mySpinorSiteSize);
@@ -181,8 +189,8 @@ Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat m
     {
       sFloat *inOdd = in;
       sFloat *outOdd = out;
-      dslashReference(tmp, fatlink, longlink, inOdd, 0, daggerBit);
-      dslashReference(outOdd, fatlink, longlink, tmp, 1, daggerBit);
+      dslashReference(tmp, fatlink, longlink, inOdd, 0, daggerBit, false);
+      dslashReference(outOdd, fatlink, longlink, tmp, 1, daggerBit, false);
 	    
       // lastly apply the mass term
       axmy(inOdd, msq_x4, outOdd, Ls*Vh*mySpinorSiteSize);
@@ -230,11 +238,11 @@ static void MatPC(sFloat *outEven, gFloat **fatlink, gFloat** longlink, sFloat *
     
   // full dslash operator
   if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-    dslashReference(tmp, fatlink, longlink, inEven, 1, dagger);
-    dslashReference(outEven, fatlink, longlink, tmp, 0, dagger);
+    dslashReference(tmp, fatlink, longlink, inEven, 1, dagger, false);
+    dslashReference(outEven, fatlink, longlink, tmp, 0, dagger, false);
   } else {
-    dslashReference(tmp, fatlink, longlink, inEven, 0, dagger);
-    dslashReference(outEven, fatlink, longlink, tmp, 1, dagger);
+    dslashReference(tmp, fatlink, longlink, inEven, 0, dagger, false);
+    dslashReference(outEven, fatlink, longlink, tmp, 1, dagger, false);
   }    
   
   free(tmp);
@@ -272,7 +280,7 @@ template <typename sFloat, typename gFloat>
 void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** longlink, 
 			    gFloat** ghostFatlink, gFloat** ghostLonglink,
 			    sFloat *spinorField, sFloat** fwd_nbr_spinor, 
-			    sFloat** back_nbr_spinor, int oddBit, int daggerBit, int nSrc)
+			    sFloat** back_nbr_spinor, int oddBit, int daggerBit, int nSrc, bool isLaplace)
 {
   for (int i=0; i<Vh*mySpinorSiteSize*nSrc; i++) res[i] = 0.0;
 
@@ -300,25 +308,33 @@ void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** longlink,
       int offset = mySpinorSiteSize*sid;
 
       for (int dir = 0; dir < 8; dir++) {
-	gFloat* fatlnk = gaugeLink_mg4dir(i, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
-	gFloat* longlnk = gaugeLink_mg4dir(i, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3);
-	
-	sFloat *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, 3, mySpinorSiteSize);
-	sFloat *third_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, 3, mySpinorSiteSize);
+        gFloat* fatlnk = gaugeLink_mg4dir(i, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
+        gFloat* longlnk = gaugeLink_mg4dir(i, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3);
 
-	sFloat gaugedSpinor[mySpinorSiteSize];
+        sFloat *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, 3, mySpinorSiteSize);
+        sFloat *third_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, 3, mySpinorSiteSize);
 
-	if (dir % 2 == 0){
-	  su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
-	  sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
-	  su3Mul(gaugedSpinor, longlnk, third_neighbor_spinor);
-	  sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
-	} else {
-	  su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
-	  sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
-	  su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
-	  sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
-	}
+        sFloat gaugedSpinor[mySpinorSiteSize];
+
+        if (dir % 2 == 0){
+          su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+          sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          su3Mul(gaugedSpinor, longlnk, third_neighbor_spinor);
+          sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+        } else {
+          su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+          if (isLaplace) {
+            sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          } else {
+            sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          }
+          su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
+          if (isLaplace) {
+            sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          } else {
+            sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+          }
+        }
       }
 
       if (daggerBit) negx(&res[offset], mySpinorSiteSize);
@@ -331,7 +347,7 @@ void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** longlink,
 
 void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink, 
 			     void** ghost_longlink, cpuColorSpinorField* in, int oddBit, int daggerBit, 
-			     QudaPrecision sPrecision, QudaPrecision gPrecision)
+			     QudaPrecision sPrecision, QudaPrecision gPrecision, bool isLaplace)
 {
   const int nSrc = in->X(4);
 
@@ -353,18 +369,18 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
       dslashReference_mg4dir((double*)out->V(), (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
-			     (double*)in->V(), (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit, nSrc);
+			     (double*)in->V(), (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit, nSrc, isLaplace);
     } else {
       dslashReference_mg4dir((double*)out->V(), (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
-			     (double*)in->V(), (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit, nSrc);
+			     (double*)in->V(), (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit, nSrc, isLaplace);
       }
   } else {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
       dslashReference_mg4dir((float*)out->V(), (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
-			     (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit, nSrc);
+			     (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit, nSrc, isLaplace);
     } else {
       dslashReference_mg4dir((float*)out->V(), (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
-			     (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit, nSrc);
+			     (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit, nSrc, isLaplace);
     }
   }
   

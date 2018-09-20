@@ -1,8 +1,8 @@
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <string.h>
 #include <sys/time.h>
 
 #include <quda.h>
@@ -346,7 +346,7 @@ typedef struct {
  */
 static int lex_rank_from_coords(const int *coords, void *fdata)
 {
-  LexMapData *md = static_cast<LexMapData *>(fdata);
+  auto *md = static_cast<LexMapData *>(fdata);
 
   int rank = coords[0];
   for (int i = 1; i < md->ndim; i++) {
@@ -682,7 +682,7 @@ static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, Tim
   gParamEx.tadpole = in.Tadpole();
   for (int d=0; d<4; d++) gParamEx.r[d] = R[d];
 
-  cudaGaugeField *out = new cudaGaugeField(gParamEx);
+  auto *out = new cudaGaugeField(gParamEx);
 
   // copy input field into the extended device gauge field
   copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
@@ -968,6 +968,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
+  checkInvertParam(inv_param);
+
   if (!initialized) errorQuda("QUDA not initialized");
 
   if ( (!h_clover && !h_clovinv) || inv_param->compute_clover ) {
@@ -1109,7 +1111,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       hack = new cudaCloverField(clover_param);
       hack->copy(*cloverPrecise); // FIXME this can lead to an redundant copies if we're not copying back direct + inverse
     } else {
-      cudaCloverField *hackOfTheHack = new cudaCloverField(clover_param);	// Hack of the hack
+      auto *hackOfTheHack = new cudaCloverField(clover_param);	// Hack of the hack
       hackOfTheHack->copy(*cloverPrecise, false);
       cloverInvert(*hackOfTheHack, inv_param->compute_clover_trlog, QUDA_CUDA_FIELD_LOCATION);
       if (inv_param->compute_clover_trlog) {
@@ -1147,7 +1149,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void freeSloppyCloverQuda(void);
+void freeSloppyCloverQuda();
 
 void loadSloppyCloverQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondition, QudaPrecision prec_refinement_sloppy)
 {
@@ -1190,18 +1192,17 @@ void loadSloppyCloverQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondi
 
     // create the mirror preconditioner clover field
     if (clover_param.Precision() != cloverSloppy->Precision()) {
-      cloverPrecondition = new cudaCloverField(clover_param);
-      cloverPrecondition->copy(*cloverSloppy, clover_param.inverse);
+      cloverRefinement = new cudaCloverField(clover_param);
+      cloverRefinement->copy(*cloverSloppy, clover_param.inverse);
     } else {
-      cloverPrecondition = cloverSloppy;
+      cloverRefinement = cloverSloppy;
     }
-
   }
 
 }
 
 // just free the sloppy fields used in mixed-precision solvers
-void freeSloppyGaugeQuda(void)
+void freeSloppyGaugeQuda()
 {
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecondition != gaugeRefinement && gaugeRefinement) delete gaugeRefinement;
@@ -1370,10 +1371,10 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
   }
 }
 
-void freeSloppyCloverQuda(void)
+void freeSloppyCloverQuda()
 {
   if (!initialized) errorQuda("QUDA not initialized");
-  if (cloverRefinement != cloverPrecondition && cloverRefinement) delete cloverRefinement;
+  if (cloverRefinement != cloverSloppy && cloverRefinement) delete cloverRefinement;
   if (cloverPrecondition != cloverSloppy && cloverPrecondition) delete cloverPrecondition;
   if (cloverSloppy != cloverPrecise && cloverSloppy) delete cloverSloppy;
   
@@ -1793,7 +1794,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
@@ -1881,7 +1882,7 @@ void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
@@ -1952,7 +1953,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
@@ -2173,15 +2174,17 @@ void checkClover(QudaInvertParam *param) {
     errorQuda("Solve precision %d doesn't match clover precision %d", param->cuda_prec, cloverPrecise->Precision());
   }
 
-  if ((!cloverSloppy || param->cuda_prec_sloppy != cloverSloppy->Precision()) ||
-      (!cloverPrecondition || param->cuda_prec_precondition != cloverPrecondition->Precision())) {
+  if ( (!cloverSloppy || param->cuda_prec_sloppy != cloverSloppy->Precision()) ||
+       (!cloverPrecondition || param->cuda_prec_precondition != cloverPrecondition->Precision()) ||
+       (!cloverRefinement || param->cuda_prec_refinement_sloppy != cloverRefinement->Precision()) ) {
     freeSloppyCloverQuda();
     loadSloppyCloverQuda(param->cuda_prec_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy);
   }
 
-  if (cloverPrecise == nullptr) errorQuda("Precise gauge field doesn't exist");
-  if (cloverSloppy == nullptr) errorQuda("Sloppy gauge field doesn't exist");
-  if (cloverPrecondition == nullptr) errorQuda("Precondition gauge field doesn't exist");
+  if (cloverPrecise == nullptr) errorQuda("Precise clover field doesn't exist");
+  if (cloverSloppy == nullptr) errorQuda("Sloppy clover field doesn't exist");
+  if (cloverPrecondition == nullptr) errorQuda("Precondition clover field doesn't exist");
+  if (cloverRefinement == nullptr) errorQuda("Refinement clover field doesn't exist");
 }
 
 quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
@@ -2248,7 +2251,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   if ((inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) && (inv_param->dslash_type != QUDA_TWISTED_CLOVER_DSLASH))
     errorQuda("Cannot apply the clover term for a non Wilson-clover or Twisted-mass-clover dslash");
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true);
 
   ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) :
@@ -2463,8 +2466,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
 
-  cudaGaugeField *cudaGauge = checkGauge(param);
   checkMultigridParam(&mg_param);
+  cudaGaugeField *cudaGauge = checkGauge(param);
 
   // check MG params (needs to go somewhere else)
   if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
@@ -2514,7 +2517,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating vector of nullptr space fields of length %d\n", mg_param.n_vec[0]);
 
-  ColorSpinorParam csParam(0, *param, cudaGauge->X(), pc_solution, mg_param.setup_location[0]);
+  ColorSpinorParam csParam(nullptr, *param, cudaGauge->X(), pc_solution, mg_param.setup_location[0]);
   csParam.create = QUDA_NULL_FIELD_CREATE;
   QudaPrecision Bprec = mg_param.precision_null[0];
   Bprec = (mg_param.setup_location[0] == QUDA_CPU_FIELD_LOCATION && Bprec < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : Bprec);
@@ -2541,7 +2544,7 @@ void* newMultigridQuda(QudaMultigridParam *mg_param) {
   pushVerbosity(mg_param->invert_param->verbosity);
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-  multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
+  auto *mg = new multigrid_solver(*mg_param, profileInvert);
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
   saveTuneCache();
@@ -2565,11 +2568,10 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
   profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-  multigrid_solver *mg = static_cast<multigrid_solver*>(mg_);
+  auto *mg = static_cast<multigrid_solver*>(mg_);
   checkMultigridParam(mg_param);
 
   QudaInvertParam *param = mg_param->invert_param;
-  checkInvertParam(param);
   // check the gauge fields have been created and set the precision as needed
   checkGauge(param);
 
@@ -2664,7 +2666,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   d = Dirac::create(diracParam);
   m = pc_solve ? static_cast<DiracMatrix*>( new DiracMdagM(*d) ) : static_cast<DiracMatrix*>( new DiracM(*d));
 
-  ColorSpinorParam ritzParam(0, *param, cudaGauge->X(), pc_solve, eig_param.location);
+  ColorSpinorParam ritzParam(nullptr, *param, cudaGauge->X(), pc_solve, eig_param.location);
 
   ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
   ritzParam.is_composite  = true;
@@ -2708,7 +2710,7 @@ void* newDeflationQuda(QudaEigParam *eig_param) {
 #ifdef MAGMA_LIB
   openMagma();
 #endif
-  deflated_solver *defl = new deflated_solver(*eig_param, profileInvert);
+  auto *defl = new deflated_solver(*eig_param, profileInvert);
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
@@ -3272,7 +3274,7 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTOP(QUDA_PROFILE_H2D);
 
-  double * nb = new double[param->num_src];
+  auto * nb = new double[param->num_src];
   for(int i=0; i < param->num_src; i++) {
     nb[i] = blas::norm2(b->Component(i));
     printfQuda("Source %i: CPU = %g, CUDA copy = %g\n", i, nb[i], nb[i]);
@@ -3468,9 +3470,13 @@ for(int i=0; i < param->num_src; i++) {
  * Generic version of the multi-shift solver. Should work for
  * most fermions. Note that offset[0] is not folded into the mass parameter.
  *
- * At present, the solution_type must be MATDAG_MAT or MATPCDAG_MATPC,
- * and solve_type must be NORMOP or NORMOP_PC.  The solution and solve
+ * For Wilson-type fermions, the solution_type must be MATDAG_MAT or MATPCDAG_MATPC,
+ * and solve_type must be NORMOP or NORMOP_PC. The solution and solve
  * preconditioning have to match.
+ * 
+ * For Staggered-type fermions, the solution_type must be MATPC, and the
+ * solve type must be DIRECT_PC. This difference in convention is because
+ * preconditioned staggered operator is normal, unlike with Wilson-type fermions.
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
@@ -3501,17 +3507,32 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
-  if (mat_solution) {
-    errorQuda("Multi-shift solver does not support MAT or MATPC solution types");
-  }
-  if (direct_solve) {
-    errorQuda("Multi-shift solver does not support DIRECT or DIRECT_PC solve types");
-  }
-  if (pc_solution & !pc_solve) {
-    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
-  }
-  if (!pc_solution & pc_solve) {
-    errorQuda("In multi-shift solver, a preconditioned (PC) solve_type requires a PC solution_type");
+
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+
+    if (param->solution_type != QUDA_MATPC_SOLUTION) {
+      errorQuda("For Staggered-type fermions, multi-shift solver only suports MATPC solution type");
+    }
+
+    if (param->solve_type != QUDA_DIRECT_PC_SOLVE) {
+      errorQuda("For Staggered-type fermions, multi-shift solver only supports DIRECT_PC solve types");
+    }
+
+  } else { // Wilson type
+
+    if (mat_solution) {
+      errorQuda("For Wilson-type fermions, multi-shift solver does not support MAT or MATPC solution types");
+    }
+    if (direct_solve) {
+      errorQuda("For Wilson-type fermions, multi-shift solver does not support DIRECT or DIRECT_PC solve types");
+    }
+    if (pc_solution & !pc_solve) {
+      errorQuda("For Wilson-type fermions, preconditioned (PC) solution_type requires a PC solve_type");
+    }
+    if (!pc_solution & pc_solve) {
+      errorQuda("For Wilson-type fermions, in multi-shift solver, a preconditioned (PC) solve_type requires a PC solution_type");
+    }
   }
 
   // Timing and FLOP counters
@@ -3636,15 +3657,26 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   massRescale(*b, *param);
   profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
-  // use multi-shift CG
-  {
-    DiracMdagM m(dirac), mSloppy(diracSloppy);
-    SolverParam solverParam(*param);
-    MultiShiftCG cg_m(m, mSloppy, solverParam, profileMulti);
-    cg_m(x, *b, p, r2_old.get());
-    // cg_m(x, *b);
-    solverParam.updateInvertParam(*param);
-  }
+  DiracMatrix *m, *mSloppy;
+
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    m = new DiracM(dirac);
+    mSloppy = new DiracM(diracSloppy);
+  } else {
+    m = new DiracMdagM(dirac);
+    mSloppy = new DiracMdagM(diracSloppy);
+  } 
+
+
+  SolverParam solverParam(*param);
+  MultiShiftCG cg_m(*m, *mSloppy, solverParam, profileMulti);
+  cg_m(x, *b, p, r2_old.get());
+  // cg_m(x, *b);
+  solverParam.updateInvertParam(*param);
+
+  delete m;
+  delete mSloppy;
 
   if (param->compute_true_res) {
     // check each shift has the desired tolerance and use sequential CG to refine
@@ -3701,16 +3733,26 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     dirac.setMass(sqrt(param->offset[i]/4));
     diracSloppy.setMass(sqrt(param->offset[i]/4));
   }
-	DiracMdagM m(dirac), mSloppy(diracSloppy);
+
+  DiracMatrix *m, *mSloppy;
+
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    m = new DiracM(dirac);
+    mSloppy = new DiracM(diracSloppy);
+  } else {
+    m = new DiracMdagM(dirac);
+    mSloppy = new DiracMdagM(diracSloppy);
+  } 
 
 	// need to curry in the shift if we are not doing staggered
 	if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
 	    param->dslash_type != QUDA_STAGGERED_DSLASH) {
-	  m.shift = param->offset[i];
-	  mSloppy.shift = param->offset[i];
+	  m->shift = param->offset[i];
+	  mSloppy->shift = param->offset[i];
 	}
 
-	if (0) { // experimenting with Minimum residual extrapolation
+	if (false) { // experimenting with Minimum residual extrapolation
 	  // only perform MRE using current and previously refined solutions
 #ifdef REFINE_INCREASING_MASS
 	  const int nRefine = i+1;
@@ -3740,7 +3782,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	  bool orthogonal = true;
 	  bool apply_mat = true;
           bool hermitian = true;
-	  MinResExt mre(m, orthogonal, apply_mat, hermitian, profileMulti);
+	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
 	  blas::copy(tmp, *b);
 	  mre(*x[i], tmp, z, q);
 
@@ -3756,21 +3798,24 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
 	solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
 
-	CG cg(m, mSloppy, solverParam, profileMulti);
+	CG cg(*m, *mSloppy, solverParam, profileMulti);
   if(i==0) 
     cg(*x[i], *b, p[i], r2_old[i]);
   else
     cg(*x[i], *b);
   
-	solverParam.true_res_offset[i] = solverParam.true_res;
-	solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
-	solverParam.updateInvertParam(*param,i);
+  solverParam.true_res_offset[i] = solverParam.true_res;
+  solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
+  solverParam.updateInvertParam(*param,i);
 
-	if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
-	    param->dslash_type == QUDA_STAGGERED_DSLASH) {
-	  dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
-	  diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
-	}
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+      param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
+    diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
+  }
+
+  delete m;
+  delete mSloppy;
 
       }
     }
@@ -4103,7 +4148,7 @@ void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
 
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaGaugeField* cudaGauge = new cudaGaugeField(gParam);
+  auto* cudaGauge = new cudaGaugeField(gParam);
 
   if (gauge) {
     cudaGauge->loadCPUField(*cpuGauge);
@@ -4116,7 +4161,7 @@ void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
 
 void saveGaugeFieldQuda(void* gauge, void* inGauge, QudaGaugeParam* param){
 
-  cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
+  auto* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
 
   GaugeFieldParam gParam(gauge, *param, QUDA_GENERAL_LINKS);
   gParam.geometry = cudaGauge->Geometry();
@@ -4128,7 +4173,7 @@ void saveGaugeFieldQuda(void* gauge, void* inGauge, QudaGaugeParam* param){
 
 
 void destroyGaugeFieldQuda(void* gauge){
-  cudaGaugeField* g = reinterpret_cast<cudaGaugeField*>(gauge);
+  auto* g = reinterpret_cast<cudaGaugeField*>(gauge);
   delete g;
 }
 
@@ -4759,7 +4804,7 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.link_type = QUDA_SU3_LINKS;
   gParam.reconstruct = param->reconstruct;
   cudaGaugeField *cudaInGauge = !param->use_resident_gauge ? new cudaGaugeField(gParam) : nullptr;
-  cudaGaugeField *cudaOutGauge = new cudaGaugeField(gParam);
+  auto *cudaOutGauge = new cudaGaugeField(gParam);
 
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -5136,7 +5181,7 @@ void compute_gauge_force_quda_(void *mom, void *gauge, int *num_loop_types, doub
     errorQuda("Invalid num_loop_types = %d\n", *num_loop_types);
   }
 
-  double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
+  auto *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
   int *path_length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));
 
   if (*num_loop_types >= 1) for(int i= 0; i< 6; ++i) {
@@ -5165,9 +5210,9 @@ void compute_gauge_force_quda_(void *mom, void *gauge, int *num_loop_types, doub
 
   computeGaugeForceQuda(mom, gauge, input_path_buf, path_length, loop_coeff, numPaths, max_length, *dt, param);
 
-  for(int dir=0; dir<4; ++dir){
-    for(int i=0; i<numPaths; ++i) host_free(input_path_buf[dir][i]);
-    host_free(input_path_buf[dir]);
+  for(auto & dir : input_path_buf){
+    for(int i=0; i<numPaths; ++i) host_free(dir[i]);
+    host_free(dir);
   }
 
   host_free(path_length);
@@ -5313,7 +5358,7 @@ void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
   cudaGaugeField *data = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
   extendedGaugeResident = data;
 
-  cudaGaugeField* io_gauge = (cudaGaugeField*)resident_gauge;
+  auto* io_gauge = (cudaGaugeField*)resident_gauge;
 
   copyExtendedGauge(*io_gauge, *extendedGaugeResident, loc);
 
@@ -5347,7 +5392,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
     precise = gaugePrecise;
   }
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), 0, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
@@ -5404,7 +5449,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAPE);
 
   GaugeFieldParam gParam(*gaugeSmeared);
-  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
+  auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
@@ -5439,7 +5484,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAPE);
 
   GaugeFieldParam gParam(*gaugeSmeared);
-  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
+  auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
@@ -5474,7 +5519,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileAPE);
 
   GaugeFieldParam gParam(*gaugeSmeared);
-  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
+  auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
@@ -5511,7 +5556,7 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
 
   GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_INIT);
   GaugeFieldParam gParam(gauge, *param);
-  cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
+  auto *cpuGauge = new cpuGaugeField(gParam);
 
   //gParam.pad = getFatLinkPadding(param->X);
   gParam.create      = QUDA_NULL_FIELD_CREATE;
@@ -5519,7 +5564,7 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
   gParam.reconstruct = param->reconstruct;
   gParam.order       = (gParam.Precision() == QUDA_DOUBLE_PRECISION || gParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
-  cudaGaugeField *cudaInGauge = new cudaGaugeField(gParam);
+  auto *cudaInGauge = new cudaGaugeField(gParam);
 
   GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -5597,7 +5642,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_INIT);
 
   GaugeFieldParam gParam(gauge, *param);
-  cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
+  auto *cpuGauge = new cpuGaugeField(gParam);
 
   //gParam.pad = getFatLinkPadding(param->X);
   gParam.create      = QUDA_NULL_FIELD_CREATE;
@@ -5606,7 +5651,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   gParam.order       = (gParam.Precision() == QUDA_DOUBLE_PRECISION || gParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
 
-  cudaGaugeField *cudaInGauge = new cudaGaugeField(gParam);
+  auto *cudaInGauge = new cudaGaugeField(gParam);
 
 
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_INIT);
