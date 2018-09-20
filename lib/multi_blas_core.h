@@ -59,6 +59,27 @@ template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Fu
 	errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
       }
 
+    } else if (y[0]->Precision() == QUDA_QUARTER_PRECISION && x[0]->Precision() == QUDA_QUARTER_PRECISION) {
+
+      if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
+      if (x[0]->Nspin() == 4) { //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+  const int M = 6;
+  multiblasCuda<NXZ,float4,char4,char4,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+#else
+  errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+      } else if (x[0]->Nspin() == 1) {//staggered
+#ifdef GPU_STAGGERED_DIRAC
+  const int M = 3;
+  multiblasCuda<NXZ,float2,char2,char2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+#else
+  errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+      } else {
+  errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
+      }
+
     } else {
 
       errorQuda("Precision combination x=%d not supported\n", x[0]->Precision());

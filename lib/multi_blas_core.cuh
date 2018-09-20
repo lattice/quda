@@ -223,11 +223,11 @@ public:
   {
     // bytes for low-precision vector
     size_t base_bytes = arg.X[0].Precision()*vec_length<FloatN>::value*M;
-    if (arg.X[0].Precision() == QUDA_HALF_PRECISION) base_bytes += sizeof(float);
+    if (arg.X[0].Precision() == QUDA_HALF_PRECISION || arg.X[0].Precision() == QUDA_QUARTER_PRECISION) base_bytes += sizeof(float);
 
     // bytes for high precision vector
     size_t extra_bytes = arg.Y[0].Precision()*vec_length<FloatN>::value*M;
-    if (arg.Y[0].Precision() == QUDA_HALF_PRECISION) extra_bytes += sizeof(float);
+    if (arg.Y[0].Precision() == QUDA_HALF_PRECISION || arg.Y[0].Precision() == QUDA_QUARTER_PRECISION) extra_bytes += sizeof(float);
 
     // the factor two here assumes we are reading and writing to the high precision vector
     return ((arg.f.streams()-2)*base_bytes + 2*extra_bytes)*arg.length*nParity;
@@ -383,12 +383,12 @@ template <typename Float, typename yFloat, int nSpin, int nColor, QudaFieldOrder
 template <typename Float, typename yFloat, int nSpin, QudaFieldOrder order,
 	  typename write, typename Functor>
   void genericMultiBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
-  if (x.Ncolor() == 2) {
-    genericMultiBlas<Float,yFloat,nSpin,2,order,write,Functor>(x, y, z, w, f);
-  } else if (x.Ncolor() == 3) {
+if (x.Ncolor() == 3) {
     genericMultiBlas<Float,yFloat,nSpin,3,order,write,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 4) {
     genericMultiBlas<Float,yFloat,nSpin,4,order,write,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 6) { // free field Wilson
+    genericMultiBlas<Float,yFloat,nSpin,6,order,write,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 8) {
     genericMultiBlas<Float,yFloat,nSpin,8,order,write,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 12) {

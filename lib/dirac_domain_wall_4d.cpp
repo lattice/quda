@@ -24,9 +24,9 @@ namespace quda {
 
 // Modification for the 4D preconditioned domain wall operator
   void DiracDomainWall4DPC::Dslash4(ColorSpinorField &out, const ColorSpinorField &in, 
-                            const QudaParity parity) const
+                                    const QudaParity parity) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
@@ -38,15 +38,19 @@ namespace quda {
   }
 
   void DiracDomainWall4DPC::Dslash5(ColorSpinorField &out, const ColorSpinorField &in, 
-                            const QudaParity parity) const
+                                    const QudaParity parity) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
+#if 1
+    ApplyDslash5(out, in, in, mass, 0.0, nullptr, nullptr, 0.0, dagger, DSLASH5_DWF);
+#else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, 0, mass, 0, 0, commDim, 1, profile);
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -58,15 +62,17 @@ namespace quda {
   void DiracDomainWall4DPC::Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in,
 				       const QudaParity parity, const double &k) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
+#if 1
+    ApplyDslash5(out, in, in, mass, m5, nullptr, nullptr, 0.0, dagger, M5_INV_DWF);
+#else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, 0, mass, k, 0, commDim, 2, profile);
-
+#endif
   
     long long Ls = in.X(4);
     flops +=  144LL*(long long)in.Volume()*Ls + 3LL*Ls*(Ls-1LL);
@@ -77,8 +83,7 @@ namespace quda {
 					const QudaParity parity, const ColorSpinorField &x,
 					const double &k) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -94,14 +99,18 @@ namespace quda {
 					const QudaParity parity, const ColorSpinorField &x,
 					const double &k) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkDWF(out, in);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#if 1
+    ApplyDslash5(out, in, x, mass, 0.0, nullptr, nullptr, k, dagger, DSLASH5_DWF);
+#else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
 			 mass, k, 0, commDim, 1, profile);
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -113,15 +122,18 @@ namespace quda {
 					   const QudaParity parity, const double &a,
 					   const ColorSpinorField &x, const double &b) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
+    checkDWF(out, in);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#if 1
+    ApplyDslash5(out, in, x, mass, m5, nullptr, nullptr, b, dagger, M5_INV_DWF);
+#else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
 			 mass, a, b, commDim, 2, profile);
+#endif
 
     long long Ls = in.X(4);
     flops +=  (144LL*Ls + 48LL)*(long long)in.Volume() + 3LL*Ls*(Ls-1LL);

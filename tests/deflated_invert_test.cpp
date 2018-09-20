@@ -42,6 +42,7 @@ extern QudaPrecision  prec_ritz;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
+extern double kappa;
 extern double mu;
 extern double anisotropy;
 extern double tol; // tolerance for inverter
@@ -189,9 +190,13 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1 + 3/anisotropy);
+  }
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
@@ -423,9 +428,6 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
     
-  printfQuda("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
-	 inv_param.spinorGiB, gauge_param.gaugeGiB);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
   //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
   //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 

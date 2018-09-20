@@ -41,8 +41,10 @@ namespace quda {
   int LatticeField::bufferIndex = 0;
 
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
-    : nDim(field.Ndim()), pad(field.Pad()), precision(field.Precision()),
-      siteSubset(field.SiteSubset()), mem_type(field.MemType()), ghostExchange(field.GhostExchange())
+    : precision(field.Precision()), ghost_precision(field.Precision()),
+      nDim(field.Ndim()), pad(field.Pad()),
+      siteSubset(field.SiteSubset()), mem_type(field.MemType()),
+      ghostExchange(field.GhostExchange()), scale(field.Scale())
   {
     for(int dir=0; dir<nDim; ++dir) {
       x[dir] = field.X()[dir];
@@ -51,12 +53,14 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeFieldParam &param)
-    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
-      siteSubset(param.siteSubset), ghostExchange(param.ghostExchange), ghost_bytes(0),
-      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim),
+      precision(param.Precision()), ghost_precision(param.GhostPrecision()),
+      scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
+      ghost_bytes(0), ghost_bytes_old(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
+    precisionCheck();
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
@@ -83,6 +87,7 @@ namespace quda {
     case QUDA_DOUBLE_PRECISION:
     case QUDA_SINGLE_PRECISION:
     case QUDA_HALF_PRECISION:
+    case QUDA_QUARTER_PRECISION:
       break;
     default:
       errorQuda("Unknown precision %d", precision);
@@ -92,12 +97,15 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeField &field)
-    : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
-      siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
+    : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim),
+      precision(field.precision), ghost_precision(field.ghost_precision),
+      scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange),
+      ghost_bytes(0), ghost_bytes_old(0),
       ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
+    precisionCheck();
     for (int i=0; i<nDim; i++) {
       x[i] = field.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
@@ -187,7 +195,7 @@ namespace quda {
     initGhostFaceBuffer = false;
   }
 
-  void LatticeField::createComms(bool no_comms_fill)
+  void LatticeField::createComms(bool no_comms_fill, bool bidir)
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
@@ -212,10 +220,11 @@ namespace quda {
 	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
 
 	my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
+	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*ghost_precision;
       } // loop over b
 
-      offset += ghost_face_bytes[i];
+      // if not bidir then forwards and backwards will alias
+      if (bidir) offset += ghost_face_bytes[i];
 
       for (int b=0; b<2; ++b) {
 	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
@@ -225,7 +234,7 @@ namespace quda {
 	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
 
 	my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*precision;
+	from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*ghost_precision;
       } // loop over b
       offset += ghost_face_bytes[i];
 
@@ -438,20 +447,22 @@ namespace quda {
 
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
-	  comm_free(mh_send_p2p_fwd[b][dim]);
-	  comm_free(mh_recv_p2p_fwd[b][dim]);
-	  cudaEventDestroy(ipcCopyEvent[b][1][dim]);
-
-	  // only close this handle if it doesn't alias the back ghost
-	  if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+	  if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
+	  if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
+	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
+	    cudaEventDestroy(ipcCopyEvent[b][1][dim]);
+	    // only close this handle if it doesn't alias the back ghost
+	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+	  }
 	}
 
 	if (comm_peer2peer_enabled(0,dim)) {
-	  comm_free(mh_send_p2p_back[b][dim]);
-	  comm_free(mh_recv_p2p_back[b][dim]);
-	  cudaEventDestroy(ipcCopyEvent[b][0][dim]);
-
-	  cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+	  if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
+	  if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
+	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
+	    cudaEventDestroy(ipcCopyEvent[b][0][dim]);
+	    cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+	  }
 	}
       } // buffer
     } // iterate over dim
@@ -570,7 +581,9 @@ namespace quda {
       output << "x[" << i << "] = " << param.x[i] << std::endl;    
     }
     output << "pad = " << param.pad << std::endl;
-    output << "precision = " << param.precision << std::endl;
+    output << "precision = " << param.Precision() << std::endl;
+    output << "ghost_precision = " << param.GhostPrecision() << std::endl;
+    output << "scale = " << param.scale << std::endl;
 
     output << "ghostExchange = " << param.ghostExchange << std::endl;
     for (int i=0; i<param.nDim; i++) {

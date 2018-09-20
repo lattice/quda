@@ -1,10 +1,10 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_STANDARD 11)
+
 # disable in source builds
 # this is only a temporary fix, but for now we need it as cmake will
 # otherwise overwrite the existing makefiles
@@ -133,10 +133,14 @@ set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
 set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)")
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
+set(QUDA_NVML OFF CACHE BOOL "use NVML to report CUDA graphics driver version" )
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template for multi-blas /-reduce")
 set(QUDA_CTEST_SEP_DSLASH_POLICIES OFF CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
+set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
+set(QUDA_CXX_STANDARD 11 CACHE STRING "set the CXX Standard (11 or 14)")
+set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
 
 
 # NVTX options
@@ -151,6 +155,7 @@ set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
+
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
@@ -158,10 +163,13 @@ mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
+mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
+
+mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -170,6 +178,7 @@ mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
+mark_as_advanced(QUDA_CXX_STANDARD)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
@@ -222,7 +231,7 @@ include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 ## Now we hopefully found some way to get eigen to work
 
 
-
+set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 #define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
 "Flags used by the C++ compiler during regular development builds.")
@@ -307,11 +316,12 @@ if(QUDA_QMP)
     message( FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is set" )
   endif()
   add_definitions(-DQMP_COMMS)
-  set(QUDA_QMP_LDFLAGS  "" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-  set(QUDA_QMP_LIBS  "" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+  set(QUDA_QMP_LDFLAGS  ${QUDA_QMP_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+  set(QUDA_QMP_LIBS  ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   #FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
@@ -394,7 +404,7 @@ if(QUDA_BLOCKSOLVER)
 endif()
 
 if(QUDA_ALTRELIABLE)
-  add_definitions(-DALTRELIABE)
+  add_definitions(-DALTRELIABLE)
 endif()
 
 if(QUDA_USE_EIGEN)
@@ -475,7 +485,12 @@ if(QUDA_INTERFACE_NVTX)
 endif(QUDA_INTERFACE_NVTX)
 
 if(QUDA_NVTX)
+  if(CMAKE_VERSION VERSION_GREATER  3.7.99)
+    get_filename_component(cuda_dir "${CMAKE_CUDA_COMPILER}" DIRECTORY)
+    FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt PATHS  ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} "${cuda_dir}/..")
+  else()
   FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64/)
+  endif()
   LIST(APPEND QUDA_LIBS ${CUDA_NVTX_LIB})
 endif(QUDA_NVTX)
 
@@ -532,75 +547,38 @@ if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
   enable_language(Fortran)
 endif()
 
+# CUDA stuff
 
-if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
-  set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
-  set(USING_CUDA_LANG_SUPPORT True)
-  set(CMAKE_CUDA_STANDARD 11)
-  set(CMAKE_CUDA_STANDARD_REQUIRED True)
-  mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
-else()
-  set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
-  mark_as_advanced(CUDA_HOST_COMPILER)
-  find_package(CUDA REQUIRED)
-  set(USING_CUDA_LANG_SUPPORT False)
-endif()
+set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
+set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
+set(CMAKE_CUDA_STANDARD_REQUIRED True)
+mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
+
 
 # NVCC FLAGS independet off build type
-if(NOT USING_CUDA_LANG_SUPPORT)
-  set(QUDA_NVCC_FLAGS -Wno-deprecated-gpu-targets -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
-  if(QUDA_VERBOSE_BUILD)
-    LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
-  endif(QUDA_VERBOSE_BUILD)
-else()
-  set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
-  set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
-  if(QUDA_VERBOSE_BUILD)
-      set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --ptxas-options=-v" CACHE STRING "Flags used by the CUDA compiler" FORCE)
-  endif(QUDA_VERBOSE_BUILD)
-endif()
 
-
-if(NOT USING_CUDA_LANG_SUPPORT)
-## define CUDA flags when CMake < 3.8
-set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
-    "Flags used by the CUDA compiler during regular development builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_STRICT ${CUDA_NVCC_FLAGS_DEVEL} CACHE STRING
-    "Flags used by the CUDA compiler during strict jenkins builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
-    "Flags used by the C++ compiler during release builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_HOSTDEBUG ${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG CACHE STRING
-    "Flags used by the C++ compiler during host-debug builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_DEVICEDEBUG ${QUDA_NVCC_FLAGS} -G CACHE STRING
-    "Flags used by the C++ compiler during device-debug builds."
-    FORCE )
-set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
-    "Flags used by the C++ compiler during full (host+device) debug builds."
-    FORCE )
-
-else()
+set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
+set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
+if(QUDA_VERBOSE_BUILD)
+  set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --ptxas-options=-v" CACHE STRING "Flags used by the CUDA compiler" FORCE)
+endif(QUDA_VERBOSE_BUILD)
 
 ## define CUDA flags when CMake >= 3.8
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
 set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -lineinfo -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}" CACHE STRING
-    "Flags used by the CUDA compiler during regular development builds.")
+  "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT "${CMAKE_CUDA_FLAGS_DEVEL}" CACHE STRING
-    "Flags used by the CUDA compiler during strict jenkins builds.")
+  "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE "${QUDA_NVCC_FLAGS} -O3 -w" CACHE STRING
-    "Flags used by the CUDA compiler during release builds.")
+  "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG" CACHE STRING
-    "Flags used by the C++ compiler during host-debug builds.")
+  "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG "${QUDA_NVCC_FLAGS} -G" CACHE STRING
-    "Flags used by the C++ compiler during device-debug builds.")
+  "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
-    "Flags used by the C++ compiler during full (host+device) debug builds." )
+  "Flags used by the C++ compiler during full (host+device) debug builds." )
 
-  find_package(CUDAWrapper)
-endif()
+find_package(CUDAWrapper)
 
 
 # We need threads

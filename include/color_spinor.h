@@ -288,7 +288,7 @@ namespace quda {
 	@param sign Positive or negative projector
 	@return The spin-projected Spinor
     */
-    __device__ __host__ inline ColorSpinor<Float,Nc,2> project(int dim, int sign) {
+    __device__ __host__ inline ColorSpinor<Float,Nc,2> project(int dim, int sign) const {
       ColorSpinor<Float,Nc,2> proj;
       complex<Float> j(0.0,1.0);
       
@@ -361,6 +361,24 @@ namespace quda {
 	  for (int i=0; i<Nc; i++) {
 	    proj(0,i) = 2*(*this)(2,i);
 	    proj(1,i) = 2*(*this)(3,i);
+	  }
+	  break;
+	}
+	break;
+      case 4:
+	switch (sign) {
+	case 1: // positive projector
+#pragma unroll
+	  for (int i=0; i<Nc; i++) {
+	    proj(0,i) = (*this)(0,i) + (*this)(2,i);
+	    proj(1,i) = (*this)(1,i) + (*this)(3,i);
+	  }
+	  break;
+	case -1: // negative projector
+#pragma unroll
+	  for (int i=0; i<Nc; i++) {
+	    proj(0,i) = (*this)(0,i) - (*this)(2,i);
+	    proj(1,i) = (*this)(1,i) - (*this)(3,i);
 	  }
 	  break;
 	}
@@ -689,7 +707,7 @@ namespace quda {
 	@param sign Positive or negative projector
 	@return The spin-reconstructed Spinor
     */
-      __device__ __host__ inline ColorSpinor<Float,Nc,4> reconstruct(int dim, int sign) {
+      __device__ __host__ inline ColorSpinor<Float,Nc,4> reconstruct(int dim, int sign) const {
       ColorSpinor<Float,Nc,4> recon;
       complex<Float> j(0.0,1.0);
       
@@ -778,6 +796,28 @@ namespace quda {
 	    recon(1,i) = 0;
 	    recon(2,i) = (*this)(0,i);
 	    recon(3,i) = (*this)(1,i);
+	  }
+	  break;
+	}
+	break;
+      case 4:
+	switch (sign) {
+	case 1: // positive projector
+#pragma unroll
+	  for (int i=0; i<Nc; i++) {
+	    recon(0,i) = (*this)(0,i);
+	    recon(1,i) = (*this)(1,i);
+	    recon(2,i) = (*this)(0,i);
+	    recon(3,i) = (*this)(1,i);
+	  }
+	  break;
+	case -1: // negative projector
+#pragma unroll
+	  for (int i=0; i<Nc; i++) {
+	    recon(0,i) = (*this)(0,i);
+	    recon(1,i) = (*this)(1,i);
+	    recon(2,i) = -(*this)(0,i);
+	    recon(3,i) = -(*this)(1,i);
 	  }
 	  break;
 	}

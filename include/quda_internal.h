@@ -26,8 +26,6 @@
 #include <pthread.h>
 #endif
 
-#define MAX_SHORT 32767.0f
-
 #define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
 #define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
 #include <enum_quda.h>
@@ -97,6 +95,27 @@ extern "C" {
 namespace quda {
 
   typedef std::complex<double> Complex;
+
+  /**
+   * Traits for determining the maximum and inverse maximum
+   * value of a (signed) char and short. Relevant for
+   * fixed precision types. 
+   */
+  template< typename T > struct fixedMaxValue{ static constexpr float value = 0.0f; };
+  template<> struct fixedMaxValue<short>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<char>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
+
+  template< typename T > struct fixedInvMaxValue{ static constexpr double value = 3.402823e+38; };
+  template<> struct fixedInvMaxValue<short>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<short2>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<short4>{ static constexpr double value = 3.051850948e-5; };
+  template<> struct fixedInvMaxValue<char>{ static constexpr double value = 7.87401574e-3; };
+  template<> struct fixedInvMaxValue<char2>{ static constexpr double value = 7.87401574e-3; };
+  template<> struct fixedInvMaxValue<char4>{ static constexpr double value = 7.87401574e-3; };
 
   /**
    * Use this for recording a fine-grained profile of a QUDA
@@ -174,6 +193,8 @@ namespace quda {
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
     QUDA_PROFILE_IO, /**< time spent on file i/o */
+    QUDA_PROFILE_CHRONO, /**< time spent on chronology */
+    QUDA_PROFILE_EIGEN, /**< time spent on host-side Eigen */
 
     // lower level counters used in the dslash and api profiling
     QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers which do not count towrads global time */
@@ -315,6 +336,8 @@ namespace quda {
 
     static void PrintGlobal();
 
+    bool isRunning(QudaProfileType idx) { return profile[idx].running; }
+
   };
 
 #define TPSTART(idx) Start_(__func__, __FILE__, __LINE__, idx)
@@ -331,9 +354,9 @@ namespace quda {
 #endif
 
   /**
-     * Check that the resident gauge field is compatible with the requested inv_param
-     * @param inv_param   Contains all metadata regarding host and device storage
-     */
+   * Check that the resident gauge field is compatible with the requested inv_param
+   * @param inv_param   Contains all metadata regarding host and device storage
+   */
   bool canReuseResidentGauge(QudaInvertParam *inv_param);
 }
 

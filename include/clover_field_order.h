@@ -16,6 +16,7 @@
 #include <register_traits.h>
 #include <clover_field.h>
 #include <complex_quda.h>
+#include <thrust_helper.cuh>
 #include <quda_matrix.h>
 #include <color_spinor.h>
 
@@ -158,6 +159,8 @@ namespace quda {
 
     */
 
+    template<typename Float> struct abs_ { __host__ __device__ Float operator()(quda::complex<Float> x) { return abs(x); } };
+
     template<typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
       Accessor(const CloverField &A, bool inverse=false) {
@@ -181,10 +184,11 @@ namespace quda {
       struct Accessor<Float,nColor,nSpin,QUDA_FLOAT4_CLOVER_ORDER> {
       Float *a;
       int stride;
-      size_t offset;
+      size_t offset_cb;
       static constexpr int N = nSpin * nColor / 2;
     Accessor(const CloverField &A, bool inverse=false)
-      : a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))), stride(A.Stride()), offset(A.Bytes()/(2*sizeof(Float))) { }
+      : a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))), stride(A.Stride()),
+	offset_cb(A.Bytes()/(2*sizeof(Float))) { }
 
       __device__ __host__ inline complex<Float> operator()(int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
 	// if not in the diagonal chiral block then return 0.0
@@ -194,7 +198,7 @@ namespace quda {
 
 	int row = s_row%2 * nColor + c_row;
 	int col = s_col%2 * nColor + c_col;
-	Float *a_ = a+parity*offset+stride*chirality*N*N;
+	Float *a_ = a+parity*offset_cb+stride*chirality*N*N;
 
 	if (row == col) {
 	  return 2*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(row, stride, x) ];
@@ -217,6 +221,21 @@ namespace quda {
 
       }
 
+      __host__ double device_absmax() const {
+	thrust_allocator alloc;
+	thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
+	// just use offset_cb, since factor of two from parity is equivalent to complexity
+	return thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb,
+					abs_<Float>(), 0.0, thrust::maximum<Float>());
+      }
+
+      __host__ double device_absmin() const {
+	thrust_allocator alloc;
+	thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
+	// just use offset_cb, since factor of two from parity is equivalent to complexity
+	return thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb,
+					abs_<Float>(), 0.0, thrust::minimum<Float>());
+      }
     };
 
     template<typename Float, int nColor, int nSpin> 
@@ -257,6 +276,15 @@ namespace quda {
 	}
       }
 
+      __host__ double device_absmax() const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+
+      __host__ double device_absmin() const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
     };
 
     /**
@@ -272,13 +300,15 @@ namespace quda {
 	CloverField &A;
 	const int volumeCB;
 	const Accessor<Float,nColor,nSpin,order> accessor;
+	bool inverse;
 
       public:
 	/** 
 	 * Constructor for the FieldOrder class
 	 * @param field The field that we are accessing
 	 */
-      FieldOrder(CloverField &A, bool inverse=false) : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse)
+      FieldOrder(CloverField &A, bool inverse=false)
+      : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse), inverse(inverse)
 	{ }
 	
 	CloverField& Field() { return A; }
@@ -352,6 +382,51 @@ namespace quda {
 	  constexpr int chiral_block = n * n / 2;
 	  return static_cast<size_t>(volumeCB) * chiral_block * 2ll * 2ll * sizeof(Float); // 2 from complex, 2 from chirality
 	}
+
+	/**
+	 * @brief Returns the Linfinity norm of the field
+	 * @param[in] dim Which dimension we are taking the Linfinity norm of
+	 * @return Linfinity norm
+	 */
+	__host__ double abs_max(int dim) const {
+	  double absmax = 0;
+	  if (A.Location() == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmax = accessor.device_absmax();
+	  } else {
+	    // do simple norm on host memory
+	    complex<Float> *a = static_cast<complex<Float>*>(A.V(inverse));
+	    absmax = 0.0;
+	    for (size_t i=0; i<A.Bytes()/sizeof(complex<Float>); i++) {
+	      absmax = (abs(a[i]) > absmax) ? abs(a[i]) : absmax;
+	    }
+	  }
+	  comm_allreduce_max(&absmax);
+	  return absmax;
+	}
+
+	/**
+	 * @brief Returns the minimum absolute value of the field
+	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
+	 * @return Minimum norm
+	 */
+	__host__ double abs_min(int dim) const {
+	  double absmin = 0;
+	  if (A.Location() == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmin = accessor.device_absmin();
+	  } else {
+	    // do simple norm on host memory
+	    complex<Float> *a = static_cast<complex<Float>*>(A.V(inverse));
+	    absmin = 0.0;
+	    for (size_t i=0; i<A.Bytes()/sizeof(complex<Float>); i++) {
+	      absmin = (abs(a[i]) > absmin) ? abs(a[i]) : absmin;
+	    }
+	  }
+	  comm_allreduce_min(&absmin);
+	  return absmin;
+	}
+
       };
 
     /**
@@ -412,7 +487,7 @@ namespace quda {
 	      normTex = static_cast<const cudaCloverField&>(clover).NormTex();
 	    }
 	    if (!huge_alloc && (this->clover != clover.V(is_inverse) ||
-				(clover.Precision() == QUDA_HALF_PRECISION && this->norm != clover.Norm(is_inverse)) ) && !override) {
+				((clover.Precision() == QUDA_HALF_PRECISION || clover.Precision() == QUDA_QUARTER_PRECISION) && this->norm != clover.Norm(is_inverse)) ) && !override) {
 	      errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
 	    }
 	  }
@@ -490,6 +565,17 @@ namespace quda {
 #pragma unroll
 	    for (int i=0; i<block; i++) v[i] *= nrm;
 	  }
+
+    if (sizeof(Float)==sizeof(char)) {
+#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
+      RegType nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity*norm_offset + chirality*stride + x) :
+        norm[parity*norm_offset + chirality*stride + x];
+#else
+            RegType nrm = norm[parity*norm_offset + chirality*stride + x];
+#endif
+#pragma unroll
+      for (int i=0; i<block; i++) v[i] *= nrm;
+    }
 	}
   
 	/**
@@ -503,7 +589,7 @@ namespace quda {
 
 	  // find the norm of each chiral block
 	  RegType scale = 0.0;
-	  if (sizeof(Float)==sizeof(short)) {
+	  if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
 #pragma unroll
 	    for (int i=0; i<block; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
 	    norm[parity*norm_offset + chirality*stride + x] = scale;
@@ -513,7 +599,7 @@ namespace quda {
 	  for (int i=0; i<M; i++) {
 	    Vector vecTmp;
 	    // first do scalar copy converting into storage type and rescaling if necessary
-	    if (sizeof(Float)==sizeof(short))
+	    if (sizeof(Float)==sizeof(short)||sizeof(Float)==sizeof(char))
 #pragma unroll
 	      for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[i*N+j] / scale);
 	    else
@@ -580,7 +666,7 @@ namespace quda {
 
 	size_t Bytes() const {
 	  size_t bytes = length*sizeof(Float);
-	  if (sizeof(Float)==sizeof(short)) bytes += 2*sizeof(float);
+	  if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) bytes += 2*sizeof(float);
 	  return bytes;
 	}
       };
@@ -782,6 +868,9 @@ namespace quda {
 
   // half precision uses Float4
   template<int N> struct clover_mapper<short,N> { typedef clover::FloatNOrder<short, N, 4> type; };
+
+  // quarter precision uses Float4
+  template<int N> struct clover_mapper<char,N> { typedef clover::FloatNOrder<char, N, 4> type; };
 
 } // namespace quda
 

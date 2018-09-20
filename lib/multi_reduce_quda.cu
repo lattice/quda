@@ -67,6 +67,7 @@ namespace quda {
 
     cudaStream_t* getStream();
     cudaEvent_t* getReduceEvent();
+    bool getFastReduce();
 
     template <int writeX, int writeY, int writeZ, int writeW>
     struct write {

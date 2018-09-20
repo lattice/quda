@@ -161,6 +161,14 @@ extern "C" {
   void comm_peer2peer_init(const char *hostname_recv_buf);
 
   /**
+     @brief Returns true if any peer-to-peer capability is present on
+     this system (regardless of whether it has been disabled or not.  We
+     use this, for example, to determine if we need to allocate pinned
+     device memory or not.
+  */
+  bool comm_peer2peer_present();
+
+  /**
      Query what peer-to-peer communication is enabled globally
      @return 2-bit number reporting 1 for copy engine, 2 for remote writes
   */
@@ -254,6 +262,7 @@ extern "C" {
   int comm_query(MsgHandle *mh);
   void comm_allreduce(double* data);
   void comm_allreduce_max(double* data);
+  void comm_allreduce_min(double* data);
   void comm_allreduce_array(double* data, size_t size);
   void comm_allreduce_int(int* data);
   void comm_allreduce_xor(uint64_t *data);

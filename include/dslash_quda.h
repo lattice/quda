@@ -3,6 +3,7 @@
 
 #include <quda_internal.h>
 #include <tune_quda.h>
+#include <dirac_quda.h>
 #include <gauge_field.h>
 
 #include <worker.h>
@@ -18,6 +19,9 @@ namespace quda {
     @return Whether the T dimension is kernel packed or not
     */
   bool getKernelPackT();
+
+  void pushKernelPackT(bool pack);
+  void popKernelPackT();
 
   /**
      Sets commDim array used in dslash_pack.cu
@@ -57,6 +61,33 @@ namespace quda {
   */
   void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in,
 		   const CloverField &clover, bool inverse, int parity);
+
+  enum Dslash5Type {
+    DSLASH5_DWF,
+    DSLASH5_MOBIUS_PRE,
+    DSLASH5_MOBIUS,
+    M5_INV_DWF,
+    M5_INV_MOBIUS
+  };
+
+  /**
+     @brief Apply the domain-wall / mobius Dslash5 operator.  In the
+     current implementation, it is expected that the color-spinor
+     fields are 4-d preconditioned.
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] x Auxilary input color-spinor field
+     @param[in] m_f Fermion mass parameter
+     @param[in] m_5 Wilson mass shift
+     @param[in] b_5 Mobius coefficient array (length Ls)
+     @param[in] c_5 Mobius coefficient array (length Ls)
+     @param[in] a Scale factor use in xpay operator
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] type
+  */
+  void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+		    double a, bool dagger, Dslash5Type type);
 
   // domain wall Dslash  
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,

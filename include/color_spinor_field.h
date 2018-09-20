@@ -84,6 +84,7 @@ namespace quda {
 
     int nColor; // Number of colors of the field
     int nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
+    int nVec;  // number of packed vectors (for multigrid transfer operator)
 
     QudaTwistFlavorType twistFlavor; // used by twisted mass
 
@@ -108,7 +109,7 @@ namespace quda {
 
   ColorSpinorParam()
     : LatticeFieldParam(), location(QUDA_INVALID_FIELD_LOCATION), nColor(0),
-      nSpin(0), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
+      nSpin(0), nVec(1), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS),
       create(QUDA_INVALID_FIELD_CREATE), PCtype(QUDA_PC_INVALID),
       is_composite(false), composite_dim(0), is_component(false), component_id(0) { ; }
@@ -119,7 +120,7 @@ namespace quda {
     : LatticeFieldParam(4, X, 0, inv_param.cpu_prec), location(location), nColor(3),
       nSpin( (inv_param.dslash_type == QUDA_ASQTAD_DSLASH ||
               inv_param.dslash_type == QUDA_STAGGERED_DSLASH ||
-	      inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ? 1 : 4),
+	      inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ? 1 : 4), nVec(1),
       twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
@@ -178,8 +179,8 @@ namespace quda {
   ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
 		   QudaFieldLocation location=QUDA_CUDA_FIELD_LOCATION)
     : LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
-      location(location), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), twistFlavor(cpuParam.twistFlavor),
-      siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER),
+      location(location), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), nVec(cpuParam.nVec),
+      twistFlavor(cpuParam.twistFlavor), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER),
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
       create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0), is_composite(cpuParam.is_composite), composite_dim(cpuParam.composite_dim), is_component(false), component_id(0)
       {
@@ -192,17 +193,19 @@ namespace quda {
        If using CUDA native fields, this function will ensure that the
        field ordering is appropriate for the new precision setting to
        maintain this status
-       @param precision New precision value
+       @param precision_ New precision value
+       @param ghost_precision_ New ghost precision value
      */
-    void setPrecision(QudaPrecision precision) {
+    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision=QUDA_INVALID_PRECISION, bool force_native=false) {
       // is the current status in native field order?
-      bool native = false;
+      bool native = force_native ? true : false;
       if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1 || nSpin==2) &&
 	    (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
-	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION) &&
+	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION || this->precision == QUDA_QUARTER_PRECISION) &&
 	    (nSpin==4) && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
 
       this->precision = precision;
+      this->ghost_precision = (ghost_precision == QUDA_INVALID_PRECISION) ? precision : ghost_precision;
 
       // if this is a native field order, let's preserve that status, else keep the same field order
       if (native) fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ?
@@ -216,6 +219,7 @@ namespace quda {
       printfQuda("nDim = %d\n", nDim);
       for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
       printfQuda("precision = %d\n", precision);
+      printfQuda("ghost_precision = %d\n", ghost_precision);
       printfQuda("pad = %d\n", pad);
       printfQuda("siteSubset = %d\n", siteSubset);
       printfQuda("siteOrder = %d\n", siteOrder);
@@ -271,7 +275,7 @@ namespace quda {
   class ColorSpinorField : public LatticeField {
 
   private:
-    void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor,
+    void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
 		QudaPrecision precision, int pad, QudaSiteSubset subset,
 		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
 		QudaDWFPCType PCtype);
@@ -279,10 +283,13 @@ namespace quda {
 
   protected:
     bool init;
-    mutable bool init_ghost_zone;
+
+    /** Used to keep local track of allocated ghost_precision in createGhostZone */
+    mutable QudaPrecision ghost_precision_allocated;
 
     int nColor;
     int nSpin;
+    int nVec;
 
     int nDim;
     int x[QUDA_MAX_DIM];
@@ -359,6 +366,7 @@ namespace quda {
 
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
+    int Nvec() const { return nVec; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int* X() const { return x; }
@@ -405,9 +413,11 @@ namespace quda {
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
+       @param[in] ghost_precision The precision used for the ghost exchange
      */
     virtual void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-			       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const = 0;
+			       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
+			       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const = 0;
 
     /**
       This function returns true if the field is stored in an internal
@@ -491,10 +501,34 @@ namespace quda {
 
     static ColorSpinorField* Create(const ColorSpinorParam &param);
     static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
-    ColorSpinorField* CreateCoarse(const int *geoblockSize, int spinBlockSize, int Nvec,
-				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION);
+
+    /**
+       @brief Create a coarse color-spinor field, using this field to set the meta data
+       @param[in] geoBlockSize Geometric block size that defines the coarse grid dimensions
+       @param[in] spinlockSize Geometric block size that defines the coarse spin dimension
+       @param[in] Nvec Number of coarse color degrees of freedom per grid point
+       @param[in] precision Optionally set the precision of the fine field
+       @param[in] location Optionally set the location of the coarse field
+       @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
+    */
+    ColorSpinorField* CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+                                   QudaPrecision precision=QUDA_INVALID_PRECISION,
+				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
+                                   QudaMemoryType mem_Type=QUDA_MEMORY_INVALID);
+
+    /**
+       @brief Create a fine color-spinor field, using this field to set the meta data
+       @param[in] geoBlockSize Geometric block size that defines the fine grid dimensions
+       @param[in] spinlockSize Geometric block size that defines the fine spin dimension
+       @param[in] Nvec Number of fine color degrees of freedom per grid point
+       @param[in] precision Optionally set the precision of the fine field
+       @param[in] location Optionally set the location of the fine field
+       @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
+    */
     ColorSpinorField* CreateFine(const int *geoblockSize, int spinBlockSize, int Nvec,
-				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION);
+                                 QudaPrecision precision=QUDA_INVALID_PRECISION,
+				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
+                                 QudaMemoryType mem_type=QUDA_MEMORY_INVALID);
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
@@ -749,9 +783,11 @@ namespace quda {
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
+       @param[in] ghost_precision The precision used for the ghost exchange
      */
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
+		       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
 
 #ifdef USE_TEXTURE_OBJECTS
     inline const cudaTextureObject_t& Tex() const { return tex; }
@@ -849,17 +885,19 @@ namespace quda {
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Dummy for CPU
        @param[in] gdr_recv Dummy for GPU
+       @param[in] ghost_precision The precision used for the ghost exchange
      */
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
+		       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
 
     /**
-       @brief Backs up the cudaColorSpinorField
+       @brief Backs up the cpuColorSpinorField
     */
     void backup() const;
 
     /**
-       @brief Restores the cudaColorSpinorField
+       @brief Restores the cpuColorSpinorField
     */
     void restore();
   };
@@ -893,17 +931,55 @@ namespace quda {
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			int nFace, int dagger, MemoryLocation *destination=nullptr);
 
-  /*Generate a gaussian distributed spinor
-   * @param src The spinorfield
-   * @param seed Seed
-   * */
-  void spinorGauss(ColorSpinorField &src, int seed);
+  /**
+     @brief Generate a random noise spinor.  This variant allows the user to manage the RNG state.
+     @param src The colorspinorfield
+     @param randstates Random state
+     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+  */
+  void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type);
 
-  /*Generate a gaussian distributed spinor
-   * @param src The spinorfield
-   * @param randstates Random state
-   * */
-  void spinorGauss(ColorSpinorField &src, RNG& randstates);
+  /**
+     @brief Generate a random noise spinor.  This variant just
+     requires a seed and will create and destroy the random number state.
+     @param src The colorspinorfield
+     @param seed Seed
+     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+  */
+  void spinorNoise(ColorSpinorField &src, int seed, QudaNoiseType type);
+
+
+  /**
+     @brief Helper function for determining if the preconditioning
+     type of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If PCtype is unique return this
+   */
+  inline QudaDWFPCType PCType_(const char *func, const char *file, int line,
+			       const ColorSpinorField &a, const ColorSpinorField &b) {
+    QudaDWFPCType type = QUDA_PC_INVALID;
+    if (a.DWFPCtype() == b.DWFPCtype()) type = a.DWFPCtype();
+    else errorQuda("PCTypes %d %d do not match (%s:%d in %s())\n",
+		   a.DWFPCtype(), b.DWFPCtype(), file, line, func);
+    return type;
+  }
+
+  /**
+     @brief Helper function for determining if the precision of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check precision on
+     @return If precision is unique return the precision
+   */
+  template <typename... Args>
+  inline QudaDWFPCType PCType_(const char *func, const char *file, int line,
+			       const ColorSpinorField &a, const ColorSpinorField &b,
+			       const Args &... args) {
+    return static_cast<QudaDWFPCType>(PCType_(func,file,line,a,b) & PCType_(func,file,line,a,args...));
+  }
+
+#define checkPCType(...) PCType_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda
 

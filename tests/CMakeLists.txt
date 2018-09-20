@@ -22,6 +22,11 @@ endif()
 
 #define tests
 
+# if we build with QDP JIT the tests cannot run anyway
+if(QUDA_INTERFACE_QDPJIT)
+  set(QUDA_BUILD_ALL_TESTS OFF)
+endif()
+
 if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_MASS OR QUDA_DIRAC_DOMAIN_WALL)
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   cuda_add_executable(dslash_ctest dslash_ctest.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
@@ -48,14 +53,14 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
-  cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
-  cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp staggered_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp staggered_dslash_reference.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
   QUDA_CHECKBUILDTEST(staggered_dslash_ctest BUILD_TESTING)
 
-  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(staggered_invert_test QUDA_BUILD_ALL_TESTS)
 
@@ -95,6 +100,10 @@ cuda_add_executable(blas_test blas_test.cu)
 target_link_libraries(blas_test ${TEST_LIBS})
 QUDA_CHECKBUILDTEST(blas_test QUDA_BUILD_ALL_TESTS)
 
+cuda_add_executable(copy_test copy_test.cu)
+target_link_libraries(copy_test ${TEST_LIBS})
+QUDA_CHECKBUILDTEST(copy_test QUDA_BUILD_ALL_TESTS)
+
 cuda_add_executable(covdev_test covdev_test.cpp  covdev_reference.cpp)
 target_link_libraries(covdev_test ${TEST_LIBS})
 QUDA_CHECKBUILDTEST(covdev_test QUDA_BUILD_ALL_TESTS)
@@ -109,6 +118,10 @@ if(QUDA_LINK_HISQ)
   cuda_add_executable(unitarize_link_test unitarize_link_test.cpp)
   target_link_libraries(unitarize_link_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(unitarize_link_test QUDA_BUILD_ALL_TESTS)
+
+  cuda_add_executable(hisq_stencil_test hisq_stencil_test.cpp llfat_reference.cpp)
+  target_link_libraries(hisq_stencil_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(hisq_stencil_test QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_FORCE_GAUGE)
@@ -121,6 +134,10 @@ if(QUDA_GAUGE_ALG)
   cuda_add_executable(gauge_alg_test gauge_alg_test.cpp)
   target_link_libraries(gauge_alg_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(gauge_alg_test QUDA_BUILD_ALL_TESTS)
+
+  cuda_add_executable(heatbath_test heatbath_test.cpp)
+  target_link_libraries(heatbath_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(heatbath_test QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_FORCE_HISQ)
@@ -215,6 +232,12 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     if(polenv)
       set_tests_properties(dslash_improved_staggered-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
       set_tests_properties(dslash_naive_staggered-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+    if(QUDA_LINK_HISQ)
+      add_test(NAME dslash_improved_staggered_build-policy${pol2} COMMAND staggered_dslash_ctest --dslash-type asqtad --test 1 --xdim 6 --ydim 8 --zdim 10 --tdim 12 --compute-fat-long true --epsilon-naik -0.01 --tadpole-coeff 0.9 --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
+      if (polenv)
+        set_tests_properties(dslash_improved_staggered_build_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+      endif()
     endif()
   endif()
 

@@ -1918,14 +1918,20 @@ struct DslashFactory {
        config += comm_gdr_enabled();
        config += 2*comm_peer2peer_enabled_global();
 
-       if (comm_peer2peer_enabled_global() & 2) {
+       if (comm_peer2peer_enabled_global() & 2) { // enable/disable p2p copy engine policy tuning
          p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)] = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
+         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE);
        }
-       if (comm_peer2peer_enabled_global() & 1) {
+
+       if (comm_peer2peer_enabled_global() & 1) { // enable/disable p2p direct store policy tuning
          p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE)] = QudaP2PPolicy::QUDA_P2P_COPY_ENGINE;
+         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE);
        }
-       p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
-       first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT); // first active policy is presently always the default
+
+       if (!(comm_peer2peer_enabled_global() & 4)) { // enable/disable non-p2p policy tuning
+         p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_DEFAULT)] = QudaP2PPolicy::QUDA_P2P_DEFAULT;
+         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_DEFAULT);
+       }
 
        static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_POLICY");
        if (dslash_policy_env) { // set the policies to tune for explicitly
@@ -2066,14 +2072,17 @@ struct DslashFactory {
                          i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC) && dslashParam.remote_write) ) {
              // these dslash policies all must have kernel packing enabled
 
-             bool kernel_pack_old = getKernelPackT();
+             // clumsy, but we call setKernelPackT a handful of times before
+             // we restore the the current state, so this will "just work"
+             pushKernelPackT(getKernelPackT());
 
              // if we are using GDR policies then we must tune the
-             // non-GDR variants as well with and without kernel packing
-             // enabled - this ensures that all GPUs will have the
-             // required tune cache entries prior to potential process
-             // divergence regardless of which GPUs are blacklisted
-             // don't enter if remote writing since there we always use kernel packing
+             // non-GDR variants as well with and without kernel
+             // packing enabled - this ensures that all GPUs will have
+             // the required tune cache entries prior to potential
+             // process divergence regardless of which GPUs are
+             // blacklisted.  don't enter if remote writing since
+             // there we always use kernel packing
              if ( (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
                    i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
                    i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH ||
@@ -2095,7 +2104,7 @@ struct DslashFactory {
              delete dslashImp;
 
              // restore default kernel packing
-             setKernelPackT(kernel_pack_old);
+             popKernelPackT();
 
            } else if (i != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED){
              errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
@@ -2116,7 +2125,7 @@ struct DslashFactory {
    void apply(const cudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
 
-     if (config != tp.aux.w) {
+     if (config != tp.aux.w && comm_size() > 1) {
        errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "
 		 "this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.",
 		 config, tp.aux.w);
@@ -2129,8 +2138,8 @@ struct DslashFactory {
      if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
      dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
 
-     // switch on kernel packing for the policies that need it
-     bool kernel_pack_old = getKernelPackT();
+     // switch on kernel packing for the policies that need it, save default kernel packing
+     pushKernelPackT(getKernelPackT());
      auto p = static_cast<QudaDslashPolicy>(tp.aux.x);
      if ( p == QudaDslashPolicy::QUDA_GDR_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
@@ -2153,7 +2162,7 @@ struct DslashFactory {
      comm_enable_peer2peer(p2p_enabled);
 
      // restore default kernel packing
-     setKernelPackT(kernel_pack_old);
+     popKernelPackT();
    }
 
    int tuningIter() const { return 10; }

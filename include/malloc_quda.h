@@ -2,6 +2,7 @@
 #define _MALLOC_QUDA_H
 
 #include <cstdlib>
+#include <enum_quda.h>
 
 namespace quda {
 
@@ -46,6 +47,8 @@ namespace quda {
   inline constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
   inline constexpr const char* r_slant(const char* str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
   inline constexpr const char* file_name(const char* str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
+
+  QudaFieldLocation get_pointer_location(const void *ptr);
 
 } // namespace quda
 

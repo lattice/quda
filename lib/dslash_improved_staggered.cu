@@ -43,7 +43,13 @@ namespace quda {
 #undef GPU_CLOVER_DIRAC
 #undef GPU_DOMAIN_WALL_DIRAC
 #define DD_IMPROVED 1
+
+#define DD_DAG 0
 #include <staggered_dslash_def.h> // staggered Dslash kernels
+#undef DD_DAG
+#define DD_DAG 1
+#include <staggered_dslash_def.h> // staggered Dslash dagger kernels
+
 #undef DD_IMPROVED
 
 #include <dslash_quda.cuh>
@@ -224,8 +230,8 @@ namespace quda {
     virtual long long bytes() const {
       int gauge_bytes_fat = QUDA_RECONSTRUCT_NO * in->Precision();
       int gauge_bytes_long = reconstruct * in->Precision();
-      bool isHalf = in->Precision() == sizeof(short) ? true : false;
-      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+      bool isFixed = (in->Precision() == sizeof(short) || in->Precision() == sizeof(char)) ? true : false;
+      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isFixed ? sizeof(float) : 0);
       int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat) + spinor_bytes;
       int num_dir = 2 * 4; // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
 

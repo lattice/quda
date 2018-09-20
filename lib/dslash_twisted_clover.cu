@@ -188,8 +188,8 @@ namespace quda {
     }
 
     long long bytes() const {
-      bool isHalf = in->Precision() == sizeof(short) ? true : false;
-      int clover_bytes = 72 * in->Precision() + (isHalf ? 2*sizeof(float) : 0);
+      bool isFixed = (in->Precision() == sizeof(short) || in->Precision() == sizeof(char)) ? true : false;
+      int clover_bytes = 72 * in->Precision() + (isFixed ? 2*sizeof(float) : 0);
       long long bytes = DslashCuda::bytes();
       switch(dslashParam.kernel_type) {
       case EXTERIOR_KERNEL_X:

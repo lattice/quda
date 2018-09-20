@@ -510,8 +510,8 @@ namespace quda {
     }
 
     long long bytes() const {
-      bool isHalf = in->Precision() == sizeof(short) ? true : false;
-      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+      bool isFixed = (in->Precision() == sizeof(short) || in->Precision() == sizeof(char)) ? true : false;
+      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isFixed ? sizeof(float) : 0);
       long long Ls = in->X(4);
       long long bytes = 0;
 

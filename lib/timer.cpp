@@ -35,8 +35,8 @@ namespace quda {
   }
 
   std::string TimeProfile::pname[] = { "download",  "upload", "init", "preamble", "compute",
-				       "comms", "epilogue", "free", "file i/o", "dummy", "pack kernel",
-				       "dslash kernel", "gather", "scatter",
+				       "comms", "epilogue", "free", "file i/o", "chronology", "eigen",
+                                       "dummy", "pack kernel", "dslash kernel", "gather", "scatter",
                                        "kernel launch", "event record",
 				       "event query", "stream wait event", "set func attribute",
                                        "event synchronize", "stream synchronize", "device synchronize",

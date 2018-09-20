@@ -3,9 +3,11 @@ include ../make.inc
 QUDA = libquda.a
 
 QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
-	coarsecoarse_op.o multigrid.o transfer.o transfer_util.o	\
+	coarsecoarse_op.o coarse_op_preconditioned.o 			\
+	multigrid.o transfer.o block_orthogonalize.o			\
 	prolongator.o restrictor.o gauge_phase.o timer.o malloc.o	\
-	solver.o inv_bicgstab_quda.o inv_cg_quda.o			\
+	solver.o inv_bicgstab_quda.o inv_cg_quda.o inv_cg3_quda.o	\
+	inv_cg3ne_quda.o inv_ca_gcr.o inv_ca_cg.o			\
 	inv_multi_cg_quda.o inv_eigcg_quda.o inv_gmresdr_quda.o		\
 	gauge_ape.o gauge_stout.o gauge_plaq.o laplace.o gauge_laplace.o\
 	inv_gcr_quda.o inv_mr_quda.o inv_bicgstabl_quda.o     		\
@@ -27,15 +29,20 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dslash_ndeg_twisted_mass.o dslash_twisted_clover.o		\
 	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
 	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
+	dslash5_domain_wall.o						\
 	blas_quda.o multi_blas_quda.o copy_quda.o 			\
-	reduce_quda.o multi_reduce_quda.o				\
+	reduce_quda.o multi_reduce_quda.o contract.o			\
 	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	copy_color_spinor.o copy_color_spinor_dd.o			\
 	copy_color_spinor_ds.o copy_color_spinor_dh.o			\
-	copy_color_spinor_sd.o copy_color_spinor_ss.o			\
-	copy_color_spinor_sh.o copy_color_spinor_hd.o			\
+	copy_color_spinor_dq.o copy_color_spinor_sd.o			\
+	copy_color_spinor_ss.o copy_color_spinor_sh.o			\
+	copy_color_spinor_sq.o copy_color_spinor_hd.o			\
 	copy_color_spinor_hs.o copy_color_spinor_hh.o			\
+	copy_color_spinor_hq.o copy_color_spinor_qd.o			\
+	copy_color_spinor_qs.o copy_color_spinor_qh.o			\
+	copy_color_spinor_qq.o						\
 	extract_gauge_ghost_extended.o copy_gauge_double.o		\
 	copy_gauge_single.o copy_gauge_half.o copy_gauge.o		\
 	copy_clover.o staggered_oprod.o					\
@@ -53,8 +60,11 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o	\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
 	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
+	copy_color_spinor_mg_hs.o copy_color_spinor_mg_sh.o		\
+	copy_color_spinor_mg_qs.o copy_color_spinor_mg_sq.o		\
+	copy_color_spinor_mg_hh.o copy_color_spinor_mg_qq.o		\
 	quda_cuda_api.o quda_arpack_interface.o deflation.o ${QIO_UTIL}   \
-	spinor_gauss.o gauge_random.o checksum.o
+	spinor_noise.o gauge_random.o checksum.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\

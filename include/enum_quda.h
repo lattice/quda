@@ -56,6 +56,7 @@ extern "C" {
   } QudaTboundary;
 
   typedef enum QudaPrecision_s {
+    QUDA_QUARTER_PRECISION = 1,
     QUDA_HALF_PRECISION = 2,
     QUDA_SINGLE_PRECISION = 4,
     QUDA_DOUBLE_PRECISION = 8,
@@ -118,6 +119,11 @@ extern "C" {
     QUDA_CGNE_INVERTER,
     QUDA_CGNR_INVERTER,
     QUDA_MSPCG_INVERTER,
+    QUDA_CG3_INVERTER,
+    QUDA_CG3NE_INVERTER,
+    QUDA_CG3NR_INVERTER,
+    QUDA_CA_CG_INVERTER,
+    QUDA_CA_GCR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -347,9 +353,16 @@ extern "C" {
     QUDA_RANDOM_SOURCE,
     QUDA_CONSTANT_SOURCE,
     QUDA_SINUSOIDAL_SOURCE,
+    QUDA_CORNER_SOURCE,
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
-  
+
+  typedef enum QudaNoiseType_s {
+    QUDA_NOISE_GAUSS,
+    QUDA_NOISE_UNIFORM,
+    QUDA_NOISE_INVALID = QUDA_INVALID_ENUM
+  } QudaNoiseType;
+
   // used to select projection method for deflated solvers
   typedef enum QudaProjectionType_s {
       QUDA_MINRES_PROJECTION,
@@ -404,6 +417,12 @@ extern "C" {
     QUDA_COMPUTE_NULL_VECTOR_YES,
     QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
   } QudaComputeNullVector;
+
+  typedef enum QudaSetupType_s {
+    QUDA_NULL_VECTOR_SETUP,
+    QUDA_TEST_VECTOR_SETUP,
+    QUDA_INVALID_SETUP_TYPE = QUDA_INVALID_ENUM
+  } QudaSetupType;
 
   typedef enum QudaBoolean_s {
     QUDA_BOOLEAN_NO = 0,

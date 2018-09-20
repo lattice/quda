@@ -11,7 +11,7 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <tune_quda.h>
-#include <algorithm> // for std::swap
+#include <utility> // for std::swap
 
 namespace quda {
 
@@ -93,11 +93,11 @@ namespace quda {
 				QudaFieldLocation location, FloatOut *Out) {
 
     if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      typedef typename colorspinor::FieldOrderCB<FloatOut, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER> ColorSpinor;
+      typedef typename colorspinor::FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER,FloatOut> ColorSpinor;
       ColorSpinor outOrder(out, 1, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(outOrder, inOrder, out, location);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      typedef typename colorspinor::FieldOrderCB<FloatOut, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> ColorSpinor;
+      typedef typename colorspinor::FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,FloatOut> ColorSpinor;
       ColorSpinor outOrder(out, 1, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(outOrder, inOrder, out, location);
     } else {
@@ -112,11 +112,11 @@ namespace quda {
 				QudaFieldLocation location, FloatOut *Out, FloatIn *In) {
 
     if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      typedef typename colorspinor::FieldOrderCB<FloatIn, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER> ColorSpinor;
+      typedef typename colorspinor::FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER,FloatIn> ColorSpinor;
       ColorSpinor inOrder(in, 1, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, location, Out);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      typedef typename colorspinor::FieldOrderCB<FloatIn, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> ColorSpinor;
+      typedef typename colorspinor::FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,FloatIn> ColorSpinor;
       ColorSpinor inOrder(in, 1, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, location, Out);
     } else {
@@ -236,6 +236,9 @@ namespace quda {
   case 16:								\
     CopyGenericColorSpinor<16>(dst, src, location, dst_ptr, src_ptr);	\
     break;								\
+  case 18:                \
+    CopyGenericColorSpinor<18>(dst, src, location, dst_ptr, src_ptr); \
+    break;                \
   case 24:								\
     CopyGenericColorSpinor<24>(dst, src, location, dst_ptr, src_ptr);	\
     break;								\

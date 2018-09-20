@@ -172,6 +172,8 @@ template<typename OutputType, typename InputType, int tex_id>
     int Texture<OutputType, InputType, tex_id>::count = 0;
 
 #define DECL_TEX(id)							\
+  texture<char2,1,cudaReadModeNormalizedFloat> tex_char2_##id;   \
+  texture<char4,1,cudaReadModeNormalizedFloat> tex_char4_##id;   \
   texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_##id;	\
   texture<short4,1,cudaReadModeNormalizedFloat> tex_short4_##id;	\
   texture<float,1> tex_float_##id;					\
@@ -227,6 +229,10 @@ template<typename OutputType, typename InputType, int tex_id>
 
 #define DEF_ALL(id)				\
   DECL_TEX(id)					\
+  DEF_BIND_UNBIND_FETCH(short2, char2, id) \
+  DEF_BIND_UNBIND_FETCH(short4, char4, id) \
+  DEF_BIND_UNBIND_FETCH(float2, char2, id) \
+  DEF_BIND_UNBIND_FETCH(float4, char4, id) \
   DEF_BIND_UNBIND_FETCH(float2, short2, id)	\
   DEF_BIND_UNBIND_FETCH(float4, short4, id)	\
   DEF_BIND_UNBIND_FETCH(float, float, id)	\
@@ -240,10 +246,14 @@ template<typename OutputType, typename InputType, int tex_id>
   DEF_BIND_UNBIND(double4, float4, id)		\
   DEF_BIND_UNBIND(double2, short2, id)		\
   DEF_BIND_UNBIND(double4, short4, id)		\
+  DEF_BIND_UNBIND(double2, char2, id)    \
+  DEF_BIND_UNBIND(double4, char4, id)    \
   DEF_FETCH_DBLE_MIXED(double2, float2, id)	\
   DEF_FETCH_DBLE_MIXED(double4, float4, id)	\
   DEF_FETCH_DBLE_MIXED(double2, short2, id)	\
-  DEF_FETCH_DBLE_MIXED(double4, short4, id)
+  DEF_FETCH_DBLE_MIXED(double4, short4, id) \
+  DEF_FETCH_DBLE_MIXED(double2, char2, id) \
+  DEF_FETCH_DBLE_MIXED(double4, char4, id) \
 
   // Declare the textures and define the member functions of the corresponding templated classes.
   DEF_ALL(0)
@@ -268,8 +278,8 @@ template<typename OutputType, typename InputType, int tex_id>
      Checks that the types are set correctly.  The precision used in the
      RegType must match that of the InterType, and the ordering of the
      InterType must match that of the StoreType.  The only exception is
-     when half precision is used, in which case, RegType can be a double
-     and InterType can be single (with StoreType short).
+     when fixed precision is used, in which case, RegType can be a double
+     and InterType can be single (with StoreType short or char).
      
      @param RegType Register type used in kernel
      @param InterType Intermediate format - RegType precision with StoreType ordering
@@ -282,7 +292,7 @@ template<typename OutputType, typename InputType, int tex_id>
     const size_t inter_size = sizeof(((InterType*)0)->x);
     const size_t store_size = sizeof(((StoreType*)0)->x);
 
-    if (reg_size != inter_size  && store_size != 2 && inter_size != 4)
+    if (reg_size != inter_size  && store_size != 2 && store_size != 1 && inter_size != 4)
       errorQuda("Precision of register (%lu) and intermediate (%lu) types must match\n",
 		(unsigned long)reg_size, (unsigned long)inter_size);
   
@@ -296,7 +306,7 @@ template<typename OutputType, typename InputType, int tex_id>
 
   }
 
-  template <typename FloatN, int M>
+  template <int M, typename FloatN, typename FixedType>
   __device__ inline float store_norm(float *norm, FloatN x[M], int i) {
     float c[M];
 #pragma unroll
@@ -304,7 +314,7 @@ template<typename OutputType, typename InputType, int tex_id>
 #pragma unroll
     for (int j=1; j<M; j++) c[0] = fmaxf(c[j],c[0]);
     norm[i] = c[0];
-    return __fdividef(MAX_SHORT, c[0]);
+    return __fdividef(fixedMaxValue<FixedType>::value, c[0]);
   }
 
   /**
@@ -425,8 +435,8 @@ template <typename RegType, typename StoreType, int N, int tex_id=-1>
 #ifndef USE_TEXTURE_OBJECTS
       if (tex_id >= 0 && tex_id <= MAX_TEX_ID) {
 #endif
-	// half precision types
-	if ( isHalf<StoreType>::value ) {
+	// fixed precision
+	if ( isFixed<StoreType>::value ) {
 	  float xN = norm[cb_norm_offset*parity + i];
 #pragma unroll
 	  for (int j=0; j<M; j++) y[j] = xN*tex[cb_offset*parity + i + j*stride];
@@ -437,7 +447,7 @@ template <typename RegType, typename StoreType, int N, int tex_id=-1>
 #ifndef USE_TEXTURE_OBJECTS
       } else { // default load when out of tex_id range
 
-	if ( isHalf<StoreType>::value ) {
+	if ( isFixed<StoreType>::value ) {
 	  float xN = norm[cb_norm_offset*parity + i];
 #pragma unroll
 	  for (int j=0; j<M; j++) {
@@ -472,8 +482,8 @@ template <typename RegType, typename StoreType, int N, int tex_id=-1>
 #ifndef USE_TEXTURE_OBJECTS
     if (tex_id >= 0 && tex_id <= MAX_TEX_ID) {
 #endif
-      // half precision types (FIXME - these don't look correct?)
-      if ( isHalf<StoreType>::value ) {
+      // fixed precision types (FIXME - these don't look correct?)
+      if ( isFixed<StoreType>::value ) {
 	float xN = norm[i];
 #pragma unroll
 	for (int j=0; j<M; j++) y[j] = xN*ghostTex[i + j*ghost_stride[dim]];
@@ -484,7 +494,7 @@ template <typename RegType, typename StoreType, int N, int tex_id=-1>
 #ifndef USE_TEXTURE_OBJECTS
     } else { // default load when out of tex_id range
       
-      if ( isHalf<StoreType>::value ) {
+      if ( isFixed<StoreType>::value ) {
 	float xN = norm[i];
 #pragma unroll
 	for (int j=0; j<M; j++) {
@@ -508,6 +518,7 @@ template <typename RegType, typename StoreType, int N, int tex_id=-1>
       if (sizeof(((StoreType*)0)->x) == sizeof(double)) precision = QUDA_DOUBLE_PRECISION;
       else if (sizeof(((StoreType*)0)->x) == sizeof(float)) precision = QUDA_SINGLE_PRECISION;
       else if (sizeof(((StoreType*)0)->x) == sizeof(short)) precision = QUDA_HALF_PRECISION;
+      else if (sizeof(((StoreType*)0)->x) == sizeof(char)) precision = QUDA_QUARTER_PRECISION;
       else errorQuda("Unknown precision type\n");
       return precision;
     }
@@ -580,20 +591,20 @@ template <typename RegType, typename StoreType, int N, int write, int tex_id=-1>
     ~Spinor() { }
 
     // default store used for simple fields
-  __device__ inline void save(RegType x[], int i, const int parity = 0) {
+    __device__ inline void save(RegType x[], int i, const int parity = 0) {
       if (write) {
-	constexpr int M = (N * vec_length<RegType>::value ) / vec_length<InterType>::value;
-	InterType y[M];
-	convert<InterType, RegType>(y, x, M);
-	
-	if ( isHalf<StoreType>::value ) {
-          float C = store_norm<InterType, M>(ST::norm, y, ST::cb_norm_offset*parity + i);
+        constexpr int M = (N * vec_length<RegType>::value ) / vec_length<InterType>::value;
+        InterType y[M];
+        convert<InterType, RegType>(y, x, M);
+
+        if ( isFixed<StoreType>::value ) {
+          float C = store_norm<M, InterType, StoreType>(ST::norm, y, ST::cb_norm_offset*parity + i);
 #pragma unroll
           for (int j=0; j<M; j++) copyFloatN(SPINOR[ST::cb_offset*parity + i + j*ST::stride], C*y[j]);
-	} else {
+        } else {
 #pragma unroll
           for (int j=0; j<M; j++) copyFloatN(SPINOR[ST::cb_offset*parity + i + j*ST::stride], y[j]);
-	}
+        }
       }
     }
 
