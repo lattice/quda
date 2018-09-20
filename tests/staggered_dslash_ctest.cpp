@@ -1082,8 +1082,13 @@ TEST_P(StaggeredDslashTest, benchmark) {
     // Set n_naiks to 2 if eps_naik != 0.0
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       if (eps_naik != 0.0) {
-        n_naiks = 2;
-        printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
+        if (compute_fatlong) {
+          n_naiks = 2;
+          printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
+        } else {
+          eps_naik = 0.0;
+          printfQuda("Not computing fat-long, ignoring epsilon correction.\n");
+        }
       } else {
         printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
       }
