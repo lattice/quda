@@ -169,9 +169,9 @@ namespace quda {
       dirac_param_precondition.commDim[i] = 0;
     }
 
-//    dirac_param.print();
-//    dirac_param_sloppy.print();
-//    dirac_param_precondition.print();
+    dirac_param.print();
+    dirac_param_sloppy.print();
+    dirac_param_precondition.print();
     
     mat = new DiracMobiusPC(dirac_param);
     nrm_op = new DiracMdagM(mat);
@@ -330,7 +330,7 @@ namespace quda {
     if(tc and fb->Precision() == QUDA_HALF_PRECISION){
       mat_precondition->Dagger(QUDA_DAG_YES);
       mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
-      mat_precondition->dslash5inv_sm_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
+      mat_precondition->Dslash5inv(*ft, *fb, static_cast<QudaParity>(0));
       mat_precondition->Dagger(QUDA_DAG_NO);
     }
     double mdd = xmyNorm(*ft, *fx);
