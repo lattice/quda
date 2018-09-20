@@ -23,18 +23,19 @@ namespace quda {
   template <typename Float, int Nc, int Ns>
     struct ColorSpinor {
 
-      complex<Float> data[Nc*Ns];
+      static constexpr int n = Nc * Ns;
+      complex<Float> data[n];
 
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>() {
 #pragma unroll
-	for (int i=0; i<Nc*Ns; i++) {
+	for (int i=0; i<n; i++) {
 	  data[i] = 0;
 	}
       }
 
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const ColorSpinor<Float, Nc, Ns> &a) {
 #pragma unroll
-	for (int i=0; i<Nc*Ns; i++) {
+	for (int i=0; i<n; i++) {
 	  data[i] = a.data[i];
 	}
       }
@@ -42,7 +43,7 @@ namespace quda {
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator=(const ColorSpinor<Float, Nc, Ns> &a) {
 	if (this != &a) {
 #pragma unroll
-	  for (int i=0; i<Nc*Ns; i++) {
+	  for (int i=0; i<n; i++) {
 	    data[i] = a.data[i];
 	  }
 	}
@@ -52,7 +53,7 @@ namespace quda {
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator+=(const ColorSpinor<Float, Nc, Ns> &a) {
 	if (this != &a) {
 #pragma unroll
-	  for (int i=0; i<Nc*Ns; i++) {
+	  for (int i=0; i<n; i++) {
 	    data[i] += a.data[i];
 	  }
 	}
@@ -109,19 +110,20 @@ namespace quda {
    */
   template <typename Float, int Nc>
     struct ColorSpinor<Float, Nc, 4> {
-    static const int Ns = 4;
-    complex<Float> data[Nc*4];
+    static constexpr int Ns = 4;
+    static constexpr int n = Nc * Ns;
+    complex<Float> data[n];
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>() {
 #pragma unroll
-      for (int i=0; i<Nc*Ns; i++) {
+      for (int i=0; i<n; i++) {
 	data[i] = 0;
       }      
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>(const ColorSpinor<Float, Nc, 4> &a) {
 #pragma unroll
-      for (int i=0; i<Nc*Ns; i++) {
+      for (int i=0; i<n; i++) {
 	data[i] = a.data[i];
       }      
     }
@@ -129,7 +131,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator=(const ColorSpinor<Float, Nc, 4> &a) {
       if (this != &a) {
 #pragma unroll
-	for (int i=0; i<Nc*Ns; i++) {
+	for (int i=0; i<n; i++) {
 	  data[i] = a.data[i];
 	}
       }
@@ -139,7 +141,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator+=(const ColorSpinor<Float, Nc, 4> &a) {
       if (this != &a) {
 #pragma unroll
-	for (int i=0; i<Nc*Ns; i++) {
+	for (int i=0; i<n; i++) {
 	  data[i] += a.data[i];
 	}
       }
@@ -647,19 +649,20 @@ namespace quda {
    */
   template <typename Float, int Nc>
     struct ColorSpinor<Float, Nc, 2> {
-    static const int Ns = 2;
-    complex<Float> data[Nc*2];
+    static constexpr int Ns = 2;
+    static constexpr int n = Nc * Nc;
+    complex<Float> data[n];
     
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>() {
 #pragma unroll
-      for (int i=0; i<Nc*Ns; i++) {
+      for (int i=0; i<n; i++) {
 	data[i] = 0;
       }      
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>(const ColorSpinor<Float, Nc, 2> &a) {
 #pragma unroll
-      for (int i=0; i<Nc*Ns; i++) {
+      for (int i=0; i<n; i++) {
 	data[i] = a.data[i];
       }      
     }
@@ -668,7 +671,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator=(const ColorSpinor<Float, Nc, 2> &a) {
       if (this != &a) {
 #pragma unroll
-	for (int i=0; i<Nc*Ns; i++) {
+	for (int i=0; i<n; i++) {
 	  data[i] = a.data[i];
 	}
       }
@@ -678,7 +681,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator+=(const ColorSpinor<Float, Nc, 2> &a) {
       if (this != &a) {
 #pragma unroll
-	for (int i=0; i<Nc*Ns; i++) {
+	for (int i=0; i<n; i++) {
 	  data[i] += a.data[i];
 	}
       }
@@ -1026,10 +1029,9 @@ namespace quda {
     ColorSpinor<Float,Nc,Ns> operator*(const HMatrix<Float,Nc*Ns> &A, const ColorSpinor<Float,Nc,Ns> &x) {
 
     ColorSpinor<Float,Nc,Ns> y;
-    constexpr int N = Nc*Ns;
 
 #pragma unroll
-    for (int i=0; i<N; i++) {
+    for (int i=0; i<A.n; i++) {
       if (i==0) {
 	y.data[i].x  = A(i,0).real() * x.data[0].real();
 	y.data[i].y  = A(i,0).real() * x.data[0].imag();
@@ -1040,7 +1042,7 @@ namespace quda {
 	y.data[i].y += A(i,0).imag() * x.data[0].real();
       }
 #pragma unroll
-      for (int j=1; j<N; j++) {
+      for (int j=1; j<A.n; j++) {
 	if (i==j) {
 	  y.data[i].x += A(i,j).real() * x.data[j].real();
 	  y.data[i].y += A(i,j).real() * x.data[j].imag();
