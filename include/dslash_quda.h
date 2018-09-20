@@ -87,7 +87,7 @@ namespace quda {
 
 
   void ApplyDslashStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
-        double a, const ColorSpinorField *x, int parity)   ;
+        double a, const ColorSpinorField *x, int parity, bool improved);
 
   // improved staggered Dslash    
   void improvedStaggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge,

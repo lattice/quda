@@ -16,11 +16,11 @@ namespace quda {
   /**
      @brief Parameter structure for driving the Staggered Dslash operator
    */
-  template <typename Float, int nColor, QudaReconstructType reconstruct, bool improved, bool xpay, bool dagger>
+  template <typename Float, int nColor, QudaReconstructType reconstruct_u, QudaReconstructType reconstruct_l, bool improved, bool xpay, bool dagger>
   struct DslashArg {
     using F = typename colorspinor_mapper<Float,1,nColor>::type;
-    using GU = typename gauge_mapper<Float,reconstruct>::type;
-    using GL = typename gauge_mapper<Float,reconstruct>::type;
+    using GU = typename gauge_mapper<Float,reconstruct_u,18,QUDA_STAGGERED_PHASE_MILC>::type;
+    using GL = typename gauge_mapper<Float,reconstruct_l,18,QUDA_STAGGERED_PHASE_MILC>::type;
 
     F out;                // output vector field
     const F in;           // input vector field
@@ -75,7 +75,7 @@ namespace quda {
     coord[4] = 0;
 
 #pragma unroll
-    for (int d = 0; d<nDim; d++) {// loop over dimension{
+    for (int d = 0; d<4; d++) {// loop over dimension{
       //Forward gather - compute fwd offset for vector fetch
       {
       const int fwd_idx = linkIndexP1(coord, arg.dim, d);
@@ -95,13 +95,13 @@ namespace quda {
         const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
         if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
           const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
-          const Link U = arg.U(d, x_cb, parity);
+          const Link L = arg.L(d, x_cb, parity);
           const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-        out += U * in;
+        out += L * in;
         } else {
-          const Link U = arg.U(d, x_cb, parity);
+          const Link L = arg.L(d, x_cb, parity);
           const Vector in = arg.in(fwd3_idx, their_spinor_parity);
-          out += U * in;
+          out += L * in;
         }  
       }
 
@@ -128,13 +128,13 @@ namespace quda {
 
         if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
           const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-          const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
+          const Link L = arg.L.Ghost(d, ghost_idx, 1-parity);
           const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-          out -= conj(U) * in;
+          out -= conj(L) * in;
         } else {
-          const Link U = arg.U(d, gauge_idx, 1-parity);
+          const Link L = arg.L(d, gauge_idx, 1-parity);
           const Vector in = arg.in(back3_idx, their_spinor_parity);
-          out -= conj(U) * in;
+          out -= conj(L) * in;
         }
       }
     } //nDim
@@ -241,45 +241,59 @@ namespace quda {
   };
 
 
-  template <typename Float, int nColor, QudaReconstructType recon>
+  template <typename Float, int nColor, QudaReconstructType recon_u, QudaReconstructType recon_l, bool improved>
     void ApplyDslashStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
            double a, const ColorSpinorField *x, int parity)
   {
     constexpr int nDim = 4;
     if (x) {
-      DslashArg<Float,nColor,recon,false, true, false> arg(out, in, U, L, a, x, parity);
+      DslashArg<Float,nColor,recon_u, recon_l, improved, true, false> arg(out, in, U, L, a, x, parity);
       DslashStaggered<Float,nDim,nColor,decltype(arg) > dslash(arg, in);
       dslash.apply(0);
     } else {
-      DslashArg<Float,nColor,recon,false, false, false> arg(out, in, U, L, a, x, parity);
+      DslashArg<Float,nColor,recon_u, recon_l, improved, false, false> arg(out, in, U, L, a, x, parity);
       DslashStaggered<Float,nDim,nColor,decltype(arg) > dslash(arg, in);
       dslash.apply(0);
     }
   }
 
   // template on the gauge reconstruction
-  template <typename Float, int nColor>
+  template <typename Float, int nColor, bool improved>
     void ApplyDslashStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
           double a, const ColorSpinorField *x, int parity)
   {
-    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, L, a, x, parity);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_13) {
-      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_13>(out, in, U, L, a, x, parity);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_9) {
-      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_9>(out, in, U, L, a, x, parity);
+    if(improved){
+    if (L.Reconstruct()== QUDA_RECONSTRUCT_NO) {
+      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_NO, true>(out, in, U, L, a, x, parity);
+    } else if (L.Reconstruct()== QUDA_RECONSTRUCT_13) {
+      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, true >(out, in, U, L, a, x, parity);
+    } else if (L.Reconstruct()== QUDA_RECONSTRUCT_9) {
+      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_9, true>(out, in, U, L, a, x, parity);
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
     }
   }
+  else{
+      if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
+      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_NO,false>(out, in, U, L, a, x, parity);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
+      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_NO,false>(out, in, U, L, a, x, parity);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
+      errorQuda("Recon 8 not implemented for standard staggered.\n")
+      // ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_NO, false>(out, in, U, L, a, x, parity);
+    } else {
+      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+    }  
+  }
+  }
 
   // template on the number of colors
-  template <typename Float>
+  template <typename Float, bool improved>
     void ApplyDslashStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
           double a, const ColorSpinorField *x, int parity)
   {
     if (in.Ncolor() == 3) {
-      ApplyDslashStaggered<Float,3>(out, in, U, L, a, x, parity);
+      ApplyDslashStaggered<Float,3, improved>(out, in, U, L, a, x, parity);
     } else {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
@@ -295,7 +309,7 @@ namespace quda {
   //out(x) = M*in = - kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   //Uses the kappa normalization for the Wilson operator.
   void ApplyDslashStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
-        double a, const ColorSpinorField *x, int parity)        
+        double a, const ColorSpinorField *x, int parity, bool improved)        
   {
     
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
@@ -312,15 +326,23 @@ namespace quda {
     in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy
 
     if (dslash::aux_worker) dslash::aux_worker->apply(0);
-
+    if (improved){
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyDslashStaggered<double>(out, in, U, L, a, x, parity);
+      ApplyDslashStaggered<double, true>(out, in, U, L, a, x, parity);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyDslashStaggered<float>(out, in, U, L,  a, x, parity);
+      ApplyDslashStaggered<float, true>(out, in, U, L,  a, x, parity);
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
-
+  } else {
+    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
+      ApplyDslashStaggered<double, false>(out, in, U, L, a, x, parity);
+    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+      ApplyDslashStaggered<float, false>(out, in, U, L,  a, x, parity);
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+  }
     in.bufferIndex = (1 - in.bufferIndex);
   }
 

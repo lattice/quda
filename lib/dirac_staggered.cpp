@@ -56,7 +56,8 @@ namespace quda {
       errorQuda("Not supported");
     }
 #else
-    ApplyDslashStaggered(out, in, *gauge, *gauge, 0., nullptr, parity);
+    constexpr bool impoved=false;
+    ApplyDslashStaggered(out, in, *gauge, *gauge, 0., nullptr, parity, impoved);
 #endif
     flops += 570ll*in.Volume();
   }
@@ -75,7 +76,8 @@ namespace quda {
       errorQuda("Not supported");
     }  
 #else
-    ApplyDslashStaggered(out, in, *gauge, *gauge, k, &x, parity);
+    constexpr bool improved=false;
+    ApplyDslashStaggered(out, in, *gauge, *gauge, k, &x, parity, improved);
 #endif
     flops += 582ll*in.Volume();
   }

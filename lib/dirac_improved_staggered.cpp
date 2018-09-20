@@ -51,11 +51,15 @@ namespace quda {
 			      const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+#if 0
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 				  &static_cast<const cudaColorSpinorField&>(in), parity, 
 				  dagger, 0, 0, commDim, profile);
+#else
+    constexpr bool improved = true;
+    ApplyDslashStaggered(out, in, fatGauge, longGauge , 0., nullptr, parity, improved);
+#endif
     } else {
       errorQuda("Not supported");
     }  
