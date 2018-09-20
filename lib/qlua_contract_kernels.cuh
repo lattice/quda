@@ -70,14 +70,23 @@
 
 #define QC(x) qc_quda_##x
 
+constexpr int cSize = 4096;
+
 namespace quda { 
 
   //- C.K. Constant variable declarations
   __constant__ QC_CPLX cS1_gvec[QC_LEN_G];
   __constant__ QC_CPLX cS2_gvec[QC_LEN_G];
+  __constant__ char cGamma[cSize]; // constant buffer for gamma matrices on GPU
+
+
+  QC_REAL gamma_left_coeff_Re_cMem(int m, int n, int c);
+  int gamma_left_ind_cMem(int m, int n);
+
 
   //-- Forward declarations for contraction wrappers
   void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
+  void qcCopyGammaToSymbol(qcTMD_gamma gamma_h);
 
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);

@@ -62,6 +62,52 @@ namespace quda {
     return gamma_left_ind_[m][n];
   }
 
+
+  QC_REAL gamma_left_coeff_Re_cMem(int m, int n, int c){
+    CONSTVAR_ QC_REAL gamma_left_coeff_Re_[QC_LEN_G][QC_Ns][2] = {
+      { {1,0}, {1,0}, {1,0}, {1,0} },             /* G0 = 1 */
+      { {0,1}, {0,1},{0,-1},{0,-1} },             /* G1 = g1 */
+      {{-1,0}, {1,0}, {1,0},{-1,0} },             /* G2 = g2 */
+      {{0,-1}, {0,1},{0,-1}, {0,1} },             /* G3 = g1 g2 */
+      { {0,1},{0,-1},{0,-1}, {0,1} },             /* G4 = g3 */
+      {{-1,0}, {1,0},{-1,0}, {1,0} },             /* G5 = g1 g3 */
+      {{0,-1},{0,-1},{0,-1},{0,-1} },             /* G6 = g2 g3 */
+      { {1,0}, {1,0},{-1,0},{-1,0} },             /* G7 = g1 g2 g3 */
+      { {1,0}, {1,0}, {1,0}, {1,0} },             /* G8 = g4 */
+      { {0,1}, {0,1},{0,-1},{0,-1} },             /* G9 = g1 g4 */
+      {{-1,0}, {1,0}, {1,0},{-1,0} },             /* G10= g2 g4 */
+      {{0,-1}, {0,1},{0,-1}, {0,1} },             /* G11= g1 g2 g4 */
+      { {0,1},{0,-1},{0,-1}, {0,1} },             /* G12= g3 g4 */
+      {{-1,0}, {1,0},{-1,0}, {1,0} },             /* G13= g1 g3 g4 */
+      {{0,-1},{0,-1},{0,-1},{0,-1} },             /* G14= g2 g3 g4 */
+      { {1,0}, {1,0},{-1,0},{-1,0} },             /* G15= g1 g2 g3 g4 */
+    };
+    return gamma_left_coeff_Re_[m][n][c];
+  }
+
+  int gamma_left_ind_cMem(int m, int n){
+    CONSTVAR_ int gamma_left_ind_[QC_LEN_G][QC_Ns] = {
+      { 0, 1, 2, 3 },             /* G0 = 1 */
+      { 3, 2, 1, 0 },             /* G1 = g1 */
+      { 3, 2, 1, 0 },             /* G2 = g2 */
+      { 0, 1, 2, 3 },             /* G3 = g1 g2 */
+      { 2, 3, 0, 1 },             /* G4 = g3 */
+      { 1, 0, 3, 2 },             /* G5 = g1 g3 */
+      { 1, 0, 3, 2 },             /* G6 = g2 g3 */
+      { 2, 3, 0, 1 },             /* G7 = g1 g2 g3 */
+      { 2, 3, 0, 1 },             /* G8 = g4 */
+      { 1, 0, 3, 2 },             /* G9 = g1 g4 */
+      { 1, 0, 3, 2 },             /* G10= g2 g4 */
+      { 2, 3, 0, 1 },             /* G11= g1 g2 g4 */
+      { 0, 1, 2, 3 },             /* G12= g3 g4 */
+      { 3, 2, 1, 0 },             /* G13= g1 g3 g4 */
+      { 3, 2, 1, 0 },             /* G14= g2 g3 g4 */
+      { 0, 1, 2, 3 },             /* G15= g1 g2 g3 g4 */
+    };
+    return gamma_left_ind_[m][n];
+  }
+
+
   /* bits (gammas) in 0..15 (in G0..G15) */
   inline __device__ int qc_bitcount16(int n){
     CONSTVAR_ int qc_bitcount16_[QC_LEN_G] = { 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4 };
@@ -1001,6 +1047,10 @@ namespace quda {
     cudaMemcpyToSymbol(cS1_gvec, S1, sizeof(complex<QC_REAL>)*QC_LEN_G);
   }
 
+  void qcCopyGammaToSymbol(qcTMD_gamma gamma_h){
+    cudaMemcpyToSymbol(cGamma, &gamma_h, sizeof(qcTMD_gamma));
+  }
+
 
   __device__ void prepareDevicePropSite(complex<QC_REAL> *devProp, Vector *vec, bool preserveBasis){
 
@@ -1429,6 +1479,12 @@ namespace quda {
 
   extern __shared__ complex<QC_REAL> qc_U_D_aD_shared[];
 
+
+  inline __device__ const qcTMD_gamma* gammaMat() {
+    return reinterpret_cast<const qcTMD_gamma*>(cGamma);
+  }
+
+
   /* local qbarUq contractions for TMD */
   /* compute (res)[is,js] += a * \sum_{jc} conj(v2[jc,js]) * (\sum_{ic} u[jc,ic] v1[ic,is]) */
   __global__ void tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue(
@@ -1459,6 +1515,8 @@ namespace quda {
     complex<QC_REAL> *gres  = u_v1 + QC_LEN_D ;
     complex<QC_REAL> *umat  = gres + QC_LEN_G ;
 
+    const qcTMD_gamma *gamma = gammaMat();
+
     /* index into GaugeField */
     int ulink_idx;
     { /* speculative calc for extendedGauge */
@@ -1472,20 +1530,34 @@ namespace quda {
     ulink_idx = arg->extendedGauge ? ulink_idx : x_cb;
     
     /* load umat */
+#if 0
     if (i1 < QC_Nc && i2 < QC_Nc)
       umat[QC_LIDX_M(i1,i2)] = arg->U.getData(arg->i_mu, ulink_idx, pty, i1, i2);
     //__syncthreads(); /* no need until the 1st pair v1,v2 are also read */
-    
+#else
+    if (0 == i12) {
+      *(reinterpret_cast<Link *>(umat)) = arg->U(arg->i_mu, ulink_idx, pty);
+    }
+#endif
     gres[QC_LIDX_G(i1, i2)] = 0.;
     /* loop over vectors */
+#pragma unroll
     for (int i = 0 ; i < QUDA_PROP_NVEC /*TODO replace with nvec for disconnected contractions*/ ; i++){
       /* load v1, v2 */
+#if 0
+#define QC_LIDX_D_TR(ic, is) QC_LIDX_D(ic, is)
       if (i1 < QC_Nc) {
-        // v1[QC_LIDX_D(i1,i2)] = arg->fwdProp[i](x_cb, pty)(i2, i1); /* sic! [color, spin] <- [spin, color] */
-        // v2[QC_LIDX_D(i1,i2)] = arg->bwdProp[i](x_cb, pty)(i2, i1); /* sic! [color, spin] <- [spin, color] */
         v1[QC_LIDX_D(i1,i2)] = arg->fwdProp[i].getData(x_cb, pty, i2, i1); /* sic! [color, spin] <- [spin, color] */
         v2[QC_LIDX_D(i1,i2)] = arg->bwdProp[i].getData(x_cb, pty, i2, i1); /* sic! [color, spin] <- [spin, color] */
       }
+#else
+#define QC_LIDX_D_TR(ic, is) ((ic) + QC_Nc*(is))
+      if (0 == i12) {
+        *(reinterpret_cast<Vector *>(v1)) = arg->fwdProp[i](x_cb, pty);
+        *(reinterpret_cast<Vector *>(v2)) = arg->bwdProp[i](x_cb, pty); 
+      }
+      /* FIXME change QC_LIDX_V to Vector indexing */
+#endif
       __syncthreads();
 
       /* compute u.v1 */
@@ -1494,9 +1566,9 @@ namespace quda {
 
 #pragma unroll
         for (int kc = 0 ; kc < QC_Nc ; kc++)
-          s += umat[QC_LIDX_M(i1, kc)] * v1[QC_LIDX_D(kc,i2)];
+          s += umat[QC_LIDX_M(i1, kc)] * v1[QC_LIDX_D_TR(kc,i2)];
 
-        u_v1[QC_LIDX_D(i1,i2)] = s;
+        u_v1[QC_LIDX_D_TR(i1,i2)] = s;
       }
       __syncthreads();
 
@@ -1505,27 +1577,29 @@ namespace quda {
         complex<QC_REAL> s = 0;
 
         for (int kc = 0 ; kc < QC_Nc ; kc++)
-          s += conj(v2[QC_LIDX_D(kc, i2)]) * u_v1[QC_LIDX_D(kc,i1)];
+          s += conj(v2[QC_LIDX_D_TR(kc, i2)]) * u_v1[QC_LIDX_D_TR(kc,i1)];
 
         gres[QC_LIDX_G(i1, i2)] += s;
       }
       __syncthreads(); /* sic! avoid overwrite v2 in the next iter; sync gres before Gamma proj */
-    }
+    }//- loop over prop-i
 
 
     /* proj on Gamma(ng) -> Corr_dev[tid + lV*ng] */
     int ng  = i12;
 #if 1
     QC_CPLX s = 0;
+#pragma unroll
     for (int is = 0 ; is < QC_Ns ; is++) {
-      int js = gamma_left_ind(ng, is);
-      s += gamma_left_coeff(ng, is) * gres[QC_LIDX_G(js, is)];
+      int js = gamma->left_ind[ng][is];
+      s += gamma->left_coeff[ng][is] * gres[QC_LIDX_G(js, is)];
     }
     Corr_dev[tid + lV*ng] = s;
 #else
     Corr_dev[tid + lV*ng] = gres[QC_LIDX_G(i1, i2)]; /* XXX skip Gamma-projection, for testing only! */
 #endif
-  }
+
+  }//-kernel
 
 
 

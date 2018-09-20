@@ -664,6 +664,95 @@ namespace quda {
     TuneKey tuneKey() const { return TuneKey(meta->VolString(), typeid(*this).name(), aux); }
   };
 
+  //-- Class for TMD contractions with shmem, make it tunable
+  class qcTMDshmem : public TunableVectorY {
+
+  protected:
+    qcTMD_Arg *arg_dev;
+    const cudaColorSpinorField *meta;
+    qluaCntr_Type cntrType;
+    bool extendedGauge;
+    complex<QUDA_REAL> *corrQuda_dev;
+    int Nc;
+    int Ns;
+    int blockdimZ;
+    size_t shmem_per_site;
+    
+    long long flops() const{
+      return (long long)meta->VolumeCB() * meta->SiteSubset() * (Nc*Nc*Ns*Ns*(1+Nc*Ns) * 8 + Ns*Ns*Ns * 2);
+    }
+    long long bytes() const{
+      return (long long)meta->VolumeCB() * meta->SiteSubset() * (2*Ns*Ns*Nc*Nc + Nc*Nc) * 2*8;
+    }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return meta->VolumeCB(); }
+
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { 
+      return param.block.x * param.block.y * shmem_per_site ; 
+    }
+    virtual int blockStep() const { 
+      return /*FIXME*/4*((deviceProp.warpSize + blockdimZ - 1) / blockdimZ) ; 
+    }
+    virtual int blockMin() const { 
+      return /*FIXME*/4*((deviceProp.warpSize + blockdimZ - 1) / blockdimZ) ; 
+    }
+
+  public:
+    qcTMDshmem(const cudaColorSpinorField *meta_, qcTMD_Arg *arg_dev_, 
+        complex<QUDA_REAL> *corrQuda_dev_, 
+        qluaCntr_Type cntrType_, bool extendedGauge_,
+        int blockdimZ_, size_t shmem_per_site_)
+      : TunableVectorY(meta_->SiteSubset()), meta(meta_),
+	arg_dev(arg_dev_), corrQuda_dev(corrQuda_dev_), cntrType(cntrType_), 
+        extendedGauge(extendedGauge_), Nc(QUDA_Nc), Ns(QUDA_Ns),
+        blockdimZ(blockdimZ_), shmem_per_site(shmem_per_site_)
+    {
+      strcpy(aux, meta_->AuxString());
+      strcat(aux, comm_dim_partitioned_string());
+    }
+    virtual ~qcTMDshmem() { }
+
+    long long getFlops(){return flops();}
+    long long getBytes(){return bytes();}
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), /*getVerbosity()*/QUDA_DEBUG_VERBOSE);
+      if(cntrType != what_tmd_g_F_B) 
+        errorQuda("qcTMDshmem::apply(): Support only TMD contractions for now!\n");
+      printfQuda("qcTMDshmem::apply(): grid={%ld,%ld,%ld} block={%ld,%ld,%ld} shmem=%ld\n",
+          (long)tp.grid.x, (long)tp.grid.y, (long)tp.grid.z, 
+          (long)tp.block.x, (long)tp.block.y, (long)tp.block.z,
+          (long)tp.shared_bytes);
+      tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue 
+        <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(corrQuda_dev, arg_dev);
+    }
+    void initTuneParam(TuneParam &param) const
+    {
+      TunableVectorY::initTuneParam(param);
+      param.block.z = blockdimZ;
+      param.grid.z  = 1;
+    }
+    void defaultTuneParam(TuneParam &param) const
+    {
+      TunableVectorY::defaultTuneParam(param);
+      param.block.z = blockdimZ;
+      param.grid.z  = 1;
+    }
+
+    TuneKey tuneKey() const { return TuneKey(meta->VolString(), typeid(*this).name(), aux); }
+  };
+
+
+  void qcCopyGammaToConstMem(){
+    qcTMD_gamma gamma_h;
+    for(int m=0;m<QC_LEN_G;m++){
+      for(int n=0;n<QC_Ns;n++){
+	gamma_h.left_ind[m][n] = gamma_left_ind_cMem(m, n);
+	gamma_h.left_coeff[m][n] = {gamma_left_coeff_Re_cMem(m,n,0), gamma_left_coeff_Re_cMem(m,n,1)};
+      }
+    }
+    qcCopyGammaToSymbol(gamma_h);
+  }
 
   //-Top-level function
   void QuarkContractTMD_GPU(QuarkTMD_state *qcs){
@@ -673,6 +762,8 @@ namespace quda {
     if(qcs->cntrType != what_tmd_g_F_B)
       errorQuda("%s: This function supports only TMD contractions!\n", func_name);
 
+    printfQuda("%s: Performing TMD Step %d\n", func_name, qcs->iStep);
+
     qcTMD_Arg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, qcs->wlinks, qcs->i_wl_vbv, qcs->paramAPI.preserveBasis);    
     qcTMD_Arg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(arg) );
@@ -680,34 +771,40 @@ namespace quda {
     cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
     checkCudaError();
 
+    if(qcs->iStep == 1) qcCopyGammaToConstMem();
+    
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
     double t1; 
+    t1 = MPI_Wtime();
 #if 0  /* no shmem */
 #  if 0 /* no tuning */
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-    t1 = MPI_Wtime();
     if(arg.extendedGauge)
       tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt <<< gridDim, blockDim >>>(qcs->corrQuda_dev, arg_dev);
     else
       tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue <<< gridDim, blockDim >>>(qcs->corrQuda_dev, arg_dev);
 #  else /* auto tuning*/
-    t1 = MPI_Wtime();
     qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType, arg.extendedGauge);
     printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
     printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
     contractTMD.apply(0);
 #  endif
 #else /* shmem, no tuning */
+#  if 0
 #  define SITES_PER_DIMX 16
-    dim3 blockDim(SITES_PER_DIMX, arg.nParity, QC_UDD_THREADS_PER_SITE); /* blockDim={16*nSitesPerBlock, arg.nParity, 1} */
+    dim3 blockDim(SITES_PER_DIMX, arg.nParity, QC_UDD_THREADS_PER_SITE); 
     dim3 gridDim((arg.volumeCB + blockDim.x - 1) / blockDim.x, 1, 1);
     size_t shmem_size = blockDim.x * blockDim.y * QC_UDD_SHMEM_PER_SITE;
-    t1 = MPI_Wtime();
-    if(arg.extendedGauge)
-      tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue <<< gridDim, blockDim, shmem_size >>>(qcs->corrQuda_dev, arg_dev);
-    else
-      tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue <<< gridDim, blockDim, shmem_size >>>(qcs->corrQuda_dev, arg_dev);
+    tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue 
+      <<< gridDim, blockDim, shmem_size >>>(qcs->corrQuda_dev, arg_dev);
+#  else
+    qcTMDshmem contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType, 
+        arg.extendedGauge, QC_UDD_THREADS_PER_SITE, QC_UDD_SHMEM_PER_SITE);
+    printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
+    printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
+    contractTMD.apply(0);
+#  endif
 #endif
 
     cudaDeviceSynchronize();

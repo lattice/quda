@@ -1362,6 +1362,11 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   printfQuda("%s: Momentum projection buffers allocated.\n", func_name);
   //-------------------------------------------------------------
 
+  //- Copy the gamma matrix related objects to __constant__ GPU memory
+  //- CK-TODO: Comment for now, it would be better if called here
+  //  qcCopyGammaToConstMem();
+
+
   printfQuda("%s: Final Memory Report (after memory allocations):\n", func_name);
   printGPUMemInfo();
 

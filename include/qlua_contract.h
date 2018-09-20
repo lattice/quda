@@ -15,6 +15,8 @@
 #include <color_spinor_field_order.h>
 #include <interface_qlua_internal.h>
 
+#define QUDA_LEN_G (QUDA_Ns*QUDA_Ns)
+
 namespace quda {
 
   //-C.K. Typedef Propagator, Gauge Field and Vector Structures
@@ -346,6 +348,12 @@ namespace quda {
 
   };
   //---------------------------------------------------------------------
+
+
+  struct qcTMD_gamma {
+    int left_ind[QUDA_LEN_G][QUDA_Ns];
+    complex<QUDA_REAL> left_coeff[QUDA_LEN_G][QUDA_Ns];
+  };
 
   
 }//-- namespace quda
