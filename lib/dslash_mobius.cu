@@ -218,7 +218,7 @@ namespace quda {
  
     unsigned int shared_bytes_per_block(int x, int y) const { 
       if(DS_type == 9){
-        return ( (y*4)*(y*4+8)+(y*4)*(x*6+8)*2 )*2; // 4*4*2 TODO: fix this!
+        return ( (y*4)*(y*4+0)+(y*4)*(x*6+16)*1 )*2; // 4*4*2 TODO: fix this!
       }else{
         return sharedBytesPerThread()*x*y;
       }
