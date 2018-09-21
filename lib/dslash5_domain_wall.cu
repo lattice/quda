@@ -18,7 +18,6 @@ namespace quda {
     complex<real> a[QUDA_MAX_DWF_LS]; // xpay coefficients
     complex<real> b[QUDA_MAX_DWF_LS];
     complex<real> c[QUDA_MAX_DWF_LS];
-    complex<real> inv;
   };
 
   constexpr int size = 4096;
@@ -327,7 +326,6 @@ namespace quda {
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-
   template <typename real, int nColor, bool dagger, Dslash5Type type, bool shared, typename Vector, typename Arg>
   __device__ __host__ inline Vector variableInv(Arg &arg, int parity, int x_cb, int s_) {
 
@@ -346,20 +344,23 @@ namespace quda {
       int s = s_;
       // FIXME - compiler will always set these auto types to complex
       // which kills perf for DWF and regular Mobius
-      auto R = (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.c : z->c[0];
+      auto R = (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.c : z->c[0].real();
+      HalfVector r;
       for (int s_count = 0; s_count<arg.Ls; s_count++) {
-        auto factorR = R * ( s_ < s ? -arg.m_f : static_cast<real>(1.0) );
+        auto factorR = ( s_ < s ? -arg.m_f * R : R );
 
         if (shared) {
-          out += factorR * cache.load(threadIdx.x, s, parity).reconstruct(4, proj_dir);
+          r += factorR * cache.load(threadIdx.x, s, parity);
         } else {
           Vector in = arg.in(s*arg.volume_4d_cb + x_cb, parity);
-          out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+          r += factorR * in.project(4, proj_dir);
         }
 
-        R *= (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.b : z->b[s];
+        R *= (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.b : z->b[s].real();
         s = (s + arg.Ls - 1)%arg.Ls;
       }
+
+      out += r.reconstruct(4, proj_dir);
     }
 
     if (shared) cache.sync(); // ensure we finish R before overwriting cache
@@ -369,20 +370,23 @@ namespace quda {
       if (shared) cache.save(in.project(4, proj_dir));
 
       int s = s_;
-      auto L = (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.c : z->c[0];
+      auto L = (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.c : z->c[0].real();
+      HalfVector l;
       for (int s_count = 0; s_count<arg.Ls; s_count++) {
-        auto factorL = L * ( s_ > s ? -arg.m_f : static_cast<real>(1.0));
+        auto factorL = ( s_ > s ? -arg.m_f * L : L );
 
         if (shared) {
-          out += factorL * (cache.load(threadIdx.x, s, parity)).reconstruct(4, proj_dir);
+          l += factorL * cache.load(threadIdx.x, s, parity);
         } else {
           Vector in = arg.in(s*arg.volume_4d_cb + x_cb, parity);
-          out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+          l += factorL * in.project(4, proj_dir);
         }
 
-        L *= (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.b : z->b[s];
+        L *= (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.b : z->b[s].real();
         s = (s + 1)%arg.Ls;
       }
+
+      out += l.reconstruct(4, proj_dir);
     }
 
     return out;
@@ -419,7 +423,7 @@ namespace quda {
         out = x + arg.a*out;
       } else if (type == M5_INV_ZMOBIUS) {
         auto *z = coeff<real>();
-        out = x + z->a[s] * out;
+        out = x + z->a[s].real() * out;
       }
     }
 
@@ -491,11 +495,13 @@ namespace quda {
         flops_ = n * (8ll*bulk + 10ll*wall + 8ll * meta.Volume() +  (arg.xpay ? 8ll * meta.Volume() : 0) );
         break;
       case M5_INV_DWF:
-      case M5_INV_MOBIUS:
-        flops_ = (n * n * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume(); // 8?
+      case M5_INV_MOBIUS: // fixme flops
+        //flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
+        flops_ = (144 * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
         break;
       case M5_INV_ZMOBIUS:
-        flops_ = (n * n * Ls + (arg.xpay ? 8ll : 0)) * meta.Volume(); // 16?
+        //flops_ = ((12 + 16 * n) * Ls + (arg.xpay ? 8ll : 0)) * meta.Volume();
+        flops_ = (144 * Ls + (arg.xpay ? 8ll : 0)) * meta.Volume();
         break;
       default:
 	errorQuda("Unknown Dslash5Type %d", arg.type);
