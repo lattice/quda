@@ -902,11 +902,10 @@ exit(-1);
   }
   free(kappa_5);
 } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH){
-  double *kappa_b, *kappa_c, *kappa_5, *kappa_mdwf;
-  kappa_b = (double*)malloc(Lsdim*sizeof(double));
-  kappa_c = (double*)malloc(Lsdim*sizeof(double));
-  kappa_5 = (double*)malloc(Lsdim*sizeof(double));
-  kappa_mdwf = (double*)malloc(Lsdim*sizeof(double));
+  double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+  double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+  double _Complex *kappa_5 = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+  double _Complex *kappa_mdwf = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
   for(int xs = 0 ; xs < Lsdim ; xs++)
   {
     kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
@@ -925,7 +924,7 @@ exit(-1);
     mdw_dslash_4_pre(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5, true);
     break;
     case 3:
-    dslash_5_inv(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_mdwf);
+    mdw_dslash_5_inv(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_mdwf);
     break;
     case 4:    
     mdw_matpc(spinorRef->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);

@@ -508,9 +508,8 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        double *kappa_b, *kappa_c;
-        kappa_b = (double*)malloc(Lsdim*sizeof(double));
-        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
@@ -566,9 +565,8 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        double *kappa_b, *kappa_c;
-        kappa_b = (double*)malloc(Lsdim*sizeof(double));
-        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
@@ -642,9 +640,8 @@ int main(int argc, char **argv)
         dw_4d_matpc(spinorTmp, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
         dw_4d_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        double *kappa_b, *kappa_c;
-        kappa_b = (double*)malloc(Lsdim*sizeof(double));
-        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
