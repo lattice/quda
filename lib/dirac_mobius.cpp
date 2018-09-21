@@ -233,7 +233,7 @@ namespace quda {
     Complex zb_5[QUDA_MAX_DWF_LS];
     Complex zc_5[QUDA_MAX_DWF_LS];
     for (int i=0; i<Ls; i++) { zb_5[i] = b_5[i]; zc_5[i] = c_5[i]; }
-    ApplyDslash5(out, in, in, mass, m5, zb_5, zc_5, 0.0, dagger, M5_INV_MOBIUS);
+    ApplyDslash5(out, in, in, mass, m5, zb_5, zc_5, 0.0, dagger, M5_INV_ZMOBIUS);
 
 #else
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
@@ -241,6 +241,15 @@ namespace quda {
 		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 3, profile);
 #endif
     
+    if (0) {
+      //M5 = 1 + 0.5*kappa_b/kappa_c * D5
+      using namespace blas;
+      cudaColorSpinorField A(out);
+      Dslash5(A, out, parity);
+      printfQuda("Dslash5Xpay = %e M5inv = %e in = %e\n", norm2(A), norm2(out), norm2(in));
+      exit(0);
+    }
+
     long long Ls = in.X(4);
     flops += 144LL*(long long)in.Volume()*Ls + 3LL*Ls*(Ls-1LL);
   }
@@ -257,7 +266,7 @@ namespace quda {
     Complex zb_5[QUDA_MAX_DWF_LS];
     Complex zc_5[QUDA_MAX_DWF_LS];
     for (int i=0; i<Ls; i++) { zb_5[i] = b_5[i]; zc_5[i] = c_5[i]; }
-    ApplyDslash5(out, in, x, mass, m5, zb_5, zc_5, k, dagger, M5_INV_MOBIUS);
+    ApplyDslash5(out, in, x, mass, m5, zb_5, zc_5, k, dagger, M5_INV_ZMOBIUS);
 #else
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),

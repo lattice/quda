@@ -67,13 +67,14 @@ namespace quda {
     DSLASH5_MOBIUS_PRE,
     DSLASH5_MOBIUS,
     M5_INV_DWF,
-    M5_INV_MOBIUS
+    M5_INV_MOBIUS,
+    M5_INV_ZMOBIUS
   };
 
   /**
-     @brief Apply the domain-wall / mobius Dslash5 operator.  In the
-     current implementation, it is expected that the color-spinor
-     fields are 4-d preconditioned.
+     @brief Apply either the domain-wall / mobius Dslash5 operator or
+     the M5 inverse operator.  In the current implementation, it is
+     expected that the color-spinor fields are 4-d preconditioned.
      @param[out] out Result color-spinor field
      @param[in] in Input color-spinor field
      @param[in] x Auxilary input color-spinor field
