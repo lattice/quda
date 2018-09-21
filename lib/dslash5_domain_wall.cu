@@ -5,6 +5,7 @@
 #include <dslash_quda.h>
 #include <inline_ptx.h>
 #include <shared_memory_cache_helper.cuh>
+#include <math_helper.cuh>
 
 namespace quda {
 
@@ -12,6 +13,12 @@ namespace quda {
 
   /**
      @brief Structure containing zMobius / Zolotarev coefficients
+
+     FIXME
+     - fix flops counters
+     - check dagger operators are correct - there might need to be a
+       shift by 1 in which coefficients are used and conjugation of coefficients
+     - use kappa notation and not b/c for consistency with other codes and sanity
   */
   template <typename real>
   struct coeff_5 {
@@ -23,6 +30,36 @@ namespace quda {
   constexpr int size = 4096;
   static __constant__ char mobius_d[size]; // constant buffer used for Mobius coefficients for GPU kernel
   static char mobius_h[size];              // constant buffer used for Mobius coefficients for CPU kernel
+
+  /**
+     @brief Helper function for grabbing the constant struct, whether
+     we are on the GPU or CPU.
+  */
+  template <typename real>
+  inline __device__ __host__ const coeff_5<real>* coeff() {
+#ifdef __CUDA_ARCH__
+    return reinterpret_cast<const coeff_5<real>*>(mobius_d);
+#else
+    return reinterpret_cast<const coeff_5<real>*>(mobius_h);
+#endif
+  }
+
+  template <typename real, Dslash5Type, typename Arg> struct coeff_type {
+    typedef real type;
+    const Arg &arg;
+    __device__ __host__ coeff_type(const Arg &arg) : arg(arg) { }
+    __device__ __host__ real a(int s) { return arg.a; }
+    __device__ __host__ real b(int s) { return arg.b; }
+    __device__ __host__ real c(int s) { return arg.c; }
+  };
+
+  template <typename real, typename Arg> struct coeff_type<real,M5_INV_ZMOBIUS,Arg> {
+    typedef complex<real> type;
+    __device__ __host__ coeff_type(const Arg &arg) { }
+    __device__ __host__ complex<real> a(int s) { return coeff<real>()->a[s]; }
+    __device__ __host__ complex<real> b(int s) { return coeff<real>()->b[s]; }
+    __device__ __host__ complex<real> c(int s) { return coeff<real>()->c[s]; }
+  };
 
   /**
      @brief Parameter structure for applying the Dslash
@@ -125,19 +162,6 @@ namespace quda {
   };
 
   /**
-     @brief Helper function for grabbing the constant struct, whether
-     we are on the GPU or CPU.
-  */
-  template <typename real>
-  inline __device__ __host__ const coeff_5<real>* coeff() {
-#ifdef __CUDA_ARCH__
-    return reinterpret_cast<const coeff_5<real>*>(mobius_d);
-#else
-    return reinterpret_cast<const coeff_5<real>*>(mobius_h);
-#endif
-  }
-
-  /**
      @brief Apply the D5 operator at given site
      @param[in] arg Argument struct containing any meta data and accessors
      @param[in] parity Parity we are on
@@ -234,27 +258,6 @@ namespace quda {
     dslash5<Float,nColor,dagger,xpay,type>(arg, parity, x_cb, s);
   }
 
-  /*
-    @brief Fast power function that works for negative "a" argument
-    @param a argument we want to raise to some power
-    @param b power that we want to raise a to
-    @return pow(a,b)
-  */
-  template<typename real>
-  __device__ __host__ inline real __fast_pow(real a, int b) {
-#ifdef __CUDA_ARCH__
-    if (sizeof(real) == sizeof(double)) {
-      return pow(a, b);
-    } else {
-      float sign = signbit(a) ? -1.0f : 1.0f;
-      float power = __powf(fabsf(a), b);
-      return b&1 ? sign * power : power;
-    }
-#else
-    return std::pow(a, b);
-#endif
-  }
-
   /**
      @brief Apply the M5 inverse operator at a given site on the
      lattice.  This is the original algorithm as described in Kim and
@@ -273,7 +276,6 @@ namespace quda {
   template <typename real, int nColor, bool dagger, Dslash5Type type, bool shared, typename Vector, typename Arg>
   __device__ __host__ inline Vector constantInv(Arg &arg, int parity, int x_cb, int s_) {
 
-    auto *z = coeff<real>();
     const auto k = arg.b;
     const auto inv = arg.c;
 
@@ -331,7 +333,7 @@ namespace quda {
 
     constexpr int nSpin = 4;
     typedef ColorSpinor<real,nColor,nSpin/2> HalfVector;
-    auto *z = coeff<real>();
+    coeff_type<real,type,Arg> coeff(arg);
     Vector in = arg.in(s_*arg.volume_4d_cb + x_cb, parity);
     Vector out;
 
@@ -342,9 +344,7 @@ namespace quda {
       if (shared) cache.save(in.project(4, proj_dir));
 
       int s = s_;
-      // FIXME - compiler will always set these auto types to complex
-      // which kills perf for DWF and regular Mobius
-      auto R = (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.c : z->c[0].real();
+      auto R = coeff.c(0);
       HalfVector r;
       for (int s_count = 0; s_count<arg.Ls; s_count++) {
         auto factorR = ( s_ < s ? -arg.m_f * R : R );
@@ -356,7 +356,7 @@ namespace quda {
           r += factorR * in.project(4, proj_dir);
         }
 
-        R *= (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.b : z->b[s].real();
+        R *= coeff.b(s);
         s = (s + arg.Ls - 1)%arg.Ls;
       }
 
@@ -370,7 +370,7 @@ namespace quda {
       if (shared) cache.save(in.project(4, proj_dir));
 
       int s = s_;
-      auto L = (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.c : z->c[0].real();
+      auto L = coeff.c(0);
       HalfVector l;
       for (int s_count = 0; s_count<arg.Ls; s_count++) {
         auto factorL = ( s_ > s ? -arg.m_f * L : L );
@@ -382,7 +382,7 @@ namespace quda {
           l += factorL * in.project(4, proj_dir);
         }
 
-        L *= (type == M5_INV_DWF || type == M5_INV_MOBIUS) ? arg.b : z->b[s].real();
+        L *= coeff.b(s);
         s = (s + 1)%arg.Ls;
       }
 
@@ -409,9 +409,10 @@ namespace quda {
     constexpr int nSpin = 4;
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,nSpin> Vector;
+    coeff_type<real,type,Arg> coeff(arg);
 
     Vector out;
-    if (type == M5_INV_DWF || type == M5_INV_MOBIUS) {
+    if (0) {//type == M5_INV_DWF || type == M5_INV_MOBIUS) {
       out = constantInv<real,nColor,dagger,type,shared,Vector>(arg, parity, x_cb, s);
     } else { // zMobius, must call variableInv
       out = variableInv<real,nColor,dagger,type,shared,Vector>(arg, parity, x_cb, s);
@@ -419,12 +420,7 @@ namespace quda {
 
     if (xpay) {
       Vector x = arg.x(s*arg.volume_4d_cb + x_cb, parity);
-      if (type == M5_INV_DWF || type == M5_INV_MOBIUS) {
-        out = x + arg.a*out;
-      } else if (type == M5_INV_ZMOBIUS) {
-        auto *z = coeff<real>();
-        out = x + z->a[s].real() * out;
-      }
+      out = x + coeff.a(s) * out;
     }
 
     arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
@@ -495,7 +491,7 @@ namespace quda {
         flops_ = n * (8ll*bulk + 10ll*wall + 8ll * meta.Volume() +  (arg.xpay ? 8ll * meta.Volume() : 0) );
         break;
       case M5_INV_DWF:
-      case M5_INV_MOBIUS: // fixme flops
+      case M5_INV_MOBIUS: // FIXME flops
         //flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
         flops_ = (144 * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
         break;
