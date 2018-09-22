@@ -12,15 +12,25 @@
 #include <lanczos_quda.h>
 #include <ritz_quda.h>
 
+//---------------------------------//
+// feature/eigensolver notice      //
+// Quarantined during development  //
+//---------------------------------//
+
+#if 0
 namespace quda {
 
   void RitzMat::operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {
     using namespace blas;
-    
-    const double alpha = pow(cheby_param[0], 2);
-    const double beta  = pow(cheby_param[1]+fabs(shift), 2);
 
+    //Clean Me
+    //const double alpha = pow(cheby_param[0], 2);
+    //const double beta  = pow(cheby_param[1]+fabs(shift), 2);
+
+    const double alpha = 8.0e-2;
+    const double beta  = 4.0;
+    
     const double c1 = 2.0*(alpha+beta)/(alpha-beta); 
     const double c0 = 2.0/(alpha+beta); 
 
@@ -68,3 +78,4 @@ namespace quda {
     }
   }
 }
+#endif 

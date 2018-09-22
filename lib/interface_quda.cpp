@@ -181,6 +181,9 @@ static TimeProfile profileDslash("dslashQuda");
 //!< Profiler for arpackEigensolveQuda
 static TimeProfile profileArpackEigensolve("arpackEigensolveQuda");
 
+//!< Profiler for lanczosEigensolveQuda
+static TimeProfile profileLanczosEigensolve("lanczosEigensolveQuda");
+
 //!< Profiler for invertQuda
 static TimeProfile profileInvert("invertQuda");
 
@@ -2241,13 +2244,22 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
+//---------------------------------//
+// feature/eigensolver notice      //
+// Quarantined during development  //
+//---------------------------------//
 
+#if 0
 void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
-                 void *hp_alpha, void *hp_beta, QudaEigParam *eig_param)
-{
+                 void *hp_alpha, void *hp_beta, QudaEigParam *eig_param) {
+
+  printfQuda("Flag 1\n");
+
   QudaInvertParam *param;
   param = eig_param->invert_param;
 
+  printfQuda("Flag 2\n");
+  
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
@@ -2265,8 +2277,12 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
 
+  printfQuda("Flag 3\n");
+  
   checkEigParam(eig_param);
 
+  printfQuda("Flag 4\n");
+  
   bool pc_solution = (param->solution_type == QUDA_MATPC_DAG_SOLUTION) ||
                      (param->solution_type == QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION);
 
@@ -2274,85 +2290,98 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
   DiracParam diracParam;
   setDiracParam(diracParam, param, pc_solution);
   Dirac *d = Dirac::create(diracParam); // create the Dirac operator
-
   Dirac &dirac = *d;
 
+  printfQuda("Flag 5\n");
+  
   profileInvert.TPSTART(QUDA_PROFILE_H2D);
 
   cudaColorSpinorField *r = NULL;
   cudaColorSpinorField *Apsi = NULL;
   const int *X = cudaGauge->X();
 
+  printfQuda("Flag 6\n");
+  
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_r, *param, X, pc_solution);
   ColorSpinorField *h_r = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
                           static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) :
                           static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
 
+  printfQuda("Flag 7\n");
+  
   cpuParam.v = hp_Apsi;
   ColorSpinorField *h_Apsi = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
                              static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) :
                              static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
 
+  printfQuda("Flag 8\n");
+  
   //Make Eigen vector data set
   cpuColorSpinorField **h_Eig_Vec;
   h_Eig_Vec =(cpuColorSpinorField **)safe_malloc( m*sizeof(cpuColorSpinorField*));
   for( int k = 0 ; k < m ; k++)
   {
-    cpuParam.v = ((double**)hp_V)[k];
+    //cpuParam.v = ((double**)hp_V)[k];
     h_Eig_Vec[k] = new cpuColorSpinorField(cpuParam);
   }
 
+  printfQuda("Flag 9\n");
+  
   // download source
   ColorSpinorParam cudaParam(cpuParam, *param);
-  cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  r = new cudaColorSpinorField(*h_r, cudaParam);
-  Apsi = new cudaColorSpinorField(*h_Apsi, cudaParam);
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  r = new cudaColorSpinorField(cudaParam);
+  Apsi = new cudaColorSpinorField(cudaParam);
 
   double cpu;
   double gpu;
-
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    cpu = blas::norm2(*h_r);
-    gpu = blas::norm2(*r);
-    printfQuda("r vector CPU %1.14e CUDA %1.14e\n", cpu, gpu);
-    cpu = blas::norm2(*h_Apsi);
-    gpu = blas::norm2(*Apsi);
-    printfQuda("Apsi vector CPU %1.14e CUDA %1.14e\n", cpu, gpu);
-  }
-
+  
+  //if (getVerbosity() >= QUDA_VERBOSE) {
+  //cpu = blas::norm2(*h_r);
+  gpu = blas::norm2(*r);
+  //printfQuda("r vector CPU %1.14e CUDA %1.14e\n", cpu, gpu);
+  //cpu = blas::norm2(*h_Apsi);
+  gpu = blas::norm2(*Apsi);
+  //printfQuda("Apsi vector CPU %1.14e CUDA %1.14e\n", cpu, gpu);
+  //}
+  
+  printfQuda("Flag 10\n");
+  
   // download Eigen vector set
   cudaColorSpinorField **Eig_Vec;
   Eig_Vec = (cudaColorSpinorField **)safe_malloc( m*sizeof(cudaColorSpinorField*));
 
-  for( int k = 0 ; k < m ; k++)
-  {
-    Eig_Vec[k] = new cudaColorSpinorField(*h_Eig_Vec[k], cudaParam);
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      cpu = blas::norm2(*h_Eig_Vec[k]);
-      gpu = blas::norm2(*Eig_Vec[k]);
-      printfQuda("Eig_Vec[%d] CPU %1.14e CUDA %1.14e\n", k, cpu, gpu);
-    }
+  printfQuda("Flag 11\n");
+  
+  for( int k = 0 ; k < m ; k++) {
+
+    printfQuda("Flag 11.1 %d\n", k);
+    Eig_Vec[k] = new cudaColorSpinorField(cudaParam);
+    printfQuda("Flag 11.2 %d\n", k);
+    //if (getVerbosity() >= QUDA_VERBOSE) {
+    gpu = blas::norm2(*Eig_Vec[k]);
+    printfQuda("Flag 11.3 %d\n", k);
+    //cpu = blas::norm2(*h_Eig_Vec[k]);
+    printfQuda("Eig_Vec[%d] CPU %1.14e CUDA %1.14e\n", k, cpu, gpu);
+    //}
+
+    printfQuda("Flag 11.4 %d\n", k);
   }
   profileInvert.TPSTOP(QUDA_PROFILE_H2D);
 
-  if(eig_param->RitzMat_lanczos == QUDA_MATPC_DAG_SOLUTION)
-  {
-    DiracMdag mat(dirac);
-    RitzMat ritz_mat(mat,*eig_param);
-    Eig_Solver *eig_solve = Eig_Solver::create(*eig_param, ritz_mat, profileInvert);
-    (*eig_solve)((double*)hp_alpha, (double*)hp_beta, Eig_Vec, *r, *Apsi, k0, m);
-    delete eig_solve;
-  }
-  else if(eig_param->RitzMat_lanczos == QUDA_MATPCDAG_MATPC_SOLUTION)
-  {
-    DiracMdagM mat(dirac);
-    RitzMat ritz_mat(mat,*eig_param);
-    Eig_Solver *eig_solve = Eig_Solver::create(*eig_param, ritz_mat, profileInvert);
-    (*eig_solve)((double*)hp_alpha, (double*)hp_beta, Eig_Vec, *r, *Apsi, k0, m);
-    delete eig_solve;
-  }
-  else if(eig_param->RitzMat_lanczos == QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION)
+  printfQuda("Flag 12\n");
+  
+  //if(eig_param->RitzMat_lanczos == QUDA_MATPC_DAG_SOLUTION)
+  //{
+  DiracMdag mat(dirac);
+  RitzMat ritz_mat(mat,*eig_param);
+  Eig_Solver *eig_solve = Eig_Solver::create(*eig_param, ritz_mat, profileInvert);
+  (*eig_solve)((double*)hp_alpha, (double*)hp_beta, Eig_Vec, *r, *Apsi, k0, m);
+  delete eig_solve;
+  //}
+  //else if(eig_param->RitzMat_lanczos == QUDA_MATPCDAG_MATPC_SOLUTION)
+  
   {
     DiracMdagM mat(dirac);
     RitzMat ritz_mat(mat,*eig_param);
@@ -2360,18 +2389,32 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
     (*eig_solve)((double*)hp_alpha, (double*)hp_beta, Eig_Vec, *r, *Apsi, k0, m);
     delete eig_solve;
   }
-  else
+  //else if(eig_param->RitzMat_lanczos == QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION)
   {
-    errorQuda("invalid ritz matrix type\n");
-    exit(0);
+    DiracMdagM mat(dirac);
+    RitzMat ritz_mat(mat,*eig_param);
+    Eig_Solver *eig_solve = Eig_Solver::create(*eig_param, ritz_mat, profileInvert);
+    (*eig_solve)((double*)hp_alpha, (double*)hp_beta, Eig_Vec, *r, *Apsi, k0, m);
+    delete eig_solve;
   }
+  
+  //else
+  //{
+  //errorQuda("invalid ritz matrix type\n");
+  //exit(0);
+  //}
 
+  printfQuda("Flag 13\n");
+  
   //Write back calculated eigen vector
   profileInvert.TPSTART(QUDA_PROFILE_D2H);
-  for( int k = 0 ; k < m ; k++)
-  {
+  for( int k = 0 ; k < m ; k++) {
+    printfQuda("Vector %d\n", k);
     *h_Eig_Vec[k] = *Eig_Vec[k];
+    for(int i=0; i<12; i++) Eig_Vec[k]->PrintVector(i);
   }
+  
+  
   *h_r = *r;
   *h_Apsi = *Apsi;
   profileInvert.TPSTOP(QUDA_PROFILE_D2H);
@@ -2394,6 +2437,12 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
   saveTuneCache();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+#endif
+//---------------------------------//
+// feature/eigensolver notice      //
+// Quarantined during development  //
+//---------------------------------//
+
 
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
   : profile(profile) {
@@ -2694,13 +2743,56 @@ void arpackEigensolveQuda(void *h_evecs, void *h_evals,
 			    inv_param->solution_type);
 
   arpackSolve(h_evecs, h_evals, *mat, arpack_param, &cpuParam);
-  //arpackSolveProto(h_evecs, h_evals, *mat, arpack_param, &cpuParam);  
   
   profileArpackEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
   
 }
 
+
+void lanczosEigensolveQuda(void *h_evecs, void *h_evals,
+			   QudaInvertParam *inv_param,
+			   QudaEigParam *eig_param,
+			   QudaGaugeParam *gauge_param){
+
+  profilerStart(__func__);
+  
+  profileLanczosEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printQudaInvertParam(inv_param);
+    printQudaEigParam(eig_param);
+  }
+
+  bool pc_solve =
+    (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  
+  checkInvertParam(inv_param);
+  checkEigParam(eig_param);
+  cudaGaugeField *cudaGauge = checkGauge(inv_param);
+  
+  //Define problem matrix
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc_solve);
+  
+  //Construct operator.
+  Dirac *mat = Dirac::create(diracParam);
+  
+  //For QUDA data type eigenvectors
+  ColorSpinorParam cpuParam(&h_evecs, *inv_param, cudaGauge->X(),
+			    inv_param->solution_type);
+
+  lanczosSolve(h_evecs, h_evals, *mat, eig_param, &cpuParam);
+  
+  profileLanczosEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
+  profilerStop(__func__);
+  
+}
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {

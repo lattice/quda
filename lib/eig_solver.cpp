@@ -2,6 +2,13 @@
 #include <invert_quda.h>
 #include <lanczos_quda.h>
 
+
+//---------------------------------//
+// feature/eigensolver notice      //
+// Quarantined during development  //
+//---------------------------------//
+
+#if 0
 namespace quda {
 
   static void report(const char *type) {
@@ -25,7 +32,9 @@ namespace quda {
       break;
 #endif
     default:
-      errorQuda("Invalid eig solver type");
+      report("Lanczos solver");
+      eig_solver = new Lanczos(ritz_mat, param, profile);
+      //errorQuda("Invalid eig solver type");
     }
     
     return eig_solver;
@@ -62,3 +71,4 @@ namespace quda {
     }
   }
 } // namespace quda
+#endif

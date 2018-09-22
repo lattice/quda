@@ -344,14 +344,27 @@ extern "C" {
   typedef struct QudaEigParam_s {
 
     QudaInvertParam *invert_param;
-    //specific for Lanczos method:
-    QudaSolutionType  RitzMat_lanczos;
-    QudaSolutionType  RitzMat_Convcheck;
     QudaEigType eig_type;
 
-    double *MatPoly_param;
-    int NPoly;
-    double Stp_residual;
+    /** Use Polynomial Acceleration **/
+    QudaBoolean usePolyAcc;
+
+    /** degree of the Chebysev polynomial **/
+    int polyDeg;
+
+    /** Range used in polynomial acceleration **/
+    double amin;    
+    double amax;
+
+    /** What type of Dirac operator we are using **/
+    /** If !(useNormOp && useDagger) use M. **/
+    /** If useDagger == true, use Mdag  instead of M. **/
+    /** If useNormOp == true, use MdagM instead of M. **/
+    /** If useNormOp && useDagger use MMdag. **/    
+    QudaBoolean useDagger;
+    QudaBoolean useNormOp;
+    
+    double tol;
     int nk;
     int np;
     int f_size;
@@ -388,29 +401,6 @@ extern "C" {
     QudaExtLibType extlib_type;
 
   } QudaEigParam;
-
-  // Parameter set for the ARPACK Fortran variables.    
-  typedef struct arpackFortranParam_s {
-    
-    // all FORTRAN communication uses underscored 
-    int ido_; 
-    int info_;       //Error information.
-    int *ipntr_;     //Holds info about array sizes
-    int *iparam_;    //Holds problem type parameters
-    int *select_;
-    int n_;          //Local (complex) array size
-    int nev_;        //Number of Evecs/Evals requested
-    int nkv_;        //Size of the Kyrlov space (nev_ + extra vecs)
-    int ldv_;        //Leading dimension of the Krylov space (usually n_)
-    int lworkl_;     //Size of private workspace
-    int rvec_;       //==1 compute Ritz vectors ; ==0 compute Ritz values only 
-    int max_iter_;   //Maximum ARPACK iterations.
-    char howmany_;   // 
-    char bmat_;      //Matrix in A v = \lambda B v
-    char *spectrum_; //Part of the eigenspectrum to be calculated {S,L},{R,I,M}
-    int *fcomm_;     //MPI comms array
-    
-  } arpackFortranParam;
 
   
   // Parameter set for using the ARPACK interface.    
@@ -815,27 +805,33 @@ extern "C" {
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
    * loadGaugeQuda().
-   * @param h_x    Solution spinor field
-   * @param h_b    Source spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage and solver parameters
+   * @param h_evecs    1D array holding the eigenvectors
+   * @param h_evals    The eigenvalues.    
+   * @param inv_param  Contains all metadata regarding host and device
+   *                   storage and solver parameters
+   * @param e_param    Contains all the eigen data required by QUDA to perform
+   *                   the solve.
+   * @param g_param    Gauge field meta data
    */
-  void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
-                   void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
-  //DMH: FIXME^
-  
+
+  void lanczosEigensolveQuda(void *h_evecs, void *h_evals,
+			     QudaInvertParam *inv_param,
+			     QudaEigParam *e_param,
+			     QudaGaugeParam *g_param);
+    
   /**
    * Perform the solve, according to the parameters set in inv_param and 
    * arpack_param. It is assumed that the gauge field has already been loaded 
    * via loadGaugeQuda().
-   * @param h_evecs    1D array holding the eigenvalues
-   * @param h_evals    The eigenvalues.    
+   * @param h_evecs    1D array holding the eigenvectors
+   * @param h_evals    The eigenvalues.
    * @param inv_param  Contains all metadata regarding host and device
    *                   storage and solver parameters
-   * @param a_param    Contains all the data required by ARPACK to perform
+   * @param a_param    Contains all the eigen data required by ARPACK to perform
    *                   the solve.
    * @param g_param    Gauge field meta data
    */
+  
   void arpackEigensolveQuda(void *h_evecs, void *h_evals,
 			    QudaInvertParam *inv_param,
 			    QudaArpackParam *a_param,

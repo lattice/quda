@@ -125,9 +125,13 @@ extern "C" {
   } QudaInverterType;
 
   typedef enum QudaEigType_s {
-    QUDA_LANCZOS,         //Normal Lanczos solver
-    QUDA_IMP_RST_LANCZOS, //Implicitly restarted Lanczos solver
-    QUDA_INVALID_LANCZOS = QUDA_INVALID_ENUM
+    QUDA_LANCZOS_EIG,                 //Normal Lanczos solver
+    QUDA_BLOCK_LANCZOS_EIG,           //Block Lanczos
+    QUDA_IMP_RST_LANCZOS_EIG,         //Implicitly restarted Lanczos solver
+    QUDA_THICK_RST_LANCZOS_EIG,       //Thick restarted Lanczos solver
+    QUDA_THICK_RST_BLOCK_LANCZOS_EIG, //Thick restarted block Lanczos solver
+    QUDA_ARPACK_INTERFACE_EIG,        //Use Arpack interafce, problem type specfied in ARPACK param
+    QUDA_INVALID_EIG = QUDA_INVALID_ENUM
   } QudaEigType;
   
   /** S=smallest L=largest

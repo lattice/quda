@@ -144,8 +144,8 @@ namespace quda{
    *
    *  @param[in/out] h_evecs       A pointer to eigenvector array.
    *  @param[in/out] h_evals       A pointer to eigenvalue array.
-   *  @param[in]     matSmooth     An explicit construction of the problem matrix.
-   *  @param[in]     arpack_param  Parameter container defining the how the matrix 
+   *  @param[in]     mat           An explicit construction of the problem matrix.
+   *  @param[in]     param         Parameter container defining the how the matrix 
    *                               is to be solved.
    *  @param[in]     local_dim     Parameter container with meta data for the 
    *                               QUDA color-spinor eigenvectors.
@@ -156,10 +156,10 @@ namespace quda{
 		   QudaArpackParam *arpack_param,
 		   ColorSpinorParam *cpuParam);
 
-  void arpackSolveProto(void *h_evecs, void *h_evals,
-			const Dirac &mat,
-			QudaArpackParam *arpack_param,
-			ColorSpinorParam *cpuParam);
+  void lanczosSolve(void *h_evecs, void *h_evals,
+		    const Dirac &mat,
+		    QudaEigParam *eig_param,
+		    ColorSpinorParam *cpuParam);
   
 }//end of namespace quda 
 

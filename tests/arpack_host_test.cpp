@@ -302,6 +302,20 @@ void setArpackParam(QudaArpackParam &arpack_param) {
 
 }
 
+void setEigParam(QudaEigParam &eig_param) {
+
+  eig_param.nk      = eig_nEv;
+  eig_param.np      = eig_nKv - eig_nEv;
+  eig_param.usePolyAcc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.polyDeg = eig_poly_deg;
+  eig_param.amin    = eig_amin;
+  eig_param.amax    = eig_amax;
+  eig_param.tol     = eig_tol;
+  eig_param.cuda_prec_ritz = prec;
+  eig_param.useNormOp = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.useDagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+}
+
 
 int main(int argc, char **argv)
 {
@@ -335,6 +349,12 @@ int main(int argc, char **argv)
 
   QudaArpackParam arpack_param = newQudaArpackParam();
   setArpackParam(arpack_param);
+
+  QudaEigParam eig_param = newQudaEigParam();
+  QudaInvertParam eig_inv_param = newQudaInvertParam();
+  setInvertParam(eig_inv_param);
+  eig_param.invert_param = &eig_inv_param;
+  setEigParam(eig_param);
   
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
@@ -403,10 +423,14 @@ int main(int argc, char **argv)
     hostEvals = (void*)malloc(     2*arpack_param.nKv*sizeof(double));
   }
 
+  double timeARPACK = -((double)clock());  
   //This function returns the hostEvecs and hostEvals pointers, populated with the
   //requested data, at the requested prec.
   arpackEigensolveQuda(hostEvecs, hostEvals, &inv_param, &arpack_param, &gauge_param);
-
+  timeARPACK += (double)clock();
+  printfQuda("Time for ARPACK IRAM = %f\n", timeARPACK/CLOCKS_PER_SEC);
+    
+  /*
   //Access the eigenmode data
   printfQuda("First 12 elements of the eigenvectors and the eigenvalues:\n");    
   for(int i=0; i<arpack_param.nEv; i++) {
@@ -433,7 +457,41 @@ int main(int argc, char **argv)
 		 ((double*)hostEvals)[2*i + 1]);
     }
   }
+  */
+
+  double timeQUDA = -((double)clock());  
+  lanczosEigensolveQuda(hostEvecs, hostEvals, &inv_param, &eig_param, &gauge_param);
+  timeQUDA += (double)clock();  
+  printfQuda("Time for QUDA TRLM = %f\n", timeQUDA/CLOCKS_PER_SEC);
   
+  /*
+  //Access the eigenmode data
+  printfQuda("First 12 elements of the eigenvectors and the eigenvalues:\n");    
+  for(int i=0; i<arpack_param.nEv; i++) {
+    printfQuda("eigenvector %d:\n",i);
+    for(int j=0; j<12; j++) {
+      if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+	printfQuda("(%e,%e)\n",		   
+		   ((float*)hostEvecs)[i*vol*24 + 2*j],
+		   ((float*)hostEvecs)[i*vol*24 + 2*j+1]);
+      } else {
+	printfQuda("(%e,%e)\n",		   
+		   ((double*)hostEvecs)[i*vol*24 + 2*j],
+		   ((double*)hostEvecs)[i*vol*24 + 2*j+1]);
+      }
+    }      
+    printfQuda("eigenvalue %d = ", i);
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      printfQuda("(%e,%e)\n",		   
+		 ((float*)hostEvals)[2*i],
+		 ((float*)hostEvals)[2*i + 1]);
+    } else {
+      printfQuda("(%e,%e)\n",		   
+		 ((double*)hostEvals)[2*i],
+		 ((double*)hostEvals)[2*i + 1]);
+    }
+  }
+  */
   
   // stop the timer
   time0 += clock();

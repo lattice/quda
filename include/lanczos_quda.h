@@ -8,6 +8,12 @@
 #include <color_spinor_field.h>
 #include <eig_variables.h>
 
+//---------------------------------//
+// feature/eigensolver notice      //
+// Quarantined during development  //
+//---------------------------------//
+
+#if 0
 namespace quda {
 
   /**
@@ -90,5 +96,7 @@ namespace quda {
 #endif
 
 } // namespace quda
+
+#endif
 
 #endif // _LANCZOS_QUDA_H

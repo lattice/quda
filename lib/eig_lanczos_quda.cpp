@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -13,6 +12,12 @@
 
 #include <iostream>
 
+//---------------------------------//
+// feature/eigensolver notice      //
+// Quarantined during development  //
+//---------------------------------//
+
+#if 0
 namespace quda {
 
   Lanczos::Lanczos(RitzMat &ritz_mat, QudaEigParam &eigParam, TimeProfile &profile) :
@@ -26,13 +31,15 @@ namespace quda {
 
   }
 
-  void Lanczos::operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m) 
-  {
+  void Lanczos::operator()(double *alpha, double *beta,
+			   cudaColorSpinorField **Eig_Vec,
+			   cudaColorSpinorField &r,
+			   cudaColorSpinorField &Apsi, int k0, int m) {
     using namespace blas;
-
+    
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    // Check to see that we'reV not trying to invert on a zero-field source    
+    // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(r);
     if(b2 == 0){
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -48,7 +55,7 @@ namespace quda {
     for (int k = k0; k < m; ++k)
     {
       if( k == 0 )
-      {
+o      {
         // r_k = A*v_k , r_k is used for temporary buffer.
         ritz_mat(r, *(Eig_Vec[0]));
         // alpha_k = ( v_k , r_k )
@@ -92,16 +99,22 @@ namespace quda {
   }
   
 #if 0
-  ImpRstLanczos::ImpRstLanczos(RitzMat &ritz_mat, QudaEigParam &eigParam, TimeProfile &profile) :
-    Eig_Solver(eigParam, profile), ritz_mat(ritz_mat)
-  { }
+  ImpRstLanczos::ImpRstLanczos(RitzMat &ritz_mat, QudaEigParam &eigParam,
+			       TimeProfile &profile) :
+    Eig_Solver(eigParam, profile),
+    ritz_mat(ritz_mat) {
 
-  ImpRstLanczos::~ImpRstLanczos()
-  { }
+  }
 
-  void ImpRstLanczos::operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec,
-				 cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m)
-  { }
+  ImpRstLanczos::~ImpRstLanczos() { }
+
+  void ImpRstLanczos::operator()(double *alpha, double *beta,
+				 cudaColorSpinorField **Eig_Vec,
+				 cudaColorSpinorField &r,
+				 cudaColorSpinorField &Apsi, int k0, int m) {
+  }
 #endif
-
+  
 } // namespace quda
+
+#endif
