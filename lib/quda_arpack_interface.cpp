@@ -1224,7 +1224,7 @@ namespace quda{
 
     int nev = eig_param->nk;
     int nkv = eig_param->nk + eig_param->np;
-    int extra = 128;
+    int extra = 208;
     nkv += extra;
     eig_param->usePolyAcc = QUDA_BOOLEAN_NO;
     
@@ -1249,14 +1249,14 @@ namespace quda{
     h_evals_ = (std::complex<Float>*) (Float*)(h_evals);
     
     //Ritz vectors
-    std::vector<cpuColorSpinorField*> h_ritzVecs;
+    cpuColorSpinorField** h_ritzVecs = (cpuColorSpinorField**)malloc((1+nkv)*sizeof(cpuColorSpinorField*));
     std::complex<Float> **ritzVecs = (std::complex<Float>**)malloc((1+nkv)*sizeof(std::complex<Float*>));
-
+    
     //Allocate space for the Ritz vectors.
     for(int i=0; i<nkv+1; i++) {
       ritzVecs[i] = (std::complex<Float>*)malloc(length/2*sizeof(std::complex<Float>));
       cpuParam->v = (std::complex<Float>*)ritzVecs[i];
-      h_ritzVecs.emplace_back(new cpuColorSpinorField(*cpuParam));
+      h_ritzVecs[i] = new cpuColorSpinorField(*cpuParam);
       blas::zero(*(h_ritzVecs[i]));
     }
 
@@ -1413,10 +1413,8 @@ namespace quda{
 
     using Eigen::MatrixXd;
     MatrixXd triDiag = MatrixXd::Zero(nkv, nkv);
-
     
     // Compute Y_{nkv,nev}
-    Float Ymat[nkv][nkv];
     using Eigen::MatrixXd;
     triDiag = MatrixXd::Zero(nkv, nkv);
     
@@ -1436,24 +1434,27 @@ namespace quda{
     
     //Eigensolve T, sort low -> high, place nev evecs in Y
     Eigen::SelfAdjointEigenSolver<MatrixXd> eigenSolver(triDiag);
+
+    //Place data in accessible array
+    Float Ymat[nkv][nkv];
     for(int i=0; i<nkv; i++)
       for(int j=0; j<nkv; j++) 
 	Ymat[i][j] = eigenSolver.eigenvectors().col(i)[j];
-    
-    
-    // Q_tilde_{nev,nkv} = Q * Y
-    
-    /*
+
+    //Perform Rayleigh-Ritz check for convergence    
+    // Q_tilde_{nkv,nkv} = Q * Y 
+
     //Copy all q vectors to host for manipulation
+    //ritzVecs[i] references h_ritzVecs[i]
     for(int i=0; i<nkv; i++) {
       *h_ritzVecs[i] = *d_ritzVecs[i];
-    }    
+    }
     
     //loop over rows of Q
-    for(int j=0; j<nkv; j++) {
-      
+    for(int j=0; j<length/2; j++) {      
+
       //put jth row of Q in temp
-      std::complex<Float> tmp[nkv];
+      std::complex<Float> tmp[nkv];      
       for(int i=0; i<nkv; i++) {
 	tmp[i] = ritzVecs[i][j];
 	//if(j==0) printfQuda("Original row %e %e\n", real(tmp[i]), imag(tmp[i]));
@@ -1461,7 +1462,7 @@ namespace quda{
       
       std::complex<Float> sum = 0.0;
       //loop over columns of Y 
-      for(int k=0; k<nev; k++) {
+      for(int k=0; k<nkv; k++) {
 	//take product of jth row of Q and kth column of Y
 	//to compute Q_tilde[k][j].
 	for(int l=0; l<nkv; l++) {
@@ -1473,29 +1474,66 @@ namespace quda{
       }
     }
     
-    //Copy all nev q vectors to device
+    //Error estimates given by || M * q_tilde  -  lambda q_tilde ||
     for(int i=0; i<nkv; i++) {
+      
+      //Copy q vector to device
       *d_ritzVecs[i] = *h_ritzVecs[i];
-    }    
-    */
+      //M * q_tilde
+      mat.MdagM(*d_v, *(d_ritzVecs[i]));      
+      blas::caxpby(eigenSolver.eigenvalues()[i], *d_ritzVecs[i], -1.0, *d_v);
+      h_evals_resid[i] = sqrt(blas::norm2(*d_v));
+      
+    }
     
     for(int i=0; i<nkv; i++) {
       h_evals_alt[i] = eigenSolver.eigenvalues()[i];
-    }
-    
-    for(int i=0; i<nkv; i++){
       h_evals_sorted_idx[i] = i;
       mod_h_evals_sorted[i] = h_evals_alt[i];
     }
     
     sortAbs<Float>(mod_h_evals_sorted, nkv, true, h_evals_sorted_idx);
-    
-    for(int i=0; i<nev; i++){
+
+    for(int i=0; i<nkv; i++){
       int idx = h_evals_sorted_idx[i];
-      printfQuda("EigValue[%04d] = %+e  %+e  Residual: %+e\n",		 
-		 i, h_evals_alt[idx], 0.0, 0.0); //FIXME
+      printfQuda("RitzValue[%04d] = %+e Residual: %+e\n",		 
+		 i, h_evals_alt[idx], h_evals_resid[idx]); 
     }
     
+    for(int i=0 ; i < nev ; i++){
+
+      int idx = h_evals_sorted_idx[i];
+      
+      *d_v = *d_ritzVecs[idx];
+
+      if(eig_param->useNormOp && eig_param->useDagger) {
+	mat.MMdag(*d_v2,*d_v);
+      }
+      else if(eig_param->useNormOp && !eig_param->useDagger) {
+	  mat.MdagM(*d_v2,*d_v);
+      }
+      else if (!eig_param->useNormOp && eig_param->useDagger) {
+	mat.Mdag(*d_v2,*d_v);
+      }
+      else {  
+	mat.M(*d_v2,*d_v);
+      }
+      
+      // lambda = v^dag * M*v
+      Complex C = blas::cDotProduct(*d_v, *d_v2);
+     
+      std::complex<Float> unit(1.0,0.0);
+      std::complex<Float> m_lambda(-real(C), 0.0);
+      
+      // d_v = ||M*v - lambda*v||
+      blas::caxpby(unit, *d_v2, m_lambda, *d_v);
+      Float L2norm = blas::norm2(*d_v);
+      
+      printfQuda("EigValue[%04d] = %+e Residual: %+e\n",
+		 i, h_evals_alt[idx], sqrt(L2norm));
+    }
+    
+       
     free(mod_h_evals_sorted);
     free(h_evals_resid);
     free(h_evals_alt);
