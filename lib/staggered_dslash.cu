@@ -19,8 +19,9 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType reconstruct_u, QudaReconstructType reconstruct_l, bool improved, bool xpay, bool dagger>
   struct DslashArg {
     using F = typename colorspinor_mapper<Float,1,nColor>::type;
-    using GU = typename gauge_mapper<Float,reconstruct_u,18,QUDA_STAGGERED_PHASE_MILC>::type;
-    using GL = typename gauge_mapper<Float,reconstruct_l,18,QUDA_STAGGERED_PHASE_MILC>::type;
+    using GU = typename gauge_mapper<Float,reconstruct_u, 18, QUDA_STAGGERED_PHASE_MILC>::type;
+    // typedef typename gauge_mapper<Float,reco,18,QUDA_STAGGERED_PHASE_MILC>::type GU;
+    using GL = typename gauge_mapper<Float,reconstruct_l>::type;
 
     F out;                // output vector field
     const F in;           // input vector field
@@ -74,8 +75,12 @@ namespace quda {
     getCoords(coord, x_cb, arg.dim, parity);
     coord[4] = 0;
 
+
 #pragma unroll
     for (int d = 0; d<4; d++) {// loop over dimension{
+      //         Float sign = (d == 0 && ((coords[3] ) & 1) != 0) ||
+      // ( d == 1 && ((coords[0] + coords[3] ) & 1) != 0) ||
+      // ( d == 2 && ((coords[0] + coords[1] + coords[3] ) & 1) != 0) ? -1.0 : 1.0;
       //Forward gather - compute fwd offset for vector fetch
       {
       const int fwd_idx = linkIndexP1(coord, arg.dim, d);
@@ -87,6 +92,9 @@ namespace quda {
   out += U * in;
   } else {
   const Link U = arg.U(d, x_cb, parity);
+  // U[6] *= sign;
+  // U[7] *= sign;
+  // U[8] *= sign;
   const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += U * in;
         }
@@ -104,7 +112,7 @@ namespace quda {
           out += L * in;
         }  
       }
-
+#if 1
       {
       //Backward gather - compute back offset for spinor and gauge fetch
       const int back_idx = linkIndexM1(coord, arg.dim, d);
@@ -137,6 +145,7 @@ namespace quda {
           out -= conj(L) * in;
         }
       }
+      #endif
     } //nDim
 
   }
@@ -279,7 +288,7 @@ namespace quda {
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
       ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_NO,false>(out, in, U, L, a, x, parity);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      errorQuda("Recon 8 not implemented for standard staggered.\n")
+      errorQuda("Recon 8 not implemented for standard staggered.\n");
       // ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_NO, false>(out, in, U, L, a, x, parity);
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
@@ -331,7 +340,10 @@ namespace quda {
       ApplyDslashStaggered<double, true>(out, in, U, L, a, x, parity);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
       ApplyDslashStaggered<float, true>(out, in, U, L,  a, x, parity);
-    } else {
+    } //else if (U.Precision() == QUDA_HALF_PRECISION) {
+    //   ApplyDslashStaggered<short, true>(out, in, U, L,  a, x, parity);
+    // } 
+    else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
   } else {
