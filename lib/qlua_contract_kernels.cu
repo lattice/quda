@@ -1293,166 +1293,19 @@ namespace quda {
   }
 
   //------------------------------------------------------------------------------------------
-  __global__ void tmd_g_U_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
-
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-    int tid  = x_cb + pty * arg->volumeCB;
-    int lV   = arg->volume;
-
-    if (x_cb >= arg->volumeCB) return;
-    if (pty >= arg->nParity) return;
-    if(tid >= lV) return;
-
-    complex<QC_REAL> dev_prop1[QC_LEN_P];
-    complex<QC_REAL> dev_prop2[QC_LEN_P];
-    complex<QC_REAL> dev_link[QC_LEN_M];
-
-    Vector vec1[QUDA_PROP_NVEC];
-    Vector vec2[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec1[i] = arg->fwdProp[i](x_cb, pty);
-      vec2[i] = arg->bwdProp[i](x_cb, pty);
-    }
-    prepareDevicePropSite(dev_prop1, vec1, arg->preserveBasis);
-    prepareDevicePropSite(dev_prop2, vec2, arg->preserveBasis);
-
-    Link U = arg->U(arg->i_mu, x_cb, pty);
-
-    prepareDeviceLinkSite(dev_link, U);
-
-    qc_quda_contract_tr_g_U_P_P(Corr_dev + tid, lV,
-				dev_link,  1,
-				dev_prop1, 1,
-				dev_prop2, 1);
-  }
-  __global__ void tmd_g_U_P_P_gvec_kernel_gaugeExt(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
-
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-    int tid  = x_cb + pty * arg->volumeCB;
-    int lV   = arg->volume;
-
-    if (x_cb >= arg->volumeCB) return;
-    if (pty >= arg->nParity) return;
-    if(tid >= lV) return;
-
-    complex<QC_REAL> dev_prop1[QC_LEN_P];
-    complex<QC_REAL> dev_prop2[QC_LEN_P];
-    complex<QC_REAL> dev_link[QC_LEN_M];
-
-    Vector vec1[QUDA_PROP_NVEC];
-    Vector vec2[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      vec1[i] = arg->fwdProp[i](x_cb, pty);
-      vec2[i] = arg->bwdProp[i](x_cb, pty);
-    }
-    prepareDevicePropSite(dev_prop1, vec1, arg->preserveBasis);
-    prepareDevicePropSite(dev_prop2, vec2, arg->preserveBasis);
-
-    Link U;
-    {      
-      int crd[5];
-      getCoords(crd, x_cb, arg->dim, pty);
-      crd[4] = 0;
-      int c2[5] = {0,0,0,0,0};
-      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
-	
-      U = arg->U(arg->i_mu, linkIndex(c2, arg->dimEx), pty);
-    }
-
-    prepareDeviceLinkSite(dev_link, U);
-
-    qc_quda_contract_tr_g_U_P_P(Corr_dev + tid, lV,
-				dev_link,  1,
-				dev_prop1, 1,
-				dev_prop2, 1);
-  }
-  //------------------------------------------------------------------------------------------
-
-  /* local qbarUq contractions for TMD */
-  __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
-
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-    int tid  = x_cb + pty * arg->volumeCB;
-    int lV   = arg->volume;
-
-    if (x_cb >= arg->volumeCB) return;
-    if (pty >= arg->nParity) return;
-    if(tid >= lV) return;
-
-    Link U = arg->U(arg->i_mu, x_cb, pty);
-
-    QC_CPLX tmpG1[QC_LEN_G];
-    QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
-
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      Vector vec1 = arg->fwdProp[i](x_cb, pty);
-      Vector vec2 = arg->bwdProp[i](x_cb, pty);
-      //      QC(G_peqa_colortrace_U_dot_D_dot_aD)(Corr_dev + tid, lV, 1., U, vec1, vec2);
-      QC(G_peqa_colortrace_U_dot_D_dot_aD)(tmpG1, 1., 1., U, vec1, vec2);
-    }
-
-    /* project onto Gamma(n=0..15)-matrices */
-    QC(gvec_eq_trace_gamma_dot_G)(Corr_dev + tid, lV, tmpG1, 1);
-
-  }
-  //------------------------------------------------------------------------------------------
-
-
-  __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
-
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-    int tid  = x_cb + pty * arg->volumeCB;
-    int lV   = arg->volume;
-
-    if (x_cb >= arg->volumeCB) return;
-    if (pty >= arg->nParity) return;
-    if(tid >= lV) return;
-
-    Link U;
-    { /* this condition is the same for all threads;
-			       can this cause thread divergence? */
-      int crd[5];
-      getCoords(crd, x_cb, arg->dim, pty);
-      crd[4] = 0;
-      int c2[5] = {0,0,0,0,0};
-      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
-
-      U = arg->U(arg->i_mu, linkIndex(c2, arg->dimEx), pty);
-    }
-
-    QC_CPLX tmpG1[QC_LEN_G];
-    QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
-
-#pragma unroll
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      Vector vec1 = arg->fwdProp[i](x_cb, pty);
-      Vector vec2 = arg->bwdProp[i](x_cb, pty);
-      QC(G_peqa_colortrace_U_dot_D_dot_aD)(tmpG1, 1., 1., U, vec1, vec2);
-    }
-
-    /* project onto Gamma(n=0..15)-matrices */
-    QC(gvec_eq_trace_gamma_dot_G)(Corr_dev + tid, lV, tmpG1, 1);
-
-  }
-  //------------------------------------------------------------------------------------------
 
 
   extern __shared__ complex<QC_REAL> qc_U_D_aD_shared[];
-
 
   inline __device__ const qcTMD_gamma* gammaMat() {
     return reinterpret_cast<const qcTMD_gamma*>(cGamma);
   }
 
 
+
   /* local qbarUq contractions for TMD */
   /* compute (res)[is,js] += a * \sum_{jc} conj(v2[jc,js]) * (\sum_{ic} u[jc,ic] v1[ic,is]) */
-  __global__ void tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue(
-									      complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg)
+  __global__ void tmd_g_U_D_aD_gvec_kernel(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg)
   {
     /* blockDim = {*SITES_PER_BLOCK, parity ...} */
     /* site/parity */
@@ -1494,34 +1347,19 @@ namespace quda {
     ulink_idx = arg->extendedGauge ? ulink_idx : x_cb;
     
     /* load umat */
-#if 0
-    if (i1 < QC_Nc && i2 < QC_Nc)
-      umat[QC_LIDX_M(i1,i2)] = arg->U.getData(arg->i_mu, ulink_idx, pty, i1, i2);
-    //__syncthreads(); /* no need until the 1st pair v1,v2 are also read */
-#else
     if (0 == i12) {
       *(reinterpret_cast<Link *>(umat)) = arg->U(arg->i_mu, ulink_idx, pty);
     }
-#endif
+
     gres[QC_LIDX_G(i1, i2)] = 0.;
     /* loop over vectors */
 #pragma unroll
-    for (int i = 0 ; i < QUDA_PROP_NVEC /*TODO replace with nvec for disconnected contractions*/ ; i++){
+    for (int i=0; i<QUDA_PROP_NVEC; i++){
       /* load v1, v2 */
-#if 0
-#define QC_LIDX_D_TR(ic, is) QC_LIDX_D(ic, is)
-      if (i1 < QC_Nc) {
-        v1[QC_LIDX_D(i1,i2)] = arg->fwdProp[i].getData(x_cb, pty, i2, i1); /* sic! [color, spin] <- [spin, color] */
-        v2[QC_LIDX_D(i1,i2)] = arg->bwdProp[i].getData(x_cb, pty, i2, i1); /* sic! [color, spin] <- [spin, color] */
-      }
-#else
-#define QC_LIDX_D_TR(ic, is) ((ic) + QC_Nc*(is))
       if (0 == i12) {
         *(reinterpret_cast<Vector *>(v1)) = arg->fwdProp[i](x_cb, pty);
         *(reinterpret_cast<Vector *>(v2)) = arg->bwdProp[i](x_cb, pty); 
       }
-      /* FIXME change QC_LIDX_V to Vector indexing */
-#endif
       __syncthreads();
 
       /* compute u.v1 */
@@ -1551,7 +1389,6 @@ namespace quda {
 
     /* proj on Gamma(ng) -> Corr_dev[tid + lV*ng] */
     int ng  = i12;
-#if 1
     QC_CPLX s = 0;
 #pragma unroll
     for (int is = 0 ; is < QC_Ns ; is++) {
@@ -1559,12 +1396,158 @@ namespace quda {
       s += gamma->left_coeff[ng][is] * gres[QC_LIDX_G(js, is)];
     }
     Corr_dev[tid + lV*ng] = s;
-#else
-    Corr_dev[tid + lV*ng] = gres[QC_LIDX_G(i1, i2)]; /* XXX skip Gamma-projection, for testing only! */
-#endif
 
   }//-kernel
 
 
 
 } //- namespace quda
+
+
+// Deprecated TMD kernel functions, will be removed
+//   __global__ void tmd_g_U_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
+
+//     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+//     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+//     int tid  = x_cb + pty * arg->volumeCB;
+//     int lV   = arg->volume;
+
+//     if (x_cb >= arg->volumeCB) return;
+//     if (pty >= arg->nParity) return;
+//     if(tid >= lV) return;
+
+//     complex<QC_REAL> dev_prop1[QC_LEN_P];
+//     complex<QC_REAL> dev_prop2[QC_LEN_P];
+//     complex<QC_REAL> dev_link[QC_LEN_M];
+
+//     Vector vec1[QUDA_PROP_NVEC];
+//     Vector vec2[QUDA_PROP_NVEC];
+//     for(int i=0;i<QUDA_PROP_NVEC;i++){
+//       vec1[i] = arg->fwdProp[i](x_cb, pty);
+//       vec2[i] = arg->bwdProp[i](x_cb, pty);
+//     }
+//     prepareDevicePropSite(dev_prop1, vec1, arg->preserveBasis);
+//     prepareDevicePropSite(dev_prop2, vec2, arg->preserveBasis);
+
+//     Link U = arg->U(arg->i_mu, x_cb, pty);
+
+//     prepareDeviceLinkSite(dev_link, U);
+
+//     qc_quda_contract_tr_g_U_P_P(Corr_dev + tid, lV,
+// 				dev_link,  1,
+// 				dev_prop1, 1,
+// 				dev_prop2, 1);
+//   }
+//   __global__ void tmd_g_U_P_P_gvec_kernel_gaugeExt(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
+
+//     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+//     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+//     int tid  = x_cb + pty * arg->volumeCB;
+//     int lV   = arg->volume;
+
+//     if (x_cb >= arg->volumeCB) return;
+//     if (pty >= arg->nParity) return;
+//     if(tid >= lV) return;
+
+//     complex<QC_REAL> dev_prop1[QC_LEN_P];
+//     complex<QC_REAL> dev_prop2[QC_LEN_P];
+//     complex<QC_REAL> dev_link[QC_LEN_M];
+
+//     Vector vec1[QUDA_PROP_NVEC];
+//     Vector vec2[QUDA_PROP_NVEC];
+//     for(int i=0;i<QUDA_PROP_NVEC;i++){
+//       vec1[i] = arg->fwdProp[i](x_cb, pty);
+//       vec2[i] = arg->bwdProp[i](x_cb, pty);
+//     }
+//     prepareDevicePropSite(dev_prop1, vec1, arg->preserveBasis);
+//     prepareDevicePropSite(dev_prop2, vec2, arg->preserveBasis);
+
+//     Link U;
+//     {      
+//       int crd[5];
+//       getCoords(crd, x_cb, arg->dim, pty);
+//       crd[4] = 0;
+//       int c2[5] = {0,0,0,0,0};
+//       for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
+	
+//       U = arg->U(arg->i_mu, linkIndex(c2, arg->dimEx), pty);
+//     }
+
+//     prepareDeviceLinkSite(dev_link, U);
+
+//     qc_quda_contract_tr_g_U_P_P(Corr_dev + tid, lV,
+// 				dev_link,  1,
+// 				dev_prop1, 1,
+// 				dev_prop2, 1);
+//   }
+//   //------------------------------------------------------------------------------------------
+
+//   /* local qbarUq contractions for TMD */
+//   __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
+
+//     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+//     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+//     int tid  = x_cb + pty * arg->volumeCB;
+//     int lV   = arg->volume;
+
+//     if (x_cb >= arg->volumeCB) return;
+//     if (pty >= arg->nParity) return;
+//     if(tid >= lV) return;
+
+//     Link U = arg->U(arg->i_mu, x_cb, pty);
+
+//     QC_CPLX tmpG1[QC_LEN_G];
+//     QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
+
+//     for(int i=0;i<QUDA_PROP_NVEC;i++){
+//       Vector vec1 = arg->fwdProp[i](x_cb, pty);
+//       Vector vec2 = arg->bwdProp[i](x_cb, pty);
+//       //      QC(G_peqa_colortrace_U_dot_D_dot_aD)(Corr_dev + tid, lV, 1., U, vec1, vec2);
+//       QC(G_peqa_colortrace_U_dot_D_dot_aD)(tmpG1, 1., 1., U, vec1, vec2);
+//     }
+
+//     /* project onto Gamma(n=0..15)-matrices */
+//     QC(gvec_eq_trace_gamma_dot_G)(Corr_dev + tid, lV, tmpG1, 1);
+
+//   }
+//   //------------------------------------------------------------------------------------------
+
+
+//   __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg){
+
+//     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+//     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+//     int tid  = x_cb + pty * arg->volumeCB;
+//     int lV   = arg->volume;
+
+//     if (x_cb >= arg->volumeCB) return;
+//     if (pty >= arg->nParity) return;
+//     if(tid >= lV) return;
+
+//     Link U;
+//     { /* this condition is the same for all threads;
+// 			       can this cause thread divergence? */
+//       int crd[5];
+//       getCoords(crd, x_cb, arg->dim, pty);
+//       crd[4] = 0;
+//       int c2[5] = {0,0,0,0,0};
+//       for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
+
+//       U = arg->U(arg->i_mu, linkIndex(c2, arg->dimEx), pty);
+//     }
+
+//     QC_CPLX tmpG1[QC_LEN_G];
+//     QC(cplx_vec_zero)(tmpG1, 1, QC_LEN_G);
+
+// #pragma unroll
+//     for(int i=0;i<QUDA_PROP_NVEC;i++){
+//       Vector vec1 = arg->fwdProp[i](x_cb, pty);
+//       Vector vec2 = arg->bwdProp[i](x_cb, pty);
+//       QC(G_peqa_colortrace_U_dot_D_dot_aD)(tmpG1, 1., 1., U, vec1, vec2);
+//     }
+
+//     /* project onto Gamma(n=0..15)-matrices */
+//     QC(gvec_eq_trace_gamma_dot_G)(Corr_dev + tid, lV, tmpG1, 1);
+
+//   }
+//   //------------------------------------------------------------------------------------------

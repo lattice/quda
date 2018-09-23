@@ -682,7 +682,7 @@ namespace quda {
 		   (long)tp.grid.x, (long)tp.grid.y, (long)tp.grid.z, 
 		   (long)tp.block.x, (long)tp.block.y, (long)tp.block.z,
 		   (long)tp.shared_bytes);
-      tmd_g_U_D_aD_gvec_kernel_shmem16_VecByVec_preserveBasisTrue<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(corrQuda_dev, arg_dev);
+      tmd_g_U_D_aD_gvec_kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(corrQuda_dev, arg_dev);
     }
     void initTuneParam(TuneParam &param) const
     {
@@ -729,8 +729,8 @@ namespace quda {
     cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
     checkCudaError();
     
-    if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
-    double t1 = MPI_Wtime();
+    if(arg.nParity != 2)   errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
+    if(!arg.preserveBasis) errorQuda("%s: TMD kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
 
     qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType, 
 		      arg.extendedGauge, QC_UDD_THREADS_PER_SITE, QC_UDD_SHMEM_PER_SITE);
@@ -740,8 +740,8 @@ namespace quda {
       printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
     }
 
+    double t1 = MPI_Wtime();
     contractTMD.apply(0);
-
     cudaDeviceSynchronize();
     checkCudaError();
     double t2 = MPI_Wtime();
