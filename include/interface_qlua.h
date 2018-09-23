@@ -138,6 +138,7 @@ typedef struct {
   int preserveBasis;
   char shfFlag[512];
   char shfType[512];
+  int qdp2quda;
 } qudaAPI_Param;
 
 typedef struct{
@@ -214,8 +215,8 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrPosSpc, const 
 EXTRN_C int
 QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
                   const int *momlist,
-                  QUDA_REAL *qluaPropFrw_host, QUDA_REAL *qluaPropBkw_host,
-                  QUDA_REAL *qluaGauge_host[],
+                  void *qluaPropFrw_host, void *qluaPropBkw_host,
+                  void *qluaGauge_host[],
                   qudaAPI_Param paramAPI);
 
 EXTRN_C int

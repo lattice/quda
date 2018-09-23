@@ -112,10 +112,12 @@ check_quda_comms(const qudaLattice *qS)
 //-- fill out QudaInvertParam
 static void
 init_QudaInvertParam_generic(QudaInvertParam& ip,
-                             const QudaGaugeParam& gp, qudaAPI_Param paramAPI, bool preserveBasis=false)
+                             const QudaGaugeParam& gp, qudaAPI_Param paramAPI, bool preserveBasis=false, bool qdp2quda = true)
 {
 
   printfQuda("init_QudaInvertParam_generic: %s preserve the Gamma basis!\n", preserveBasis ? "Will" : "Will NOT");
+  if(!qdp2quda)
+    warningQuda("init_QudaInvertParam_generic: Got qdp2quda = FALSE. Correctness of results not guaranteed!\n");
 
   ip  = newQudaInvertParam();
 
@@ -128,7 +130,7 @@ init_QudaInvertParam_generic(QudaInvertParam& ip,
   ip.cuda_prec                = QUDA_DOUBLE_PRECISION;
   ip.cuda_prec_sloppy         = QUDA_HALF_PRECISION;
   ip.dagger                   = QUDA_DAG_NO;
-  ip.dirac_order              = QUDA_QDP_DIRAC_ORDER;
+  ip.dirac_order              = (qdp2quda ? QUDA_QDP_DIRAC_ORDER : QUDA_INVALID_DIRAC_ORDER);
   ip.gamma_basis              = (preserveBasis ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS);
   ip.inv_type                 = QUDA_BICGSTAB_INVERTER;
   ip.mass_normalization       = QUDA_KAPPA_NORMALIZATION;
@@ -855,6 +857,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
     printfQuda("%s: Got Contraction type \'%s\'\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
   bool preserveBasis = paramAPI.preserveBasis == 1 ? true : false;
+  bool qdp2quda = paramAPI.qdp2quda == 1 ? true : false;
   
   //-- Load the parameters required for the CSFs, TODO: May need to control this with paramAPI.mpParam.bc_t
   QudaGaugeParam gp;
@@ -862,7 +865,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
   
   QudaInvertParam ip;
-  init_QudaInvertParam_generic(ip, gp, paramAPI, preserveBasis);
+  init_QudaInvertParam_generic(ip, gp, paramAPI, preserveBasis, qdp2quda);
   setVerbosity(paramAPI.verbosity);
   //------------------------------------------------------------------------------------------
 
@@ -1124,8 +1127,8 @@ int momentumProjectTMDCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
 EXTRN_C int
 QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
 		  const int *momlist,
-		  QUDA_REAL *qluaPropFrw_host, QUDA_REAL *qluaPropBkw_host,
-		  QUDA_REAL *qluaGauge_host[],
+		  void *qluaPropFrw_host, void *qluaPropBkw_host,
+		  void *qluaGauge_host[],
 		  qudaAPI_Param paramAPI){
 
   double t5 = MPI_Wtime();
@@ -1143,6 +1146,14 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   }
 
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state *>(*Vqcs));
+
+  QUDA_REAL *qudaPropFrw_host = (static_cast<QUDA_REAL*>(qluaPropFrw_host));
+  QUDA_REAL *qudaPropBkw_host = (static_cast<QUDA_REAL*>(qluaPropBkw_host));
+
+  QUDA_REAL *qudaGauge_host[qS->rank];
+  for(int mu=0;mu<qS->rank;mu++)
+    qudaGauge_host[mu] = (static_cast<QUDA_REAL*>(qluaGauge_host[mu]));
+
 
   if(paramAPI.mpParam.cntrType != what_tmd_g_F_B)
     errorQuda("%s: Contraction type not parsed correctly or not supported!\n", func_name);
@@ -1212,6 +1223,7 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   
   //-- Load the parameters required for the ColorSpinorFields and GaugeFields
   bool preserveBasis = paramAPI.preserveBasis == 1 ? true : false;
+  bool qdp2quda = paramAPI.qdp2quda == 1 ? true : false;
   int Nc = QUDA_Nc;
   int Ns = QUDA_Ns;
 
@@ -1220,7 +1232,7 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
   
   QudaInvertParam ip;
-  init_QudaInvertParam_generic(ip, gp, paramAPI, preserveBasis);
+  init_QudaInvertParam_generic(ip, gp, paramAPI, preserveBasis, qdp2quda);
   setVerbosity(paramAPI.verbosity);
 
   //-- Initialize generic variables of qcs
@@ -1258,9 +1270,9 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   qcs->aux_u   = NULL;
   qcs->wlinks  = NULL;
   for(int mu=0;mu<qS->rank;mu++)
-    if(qluaGauge_host[mu] == NULL)
+    if(qudaGauge_host[mu] == NULL)
       errorQuda("%s: Got NULL host qlua gauge field [%d]\n", func_name, mu);
-  cuda_gf = new_cudaGaugeField(gp, qluaGauge_host); //- The original, regular gauge field
+  cuda_gf = new_cudaGaugeField(gp, qudaGauge_host); //- The original, regular gauge field
   if(cuda_gf == NULL)
     errorQuda("%s: Cannot allocate Original Gauge Field! Exiting.\n", func_name);
 
@@ -1291,12 +1303,12 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
 
   //- Allocate device pointers of Forward and Backward propagators
   for(int ivec=0;ivec<nVec;ivec++){
-    qcs->cpuPropFrw[ivec]  = new_cpuColorSpinorField(gp, ip, Nc, Ns, &(qluaPropFrw_host[ivec * csVecLgh]) );
+    qcs->cpuPropFrw[ivec]  = new_cpuColorSpinorField(gp, ip, Nc, Ns, &(qudaPropFrw_host[ivec * csVecLgh]) );
     if(qcs->cpuPropFrw[ivec] == NULL)
       errorQuda("%s: Cannot allocate cpu forward propagator for ivec = %d. Exiting.\n", func_name, ivec);
 
-    qcs->cudaPropFrw_bsh[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropFrw_host[ivec * csVecLgh]) );
-    qcs->cudaPropBkw[ivec]     = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qluaPropBkw_host[ivec * csVecLgh]) );
+    qcs->cudaPropFrw_bsh[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qudaPropFrw_host[ivec * csVecLgh]) );
+    qcs->cudaPropBkw[ivec]     = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(qudaPropBkw_host[ivec * csVecLgh]) );
     if( (qcs->cudaPropFrw_bsh[ivec] == NULL) || (qcs->cudaPropBkw[ivec] == NULL) )
       errorQuda("%s: Cannot allocate cuda forward and/or backward propagators for ivec = %d. Exiting.\n", func_name, ivec);
   }
