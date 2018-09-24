@@ -65,9 +65,13 @@
 #define QC_LIDX_D_TR(ic, is)   QC_QUDA_LIDX_D_TR(ic,is)
 #define QC_LIDX_P(ic,is,jc,js) QC_QUDA_LIDX_P(ic,is,jc,js)
 
-#define QC_UDD_THREADS_PER_SITE   (QC_Ns*QC_Ns)
-#define QC_UDD_SITE_CPLXBUF       (3*QC_LEN_D + QC_LEN_M + QC_LEN_G)
-#define QC_UDD_SHMEM_PER_SITE     (QC_UDD_SITE_CPLXBUF*sizeof(complex<QC_REAL>))
+#define SITES_PER_DIMX 16
+#define QC_THREADS_PER_SITE   (QC_Ns*QC_Ns)
+#define QC_TMD_SITE_CPLXBUF   (3*QC_LEN_D + QC_LEN_M + QC_LEN_G)
+#define QC_TMD_SHMEM_PER_SITE (QC_TMD_SITE_CPLXBUF*sizeof(complex<QC_REAL>))
+
+#define QC_QBARQ_SITE_CPLXBUF   (2*QC_LEN_D + QC_LEN_G)
+#define QC_QBARQ_SHMEM_PER_SITE (QC_QBARQ_SITE_CPLXBUF*sizeof(complex<QC_REAL>))
 
 #define QC(x) qc_quda_##x
 
@@ -80,19 +84,18 @@ namespace quda {
   __constant__ QC_CPLX cS2_gvec[QC_LEN_G];
   __constant__ char cGamma[cSize]; // constant buffer for gamma matrices on GPU
 
-
   QC_REAL gamma_left_coeff_Re_cMem(int m, int n, int c);
   int gamma_left_ind_cMem(int m, int n);
 
-
   //-- Forward declarations for contraction wrappers
-  void copySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
-  void qcCopyGammaToSymbol(qcTMD_gamma gamma_h);
+  void qcCopySmatricesToSymbol(complex<QC_REAL> *S2, complex<QC_REAL> *S1);
+  void qcCopyGammaToSymbol(qcGammaStruct gamma_h);
 
-  __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev,
+							 QluaContractArg *arg);
   __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
-  __global__ void qbarq_g_P_aP_gvec_kernel_vecByVec_preserveBasisTrue(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
+  __global__ void qbarq_g_P_aP_gvec_shMem_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
   __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);
@@ -110,3 +113,4 @@ namespace quda {
   // __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg);
   // __global__ void tmd_g_U_P_P_gvec_kernel_gaugeExt(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg);
   // __global__ void tmd_g_U_P_aP_gvec_kernel_vecByVec_preserveBasisTrue_gaugeExt(complex<QC_REAL> *Corr_dev, qcTMD_Arg *arg);  
+  // __global__ void qbarq_g_P_aP_gvec_kernel_vecByVec_preserveBasisTrue(complex<QC_REAL> *Corr_dev, QluaContractArg *arg);

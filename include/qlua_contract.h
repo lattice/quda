@@ -350,7 +350,7 @@ namespace quda {
   //---------------------------------------------------------------------
 
 
-  struct qcTMD_gamma {
+  struct qcGammaStruct {
     int left_ind[QUDA_LEN_G][QUDA_Ns];
     complex<QUDA_REAL> left_coeff[QUDA_LEN_G][QUDA_Ns];
   };
