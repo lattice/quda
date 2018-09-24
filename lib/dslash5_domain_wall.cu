@@ -281,7 +281,10 @@ namespace quda {
 
     // if using shared-memory caching then load spinor field for my site into cache
     VectorCache<real,Vector> cache;
-    if (shared) cache.save(arg.in(s_*arg.volume_4d_cb + x_cb, parity));
+    if (shared) {
+      cache.save(arg.in(s_*arg.volume_4d_cb + x_cb, parity));
+      cache.sync();
+    }
 
     Vector out;
 
