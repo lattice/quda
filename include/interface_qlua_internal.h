@@ -215,7 +215,7 @@ namespace quda {
                             complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
                             qudaAPI_Param paramAPI);
 
-  void QuarkContractTMD_GPU(QuarkTMD_state *qcs);
+  void QuarkContractTMDqPDF_GPU(QuarkTMD_state *qcs);
   
 } //- namespace quda
   

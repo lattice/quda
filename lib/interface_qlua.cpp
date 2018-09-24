@@ -974,13 +974,11 @@ int string_prefix(const char *p, const char *str){
 
 
 //-- top level function, performs momentum projection
-int momentumProjectTMDCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
+int momentumProjectTMDqPDFCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
 
   int status = 0;
 
   const char *func_name = "momentumProjectTMDCorr_Quda";
- 
-  setVerbosity(qcs->paramAPI.verbosity);
 
   int Ndata   = qcs->paramAPI.mpParam.Ndata;
   int locT    = qcs->paramAPI.mpParam.locT;
@@ -1603,13 +1601,13 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
 
   //- Perform TMD contractions
   double t9 = MPI_Wtime();
-  QuarkContractTMD_GPU(qcs);
+  QuarkContractTMDqPDF_GPU(qcs);
   double t10 = MPI_Wtime();
   printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' done in %f sec.\n", func_name, t10-t9);
 
   //- Perform Momentum Projection
   double t11 = MPI_Wtime();
-  int mpStat = momentumProjectTMDCorr_Quda(qcs, momproj_buf);
+  int mpStat = momentumProjectTMDqPDFCorr_Quda(qcs, momproj_buf);
   if(mpStat != 0) {
     errorQuda("mpStat=%d\n", mpStat);
     return 1;
@@ -1707,13 +1705,13 @@ QuarkPDFstep_momProj_Quda(void *Vqcs,
 
   //- Perform PDF contractions
   double t9 = MPI_Wtime();
-  QuarkContractTMD_GPU(qcs);
+  QuarkContractTMDqPDF_GPU(qcs);
   double t10 = MPI_Wtime();
   printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' done in %f sec.\n", func_name, t10-t9);
 
   //- Perform Momentum Projection
   double t11 = MPI_Wtime();
-  int mpStat = momentumProjectTMDCorr_Quda(qcs, momproj_buf);
+  int mpStat = momentumProjectTMDqPDFCorr_Quda(qcs, momproj_buf);
   if(mpStat != 0) {
     errorQuda("mpStat=%d\n", mpStat);
     return 1;

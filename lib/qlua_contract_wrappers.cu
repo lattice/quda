@@ -563,13 +563,12 @@ namespace quda {
 
 
   //-- Class for TMD contractions with shmem, make it tunable
-  class qcTMD : public TunableVectorY {
+  class quarkContract : public TunableVectorY {
 
   protected:
-    qcTMD_Arg *arg_dev;
+    void *arg_dev;
     const cudaColorSpinorField *meta;
     qluaCntr_Type cntrType;
-    bool extendedGauge;
     complex<QUDA_REAL> *corrQuda_dev;
     int Nc;
     int Ns;
@@ -577,10 +576,18 @@ namespace quda {
     size_t shmem_per_site;
     
     long long flops() const{
-      return (long long)meta->VolumeCB() * meta->SiteSubset() * (Nc*Nc*Ns*Ns*(1+Nc*Ns) * 8 + Ns*Ns*Ns * 2);
+      long long flopCnt = 0;
+      if(cntrType == what_tmd_g_F_B)    flopCnt = (long long)meta->VolumeCB() * meta->SiteSubset() * (Nc*Nc*Ns*Ns*(1+Nc*Ns) * 8 + Ns*Ns*Ns * 2);
+      if(cntrType == what_qbarq_g_F_aB) flopCnt = (long long)meta->VolumeCB() * meta->SiteSubset() * (Nc*Nc*Ns*Ns*Ns * 8 + Ns*Ns*Ns * 2);
+      if(cntrType == what_qpdf_g_F_B)   flopCnt = (long long)meta->VolumeCB() * meta->SiteSubset() * (Nc*Nc*Ns*Ns*Ns * 8 + Ns*Ns*Ns * 2);
+      return flopCnt;
     }
     long long bytes() const{
-      return (long long)meta->VolumeCB() * meta->SiteSubset() * (2*Ns*Ns*Nc*Nc + Nc*Nc) * 2*8;
+      long long byteCnt = 0;
+      if(cntrType == what_tmd_g_F_B)    byteCnt = (long long)meta->VolumeCB() * meta->SiteSubset() * (2*Ns*Ns*Nc*Nc + Nc*Nc) * 2*8;
+      if(cntrType == what_qbarq_g_F_aB) byteCnt = (long long)meta->VolumeCB() * meta->SiteSubset() * (2*Ns*Ns*Nc*Nc) * 2*8;
+      if(cntrType == what_qpdf_g_F_B)   byteCnt = (long long)meta->VolumeCB() * meta->SiteSubset() * (2*Ns*Ns*Nc*Nc) * 2*8;
+      return byteCnt;
     }
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return meta->VolumeCB(); }
@@ -596,35 +603,40 @@ namespace quda {
     }
 
   public:
-    qcTMD(const cudaColorSpinorField *meta_, qcTMD_Arg *arg_dev_, 
-        complex<QUDA_REAL> *corrQuda_dev_, 
-        qluaCntr_Type cntrType_, bool extendedGauge_,
-        int blockdimZ_, size_t shmem_per_site_)
+    quarkContract(const cudaColorSpinorField *meta_, void *arg_dev_, 
+		  complex<QUDA_REAL> *corrQuda_dev_, 
+		  qluaCntr_Type cntrType_,
+		  int blockdimZ_, size_t shmem_per_site_)
       : TunableVectorY(meta_->SiteSubset()), meta(meta_),
 	arg_dev(arg_dev_), corrQuda_dev(corrQuda_dev_), cntrType(cntrType_), 
-        extendedGauge(extendedGauge_), Nc(QUDA_Nc), Ns(QUDA_Ns),
+        Nc(QUDA_Nc), Ns(QUDA_Ns),
         blockdimZ(blockdimZ_), shmem_per_site(shmem_per_site_)
     {
       strcpy(aux, meta_->AuxString());
       strcat(aux, comm_dim_partitioned_string());
     }
-    virtual ~qcTMD() { }
+    virtual ~quarkContract() { }
 
     long long getFlops(){return flops();}
     long long getBytes(){return bytes();}
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if(cntrType != what_tmd_g_F_B) 
-        errorQuda("qcTMD::apply(): Support only TMD contractions for now!\n");
+      if((cntrType != what_tmd_g_F_B) && (cntrType != what_qbarq_g_F_aB) && (cntrType != what_qpdf_g_F_B))
+        errorQuda("quarkContract::apply(): Support only \'what_tmd_g_F_B\', \'what_qpdf_g_F_B\' and \'what_qbarq_g_F_aB\' contractions for now!\n");
+
       if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
-	printfQuda("qcTMD::apply(): grid={%ld,%ld,%ld} block={%ld,%ld,%ld} shmem=%ld\n",
+	printfQuda("quarkContract::apply(): grid={%ld,%ld,%ld} block={%ld,%ld,%ld} shmem=%ld\n",
 		   (long)tp.grid.x, (long)tp.grid.y, (long)tp.grid.z, 
 		   (long)tp.block.x, (long)tp.block.y, (long)tp.block.z,
 		   (long)tp.shared_bytes);
 
-      tmd_g_U_D_aD_gvec_kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(corrQuda_dev, arg_dev);
+      if(cntrType == what_tmd_g_F_B)
+	tmd_g_U_D_aD_gvec_kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(corrQuda_dev, (qcTMD_Arg*)arg_dev);
+      if( (cntrType == what_qbarq_g_F_aB) || (cntrType == what_qpdf_g_F_B) )
+      	qbarq_g_P_aP_gvec_shMem_kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(corrQuda_dev, (QluaContractArg*)arg_dev);
     }
+
     void initTuneParam(TuneParam &param) const
     {
       TunableVectorY::initTuneParam(param);
@@ -643,73 +655,6 @@ namespace quda {
   //---------------------------------------------------------------------------
 
 
-  void perform_Std_Contract(complex<QUDA_REAL> *corrQuda_dev, QluaContractArg arg){
-
-    const char *func_name = "perform_Std_Contract";
-    
-    QluaContractArg *arg_dev;
-    cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
-    checkCudaError();
-    cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);    
-    checkCudaError();
-
-    double t1 = MPI_Wtime();
-    switch(arg.cntrType){
-    case what_baryon_sigma_UUS: {
-      dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-      dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-      baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
-    } break;
-    case what_qbarq_g_F_B: {
-      dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-      dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-      qbarq_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
-    } break;
-    case what_qbarq_g_F_aB: {
-#if 1
-      printfQuda("##### %s: Running the original qbarq_g_P_aP_gvec!!!\n", func_name);
-      dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-      dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-      qbarq_g_P_aP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
-#else
-      if(!arg.preserveBasis) errorQuda("%s: qbarq_g_P_aP_gvec kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
-      printfQuda("##### %s: Running the shared-Mem qbarq_g_P_aP_gvec!!!\n", func_name);
-      dim3 blockDim(SITES_PER_DIMX, arg.nParity, QC_THREADS_PER_SITE); 
-      dim3 gridDim((arg.volumeCB + blockDim.x - 1) / blockDim.x, 1, 1);
-      size_t shmem_size = blockDim.x * blockDim.y * QC_QBARQ_SHMEM_PER_SITE;     
-      qbarq_g_P_aP_gvec_shMem_kernel<<<gridDim, blockDim, shmem_size>>>(corrQuda_dev, arg_dev);
-#endif
-    } break;
-    case what_qbarq_g_F_hB: {
-      dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-      dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-      qbarq_g_P_hP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
-    } break;
-    case what_meson_F_B: {
-      dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-      dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-      meson_F_B_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
-    } break;
-    case what_meson_F_aB: {
-      dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-      dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-      meson_F_aB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
-    } break;
-    case what_meson_F_hB: {
-      dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
-      dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
-      meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
-    } break;
-    default: errorQuda("%s: Contraction type \'%s\' not implemented!\n", func_name, qc_contractTypeStr[arg.cntrType]);
-    }//- switch
-    cudaDeviceSynchronize();
-    checkCudaError();
-    double t2 = MPI_Wtime();
-    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[arg.cntrType], t2-t1);
-
-    cudaFree(arg_dev);
-  }//-- perform_Std_Contract
-
   //-Top-level function
   void QuarkContractStd_GPU(complex<QUDA_REAL> *corrQuda_dev,
 			    cudaColorSpinorField **cudaProp1,
@@ -726,40 +671,86 @@ namespace quda {
       errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
     QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, paramAPI.mpParam.cntrType, paramAPI.preserveBasis); 
+    QluaContractArg *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(arg) );
+    checkCudaError();
+    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
+    checkCudaError();
+
     if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
     if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS) qcCopySmatricesToSymbol(S2, S1);
     if(paramAPI.mpParam.cntrType == what_qbarq_g_F_aB) qcCopyGammaToConstMem();
 
-    perform_Std_Contract(corrQuda_dev, arg);
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
+    double t1 = MPI_Wtime();
+    switch(arg.cntrType){
+    case what_baryon_sigma_UUS: {
+      baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+    } break;
+    case what_qbarq_g_F_B: {
+      qbarq_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+    } break;
+    case what_qbarq_g_F_aB: {
+      if(!arg.preserveBasis) errorQuda("%s: qbarq_g_P_aP_gvec kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
+      quarkContract qbarq_gPaP(cudaProp1[0], (void*)arg_dev, corrQuda_dev, arg.cntrType, 
+			       QC_THREADS_PER_SITE, QC_TMD_SHMEM_PER_SITE);    
+      if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+	printfQuda("%s: qbarq_gPaP::Flops = %lld\n", func_name, qbarq_gPaP.getFlops());
+	printfQuda("%s: qbarq_gPaP::Bytes = %lld\n", func_name, qbarq_gPaP.getBytes());
+      }
+      qbarq_gPaP.apply(0);
+      cudaDeviceSynchronize();
+      checkCudaError();
+    } break;
+    case what_qbarq_g_F_hB: {
+      qbarq_g_P_hP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+    } break;
+    case what_meson_F_B: {
+      meson_F_B_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+    } break;
+    case what_meson_F_aB: {
+      meson_F_aB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+    } break;
+    case what_meson_F_hB: {
+      meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+    } break;
+    default: errorQuda("%s: Contraction type \'%s\' not implemented!\n", func_name, qc_contractTypeStr[arg.cntrType]);
+    }//- switch
+    cudaDeviceSynchronize();
+    checkCudaError();
+    double t2 = MPI_Wtime();
+    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[arg.cntrType], t2-t1);
+
+    cudaFree(arg_dev);
   }//-- QuarkContractStd_GPU
   //---------------------------------------------------------------------------
 
 
   //-Top-level function
-  void QuarkContractTMD_GPU(QuarkTMD_state *qcs){
+  void QuarkContractTMDqPDF_GPU(QuarkTMD_state *qcs){
 
-    const char *func_name = "QuarkContractTMD_GPU";
+    const char *func_name = "QuarkContractTMDqPDF_GPU";
 
     if( (qcs->cntrType != what_tmd_g_F_B) && (qcs->cntrType != what_qpdf_g_F_B) )
       errorQuda("%s: This function supports only TMD and PDF contractions!\n", func_name);
 
     if(qcs->cntrType == what_tmd_g_F_B){
-      printfQuda("%s: Performing TMD Step %d\n", func_name, qcs->iStep);
+      printfQuda("%s: Performing contractions for TMD Step %d\n", func_name, qcs->iStep);
 
       qcTMD_Arg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, qcs->wlinks, qcs->i_wl_vbv, qcs->paramAPI.preserveBasis);    
       qcTMD_Arg *arg_dev;
       cudaMalloc((void**)&(arg_dev), sizeof(arg) );
       checkCudaError();
       cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
-      checkCudaError();
-    
+      checkCudaError();    
       if(arg.nParity != 2)   errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
       if(!arg.preserveBasis) errorQuda("%s: TMD kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
 
-      qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType, 
-			arg.extendedGauge, QC_THREADS_PER_SITE, QC_TMD_SHMEM_PER_SITE);
-    
+      quarkContract contractTMD(qcs->cudaPropBkw[0], (void*)arg_dev, qcs->corrQuda_dev, qcs->cntrType, 
+				QC_THREADS_PER_SITE, QC_TMD_SHMEM_PER_SITE);
+
       if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
 	printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
 	printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
@@ -774,7 +765,7 @@ namespace quda {
       cudaFree(arg_dev);
     }
     else{
-      printfQuda("%s: Performing PDF Step %d\n", func_name, qcs->iStep);
+      printfQuda("%s: Performing contractions for PDF Step %d\n", func_name, qcs->iStep);
 
       QluaContractArg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, NULL, qcs->cntrType, qcs->paramAPI.preserveBasis); 
       QluaContractArg *arg_dev;
@@ -782,15 +773,21 @@ namespace quda {
       checkCudaError();
       cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
       checkCudaError();
+      if(arg.nParity != 2)   errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
+      if(!arg.preserveBasis) errorQuda("%s: qPDF kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
 
-      if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
-      if(!arg.preserveBasis) errorQuda("%s: qbarq_g_P_aP_gvec_shMem kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
+      quarkContract qbarq_gPaP(qcs->cudaPropBkw[0], (void*)arg_dev, qcs->corrQuda_dev, qcs->cntrType, 
+			       QC_THREADS_PER_SITE, QC_TMD_SHMEM_PER_SITE);
 
-      dim3 blockDim(SITES_PER_DIMX, arg.nParity, QC_THREADS_PER_SITE); 
-      dim3 gridDim((arg.volumeCB + blockDim.x - 1) / blockDim.x, 1, 1);
-      size_t shmem_size = blockDim.x * blockDim.y * QC_QBARQ_SHMEM_PER_SITE;     
+      if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+	printfQuda("%s: qbarq_gPaP::Flops = %lld\n", func_name, qbarq_gPaP.getFlops());
+	printfQuda("%s: qbarq_gPaP::Bytes = %lld\n", func_name, qbarq_gPaP.getBytes());
+      }
+
       double t1 = MPI_Wtime();
-      qbarq_g_P_aP_gvec_shMem_kernel<<<gridDim, blockDim, shmem_size>>>(qcs->corrQuda_dev, arg_dev);
+      qbarq_gPaP.apply(0);
+      cudaDeviceSynchronize();
+      checkCudaError();
       double t2 = MPI_Wtime();
       printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
       cudaFree(arg_dev);
@@ -800,6 +797,51 @@ namespace quda {
 
 
 } //-namespace quda
+
+
+
+
+
+
+// qbarq_P_aP contractions test cases
+// #if 0 //- Original kernel
+//       printfQuda("##### %s: Running the original qbarq_g_P_aP_gvec!!!\n", func_name);
+//       dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+//       dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+//       qbarq_g_P_aP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
+// #else //- ShMem kernel
+// #if 0 //- ShMem, NO tuning
+//       if(!arg.preserveBasis) errorQuda("%s: qbarq_g_P_aP_gvec kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
+//       printfQuda("##### %s: Running the shared-Mem tuning-NO qbarq_g_P_aP_gvec!!!\n", func_name);
+//       dim3 blockDim(SITES_PER_DIMX, arg.nParity, QC_THREADS_PER_SITE); 
+//       dim3 gridDim((arg.volumeCB + blockDim.x - 1) / blockDim.x, 1, 1);
+//       size_t shmem_size = blockDim.x * blockDim.y * QC_QBARQ_SHMEM_PER_SITE;     
+//       qbarq_g_P_aP_gvec_shMem_kernel<<<gridDim, blockDim, shmem_size>>>(corrQuda_dev, arg_dev);
+// #else//- ShMem, Tuning
+//       if(!arg.preserveBasis) errorQuda("%s: qbarq_g_P_aP_gvec kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
+//       printfQuda("##### %s: Running the shared-Mem tuning-YES qbarq_g_P_aP_gvec!!!\n", func_name);
+//       quarkContract qbarq_gPaP(cudaProp1[0], (void*)arg_dev, corrQuda_dev, arg.cntrType, 
+// 			       QC_THREADS_PER_SITE, QC_TMD_SHMEM_PER_SITE);    
+//       if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+// 	printfQuda("%s: qbarq_gPaP::Flops = %lld\n", func_name, qbarq_gPaP.getFlops());
+// 	printfQuda("%s: qbarq_gPaP::Bytes = %lld\n", func_name, qbarq_gPaP.getBytes());
+//       }
+//       qbarq_gPaP.apply(0);
+//       cudaDeviceSynchronize();
+//       checkCudaError();
+// #endif//- ShMem: Tuning, NO tuning
+// #endif //- Original, ShMem
+
+
+      // qPDF contractions without tuning
+      // dim3 blockDim(SITES_PER_DIMX, arg.nParity, QC_THREADS_PER_SITE); 
+      // dim3 gridDim((arg.volumeCB + blockDim.x - 1) / blockDim.x, 1, 1);
+      // size_t shmem_size = blockDim.x * blockDim.y * QC_QBARQ_SHMEM_PER_SITE;     
+      // double t1 = MPI_Wtime();
+      // qbarq_g_P_aP_gvec_shMem_kernel<<<gridDim, blockDim, shmem_size>>>(qcs->corrQuda_dev, arg_dev);
+      // double t2 = MPI_Wtime();
+      // printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
+      // cudaFree(arg_dev);
 
 
 // #if 0  /* no shmem */
