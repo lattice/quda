@@ -35,12 +35,12 @@ namespace quda {
        @param[in] a The vector to store in the shared memory cache
      */
     __device__ inline void save(const Vector &a) {
+      int j = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
 #pragma unroll
-      for (int i=0; i<2*a.n; i++) {
-        int j = ((i*blockDim.z + threadIdx.z)*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
+      for (int i=0; i<2*a.size; i++) {
         cache()[j] = *(reinterpret_cast<const real*>(a.data) + i);
+        j += blockDim.z*blockDim.y*blockDim.x;
       }
-      __syncthreads();
     }
 
     /**
@@ -52,10 +52,11 @@ namespace quda {
      */
     __device__ inline Vector load(int x, int y, int z) {
       Vector a;
+      int j = (z*blockDim.y + y)*blockDim.x + x;
 #pragma unroll
-      for (int i=0; i<2*a.n; i++) {
-        int j = ((i*blockDim.z + z)*blockDim.y + y)*blockDim.x + x;
+      for (int i=0; i<2*a.size; i++) {
         *(reinterpret_cast<real*>(a.data) + i) = cache()[j];
+        j += blockDim.z*blockDim.y*blockDim.x;
       }
       return a;
     }
