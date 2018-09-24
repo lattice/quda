@@ -130,7 +130,7 @@ init_QudaInvertParam_generic(QudaInvertParam& ip,
   ip.cuda_prec                = QUDA_DOUBLE_PRECISION;
   ip.cuda_prec_sloppy         = QUDA_HALF_PRECISION;
   ip.dagger                   = QUDA_DAG_NO;
-  ip.dirac_order              = (qdp2quda ? QUDA_QDP_DIRAC_ORDER : QUDA_INVALID_DIRAC_ORDER);
+  ip.dirac_order              = (qdp2quda ? QUDA_QDP_DIRAC_ORDER : QUDA_LEX_DIRAC_ORDER);
   ip.gamma_basis              = (preserveBasis ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS);
   ip.inv_type                 = QUDA_BICGSTAB_INVERTER;
   ip.mass_normalization       = QUDA_KAPPA_NORMALIZATION;
@@ -1136,6 +1136,11 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   int status = 0;
   const char *func_name = "QuarkTMDinit_Quda";
 
+  if( (paramAPI.mpParam.cntrType != what_tmd_g_F_B) && 
+      (paramAPI.mpParam.cntrType != what_qpdf_g_F_B) )
+    errorQuda("%s: Contraction type not parsed correctly or not supported!\n", func_name);
+
+
   if (check_quda_comms(qS)) return 1;
   if (NULL == Vqcs) return 1;
 
@@ -1155,8 +1160,6 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
     qudaGauge_host[mu] = (static_cast<QUDA_REAL*>(qluaGauge_host[mu]));
 
 
-  if(paramAPI.mpParam.cntrType != what_tmd_g_F_B)
-    errorQuda("%s: Contraction type not parsed correctly or not supported!\n", func_name);
   if(paramAPI.mpParam.GPU_phaseMatrix != 1){
     warningQuda("%s: Got GPU_phaseMatrix != 1. Overriding, will create phase matrix on GPU!\n", func_name);
     paramAPI.mpParam.GPU_phaseMatrix = 1;
@@ -1276,17 +1279,26 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   if(cuda_gf == NULL)
     errorQuda("%s: Cannot allocate Original Gauge Field! Exiting.\n", func_name);
 
-  //- Extended gauge field, copy of original, extendedGhosts are already exchanged
+  //- Extended gauge field, copy of original, extendedGhosts are exchanged
   qcs->gf_u = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_yes);
-  //- Extended auxilliary gauge fields. If copyGayge_no: initialized to zero, extendedGhosts are NOT exchanged
-  qcs->bsh_u  = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_no);
-  qcs->aux_u  = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_no);
-  qcs->wlinks = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_no);
+  if(qcs->gf_u  == NULL)
+    errorQuda("%s: Cannot allocate original extended Gauge Field! Exiting.\n", func_name);
 
-  if((qcs->gf_u  == NULL) || (qcs->bsh_u  == NULL) ||
-     (qcs->aux_u == NULL) || (qcs->wlinks == NULL) )
-    errorQuda("%s: Cannot allocate Extended Gauge Fields! Exiting.\n", func_name);
+  if(qcs->cntrType == what_tmd_g_F_B){
+    //- Extended auxilliary gauge fields. If copyGayge_no: initialized to zero, extendedGhosts are NOT exchanged
+    qcs->bsh_u  = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_no);
+    qcs->aux_u  = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_no);
+    qcs->wlinks = new_ExtendedcudaGaugeField(*(cuda_gf), qcs->qcR, copyGauge_no);
     
+    if( (qcs->bsh_u  == NULL) || (qcs->aux_u == NULL) || (qcs->wlinks == NULL) )
+      errorQuda("%s: Cannot allocate auxilliary extended Gauge Fields! Exiting.\n", func_name);
+  }
+  else{
+    //- No auxilliary gauge fields needed for qPDF contractions
+    qcs->bsh_u  = NULL;
+    qcs->aux_u  = NULL;
+    qcs->wlinks = NULL;
+  }
   delete cuda_gf;
   cuda_gf = NULL;
   
@@ -1344,7 +1356,7 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   //-------------------------------------------------------------
 
 
-  //- Host/Device coorelator in position space
+  //- Host/Device correlator in position space
   LONG_T corrLgh = locvol * Ndata;
   size_t corrByteSize = SizeCplxReal * corrLgh;
   cudaMalloc((void**)&(qcs->corrQuda_dev), corrByteSize);
@@ -1409,13 +1421,15 @@ QuarkTMDfree_Quda(void **Vqcs){
 
   //- Delete gauge fields
   delete qcs->gf_u;
-  delete qcs->bsh_u;
-  delete qcs->aux_u;
-  delete qcs->wlinks;
   qcs->gf_u   = NULL;
-  qcs->bsh_u  = NULL;
-  qcs->aux_u  = NULL;
-  qcs->wlinks = NULL;
+  if(qcs->cntrType == what_tmd_g_F_B){
+    delete qcs->bsh_u;
+    delete qcs->aux_u;
+    delete qcs->wlinks;
+    qcs->bsh_u  = NULL;
+    qcs->aux_u  = NULL;
+    qcs->wlinks = NULL;
+  }
 
   //- Delete propagators
   for(int i=0;i<QUDA_PROP_NVEC;i++){
@@ -1625,6 +1639,110 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   
   double t15 = MPI_Wtime();
   printfQuda("%s: GPU TMD step %d finished successfully in %f sec. Returning...\n", func_name, qcs->iStep, t15-t14);
+
+  cudaProfilerStop();
+
+  return status;
+}
+
+
+
+//- C.K. Main function which performs propagator shifts and performs PDF contractions
+EXTRN_C int
+QuarkPDFstep_momProj_Quda(void *Vqcs,
+			  XTRN_CPLX *momproj_buf,     /* output in Pspace */
+			  XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
+			  const char *b_lpath){
+
+  cudaProfilerStart();
+
+  double t14 = MPI_Wtime();
+  int status = 0;
+  const char *func_name = "QuarkPDFstep_momProj_Quda";
+
+  QuarkTMD_state *qcs = (static_cast<QuarkTMD_state *>(Vqcs));
+
+  printfQuda("%s: Performing PDF-step %d...\n", func_name, ++qcs->iStep);
+  
+  const char *b_lpath_inc = NULL;
+  char *b_lpath_ptr = NULL;
+  int cur_blen = strlen(qcs->b_lpath);
+
+  //- b_lpath: increment or reset?
+  double t20 = MPI_Wtime();
+  if( 0 < cur_blen && string_prefix(qcs->b_lpath, b_lpath) ){
+    b_lpath_inc = b_lpath + cur_blen;
+    b_lpath_ptr = qcs->b_lpath + cur_blen;
+    double t21 = MPI_Wtime();
+    printfQuda("TIMING - %s: b_path increment done in %f sec.\n", func_name, t21-t20);
+  }
+  else{
+    b_lpath_inc = b_lpath;
+    b_lpath_ptr = qcs->b_lpath;
+    memset(b_lpath_ptr, 0, sizeof(qcs->b_lpath));
+    
+    qcCPUtoCudaProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
+    double t21 = MPI_Wtime();
+    printfQuda("TIMING - %s: b_path reset done in %f sec.\n", func_name, t21-t20);
+  }
+
+  /* build up b_lpath */
+  for (; *b_lpath_inc ; b_lpath_inc++, b_lpath_ptr++) {
+    char c = *b_lpath_inc;
+    qcTMD_ShiftFlag shfFlag = TMDparseShiftFlag(c);
+
+    //- Covariant shift of qcs->cudaPropFrw_bsh in dir 'c'
+    double t1 = MPI_Wtime();
+    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+      perform_ShiftCudaVec_Cov(qcs->cudaPropAux, qcs->cudaPropFrw_bsh[ivec], qcs->gf_u, shfFlag);
+      qcSwapCudaVec(&(qcs->cudaPropFrw_bsh[ivec]), &(qcs->cudaPropAux));
+    }
+    double t2 = MPI_Wtime();
+    printfQuda("TIMING - %s: Covariant Propagator shift done in %f sec.\n", func_name, t2-t1);
+
+    //- memorize
+    *b_lpath_ptr = c;
+  }
+  *b_lpath_ptr = '\0';
+
+  //- Perform PDF contractions
+  double t9 = MPI_Wtime();
+  QuarkContractTMD_GPU(qcs);
+  double t10 = MPI_Wtime();
+  printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' done in %f sec.\n", func_name, t10-t9);
+
+  //- Perform Momentum Projection
+  double t11 = MPI_Wtime();
+  int mpStat = momentumProjectTMDCorr_Quda(qcs, momproj_buf);
+  if(mpStat != 0) {
+    errorQuda("mpStat=%d\n", mpStat);
+    return 1;
+  }
+  double t12 = MPI_Wtime();
+  printfQuda("TIMING - %s: Function \'momentumProjectTMDCorr_Quda\' done in %f sec.\n", func_name, t12-t11);
+
+  //-- Copy the position space correlator back to CPU if required
+  if(qcs->push_res){
+    double t24 = MPI_Wtime();
+    LONG_T lV = qcs->paramAPI.mpParam.locvol;
+    int Ndata = qcs->paramAPI.mpParam.Ndata;
+    size_t corrByteSize = sizeof(complex<QUDA_REAL>) * lV * Ndata;
+    printfQuda("%s: Will copy the position-space correlator to CPU. Got lV = %lld, Ndata = %d, corrByteSize = %zd\n",
+	       func_name, lV, Ndata, corrByteSize);
+    cudaMemcpy(corrQuda, qcs->corrQuda_dev, corrByteSize, cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    checkCudaError();
+    double t25 = MPI_Wtime();
+    printfQuda("%s: Position-space correlator copied to CPU in %f sec.\n", func_name, t25-t24);
+  }
+
+  saveTuneCache();
+
+  printfQuda("%s: Memory Report after PDF step %d:\n", func_name, qcs->iStep);
+  printGPUMemInfo();
+  
+  double t15 = MPI_Wtime();
+  printfQuda("%s: GPU PDF step %d finished successfully in %f sec. Returning...\n", func_name, qcs->iStep, t15-t14);
 
   cudaProfilerStop();
 

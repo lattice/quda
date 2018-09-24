@@ -185,6 +185,8 @@ namespace quda {
 
   void perform_ShiftCudaVec_nonCov(ColorSpinorField *dst, ColorSpinorField *src,
 				   qcTMD_ShiftFlag shfFlag);
+  void perform_ShiftCudaVec_Cov(ColorSpinorField *dst, ColorSpinorField *src, cudaGaugeField *gf,
+                                qcTMD_ShiftFlag shfFlag);
   void perform_ShiftLink_Cov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
                              cudaGaugeField *gf, qcTMD_ShiftFlag shfFlag);
   void perform_ShiftGauge_nonCov(cudaGaugeField *dst, cudaGaugeField *src,

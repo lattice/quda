@@ -741,38 +741,61 @@ namespace quda {
 
     const char *func_name = "QuarkContractTMD_GPU";
 
-    if(qcs->cntrType != what_tmd_g_F_B)
-      errorQuda("%s: This function supports only TMD contractions!\n", func_name);
+    if( (qcs->cntrType != what_tmd_g_F_B) && (qcs->cntrType != what_qpdf_g_F_B) )
+      errorQuda("%s: This function supports only TMD and PDF contractions!\n", func_name);
 
-    printfQuda("%s: Performing TMD Step %d\n", func_name, qcs->iStep);
+    if(qcs->cntrType == what_tmd_g_F_B){
+      printfQuda("%s: Performing TMD Step %d\n", func_name, qcs->iStep);
 
-    qcTMD_Arg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, qcs->wlinks, qcs->i_wl_vbv, qcs->paramAPI.preserveBasis);    
-    qcTMD_Arg *arg_dev;
-    cudaMalloc((void**)&(arg_dev), sizeof(arg) );
-    checkCudaError();
-    cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
-    checkCudaError();
+      qcTMD_Arg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, qcs->wlinks, qcs->i_wl_vbv, qcs->paramAPI.preserveBasis);    
+      qcTMD_Arg *arg_dev;
+      cudaMalloc((void**)&(arg_dev), sizeof(arg) );
+      checkCudaError();
+      cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
+      checkCudaError();
     
-    if(arg.nParity != 2)   errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
-    if(!arg.preserveBasis) errorQuda("%s: TMD kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
+      if(arg.nParity != 2)   errorQuda("%s: This function supports only Full Site Subset fields!\n", func_name);
+      if(!arg.preserveBasis) errorQuda("%s: TMD kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
 
-    qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType, 
-		      arg.extendedGauge, QC_THREADS_PER_SITE, QC_TMD_SHMEM_PER_SITE);
+      qcTMD contractTMD(qcs->cudaPropBkw[0], arg_dev, qcs->corrQuda_dev, qcs->cntrType, 
+			arg.extendedGauge, QC_THREADS_PER_SITE, QC_TMD_SHMEM_PER_SITE);
+    
+      if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+	printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
+	printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
+      }
 
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
-      printfQuda("%s: contractTMD::Flops = %lld\n", func_name, contractTMD.getFlops());
-      printfQuda("%s: contractTMD::Bytes = %lld\n", func_name, contractTMD.getBytes());
+      double t1 = MPI_Wtime();
+      contractTMD.apply(0);
+      cudaDeviceSynchronize();
+      checkCudaError();
+      double t2 = MPI_Wtime();
+      printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
+      cudaFree(arg_dev);
+    }
+    else{
+      printfQuda("%s: Performing PDF Step %d\n", func_name, qcs->iStep);
+
+      QluaContractArg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, NULL, qcs->cntrType, qcs->paramAPI.preserveBasis); 
+      QluaContractArg *arg_dev;
+      cudaMalloc((void**)&(arg_dev), sizeof(arg) );
+      checkCudaError();
+      cudaMemcpy(arg_dev, &arg, sizeof(arg), cudaMemcpyHostToDevice);    
+      checkCudaError();
+
+      if(arg.nParity != 2) errorQuda("%s: This function supports only Full Site Subset spinors!\n", func_name);
+      if(!arg.preserveBasis) errorQuda("%s: qbarq_g_P_aP_gvec_shMem kernel supports only QUDA_UKQCD_GAMMA_BASIS!\n", func_name);
+
+      dim3 blockDim(SITES_PER_DIMX, arg.nParity, QC_THREADS_PER_SITE); 
+      dim3 gridDim((arg.volumeCB + blockDim.x - 1) / blockDim.x, 1, 1);
+      size_t shmem_size = blockDim.x * blockDim.y * QC_QBARQ_SHMEM_PER_SITE;     
+      double t1 = MPI_Wtime();
+      qbarq_g_P_aP_gvec_shMem_kernel<<<gridDim, blockDim, shmem_size>>>(qcs->corrQuda_dev, arg_dev);
+      double t2 = MPI_Wtime();
+      printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
+      cudaFree(arg_dev);
     }
 
-    double t1 = MPI_Wtime();
-    contractTMD.apply(0);
-    cudaDeviceSynchronize();
-    checkCudaError();
-    double t2 = MPI_Wtime();
-    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
-
-    cudaFree(arg_dev);
-    arg_dev = NULL;
   }//-- QuarkContractTMD_GPU
 
 
