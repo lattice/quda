@@ -415,6 +415,8 @@ if(QUDA_JITIFY)
 #  find_library(LibDL_Libraries nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
   LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
   LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
+  configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
+  include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 endif()
 
 if(QUDA_ALTRELIABLE)

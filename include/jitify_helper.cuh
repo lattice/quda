@@ -26,6 +26,8 @@
 #define JITIFY_PRINT_LAUNCH        0
 #endif
 
+
+#include "jitify_options.hpp"
 #include <jitify.hpp>
 
 namespace quda {

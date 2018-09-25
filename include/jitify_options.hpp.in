@@ -1,0 +1,9 @@
+#define JITIFY_OPTIONS -I${CMAKE_CURRENT_BINARY_DIR}/lib \
+-I${CMAKE_CURRENT_BINARY_DIR}/include \
+-I${CMAKE_CURRENT_BINARY_DIR}/include/cub \
+-I${CMAKE_CURRENT_BINARY_DIR}/include/cub/block \
+-I${CMAKE_CURRENT_BINARY_DIR}/include/cub/warp \
+-I${CMAKE_CURRENT_BINARY_DIR}/include/cub/block/specializations \
+-I${CMAKE_CURRENT_BINARY_DIR}/include/cub/device/dispatch \
+-I${CMAKE_CURRENT_BINARY_DIR}/include/cub/device
+
