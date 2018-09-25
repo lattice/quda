@@ -42,13 +42,14 @@ QudaVerbosity parseVerbosity(const char *v){
   else if (strcmp(v,"QUDA_VERBOSE")==0)       verbosity = QUDA_VERBOSE;
   else if (strcmp(v,"QUDA_DEBUG_VERBOSE")==0) verbosity = QUDA_DEBUG_VERBOSE;
   else if (strcmp(v,"INVALID_VERBOSITY")==0){
-    printfQuda("Verbosity not set! Will set to QUDA_SUMMARIZE\n");
+    printfQuda("parseVerbosity: Verbosity not set! Will set to QUDA_SUMMARIZE\n");
     verbosity = QUDA_SUMMARIZE;
   }
   else{
-    printfQuda("Verbosity not set correctly (got \"%s\")! Will set to QUDA_SUMMARIZE\n",v);
+    printfQuda("parseVerbosity: Verbosity not set correctly (got \"%s\")! Will set to QUDA_SUMMARIZE\n",v);
     verbosity = QUDA_SUMMARIZE;
   }
+  printfQuda("parseVerbosity: Verbosity set to: %s\n", v);
 
   return verbosity;
 }
