@@ -27,6 +27,7 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
+#include <blas_quda.h>
 
 // Various CPU fields lifted from
 // staggered_invert_test.cpp
@@ -146,12 +147,13 @@ namespace quda {
 
 template<typename Float>
 void constructSpinorField(Float *res) {
+  int vol = V;
   for(int src=0; src<Nsrc; src++) {
-    for(int i = 0; i < Vh; i++) {
+    for(int i = 0; i < vol; i++) {
       for (int s = 0; s < 1; s++) {
         for (int m = 0; m < 3; m++) {
-          res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-          res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
+          res[(src*vol + i)*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
+          res[(src*vol + i)*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
         }
       }
     }
@@ -245,27 +247,37 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.cuda_prec_sloppy = prec_sloppy;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param.anisotropy = 1.0;
-
-
-  // Fix me: must always be set to 1.0 for reasons not yet discerned. 
-  // The tadpole coefficient gets encoded directly into the fat link
-  // construct coefficents.
-  gauge_param.tadpole_coeff = 1.0;
 
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
 
-  gauge_param.scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*gauge_param.tadpole_coeff*gauge_param.tadpole_coeff);
+  gauge_param.anisotropy = 1.0;
 
+  // For asqtad:
+  //gauge_param.tadpole_coeff = tadpole_coeff;
+  //gauge_param.scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
+
+  // For HISQ, this must always be set to 1.0, since the tadpole
+  // correction is baked into the coefficients for the first fattening.
+  // The tadpole doesn't mean anything for the second fattening
+  // since the input fields are unitarized.
+  gauge_param.tadpole_coeff = 1.0;
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gauge_param.scale = -1.0/24.0;
+    if (eps_naik != 0) {
+      gauge_param.scale *= (1.0+eps_naik);
+    }
+  } else {
+    gauge_param.scale = 1.0;
+  }
+  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.type = QUDA_WILSON_LINKS;
 
-  // QUDA_QDP_GAUGE_ORDER causes a segfault...
-  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  
   gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
+
 #ifdef MULTI_GPU
   int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
   int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
@@ -276,6 +288,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   pad_size = MAX(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;    
 #endif
+
 }
 
 void setMultigridParam(QudaMultigridParam &mg_param) {
@@ -471,63 +484,68 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
+
+  // Solver params
+  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.mass = mass;
+
+  // outer solver parameters
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.tol = tol;
+  inv_param.maxiter = niter;
+  inv_param.reliable_delta = 1e-4;
+  inv_param.pipeline = pipeline;
+
   inv_param.Ls = 1;
 
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
-  inv_param.cpu_prec = cpu_prec;
-  inv_param.cuda_prec = cuda_prec;
-  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
-
-  inv_param.cuda_prec_precondition = cuda_prec_precondition;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.dslash_type = dslash_type;
-
-  inv_param.mass = mass;
-  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
-
-  inv_param.dagger = QUDA_DAG_NO;
-
-  // no need to set clover params
-
-  // do we want full solution or single-parity solution
-  inv_param.solution_type = (solve_type == QUDA_DIRECT_PC_SOLVE) ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
-
-  // do we want to use an even-odd preconditioned solve or not
-  inv_param.solve_type = solve_type;
-  inv_param.matpc_type = matpc_type;
-
-  inv_param.inv_type = QUDA_GCR_INVERTER;
-
-  inv_param.verbosity = QUDA_VERBOSE;
-  //inv_param.verbosity_precondition = mg_verbosity[0];
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE; // ESW HACK
-
-  /* ESW HACK: comment this out to do a non-MG solve. */
-  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-
-  inv_param.pipeline = pipeline;
-  inv_param.gcrNkrylov = gcrNkrylov;
-  inv_param.tol = tol;
+  if(tol_hq == 0 && tol == 0){
+    errorQuda("qudaInvert: requesting zero residual\n");
+    exit(1);
+  }
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
   inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 
+  /* ESW HACK: comment this out to do a non-MG solve. */
+  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
+  //inv_param.verbosity_precondition = mg_verbosity[0];
+  inv_param.verbosity_precondition = QUDA_SUMMARIZE; // ESW HACK
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+
+  // Specify Krylov sub-size for GCR, BICGSTAB(L)
+  inv_param.gcrNkrylov = gcrNkrylov;
+
+  // do we want full solution or single-parity solution
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+  // do we want to use an even-odd preconditioned solve or not
+  inv_param.solve_type = solve_type;
+  inv_param.matpc_type = matpc_type;
+  inv_param.dagger = QUDA_DAG_NO;
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+
+  inv_param.cpu_prec = cpu_prec;
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  inv_param.dslash_type = dslash_type;
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+  
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
-  inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-4;
+  
 
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
@@ -631,18 +649,17 @@ int main(int argc, char **argv)
 
 
   setDims(gauge_param.X);
-
+  dw_setDims(gauge_param.X,1); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
 
   /* Taken from staggered_invert_test to load gauge fields */
-
-
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
+  void* milc_inlink = nullptr;
   void* milc_fatlink = nullptr;
   void* milc_longlink = nullptr;
 
@@ -652,6 +669,7 @@ int main(int argc, char **argv)
     qdp_longlink[dir] = malloc(V*gaugeSiteSize*gSize);
   }
 
+  milc_inlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_longlink = malloc(4*V*gaugeSiteSize*gSize);
 
@@ -663,27 +681,26 @@ int main(int argc, char **argv)
     }
   } else {
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      construct_gauge_field(qdp_fatlink, 0, gauge_param.cpu_prec, &gauge_param);
+      construct_gauge_field(qdp_fatlink, 1, gauge_param.cpu_prec, &gauge_param);
     } else {
       construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec,&gauge_param,dslash_type);
     }
     //createSiteLinkCPU(inlink, gauge_param.cpu_prec, 0); // 0 for no phases
   }
 
-#ifdef GPU_GAUGE_TOOLS
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  // Compute plaquette
+  reorderQDPtoMILC(milc_inlink,qdp_inlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
   double plaq[3];
-  loadGaugeQuda(qdp_inlink, &gauge_param);
+  loadGaugeQuda(milc_inlink, &gauge_param);
   plaqQuda(plaq);
-  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
   if (dslash_type != QUDA_LAPLACE_DSLASH) {
     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
     plaq[1] = -plaq[1];
     plaq[2] = -plaq[2];
   }
+  free(milc_inlink);
 
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-#endif
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
   // "compute" the fat/long links or not.
@@ -779,13 +796,17 @@ int main(int argc, char **argv)
 
   }
 
-#ifdef GPU_GAUGE_TOOLS
+  // Alright, we've created all the void** links.
+  // Create the void* pointers
+  reorderQDPtoMILC(milc_fatlink,qdp_fatlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
+  reorderQDPtoMILC(milc_longlink,qdp_longlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
+
+
+  // Just out of curiosity, look at the fat link plaquette
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
     double plaq[3];
-    loadGaugeQuda(qdp_fatlink, &gauge_param);
+    loadGaugeQuda(milc_fatlink, &gauge_param);
     plaqQuda(plaq);
-    gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
 
     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
     plaq[1] = -plaq[1];
@@ -793,24 +814,16 @@ int main(int argc, char **argv)
 
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
-#endif
-
-  // Alright, we've created all the void** links.
-  // Create the void* pointers
-  reorderQDPtoMILC(milc_fatlink,qdp_fatlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
-  reorderQDPtoMILC(milc_longlink,qdp_longlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
-
-
 
 
   ColorSpinorParam csParam;
   csParam.nColor=3;
   csParam.nSpin=1;
-  csParam.nDim=4;
+  csParam.nDim=5;
   for (int d = 0; d < 4; d++) csParam.x[d] = gauge_param.X[d];
   bool pc = (inv_param.solution_type == QUDA_MATPC_SOLUTION || inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   if (pc) csParam.x[0] /= 2;
-  //csParam.x[4] = Nsrc;
+  csParam.x[4] = 1;
 
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
@@ -897,70 +910,95 @@ int main(int argc, char **argv)
 
 
 
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
-    invertQuda((float*)out->V(), (float*)in->V(), &inv_param);
-  }else{
-    invertQuda((double*)out->V(), (double*)in->V(), &inv_param);
-  }
-
-  warningQuda("Got out of inverter, need to verify.\n");
-  fflush(stdout);
-
-  // free the multigrid solver
-  destroyMultigridQuda(mg_preconditioner);
+  invertQuda(out->V(), in->V(), &inv_param);
 
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-    
-  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-  //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, 0.0);
-  fflush(stdout);
-
-  // I haven't been able to get this verify working,
-  // and I'm not going to try for now. The issue is I need
-  // to check both parities.
-  /* 
-  
-  // Prepare for checks and such.
   double nrm2=0;
   double src2=0;
-  double l2r=0;
 
-  int len = V;//Vh*Nsrc;
+  int len = 0;
+  if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+    len = V*Nsrc;
+  } else {
+    len = Vh*Nsrc;
+  }
 
-  double factor = 1.0 / (2.0*mass);
+  // Check solution
+  if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
+
+    //In QUDA, the full staggered operator has the sign convention
+    //{{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
+    //have the minus sign. Passing in QUDA_DAG_YES solves this
+    //discrepancy
+#ifdef MULTI_GPU
+    staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Even()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+     reinterpret_cast<cpuColorSpinorField*>(&out->Odd()), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+    staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&ref->Odd()), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+     reinterpret_cast<cpuColorSpinorField*>(&out->Even()), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+#else
+    staggered_dslash(ref->Even().V(), qdp_fatlink, qdp_longlink, out->Odd().V(), QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+    staggered_dslash(ref->Odd().V(), qdp_fatlink, qdp_longlink, out->Even().V(), QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
+#endif    
+    //if (dslash_type == QUDA_LAPLACE_DSLASH) {
+    //  xpay(out->V(), kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
+    //  ax(0.5/kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
+    //} else {
+      axpy(2*mass, out->V(), ref->V(), ref->Length(), gauge_param.cpu_prec);
+    //}
+
+    // Reference debugging code: print the first component
+    // of the even and odd partities within a solution vector.
+    
+    printfQuda("\nLength: %lu\n", ref->Length());
+
+    // for verification
+    printfQuda("\n\nEven:\n");
+    printfQuda("CUDA: %f\n", ((double*)(in->Even().V()))[0]);
+    printfQuda("Soln: %f\n", ((double*)(out->Even().V()))[0]);
+    printfQuda("CPU:  %f\n", ((double*)(ref->Even().V()))[0]);
+
+    printfQuda("\n\nOdd:\n");
+    printfQuda("CUDA: %f\n", ((double*)(in->Odd().V()))[0]);
+    printfQuda("Soln: %f\n", ((double*)(out->Odd().V()))[0]);
+    printfQuda("CPU:  %f\n", ((double*)(ref->Odd().V()))[0]);
+    printfQuda("\n\n");
+    
+    mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+    nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+    src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+
+  } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
 #ifdef MULTI_GPU    
-  //mat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, in, factor, QUDA_DAG_NO, inv_param.cpu_prec, gauge_param.cpu_prec, &inv_param);
-
-  // Need to do both even and odd...
-  staggered_dslash_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, in, 0, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
-
+    matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
+        out, mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmp, QUDA_EVEN_PARITY);
 #else
-  mat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), factor, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+    matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
 #endif
 
-  printfQuda("\nCompleted reference dslash.\n");
-  fflush(stdout);
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      printfQuda("%f %f\n", ((float*)in->V())[12], ((float*)ref->V())[12]);
+    } else {
+      printfQuda("%f %f\n", ((double*)in->V())[12], ((double*)ref->V())[12]);
+    }
 
-  ax( factor, in->V(), len*mySpinorSiteSize, inv_param.cpu_prec );
+    mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+    nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+    src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+  }
 
-  int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
-  mxpy(in->V(), ref->V(), vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-  nrm2 = norm_2(ref->V(), vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-  src2 = norm_2(in->V(), vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-  l2r = sqrt(nrm2 / src2);
+  double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
+  double l2r = sqrt(nrm2/src2);
 
-  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
-	     inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
-  fflush(stdout);
+  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+      inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
-  */ 
-  // End I'm lazy.
+  printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
+      time0, inv_param.secs, inv_param.iter, inv_param.secs,
+      inv_param.gflops/inv_param.secs);
 
   // Clean up gauge fields, at least
   for (int dir = 0; dir < 4; dir++) {
@@ -978,6 +1016,9 @@ int main(int argc, char **argv)
   delete out;
   delete ref;
   delete tmp;
+
+  // free the multigrid solver
+  destroyMultigridQuda(mg_preconditioner);
 
   // finalize the QUDA library
   endQuda();

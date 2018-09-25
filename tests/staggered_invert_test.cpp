@@ -113,8 +113,8 @@ void constructSpinorField(Float *res) {
     for(int i = 0; i < vol; i++) {
       for (int s = 0; s < 1; s++) {
         for (int m = 0; m < 3; m++) {
-          res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-          res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
+          res[(src*vol + i)*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
+          res[(src*vol + i)*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
         }
       }
     }
@@ -354,6 +354,7 @@ invert_test(int argc, char** argv)
   void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
+  void* milc_inlink = nullptr;
   void* milc_fatlink = nullptr;
   void* milc_longlink = nullptr;
 
@@ -363,6 +364,7 @@ invert_test(int argc, char** argv)
     qdp_longlink[dir] = malloc(V*gaugeSiteSize*gSize);
   }
 
+  milc_inlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_longlink = malloc(4*V*gaugeSiteSize*gSize);
 
@@ -381,21 +383,19 @@ invert_test(int argc, char** argv)
     //createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
   }
 
-#ifdef GPU_GAUGE_TOOLS
-  /*gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  printfQuda("gaugePrecise: %lu\n", (unsigned long)gaugePrecise);
+  // Compute plaquette
+  reorderQDPtoMILC(milc_inlink,qdp_inlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
   double plaq[3];
-  loadGaugeQuda(qdp_inlink, &gaugeParam);
+  loadGaugeQuda(milc_inlink, &gaugeParam);
   plaqQuda(plaq);
-  gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
   if (dslash_type != QUDA_LAPLACE_DSLASH) {
     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
     plaq[1] = -plaq[1];
     plaq[2] = -plaq[2];
   }
+  free(milc_inlink);
 
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);*/
-#endif
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you 
   // "compute" the fat/long links or not.
@@ -508,27 +508,22 @@ invert_test(int argc, char** argv)
 
   }
 
-#ifdef GPU_GAUGE_TOOLS
-  /*if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  // Alright, we've created all the void** links.
+  // Create the void* pointers
+  reorderQDPtoMILC(milc_fatlink,qdp_fatlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderQDPtoMILC(milc_longlink,qdp_longlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+
+
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
     double plaq[3];
-    loadGaugeQuda(qdp_fatlink, &gaugeParam);
-    plaqQuda(plaq);
-    gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
+    loadGaugeQuda(milc_fatlink, &gaugeParam);
 
     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
     plaq[1] = -plaq[1];
     plaq[2] = -plaq[2];
 
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  }*/
-#endif
-
-  // Alright, we've created all the void** links.
-  // Create the void* pointers
-  reorderQDPtoMILC(milc_fatlink,qdp_fatlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-  reorderQDPtoMILC(milc_longlink,qdp_longlink,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-
+  }
 
   ColorSpinorParam csParam;
   csParam.nColor=3;
@@ -654,7 +649,7 @@ invert_test(int argc, char** argv)
 
       // Reference debugging code: print the first component
       // of the even and odd partities within a solution vector.
-      /*
+      
       printfQuda("\nLength: %lu\n", ref->Length());
 
       // for verification
@@ -668,7 +663,7 @@ invert_test(int argc, char** argv)
       printfQuda("Soln: %f\n", ((double*)(out->Odd().V()))[0]);
       printfQuda("CPU:  %f\n", ((double*)(ref->Odd().V()))[0]);
       printfQuda("\n\n");
-      */
+      
       
       mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
