@@ -987,7 +987,14 @@ namespace quda {
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-      diracSmoother->MdagM(tmp2->Even(), tmp1->Odd());
+
+      // dirty (read: lazy) hack to figure out if this level is a
+      // preconditioned staggered op
+      if (tmp2->Nspin() == 1) {
+        diracSmoother->M(tmp2->Even(), tmp1->Odd()); // staggered!
+      } else {
+        diracSmoother->MdagM(tmp2->Even(), tmp1->Odd());
+      }
       Complex dot = cDotProduct(tmp2->Even(),tmp1->Odd());
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",

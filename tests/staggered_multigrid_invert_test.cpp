@@ -621,10 +621,10 @@ int main(int argc, char **argv)
   }
 
   // ESW HACK: needs to be addressed
-  if (solve_type == QUDA_DIRECT_PC_SOLVE || coarse_solve_type[0] == QUDA_DIRECT_PC_SOLVE || smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) {
+  /*if (solve_type == QUDA_DIRECT_PC_SOLVE || coarse_solve_type[0] == QUDA_DIRECT_PC_SOLVE || smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) {
     printfQuda("staggered_multigtid_invert_test doesn't support preconditioned outer solve yet.\n");
     exit(0);
-  }
+  }*/
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
