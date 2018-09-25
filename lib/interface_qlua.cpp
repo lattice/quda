@@ -17,8 +17,25 @@
 #include <cublas_v2.h>
 #include <interface_qlua_internal.h>
 #include <cuda_profiler_api.h>
+#include <sys/types.h>
+#include <sys/sysinfo.h>
 
 using namespace quda;
+
+
+void printCPUMemInfo(){
+  struct sysinfo memInfo;
+  sysinfo (&memInfo);
+  long long totalPhysMem = memInfo.totalram;
+  long long freePhysMem  = memInfo.freeram;
+  long long usedPhysMem  = memInfo.totalram - memInfo.freeram;
+  totalPhysMem *= memInfo.mem_unit;
+  freePhysMem  *= memInfo.mem_unit;
+  usedPhysMem  *= memInfo.mem_unit;
+  printfQuda("  CPUMemInfo: Total CPU Memory: %lld MBytes.\n", totalPhysMem/(1<<20));
+  printfQuda("  CPUMemInfo: Free  CPU Memory: %lld MBytes.\n", freePhysMem /(1<<20));
+  printfQuda("  CPUMemInfo: Used  CPU Memory: %lld MBytes.\n", usedPhysMem /(1<<20));
+}
 
 
 void printGPUMemInfo(){
@@ -1005,14 +1022,14 @@ int momentumProjectTMDqPDFCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
    * corrOut_dev=(Nmoms,Ndata*locT) is the output matrix in column-major format
    */
   if(typeid(QUDA_REAL) == typeid(double)){
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s: Performing momentum projection in double precision.\n", func_name);
+    if(getVerbosity() >= QUDA_VERBOSE) printfQuda("%s: Performing momentum projection in double precision.\n", func_name);
     stat = cublasZgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*locT, V3,
 		       &al, qcs->phaseMatrix_dev, V3,
 		       qcs->corrInp_dev , V3, &be,
 		       qcs->corrOut_dev, Nmoms);
   }
   else if(typeid(QUDA_REAL) == typeid(float)){
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s: Performing momentum projection in single precision.\n", func_name);
+    if(getVerbosity() >= QUDA_VERBOSE) printfQuda("%s: Performing momentum projection in single precision.\n", func_name);
     stat = cublasCgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*locT, V3,
 		       (cuComplex*)&al, (cuComplex*)qcs->phaseMatrix_dev, V3,
 		       (cuComplex*)qcs->corrInp_dev , V3, (cuComplex*)&be,
@@ -1244,9 +1261,10 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   printfQuda("%s: Invert-Gauge-Generic parameters set!\n", func_name);
   //-------------------------------------------------------------
 
-  if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+  if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Initial Memory Report (before memory allocations):\n", func_name);
     printGPUMemInfo();
+    printCPUMemInfo();
   }
 
   //- Load the gauge fields
@@ -1382,13 +1400,14 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
   qcCopyGammaToConstMem();
 
 
-  if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+  if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Final Memory Report (after memory allocations):\n", func_name);
     printGPUMemInfo();
+    printCPUMemInfo();
   }
 
   double t6 = MPI_Wtime();
-  printfQuda("TIMING - %s: GPU TMD contract state initialized successfully in %f sec. Returning...\n\n\n", func_name, t6-t5);
+  printfQuda("TIMING - %s: GPU TMD contract state initialized successfully in %f sec. Returning...\n", func_name, t6-t5);
   
   return status;
 }//- QuarkTMDinit_Quda
@@ -1410,9 +1429,10 @@ QuarkTMDfree_Quda(void **Vqcs){
 
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state*>(*Vqcs));
 
-  if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+  if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Memory Report before freeing memory:\n", func_name);
     printGPUMemInfo();
+    printCPUMemInfo();
   }
 
   //- Delete gauge fields
@@ -1463,9 +1483,10 @@ QuarkTMDfree_Quda(void **Vqcs){
   free(*Vqcs);
   *Vqcs = NULL;
 
-  if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+  if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Memory Report after freeing memory:\n", func_name);
     printGPUMemInfo();
+    printCPUMemInfo();
   }
 
   double t2 = MPI_Wtime();
@@ -1493,7 +1514,13 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state *>(Vqcs));
 
   printfQuda("%s: Performing TMD-step %d...\n", func_name, ++qcs->iStep);
-  
+
+  if(getVerbosity() >= QUDA_VERBOSE){
+    printfQuda("%s: Memory Report before TMD step %d:\n", func_name, qcs->iStep);
+    printGPUMemInfo();
+    printCPUMemInfo();
+  }
+    
   const char *b_lpath_inc = NULL;
   const char *v_lpath_inc = NULL;
   char *b_lpath_ptr = NULL;
@@ -1508,7 +1535,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     b_lpath_inc = b_lpath + cur_blen;
     b_lpath_ptr = qcs->b_lpath + cur_blen;
     double t21 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("TIMING - %s: b_path increment done in %f sec.\n", func_name, t21-t20);
   }
   else{
@@ -1521,7 +1548,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b, qcs->qcR);       //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
     qcCopyExtendedGaugeField(qcs->bsh_u, qcs->gf_u, qcs->qcR);   //- (re)set qcs->bsh_u to qcs->gf_u
     double t21 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("TIMING - %s: b_path reset done in %f sec.\n", func_name, t21-t20);
   }
 
@@ -1566,7 +1593,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     v_lpath_inc = v_lpath + cur_vlen;
     v_lpath_ptr = qcs->v_lpath + cur_vlen;
     double t23 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("TIMING - %s: v_path incerement done in %f sec.\n", func_name, t23-t22);
   }
   else{
@@ -1577,7 +1604,7 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
     //- (re)set qcs->wlinks[i_wl_vbv] {Wvbv} to qcs->wlinks[i_wl_b] {Wb}
     qcCopyCudaLink(qcs->wlinks, qcs->i_wl_vbv, qcs->wlinks, qcs->i_wl_b, qcs->qcR);
     double t23 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("TIMING - %s: v_path reset done in %f sec.\n", func_name, t23-t22);
   }
 
@@ -1634,9 +1661,10 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
 
   saveTuneCache();
 
-  if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+  if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Memory Report after TMD step %d:\n", func_name, qcs->iStep);
     printGPUMemInfo();
+    printCPUMemInfo();
   }
   double t15 = MPI_Wtime();
   printfQuda("TIMING - %s: GPU TMD step %d finished successfully in %f sec. Returning...\n", func_name, qcs->iStep, t15-t14);
@@ -1664,7 +1692,7 @@ QuarkPDFstep_momProj_Quda(void *Vqcs,
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state *>(Vqcs));
 
   printfQuda("%s: Performing PDF-step %d...\n", func_name, ++qcs->iStep);
-  
+
   const char *b_lpath_inc = NULL;
   char *b_lpath_ptr = NULL;
   int cur_blen = strlen(qcs->b_lpath);
@@ -1675,7 +1703,7 @@ QuarkPDFstep_momProj_Quda(void *Vqcs,
     b_lpath_inc = b_lpath + cur_blen;
     b_lpath_ptr = qcs->b_lpath + cur_blen;
     double t21 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("TIMING - %s: b_path increment done in %f sec.\n", func_name, t21-t20);
   }
   else{
@@ -1685,7 +1713,7 @@ QuarkPDFstep_momProj_Quda(void *Vqcs,
     
     qcCPUtoCudaProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
     double t21 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("TIMING - %s: b_path reset done in %f sec.\n", func_name, t21-t20);
   }
 
@@ -1739,9 +1767,10 @@ QuarkPDFstep_momProj_Quda(void *Vqcs,
 
   saveTuneCache();
 
-  if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+  if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Memory Report after PDF step %d:\n", func_name, qcs->iStep);
     printGPUMemInfo();
+    printCPUMemInfo();
   }
 
   double t15 = MPI_Wtime();

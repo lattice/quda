@@ -395,7 +395,7 @@ namespace quda {
     cudaDeviceSynchronize();
     checkCudaError();
     double t2 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("%s: Kernel done in %f sec.\n", funcname, t2-t1);
     
     cudaFree(arg_dev);
@@ -436,7 +436,7 @@ namespace quda {
     cudaDeviceSynchronize();
     checkCudaError();
     double t2 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("%s: Kernel done in %f sec.\n", funcname, t2-t1);
 
     cudaFree(arg_dev);
@@ -476,7 +476,7 @@ namespace quda {
     cudaDeviceSynchronize();
     checkCudaError();
     double t2 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("%s: Kernel done in %f sec.\n", funcname, t2-t1);
 
     dst->exchangeExtendedGhost(dst->R(), QCredundantComms);
@@ -518,7 +518,7 @@ namespace quda {
     cudaDeviceSynchronize();
     checkCudaError();
     double t2 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("%s: Kernel done in %f sec.\n", funcname, t2-t1);
 
     dst->exchangeExtendedGhost(dst->R(), QCredundantComms);
@@ -561,7 +561,7 @@ namespace quda {
     cudaDeviceSynchronize();
     checkCudaError();
     double t2 = MPI_Wtime();
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("%s: Kernel done in %f sec.\n", funcname, t2-t1);
 
     dst->exchangeExtendedGhost(dst->R(), QCredundantComms);
