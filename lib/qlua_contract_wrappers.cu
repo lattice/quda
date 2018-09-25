@@ -368,9 +368,11 @@ namespace quda {
 
     qcTMD_ShiftDir  shfDir  = TMDparseShiftDirection(shfFlag);
     qcTMD_ShiftSgn  shfSgn  = TMDparseShiftSign(shfFlag);     
-    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform an On-Axis Non-Covariant shift in the %s%s direction\n",
-		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  ){
+      if(getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("%s: Will perform an On-Axis Non-Covariant shift in the %s%s direction\n",
+		   funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    }
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
 
@@ -407,9 +409,11 @@ namespace quda {
 
     qcTMD_ShiftDir  shfDir  = TMDparseShiftDirection(shfFlag);
     qcTMD_ShiftSgn  shfSgn  = TMDparseShiftSign(shfFlag);     
-    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform an On-Axis Covariant shift in the %s%s direction\n",
-		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  ){
+      if(getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("%s: Will perform an On-Axis Covariant shift in the %s%s direction\n",
+		   funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    }
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
 
@@ -447,9 +451,11 @@ namespace quda {
 
     qcTMD_ShiftDir  shfDir  = TMDparseShiftDirection(shfFlag);
     qcTMD_ShiftSgn  shfSgn  = TMDparseShiftSign(shfFlag);     
-    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform a Gauge Link Non-Covariant shift in the %s%s direction\n",
-		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  ){
+      if(getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("%s: Will perform a Gauge Link Non-Covariant shift in the %s%s direction\n",
+		   funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    }
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
     
@@ -487,9 +493,11 @@ namespace quda {
 
     qcTMD_ShiftDir  shfDir  = TMDparseShiftDirection(shfFlag);
     qcTMD_ShiftSgn  shfSgn  = TMDparseShiftSign(shfFlag);     
-    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform a Gauge Link Covariant shift in the %s%s direction\n",
-		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  ){
+      if(getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("%s: Will perform a Gauge Link Covariant shift in the %s%s direction\n",
+		   funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    }
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
     
@@ -528,9 +536,11 @@ namespace quda {
 
     qcTMD_ShiftDir  shfDir  = TMDparseShiftDirection(shfFlag);
     qcTMD_ShiftSgn  shfSgn  = TMDparseShiftSign(shfFlag, flipShfSgn);
-    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  )
-      printfQuda("%s: Will perform a Gauge Link AdjSplitCov shift in the %s%s direction\n",
-		 funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    if( ((int)shfSgn>=0 && (int)shfSgn<2) && ((int)shfDir>=0 && (int)shfDir<4)  ){
+      if(getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("%s: Will perform a Gauge Link AdjSplitCov shift in the %s%s direction\n",
+		   funcname, qcTMD_ShiftSgnArray[(int)shfSgn], qcTMD_ShiftDirArray[(int)shfDir]);
+    }
     else
       errorQuda("%s: Got invalid shfDir and/or shfSgn.\n", funcname);
     
@@ -737,8 +747,6 @@ namespace quda {
       errorQuda("%s: This function supports only TMD and PDF contractions!\n", func_name);
 
     if(qcs->cntrType == what_tmd_g_F_B){
-      printfQuda("%s: Performing contractions for TMD Step %d\n", func_name, qcs->iStep);
-
       qcTMD_Arg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, qcs->wlinks, qcs->i_wl_vbv, qcs->paramAPI.preserveBasis);    
       qcTMD_Arg *arg_dev;
       cudaMalloc((void**)&(arg_dev), sizeof(arg) );
@@ -761,12 +769,10 @@ namespace quda {
       cudaDeviceSynchronize();
       checkCudaError();
       double t2 = MPI_Wtime();
-      printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
+      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
       cudaFree(arg_dev);
     }
     else{
-      printfQuda("%s: Performing contractions for PDF Step %d\n", func_name, qcs->iStep);
-
       QluaContractArg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, NULL, qcs->cntrType, qcs->paramAPI.preserveBasis); 
       QluaContractArg *arg_dev;
       cudaMalloc((void**)&(arg_dev), sizeof(arg) );
@@ -789,7 +795,7 @@ namespace quda {
       cudaDeviceSynchronize();
       checkCudaError();
       double t2 = MPI_Wtime();
-      printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
+      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
       cudaFree(arg_dev);
     }
 
