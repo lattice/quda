@@ -130,6 +130,11 @@ namespace quda {
      @param[in] value Value to set
   */
   cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
+#else
+
+// dummy macro when running on older CUDA
+#define qudaFuncSetAttribute(a, b, c) cudaSuccess
+
 #endif
 
   /**

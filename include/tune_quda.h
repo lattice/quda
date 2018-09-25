@@ -137,9 +137,10 @@ namespace quda {
     }
 
     /**
-     * @brief For reason this can't be queried from the device properties, so
-     * here we set set this.  Based on Table 14 of the CUDA
-     * Programming Guide 9.0 (Technical Specifications per Compute Capability)
+     * @brief For some reason this can't be queried from the device
+     * properties, so here we set set this.  Based on Table 14 of the
+     * CUDA Programming Guide 10.0 (Technical Specifications per
+     * Compute Capability)
      * @return The maximum number of simultaneously resident blocks per SM
      */
     unsigned int maxBlocksPerSM() const {
@@ -150,8 +151,37 @@ namespace quda {
 	return 16;
       case 5:
       case 6:
-      case 7:
 	return 32;
+      case 7:
+	switch (deviceProp.minor) {
+	case 0: return 32;
+	case 5: return 16;
+	}
+      default:
+	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
+	return 0;
+      }
+    }
+
+    /**
+     * @brief This can't be correctly queried in CUDA for all
+     * architectures so here we set set this.  Based on Table 14 of
+     * the CUDA Programming Guide 10.0 (Technical Specifications per
+     * Compute Capability).
+     * @return The maximum number of simultaneously resident blocks per SM
+     */
+    unsigned int maxDynamicSharedPerBlock() const {
+      switch (deviceProp.major) {
+      case 2:
+      case 3:
+      case 5:
+      case 6:
+	return 48*1024;
+      case 7:
+	switch (deviceProp.minor) {
+	case 0: return 96*1024;
+	case 5: return 64*1024;
+	}
       default:
 	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
 	return 0;
