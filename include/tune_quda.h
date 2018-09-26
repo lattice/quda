@@ -171,11 +171,13 @@ namespace quda {
      * enable max shared memory per block for
      */
     template <typename F>
-    void setMaxDynamicSharedBytesPerBlock(F *func) const {
+    inline void setMaxDynamicSharedBytesPerBlock(F *func) const {
+#if CUDA_VERSION >= 9000
       qudaFuncSetAttribute((const void*)func, cudaFuncAttributePreferredSharedMemoryCarveout,
 			   (int)cudaSharedmemCarveoutMaxShared);
       qudaFuncSetAttribute((const void*)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
 			   maxDynamicSharedBytesPerBlock());
+#endif
     }
 
     /**

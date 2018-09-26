@@ -1029,7 +1029,7 @@ namespace quda {
     ColorSpinor<Float,Nc,Ns> operator*(const HMatrix<Float,Nc*Ns> &A, const ColorSpinor<Float,Nc,Ns> &x) {
 
     ColorSpinor<Float,Nc,Ns> y;
-    constexpr int N = x.size;
+    constexpr int N = Ns * Nc;
 
 #pragma unroll
     for (int i=0; i<N; i++) {
