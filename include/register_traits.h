@@ -352,7 +352,7 @@ namespace quda {
 
   template <typename VectorType>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value) {
-    reinterpret_cast< __restrict__ VectorType* >(ptr)[idx] = value;
+    reinterpret_cast< VectorType* >(ptr)[idx] = value;
   }
 
   template <>

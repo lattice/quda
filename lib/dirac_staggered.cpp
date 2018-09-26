@@ -206,8 +206,6 @@ namespace quda {
 				 ColorSpinorField &x, ColorSpinorField &b, 
 				 const QudaSolutionType solType) const
   {
-    printfQuda("Enter prepare.\n");
-
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       src = &b;
@@ -218,7 +216,6 @@ namespace quda {
     // we desire solution to full system.
     // See sign convention comment in DiracStaggeredPC::M().
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      printfQuda("Prepare for even-even.\n");
       // With the convention given in DiracStaggered::M(),
       // the source is src = 2m b_e + D_eo b_o
       // But remember, DslashXpay actually applies
@@ -246,7 +243,6 @@ namespace quda {
   void DiracStaggeredPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				     const QudaSolutionType solType) const
   {
-    printfQuda("Enter reconstruct.\n");
 
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       return;
@@ -257,7 +253,6 @@ namespace quda {
     // create full solution
     // See sign convention comment in DiracStaggeredPC::M()
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      printfQuda("Reconstruct even-even.\n");
       
       // With the convention given in DiracStaggered::M(),
       // the reconstruct is x_o = 1/(2m) (b_o + D_oe x_e)

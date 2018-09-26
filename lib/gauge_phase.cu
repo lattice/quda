@@ -2,6 +2,7 @@
 #include <comm_quda.h>
 #include <complex_quda.h>
 #include <index_helper.cuh>
+#include <tune_quda.h>
 
 /**
    This code has not been checked.  In particular, I suspect it is
