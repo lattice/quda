@@ -510,7 +510,7 @@ namespace quda {
       for (int i = 0; i < num_offset; i++) {
         // only calculate true residual if we need to:
         // 1.) For higher shifts if we did not use mixed precision
-	// 2.) For shift 0 if we did not exit early  (we went to the full solution)
+        // 2.) For shift 0 if we did not exit early  (we went to the full solution)
         if ( (i > 0 and not mixed) or (i == 0 and not exit_early) ) {
           mat(*r, *x[i], *tmp4_p, *tmp5_p);
           if (r->Nspin() == 4) {
