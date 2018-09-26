@@ -377,6 +377,10 @@ int main(int argc, char **argv)
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);
 
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
   // load the clover term, if desired
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
     loadCloverQuda(clover, clover_inv, &inv_param);

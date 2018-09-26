@@ -8,6 +8,7 @@
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 #include <fast_intdiv.h>
+#include <tune_quda.h>
 
 #define MIN_COEFF 1e-7
 
