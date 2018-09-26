@@ -117,7 +117,7 @@ namespace quda {
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_threads = maxBlockSize(param);
-      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
+      const unsigned int max_shared = maxSharedBytesPerBlock();
       bool ret;
 
       param.block.x += blockStep();
@@ -143,7 +143,8 @@ namespace quda {
      * Compute Capability)
      * @return The maximum number of simultaneously resident blocks per SM
      */
-    unsigned int maxBlocksPerSM() const {
+    unsigned int maxBlocksPerSM() const
+    {
       switch (deviceProp.major) {
       case 2:
 	return 8;
@@ -164,13 +165,27 @@ namespace quda {
     }
 
     /**
+     * @brief Enable the maximum dynamic shared bytes for the kernel
+     * "func" (values given by maxDynamicSharedBytesPerBlock()).
+     * @param[in] func Function pointer to the kernel we want to
+     * enable max shared memory per block for
+     */
+    template <typename F>
+    void setMaxDynamicSharedBytesPerBlock(F *func) const {
+      qudaFuncSetAttribute((const void*)func, cudaFuncAttributePreferredSharedMemoryCarveout,
+			   (int)cudaSharedmemCarveoutMaxShared);
+      qudaFuncSetAttribute((const void*)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+			   maxDynamicSharedBytesPerBlock());
+    }
+
+    /**
      * @brief This can't be correctly queried in CUDA for all
      * architectures so here we set set this.  Based on Table 14 of
      * the CUDA Programming Guide 10.0 (Technical Specifications per
      * Compute Capability).
-     * @return The maximum number of simultaneously resident blocks per SM
+     * @return The maximum dynamic shared memory to CUDA thread block
      */
-    unsigned int maxDynamicSharedPerBlock() const {
+    unsigned int maxDynamicSharedBytesPerBlock() const {
       switch (deviceProp.major) {
       case 2:
       case 3:
@@ -189,6 +204,19 @@ namespace quda {
     }
 
     /**
+     * @brief The maximum shared memory that a CUDA thread block can
+     * use in the autotuner.  This isn't necessarily the same as
+     * maxDynamicSharedMemoryPerBlock since that may need explicit opt
+     * in to enable (by calling setMaxDynamicSharedBytes for the
+     * kernel in question).  If the CUDA kernel in question does this
+     * opt in then this function can be overloaded to return
+     * maxDynamicSharedBytesPerBlock.
+     * @return The maximum shared bytes limit per block the autotung
+     * will utilize.
+     */
+    virtual unsigned int maxSharedBytesPerBlock() const { return deviceProp.sharedMemPerBlock; }
+
+    /**
      * The goal here is to throttle the number of thread blocks per SM
      * by over-allocating shared memory (in order to improve L2
      * utilization, etc.).  We thus request the smallest amount of
@@ -198,7 +226,7 @@ namespace quda {
     virtual bool advanceSharedBytes(TuneParam &param) const
     {
       if (tuneSharedBytes()) {
-	const int max_shared = deviceProp.sharedMemPerBlock;
+	const int max_shared = maxSharedBytesPerBlock();
 	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), maxBlocksPerSM());
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;

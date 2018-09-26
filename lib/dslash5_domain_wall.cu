@@ -344,6 +344,7 @@ namespace quda {
 
     { // first do R
       constexpr int proj_dir = dagger ? -1 : +1;
+
       if (shared) {
         cache.save(in.project(4, proj_dir));
         cache.sync();
@@ -546,6 +547,15 @@ namespace quda {
       }
     }
 
+    // overloaded to return max dynamic shared memory if doing shared-memory inverse
+    unsigned int maxSharedBytesPerBlock() const {
+      if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS) ) {
+	return maxDynamicSharedBytesPerBlock();
+      } else {
+	return TunableVectorYZ::maxSharedBytesPerBlock();
+      }
+    }
+
   public:
     Dslash5(Arg &arg, const ColorSpinorField &meta)
       : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
@@ -564,6 +574,16 @@ namespace quda {
       }
     }
     virtual ~Dslash5() { }
+
+    template <typename T>
+    inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+      if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS) ) {
+	// if inverse kernel uses shared memory then maximize total shared memory pool
+	setMaxDynamicSharedBytesPerBlock(f);
+      }
+      void *args[] = { &arg };
+      qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+    }
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -615,46 +635,46 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (arg.type == DSLASH5_DWF) {
 	  if (arg.xpay) arg.dagger ?
-			  dslash5GPU<Float,nColor, true, true,DSLASH5_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5GPU<Float,nColor,false, true,DSLASH5_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5GPU<Float,nColor, true, true,DSLASH5_DWF,Arg>, tp, arg, stream) :
+			  launch(dslash5GPU<Float,nColor,false, true,DSLASH5_DWF,Arg>, tp, arg, stream);
 	  else          arg.dagger ?
-			  dslash5GPU<Float,nColor, true,false,DSLASH5_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5GPU<Float,nColor,false,false,DSLASH5_DWF> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5GPU<Float,nColor, true,false,DSLASH5_DWF,Arg>, tp, arg, stream) :
+			  launch(dslash5GPU<Float,nColor,false,false,DSLASH5_DWF,Arg>, tp, arg, stream);
 	} else if (arg.type == DSLASH5_MOBIUS_PRE) {
 	  if (arg.xpay) arg.dagger ?
-			  dslash5GPU<Float,nColor, true, true,DSLASH5_MOBIUS_PRE> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5GPU<Float,nColor,false, true,DSLASH5_MOBIUS_PRE> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5GPU<Float,nColor, true, true,DSLASH5_MOBIUS_PRE,Arg>, tp, arg, stream) :
+			  launch(dslash5GPU<Float,nColor,false, true,DSLASH5_MOBIUS_PRE,Arg>, tp, arg, stream);
 	  else          arg.dagger ?
-			  dslash5GPU<Float,nColor, true,false,DSLASH5_MOBIUS_PRE> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5GPU<Float,nColor,false,false,DSLASH5_MOBIUS_PRE> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5GPU<Float,nColor, true,false,DSLASH5_MOBIUS_PRE,Arg>, tp, arg, stream) :
+			  launch(dslash5GPU<Float,nColor,false,false,DSLASH5_MOBIUS_PRE,Arg>, tp, arg, stream);
 	} else if (arg.type == DSLASH5_MOBIUS) {
 	  if (arg.xpay) arg.dagger ?
-			  dslash5GPU<Float,nColor, true, true,DSLASH5_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5GPU<Float,nColor,false, true,DSLASH5_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5GPU<Float,nColor, true, true,DSLASH5_MOBIUS,Arg>, tp, arg, stream) :
+			  launch(dslash5GPU<Float,nColor,false, true,DSLASH5_MOBIUS,Arg>, tp, arg, stream);
 	  else          arg.dagger ?
-			  dslash5GPU<Float,nColor, true,false,DSLASH5_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5GPU<Float,nColor,false,false,DSLASH5_MOBIUS> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5GPU<Float,nColor, true,false,DSLASH5_MOBIUS,Arg>, tp, arg, stream) :
+			  launch(dslash5GPU<Float,nColor,false,false,DSLASH5_MOBIUS,Arg>, tp, arg, stream);
 	} else if (arg.type == M5_INV_DWF) {
 	  if (arg.xpay) arg.dagger ?
-			  dslash5invGPU<Float,nColor, true, true,M5_INV_DWF,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false, true,M5_INV_DWF,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5invGPU<Float,nColor, true, true,M5_INV_DWF,shared,var_inverse,Arg>, tp, arg, stream) :
+	                  launch(dslash5invGPU<Float,nColor,false, true,M5_INV_DWF,shared,var_inverse,Arg>, tp, arg, stream);
 	  else          arg.dagger ?
-			  dslash5invGPU<Float,nColor, true,false,M5_INV_DWF,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false,false,M5_INV_DWF,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5invGPU<Float,nColor, true,false,M5_INV_DWF,shared,var_inverse,Arg>, tp, arg, stream) :
+	                  launch(dslash5invGPU<Float,nColor,false,false,M5_INV_DWF,shared,var_inverse,Arg>, tp, arg, stream);
 	} else if (arg.type == M5_INV_MOBIUS) {
 	  if (arg.xpay) arg.dagger ?
-			  dslash5invGPU<Float,nColor, true, true,M5_INV_MOBIUS,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false, true,M5_INV_MOBIUS,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5invGPU<Float,nColor, true, true,M5_INV_MOBIUS,shared,var_inverse,Arg>, tp, arg, stream) :
+	                  launch(dslash5invGPU<Float,nColor,false, true,M5_INV_MOBIUS,shared,var_inverse,Arg>, tp, arg, stream);
 	  else          arg.dagger ?
-			  dslash5invGPU<Float,nColor, true,false,M5_INV_MOBIUS,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false,false,M5_INV_MOBIUS,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5invGPU<Float,nColor, true,false,M5_INV_MOBIUS,shared,var_inverse,Arg>, tp, arg, stream) :
+			  launch(dslash5invGPU<Float,nColor,false,false,M5_INV_MOBIUS,shared,var_inverse,Arg>, tp, arg, stream);
 	} else if (arg.type == M5_INV_ZMOBIUS) {
 	  if (arg.xpay) arg.dagger ?
-			  dslash5invGPU<Float,nColor, true, true,M5_INV_ZMOBIUS,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false, true,M5_INV_ZMOBIUS,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5invGPU<Float,nColor, true, true,M5_INV_ZMOBIUS,shared,var_inverse,Arg>, tp, arg, stream) :
+	                  launch(dslash5invGPU<Float,nColor,false, true,M5_INV_ZMOBIUS,shared,var_inverse,Arg>, tp, arg, stream);
 	  else          arg.dagger ?
-			  dslash5invGPU<Float,nColor, true,false,M5_INV_ZMOBIUS,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg) :
-			  dslash5invGPU<Float,nColor,false,false,M5_INV_ZMOBIUS,shared,var_inverse> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+			  launch(dslash5invGPU<Float,nColor, true,false,M5_INV_ZMOBIUS,shared,var_inverse,Arg>, tp, arg, stream) :
+			  launch(dslash5invGPU<Float,nColor,false,false,M5_INV_ZMOBIUS,shared,var_inverse,Arg>, tp, arg, stream);
 	}
       }
     }
