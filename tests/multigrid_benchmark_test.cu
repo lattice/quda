@@ -12,6 +12,8 @@
 #include <dslash_util.h>
 #include <dirac_quda.h>
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+
 extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern int nvec;
