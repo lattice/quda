@@ -148,7 +148,7 @@ init_QudaInvertParam_generic(QudaInvertParam& ip,
   ip.cuda_prec                = QUDA_DOUBLE_PRECISION;
   ip.cuda_prec_sloppy         = QUDA_HALF_PRECISION;
   ip.dagger                   = QUDA_DAG_NO;
-  ip.dirac_order              = (qdp2quda ? QUDA_QDP_DIRAC_ORDER : QUDA_LEX_DIRAC_ORDER);
+  ip.dirac_order              = (qdp2quda ? QUDA_QDP_DIRAC_ORDER : QUDA_INVALID_DIRAC_ORDER);
   ip.gamma_basis              = (preserveBasis ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS);
   ip.inv_type                 = QUDA_BICGSTAB_INVERTER;
   ip.mass_normalization       = QUDA_KAPPA_NORMALIZATION;
