@@ -89,9 +89,7 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   mark_as_advanced(QUDA_GITDIR)
 endif()
 
-# include_directories
-include_directories(dslash_core)
-include_directories(.)
+
 
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
@@ -109,6 +107,12 @@ if(QUDA_BUILD_SHAREDLIB)
 else()
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
+
+# include_directories
+target_include_directories(quda PRIVATE dslash_core)
+target_include_directories(quda SYSTEM PRIVATE ../include_ext)
+target_include_directories(quda PRIVATE .)
+
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
@@ -126,10 +130,14 @@ endif()
 
 # some clang warnings shouds be warning even when turning warnings into errors
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field>)
+    message("CLANG")
+    target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field" "SHELL:-Xcompiler -Wno-error=unused-function">)
+
 # this is a hack to get colored diagnostics back when using Ninja and clang
     if(CMAKE_GENERATOR MATCHES "Ninja")
-      target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
+      message("NINJA")
+      target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
     endif()
 endif()
 

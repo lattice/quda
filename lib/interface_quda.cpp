@@ -286,7 +286,7 @@ static void profilerStart(const char *f) {
 
 
     char* donotprofile_env = getenv("QUDA_DO_NOT_PROFILE"); // disable profiling of QUDA parts
-    if (donotprofile_env && (!strcmp(donotprofile_env, "0") == 0))  {
+    if (donotprofile_env && (!(strcmp(donotprofile_env, "0") == 0)))  {
       do_not_profile_quda=true;
       printfQuda("Disabling profiling in QUDA\n");
     }
@@ -3366,7 +3366,7 @@ for(int i=0; i < param->num_src; i++) {
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->solve(*out,*in);
+      solve->blocksolve(*out,*in);
       for(int i=0; i < param->num_src; i++) {
         blas::copy(in->Component(i), out->Component(i));
       }
@@ -3378,14 +3378,14 @@ for(int i=0; i < param->num_src; i++) {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->solve(*out,*in);
+      solve->blocksolve(*out,*in);
       solverParam.updateInvertParam(*param);
       delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->solve(*out,*in);
+      solve->blocksolve(*out,*in);
       solverParam.updateInvertParam(*param);
       delete solve;
     } else { // norm_error_solve
