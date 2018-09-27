@@ -65,8 +65,8 @@ namespace quda {
     
     diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_DIRAC;
     diracParam.Ls = inv_param->Ls;
-    memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
-    memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
+    memcpy(diracParam.b_5, inv_param->b_5, sizeof(double _Complex)*inv_param->Ls);
+    memcpy(diracParam.c_5, inv_param->c_5, sizeof(double _Complex)*inv_param->Ls);
     
     if(inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC || inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC){
       errorQuda("Currently MSPCG does NOT support asymmetric preconditioning.\n"); 

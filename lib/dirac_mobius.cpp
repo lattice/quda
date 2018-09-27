@@ -430,10 +430,12 @@ namespace quda {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-    
+     
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }   
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 0, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
+		   parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 0, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
 
     if(expanding_){
       long long vol = (Xs_[0]+2*(R_[0]-Rz_[0]))*(Xs_[1]+2*(R_[1]-Rz_[1]))*(Xs_[2]+2*(R_[2]-Rz_[2]))*(Xs_[3]+2*(R_[3]-Rz_[3]))/2;
@@ -449,10 +451,12 @@ namespace quda {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
- 
+     
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 1, profile, sp_idx_length, R_, Xs_);
+		   parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 1, profile, sp_idx_length, R_, Xs_);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*sp_idx_length;
@@ -467,10 +471,12 @@ namespace quda {
 
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-    
+     
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }   
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 3, profile, sp_idx_length, R_, Xs_);
+		   parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 3, profile, sp_idx_length, R_, Xs_);
 
     long long Ls = in.X(4);
     flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
@@ -484,11 +490,13 @@ namespace quda {
 
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-
+    
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }   
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
-		   mass, k, b_5, c_5, m5, commDim, 1, profile, sp_idx_length, R_, Xs_);
+		   mass, k, b5_, c5_, m5, commDim, 1, profile, sp_idx_length, R_, Xs_);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*sp_idx_length;
@@ -504,9 +512,11 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }      
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 4, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
+		   parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 4, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
     
     long long Ls = in.X(4);
 		long long bulk = (Ls-2)*sp_idx_length;
@@ -529,9 +539,11 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }   
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 6, profile, sp_idx_length, R_, Xs_);
+		   parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 6, profile, sp_idx_length, R_, Xs_);
     
     long long Ls = in.X(4);
 		long long bulk = (Ls-2)*sp_idx_length;
@@ -546,11 +558,13 @@ namespace quda {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-    
+     
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
-			 mass, k,b_5, c_5, m5, commDim, 5, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
+			 mass, k, b5_, c5_, m5, commDim, 5, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
     
     long long Ls = in.X(4);
 		long long bulk = (Ls-2)*sp_idx_length;
@@ -573,10 +587,12 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
-			 mass, k,b_5, c_5, m5, commDim, 7, profile, sp_idx_length, R_, Xs_);
+			 mass, k, b5_, c5_, m5, commDim, 7, profile, sp_idx_length, R_, Xs_);
     
     long long Ls = in.X(4);
 		long long bulk = (Ls-2)*sp_idx_length;
@@ -592,10 +608,12 @@ namespace quda {
 
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-    
+ 
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 8, profile, sp_idx_length, R_, Xs_);
+		   parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 8, profile, sp_idx_length, R_, Xs_);
 
     long long Ls = in.X(4);
     flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
@@ -608,10 +626,12 @@ namespace quda {
 
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-    
+ 
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
-		   parity, dagger, 0, mass, 0, b_5, c_5, m5, commDim, 9, profile, sp_idx_length, R_, Xs_);
+		   parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 9, profile, sp_idx_length, R_, Xs_);
 
     long long Ls = in.X(4);
     flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
