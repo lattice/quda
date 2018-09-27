@@ -492,7 +492,7 @@ invert_test(void)
       computeHISQLinksGPU(qdp_fatlink, qdp_longlink,
                           (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
                           (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr,
-                          qdp_inlink, &gaugeParam, act_paths, 0.0 /* eps_naik */);
+                          qdp_inlink, &gaugeParam, act_paths, eps_naik);
 
       
       if (n_naiks == 2) {
@@ -607,8 +607,8 @@ invert_test(void)
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
     gaugeParam.ga_pad = link_pad;
-    gaugeParam.reconstruct= link_recon;
-    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    gaugeParam.reconstruct= (link_recon == QUDA_RECONSTRUCT_12 || link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
+    gaugeParam.reconstruct_sloppy = (link_recon_sloppy == QUDA_RECONSTRUCT_12 || link_recon_sloppy == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon_sloppy;
     gaugeParam.cuda_prec_precondition = gaugeParam.cuda_prec_sloppy;
     gaugeParam.reconstruct_precondition = gaugeParam.reconstruct_sloppy;
     loadGaugeQuda(milc_longlink, &gaugeParam);
@@ -998,8 +998,13 @@ int main(int argc, char** argv)
   // Set n_naiks to 2 if eps_naik != 0.0
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     if (eps_naik != 0.0) {
-      n_naiks = 2;
-      printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
+      if (compute_fatlong) {
+        n_naiks = 2;
+        printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
+      } else {
+        eps_naik = 0.0;
+        printfQuda("Not computing fat-long, ignoring epsilon correction.\n");
+      }
     } else {
       printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
     }
