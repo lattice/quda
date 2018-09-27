@@ -122,7 +122,7 @@ namespace quda {
    */
   cudaError_t qudaDeviceSynchronize();
 
-#if (CUDA_VERSION >= 9000)
+#if CUDA_VERSION >= 9000
   /**
      @brief Wrapper around cudaFuncSetAttribute
      @param[in] func Function for which we are setting the attribute

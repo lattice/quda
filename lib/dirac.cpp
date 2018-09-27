@@ -158,6 +158,9 @@ namespace quda {
     } else if (param.type == QUDA_DOMAIN_WALLPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWallPC operator\n");
       return new DiracDomainWallPC(param);
+    } else if (param.type == QUDA_DOMAIN_WALL_4D_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWall4D operator\n");
+      return new DiracDomainWall4D(param);
     } else if (param.type == QUDA_DOMAIN_WALL_4DPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWall4DPC operator\n");
       return new DiracDomainWall4DPC(param);

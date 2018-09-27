@@ -23,19 +23,19 @@ namespace quda {
   template <typename Float, int Nc, int Ns>
     struct ColorSpinor {
 
-      static constexpr int n = Nc * Ns;
-      complex<Float> data[n];
+      static constexpr int size = Nc * Ns;
+      complex<Float> data[size];
 
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>() {
 #pragma unroll
-	for (int i=0; i<n; i++) {
+	for (int i=0; i<size; i++) {
 	  data[i] = 0;
 	}
       }
 
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const ColorSpinor<Float, Nc, Ns> &a) {
 #pragma unroll
-	for (int i=0; i<n; i++) {
+	for (int i=0; i<size; i++) {
 	  data[i] = a.data[i];
 	}
       }
@@ -43,7 +43,7 @@ namespace quda {
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator=(const ColorSpinor<Float, Nc, Ns> &a) {
 	if (this != &a) {
 #pragma unroll
-	  for (int i=0; i<n; i++) {
+	  for (int i=0; i<size; i++) {
 	    data[i] = a.data[i];
 	  }
 	}
@@ -53,7 +53,7 @@ namespace quda {
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator+=(const ColorSpinor<Float, Nc, Ns> &a) {
 	if (this != &a) {
 #pragma unroll
-	  for (int i=0; i<n; i++) {
+	  for (int i=0; i<size; i++) {
 	    data[i] += a.data[i];
 	  }
 	}
@@ -111,19 +111,19 @@ namespace quda {
   template <typename Float, int Nc>
     struct ColorSpinor<Float, Nc, 4> {
     static constexpr int Ns = 4;
-    static constexpr int n = Nc * Ns;
-    complex<Float> data[n];
+    static constexpr int size = Nc * Ns;
+    complex<Float> data[size];
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>() {
 #pragma unroll
-      for (int i=0; i<n; i++) {
+      for (int i=0; i<size; i++) {
 	data[i] = 0;
       }      
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>(const ColorSpinor<Float, Nc, 4> &a) {
 #pragma unroll
-      for (int i=0; i<n; i++) {
+      for (int i=0; i<size; i++) {
 	data[i] = a.data[i];
       }      
     }
@@ -131,7 +131,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator=(const ColorSpinor<Float, Nc, 4> &a) {
       if (this != &a) {
 #pragma unroll
-	for (int i=0; i<n; i++) {
+	for (int i=0; i<size; i++) {
 	  data[i] = a.data[i];
 	}
       }
@@ -141,7 +141,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator+=(const ColorSpinor<Float, Nc, 4> &a) {
       if (this != &a) {
 #pragma unroll
-	for (int i=0; i<n; i++) {
+	for (int i=0; i<size; i++) {
 	  data[i] += a.data[i];
 	}
       }
@@ -650,19 +650,19 @@ namespace quda {
   template <typename Float, int Nc>
     struct ColorSpinor<Float, Nc, 2> {
     static constexpr int Ns = 2;
-    static constexpr int n = Nc * Nc;
-    complex<Float> data[n];
+    static constexpr int size = Ns * Nc;
+    complex<Float> data[size];
     
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>() {
 #pragma unroll
-      for (int i=0; i<n; i++) {
+      for (int i=0; i<size; i++) {
 	data[i] = 0;
       }      
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>(const ColorSpinor<Float, Nc, 2> &a) {
 #pragma unroll
-      for (int i=0; i<n; i++) {
+      for (int i=0; i<size; i++) {
 	data[i] = a.data[i];
       }      
     }
@@ -671,7 +671,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator=(const ColorSpinor<Float, Nc, 2> &a) {
       if (this != &a) {
 #pragma unroll
-	for (int i=0; i<n; i++) {
+	for (int i=0; i<size; i++) {
 	  data[i] = a.data[i];
 	}
       }
@@ -681,7 +681,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator+=(const ColorSpinor<Float, Nc, 2> &a) {
       if (this != &a) {
 #pragma unroll
-	for (int i=0; i<n; i++) {
+	for (int i=0; i<size; i++) {
 	  data[i] += a.data[i];
 	}
       }
@@ -1029,7 +1029,7 @@ namespace quda {
     ColorSpinor<Float,Nc,Ns> operator*(const HMatrix<Float,Nc*Ns> &A, const ColorSpinor<Float,Nc,Ns> &x) {
 
     ColorSpinor<Float,Nc,Ns> y;
-    constexpr int N = Nc*Ns;
+    constexpr int N = Ns * Nc;
 
 #pragma unroll
     for (int i=0; i<N; i++) {
