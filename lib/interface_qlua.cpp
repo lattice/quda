@@ -576,15 +576,15 @@ Qlua_invertQuda(
 
 
 //-- top level function, performs momentum projection
-int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQuda_dev,
-			     QluaUtilArg utilArg,
-			     const qudaLattice *qS,
-			     const int *momlist,
-			     qudaAPI_Param paramAPI){
+int momProjCorr_uLocal(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQuda_dev,
+		       QluaUtilArg utilArg,
+		       const qudaLattice *qS,
+		       const int *momlist,
+		       qudaAPI_Param paramAPI){
   int status = 0;
 
   char *func_name;
-  asprintf(&func_name,"momentumProjectCorr_Quda");
+  asprintf(&func_name,"momProjCorr_uLocal");
   
   //-- Check-print parameters
   /* NOTE: In this function the QsqMax is not required, as the Momentum matrix comes as input */
@@ -872,7 +872,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   else if(paramAPI.mpParam.cntrType == what_tmd_g_F_B)
     errorQuda("%s: This function does not support TMD contractions!\n", func_name);
   else
-    printfQuda("%s: Got Contraction type \'%s\'\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
+    printfQuda("%s: Got Contraction type %s\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
   bool preserveBasis = paramAPI.preserveBasis == 1 ? true : false;
   bool qdp2quda = paramAPI.qdp2quda == 1 ? true : false;
@@ -934,11 +934,11 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   checkCudaError();
   cudaMemset(corrQuda_dev, 0, corrSize);
   double t5 = MPI_Wtime();
-  QuarkContractStd_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3,
+  QuarkContract_uLocal(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3,
 		       (complex<QUDA_REAL>*)S2, (complex<QUDA_REAL>*)S1,
 		       paramAPI);
   double t6 = MPI_Wtime();
-  printfQuda("TIMING - %s: Function \'QuarkContractStd_GPU\' completed in %f sec.\n", func_name, t6-t5);
+  printfQuda("TIMING - %s: Function QuarkContract_uLocal completed in %f sec.\n", func_name, t6-t5);
   /* --------------------------------------------------------------------------------------- */
 
   
@@ -951,10 +951,10 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   
   //-- Call momentum-projection function  
   double t7 = MPI_Wtime();  
-  int mpStat = momentumProjectCorr_Quda(momproj_buf, corrQuda_dev, utilArg, qS, momlist, paramAPI);
+  int mpStat = momProjCorr_uLocal(momproj_buf, corrQuda_dev, utilArg, qS, momlist, paramAPI);
   if(mpStat != 0) return 1;
   double t8 = MPI_Wtime();
-  printfQuda("TIMING - %s: Function \'momentumProjectCorr_Quda\' completed in %f sec.\n", func_name, t8-t7);
+  printfQuda("TIMING - %s: Function momProjCorr_uLocal completed in %f sec.\n", func_name, t8-t7);
 
   
   //-- cleanup & return
@@ -992,7 +992,7 @@ int string_prefix(const char *p, const char *str){
 
 
 //-- top level function, performs momentum projection
-int momentumProjectTMDqPDFCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
+int momProjCorr_TMD_QPDF(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
 
   int status = 0;
 
@@ -1133,11 +1133,11 @@ int momentumProjectTMDqPDFCorr_Quda(QuarkTMD_state *qcs, XTRN_CPLX *corrOut){
 
 //- C.K. Initialize the TMD contract State
 EXTRN_C int
-QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
-		  const int *momlist,
-		  void *qluaPropFrw_host, void *qluaPropBkw_host,
-		  void *qluaGauge_host[],
-		  qudaAPI_Param paramAPI){
+TMD_QPDF_initState_Quda(void **Vqcs, const qudaLattice *qS,
+			const int *momlist,
+			void *qluaPropFrw_host, void *qluaPropBkw_host,
+			void *qluaGauge_host[],
+			qudaAPI_Param paramAPI){
 
   double t5 = MPI_Wtime();
 
@@ -1416,7 +1416,7 @@ QuarkTMDinit_Quda(void **Vqcs, const qudaLattice *qS,
 
 //- C.K. Destroy the TMD contract State
 EXTRN_C int
-QuarkTMDfree_Quda(void **Vqcs){
+TMD_QPDF_freeState_Quda(void **Vqcs){
 
   double t1 = MPI_Wtime();
   int status = 0;
@@ -1500,10 +1500,10 @@ QuarkTMDfree_Quda(void **Vqcs){
 
 //- C.K. Main function which performs propagator/gauge shifts and performs TMD contractions
 EXTRN_C int
-QuarkTMDstep_momProj_Quda(void *Vqcs,
-			  XTRN_CPLX *momproj_buf,     /* output in Pspace */
-			  XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
-			  const char *b_lpath, const char *v_lpath){
+TMDstep_momProj_Quda(void *Vqcs,
+		     XTRN_CPLX *momproj_buf,     /* output in Pspace */
+		     XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
+		     const char *b_lpath, const char *v_lpath){
 
   cudaProfilerStart();
 
@@ -1632,19 +1632,19 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
 
   //- Perform TMD contractions
   double t9 = MPI_Wtime();
-  QuarkContractTMDqPDF_GPU(qcs);
+  QuarkContract_TMD_QPDF(qcs);
   double t10 = MPI_Wtime();
-  printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' done in %f sec.\n", func_name, t10-t9);
+  printfQuda("TIMING - %s: Function QuarkContract_TMD_QPDF done in %f sec.\n", func_name, t10-t9);
 
   //- Perform Momentum Projection
   double t11 = MPI_Wtime();
-  int mpStat = momentumProjectTMDqPDFCorr_Quda(qcs, momproj_buf);
+  int mpStat = momProjCorr_TMD_QPDF(qcs, momproj_buf);
   if(mpStat != 0) {
     errorQuda("mpStat=%d\n", mpStat);
     return 1;
   }
   double t12 = MPI_Wtime();
-  printfQuda("TIMING - %s: Function \'momentumProjectTMDCorr_Quda\' done in %f sec.\n", func_name, t12-t11);
+  printfQuda("TIMING - %s: Function momProjCorr_TMD_QPDF done in %f sec.\n", func_name, t12-t11);
 
   //-- Copy the position space correlator back to CPU if required
   if(qcs->push_res){
@@ -1678,10 +1678,10 @@ QuarkTMDstep_momProj_Quda(void *Vqcs,
 
 //- C.K. Main function which performs propagator shifts and performs PDF contractions
 EXTRN_C int
-QuarkPDFstep_momProj_Quda(void *Vqcs,
-			  XTRN_CPLX *momproj_buf,     /* output in Pspace */
-			  XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
-			  const char *b_lpath){
+QPDFstep_momProj_Quda(void *Vqcs,
+		      XTRN_CPLX *momproj_buf,     /* output in Pspace */
+		      XTRN_CPLX *corrQuda,        /* output in Xspace if push_res */
+		      const char *b_lpath){
 
   cudaProfilerStart();
 
@@ -1738,19 +1738,19 @@ QuarkPDFstep_momProj_Quda(void *Vqcs,
 
   //- Perform PDF contractions
   double t9 = MPI_Wtime();
-  QuarkContractTMDqPDF_GPU(qcs);
+  QuarkContract_TMD_QPDF(qcs);
   double t10 = MPI_Wtime();
-  printfQuda("TIMING - %s: Function \'QuarkContractTMD_GPU\' done in %f sec.\n", func_name, t10-t9);
+  printfQuda("TIMING - %s: Function QuarkContract_TMD_QPDF done in %f sec.\n", func_name, t10-t9);
 
   //- Perform Momentum Projection
   double t11 = MPI_Wtime();
-  int mpStat = momentumProjectTMDqPDFCorr_Quda(qcs, momproj_buf);
+  int mpStat = momProjCorr_TMD_QPDF(qcs, momproj_buf);
   if(mpStat != 0) {
     errorQuda("mpStat=%d\n", mpStat);
     return 1;
   }
   double t12 = MPI_Wtime();
-  printfQuda("TIMING - %s: Function \'momentumProjectTMDCorr_Quda\' done in %f sec.\n", func_name, t12-t11);
+  printfQuda("TIMING - %s: Function momProjCorr_TMD_QPDF done in %f sec.\n", func_name, t12-t11);
 
   //-- Copy the position space correlator back to CPU if required
   if(qcs->push_res){

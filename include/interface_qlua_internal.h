@@ -208,14 +208,14 @@ namespace quda {
 			     const int *momMatrix,
                              momProjParam param);
 
-  void QuarkContractStd_GPU(complex<QUDA_REAL> *corrQuda_dev,
+  void QuarkContract_uLocal(complex<QUDA_REAL> *corrQuda_dev,
                             cudaColorSpinorField **cudaProp1,
                             cudaColorSpinorField **cudaProp2,
                             cudaColorSpinorField **cudaProp3,
                             complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
                             qudaAPI_Param paramAPI);
 
-  void QuarkContractTMDqPDF_GPU(QuarkTMD_state *qcs);
+  void QuarkContract_TMD_QPDF(QuarkTMD_state *qcs);
   
 } //- namespace quda
   

@@ -633,7 +633,7 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if((cntrType != what_tmd_g_F_B) && (cntrType != what_qbarq_g_F_aB) && (cntrType != what_qpdf_g_F_B))
-        errorQuda("quarkContract::apply(): Support only \'what_tmd_g_F_B\', \'what_qpdf_g_F_B\' and \'what_qbarq_g_F_aB\' contractions for now!\n");
+        errorQuda("quarkContract::apply(): Support only what_tmd_g_F_B, what_qpdf_g_F_B and what_qbarq_g_F_aB contractions for now!\n");
 
       if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
 	printfQuda("quarkContract::apply(): grid={%ld,%ld,%ld} block={%ld,%ld,%ld} shmem=%ld\n",
@@ -666,19 +666,19 @@ namespace quda {
 
 
   //-Top-level function
-  void QuarkContractStd_GPU(complex<QUDA_REAL> *corrQuda_dev,
+  void QuarkContract_uLocal(complex<QUDA_REAL> *corrQuda_dev,
 			    cudaColorSpinorField **cudaProp1,
 			    cudaColorSpinorField **cudaProp2,
 			    cudaColorSpinorField **cudaProp3,
 			    complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1,
 			    qudaAPI_Param paramAPI){    
 
-    const char *func_name = "QuarkContractStd_GPU";
+    const char *func_name = "QuarkContract_uLocal";
     
     if(typeid(QC_REAL) != typeid(QUDA_REAL)) errorQuda("%s: QUDA_REAL and QC_REAL type mismatch!\n", func_name);
 
     if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) )
-      errorQuda("%s: Contraction type \'%s\' not supported!\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
+      errorQuda("%s: Contraction type %s not supported!\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
     QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, paramAPI.mpParam.cntrType, paramAPI.preserveBasis); 
     QluaContractArg *arg_dev;
@@ -726,22 +726,22 @@ namespace quda {
     case what_meson_F_hB: {
       meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, arg_dev);
     } break;
-    default: errorQuda("%s: Contraction type \'%s\' not implemented!\n", func_name, qc_contractTypeStr[arg.cntrType]);
+    default: errorQuda("%s: Contraction type %s not implemented!\n", func_name, qc_contractTypeStr[arg.cntrType]);
     }//- switch
     cudaDeviceSynchronize();
     checkCudaError();
     double t2 = MPI_Wtime();
-    printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[arg.cntrType], t2-t1);
+    printfQuda("TIMING - %s: Contraction kernel %s finished in %f sec.\n", func_name, qc_contractTypeStr[arg.cntrType], t2-t1);
 
     cudaFree(arg_dev);
-  }//-- QuarkContractStd_GPU
+  }//-- QuarkContract_uLocal
   //---------------------------------------------------------------------------
 
 
   //-Top-level function
-  void QuarkContractTMDqPDF_GPU(QuarkTMD_state *qcs){
+  void QuarkContract_TMD_QPDF(QuarkTMD_state *qcs){
 
-    const char *func_name = "QuarkContractTMDqPDF_GPU";
+    const char *func_name = "QuarkContract_TMD_QPDF";
 
     if( (qcs->cntrType != what_tmd_g_F_B) && (qcs->cntrType != what_qpdf_g_F_B) )
       errorQuda("%s: This function supports only TMD and PDF contractions!\n", func_name);
@@ -769,7 +769,7 @@ namespace quda {
       cudaDeviceSynchronize();
       checkCudaError();
       double t2 = MPI_Wtime();
-      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
+      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("TIMING - %s: Contraction kernel %s finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
       cudaFree(arg_dev);
     }
     else{
@@ -795,11 +795,11 @@ namespace quda {
       cudaDeviceSynchronize();
       checkCudaError();
       double t2 = MPI_Wtime();
-      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("TIMING - %s: Contraction kernel \'%s\' finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
+      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("TIMING - %s: Contraction kernel %s finished in %f sec.\n", func_name, qc_contractTypeStr[qcs->cntrType], t2-t1);
       cudaFree(arg_dev);
     }
 
-  }//-- QuarkContractTMD_GPU
+  }//-- QuarkContract_TMD_QPDF
 
 
 } //-namespace quda
