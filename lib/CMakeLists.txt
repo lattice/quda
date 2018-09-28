@@ -132,7 +132,7 @@ endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message("CLANG")
     target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
-    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field" "SHELL:-Xcompiler -Wno-error=unused-function">)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field" "SHELL:-Xcompiler -Wno-error=unused-function" >)
 
 # this is a hack to get colored diagnostics back when using Ninja and clang
     if(CMAKE_GENERATOR MATCHES "Ninja")
