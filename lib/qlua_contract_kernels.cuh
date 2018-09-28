@@ -15,7 +15,6 @@
 #  endif
 #endif
 
-#include <complex_quda.h>
 #include <qlua_contract.h>
 
 #ifndef LONG_T

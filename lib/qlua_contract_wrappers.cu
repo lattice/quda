@@ -1,18 +1,12 @@
-#include <transfer.h>
-#include <quda_internal.h>
-#include <quda_matrix.h>
-#include <index_helper.cuh>
-#include <gauge_field.h>
-#include <gauge_field_order.h>
-#include <color_spinor.h>
-#include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
-#include <mpi.h>
-#include <qlua_contract.h>
+/* C. Kallidonis: Wrapper functions called from interface_qlua.cpp.
+ * These wrappers call GPU kernels from qlua_contract_kernels.cu,
+ * qlua_contract_shifts.cu and qlua_util_kernels.cu
+ * Update: September 2018
+ */
+
 #include <qlua_contract_kernels.cuh>
 #include <qlua_contract_shifts.cuh>
-
-
+#include <qlua_util_kernels.cuh>
 
 namespace quda {  
 
@@ -27,32 +21,35 @@ namespace quda {
   
   const char *qcTMD_ShiftDirArray[] = {"x", "y", "z", "t"};
   const char *qcTMD_ShiftSgnArray[] = {"-", "+"};
-  
-  __global__ void QluaSiteOrderCheck_kernel(QluaUtilArg *utilArg){
-    
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;    
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+  //---------------------------------------------------------------------------
 
-    if (x_cb >= utilArg->volumeCB) return;
-    if (pty >= utilArg->nParity) return;
 
-    int crd[5];
-    getCoords(crd, x_cb, utilArg->lL, pty);  //-- Get local coordinates crd[] at given x_cb and pty
-    crd[4] = 0;  
+  void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix_dev,
+                             const int *momMatrix,
+                             momProjParam param){
+    int *momMatrix_dev;
+    cudaMalloc((void**)&momMatrix_dev, sizeof(int)*param.momDim*param.Nmoms );
+    checkCudaErrorNoSync();
+    cudaMemcpy(momMatrix_dev, momMatrix, sizeof(int)*param.momDim*param.Nmoms, cudaMemcpyHostToDevice);
 
-    int idx_cb = linkIndex(crd, utilArg->lL); //-- Checkerboard index, MUST be equal to x_cb
-    
-    int i_rlex = crd[0] + utilArg->lL[0]*(crd[1] + utilArg->lL[1]*(crd[2] + utilArg->lL[2]*(crd[3])));  //-- Full lattice site index
-    int i_par = (crd[0] + crd[1] + crd[2] + crd[3]) & 1;
+    MomProjArg arg(param);
+    MomProjArg *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(MomProjArg) );
+    checkCudaErrorNoSync();
+    cudaMemcpy(arg_dev, &arg, sizeof(MomProjArg), cudaMemcpyHostToDevice);
 
-    if( (i_rlex/2 != x_cb) || (pty != i_par) || (idx_cb != x_cb) ){
-      d_crdChkVal = -1;
-      printf("coordCheck - ERROR: x_cb = %d, pty = %d: Site order mismatch!\n", x_cb, pty);    
-    }
-    else d_crdChkVal = 0;
+    //-Call the kernel
+    dim3 blockDim(THREADS_PER_BLOCK, 1, 1);
+    dim3 gridDim((param.V3 + blockDim.x -1)/blockDim.x, 1, 1); // spawn threads only for the spatial volume
 
-  }//-- function
+    phaseMatrix_kernel<<<gridDim,blockDim>>>(phaseMatrix_dev, momMatrix_dev, arg_dev);
+    cudaDeviceSynchronize();
+    checkCudaError();
 
+    cudaFree(momMatrix_dev);
+    cudaFree(arg_dev);
+  }
+  //---------------------------------------------------------------------------
   
   int QluaSiteOrderCheck(QluaUtilArg *utilArg){
     int crdChkVal;
@@ -77,34 +74,6 @@ namespace quda {
     return crdChkVal;
   }//-- function
   //---------------------------------------------------------------------------
-
-  
-  __global__ void convertSiteOrder_QudaQDP_to_momProj_kernel(void *dst, const void *src, QluaUtilArg *arg){
-
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-
-    int crd[5];
-    getCoords(crd, x_cb, arg->lL, pty);
-    int i_t = crd[arg->t_axis];
-    int i_sp = 0;
-
-    for (int i = 0 ; i < 4 ; i++)
-      i_sp += arg->sp_stride[i] * crd[i];
-
-    for (int i_f = 0 ; i_f < arg->nFldSrc ; i_f++){
-      char *dst_i = (char*)dst + arg->rec_size * (
-          i_sp + arg->sp_locvol * (
-          i_f  + arg->nFldDst   * i_t));
-      const char *src_i = (char*)src + arg->rec_size * (
-          x_cb + arg->volumeCB * (
-          pty + 2 * i_f));
-
-      for (int j = 0 ; j < arg->rec_size ; j++)
-        *dst_i++ = *src_i++;
-    }//- i_f
-    
-  }//-- function
 
   void convertSiteOrder_QudaQDP_to_momProj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg){
 
@@ -137,7 +106,7 @@ namespace quda {
     if(shfFlag==qcShfStr_None) errorQuda("TMDparseShiftFlag: Cannot parse given shift flag, flagStr = %c.\n", flagStr);
     return shfFlag;
   }
-
+  //---------------------------------------------------------------------------
   qcTMD_ShiftType TMDparseShiftType(char *typeStr){
     
     qcTMD_ShiftType shfType = qcInvalidShift;
@@ -150,7 +119,7 @@ namespace quda {
     if(shfType==qcInvalidShift) errorQuda("TMDparseShiftType: Cannot parse given shift type, typeStr = %s.\n", typeStr);
     return shfType;
   }
-
+  //---------------------------------------------------------------------------
   qcTMD_ShiftDir TMDparseShiftDirection(qcTMD_ShiftFlag shfFlag){
 
     qcTMD_ShiftDir shfDir = qcShfDirNone;
@@ -177,7 +146,6 @@ namespace quda {
     return shfDir;
   }
   //---------------------------------------------------------------------------
-
   qcTMD_ShiftSgn TMDparseShiftSign(qcTMD_ShiftFlag shfFlag, bool flipShfSgn=false){
 
     qcTMD_ShiftSgn shfSgn = qcShfSgnNone;
@@ -203,7 +171,6 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
-
   void qcCopyExtendedGaugeField(cudaGaugeField *dst, cudaGaugeField *src, const int *R){
 
     if( (dst->GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) ||
@@ -215,32 +182,6 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
-
-  __global__ void qcCopyCudaLink_kernel(Arg_CopyCudaLink *arg){
-
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-    pty = (arg->nParity == 2) ? pty : arg->parity;
-    if (x_cb >= arg->volumeCB) return;
-    if (pty >= arg->nParity) return;
-
-    if(arg->extendedGauge){
-      int crd[5];
-      getCoords(crd, x_cb, arg->dim, pty);
-      crd[4] = 0;
-      int c2[5] = {0,0,0,0,0};
-      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
-
-      Link srcU = arg->Usrc(arg->i_src, linkIndex(c2, arg->dimEx), pty);
-      arg->Udst(arg->i_dst, linkIndex(c2, arg->dimEx), pty) = srcU;
-    }
-    else{
-      Link srcU = arg->Usrc(arg->i_src, x_cb, pty);
-      arg->Udst(arg->i_dst, x_cb, pty) = srcU;
-    }
-
-  }
-  
   void qcCopyCudaLink(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src, const int *R){
 
     Arg_CopyCudaLink arg(dst, i_dst, src, i_src);
@@ -265,30 +206,6 @@ namespace quda {
     arg_dev = NULL;
   }
   //---------------------------------------------------------------------------
-
-
-  __global__ void qcSetGaugeToUnity_kernel(Arg_SetUnityLink *arg){
-
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-    pty = (arg->nParity == 2) ? pty : arg->parity;
-    if (x_cb >= arg->volumeCB) return;
-    if (pty >= arg->nParity) return;
-
-    Link unitU(arg->unityU); //- That's a 3x3 unity matrix
-
-    if(arg->extendedGauge){
-      int crd[5];
-      getCoords(crd, x_cb, arg->dim, pty);
-      crd[4] = 0;
-      int c2[5] = {0,0,0,0,0};
-      for(int i=0;i<4;i++) c2[i] = crd[i] + arg->brd[i];
-
-      arg->U(arg->mu, linkIndex(c2, arg->dimEx), pty) = unitU;
-    }
-    else arg->U(arg->mu, x_cb, pty) = unitU;
-
-  }
 
   void qcSetGaugeToUnity(cudaGaugeField *U, int mu, const int *R){
 
@@ -315,7 +232,6 @@ namespace quda {
   }
   //---------------------------------------------------------------------------
 
-
   void qcExchangeGhostVec(ColorSpinorField *x){
     const int nFace  = 1;
     x->exchangeGhost((QudaParity)(1), nFace, 0); //- first argument is redundant when nParity = 2. nFace MUST be 1 for now.
@@ -333,13 +249,13 @@ namespace quda {
     *x1 = *x2;
     *x2 = xtmp;
   }
-
+  //---------------------------------------------------------------------------
   void qcSwapCudaVec(cudaColorSpinorField **x1, cudaColorSpinorField **x2){
     cudaColorSpinorField *xtmp = *x1;
     *x1 = *x2;
     *x2 = xtmp;
   }
-
+  //---------------------------------------------------------------------------
   void qcCPUtoCudaVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec){
     *cudaVec = *cpuVec;
   }  
@@ -348,7 +264,6 @@ namespace quda {
       qcCPUtoCudaVec(cudaProp[i], cpuProp[i]);
   }
   //---------------------------------------------------------------------------
-
 
   void qcCopyGammaToConstMem(){
     qcGammaStruct gamma_h;
@@ -360,7 +275,7 @@ namespace quda {
     }
     qcCopyGammaToSymbol(gamma_h);
   }
-
+  //---------------------------------------------------------------------------
 
   void perform_ShiftCudaVec_nonCov(ColorSpinorField *dst, ColorSpinorField *src, qcTMD_ShiftFlag shfFlag){
 
@@ -401,6 +316,7 @@ namespace quda {
     cudaFree(arg_dev);
     arg_dev = NULL;
   }//-- perform_ShiftCudaVec_nonCov
+  //---------------------------------------------------------------------------
   
   void perform_ShiftCudaVec_Cov(ColorSpinorField *dst, ColorSpinorField *src, cudaGaugeField *gf,
 				qcTMD_ShiftFlag shfFlag){
@@ -442,7 +358,7 @@ namespace quda {
     cudaFree(arg_dev);
     arg_dev = NULL;
   }//-- perform_ShiftCudaVec_Cov
-
+  //---------------------------------------------------------------------------
 
   void perform_ShiftGauge_nonCov(cudaGaugeField *dst, cudaGaugeField *src,
 				 qcTMD_ShiftFlag shfFlag){
@@ -484,7 +400,7 @@ namespace quda {
     cudaFree(arg_dev);
     arg_dev = NULL;
   }//-- perform_ShiftGauge_nonCov
-
+  //---------------------------------------------------------------------------
 
   void perform_ShiftLink_Cov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
 			     cudaGaugeField *gf, qcTMD_ShiftFlag shfFlag){
@@ -526,7 +442,7 @@ namespace quda {
     cudaFree(arg_dev);
     arg_dev = NULL;
   }//-- perform_ShiftLink_Cov
-
+  //---------------------------------------------------------------------------
 
   void perform_ShiftLink_AdjSplitCov(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src,
 				     cudaGaugeField *gf, cudaGaugeField *gf2,

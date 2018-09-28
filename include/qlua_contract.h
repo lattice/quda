@@ -4,6 +4,7 @@
 #ifndef QLUA_CONTRACT_H__
 #define QLUA_CONTRACT_H__
 
+#include <mpi.h>
 #include <transfer.h>
 #include <complex_quda.h>
 #include <quda_internal.h>
@@ -12,6 +13,7 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <color_spinor.h>
+#include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <interface_qlua_internal.h>
 
@@ -24,7 +26,6 @@ namespace quda {
   typedef typename gauge_mapper<QUDA_REAL,QUDA_RECONSTRUCT_NO>::type GaugeU;
   typedef ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> Vector;
   typedef Matrix<complex<QUDA_REAL>,QUDA_Nc> Link;
-
 
   extern const int nShiftFlag;
   extern const int nShiftType;
@@ -58,9 +59,9 @@ namespace quda {
     complex<QUDA_REAL> zro = complex<QUDA_REAL>{0,0};
     complex<QUDA_REAL> val = complex<QUDA_REAL>{sqrt(0.5),0};
     complex<QUDA_REAL> M[Ns][Ns] = { { zro, -val,  zro, -val},
-				     { val,  zro,  val,  zro},
-				     { zro, -val,  zro,  val},
-				     { val,  zro, -val,  zro} };
+  				     { val,  zro,  val,  zro},
+  				     { zro, -val,  zro,  val},
+  				     { val,  zro, -val,  zro} };
 
     complex<QUDA_REAL> M_Trans[Ns][Ns];
     for(int i=0;i<Ns;i++){
@@ -94,6 +95,40 @@ namespace quda {
 
   }
   //---------------------------------------------------------------------------
+
+  struct ContractQQArg {
+
+    Propagator pIn1[QUDA_PROP_NVEC];  // Input propagator 1
+    Propagator pIn2[QUDA_PROP_NVEC];  // Input propagator 2
+    Propagator pOut[QUDA_PROP_NVEC];  // Output propagator
+
+    const int parity;                 // only use this for single parity fields
+    const int nParity;                // number of parities we're working on
+    const int nFace;                  // hard code to 1 for now
+    const int dim[5];                 // full lattice dimensions
+    const int commDim[4];             // whether a given dimension is partitioned or not
+    const int volumeCB;               // checkerboarded volume
+    const int nVec;                   // number of vectors in the propagator (usually 12)
+
+    qluaCntrQQ_Id cntrID;             // contract index
+
+    ContractQQArg(ColorSpinorField **propOut, ColorSpinorField **propIn1, ColorSpinorField **propIn2, int parity, cntrQQParam cQQParam)
+      :   parity(parity), nParity(propIn1[0]->SiteSubset()), nFace(1),
+	  dim{ (3-nParity) * propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3), 1 },
+      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+      volumeCB(propIn1[0]->VolumeCB()), nVec(cQQParam.nVec), cntrID(cQQParam.cntrID)
+    {
+
+      for(int ivec=0;ivec<nVec;ivec++){
+        pIn1[ivec].init(*propIn1[ivec]);
+        pIn2[ivec].init(*propIn2[ivec]);
+        pOut[ivec].init(*propOut[ivec]);
+      }
+
+    }
+  }; //-- Structure definition
+  //---------------------------------------------------------------------------
+
 
   struct QluaContractArg {
     

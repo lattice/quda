@@ -1,8 +1,5 @@
-/* Collection of functions required for applying         
- * the laplacian / performing WUppertal smearing.
- * The top level function will be called from a 
- * qlua C-interface.
- * October 2017
+/* C. Kallidonis: Collection of functions that are called from Qlua
+ * October 2017, Update: September 2018
  */
 
 #include <quda.h>
@@ -1782,7 +1779,7 @@ QPDFstep_momProj_Quda(void *Vqcs,
 }
 
 
-//- Legacy function
+//- Legacy function, just keep it here so that Qlua-build does not complain
 EXTRN_C int
 momentumProjectionPropagator_Quda(QUDA_REAL *corrOut,
 				  QUDA_REAL *corrIn,

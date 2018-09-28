@@ -66,6 +66,28 @@ namespace quda {
     qcAdjSplitCovShift = 2
   } qcTMD_ShiftType;
 
+  //- C.K. Argument structure for creating the Phase Matrix on GPU
+  struct MomProjArg{
+
+    const LONG_T V3;
+    const int momDim;
+    const int Nmoms;
+    const int expSgn;
+    const int csrc[QUDA_DIM];
+    const int localL[QUDA_DIM];
+    const int totalL[QUDA_DIM];
+    const int commCoord[QUDA_DIM];
+
+    MomProjArg(momProjParam param)
+      :   V3(param.V3), momDim(param.momDim), Nmoms(param.Nmoms), expSgn(param.expSgn),
+	  csrc{param.csrc[0],param.csrc[1],param.csrc[2],param.csrc[3]},
+      localL{param.localL[0],param.localL[1],param.localL[2],param.localL[3]},
+      totalL{param.totalL[0],param.totalL[1],param.totalL[2],param.totalL[3]},
+      commCoord{comm_coord(0),comm_coord(1),comm_coord(2),comm_coord(3)}
+    { }
+  }; //-- structure
+
+
   struct QluaUtilArg {
     
     const int nParity;            // number of parities we're working on
@@ -197,8 +219,7 @@ namespace quda {
 
   void qcCopyGammaToConstMem();
   
-  void cudaContractQQ(
-  		      ColorSpinorField **propOut,
+  void cudaContractQQ(ColorSpinorField **propOut,
   		      ColorSpinorField **propIn1,
   		      ColorSpinorField **propIn2,
   		      int parity, int Nc, int Ns,
