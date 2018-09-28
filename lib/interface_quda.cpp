@@ -286,7 +286,7 @@ static void profilerStart(const char *f) {
 
 
     char* donotprofile_env = getenv("QUDA_DO_NOT_PROFILE"); // disable profiling of QUDA parts
-    if (donotprofile_env && (!strcmp(donotprofile_env, "0") == 0))  {
+    if (donotprofile_env && (!(strcmp(donotprofile_env, "0") == 0)))  {
       do_not_profile_quda=true;
       printfQuda("Disabling profiling in QUDA\n");
     }
@@ -3366,7 +3366,7 @@ for(int i=0; i < param->num_src; i++) {
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->solve(*out,*in);
+      solve->blocksolve(*out,*in);
       for(int i=0; i < param->num_src; i++) {
         blas::copy(in->Component(i), out->Component(i));
       }
@@ -3378,14 +3378,14 @@ for(int i=0; i < param->num_src; i++) {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->solve(*out,*in);
+      solve->blocksolve(*out,*in);
       solverParam.updateInvertParam(*param);
       delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->solve(*out,*in);
+      solve->blocksolve(*out,*in);
       solverParam.updateInvertParam(*param);
       delete solve;
     } else { // norm_error_solve
@@ -3666,13 +3666,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   } else {
     m = new DiracMdagM(dirac);
     mSloppy = new DiracMdagM(diracSloppy);
-  } 
-
+  }
 
   SolverParam solverParam(*param);
   MultiShiftCG cg_m(*m, *mSloppy, solverParam, profileMulti);
   cg_m(x, *b, p, r2_old.get());
-  // cg_m(x, *b);
   solverParam.updateInvertParam(*param);
 
   delete m;
@@ -3684,19 +3682,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField r(*b, cudaParam);
     profileMulti.TPSTOP(QUDA_PROFILE_INIT);
-// profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
-//   delete d;
-//   delete dSloppy;
-//   delete dPre;
-//   freeSloppyGaugeQuda();
-//   loadSloppyGaugeQuda(param->cuda_prec_refinement_sloppy, param->cuda_prec_precondition);
-//   loadSloppyCloverQuda(param->cuda_prec_refinement_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy);
-  QudaInvertParam refineparam = *param;
-  refineparam.cuda_prec_sloppy = param->cuda_prec_refinement_sloppy;
-  // createDirac(d, dSloppy, dPre, refineparam, pc_solve);
-  Dirac &dirac = *d;
-  Dirac &diracSloppy = *dRefine;
-// profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);  
+    QudaInvertParam refineparam = *param;
+    refineparam.cuda_prec_sloppy = param->cuda_prec_refinement_sloppy;
+    Dirac &dirac = *d;
+    Dirac &diracSloppy = *dRefine;
 
 #define REFINE_INCREASING_MASS
 #ifdef REFINE_INCREASING_MASS
@@ -3716,34 +3705,32 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	the iterated residual tolerance of the previous multi-shift
 	solver (iter_res_offset[i]), which ever is greater.
       */
-      const double prec_tol = std::pow(10.,(-2*(int)param->cuda_prec+2));
+      const double prec_tol = std::pow(10.,(-2*(int)param->cuda_prec+4)); // implicit refinment limit of 1e-12
       const double iter_tol = (param->iter_res_offset[i] < prec_tol ? prec_tol : (param->iter_res_offset[i] *1.1));
       const double refine_tol = (param->tol_offset[i] == 0.0 ? iter_tol : param->tol_offset[i]);
       // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0
-      if ((i>0 && param->cuda_prec != param->cuda_prec_sloppy) || param->true_res_offset[i] > refine_tol || rsd_hq > tol_hq) {
+      if (param->true_res_offset[i] > refine_tol || rsd_hq > tol_hq) {
 	if (getVerbosity() >= QUDA_SUMMARIZE)
 	  printfQuda("Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n",
 		     i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
 
+        // for staggered the shift is just a change in mass term (FIXME: for twisted mass also)
+        if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+            param->dslash_type == QUDA_STAGGERED_DSLASH) {
+          dirac.setMass(sqrt(param->offset[i]/4));
+          diracSloppy.setMass(sqrt(param->offset[i]/4));
+        }
 
+        DiracMatrix *m, *mSloppy;
 
-  // for staggered the shift is just a change in mass term (FIXME: for twisted mass also)
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
-      param->dslash_type == QUDA_STAGGERED_DSLASH) {
-    dirac.setMass(sqrt(param->offset[i]/4));
-    diracSloppy.setMass(sqrt(param->offset[i]/4));
-  }
-
-  DiracMatrix *m, *mSloppy;
-
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
-      param->dslash_type == QUDA_STAGGERED_DSLASH) {
-    m = new DiracM(dirac);
-    mSloppy = new DiracM(diracSloppy);
-  } else {
-    m = new DiracMdagM(dirac);
-    mSloppy = new DiracMdagM(diracSloppy);
-  } 
+        if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+            param->dslash_type == QUDA_STAGGERED_DSLASH) {
+          m = new DiracM(dirac);
+          mSloppy = new DiracM(diracSloppy);
+        } else {
+          m = new DiracMdagM(dirac);
+          mSloppy = new DiracMdagM(diracSloppy);
+        }
 
 	// need to curry in the shift if we are not doing staggered
 	if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
@@ -3797,25 +3784,28 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
 	solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
 	solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
+        solverParam.delta = param->reliable_delta_refinement;
 
-	CG cg(*m, *mSloppy, solverParam, profileMulti);
-  if(i==0) 
-    cg(*x[i], *b, p[i], r2_old[i]);
-  else
-    cg(*x[i], *b);
-  
-  solverParam.true_res_offset[i] = solverParam.true_res;
-  solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
-  solverParam.updateInvertParam(*param,i);
+        {
+          CG cg(*m, *mSloppy, solverParam, profileMulti);
+          if (i==0)
+            cg(*x[i], *b, p[i], r2_old[i]);
+          else
+            cg(*x[i], *b);
+        }
 
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
-      param->dslash_type == QUDA_STAGGERED_DSLASH) {
-    dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
-    diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
-  }
+        solverParam.true_res_offset[i] = solverParam.true_res;
+        solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
+        solverParam.updateInvertParam(*param,i);
 
-  delete m;
-  delete mSloppy;
+        if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+            param->dslash_type == QUDA_STAGGERED_DSLASH) {
+          dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
+          diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
+        }
+
+        delete m;
+        delete mSloppy;
 
       }
     }
@@ -4255,7 +4245,7 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
 
   // create the staggered operator
   DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, QUDA_NORMOP_PC_SOLVE);
+  setDiracParam(diracParam, inv_param, true);
   Dirac *dirac = Dirac::create(diracParam);
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_INIT);

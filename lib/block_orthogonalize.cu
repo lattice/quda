@@ -15,7 +15,10 @@
 #include <launch_kernel.cuh>
 
 #include <jitify_helper.cuh>
+
+#ifdef GPU_MULTIGRID
 #include <kernels/block_orthogonalize.cuh>
+#endif
 
 namespace quda {
 

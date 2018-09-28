@@ -21,12 +21,6 @@ static __inline__ __device__ double2 fetch_double2(Tex t, int i)
   return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
 }
 
-static __inline__ __device__ double2 fetch_double2_old(texture<int4, 1> t, int i)
-{
-  int4 v = tex1Dfetch(t,i);
-  return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
-}
-
 
 #ifndef USE_TEXTURE_OBJECTS
 // Double precision gauge field

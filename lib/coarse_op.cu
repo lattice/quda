@@ -3,7 +3,9 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 
+#ifdef GPU_MULTIGRID
 #include <coarse_op.cuh>
+#endif
 
 namespace quda {
 
