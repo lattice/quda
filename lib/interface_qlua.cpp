@@ -1506,7 +1506,7 @@ TMDstep_momProj_Quda(void *Vqcs,
 
   double t14 = MPI_Wtime();
   int status = 0;
-  const char *func_name = "QuarkTMDstep_momProj_Quda";
+  const char *func_name = "TMDstep_momProj_Quda";
 
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state *>(Vqcs));
 
@@ -1684,7 +1684,7 @@ QPDFstep_momProj_Quda(void *Vqcs,
 
   double t14 = MPI_Wtime();
   int status = 0;
-  const char *func_name = "QuarkPDFstep_momProj_Quda";
+  const char *func_name = "QPDFstep_momProj_Quda";
 
   QuarkTMD_state *qcs = (static_cast<QuarkTMD_state *>(Vqcs));
 
