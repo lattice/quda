@@ -101,7 +101,7 @@ namespace quda {
 
   /**
     @brief Parameter structure for applying the Dslash
-   */
+  */
   template<int Ls_>
   struct Dslash5TensorCoreArg {
     typedef typename colorspinor_mapper<short, 4, 3>::type F;
@@ -163,7 +163,7 @@ namespace quda {
   /**
     @brief Tensor core kernel for applying the M5inv operator
     @param[in] arg Argument struct containing any meta data and accessors
-   */
+  */
   template<int block_dim_x, int Ls_, bool dagger, bool xpay, class Arg>
   __global__ void dslash5inv_tensor_core(Arg arg)
   {
@@ -193,8 +193,6 @@ namespace quda {
       int offset_k = threadIdx.y*4;
       int offset_m = threadIdx.x*4;
     
-      // threadIdx.x should not be idle(?).
-      // With Ls=12 and blockDim.x=32 the following gives a 2-way bank conflict.  
       if(threadIdx.x < Ls_){
         int exp;
         exp = threadIdx.x>threadIdx.y ? Ls_-threadIdx.x+threadIdx.y : threadIdx.y-threadIdx.x;
@@ -263,11 +261,10 @@ namespace quda {
         sm_b[ (offset_pre_m+offset_pre_n)/2+1 ] = __floats2half2_rn(in(3, 1).real()*scale, in(3, 1).imag()*scale);
         sm_b[ (offset_pre_m+offset_pre_n)/2+2 ] = __floats2half2_rn(in(3, 2).real()*scale, in(3, 2).imag()*scale);
       }
-    
+      
       __syncthreads();
     
-      // wmma.h
-      {
+      { // wmma.h
         using namespace nvcuda;
     
         constexpr int WMMA_M = 16;
@@ -276,17 +273,9 @@ namespace quda {
         
         constexpr int tm_dim = M/WMMA_M;
         constexpr int tn_dim = N/WMMA_N;
-        // const int tk_dim = K >> 4;
-        
-        // The actual/physical warp assigned to each thread in this block
-        // int phys_warp_n_dim = float(blockDim.x)/float(warpSize); // TODO: should make sure blockDim.x is AT LEAST 32.
-        // int phys_warp_m_dim = blockDim.y;
         
         constexpr int total_warp = block_dim_x*Ls_/32;
-        const int this_warp = threadIdx.y;
-        
-        // int phys_warp_n = float(threadIdx.x)/float(warpSize);
-        // int phys_warp_m = threadIdx.y; 
+        const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
         
         // int total_num_warp = phys_warp_n_dim*phys_warp_m_dim;
         constexpr int total_tile = tm_dim*tn_dim;
@@ -305,7 +294,7 @@ namespace quda {
           const int warp_n = phys_warp_index-warp_m*tn_dim;
           
           // Zero the initial acc.
-          wmma::fill_fragment(c_frag, (half)0.0f);
+          wmma::fill_fragment(c_frag, static_cast<half>(0.0f));
           
           #pragma unroll
           for( int k = 0; k < tm_dim; k++ ){
@@ -314,28 +303,22 @@ namespace quda {
             const int b_row = k*WMMA_K;
             const int b_col = warp_n*WMMA_N;
     
-            // if( a_row < M && a_col < K && b_row < K && b_col < N ){    
             // Load Matrix
             nvcuda::wmma::load_matrix_sync(a_frag, sm_a+a_row+a_col*M_sm, M_sm);
             nvcuda::wmma::load_matrix_sync(b_frag, sm_c+b_col+b_row*N_sm, N_sm);
             // Perform the matrix multiplication
             wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
-            // }
           } 
-    
-          __syncthreads();
     
           int c_row = warp_m*WMMA_M;
           int c_col = warp_n*WMMA_N;
     
-          if(c_row < M && c_col < N){ 
-            nvcuda::wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, wmma::mem_row_major);
-          }
-          //  __syncthreads();
+          nvcuda::wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, wmma::mem_row_major);
         }
-        __syncthreads();
         
       } // wmma.h
+      
+      __syncthreads();
     
       if(!idle){
         Vector out;
@@ -367,7 +350,6 @@ namespace quda {
       s4_base += gridDim.x*blockDim.x;
     
     } // while
-
 
   }
 
@@ -413,19 +395,18 @@ namespace quda {
       }
 
       virtual bool tuneGridDim() const { return true; }
-      virtual bool tuneSharedBytes() const { return false; }
+//      virtual bool tuneSharedBytes() const { return false; }
       unsigned int minThreads() const { return arg.volume_4d_cb; }
-      // TODO: Implement the tunning strategy.
   
       unsigned int shared_bytes_per_block(int x, int y) const { 
-          // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
-          return ( (y*4)*(y*4+0)+(y*4)*(x*6+16) )*2; // 4*4*2 TODO: fix this!
+        // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
+        return ( (y*4)*(y*4+0)+(y*4)*(x*6+16) )*2; // 4*4*2 TODO: fix this!
       }
    
       virtual bool advanceBlockDim(TuneParam &param) const
       {
-        if(param.block.x == 16){
-          param.block.x = 32;
+        if(param.block.x < 64){
+          param.block.x += 8;
           param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
           return true;
         }else{
@@ -436,12 +417,14 @@ namespace quda {
       virtual bool advanceGridDim(TuneParam &param) const
       {
         const unsigned int max_blocks = maxGridSize();
-        const int step = deviceProp.multiProcessorCount/4;
+        const int step = deviceProp.multiProcessorCount;
         param.grid.x += step;
         if (param.grid.x > max_blocks) {
           param.grid.x = minGridSize();
           return false;
         } else {
+          param.block.x = 16;
+          param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
           return true;
         }
       }
@@ -502,6 +485,17 @@ namespace quda {
                   launch(dslash5inv_tensor_core<16, Ls_,false,false, Arg>, tp, arg, stream) ;
                 }
                 break;
+              case 24:
+                if(arg.xpay){ 
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<24, Ls_, true, true, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<24, Ls_,false, true, Arg>, tp, arg, stream) ;
+                }else{
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<24, Ls_, true,false, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<24, Ls_,false,false, Arg>, tp, arg, stream) ;
+                }
+                break;
               case 32:
                 if(arg.xpay){ 
                   arg.dagger ?
@@ -511,6 +505,50 @@ namespace quda {
                   arg.dagger ?
                   launch(dslash5inv_tensor_core<32, Ls_, true,false, Arg>, tp, arg, stream) :
                   launch(dslash5inv_tensor_core<32, Ls_,false,false, Arg>, tp, arg, stream) ;
+                }
+                break;
+              case 40:
+                if(arg.xpay){ 
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<40, Ls_, true, true, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<40, Ls_,false, true, Arg>, tp, arg, stream) ;
+                }else{
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<40, Ls_, true,false, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<40, Ls_,false,false, Arg>, tp, arg, stream) ;
+                }
+                break;
+              case 48:
+                if(arg.xpay){ 
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<48, Ls_, true, true, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<48, Ls_,false, true, Arg>, tp, arg, stream) ;
+                }else{
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<48, Ls_, true,false, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<48, Ls_,false,false, Arg>, tp, arg, stream) ;
+                }
+                break;
+              case 56:
+                if(arg.xpay){ 
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<56, Ls_, true, true, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<56, Ls_,false, true, Arg>, tp, arg, stream) ;
+                }else{
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<56, Ls_, true,false, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<56, Ls_,false,false, Arg>, tp, arg, stream) ;
+                }
+                break;
+              case 64:
+                if(arg.xpay){ 
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<64, Ls_, true, true, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<64, Ls_,false, true, Arg>, tp, arg, stream) ;
+                }else{
+                  arg.dagger ?
+                  launch(dslash5inv_tensor_core<64, Ls_, true,false, Arg>, tp, arg, stream) :
+                  launch(dslash5inv_tensor_core<64, Ls_,false,false, Arg>, tp, arg, stream) ;
                 }
                 break;
               default:
@@ -524,7 +562,7 @@ namespace quda {
 
       void initTuneParam(TuneParam &param) const {
         TunableVectorYZ::initTuneParam(param);
-        param.block = dim3(32, arg.Ls, 1); // Ls must be contained in the block
+        param.block = dim3(16, arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(80, 1, 1);
         param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
       }
