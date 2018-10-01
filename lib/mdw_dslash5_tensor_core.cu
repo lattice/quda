@@ -160,11 +160,24 @@ namespace quda {
     }
   };
 
+  __device__ inline half __half_max_abs_half2__(half max, const half2 input){
+    static constexpr uint32_t mask = ~((0x1u<<31) + (0x1u<<15)); // 01111111 11111111 01111111 11111111 
+    // Set the fisrt bit of the half to 0.
+    uint32_t input_masked = *reinterpret_cast<const uint32_t*>(&input) & mask;
+    
+    max = __hgt(max, reinterpret_cast<half2*>(&input_masked)->x) ? max : reinterpret_cast<half2*>(&input_masked)->x;
+    max = __hgt(max, reinterpret_cast<half2*>(&input_masked)->y) ? max : reinterpret_cast<half2*>(&input_masked)->y;
+//    max = __hgt(max, __hgt(input.x, (half)0.0f)?input.x:__hneg(input.x)) ? max : __hgt(input.x, (half)0.0f)?input.x:__hneg(input.x);
+//    max = __hgt(max, __hgt(input.x, (half)0.0f)?input.y:__hneg(input.y)) ? max : __hgt(input.y, (half)0.0f)?input.y:__hneg(input.y);
+    return max;
+  }
+
   /**
     @brief Tensor core kernel for applying the M5inv operator
     @param[in] arg Argument struct containing any meta data and accessors
   */
   template<int block_dim_x, int Ls_, bool dagger, bool xpay, class Arg>
+//  __global__ __launch_bounds__(1280, 4) void dslash5inv_tensor_core(Arg arg)
   __global__ void dslash5inv_tensor_core(Arg arg)
   {
     typedef ColorSpinor<float,3,4> Vector;
@@ -228,7 +241,17 @@ namespace quda {
     bool idle = false;
     int s4_base = blockIdx.x*blockDim.x; // base.
     int s4, sid;
-    
+   
+//    nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_frag[tm_dim];
+
+//    #pragma unroll
+//    for( int k = 0; k < tm_dim; k++ ){
+//      const int a_row = warp_m*WMMA_M;
+//      const int a_col = k*WMMA_K;
+//      // Load Matrix
+//      nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a+a_row+a_col*M_sm, M_sm);
+//    } 
+   
     while(s4_base < arg.volume_4d_cb){
       
       s4 = s4_base + threadIdx.x;
@@ -266,7 +289,7 @@ namespace quda {
     
       { // wmma.h
         using namespace nvcuda;
-    
+ 
         constexpr int WMMA_M = 16;
         constexpr int WMMA_N = 16;
         constexpr int WMMA_K = 16;
@@ -277,12 +300,11 @@ namespace quda {
         constexpr int total_warp = block_dim_x*Ls_/32;
         const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
         
-        // int total_num_warp = phys_warp_n_dim*phys_warp_m_dim;
         constexpr int total_tile = tm_dim*tn_dim;
         
         constexpr int warp_cycle = total_tile/total_warp;
         const int warp_m = this_warp*warp_cycle/tn_dim;
-    
+   
         for(int c = 0; c < warp_cycle; c++){
           // Set up the wmma stuff
           nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_frag;
@@ -321,11 +343,55 @@ namespace quda {
       __syncthreads();
     
       if(!idle){
-        Vector out;
+#if 1        
+        half max_ = (half)0.0f;
         
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+0)*N_sm+6*threadIdx.x)/2+0 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+0)*N_sm+6*threadIdx.x)/2+1 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+0)*N_sm+6*threadIdx.x)/2+2 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+1)*N_sm+6*threadIdx.x)/2+0 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+1)*N_sm+6*threadIdx.x)/2+1 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+1)*N_sm+6*threadIdx.x)/2+2 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+2)*N_sm+6*threadIdx.x)/2+0 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+2)*N_sm+6*threadIdx.x)/2+1 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+2)*N_sm+6*threadIdx.x)/2+2 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+3)*N_sm+6*threadIdx.x)/2+0 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+3)*N_sm+6*threadIdx.x)/2+1 ]);
+        max_ = __half_max_abs_half2__(max_, sm_b[ ((threadIdx.y*4+3)*N_sm+6*threadIdx.x)/2+2 ]);
+
+        arg.out.norm[sid] = __fdividef(__half2float(max_), scale);
+        
+        short4* out = reinterpret_cast<short4*>(arg.out.field);
+        
+        out[sid + 0*arg.volume_cb] = make_short4( __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 0 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 1 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 2 ], max_), fixedMaxValue<short>::value)),
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 3 ], max_), fixedMaxValue<short>::value)) );
+        out[sid + 1*arg.volume_cb] = make_short4( __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 4 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 5 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 0 ], max_), fixedMaxValue<short>::value)),
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 1 ], max_), fixedMaxValue<short>::value)) );
+        out[sid + 2*arg.volume_cb] = make_short4( __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 2 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 3 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 4 ], max_), fixedMaxValue<short>::value)),
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 5 ], max_), fixedMaxValue<short>::value)) );
+        out[sid + 3*arg.volume_cb] = make_short4( __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 0 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 1 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 2 ], max_), fixedMaxValue<short>::value)),
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 3 ], max_), fixedMaxValue<short>::value)) );
+        out[sid + 4*arg.volume_cb] = make_short4( __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 4 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 5 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 0 ], max_), fixedMaxValue<short>::value)),
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 1 ], max_), fixedMaxValue<short>::value)) );
+        out[sid + 5*arg.volume_cb] = make_short4( __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 2 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 3 ], max_), fixedMaxValue<short>::value)), 
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 4 ], max_), fixedMaxValue<short>::value)),
+                                                  __half2short_rn(__hmul(__hdiv(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 5 ], max_), fixedMaxValue<short>::value)) );
+#else        
+        Vector out;
         int offset_pre_m;
         int offset_pre_n = 6*threadIdx.x;
-    
+
         offset_pre_m = (threadIdx.y*4+0)*N_sm;
         out(0, 0) = *reinterpret_cast<complex<float>*>(&__half22float2(sm_b[ (offset_pre_m+offset_pre_n)/2+0 ]) )/scale;
         out(0, 1) = *reinterpret_cast<complex<float>*>(&__half22float2(sm_b[ (offset_pre_m+offset_pre_n)/2+1 ]) )/scale;
@@ -345,6 +411,7 @@ namespace quda {
         
         // write spinor field back to device memory
         arg.out(sid, 0) = out;
+#endif
       }
     
       s4_base += gridDim.x*blockDim.x;
@@ -405,7 +472,7 @@ namespace quda {
    
       virtual bool advanceBlockDim(TuneParam &param) const
       {
-        if(param.block.x < 64){
+        if(param.block.x < 32){
           param.block.x += 8;
           param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
           return true;
@@ -423,7 +490,7 @@ namespace quda {
           param.grid.x = minGridSize();
           return false;
         } else {
-          param.block.x = 16;
+          param.block.x = 32;
           param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
           return true;
         }
@@ -474,28 +541,28 @@ namespace quda {
         switch(arg.type){
           case M5_INV_MOBIUS:
             switch(tp.block.x){
-              case 16:
-                if (arg.xpay){ 
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<16, Ls_, true, true, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<16, Ls_,false, true, Arg>, tp, arg, stream) ;
-                }else{          
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<16, Ls_, true,false, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<16, Ls_,false,false, Arg>, tp, arg, stream) ;
-                }
-                break;
-              case 24:
-                if(arg.xpay){ 
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<24, Ls_, true, true, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<24, Ls_,false, true, Arg>, tp, arg, stream) ;
-                }else{
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<24, Ls_, true,false, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<24, Ls_,false,false, Arg>, tp, arg, stream) ;
-                }
-                break;
+//              case 16:
+//                if (arg.xpay){ 
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<16, Ls_, true, true, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<16, Ls_,false, true, Arg>, tp, arg, stream) ;
+//                }else{          
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<16, Ls_, true,false, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<16, Ls_,false,false, Arg>, tp, arg, stream) ;
+//                }
+//                break;
+//              case 24:
+//                if(arg.xpay){ 
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<24, Ls_, true, true, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<24, Ls_,false, true, Arg>, tp, arg, stream) ;
+//                }else{
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<24, Ls_, true,false, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<24, Ls_,false,false, Arg>, tp, arg, stream) ;
+//                }
+//                break;
               case 32:
                 if(arg.xpay){ 
                   arg.dagger ?
@@ -507,50 +574,50 @@ namespace quda {
                   launch(dslash5inv_tensor_core<32, Ls_,false,false, Arg>, tp, arg, stream) ;
                 }
                 break;
-              case 40:
-                if(arg.xpay){ 
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<40, Ls_, true, true, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<40, Ls_,false, true, Arg>, tp, arg, stream) ;
-                }else{
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<40, Ls_, true,false, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<40, Ls_,false,false, Arg>, tp, arg, stream) ;
-                }
-                break;
-              case 48:
-                if(arg.xpay){ 
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<48, Ls_, true, true, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<48, Ls_,false, true, Arg>, tp, arg, stream) ;
-                }else{
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<48, Ls_, true,false, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<48, Ls_,false,false, Arg>, tp, arg, stream) ;
-                }
-                break;
-              case 56:
-                if(arg.xpay){ 
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<56, Ls_, true, true, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<56, Ls_,false, true, Arg>, tp, arg, stream) ;
-                }else{
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<56, Ls_, true,false, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<56, Ls_,false,false, Arg>, tp, arg, stream) ;
-                }
-                break;
-              case 64:
-                if(arg.xpay){ 
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<64, Ls_, true, true, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<64, Ls_,false, true, Arg>, tp, arg, stream) ;
-                }else{
-                  arg.dagger ?
-                  launch(dslash5inv_tensor_core<64, Ls_, true,false, Arg>, tp, arg, stream) :
-                  launch(dslash5inv_tensor_core<64, Ls_,false,false, Arg>, tp, arg, stream) ;
-                }
-                break;
+//              case 40:
+//                if(arg.xpay){ 
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<40, Ls_, true, true, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<40, Ls_,false, true, Arg>, tp, arg, stream) ;
+//                }else{
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<40, Ls_, true,false, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<40, Ls_,false,false, Arg>, tp, arg, stream) ;
+//                }
+//                break;
+//              case 48:
+//                if(arg.xpay){ 
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<48, Ls_, true, true, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<48, Ls_,false, true, Arg>, tp, arg, stream) ;
+//                }else{
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<48, Ls_, true,false, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<48, Ls_,false,false, Arg>, tp, arg, stream) ;
+//                }
+//                break;
+//              case 56:
+//                if(arg.xpay){ 
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<56, Ls_, true, true, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<56, Ls_,false, true, Arg>, tp, arg, stream) ;
+//                }else{
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<56, Ls_, true,false, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<56, Ls_,false,false, Arg>, tp, arg, stream) ;
+//                }
+//                break;
+//              case 64:
+//                if(arg.xpay){ 
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<64, Ls_, true, true, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<64, Ls_,false, true, Arg>, tp, arg, stream) ;
+//                }else{
+//                  arg.dagger ?
+//                  launch(dslash5inv_tensor_core<64, Ls_, true,false, Arg>, tp, arg, stream) :
+//                  launch(dslash5inv_tensor_core<64, Ls_,false,false, Arg>, tp, arg, stream) ;
+//                }
+//                break;
               default:
                 errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
             }
@@ -562,7 +629,7 @@ namespace quda {
 
       void initTuneParam(TuneParam &param) const {
         TunableVectorYZ::initTuneParam(param);
-        param.block = dim3(16, arg.Ls, 1); // Ls must be contained in the block
+        param.block = dim3(32, arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(80, 1, 1);
         param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
       }
