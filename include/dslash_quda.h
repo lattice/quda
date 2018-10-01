@@ -90,6 +90,9 @@ namespace quda {
 		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
 		    double a, bool dagger, Dslash5Type type);
 
+  void apply_dslash5_tensor_core(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+      double m_f, double m_5, const Complex* b_5, const Complex* c_5, double a, bool dagger, Dslash5Type type);
+
   // domain wall Dslash  
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 			    const int parity, const int dagger, const cudaColorSpinorField *x,

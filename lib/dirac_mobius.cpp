@@ -629,10 +629,15 @@ namespace quda {
  
     double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
     for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
+   
+#if 1
+    apply_dslash5_tensor_core(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, M5_INV_MOBIUS);
+#else
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
 		   parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 9, profile, sp_idx_length, R_, Xs_);
-
+#endif
+    
     long long Ls = in.X(4);
     flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
