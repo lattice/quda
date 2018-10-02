@@ -33,14 +33,14 @@ public:
 
       set_ghost(is_ghost); // initial state is not ghost
 
-      strcpy(aux, location == QUDA_CUDA_FIELD_LOCATION ? compile_type_str : "CPU");
-      strcat(aux, ",out:");
+      strcpy(aux, compile_type_str(in));
+      strcat(aux, "out:");
       strcat(aux, out.AuxString());
       strcat(aux, ",in:");
       strcat(aux, in.AuxString());
 
 #ifdef FINE_GRAINED_ACCESS
-      strcat(aux,",fine-grained,");
+      strcat(aux,",fine-grained");
 #endif
 
 #ifdef JITIFY
