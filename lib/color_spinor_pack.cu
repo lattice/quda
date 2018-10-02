@@ -54,6 +54,7 @@ namespace quda {
     inline GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta, MemoryLocation *destination)
       : TunableVectorYZ((Ns/Ms)*(Nc/Mc), 2*arg.nParity), arg(arg), meta(meta) {
 
+      strcpy(aux, meta.AuxString());
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         create_jitify_program("kernels/color_spinor_pack.cuh");
