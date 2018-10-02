@@ -12,6 +12,8 @@
 #include <mma.h>
 #endif
 
+#define RELOAD
+
 namespace quda {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
@@ -241,16 +243,33 @@ namespace quda {
     bool idle = false;
     int s4_base = blockIdx.x*blockDim.x; // base.
     int s4, sid;
-   
-//    nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_frag[tm_dim];
 
-//    #pragma unroll
-//    for( int k = 0; k < tm_dim; k++ ){
-//      const int a_row = warp_m*WMMA_M;
-//      const int a_col = k*WMMA_K;
-//      // Load Matrix
-//      nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a+a_row+a_col*M_sm, M_sm);
-//    } 
+#ifndef RELOAD
+    constexpr int WMMA_M = 16;
+    constexpr int WMMA_N = 16;
+    constexpr int WMMA_K = 16;
+    
+    constexpr int tm_dim = M/WMMA_M;
+    constexpr int tn_dim = N/WMMA_N;
+    
+    constexpr int total_warp = block_dim_x*Ls_/32;
+    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
+    
+    constexpr int total_tile = tm_dim*tn_dim;
+    
+    constexpr int warp_cycle = total_tile/total_warp;
+    const int warp_m = this_warp*warp_cycle/tn_dim;
+  
+    nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_frag[tm_dim];
+
+    #pragma unroll
+    for( int k = 0; k < tm_dim; k++ ){
+      const int a_row = warp_m*WMMA_M;
+      const int a_col = k*WMMA_K;
+      // Load Matrix
+      nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a+a_row+a_col*M_sm, M_sm);
+    } 
+#endif
    
     while(s4_base < arg.volume_4d_cb){
       
@@ -320,8 +339,7 @@ namespace quda {
       __syncthreads();
     
       { // wmma.h
-        using namespace nvcuda;
- 
+#ifdef RELOAD  
         constexpr int WMMA_M = 16;
         constexpr int WMMA_N = 16;
         constexpr int WMMA_K = 16;
@@ -336,10 +354,13 @@ namespace quda {
         
         constexpr int warp_cycle = total_tile/total_warp;
         const int warp_m = this_warp*warp_cycle/tn_dim;
-   
+#endif
+
         for(int c = 0; c < warp_cycle; c++){
           // Set up the wmma stuff
+#ifdef RELOAD            
           nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_frag;
+#endif          
           nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::row_major> b_frag;
           nvcuda::wmma::fragment<nvcuda::wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, half> c_frag;
     
@@ -348,26 +369,34 @@ namespace quda {
           const int warp_n = phys_warp_index-warp_m*tn_dim;
           
           // Zero the initial acc.
-          wmma::fill_fragment(c_frag, static_cast<half>(0.0f));
+          nvcuda::wmma::fill_fragment(c_frag, static_cast<half>(0.0f));
           
           #pragma unroll
           for( int k = 0; k < tm_dim; k++ ){
+#ifdef RELOAD            
             const int a_row = warp_m*WMMA_M;
             const int a_col = k*WMMA_K;
+#endif
             const int b_row = k*WMMA_K;
             const int b_col = warp_n*WMMA_N;
     
             // Load Matrix
+#ifdef RELOAD            
             nvcuda::wmma::load_matrix_sync(a_frag, sm_a+a_row+a_col*M_sm, M_sm);
+#endif            
             nvcuda::wmma::load_matrix_sync(b_frag, sm_c+b_col+b_row*N_sm, N_sm);
             // Perform the matrix multiplication
-            wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+#ifdef RELOAD            
+            nvcuda::wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+#else            
+            nvcuda::wmma::mma_sync(c_frag, a_frag[k], b_frag, c_frag);
+#endif          
           } 
     
           int c_row = warp_m*WMMA_M;
           int c_col = warp_n*WMMA_N;
     
-          nvcuda::wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, wmma::mem_row_major);
+          nvcuda::wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, nvcuda::wmma::mem_row_major);
         }
         
       } // wmma.h
@@ -394,47 +423,48 @@ namespace quda {
 
         arg.out.norm[sid] = __half2float(max_)*scale;
         
-        const half2 max_short_div_max2_ = __half2half2( __hdiv(fixedMaxValue<short>::value, max_) );
+        // const half2 max_short_div_max2_ = __half2half2( __hdiv(fixedMaxValue<short>::value, max_) );
+        const half max_short_div_max_ = __hdiv(fixedMaxValue<short>::value, max_);
 
         short4* out = reinterpret_cast<short4*>(arg.out.field);
         
-        sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
-        sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
+//        sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
         
-        out[sid + 0*arg.volume_cb] = make_short4( __half2short_rn(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 0 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 1 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 2 ]),
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 3 ]) );
-        out[sid + 1*arg.volume_cb] = make_short4( __half2short_rn(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 4 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 5 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 0 ]),
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 1 ]) );
-        out[sid + 2*arg.volume_cb] = make_short4( __half2short_rn(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 2 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 3 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 4 ]),
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 5 ]) );
-        out[sid + 3*arg.volume_cb] = make_short4( __half2short_rn(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 0 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 1 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 2 ]),
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 3 ]) );
-        out[sid + 4*arg.volume_cb] = make_short4( __half2short_rn(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 4 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 5 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 0 ]),
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 1 ]) );
-        out[sid + 5*arg.volume_cb] = make_short4( __half2short_rn(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 2 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 3 ]), 
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 4 ]),
-                                                  __half2short_rn(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 5 ]) );
+        out[sid + 0*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)),
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)) );
+        out[sid + 1*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)),
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)) );
+        out[sid + 2*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)),
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)) );
+        out[sid + 3*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)),
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)) );
+        out[sid + 4*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)),
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)) );
+        out[sid + 5*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)), 
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)),
+                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)) );
 #else        
         Vector out;
         int offset_pre_m;
@@ -574,9 +604,12 @@ namespace quda {
 
       template<typename T>
       inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-        if ( shared && arg.type == M5_INV_MOBIUS ) {
+        static bool init = false;
+        if ( shared ) {
           // if inverse kernel uses shared memory then maximize total shared memory pool
           setMaxDynamicSharedBytesPerBlock(f);
+          // set_shared_memory_on_volta((const void*)f, "Some Function");
+          init = true;
         }
         void *args[] = { &arg };
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
