@@ -204,7 +204,7 @@ namespace quda {
     CUresult jitify_error;
 
   public:
-    Tunable() : jitify_error(CUDA_SUCCESS) { }
+    Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const cudaStream_t &stream) = 0;
