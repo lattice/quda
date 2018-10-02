@@ -162,6 +162,9 @@ namespace quda {
     }
   };
 
+  __device__ inline short2 __half22short2_rn(const half2 input){
+    return make_short2(__half2short_rn(input.x), __half2short_rn(input.y));
+  }
   __device__ inline half __half_max_abs_half2__(half max, const half2 input){
     static constexpr uint32_t mask = ~((0x1u<<31) + (0x1u<<15)); // 01111111 11111111 01111111 11111111 
     // Set the fisrt bit of the half to 0.
@@ -355,7 +358,7 @@ namespace quda {
         constexpr int warp_cycle = total_tile/total_warp;
         const int warp_m = this_warp*warp_cycle/tn_dim;
 #endif
-
+        #pragma unroll
         for(int c = 0; c < warp_cycle; c++){
           // Set up the wmma stuff
 #ifdef RELOAD            
@@ -423,48 +426,74 @@ namespace quda {
 
         arg.out.norm[sid] = __half2float(max_)*scale;
         
-        // const half2 max_short_div_max2_ = __half2half2( __hdiv(fixedMaxValue<short>::value, max_) );
-        const half max_short_div_max_ = __hdiv(fixedMaxValue<short>::value, max_);
+        const half2 max_short_div_max2_ = __half2half2( __hdiv(fixedMaxValue<short>::value, max_) );
+        // const half max_short_div_max_ = __hdiv(fixedMaxValue<short>::value, max_);
 
+        // short2* out = reinterpret_cast<short2*>(arg.out.field);
         short4* out = reinterpret_cast<short4*>(arg.out.field);
+        short2 a, b;
         
-//        sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ] = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ] = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_); 
-//        sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ] = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_); 
+        a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
+        b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
+        out[sid + 0*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
         
-        out[sid + 0*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)),
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)) );
-        out[sid + 1*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)),
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)) );
-        out[sid + 2*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)),
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)) );
-        out[sid + 3*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)),
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)) );
-        out[sid + 4*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)),
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)) );
-        out[sid + 5*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)), 
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)),
-                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)) );
+        a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
+        b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
+        out[sid + 1*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+        
+        a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
+        b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
+        out[sid + 2*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+        
+        a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
+        b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
+        out[sid + 3*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+        
+        a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
+        b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
+        out[sid + 4*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+        
+        a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
+        b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
+        out[sid + 5*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+
+//        out[(sid + 0*arg.volume_cb)*2+0] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_)); 
+//        out[(sid + 0*arg.volume_cb)*2+1] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_)); 
+//        out[(sid + 1*arg.volume_cb)*2+0] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_)); 
+//        out[(sid + 1*arg.volume_cb)*2+1] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_)); 
+//        out[(sid + 2*arg.volume_cb)*2+0] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_)); 
+//        out[(sid + 2*arg.volume_cb)*2+1] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_)); 
+//        out[(sid + 3*arg.volume_cb)*2+0] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_)); 
+//        out[(sid + 3*arg.volume_cb)*2+1] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_)); 
+//        out[(sid + 4*arg.volume_cb)*2+0] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_)); 
+//        out[(sid + 4*arg.volume_cb)*2+1] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_)); 
+//        out[(sid + 5*arg.volume_cb)*2+0] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_)); 
+//        out[(sid + 5*arg.volume_cb)*2+1] = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_)); 
+        
+//        out[sid + 0*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)),
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)) );
+//        out[sid + 1*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+0)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)),
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)) );
+//        out[sid + 2*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)),
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+1)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)) );
+//        out[sid + 3*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)),
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)) );
+//        out[sid + 4*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+2)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 0 ], max_short_div_max_)),
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 1 ], max_short_div_max_)) );
+//        out[sid + 5*arg.volume_cb] = make_short4( __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 2 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 3 ], max_short_div_max_)), 
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 4 ], max_short_div_max_)),
+//                                                  __half2short_rn(__hmul(sm_c[ (threadIdx.y*4+3)*N_sm + 6*threadIdx.x + 5 ], max_short_div_max_)) );
 #else        
         Vector out;
         int offset_pre_m;
@@ -529,10 +558,10 @@ namespace quda {
       }
 
       long long bytes() const {
-        long long Ls = meta.X(4);
+        // long long Ls = meta.X(4);
         switch (arg.type) {
           case M5_INV_MOBIUS:
-            return arg.out.Bytes() + Ls*arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
+            return arg.out.Bytes() + arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
           default: 
             errorQuda("Unknown Dslash5Type %d", arg.type);
         }
