@@ -157,7 +157,6 @@ void initFields(QudaPrecision prec)
   Y_d->copy(*Y_h);
   Yhat_d->copy(*Yhat_h);
 
-  gParam.setPrecision(param.Precision());
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 0;
