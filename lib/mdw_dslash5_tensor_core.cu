@@ -209,14 +209,16 @@ namespace quda {
       const auto inv = arg.c;
    
       int offset_k = threadIdx.y*4;
-      int offset_m = threadIdx.x*4;
-    
-      if(threadIdx.x < Ls_){
+      int x = threadIdx.x;
+      
+      while(x < Ls_){
+        int offset_m = x*4;
+        
         int exp;
-        exp = threadIdx.x>threadIdx.y ? Ls_-threadIdx.x+threadIdx.y : threadIdx.y-threadIdx.x;
-        float factorR = inv*__fast_pow(k, exp) * ( threadIdx.x>threadIdx.y ? -arg.m_f : static_cast<float>(1.0) );
-        exp = threadIdx.x<threadIdx.y ? Ls_-threadIdx.y+threadIdx.x : threadIdx.x-threadIdx.y;
-        float factorL = inv*__fast_pow(k, exp) * ( threadIdx.x<threadIdx.y ? -arg.m_f : static_cast<float>(1.0) );
+        exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
+        float factorR = inv*__fast_pow(k, exp) * ( x>threadIdx.y ? -arg.m_f : static_cast<float>(1.0) );
+        exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
+        float factorL = inv*__fast_pow(k, exp) * ( x<threadIdx.y ? -arg.m_f : static_cast<float>(1.0) );
    
         sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
         sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
@@ -237,6 +239,8 @@ namespace quda {
         sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = factorR - factorL;
         sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
         sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
+      
+        x += block_dim_x;
       }
     
     } // Construct matrix A
@@ -633,12 +637,12 @@ namespace quda {
 
       template<typename T>
       inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-        static bool init = false;
+        // static bool init = false;
         if ( shared ) {
           // if inverse kernel uses shared memory then maximize total shared memory pool
           setMaxDynamicSharedBytesPerBlock(f);
           // set_shared_memory_on_volta((const void*)f, "Some Function");
-          init = true;
+          // init = true;
         }
         void *args[] = { &arg };
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
@@ -739,7 +743,7 @@ namespace quda {
 
       void initTuneParam(TuneParam &param) const {
         TunableVectorYZ::initTuneParam(param);
-        param.block = dim3(32, arg.Ls, 1); // Ls must be contained in the block
+        param.block = dim3(16, arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(80, 1, 1);
         param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
       }
@@ -766,10 +770,38 @@ namespace quda {
     if( checkPrecision(out, in) == QUDA_HALF_PRECISION && in.Ncolor() == 3){
       // switch for Ls
       switch(in.X(4)){
+        case 8:
+          {
+            Dslash5TensorCoreArg<8> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            Dslash5TensorCore<8, Dslash5TensorCoreArg<8> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
         case 12:
           {
             Dslash5TensorCoreArg<12> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
             Dslash5TensorCore<12, Dslash5TensorCoreArg<12> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 16:
+          {
+            Dslash5TensorCoreArg<16> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            Dslash5TensorCore<16, Dslash5TensorCoreArg<16> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 20:
+          {
+            Dslash5TensorCoreArg<20> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            Dslash5TensorCore<20, Dslash5TensorCoreArg<20> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 24:
+          {
+            Dslash5TensorCoreArg<24> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            Dslash5TensorCore<24, Dslash5TensorCoreArg<24> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
