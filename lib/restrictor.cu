@@ -41,19 +41,15 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/restrictor.cuh");
 #endif
-        strcpy(aux, "GPU-");
-        strcat(aux, compile_type_str);
-        strcat(aux, ",");
-      } else {
-        strcpy(aux, "CPU,");
       }
-      strcpy(vol, out.VolString());
-      strcat(vol, ",");
-      strcat(vol, in.VolString());
-
+      strcpy(aux, compile_type_str(in));
       strcat(aux, out.AuxString());
       strcat(aux, ",");
       strcat(aux, in.AuxString());
+
+      strcpy(vol, out.VolString());
+      strcat(vol, ",");
+      strcat(vol, in.VolString());
     } // block size is checkerboard fine length / full coarse length
     virtual ~RestrictLaunch() { }
 

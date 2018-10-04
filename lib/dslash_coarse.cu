@@ -190,12 +190,8 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/dslash_coarse.cuh");
 #endif
-        strcat(aux, "GPU-");
-        strcat(aux, compile_type_str);
-        strcat(aux,",");
-      } else {
-        strcat(aux, "CPU,");
       }
+      strcat(aux, compile_type_str(out));
       strcat(aux, out.AuxString());
       strcat(aux, comm_dim_partitioned_string());
 

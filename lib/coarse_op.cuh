@@ -177,14 +177,10 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/coarse_op_kernel.cuh");
 #endif
-        strcpy(aux, ",GPU-");
-        strcat(aux, compile_type_str);
-        strcat(aux,",");
-      } else {
-        strcpy(aux, ",CPU,");
       }
+      strcpy(aux, compile_type_str(meta));
       strcat(aux, meta.AuxString());
-      strcat(aux,comm_dim_partitioned_string());
+      strcat(aux, comm_dim_partitioned_string());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
     virtual ~CalculateY() { }

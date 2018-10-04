@@ -58,13 +58,9 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/color_spinor_pack.cuh");
 #endif
-        strcat(aux, "GPU-");
-        strcat(aux, compile_type_str);
-        strcat(aux,",");
-      } else {
-        strcat(aux, "CPU,");
       }
 
+      strcpy(aux, compile_type_str(meta));
       strcat(aux, meta.AuxString());
       strcat(aux,comm_dim_partitioned_string());
 
