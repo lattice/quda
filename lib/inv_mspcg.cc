@@ -335,7 +335,8 @@ namespace quda {
     }
     double mdd = xmyNorm(*ft, *fx);
     printfQuda("%% diff      m2 = %16.12e (This number is SUPPOSED to be tiny).\n", mdd);
-
+    
+    mat_precondition->Dslash4pre(*ft, *fb, static_cast<QudaParity>(0));
 
     delete tx;
     delete tt;
