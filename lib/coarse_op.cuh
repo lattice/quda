@@ -949,6 +949,10 @@ namespace quda {
       arg.X_atomic.resetScale(max);
     }
 
+    // zero the atomic fields before we start summing to them
+    Y_atomic_.zero();
+    X_atomic_.zero();
+
     bool set_scale = false; // records where the scale has been set already or not
 
     // First compute the coarse forward links if needed
@@ -971,7 +975,7 @@ namespace quda {
 	y.apply(0);
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
-        // if we are writing to a temporary, we need to zero it first
+      // if we are writing to a temporary, we need to zero it before each computation
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
         y.setComputeType(COMPUTE_VUV); // compute Y += VUV
@@ -1040,7 +1044,7 @@ namespace quda {
       y.apply(0);
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
 
-      // if we are writing to a temporary, we need to zero it first
+      // if we are writing to a temporary, we need to zero it before each computation
       if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
