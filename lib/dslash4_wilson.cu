@@ -18,16 +18,21 @@ namespace quda {
    */
   template <typename Float, int nColor, QudaReconstructType reconstruct_>
   struct WilsonArg {
-    static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool spin_project = true;
     typedef typename colorspinor_mapper<Float,4,nColor,spin_project>::type F;
-    typedef typename gauge_mapper<Float,reconstruct>::type G;
+
+    static constexpr QudaReconstructType reconstruct = reconstruct_;
+    static constexpr bool direct_load = true;
+    static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
+    typedef typename gauge_mapper<Float,reconstruct,18,QUDA_STAGGERED_PHASE_NO,direct_load,ghost>::type G;
+
+    typedef typename mapper<Float>::type real;
 
     F out;                // output vector field
     const F in;           // input vector field
     const F x;            // input vector when doing xpay
     const G U;            // the gauge field
-    const Float kappa;    // kappa parameter = 1/(8+m)
+    const real kappa;    // kappa parameter = 1/(8+m)
     const int parity;     // only use this for single parity fields
     const int nParity;    // number of parities we're working on
     const int nFace;      // hard code to 1 for now
@@ -40,7 +45,7 @@ namespace quda {
     const bool xpay;      // whether we are doing xpay or not
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-              Float kappa, const ColorSpinorField &x, int parity, bool dagger)
+              double kappa, const ColorSpinorField &x, int parity, bool dagger)
       : out(out), in(in), U(U), kappa(kappa), x(x), parity(parity), nParity(in.SiteSubset()), nFace(1),
 	X0h(nParity == 2 ? in.X(0)/2 : in.X(0)), dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
@@ -64,8 +69,9 @@ namespace quda {
   */
   template <typename Float, int nDim, int nColor, bool dagger, typename Vector, typename Arg>
   __device__ __host__ inline void applyWilson(Vector &out, Arg &arg, int x_cb, int parity) {
-    typedef ColorSpinor<Float,nColor,2> HalfVector;
-    typedef Matrix<complex<Float>,nColor> Link;
+    typedef typename mapper<Float>::type real;
+    typedef ColorSpinor<real,nColor,2> HalfVector;
+    typedef Matrix<complex<real>,nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
     int coord[nDim];
@@ -122,7 +128,8 @@ namespace quda {
   template <typename Float, int nDim, int nColor, bool dagger, bool xpay, typename Arg>
   __device__ __host__ inline void wilson(Arg &arg, int x_cb, int parity)
   {
-    typedef ColorSpinor<Float,nColor,4> Vector;
+    typedef typename mapper<Float>::type real;
+    typedef ColorSpinor<real,nColor,4> Vector;
     Vector out;
     const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
 
@@ -324,6 +331,8 @@ namespace quda {
       ApplyWilson<double>(out, in, U, kappa, x, parity, dagger);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
       ApplyWilson<float>(out, in, U, kappa, x, parity, dagger);
+    } else if (U.Precision() == QUDA_HALF_PRECISION) {
+      ApplyWilson<short>(out, in, U, kappa, x, parity, dagger);
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }

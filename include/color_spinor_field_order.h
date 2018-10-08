@@ -951,9 +951,9 @@ namespace quda {
      @return Instance of a colorspinor_ghost_wrapper that curries in access to
      this field at the above coordinates.
   */
-        __device__ __host__ inline colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N,spin_project> >
+        __device__ __host__ inline colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project> >
     Ghost(int dim, int dir, int ghost_idx, int parity) {
-          return colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N,spin_project> >(*this, dim, dir, ghost_idx, parity);
+          return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project> >(*this, dim, dir, ghost_idx, parity);
   }
 
   /**
@@ -967,9 +967,9 @@ namespace quda {
      @return Instance of a colorspinor_ghost+wrapper that curries in access to
      this field at the above coordinates.
   */
-        __device__ __host__ inline const colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N,spin_project> >
+        __device__ __host__ inline const colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project> >
     Ghost(int dim, int dir, int ghost_idx, int parity) const {
-          return colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N,spin_project> >
+          return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project> >
           (const_cast<FloatNOrder<Float,Ns,Nc,N,spin_project>&>(*this), dim, dir, ghost_idx, parity);
   }
 
