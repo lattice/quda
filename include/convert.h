@@ -26,8 +26,8 @@ template<> inline int vecLength<double4>() { return 4; }
 
 // MAX_SHORT 32767
 #define MAX_SHORT_INV 3.051850948e-5
-static inline __device__ float s2f(const short &a) { return static_cast<float>(a) * MAX_SHORT_INV; }
-static inline __device__ double s2d(const short &a) { return static_cast<double>(a) * MAX_SHORT_INV; }
+inline __device__ float s2f(const short &a) { return static_cast<float>(a) * MAX_SHORT_INV; }
+inline __device__ double s2d(const short &a) { return static_cast<double>(a) * MAX_SHORT_INV; }
 
 template <typename FloatN>
 __device__ inline void copyFloatN(FloatN &a, const FloatN &b) { a = b; }
