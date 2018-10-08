@@ -3928,7 +3928,9 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
 
   // create the staggered operator
   DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, QUDA_NORMOP_PC_SOLVE);
+  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  setDiracParam(diracParam, inv_param, pc_solve);
   Dirac *dirac = Dirac::create(diracParam);
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_INIT);

@@ -1144,7 +1144,7 @@ namespace quda {
 
   // this is rather dumb: undoing the texture load because cudaNormalizedReadMode is used
   // should really bind to an appropriate texture instead of reusing
-  static inline __device__ short2 float22short2(float c, float2 a) {
+  inline __device__ short2 float22short2(float c, float2 a) {
     return make_short2((short)(a.x*c*MAX_SHORT), (short)(a.y*c*MAX_SHORT));
   }
 
