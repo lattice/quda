@@ -3,6 +3,9 @@
 #include <iostream>
 #include <multigrid.h>
 
+// enable new dslash (no multi-GPU support yet)
+//#define NEW_DSLASH
+
 namespace quda {
 
   DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param) { }
@@ -28,12 +31,16 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#ifdef NEW_DSLASH
+    ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, DSLASH4_WILSON);
+#else
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
     } else {
       errorQuda("Not supported");
     }
+#endif
 
     flops += 1320ll*in.Volume();
   }
@@ -45,6 +52,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#ifdef NEW_DSLASH
+    ApplyWilson(out, in, *gauge, k, x, parity, dagger, DSLASH4_WILSON);
+#else
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
@@ -52,6 +62,7 @@ namespace quda {
     } else {
       errorQuda("Not supported");
     }
+#endif
 
     flops += 1368ll*in.Volume();
   }
@@ -80,8 +91,12 @@ namespace quda {
     }
 
     checkFullSpinor(*Out, *In);
+#ifdef NEW_DSLASH
+    ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, DSLASH4_WILSON);
+#else
     DslashXpay(Out->Odd(), In->Even(), QUDA_ODD_PARITY, In->Odd(), -kappa);
     DslashXpay(Out->Even(), In->Odd(), QUDA_EVEN_PARITY, In->Even(), -kappa);
+#endif
 
     if (in.Location() == QUDA_CPU_FIELD_LOCATION) delete In;
     if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
