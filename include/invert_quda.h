@@ -6,6 +6,7 @@
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 #include <vector>
+#include <memory>
 
 namespace quda {
 
