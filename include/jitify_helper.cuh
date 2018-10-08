@@ -32,7 +32,11 @@
 #include "jitify_options.hpp"
 #include <jitify.hpp>
 
+#endif
+
 namespace quda {
+
+#ifdef JITIFY
 
   static jitify::JitCache *kernel_cache;
   static jitify::Program *program;
@@ -59,14 +63,13 @@ namespace quda {
 
 #endif
 
-namespace quda {
-
   /**
      @brief Helper function for setting auxilary string
      @param[in] meta LatticeField used for querying field location
      @return String containing location and compilation type
    */
-  inline const char *compile_type_str(const LatticeField &meta) {
+
+  inline const char* compile_type_str(const LatticeField &meta) {
 #ifdef JITIFY
     return meta.Location() == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
 #else
