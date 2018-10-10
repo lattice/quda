@@ -19,12 +19,13 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType reconstruct_>
   struct WilsonArg {
     static constexpr bool spin_project = true;
-    typedef typename colorspinor_mapper<Float,4,nColor,spin_project>::type F;
+    static constexpr bool spinor_direct_load = false; // false means texture load
+    typedef typename colorspinor_mapper<Float,4,nColor,spin_project,spinor_direct_load>::type F;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
-    static constexpr bool direct_load = true;
+    static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    typedef typename gauge_mapper<Float,reconstruct,18,QUDA_STAGGERED_PHASE_NO,direct_load,ghost>::type G;
+    typedef typename gauge_mapper<Float,reconstruct,18,QUDA_STAGGERED_PHASE_NO,gauge_direct_load,ghost>::type G;
 
     typedef typename mapper<Float>::type real;
 
@@ -32,7 +33,7 @@ namespace quda {
     const F in;           // input vector field
     const F x;            // input vector when doing xpay
     const G U;            // the gauge field
-    const real kappa;    // kappa parameter = 1/(8+m)
+    const real kappa;     // kappa parameter = 1/(8+m)
     const int parity;     // only use this for single parity fields
     const int nParity;    // number of parities we're working on
     const int nFace;      // hard code to 1 for now
@@ -44,12 +45,14 @@ namespace quda {
     const bool dagger;    // dagger
     const bool xpay;      // whether we are doing xpay or not
 
+    const DslashConstant dc; // pre-computed dslash constants for optimized indexing
+
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
               double kappa, const ColorSpinorField &x, int parity, bool dagger)
       : out(out), in(in), U(U), kappa(kappa), x(x), parity(parity), nParity(in.SiteSubset()), nFace(1),
 	X0h(nParity == 2 ? in.X(0)/2 : in.X(0)), dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-        volumeCB(in.VolumeCB()), dagger(dagger), xpay(kappa == 0.0 ? false : true)
+        volumeCB(in.VolumeCB()), dagger(dagger), xpay(kappa == 0.0 ? false : true), dc(in.getDslashConstant())
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -68,11 +71,11 @@ namespace quda {
      @param[in] x_cb The checker-boarded site index
   */
   template <typename Float, int nDim, int nColor, bool dagger, typename Vector, typename Arg>
-  __device__ __host__ inline void applyWilson(Vector &out, Arg &arg, int x_cb, int parity) {
+  __device__ __host__ inline void applyWilson(Vector &out, Arg &arg, int x_cb, int parity, int nParity) {
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,2> HalfVector;
     typedef Matrix<complex<real>,nColor> Link;
-    const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
+    const int their_spinor_parity = nParity == 2 ? 1-parity : 0;
 
     int coord[nDim];
     getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
@@ -81,10 +84,10 @@ namespace quda {
     for (int d = 0; d<nDim; d++) // loop over dimension
       {
         { // Forward gather - compute fwd offset for vector fetch
-          const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+          const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
           constexpr int proj_dir = dagger ? +1 : -1;
 
-          if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+          if ( 0 && arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
             const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
             const Link U = arg.U(d, x_cb, parity);
@@ -101,11 +104,11 @@ namespace quda {
         }
 
         { //Backward gather - compute back offset for spinor and gauge fetch
-          const int back_idx = linkIndexM1(coord, arg.dim, d);
+          const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
           const int gauge_idx = back_idx;
           constexpr int proj_dir = dagger ? -1 : +1;
 
-          if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+          if ( 0 && arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
             const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
@@ -126,14 +129,14 @@ namespace quda {
 
   //out(x) = M*in = (-D + m) * in(x-mu)
   template <typename Float, int nDim, int nColor, bool dagger, bool xpay, typename Arg>
-  __device__ __host__ inline void wilson(Arg &arg, int x_cb, int parity)
+  __device__ __host__ inline void wilson(Arg &arg, int x_cb, int parity, int nParity)
   {
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,4> Vector;
     Vector out;
-    const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
+    const int my_spinor_parity = nParity == 2 ? parity : 0;
 
-    applyWilson<Float,nDim,nColor,dagger>(out, arg, x_cb, parity);
+    applyWilson<Float,nDim,nColor,dagger>(out, arg, x_cb, parity, nParity);
 
     if (xpay) {
       Vector x = arg.x(x_cb, my_spinor_parity);
@@ -152,7 +155,7 @@ namespace quda {
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
-        wilson<Float,nDim,nColor,dagger,xpay>(arg, x_cb, parity);
+        wilson<Float,nDim,nColor,dagger,xpay>(arg, x_cb, parity, arg.nParity);
       } // 4-d volumeCB
     } // parity
 
@@ -163,14 +166,29 @@ namespace quda {
   __global__ void wilsonGPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    if (x_cb >= arg.volumeCB) return;
 
     // for full fields set parity from y thread index else use arg setting
     int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
 
-    if (x_cb >= arg.volumeCB) return;
-    //if (parity >= arg.nParity) return; // this will break for single-parity odd results
-
-    wilson<Float,nDim,nColor,dagger,xpay>(arg, x_cb, parity);
+#if 0
+    wilson<Float,nDim,nColor,dagger,xpay>(arg, x_cb, parity, arg.nParity);
+#else
+    switch(arg.nParity) { // better code if parity is explicit
+    case 1:
+      switch(parity) {
+      case 0: wilson<Float,nDim,nColor,dagger,xpay>(arg, x_cb, 0, 1); break;
+      case 1: wilson<Float,nDim,nColor,dagger,xpay>(arg, x_cb, 1, 1); break;
+      }
+      break;
+    case 2:
+      switch(parity) {
+      case 0: wilson<Float,nDim,nColor,dagger,xpay>(arg, x_cb, 0, 2); break;
+      case 1: wilson<Float,nDim,nColor,dagger,xpay>(arg, x_cb, 1, 2); break;
+      }
+      break;
+    }
+#endif
   }
 
   template <typename Float, int nDim, int nColor, typename Arg>
