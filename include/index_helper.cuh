@@ -118,6 +118,38 @@ namespace quda {
   }
 
   /**
+     @brief Compute the checkerboard 1-d index for the nearest
+     neighbor
+     @param x 4-d lattice index
+     @param mu dimension in which to add 1
+     @param dir direction (+1 or -1)
+     @param arg parameter struct
+     @return 1-d checkboard index
+   */
+  template <typename Arg>
+  static __device__ __host__ inline int getNeighborIndexCB(const int x[], int mu, int dir, const Arg &arg) {
+    int idx = ((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0];
+    switch(dir) {
+    case +1: // positive direction
+      switch(mu) {
+      case 0: return (x[0] == arg.X[0]-1 ? idx - (arg.X[0]-1) : idx + 1) >> 1;
+      case 1: return (x[1] == arg.X[1]-1 ? idx - arg.X2X1mX1 : idx + arg.X[0]) >> 1;
+      case 2: return (x[2] == arg.X[2]-1 ? idx - arg.X3X2X1mX2X1 : idx + arg.X2X1) >> 1;
+      case 3: return (x[3] == arg.X[3]-1 ? idx - arg.X4X3X2X1mX3X2X1 : idx + arg.X3X2X1) >> 1;
+      }
+    case -1:
+      switch(mu) {
+      case 0: return (x[0] == 0 ? idx + (arg.X[0]-1) : idx - 1) >> 1;
+      case 1: return (x[1] == 0 ? idx + arg.X2X1mX1 : idx - arg.X[0]) >> 1;
+      case 2: return (x[2] == 0 ? idx + arg.X3X2X1mX2X1 : idx - arg.X2X1) >> 1;
+      case 3: return (x[3] == 0 ? idx + arg.X4X3X2X1mX3X2X1 : idx - arg.X3X2X1) >> 1;
+      }
+    }
+    return 0; // should never reach here
+  }
+
+
+  /**
      Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
 
      @param x Computed spatial index
