@@ -339,7 +339,7 @@ namespace quda {
     }
 
     double r2_old=0.0;
-    if(r2_old_init != 0.0 and p_init){
+    if (r2_old_init != 0.0 and p_init) {
       r2_old = r2_old_init;
       Complex rp = blas::cDotProduct(rSloppy, *p[0]) / (r2);
       blas::caxpy(-rp, rSloppy, *p[0]);
@@ -704,7 +704,7 @@ namespace quda {
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 #if BCGRQ
-void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
+void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   #ifndef BLOCKSOLVER
   errorQuda("QUDA_BLOCKSOLVER not built.");
   #else

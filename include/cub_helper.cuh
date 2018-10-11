@@ -4,9 +4,9 @@
 #include <comm_quda.h>
 #include <blas_quda.h>
 
-#include <thrust_helper.cuh>
 using namespace quda;
-#include <cub/cub.cuh>
+
+#include <cub/block/block_reduce.cuh>
 
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>

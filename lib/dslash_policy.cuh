@@ -296,7 +296,7 @@ namespace {
 	if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
 
 	  if (async) {
-#if (CUDA_VERSION >= 8000)
+#if (CUDA_VERSION >= 8000) && 0
 	    // this will trigger the copy asynchronously
 	    *((volatile cuuint32_t*)(commsEnd_h+2*dim+dir2)) = 1;
 #else
@@ -1035,7 +1035,7 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
  */
 struct DslashAsync : DslashPolicyImp {
 
-#if (CUDA_VERSION >= 8000)
+#if (CUDA_VERSION >= 8000) && 0
 
   void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
@@ -1143,7 +1143,7 @@ struct DslashAsync : DslashPolicyImp {
  */
 struct DslashFusedExteriorAsync : DslashPolicyImp {
 
-#if (CUDA_VERSION >= 8000)
+#if (CUDA_VERSION >= 8000) && 0
 
   void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 

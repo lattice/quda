@@ -167,12 +167,12 @@ namespace quda {
   }
 
   // specializations for char-float conversion
-  static inline __host__ __device__ float c2f(const char &a) { return static_cast<float>(a) * fixedInvMaxValue<char>::value; }
-  static inline __host__ __device__ double c2d(const char &a) { return static_cast<double>(a) * fixedInvMaxValue<char>::value; }
+   inline __host__ __device__ float c2f(const char &a) { return static_cast<float>(a) * fixedInvMaxValue<char>::value; }
+   inline __host__ __device__ double c2d(const char &a) { return static_cast<double>(a) * fixedInvMaxValue<char>::value; }
 
   // specializations for short-float conversion
-  static inline __host__ __device__ float s2f(const short &a) { return static_cast<float>(a) * fixedInvMaxValue<short>::value; }
-  static inline __host__ __device__ double s2d(const short &a) { return static_cast<double>(a) * fixedInvMaxValue<short>::value; }
+   inline __host__ __device__ float s2f(const short &a) { return static_cast<float>(a) * fixedInvMaxValue<short>::value; }
+   inline __host__ __device__ double s2d(const short &a) { return static_cast<double>(a) * fixedInvMaxValue<short>::value; }
 
   // Fast float to integer round
   __device__ __host__ inline int f2i(float f) {
@@ -352,7 +352,7 @@ namespace quda {
 
   template <typename VectorType>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value) {
-    reinterpret_cast< __restrict__ VectorType* >(ptr)[idx] = value;
+    reinterpret_cast< VectorType* >(ptr)[idx] = value;
   }
 
   template <>

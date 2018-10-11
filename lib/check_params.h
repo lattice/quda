@@ -238,6 +238,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
+#ifndef CHECK_PARAM
+  P(reliable_delta_refinement, INVALID_DOUBLE);
+#else
+  if (param->reliable_delta_refinement == INVALID_DOUBLE) param->reliable_delta_refinement = param->reliable_delta;
+#endif
+
 #ifdef INIT_PARAM 
   P(use_sloppy_partial_accumulator, 0); /**< Default is to use a high-precision accumulator (not yet supported in all solvers) */
   P(solution_accumulator_pipeline, 1); /**< Default is solution accumulator depth of 1 */
@@ -298,7 +304,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cpu_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec, QUDA_INVALID_PRECISION);
 
-#if defined INIT_PARAM
+#ifndef CHECK_PARAM
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);

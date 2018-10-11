@@ -874,6 +874,10 @@ void qudaMultishiftInvert(int external_precision,
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
   }
 
+  gaugeParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
+  invertParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
+  invertParam.reliable_delta_refinement = 0.1;
+
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
 
@@ -895,6 +899,7 @@ void qudaMultishiftInvert(int external_precision,
       gaugeParam.type = QUDA_THREE_LINKS;
       gaugeParam.ga_pad = long_pad;
       getReconstruct(gaugeParam.reconstruct, gaugeParam.reconstruct_sloppy);
+      gaugeParam.reconstruct_refinement_sloppy = gaugeParam.reconstruct_sloppy;
       loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     }
     invalidate_quda_gauge = false;
