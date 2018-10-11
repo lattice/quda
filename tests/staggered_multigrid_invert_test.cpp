@@ -147,7 +147,7 @@ namespace quda {
 
 template<typename Float>
 void constructSpinorField(Float *res) {
-  int vol = V;
+  int vol = Vh;
   for(int src=0; src<Nsrc; src++) {
     for(int i = 0; i < vol; i++) {
       for (int s = 0; s < 1; s++) {
@@ -951,7 +951,7 @@ int main(int argc, char **argv)
 
     // Reference debugging code: print the first component
     // of the even and odd partities within a solution vector.
-    
+    /*
     printfQuda("\nLength: %lu\n", ref->Length());
 
     // for verification
@@ -965,7 +965,8 @@ int main(int argc, char **argv)
     printfQuda("Soln: %f\n", ((double*)(out->Odd().V()))[0]);
     printfQuda("CPU:  %f\n", ((double*)(ref->Odd().V()))[0]);
     printfQuda("\n\n");
-    
+    */
+
     mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
