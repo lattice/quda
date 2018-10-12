@@ -113,6 +113,8 @@ namespace quda {
 	extractGhost(u, (float**)ghost, extract, offset);
       } else if (u.Precision() == QUDA_HALF_PRECISION) {
 	extractGhost(u, (short**)ghost, extract, offset);
+      } else if (u.Precision() == QUDA_QUARTER_PRECISION) {
+	extractGhost(u, (char**)ghost, extract, offset);
       } else {
 	errorQuda("Unknown precision type %d", u.Precision());
       }

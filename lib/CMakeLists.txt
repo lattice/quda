@@ -48,7 +48,8 @@ set (QUDA_OBJS
   copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
   copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   copy_gauge_double.cu copy_gauge_single.cu
-  copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
+  copy_gauge_half.cu copy_gauge_quarter.cu
+  copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
