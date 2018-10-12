@@ -351,6 +351,8 @@ namespace quda {
       ApplyWilson<float>(out, in, U, kappa, x, parity, dagger);
     } else if (U.Precision() == QUDA_HALF_PRECISION) {
       ApplyWilson<short>(out, in, U, kappa, x, parity, dagger);
+    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyWilson<char>(out, in, U, kappa, x, parity, dagger);
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
