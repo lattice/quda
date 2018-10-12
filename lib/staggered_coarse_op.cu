@@ -1,21 +1,14 @@
 #include <transfer.h>
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
 #include <gauge_field.h>
-#include <gauge_field_order.h>
-#include <clover_field_order.h>
-#include <complex_quda.h>
-#include <index_helper.cuh>
-#include <gamma.cuh>
-#include <blas_cublas.h>
 
-// this is the storage type used when computing the coarse link variables
-// by using integers we have deterministic atomics
-typedef int storeType;
-
+#ifdef GPU_MULTIGRID 
 #include <staggered_coarse_op.cuh>
+#endif
 
 namespace quda {
+
+#ifdef GPU_MULTIGRID
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
@@ -30,7 +23,7 @@ namespace quda {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-	errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
+        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
@@ -60,7 +53,7 @@ namespace quda {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-	errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
+        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
       constexpr bool use_tex = __COMPUTE_CAPABILITY__ < 520 ? true : false; // on pre-Maxwell-2 use textures/ldg to get caching
@@ -80,9 +73,9 @@ namespace quda {
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(Xatomic));
 
       calculateStaggeredY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
-	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-	 vAccessor, gAccessor, Y, X, Yatomic, Xatomic, uv, v, mass, dirac, matpc,
-	 T.fineToCoarse(location), T.coarseToFine(location));
+        (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
+         vAccessor, gAccessor, Y, X, Yatomic, Xatomic, uv, v, mass, dirac, matpc,
+         T.fineToCoarse(location), T.coarseToFine(location));
 
     }
 
@@ -99,7 +92,7 @@ namespace quda {
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
 #if 0
-    if (coarseCoor == 4) {
+    if (coarseColor == 4) {
       calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, c, mass dirac, matpc);
 #endif
     if (coarseColor == 24) { // free field staggered
@@ -173,6 +166,8 @@ namespace quda {
     }
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
   }
+
+#endif // GPU_MULTIGRID
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.

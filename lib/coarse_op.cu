@@ -25,7 +25,7 @@ namespace quda {
       constexpr QudaCloverFieldOrder clOrder = QUDA_PACKED_CLOVER_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-	errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
+        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
       if (c.Order() != clOrder && c.Bytes()) errorQuda("Unsupported field order %d\n", c.Order());
 
@@ -61,7 +61,7 @@ namespace quda {
       constexpr QudaCloverFieldOrder clOrder = QUDA_FLOAT4_CLOVER_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-	errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
+        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
       if (c.Order() != clOrder && c.Bytes()) errorQuda("Unsupported field order %d\n", c.Order());
 
@@ -86,9 +86,9 @@ namespace quda {
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
       calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
-	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc,
-	 T.fineToCoarse(location), T.coarseToFine(location));
+        (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
+         avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc,
+         T.fineToCoarse(location), T.coarseToFine(location));
 
     }
 
@@ -165,24 +165,24 @@ namespace quda {
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
-	calculateY<double,double>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+        calculateY<double,double>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
       } else {
-	errorQuda("Unsupported precision %d\n", Y.Precision());
+        errorQuda("Unsupported precision %d\n", Y.Precision());
       }
 #else
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       if (T.Vectors(X.Location()).Precision() == QUDA_SINGLE_PRECISION) {
-	calculateY<float,float>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+        calculateY<float,float>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
       } else {
-	errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
+        errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
     } else if (Y.Precision() == QUDA_HALF_PRECISION) {
       if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
-	calculateY<float,short>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+        calculateY<float,short>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
       } else {
-	errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
+        errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
