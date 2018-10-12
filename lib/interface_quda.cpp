@@ -1269,9 +1269,9 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
   // first do SU3 links (if they exist)
   if (gaugePrecise) {
     GaugeFieldParam gauge_param(*gaugePrecise);
-  // switch the parameters for creating the mirror sloppy cuda gauge field
-  gauge_param.setPrecision(prec_sloppy);
-  gauge_param.order = (gauge_param.Precision() == QUDA_DOUBLE_PRECISION ||
+    // switch the parameters for creating the mirror sloppy cuda gauge field
+    gauge_param.setPrecision(prec_sloppy, true);
+    gauge_param.order = (gauge_param.Precision() == QUDA_DOUBLE_PRECISION ||
       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
 
@@ -1287,7 +1287,7 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
     }
 
     // switch the parameters for creating the mirror preconditioner cuda gauge field
-    gauge_param.setPrecision(prec_precondition);
+    gauge_param.setPrecision(prec_precondition, true);
     //gauge_param.reconstruct = param->reconstruct_precondition; // FIXME
 
     if (gaugePrecondition) errorQuda("gaugePrecondition already exists");
@@ -1306,8 +1306,8 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
     GaugeFieldParam gauge_param(*gaugeFatPrecise);
 
     if (gaugeFatSloppy != gaugeSloppy) {
-      gauge_param.setPrecision(prec_sloppy);
-      //gauge_param.reconstruct = param->reconstruct_sloppy; // FIXME
+      gauge_param.setPrecision(prec_sloppy, true);
+    //gauge_param.reconstruct = param->reconstruct_sloppy; // FIXME
 
       if (gaugeFatSloppy) errorQuda("gaugeFatSloppy already exists");
       if (gaugeFatSloppy != gaugeFatPrecise) delete gaugeFatSloppy;
@@ -1323,7 +1323,7 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
 
     if (gaugeFatPrecondition != gaugePrecondition) {
       // switch the parameters for creating the mirror preconditioner cuda gauge field
-      gauge_param.setPrecision(prec_precondition);
+      gauge_param.setPrecision(prec_precondition, true);
       //gauge_param.reconstruct = param->reconstruct_precondition; // FIXME
 
       if (gaugeFatPrecondition) errorQuda("gaugeFatPrecondition already exists\n");
@@ -1341,7 +1341,7 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
   // long links (if they exist)
   if (gaugeLongPrecise) {
     GaugeFieldParam gauge_param(*gaugeLongPrecise);
-    gauge_param.setPrecision(prec_sloppy);
+    gauge_param.setPrecision(prec_sloppy,true);
     //gauge_param.reconstruct = param->reconstruct_sloppy; // FIXME
 
     if (gaugeLongSloppy) errorQuda("gaugeLongSloppy already exists");
@@ -1356,7 +1356,7 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
     }
 
     // switch the parameters for creating the mirror preconditioner cuda gauge field
-    gauge_param.setPrecision(prec_precondition);
+    gauge_param.setPrecision(prec_precondition, true);
     //gauge_param.reconstruct = param->reconstruct_precondition; // FIXME
 
     if (gaugeLongPrecondition) warningQuda("gaugeLongPrecondition already exists\n");
