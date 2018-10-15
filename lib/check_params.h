@@ -666,6 +666,14 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(run_verify, QUDA_BOOLEAN_INVALID);
 
 #ifdef INIT_PARAM
+  P(vec_load, QUDA_BOOLEAN_INVALID);
+  P(vec_store, QUDA_BOOLEAN_INVALID);
+#else
+  P(vec_load, QUDA_BOOLEAN_NO);
+  P(vec_store, QUDA_BOOLEAN_NO);
+#endif
+
+#ifdef INIT_PARAM
   P(gflops, 0.0);
   P(secs, 0.0);
 #elif defined(PRINT_PARAM)
