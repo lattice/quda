@@ -278,13 +278,22 @@ namespace quda {
   void *mapped_malloc_(const char *func, const char *file, int line, size_t size)
   {
     MemAlloc a(func, file, line);
+
+#if 1
+    void *ptr;
+    cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostRegisterMapped | cudaHostRegisterPortable);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Aborting");
+    }
+#else
     void *ptr = aligned_malloc(a, size);
-    
     cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped);
     if (err != cudaSuccess) {
       printfQuda("ERROR: Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
+#endif
     track_malloc(MAPPED, a, ptr);
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, a.base_size);
@@ -363,6 +372,7 @@ namespace quda {
     }
     if (alloc[HOST].count(ptr)) {
       track_free(HOST, ptr);
+      free(ptr);
     } else if (alloc[PINNED].count(ptr)) {
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) {
@@ -370,19 +380,27 @@ namespace quda {
 	errorQuda("Aborting");
       }
       track_free(PINNED, ptr);
+      free(ptr);
     } else if (alloc[MAPPED].count(ptr)) {
+#if 1
+      cudaError_t err = cudaFreeHost(ptr);
+      if (err != cudaSuccess) {
+	printfQuda("ERROR: Failed to free host memory (%s:%d in %s())\n", file, line, func);
+	errorQuda("Aborting");
+      }
+#else
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) {
 	printfQuda("ERROR: Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
 	errorQuda("Aborting");
       }
+#endif
       track_free(MAPPED, ptr);
     } else {
       printfQuda("ERROR: Attempt to free invalid host pointer (%s:%d in %s())\n", file, line, func);
       print_trace();
       errorQuda("Aborting");
     }
-    free(ptr);
   }
 
 
