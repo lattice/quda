@@ -269,6 +269,7 @@ namespace quda {
     return ptr;
   }
 
+#define HOST_ALLOC // this needs to be set presently on P9
 
   /**
    * Allocate page-locked ("pinned") host memory, and map it into the
@@ -279,7 +280,7 @@ namespace quda {
   {
     MemAlloc a(func, file, line);
 
-#if 1
+#ifdef HOST_ALLOC
     void *ptr;
     cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostRegisterMapped | cudaHostRegisterPortable);
     if (err != cudaSuccess) {
@@ -382,7 +383,7 @@ namespace quda {
       track_free(PINNED, ptr);
       free(ptr);
     } else if (alloc[MAPPED].count(ptr)) {
-#if 1
+#ifdef HOST_ALLOC
       cudaError_t err = cudaFreeHost(ptr);
       if (err != cudaSuccess) {
 	printfQuda("ERROR: Failed to free host memory (%s:%d in %s())\n", file, line, func);

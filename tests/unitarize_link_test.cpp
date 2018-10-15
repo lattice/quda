@@ -189,21 +189,18 @@ static int unitarize_link_test(int &test_rc)
 			     svd_rel_error,
 			     svd_abs_error);
 
-  int* num_failures_dev;
-  if(cudaMalloc(&num_failures_dev, sizeof(int)) != cudaSuccess){
-    errorQuda("cudaMalloc failed for num_failures_dev\n");
-  }
-  cudaMemset(num_failures_dev, 0, sizeof(int));
+  int *num_failures_h = (int*)mapped_malloc(sizeof(int));
+  int *num_failures_d = nullptr;
+  cudaError_t error = cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  if (error != cudaSuccess) errorQuda("cudaHostGetDevicePointer failed with error: %s", cudaGetErrorString(error));
+  *num_failures_h = 0;
 
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
-  unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_dev);
+  unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_d);
   cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
-
-  int num_failures=0;
-  cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
 
   if (verify_results) {
     test_rc = RUN_ALL_TESTS();
@@ -219,7 +216,8 @@ static int unitarize_link_test(int &test_rc)
 
   free(fatlink);
 
-  cudaFree(num_failures_dev); 
+  int num_failures = *num_failures_h;
+  host_free(num_failures_h);
 
   free(inlink);
 #ifdef MULTI_GPU
