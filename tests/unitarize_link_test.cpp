@@ -164,7 +164,7 @@ static int unitarize_link_test(int &test_rc)
   gParam.pad         = 0;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.setPrecision(prec);
+  gParam.setPrecision(prec, true);
   cudaFatLink = new cudaGaugeField(gParam);
   cudaULink   = new cudaGaugeField(gParam);
 
