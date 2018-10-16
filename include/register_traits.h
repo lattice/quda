@@ -230,7 +230,27 @@ namespace quda {
     a.x = f2i(b.x*fixedMaxValue<char>::value); a.y = f2i(b.y*fixedMaxValue<char>::value); a.z = f2i(b.z*fixedMaxValue<char>::value); a.w = f2i(b.w*fixedMaxValue<char>::value);
   }
 
-  
+  // specialized variants of the copy function that assumes fixed-point scaling already done
+  template<typename T1, typename T2> __host__ __device__ inline void copy_scaled (T1 &a, const T2 &b) {
+    copy(a,b);
+  }
+
+  template<> __host__ __device__ inline void copy_scaled(short4 &a, const float4 &b) {
+    a.x = f2i(b.x); a.y = f2i(b.y); a.z = f2i(b.z); a.w = f2i(b.w);
+  }
+
+  template<> __host__ __device__ inline void copy_scaled(char4 &a, const float4 &b) {
+    a.x = f2i(b.x); a.y = f2i(b.y); a.z = f2i(b.z); a.w = f2i(b.w);
+  }
+
+  template<> __host__ __device__ inline void copy_scaled(short2 &a, const float2 &b) {
+    a.x = f2i(b.x); a.y = f2i(b.y);
+  }
+
+  template<> __host__ __device__ inline void copy_scaled(char2 &a, const float2 &b) {
+    a.x = f2i(b.x); a.y = f2i(b.y);
+  }
+
   /**
      Generic wrapper for Trig functions
   */
@@ -239,7 +259,7 @@ namespace quda {
       __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b); }
       __device__ __host__ static T Sin( const T &a ) { return sin(a); }
       __device__ __host__ static T Cos( const T &a ) { return cos(a); }
-      __device__ __host__ static void SinCos(const T& a, T *s, T *c) { *s = sin(a); *c = cos(a); }
+      __device__ __host__ static void SinCos(const T& a, T *s, T *c) { sincos(a, s, c); }
     };
   
   /**
@@ -248,14 +268,14 @@ namespace quda {
   template <>
     struct Trig<false,float> {
     __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b); }
-    __device__ __host__ static float Sin( const float &a ) { 
+    __device__ __host__ static float Sin( const float &a ) {
 #ifdef __CUDA_ARCH__
       return __sinf(a); 
 #else
       return sinf(a);
 #endif
     }
-    __device__ __host__ static float Cos( const float &a ) { 
+    __device__ __host__ static float Cos( const float &a ) {
 #ifdef __CUDA_ARCH__
       return __cosf(a); 
 #else
@@ -263,7 +283,7 @@ namespace quda {
 #endif
     }
 
-    __device__ __host__ static void SinCos(const float& a, float *s, float *c) { 
+    __device__ __host__ static void SinCos(const float& a, float *s, float *c) {
 #ifdef __CUDA_ARCH__
        __sincosf(a, s, c);
 #else
@@ -279,20 +299,29 @@ namespace quda {
   template <>
     struct Trig<true,float> {
     __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b)/M_PI; }
-    __device__ __host__ static float Sin( const float &a ) { 
+    __device__ __host__ static float Sin( const float &a ) {
 #ifdef __CUDA_ARCH__
-      return __sinf(a*M_PI); 
+      return __sinf(a*static_cast<float>(M_PI));
 #else
-      return sinf(a*M_PI); 
+      return sinf(a*static_cast<float>(M_PI));
 #endif
     }
-    __device__ __host__ static float Cos( const float &a ) { 
+    __device__ __host__ static float Cos( const float &a ) {
 #ifdef __CUDA_ARCH__
-      return __cosf(a*M_PI); 
+      return __cosf(a*static_cast<float>(M_PI));
 #else
-      return cosf(a*M_PI); 
+      return cosf(a*static_cast<float>(M_PI));
 #endif
     }
+
+    __device__ __host__ static void SinCos(const float& a, float *s, float *c) {
+#ifdef __CUDA_ARCH__
+       __sincosf(a*static_cast<float>(M_PI), s, c);
+#else
+       sincosf(a*static_cast<float>(M_PI), s, c);
+#endif
+    }
+
   };
 
   

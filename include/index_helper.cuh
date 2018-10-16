@@ -118,6 +118,38 @@ namespace quda {
   }
 
   /**
+     @brief Compute the checkerboard 1-d index for the nearest
+     neighbor
+     @param x 4-d lattice index
+     @param mu dimension in which to add 1
+     @param dir direction (+1 or -1)
+     @param arg parameter struct
+     @return 1-d checkboard index
+   */
+  template <typename Arg>
+  static __device__ __host__ inline int getNeighborIndexCB(const int x[], int mu, int dir, const Arg &arg) {
+    int idx = ((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0];
+    switch(dir) {
+    case +1: // positive direction
+      switch(mu) {
+      case 0: return (x[0] == arg.X[0]-1 ? idx - (arg.X[0]-1) : idx + 1) >> 1;
+      case 1: return (x[1] == arg.X[1]-1 ? idx - arg.X2X1mX1 : idx + arg.X[0]) >> 1;
+      case 2: return (x[2] == arg.X[2]-1 ? idx - arg.X3X2X1mX2X1 : idx + arg.X2X1) >> 1;
+      case 3: return (x[3] == arg.X[3]-1 ? idx - arg.X4X3X2X1mX3X2X1 : idx + arg.X3X2X1) >> 1;
+      }
+    case -1:
+      switch(mu) {
+      case 0: return (x[0] == 0 ? idx + (arg.X[0]-1) : idx - 1) >> 1;
+      case 1: return (x[1] == 0 ? idx + arg.X2X1mX1 : idx - arg.X[0]) >> 1;
+      case 2: return (x[2] == 0 ? idx + arg.X3X2X1mX2X1 : idx - arg.X2X1) >> 1;
+      case 3: return (x[3] == 0 ? idx + arg.X4X3X2X1mX3X2X1 : idx - arg.X3X2X1) >> 1;
+      }
+    }
+    return 0; // should never reach here
+  }
+
+
+  /**
      Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
 
      @param x Computed spatial index
@@ -133,6 +165,31 @@ namespace quda {
     //x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
 
     int za = (cb_index / (X[0] >> 1));
+    int zb =  (za / X[1]);
+    x[1] = (za - zb * X[1]);
+    x[3] = (zb / X[2]);
+    x[2] = (zb - x[3] * X[2]);
+    int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
+    x[0] = (2 * cb_index + x1odd  - za * X[0]);
+    return;
+  }
+
+  /**
+     Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
+
+     @param x Computed spatial index
+     @param cb_index 1-d checkerboarded index
+     @param X Full lattice dimensions
+     @param parity Site parity
+   */
+  template <typename I>
+  static __device__ __host__ inline void getCoordsCB(int x[], int cb_index, const I X[], const I X0h, int parity) {
+    //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
+    //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
+    //x[1] = (cb_index/(X[0]/2)) % X[1];
+    //x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
+
+    int za = (cb_index / X0h);
     int zb =  (za / X[1]);
     x[1] = (za - zb * X[1]);
     x[3] = (zb / X[2]);

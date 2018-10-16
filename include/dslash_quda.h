@@ -33,6 +33,32 @@ namespace quda {
   void createDslashEvents();
   void destroyDslashEvents();
 
+  enum Dslash4Type {
+    DSLASH4_WILSON
+  };
+
+  /**
+     @brief Driver for applying the Wilson stencil
+
+     out = - kappa * D * in
+
+     where D is the gauged Wilson linear operator.
+
+     If x is defined, the operation is given by out = x - kapp * D in.
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the gauge Laplace
+     @param[in] kappa Scale factor applied
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] type Type of dslash we are applying
+  */
+  void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                   double kappa, const ColorSpinorField &x, int parity, bool dagger, Dslash4Type type);
 
   // plain Wilson Dslash  
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
@@ -84,7 +110,7 @@ namespace quda {
      @param[in] c_5 Mobius coefficient array (length Ls)
      @param[in] a Scale factor use in xpay operator
      @param[in] dagger Whether this is for the dagger operator
-     @param[in] type
+     @param[in] type Type of dslash we are applying
   */
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
 		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,

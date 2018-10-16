@@ -90,14 +90,14 @@ namespace quda {
 
       /**
 	 @brief 1-d accessor functor
-	 @param[in[ idx Index
+	 @param[in] idx Index
 	 @return Complex number at this index
       */
       __device__ __host__ inline complex<Float>& operator()(int idx) { return data[idx]; }
 
       /**
 	 @brief 1-d accessor functor
-	 @param[in[ idx Index
+	 @param[in] idx Index
 	 @return Complex number at this index
       */
       __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
@@ -579,14 +579,14 @@ namespace quda {
 
     /**
        @brief 1-d accessor functor
-       @param[in[ idx Index
+       @param[in] idx Index
        @return Complex number at this index
      */
     __device__ __host__ inline complex<Float>& operator()(int idx) { return data[idx]; }
 
     /**
        @brief 1-d accessor functor
-       @param[in[ idx Index
+       @param[in] idx Index
        @return Complex number at this index
      */
     __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
@@ -847,14 +847,14 @@ namespace quda {
 
     /**
        @brief 1-d accessor functor
-       @param[in[ idx Index
+       @param[in] idx Index
        @return Complex number at this index
      */
     __device__ __host__ inline complex<Float>& operator()(int idx) { return data[idx]; }
 
     /**
        @brief 1-d accessor functor
-       @param[in[ idx Index
+       @param[in] idx Index
        @return Complex number at this index
      */
     __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }

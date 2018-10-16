@@ -1336,4 +1336,25 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
 
   }
 
+  template <typename real>
+    __host__ __device__ inline complex<real> cmul(const complex<real> &x, const complex<real> &y) {
+    complex<real> w;
+    w.x  = x.real()*y.real();
+    w.x -= x.imag()*y.imag();
+    w.y  = x.imag()*y.real();
+    w.y += x.real()*y.imag();
+    return w;
+  }
+
+  template <typename real>
+    __host__ __device__ inline complex<real> cmac(const complex<real> &x, const complex<real> &y,
+                                                  const complex<real> &z) {
+    complex<real> w = z;
+    w.x += x.real()*y.real();
+    w.x -= x.imag()*y.imag();
+    w.y += x.imag()*y.real();
+    w.y += x.real()*y.imag();
+    return w;
+  }
+
 } // end namespace quda
