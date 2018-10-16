@@ -3,7 +3,8 @@ set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
-  prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
+  prolongator.cu restrictor.cu staggered_prolongator.cu
+  gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp

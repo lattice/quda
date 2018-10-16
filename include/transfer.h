@@ -314,7 +314,22 @@ namespace quda {
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
 		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
 		int parity=QUDA_INVALID_PARITY);
-  
+
+
+#ifdef GPU_STAGGERED_DIRAC
+  /**
+     @brief Apply the unitary "prolongation" operator for Kahler-Dirac preconditioning
+     @param[out] out Resulting fine grid field
+     @param[in] in Input field on coarse grid
+     @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] spin_map Spin blocking lookup table
+     @param[in] parity of the output fine field (if single parity output field)
+   */
+  void StaggeredProlongate(ColorSpinorField &out, const ColorSpinorField &in, 
+          const int *fine_to_coarse, const int * const *spin_map,
+          int parity=QUDA_INVALID_PARITY);
+
+#endif
 
 } // namespace quda
 #endif // _TRANSFER_H

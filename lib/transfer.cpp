@@ -352,16 +352,24 @@ namespace quda {
     if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-    if ((V->Nspin() != 1) && ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))){
-      errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
-		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
+    // ESW assumption for staggered MG
+    if (output->Nspin() == 1) {
+      printfQuda("ESW debug: Performing staggered permutation prolongator.\n");
+      StaggeredProlongate(*output, *input, fine_to_coarse, spin_map, parity);
+      flops_ += 0; // it's only a permutation
+    } else { // coarse->(wilson or coarse)
+
+      if ((V->Nspin() != 1) && ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))){
+        errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
+          output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
+      }
+
+      Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
+
+      flops_ += 8*in.Ncolor()*out.Ncolor()*out.VolumeCB()*out.SiteSubset();
     }
 
-    Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
-
     out = *output; // copy result to out field (aliasing handled automatically)
-
-    flops_ += 8*in.Ncolor()*out.Ncolor()*out.VolumeCB()*out.SiteSubset();
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
