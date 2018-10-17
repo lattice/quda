@@ -532,8 +532,13 @@ namespace quda {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("MultiShift CG: Converged after %d iterations\n", k);
         for (int i = 0; i < num_offset; i++) {
-          printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e, true = %e\n",
-                     i, iter[i], param.iter_res_offset[i], param.true_res_offset[i]);
+          if(std::isinf(param.true_res_offset[i])){
+            printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e\n",
+                       i, iter[i], param.iter_res_offset[i]);
+          } else {
+            printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e, true = %e\n",
+                       i, iter[i], param.iter_res_offset[i], param.true_res_offset[i]);
+          }
         }
       }
 
