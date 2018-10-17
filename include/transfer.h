@@ -329,6 +329,18 @@ namespace quda {
           const int *fine_to_coarse, const int * const *spin_map,
           int parity=QUDA_INVALID_PARITY);
 
+  /**
+     @brief Apply the unitary "restriction" operator for Kahler-Dirac preconditioning
+     @param[out] out Resulting coarse grid field
+     @param[in] in Input field on fine grid
+     @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] spin_map Spin blocking lookup table
+     @param[in] parity of the output fine field (if single parity output field)
+   */
+  void StaggeredRestrict(ColorSpinorField &out, const ColorSpinorField &in, 
+          const int *fine_to_coarse, const int * const *spin_map,
+          int parity=QUDA_INVALID_PARITY);
+
 #endif
 
 } // namespace quda
