@@ -77,6 +77,12 @@ namespace quda {
     real c;                 // real constant Mobius coefficient
     real a;                 // real xpay coefficient
 
+    real kappa;             // kappa
+    real fac_inv;           // the overall factor for M5inv
+
+    real alpha = 1.;
+    real beta = 0.;
+
     Dslash5Type type;
 
     Dslash5TensorCoreArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
@@ -99,8 +105,12 @@ namespace quda {
 
       switch(type){
         case M5_INV_MOBIUS:
-          b = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0);
-          c = 0.5 / ( 1.0 + std::pow(b,(int)Ls) * m_f );
+          // b = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0);
+          // c = 0.5 / ( 1.0 + std::pow(b,(int)Ls) * m_f );
+          b = b_5_[0].real();
+          c = c_5_[0].real();
+          kappa   = -(c*(4.+m_5)-1.) / (b*(4.+m_5)+1.);
+          fac_inv = 0.5/(1.+std::pow(kappa,(int)Ls)*m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
           a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
           break;
         default:

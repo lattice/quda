@@ -1,3 +1,5 @@
+#pragma once
+
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
 #include <color_spinor_field_order.h>
@@ -34,42 +36,67 @@ namespace quda {
 
   // matrix a for m5inv: column major, M/M_sm(size/padded size) by k
   // (spin,Ls) by (spin,Ls), where left most index is the fastest changing one(spin).
-  // TODO: fix the dagger/non-dagger?
+  // x by y
   template<int block_dim_x, int Ls_, int M_sm, bool dagger, class Arg>
   __device__ inline void construct_matrix_a_m5inv(Arg& arg, half* sm_a){
-    const float k = arg.b;
-    const float inv = arg.c;
- 
+    const float k = arg.kappa;
+    
+    // if we rescale, then the actual matrix is alpha*m5inv+beta.
+    // Otherwise a = 1., b = 0.;
+    const float a = arg.alpha; 
+    const float b = arg.beta; 
+    
+    const float inv = a*arg.fac_inv;
+
     int offset_k = threadIdx.y*4;
     int x = threadIdx.x;
     
     while(x < Ls_){
       int offset_m = x*4;
       int exp;
-      exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
+      if(dagger){
+        exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
+      }else{
+        exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
+      }
       float factorR = inv*__fast_pow(k, exp) * ( x>threadIdx.y ? -arg.m_f : static_cast<float>(1.0) );
-      exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
+      if(dagger){
+        exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
+      }else{
+        exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
+      }
       float factorL = inv*__fast_pow(k, exp) * ( x<threadIdx.y ? -arg.m_f : static_cast<float>(1.0) );
- 
+      
+      if(exp){
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL;
+      }else{ // exp = 0 means we are on the diagonal.
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL + b;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL + b;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL + b;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL + b;
+      }
+      // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = factorR - factorL;
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
       
       sm_a[ (offset_k+1)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
+      // sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
       sm_a[ (offset_k+1)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
       sm_a[ (offset_k+1)*(M_sm)+(offset_m+3) ] = factorR - factorL;
       
       sm_a[ (offset_k+2)*(M_sm)+(offset_m+0) ] = factorR - factorL;
       sm_a[ (offset_k+2)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
+      // sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
       sm_a[ (offset_k+2)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
       
       sm_a[ (offset_k+3)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
       sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = factorR - factorL;
       sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
+      // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
     
       x += block_dim_x;
     }

@@ -97,6 +97,13 @@ namespace quda {
     M5_INV_ZMOBIUS
   };
 
+  enum MdwfFusedDslashType { // the details are too complicated to describe here.
+    dslash4_dslash5pre_dslash5inv = 0,
+    dslash4_dslash5inv_dslash5invdag = 1,
+    dslash4dag_dslash5predag_dslash5invdag = 2,
+    dslash4dag_dslash5predag = 3,
+  };
+  
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or
      the M5 inverse operator.  In the current implementation, it is
