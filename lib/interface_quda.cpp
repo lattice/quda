@@ -4471,7 +4471,7 @@ void computeHISQForceQuda(void* const milc_momentum,
         profileHISQForce.TPSTOP(QUDA_PROFILE_H2D);
 
         profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-        computeStaggeredOprod(oprod, cudaQuark, coeff[i], 3);
+        computeStaggeredOprod(oprod, cudaQuark, coeff[i + num_terms], 3);
         profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }
