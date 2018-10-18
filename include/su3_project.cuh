@@ -77,50 +77,22 @@ namespace quda {
 
     // iterate until matrix is unitary
     do {
-      out = out + conj(inv);
-      out = out*0.5;
+      out = 0.5*(out + conj(inv));
     } while(checkUnitary(inv, out, tol));
-
 
     // now project onto special unitary group
     complex<Float> det = getDeterminant(out);
-    double mod = det.x*det.x + det.y*det.y;
+    double mod = norm(det);
     mod = pow(mod, (1./6.));
     double angle = atan2(det.y, det.x);
     angle /= -3.;
     
     complex<Float> cTemp;
 
-    cTemp.x = cos(angle)/mod;
-    cTemp.y = sin(angle)/mod;
+    sincos(angle, &cTemp.y, &cTemp.x);
+    cTemp /= mod;
 
     in = out*cTemp;
-/*    if (checkUnitary(inv, out))
-    {
-    	cTemp = getDeterminant(out);
-	printf ("DetX: %+.3lf  %+.3lfi, %.3lf %.3lf\nDetN: %+.3lf  %+.3lfi", det.x, det.y, mod, angle, cTemp.x, cTemp.y);
-        cudaDeviceSynchronize();
-	checkUnitaryPrint(out, &inv);
-	setIdentity(in);
-        *in = *in * 0.5;
-    }
-    else
-    {
-      cTemp = getDeterminant(out);
-//      printf("Det: %+.3lf %+.3lf\n", cTemp.x, cTemp.y);
-      cudaDeviceSynchronize();
-
-      if (fabs(cTemp.x - 1.0) > 1e-8)
-	setIdentity(in);
-      else if (fabs(cTemp.y) > 1e-8)
-      {
-	setIdentity(in);
-        printf("DadadaUnitary failed\n");
-        *in = *in * 0.1;
-      }
-      else
-        *in = out;
-    }*/
   }
 
   
