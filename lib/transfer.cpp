@@ -401,19 +401,28 @@ namespace quda {
     if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
-    if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
+    // ESW assumption for staggered MG
+    if (input->Nspin() == 1) {
+      printfQuda("ESW debug: Performing staggered permutation restrictor.\n");
+      StaggeredRestrict(*output, *input, fine_to_coarse, spin_map, parity);
+      flops_ += 0; // it's only a permutation
+    } else { // (wilson or coarse)->coarse}
+      if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
-		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
+        out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-    Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
+      Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
+      flops_ += 8*out.Ncolor()*in.Ncolor()*in.VolumeCB()*in.SiteSubset();
+
+    }
+    
     out = *output; // copy result to out field (aliasing handled automatically)
 
     // only need to synchronize if we're transferring from GPU to CPU
     if (out.Location() == QUDA_CPU_FIELD_LOCATION && in.Location() == QUDA_CUDA_FIELD_LOCATION)
       qudaDeviceSynchronize();
-
-    flops_ += 8*out.Ncolor()*in.Ncolor()*in.VolumeCB()*in.SiteSubset();
+    
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
