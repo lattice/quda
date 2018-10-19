@@ -24,6 +24,7 @@
 #include <index_helper.cuh>
 #include <color_spinor.h>
 #include <thrust_helper.cuh>
+#include <color_spinor_field.h>
 
 namespace quda {
 

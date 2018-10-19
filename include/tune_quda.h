@@ -261,8 +261,11 @@ namespace quda {
       return n;
     }
 
+    /** This is the return result from kernels launched using jitify */
+    CUresult jitify_error;
+
   public:
-    Tunable() { }
+    Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const cudaStream_t &stream) = 0;
@@ -334,6 +337,10 @@ namespace quda {
      */
     void checkLaunchParam(TuneParam &param) {
     
+      if (param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock)
+        errorQuda("Requested block size %d greater than hardware limit %d",
+                  param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
+
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0])
 	errorQuda("Requested X-dimension block size %d greater than hardware limit %d", 
 		  param.block.x, deviceProp.maxThreadsDim[0]);
@@ -346,11 +353,10 @@ namespace quda {
 	errorQuda("Requested Z-dimension block size %d greater than hardware limit %d", 
 		  param.block.z, deviceProp.maxThreadsDim[2]);
 	  
-      if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0]){
+      if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0])
 	errorQuda("Requested X-dimension grid size %d greater than hardware limit %d", 
 		  param.grid.x, deviceProp.maxGridSize[0]);
 
-      }
       if (param.grid.y > (unsigned int)deviceProp.maxGridSize[1])
 	errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d", 
 		  param.grid.y, deviceProp.maxGridSize[1]);
@@ -360,6 +366,8 @@ namespace quda {
 		  param.grid.z, deviceProp.maxGridSize[2]);
     }
 
+    CUresult jitifyError() const { return jitify_error; }
+    CUresult& jitifyError() { return jitify_error; }
   };
 
   

@@ -5,6 +5,7 @@
 #include <index_helper.cuh>
 #include <stencil.h>
 #include <color_spinor.h>
+#include <tune_quda.h>
 #include <worker.h>
 
 /**

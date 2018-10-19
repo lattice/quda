@@ -20,11 +20,12 @@
 
 #pragma once
 
-#include <math.h>
+//#include <math.h>
+
 #include <cmath>
 #include <complex>
 #include <sstream>
-#include <cuComplex.h>
+//#include <cuComplex.h>
 
 namespace quda {
   namespace gauge {
@@ -131,8 +132,8 @@ namespace quda
   }
 
   template <typename ValueType> struct complex;
-  template <> struct complex<float>;
-  template <> struct complex<double>;
+  //template <> struct complex<float>;
+  //template <> struct complex<double>;
 
 
   /// Returns the magnitude of z.
@@ -454,7 +455,7 @@ public:
 // TODO see if returning references is a perf hazard
 
 template<>
-struct complex <float> : public cuFloatComplex
+  struct complex <float> : public float2 //cuFloatComplex
 {
 public:
   typedef float value_type;
@@ -471,11 +472,11 @@ public:
   // explicitly makes things faster with at least g++
   __host__ __device__
     complex<float>(const complex<float> & z)
-    : cuFloatComplex(z){}
+    : float2(z){}
 
   __host__ __device__
-    complex<float>(cuFloatComplex z)
-    : cuFloatComplex(z){}
+    complex<float>(float2 z)
+    : float2(z){}
   
   template <class X>
     inline complex<float>(const std::complex<X> & z)
@@ -576,7 +577,7 @@ public:
 };
 
 template<>
-struct complex <double> : public cuDoubleComplex
+  struct complex <double> : public double2 //cuDoubleComplex
 {
 public:
   typedef double value_type;
@@ -593,11 +594,11 @@ public:
   // explicitly makes things faster with at least g++
   __host__ __device__
     inline complex<double>(const complex<double> & z)
-    : cuDoubleComplex(z) {}
+    : double2(z) {}
 
   __host__ __device__
-    inline complex<double>(cuDoubleComplex z)
-    : cuDoubleComplex(z) {}
+    inline complex<double>(double2 z)
+    : double2(z) {}
 
   template <class X>
     inline complex<double>(const std::complex<X> & z)
@@ -932,13 +933,35 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <>
     __host__ __device__
     inline complex<float> operator/(const complex<float>& lhs, const complex<float>& rhs){
-    return cuCdivf(lhs,rhs);
+
+    complex<float> quot;
+    float s = fabsf(rhs.real()) + fabsf(rhs.imag());
+    float oos = 1.0f / s;
+    float ars = lhs.real() * oos;
+    float ais = lhs.imag() * oos;
+    float brs = rhs.real() * oos;
+    float bis = rhs.imag() * oos;
+    s = (brs * brs) + (bis * bis);
+    oos = 1.0f / s;
+    return complex<float>(((ars * brs) + (ais * bis)) * oos,
+			  ((ais * brs) - (ars * bis)) * oos);
   }
 
   template <>
     __host__ __device__
     inline complex<double> operator/(const complex<double>& lhs, const complex<double>& rhs){
-    return cuCdiv(lhs,rhs);
+
+    complex<double> quot;
+    double s = fabs(rhs.real()) + fabs(rhs.imag());
+    double oos = 1.0 / s;
+    double ars = lhs.real() * oos;
+    double ais = lhs.imag() * oos;
+    double brs = rhs.real() * oos;
+    double bis = rhs.imag() * oos;
+    s = (brs * brs) + (bis * bis);
+    oos = 1.0 / s;
+    return complex<double>(((ars * brs) + (ais * bis)) * oos,
+			   ((ais * brs) - (ars * bis)) * oos);
   }
 
   template <typename ValueType>
@@ -959,14 +982,13 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <>
     __host__ __device__
     inline complex<float> operator/(const float& lhs, const complex<float>& rhs){
-    return cuCdivf(complex<float>(lhs),rhs);
+    return complex<float>(lhs) / rhs;
   }
   template <>
     __host__ __device__
     inline complex<double> operator/(const double& lhs, const complex<double>& rhs){
-    return cuCdiv(complex<double>(lhs),rhs);
+    return complex<double>(lhs) / rhs;
   }
-
 
   // Unary arithmetic operations
   template <typename ValueType>
