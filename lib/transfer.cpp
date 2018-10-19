@@ -354,7 +354,7 @@ namespace quda {
 
     // ESW assumption for staggered MG
     if (output->Nspin() == 1) {
-      printfQuda("ESW debug: Performing staggered permutation prolongator.\n");
+
       StaggeredProlongate(*output, *input, fine_to_coarse, spin_map, parity);
       flops_ += 0; // it's only a permutation
     } else { // coarse->(wilson or coarse)
@@ -403,7 +403,6 @@ namespace quda {
 
     // ESW assumption for staggered MG
     if (input->Nspin() == 1) {
-      printfQuda("ESW debug: Performing staggered permutation restrictor.\n");
       StaggeredRestrict(*output, *input, fine_to_coarse, spin_map, parity);
       flops_ += 0; // it's only a permutation
     } else { // (wilson or coarse)->coarse}
