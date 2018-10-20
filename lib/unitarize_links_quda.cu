@@ -576,7 +576,7 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
     }
   
     long long flops() const { return 0; } // depends on number of iterations
-    long long bytes() const { return 4ll * 2 * arg.threads * arg.u.Bytes(); }
+    long long bytes() const { return 4ll * 2 * arg.threads * 2 * arg.u.Bytes(); }
     
     TuneKey tuneKey() const {
       std::stringstream aux;
