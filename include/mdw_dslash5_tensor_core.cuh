@@ -199,6 +199,7 @@ namespace quda {
     out[sid + 5*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y);  
   } 
 
+#if 0
   // "reload" version of wmma gemm. Matrix a is loaded when needed.
   // It is a waste of time but save register usage.
   template<int block_dim_x, int Ls_, int M, int N, int M_sm, int N_sm>
@@ -259,11 +260,12 @@ namespace quda {
         nvcuda::wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, nvcuda::wmma::mem_row_major);
     }
   } 
-  
+#endif
+
   // "preload" version of wmma gemm. Matrix a is preloaded before hand.
   // It saves time but uses more registers.
-  template<int block_dim_x, int Ls_, int M, int N, int M_sm, int N_sm, class T>
-  __device__ inline void wmma_gemm_preload(T* a_frag, half* sm_b, half* sm_c){
+  template<int block_dim_x, int Ls_, int M, int N, int M_sm, int N_sm, bool reload, class T>
+  __device__ inline void wmma_gemm(T* a_frag, half* sm_a, half* sm_b, half* sm_c){
     constexpr int WMMA_M = 16;
     constexpr int WMMA_N = 16;
     constexpr int WMMA_K = 16;
@@ -301,13 +303,22 @@ namespace quda {
       
       #pragma unroll
       for( int k = 0; k < tm_dim; k++ ){
+        const int a_row = warp_m*WMMA_M;
+        const int a_col = k*WMMA_K;
         const int b_row = k*WMMA_K;
         const int b_col = warp_n*WMMA_N;
     
         // Load Matrix
+        if(reload){
+          nvcuda::wmma::load_matrix_sync(a_frag[0], sm_a+a_row+a_col*M_sm, M_sm);
+        }
         nvcuda::wmma::load_matrix_sync(b_frag, sm_c+b_col+b_row*N_sm, N_sm);
         // Perform the matrix multiplication
-        nvcuda::wmma::mma_sync(c_frag, a_frag[k], b_frag, c_frag);
+        if(reload){
+          nvcuda::wmma::mma_sync(c_frag, a_frag[0], b_frag, c_frag);
+        }else{
+          nvcuda::wmma::mma_sync(c_frag, a_frag[k], b_frag, c_frag);
+        }
       } 
     
         int c_row = warp_m*WMMA_M;

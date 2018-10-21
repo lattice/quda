@@ -98,10 +98,10 @@ namespace quda {
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
       if (sizeof(coeff_5<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(coeff_5<real>));
-      coeff_5<real> *coeff = reinterpret_cast<coeff_5<real>*>(&mobius_h);
-      auto *a_5 =  coeff->a;
-      auto *b_5 =  coeff->b;
-      auto *c_5 =  coeff->c;
+//      coeff_5<real> *coeff = reinterpret_cast<coeff_5<real>*>(&mobius_h);
+//      auto *a_5 =  coeff->a;
+//      auto *b_5 =  coeff->b;
+//      auto *c_5 =  coeff->c;
 
       switch(type){
         case M5_INV_MOBIUS:
@@ -122,6 +122,7 @@ namespace quda {
     }
   };
 
+#if 0
 // The following two are the actual kernels. Since there is no "static_if" to use two version 
 // are implemented explicitly.
 // TODO: Maybe someone smart people could have a better idea? Or c++49 will have a "static_if"?
@@ -188,12 +189,13 @@ namespace quda {
     
     } // while
   }
+#endif  
   
   /**
     @brief Tensor core kernel for applying the M5inv operator: preload version
   */
-  template<int block_dim_x, int Ls_, bool dagger, bool xpay, class Arg>
-  __global__ void dslash5inv_tensor_core_preload(Arg arg)
+  template<int block_dim_x, int Ls_, bool dagger, bool xpay, bool reload, class Arg>
+  __global__ void dslash5inv_tensor_core(Arg arg)
   {
     float scale;
 
@@ -238,15 +240,18 @@ namespace quda {
     const int warp_m = this_warp*warp_cycle/tn_dim;
      
     typedef typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_type;
-    a_type a_frag[tm_dim];
-    #pragma unroll
-    for( int k = 0; k < tm_dim; k++ ){
-      const int a_row = warp_m*WMMA_M;
-      const int a_col = k*WMMA_K;
-      // Load Matrix
-      nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a+a_row+a_col*M_sm, M_sm);
-    } 
-  
+    typedef typename std::conditional<reload, char, char[tm_dim]>::type a_frag_size;
+    a_type a_frag[sizeof(a_frag_size)];
+    if(!reload){ // in the preload case we preload ... 
+      #pragma unroll
+      for( int k = 0; k < tm_dim; k++ ){
+        const int a_row = warp_m*WMMA_M;
+        const int a_col = k*WMMA_K;
+        // Load Matrix
+        nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a+a_row+a_col*M_sm, M_sm);
+      } 
+    }
+
     while(s4_base < arg.volume_4d_cb){
       
       s4 = s4_base + threadIdx.x;
@@ -262,9 +267,7 @@ namespace quda {
       
       __syncthreads();
     
-      { // wmma.h
-        wmma_gemm_preload<block_dim_x, Ls_, M, N, M_sm, N_sm>(a_frag, sm_c, sm_c);        
-      } // wmma.h
+      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);        
       
       __syncthreads();
     
@@ -296,7 +299,7 @@ namespace quda {
 
         long long flops_ = 0;
         switch (arg.type) {
-          case M5_INV_MOBIUS: // FIXME flops
+          case M5_INV_MOBIUS: // FIXME: flops
             //flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
             flops_ = (144 * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
             break;
@@ -424,89 +427,89 @@ namespace quda {
                 case  8:
                   if (arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload< 8, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload< 8, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core< 8, Ls_, true, true, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core< 8, Ls_,false, true, false, Arg>, tp, arg, stream) ;
                   }else{          
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload< 8, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload< 8, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core< 8, Ls_, true,false, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core< 8, Ls_,false,false, false, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 16:
                   if (arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<16, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<16, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<16, Ls_, true, true, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<16, Ls_,false, true, false, Arg>, tp, arg, stream) ;
                   }else{          
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<16, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<16, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<16, Ls_, true,false, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<16, Ls_,false,false, false, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 24:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<24, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<24, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<24, Ls_, true, true, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<24, Ls_,false, true, false, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<24, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<24, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<24, Ls_, true,false, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<24, Ls_,false,false, false, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 32:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<32, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<32, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<32, Ls_, true, true, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<32, Ls_,false, true, false, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<32, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<32, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<32, Ls_, true,false, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<32, Ls_,false,false, false, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 40:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<40, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<40, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<40, Ls_, true, true, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<40, Ls_,false, true, false, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<40, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<40, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<40, Ls_, true,false, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<40, Ls_,false,false, false, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 48:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<48, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<48, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<48, Ls_, true, true, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<48, Ls_,false, true, false, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<48, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<48, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<48, Ls_, true,false, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<48, Ls_,false,false, false, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 56:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<56, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<56, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<56, Ls_, true, true, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<56, Ls_,false, true, false, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<56, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<56, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<56, Ls_, true,false, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<56, Ls_,false,false, false, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 64:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<64, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<64, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<64, Ls_, true, true, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<64, Ls_,false, true, false, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_preload<64, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_preload<64, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<64, Ls_, true,false, false, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<64, Ls_,false,false, false, Arg>, tp, arg, stream) ;
                   }
                   break;
                 default:
@@ -524,89 +527,89 @@ namespace quda {
                 case  8:
                   if (arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload< 8, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload< 8, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core< 8, Ls_, true, true,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core< 8, Ls_,false, true,  true, Arg>, tp, arg, stream) ;
                   }else{          
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload< 8, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload< 8, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core< 8, Ls_, true,false,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core< 8, Ls_,false,false,  true, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 16:
                   if (arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<16, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<16, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<16, Ls_, true, true,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<16, Ls_,false, true,  true, Arg>, tp, arg, stream) ;
                   }else{          
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<16, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<16, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<16, Ls_, true,false,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<16, Ls_,false,false,  true, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 24:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<24, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<24, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<24, Ls_, true, true,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<24, Ls_,false, true,  true, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<24, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<24, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<24, Ls_, true,false,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<24, Ls_,false,false,  true, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 32:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<32, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<32, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<32, Ls_, true, true,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<32, Ls_,false, true,  true, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<32, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<32, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<32, Ls_, true,false,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<32, Ls_,false,false,  true, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 40:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<40, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<40, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<40, Ls_, true, true,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<40, Ls_,false, true,  true, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<40, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<40, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<40, Ls_, true,false,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<40, Ls_,false,false,  true, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 48:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<48, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<48, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<48, Ls_, true, true,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<48, Ls_,false, true,  true, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<48, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<48, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<48, Ls_, true,false,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<48, Ls_,false,false,  true, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 56:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<56, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<56, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<56, Ls_, true, true,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<56, Ls_,false, true,  true, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<56, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<56, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<56, Ls_, true,false,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<56, Ls_,false,false,  true, Arg>, tp, arg, stream) ;
                   }
                   break;
                 case 64:
                   if(arg.xpay){ 
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<64, Ls_, true, true, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<64, Ls_,false, true, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<64, Ls_, true, true,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<64, Ls_,false, true,  true, Arg>, tp, arg, stream) ;
                   }else{
                     arg.dagger ?
-                      launch(dslash5inv_tensor_core_reload<64, Ls_, true,false, Arg>, tp, arg, stream) :
-                      launch(dslash5inv_tensor_core_reload<64, Ls_,false,false, Arg>, tp, arg, stream) ;
+                      launch(dslash5inv_tensor_core<64, Ls_, true,false,  true, Arg>, tp, arg, stream) :
+                      launch(dslash5inv_tensor_core<64, Ls_,false,false,  true, Arg>, tp, arg, stream) ;
                   }
                   break;
                 default:
