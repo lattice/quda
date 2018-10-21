@@ -240,8 +240,9 @@ namespace quda {
     const int warp_m = this_warp*warp_cycle/tn_dim;
      
     typedef typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_type;
-    typedef typename std::conditional<reload, char, char[tm_dim]>::type a_frag_size;
-    a_type a_frag[sizeof(a_frag_size)];
+//    typedef typename std::conditional<reload, char, char[tm_dim]>::type a_frag_size;
+//    a_type a_frag[sizeof(a_frag_size)];
+    a_type a_frag[reload?1:tm_dim];
     if(!reload){ // in the preload case we preload ... 
       #pragma unroll
       for( int k = 0; k < tm_dim; k++ ){
