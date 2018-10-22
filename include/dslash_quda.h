@@ -5,7 +5,7 @@
 #include <tune_quda.h>
 #include <dirac_quda.h>
 #include <gauge_field.h>
-
+#include <dslash_helper.cuh>
 #include <worker.h>
 
 namespace quda {

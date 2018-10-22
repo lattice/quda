@@ -3,6 +3,7 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 #include <tune_quda.h>
+#include <dslash_helper.cuh>
 
 // these control the Wilson-type actions
 #ifdef GPU_WILSON_DIRAC
