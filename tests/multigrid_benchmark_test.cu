@@ -11,7 +11,8 @@
 // include because of nasty globals used in the tests
 #include <dslash_util.h>
 #include <dirac_quda.h>
-#include <algorithm>
+
+#define MAX(a,b) ((a)>(b)?(a):(b))
 
 extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
@@ -46,6 +47,8 @@ cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
 
 int Nspin;
 int Ncolor;
+
+#define MAX(a,b) ((a)>(b)?(a):(b))
 
 void
 display_test_info()
@@ -137,18 +140,23 @@ void initFields(QudaPrecision prec)
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.geometry = QUDA_COARSE_GEOMETRY;
   gParam.nFace = 1;
-  int pad = std::max( { (gParam.x[0]*gParam.x[1]*gParam.x[2])/2,
-	(gParam.x[1]*gParam.x[2]*gParam.x[3])/2,
-	(gParam.x[0]*gParam.x[2]*gParam.x[3])/2,
-	(gParam.x[0]*gParam.x[1]*gParam.x[3])/2 } );
+
+  int x_face_size = gParam.x[1]*gParam.x[2]*gParam.x[3]/2;
+  int y_face_size = gParam.x[0]*gParam.x[2]*gParam.x[3]/2;
+  int z_face_size = gParam.x[0]*gParam.x[1]*gParam.x[3]/2;
+  int t_face_size = gParam.x[0]*gParam.x[1]*gParam.x[2]/2;
+  int pad = MAX(x_face_size, y_face_size);
+  pad = MAX(pad, z_face_size);
+  pad = MAX(pad, t_face_size);
   gParam.pad = gParam.nFace * pad * 2;
+
   gParam.setPrecision(prec_sloppy);
+
   Y_d = new cudaGaugeField(gParam);
   Yhat_d = new cudaGaugeField(gParam);
   Y_d->copy(*Y_h);
   Yhat_d->copy(*Yhat_h);
 
-  gParam.setPrecision(param.Precision());
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 0;

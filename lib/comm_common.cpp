@@ -175,6 +175,9 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     case 1: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store)\n"); break;
     case 2: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines)\n"); break;
     case 3: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access\n"); break;
+    case 5: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n"); break;
+    case 6: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n"); break;
+    case 7: if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n"); break;
     default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
     }
 
@@ -222,14 +225,14 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
 	  int accessRank[2] = { };
 #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
-	  if (canAccessPeer[0]*canAccessPeer[1]) {
+	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
 	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
 	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
 	  }
 #endif
 
 	  // enable P2P if we can access the peer or if peer is self
-	  if (canAccessPeer[0]*canAccessPeer[1] || gpuid == neighbor_gpuid) {
+	  if (canAccessPeer[0]*canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
 	    peer2peer_enabled[dir][dim] = true;
 	    if (getVerbosity() > QUDA_SILENT) {
 	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, performance rank = (%d, %d)\n",
@@ -597,6 +600,12 @@ void comm_dim_partitioned_set(int dim)
 #endif
 }
 
+void comm_dim_partitioned_reset(){
+  for (int i=0; i<QUDA_MAX_DIM; i++)
+   manual_set_partition[i] = 0;
+   
+}
+
 
 int comm_dim_partitioned(int dim)
 {
@@ -678,6 +687,8 @@ int commCoords(int dir) { return comm_coord(dir); }
 int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
 
 void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
+
+void commDimPartitionedReset(){ comm_dim_partitioned_reset();}
 
 bool commGlobalReduction() { return globalReduce; }
 

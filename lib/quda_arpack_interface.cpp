@@ -2,6 +2,7 @@
 #include <tests/misc.h>
 #include <vector>
 #include <Eigen/Eigenvalues>
+#include <thrust/sort.h>
 
 #if (defined (QMP_COMMS) || defined (MPI_COMMS))
 #include <mpi.h>

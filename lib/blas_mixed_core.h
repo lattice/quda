@@ -10,6 +10,12 @@ namespace mixed {
 		  ColorSpinorField &z, ColorSpinorField &w) {
 
     if (checkLocation(x, y, z, w) == QUDA_CUDA_FIELD_LOCATION) {
+
+      if (!x.isNative()) {
+        warningQuda("Device blas on non-native fields is not supported\n");
+        return;
+      }
+
       if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
 	if (x.Nspin() == 4) {
 	  const int M = 12;

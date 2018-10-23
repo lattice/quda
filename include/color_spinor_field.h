@@ -8,6 +8,7 @@
 
 #include <lattice_field.h>
 #include <random_quda.h>
+#include <fast_intdiv.h>
 
 namespace quda {
 
@@ -195,9 +196,9 @@ namespace quda {
        @param precision_ New precision value
        @param ghost_precision_ New ghost precision value
      */
-    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) {
+    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision=QUDA_INVALID_PRECISION, bool force_native=false) {
       // is the current status in native field order?
-      bool native = false;
+      bool native = force_native ? true : false;
       if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1 || nSpin==2) &&
 	    (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
 	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION || this->precision == QUDA_QUARTER_PRECISION) &&
@@ -239,6 +240,38 @@ namespace quda {
   class cpuColorSpinorField;
   class cudaColorSpinorField;
 
+  /**
+     @brief Constants used by dslash and packing kernels
+  */
+  struct DslashConstant {
+    int Vh;
+    int_fastdiv X[QUDA_MAX_DIM];
+    int_fastdiv Xh[QUDA_MAX_DIM];
+    int Ls;
+
+    int volume_4d;
+    int volume_4d_cb;
+
+    int_fastdiv face_X[4];
+    int_fastdiv face_Y[4];
+    int_fastdiv face_Z[4];
+    int_fastdiv face_T[4];
+    int_fastdiv face_XY[4];
+    int_fastdiv face_XYZ[4];
+    int_fastdiv face_XYZT[4];
+
+    int ghostFace[QUDA_MAX_DIM+1];
+
+    int X2X1;
+    int X3X2X1;
+    int X2X1mX1;
+    int X3X2X1mX2X1;
+    int X4X3X2X1mX3X2X1;
+    int X4X3X2X1hmX3X2X1h;
+
+    int_fastdiv dims[4][3];
+  };
+
   class ColorSpinorField : public LatticeField {
 
   private:
@@ -250,6 +283,9 @@ namespace quda {
 
   protected:
     bool init;
+
+    /** Used to keep local track of allocated ghost_precision in createGhostZone */
+    mutable QudaPrecision ghost_precision_allocated;
 
     int nColor;
     int nSpin;
@@ -285,6 +321,8 @@ namespace quda {
 
     mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
+    mutable DslashConstant dslash_constant; // constants used by dslash and packing kernels
+
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
 
@@ -314,8 +352,10 @@ namespace quda {
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
-    char aux_string[TuneKey::aux_n]; // used as a label in the autotuner
-    void setTuningString(); // set the vol_string and aux_string for use in tuning
+    /**
+       @brief Set the vol_string and aux_string for use in tuning
+    */
+    void setTuningString();
 
   public:
     //ColorSpinorField();
@@ -344,8 +384,6 @@ namespace quda {
     size_t GhostBytes() const { return ghost_bytes; }
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
-
-    inline const char *AuxString() const { return aux_string; }
 
     void* V() {return v;}
     const void* V() const {return v;}
@@ -429,6 +467,11 @@ namespace quda {
      */
     void* const* Ghost() const;
 
+    /**
+       @brief Get the dslash_constant structure from this field
+    */
+    const DslashConstant& getDslashConstant() const { return dslash_constant; }
+
     const ColorSpinorField& Even() const;
     const ColorSpinorField& Odd() const;
 
@@ -462,10 +505,34 @@ namespace quda {
 
     static ColorSpinorField* Create(const ColorSpinorParam &param);
     static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
-    ColorSpinorField* CreateCoarse(const int *geoblockSize, int spinBlockSize, int Nvec,
-				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION);
+
+    /**
+       @brief Create a coarse color-spinor field, using this field to set the meta data
+       @param[in] geoBlockSize Geometric block size that defines the coarse grid dimensions
+       @param[in] spinlockSize Geometric block size that defines the coarse spin dimension
+       @param[in] Nvec Number of coarse color degrees of freedom per grid point
+       @param[in] precision Optionally set the precision of the fine field
+       @param[in] location Optionally set the location of the coarse field
+       @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
+    */
+    ColorSpinorField* CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+                                   QudaPrecision precision=QUDA_INVALID_PRECISION,
+				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
+                                   QudaMemoryType mem_Type=QUDA_MEMORY_INVALID);
+
+    /**
+       @brief Create a fine color-spinor field, using this field to set the meta data
+       @param[in] geoBlockSize Geometric block size that defines the fine grid dimensions
+       @param[in] spinlockSize Geometric block size that defines the fine spin dimension
+       @param[in] Nvec Number of fine color degrees of freedom per grid point
+       @param[in] precision Optionally set the precision of the fine field
+       @param[in] location Optionally set the location of the fine field
+       @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
+    */
     ColorSpinorField* CreateFine(const int *geoblockSize, int spinBlockSize, int Nvec,
-				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION);
+                                 QudaPrecision precision=QUDA_INVALID_PRECISION,
+				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
+                                 QudaMemoryType mem_type=QUDA_MEMORY_INVALID);
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;

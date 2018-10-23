@@ -24,7 +24,6 @@ namespace quda {
   // set the required parameters for the inner solver
   void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
     inner.tol = outer.tol_precondition;
-    inner.maxiter = outer.maxiter_precondition;
     inner.delta = 1e-20; // no reliable updates within the inner solver
   
     inner.precision = outer.precision_sloppy;
@@ -44,11 +43,20 @@ namespace quda {
     inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
 
     inner.use_init_guess = QUDA_USE_INIT_GUESS_NO;
-    inner.Nsteps = outer.precondition_cycle;
+
+    inner.maxiter = outer.maxiter_precondition;
+    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+      inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
+    } else {
+      inner.Nsteps = outer.precondition_cycle;
+    }
 
     inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
 
     inner.verbosity_precondition = outer.verbosity_precondition;
+
+    inner.compute_true_res = false;
+    inner.sloppy_converge = true;
   }
 
   void computeBeta(Complex **beta, std::vector<ColorSpinorField*> Ap, int i, int N, int k) {
@@ -161,15 +169,17 @@ namespace quda {
 
     fillInnerSolveParam(Kparam, param);
 
-    if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
+    if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG solver
       K = new CG(matSloppy, matPrecon, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
+    else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab solver
       K = new BiCGstab(matSloppy, matPrecon, matPrecon, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
+    else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR solver
       K = new MR(matSloppy, matPrecon, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner SD preconditioner
+    else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner SD solver
       K = new SD(matSloppy, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unknown preconditioner
+    else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) // inner CA-GCR solver
+      K = new CAGCR(matSloppy, matPrecon, Kparam, profile);
+    else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unsupported
       K = NULL;
     else 
       errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
@@ -392,7 +402,7 @@ namespace quda {
 	// recalculate residual in high precision
 	blas::xpy(ySloppy, x);
 
-	if (r2 < stop && param.sloppy_converge) break;
+	if ( (r2 < stop || total_iter==param.maxiter) && param.sloppy_converge) break;
 	mat(r, x, y);
 	r2 = blas::xmyNorm(b, r);  
 

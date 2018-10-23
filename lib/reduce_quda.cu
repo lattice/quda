@@ -9,7 +9,6 @@
 #endif
 
 #include <cub_helper.cuh>
-#include <algorithm>
 
 template<typename> struct ScalarType { };
 template<> struct ScalarType<double> { typedef double type; };
@@ -105,8 +104,9 @@ namespace quda {
       const int max_generic_blocks = 65336; // FIXME - this isn't quite right
       const int max_generic_reduce = 2 * MAX_MULTI_BLAS_N * max_generic_blocks * 4 * sizeof(QudaSumFloat);
 
-      // reduction buffer size 
-      size_t bytes = std::max(std::max(max_reduce, max_multi_reduce), max_generic_reduce);
+      // reduction buffer size
+      size_t bytes = max_reduce > max_multi_reduce ? max_reduce : max_multi_reduce;
+      bytes = bytes > max_generic_reduce ? bytes : max_generic_reduce;
 
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 

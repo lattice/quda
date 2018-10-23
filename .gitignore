@@ -14,5 +14,6 @@ config.log
 CMakeCache.txt
 CMakeFiles
 externals
+!include/externals
 .tags*
 autom4te.cache/*

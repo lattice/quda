@@ -8,7 +8,7 @@ set (QUDA_OBJS
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
-  inv_cg3_quda.cpp inv_cg3ne_quda.cpp
+  inv_cg3_quda.cpp inv_cg3ne_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu 
@@ -50,7 +50,7 @@ set (QUDA_OBJS
   copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
-  hisq_paths_force_quda.cu fermion_force_quda.cu
+  hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
   ritz_quda.cpp eig_solver.cpp blas_cublas.cu blas_magma.cu
@@ -90,9 +90,7 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   mark_as_advanced(QUDA_GITDIR)
 endif()
 
-# include_directories
-include_directories(dslash_core)
-include_directories(.)
+
 
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
@@ -110,11 +108,17 @@ if(QUDA_BUILD_SHAREDLIB)
 else()
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
+
+# include_directories
+target_include_directories(quda PRIVATE dslash_core)
+target_include_directories(quda SYSTEM PRIVATE ../include/externals)
+target_include_directories(quda PRIVATE .)
+
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
 # propagate CXX flags to CUDA host compiler
-if(USING_CUDA_LANG_SUPPORT AND ${QUDA_PROPAGATE_CXX_FLAGS})
+if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
     $<$<CONFIG:DEVEL>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVEL}>
     $<$<CONFIG:STRICT>:-Xcompiler ${CMAKE_CXX_FLAGS_STRICT}>
@@ -127,33 +131,35 @@ endif()
 
 # some clang warnings shouds be warning even when turning warnings into errors
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field>)
+    target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field" "SHELL:-Xcompiler -Wno-error=unused-function" >)
+
 # this is a hack to get colored diagnostics back when using Ninja and clang
     if(CMAKE_GENERATOR MATCHES "Ninja")
-      target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
+      target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
     endif()
 endif()
 
-target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
+target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
-  target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${QIO_LIB} ${LIME_LIB})
+  target_link_libraries(quda INTERFACE ${QIO_LIB} ${LIME_LIB})
 endif()
 
 if(QUDA_QDPJIT)
-  target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_QMP)
-  target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_MPI)
-  target_link_libraries(quda ${QUDA_SHAREDLIB_INTERFACE} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_MAGMA)
-  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${MAGMA})
+  target_link_libraries(quda PRIVATE ${MAGMA})
 endif()
 
 if(QUDA_ARPACK)
@@ -170,21 +176,18 @@ endif()
 
 
 if(QUDA_NVML)
-  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${NVML_LIBRARY})
+  target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
 endif()
 
 if(QUDA_NUMA_NVML)
-  target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${NVML_LIBRARY})
+  target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
 endif()
 
 
 # malloc.cpp uses both the driver and runtime api
 # So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub version
 # for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake 
-if(${CMAKE_VERSION} VERSION_LESS 3.8)
-  find_library(CUDA_cuda_LIBRARY cuda HINTS ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64 PATH_SUFFIXES stubs )
-endif()
-target_link_libraries(quda ${QUDA_SHAREDLIB_PRIVATE} ${CUDA_cuda_LIBRARY})
+target_link_libraries(quda PUBLIC ${CUDA_cuda_LIBRARY})
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
 if (QUDA_DOWNLOAD_EIGEN)
@@ -194,6 +197,7 @@ endif()
 
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
+
 # some hackery to prevent having old shared / static builds of quda messing with the current build
 ADD_CUSTOM_COMMAND(TARGET quda PRE_LINK COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 

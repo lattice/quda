@@ -341,6 +341,9 @@ namespace quda {
     /** Used as a label in the autotuner */
     char vol_string[TuneKey::volume_n];
     
+    /** used as a label in the autotuner */
+    char aux_string[TuneKey::aux_n];
+
     /** Sets the vol_string for use in tuning */
     virtual void setTuningString();
 
@@ -583,6 +586,9 @@ namespace quda {
 
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
+
+    /** Return the aux string used by the autotuner */
+    inline const char *AuxString() const { return aux_string; }
 
     /** @brief Backs up the LatticeField */
     virtual void backup() const { errorQuda("Not implemented"); }

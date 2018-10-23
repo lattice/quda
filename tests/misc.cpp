@@ -830,6 +830,40 @@ get_test_type(int t)
     return ret;
 }
 
+const char*
+get_staggered_test_type(int t)
+{
+    const char* ret;
+    switch(t){
+    case 0:
+  ret = "full";
+  break;
+    case 1:
+  ret = "full_ee_prec";
+  break;
+    case 2:
+  ret = "full_oo_prec";
+  break;
+    case 3:
+  ret = "even";
+  break;
+    case 4:
+  ret = "odd";
+  break;
+    case 5:
+  ret = "mcg_even";
+  break;  
+    case 6:
+  ret = "mcg_odd";
+  break;  
+    default:
+  ret = "unknown";
+  break;
+    }
+    
+    return ret;
+}
+
 int get_rank_order(char* s)
 {
   int ret = -1;
@@ -1242,6 +1276,10 @@ get_solver_type(char* s)
     ret = QUDA_CG3NE_INVERTER;
   } else if (strcmp(s, "cg3nr") == 0){
     ret = QUDA_CG3NR_INVERTER;
+  } else if (strcmp(s, "ca-cg") == 0){
+    ret = QUDA_CA_CG_INVERTER;
+  } else if (strcmp(s, "ca-gcr") == 0){
+    ret = QUDA_CA_GCR_INVERTER;
   } else {
     fprintf(stderr, "Error: invalid solver type %s\n", s);
     exit(1);
@@ -1318,6 +1356,12 @@ get_solver_str(QudaInverterType type)
     break;
   case QUDA_CG3NR_INVERTER:
     ret = "cg3nr";
+    break;
+  case QUDA_CA_CG_INVERTER:
+    ret = "ca-cg";
+    break;
+  case QUDA_CA_GCR_INVERTER:
+    ret = "ca-gcr";
     break;
   default:
     ret = "unknown";

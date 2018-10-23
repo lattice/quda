@@ -82,10 +82,20 @@ namespace quda {
       if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;
+
+    setTuningString();
   }
 
   GaugeField::~GaugeField() {
 
+  }
+
+  void GaugeField::setTuningString() {
+    LatticeField::setTuningString();
+    int aux_string_n = TuneKey::aux_n / 2;
+    int check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d,geometry=%d,Nc=%d",
+                         volume, stride, precision, geometry, nColor);
+    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
   }
 
   void GaugeField::createGhostZone(const int *R, bool no_comms_fill, bool bidir) const
@@ -320,10 +330,29 @@ namespace quda {
     return nrm1;
   }
 
+  // Scale the gauge field by the constant a
+  void ax(const double &a, GaugeField &u) {
+    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(u));
+    blas::ax(a, *b);
+    delete b;
+  }
+
   uint64_t GaugeField::checksum(bool mini) const {
     return Checksum(*this, mini);
   }
 
+  GaugeField* GaugeField::Create(const GaugeFieldParam &param) {
 
+    GaugeField *field = nullptr;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = new cpuGaugeField(param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = new cudaGaugeField(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
 
 } // namespace quda

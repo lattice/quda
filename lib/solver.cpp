@@ -47,6 +47,14 @@ namespace quda {
 	solver = new GCR(mat, matSloppy, matPrecon, param, profile);
       }
       break;
+    case QUDA_CA_CG_INVERTER:
+      report("CA-CG");
+      solver = new CACG(mat, matSloppy, param, profile);
+      break;
+    case QUDA_CA_GCR_INVERTER:
+      report("CA-GCR");
+      solver = new CAGCR(mat, matSloppy, param, profile);
+      break;
     case QUDA_MR_INVERTER:
       report("MR");
       solver = new MR(mat, matSloppy, param, profile);
@@ -127,7 +135,7 @@ namespace quda {
   }
 
 
-  void Solver::solve(ColorSpinorField& out, ColorSpinorField& in){
+  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in){
     for (int i = 0; i < param.num_src; i++) {
       (*this)(out.Component(i), in.Component(i));
       param.true_res_offset[i] = param.true_res;

@@ -159,9 +159,9 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
-    str += "#define m5 m5_d\n"
-    str += "#define mdwf_b5 mdwf_b5_d\n"
-    str += "#define mdwf_c5 mdwf_c5_d\n"
+    str += "#define m5 param.m5_d\n"
+    str += "#define mdwf_b5 param.mdwf_b5_d\n"
+    str += "#define mdwf_c5 param.mdwf_c5_d\n"
     str += "#define mferm param.mferm\n"
     str += "#define a param.a\n"
     str += "#define b param.b\n"
@@ -173,9 +173,9 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n"
-    str += "#define m5 m5_f\n"
-    str += "#define mdwf_b5 mdwf_b5_f\n"
-    str += "#define mdwf_c5 mdwf_c5_f\n"
+    str += "#define m5 param.m5_f\n"
+    str += "#define mdwf_b5 param.mdwf_b5_f\n"
+    str += "#define mdwf_c5 param.mdwf_c5_f\n"
     str += "#define mferm param.mferm_f\n"
     str += "#define a param.a\n"
     str += "#define b param.b\n"
@@ -366,7 +366,7 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
         prolog_str += (
 """
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*param.Ls) return;
+if (sid >= param.threads*param.dc.Ls) return;
 
 """)
         if domain_wall:
@@ -407,10 +407,10 @@ if (kernel_type == INTERIOR_KERNEL) {
           else:
             prolog_str+=(
 """
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
+boundaryCrossing = sid/param.dc.Xh[0] + sid/(param.dc.X[1]*param.dc.Xh[0]) + sid/(param.dc.X[2]*param.dc.X[1]*param.dc.Xh[0]);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-coord[4] = X/(X1*X2*X3*X4);
+coord[4] = X/(param.dc.X[0]*param.dc.X[1]*param.dc.X[2]*param.dc.X[3]);
 
 """)
 
@@ -418,12 +418,12 @@ coord[4] = X/(X1*X2*X3*X4);
           prolog_str+=(
 """
 X = 2*sid;
-int aux1 = X / X1;
-x1 = X - aux1 * X1;
-int aux2 = aux1 / X2;
-x2 = aux1 - aux2 * X2;
-x4 = aux2 / X3;
-x3 = aux2 - x4 * X3;
+int aux1 = X / param.dc.X[0];
+x1 = X - aux1 * param.dc.X[0];
+int aux2 = aux1 / param.dc.X[1];
+x2 = aux1 - aux2 * param.dc.X[1];
+x4 = aux2 / param.dc.X[2];
+x3 = aux2 - x4 * param.dc.X[2];
 aux1 = (param.parity + x4 + x3 + x2) & 1;
 x1 += aux1;
 X += aux1;
@@ -441,7 +441,7 @@ X += aux1;
 """
 } else { // exterior kernel
 
-const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
+const int face_volume = (param.threads*param.dc.Ls >> 1); // volume of one face
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
 
@@ -531,16 +531,16 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
-    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
+    boundary = ["coord[0]==(param.dc.X[0]-1)", "coord[0]==0", "coord[1]==(param.dc.X[1]-1)", "coord[1]==0", "coord[2]==(param.dc.X[2]-1)", "coord[2]==0", "coord[3]==(param.dc.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.dc.X[0]-1)", "coord[0]>0", "coord[1]<(param.dc.X[1]-1)", "coord[1]>0", "coord[2]<(param.dc.X[2]-1)", "coord[2]>0", "coord[3]<(param.dc.X[3]-1)", "coord[3]>0"]
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+X1", "X-X1", "X+X2X1", "X-X2X1", "X+X3X2X1", "X-X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.dc.X[0]", "X-param.dc.X[0]", "X+param.dc.X2X1", "X-param.dc.X2X1", "X+param.dc.X3X2X1", "X-param.dc.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-X1m1", "X+X1m1", "X-X2X1mX1", "X+X2X1mX1", "X-X3X2X1mX2X1", "X+X3X2X1mX2X1",
-                   "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.dc.X[0]-1)", "X+(param.dc.X[0]-1)", "X-param.dc.X2X1mX1", "X+param.dc.X2X1mX1", "X-param.dc.X3X2X1mX2X1", "X+param.dc.X3X2X1mX2X1",
+                   "X-param.dc.X4X3X2X1mX3X2X1", "X+param.dc.X4X3X2X1mX3X2X1"]
 
     cond = ""
     cond += "#ifdef MULTI_GPU\n"
@@ -568,14 +568,14 @@ def gen(dir, pack_only=False):
 
     str += "\n"
     if dir % 2 == 0:
-        if domain_wall: str += "const int ga_idx = sid % param.volume4CB;\n"
+        if domain_wall: str += "const int ga_idx = sid % param.dc.volume_4d_cb;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));\n"
-        else: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : param.volume4CB+face_idx);\n"
+        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.dc.volume_4d_cb : param.dc.volume_4d_cb+(face_idx % param.dc.ghostFace[static_cast<int>(kernel_type)]));\n"
+        else: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : param.dc.volume_4d_cb+face_idx);\n"
         str += "#else\n"
-        if domain_wall: str += "const int ga_idx = sp_idx % param.volume4CB;\n"
+        if domain_wall: str += "const int ga_idx = sp_idx % param.dc.volume_4d_cb;\n"
         else: str += "const int ga_idx = sp_idx;\n"
         str += "#endif\n"
     str += "\n"
@@ -608,9 +608,9 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     if domain_wall : 
-        load_half += "const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];\n"
+        load_half += "const int sp_stride_pad = param.dc.Ls*param.dc.ghostFace[static_cast<int>(kernel_type)];\n"
     else :
-        load_half += "const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];\n" 
+        load_half += "const int sp_stride_pad = param.dc.ghostFace[static_cast<int>(kernel_type)];\n" 
     #load_half += "#if (DD_PREC==2) // half precision\n"
     #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
     #load_half += "#endif\n"
@@ -625,7 +625,7 @@ def gen(dir, pack_only=False):
 #    if (dir+1) % 2 == 0: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
 #    else: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
     load_gauge = "// read gauge matrix from device memory\n"
-    load_gauge += "ASSN_GAUGE_MATRIX(G, GAUGE"+`( dir%2)`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
+    load_gauge += "ASSN_GAUGE_MATRIX(G, GAUGE"+`( dir%2)`+"TEX, "+`dir`+", ga_idx, param.gauge_stride);\n\n"
 
     reconstruct_gauge = "// reconstruct gauge matrix\n"
     reconstruct_gauge += "RECONSTRUCT_GAUGE_MATRIX("+`dir`+");\n\n"
@@ -731,7 +731,7 @@ def gen(dir, pack_only=False):
         if ( m < 2 ): reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.dc.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(load_gauge + decl_half + prep_half + reconstruct_gauge + mult + reconstruct)
@@ -747,8 +747,8 @@ def gen(dir, pack_only=False):
 # end def gen
 
 def gen_dw():
-    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='param.Ls-1'
-    else: lsign='+'; ledge = 'param.Ls-1'; rsign='-'; redge='0'
+    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='param.dc.Ls-1'
+    else: lsign='+'; ledge = 'param.dc.Ls-1'; rsign='-'; redge='0'
 
     str = "\n\n"
     str += "// 5th dimension -- NB: not partitionable!\n"
@@ -756,7 +756,7 @@ def gen_dw():
       str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n"
     str += "{\n// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
     str += "  {\n"
-    str += "     int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*param.volume4CB : X%s2*param.volume4CB ) / 2;\n" % (ledge, rsign, lsign)
+    str += "     int sp_idx = ( coord[4] == %s ? X%s(param.dc.Ls-1)*2*param.dc.volume_4d_cb : X%s2*param.dc.volume_4d_cb ) / 2;\n" % (ledge, rsign, lsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
@@ -799,7 +799,7 @@ def gen_dw():
     str += "  } // end P_L\n\n"
     str += " // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )\n"
     str += "  {\n"
-    str += "    int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*param.volume4CB : X%s2*param.volume4CB ) / 2;\n" % (redge, lsign, rsign)
+    str += "    int sp_idx = ( coord[4] == %s ? X%s(param.dc.Ls-1)*2*param.dc.volume_4d_cb : X%s2*param.dc.volume_4d_cb ) / 2;\n" % (redge, lsign, rsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
@@ -912,25 +912,25 @@ def gen_dw_inv():
     str += "// 'w' means output vector\n"
     str += "// 'v' means input vector\n"
     str += "{\n"
-    str += "  int base_idx = sid%param.volume4CB;\n"
+    str += "  int base_idx = sid%param.dc.volume_4d_cb;\n"
     str += "  int sp_idx;\n\n"
     str += "// let's assume the index,\n"
     str += "// s = output vector index,\n"
     str += "// s' = input vector index and\n"
     str += "// 'a'= kappa5\n"
     str += "\n"
-    str += "  spinorFloat inv_d_n = static_cast<spinorFloat>(0.5) / ( static_cast<spinorFloat>(1.0) + POW(kappa,param.Ls)*mferm );\n"
+    str += "  spinorFloat inv_d_n = static_cast<spinorFloat>(0.5) / ( static_cast<spinorFloat>(1.0) + POW(kappa,param.dc.Ls)*mferm );\n"
     str += "  spinorFloat factorR;\n"
     str += "  spinorFloat factorL;\n"
     str += "\n"
-    str += "  for(int s = 0; s < param.Ls; s++)\n  {\n"
+    str += "  for(int s = 0; s < param.dc.Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    int exponent = coord[4]  > s ? param.Ls-coord[4]+s : s-coord[4];\n"
+        str += "    int exponent = coord[4]  > s ? param.dc.Ls-coord[4]+s : s-coord[4];\n"
         str += "    factorR = inv_d_n * POW(kappa,exponent) * ( coord[4] > s ? -mferm : static_cast<spinorFloat>(1.0) );\n\n"
     else : 
-        str += "    int exponent = coord[4] < s ? param.Ls-s+coord[4] : coord[4]-s;\n"
+        str += "    int exponent = coord[4] < s ? param.dc.Ls-s+coord[4] : coord[4]-s;\n"
         str += "    factorR = inv_d_n * POW(kappa,exponent) * ( coord[4] < s ? -mferm : static_cast<spinorFloat>(1.0) );\n\n"
-    str += "    sp_idx = base_idx + s*param.volume4CB;\n"
+    str += "    sp_idx = base_idx + s*param.dc.volume_4d_cb;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
     str += "    o00_re += factorR*(i00_re + i20_re);\n" 
@@ -959,10 +959,10 @@ def gen_dw_inv():
     str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
     if dagger == True :  
-        str += "    int exponent2 = coord[4] < s ? param.Ls-s+coord[4] : coord[4]-s;\n"
+        str += "    int exponent2 = coord[4] < s ? param.dc.Ls-s+coord[4] : coord[4]-s;\n"
         str += "    factorL = inv_d_n * POW(kappa,exponent2) * ( coord[4] < s ? -mferm : static_cast<spinorFloat>(1.0));\n\n"
     else : 
-        str += "    int exponent2 = coord[4] > s ? param.Ls-coord[4]+s : s-coord[4];\n"
+        str += "    int exponent2 = coord[4] > s ? param.dc.Ls-coord[4]+s : s-coord[4];\n"
         str += "    factorL = inv_d_n * POW(kappa,exponent2) * ( coord[4] > s ? -mferm : static_cast<spinorFloat>(1.0));\n\n"
 
     str += "    o00_re += factorL*(i00_re - i20_re);\n"
@@ -1197,13 +1197,13 @@ int incomplete = 0; // Have all 8 contributions been computed for this site?
 
 switch(kernel_type) { // intentional fall-through
 case INTERIOR_KERNEL:
-  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==X4m1));
+  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==(param.dc.X[3]-1)));
 case EXTERIOR_KERNEL_T:
-  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==X3m1));
+  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==(param.dc.X[2]-1)));
 case EXTERIOR_KERNEL_Z:
-  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==X2m1));
+  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==(param.dc.X[1]-1)));
 case EXTERIOR_KERNEL_Y:
-  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==X1m1));
+  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==(param.dc.X[0]-1)));
 }
 
 """)

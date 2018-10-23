@@ -14,7 +14,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
-    : LatticeField(param), init(false), v(0), norm(0),
+    : LatticeField(param), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ),
       bytes(0), norm_bytes(0), even(0), odd(0),
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
@@ -26,7 +26,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
-    : LatticeField(field), init(false), v(0), norm(0),
+    : LatticeField(field), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ),
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
@@ -42,7 +42,7 @@ namespace quda {
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const {
 
-    if (typeid(*this) == typeid(cpuColorSpinorField)) return;
+    if ( typeid(*this) == typeid(cpuColorSpinorField) || ghost_precision_allocated == ghost_precision ) return;
 
     // For Wilson we half the number of effective faces if the fields are spin projected.
     int num_faces = ((nSpin == 4 && spin_project) ? 1 : 2) * nFace;
@@ -90,7 +90,6 @@ namespace quda {
       ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*ghost_precision;
       if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
 
-
       if(GhostOffset(i,0)%FieldOrder()) errorQuda("ghostOffset(%d,0) %d is not a multiple of FloatN\n", i, GhostOffset(i,0));
       if(GhostOffset(i,1)%FieldOrder()) errorQuda("ghostOffset(%d,1) %d is not a multiple of FloatN\n", i, GhostOffset(i,1));
 
@@ -110,6 +109,63 @@ namespace quda {
     ghost_bytes = (size_t)ghost_length*ghost_precision;
     if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
+
+    { // compute temporaries needed by dslash and packing kernels
+      auto &X = dslash_constant.X;
+      for (int dim=0; dim<nDim; dim++) X[dim] = x[dim];
+      for (int dim=nDim; dim<QUDA_MAX_DIM; dim++) X[dim] = 1;
+      if (siteSubset == QUDA_PARITY_SITE_SUBSET) X[0] = 2*X[0];
+
+      for (int i=0; i<nDim; i++) dslash_constant.Xh[i] = X[i]/2;
+
+      dslash_constant.Ls = X[4];
+      dslash_constant.volume_4d_cb = volumeCB / (nDim == 5 ? x[4] : 1);
+      dslash_constant.volume_4d = 2 * dslash_constant.volume_4d_cb;
+
+      int face[4];
+      for (int dim=0; dim<4; dim++) {
+        for (int j=0; j<4; j++) face[j] = X[j];
+        face[dim] = nFace;
+        dslash_constant.face_X[dim] = face[0];
+        dslash_constant.face_Y[dim] = face[1];
+        dslash_constant.face_Z[dim] = face[2];
+        dslash_constant.face_T[dim] = face[3];
+        dslash_constant.face_XY[dim] = dslash_constant.face_X[dim] * face[1];
+        dslash_constant.face_XYZ[dim] = dslash_constant.face_XY[dim] * face[2];
+        dslash_constant.face_XYZT[dim] = dslash_constant.face_XYZ[dim] * face[3];
+      }
+
+      dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
+      dslash_constant.ghostFace[0] = (X[1]*X[2]*X[3])/2;
+      dslash_constant.ghostFace[1] = (X[0]*X[2]*X[3])/2;
+      dslash_constant.ghostFace[2] = (X[0]*X[1]*X[3])/2;
+      dslash_constant.ghostFace[3] = (X[0]*X[1]*X[2])/2;
+
+      dslash_constant.X2X1 = X[1]*X[0];
+      dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
+      dslash_constant.X2X1mX1 = (X[1]-1)*X[0];
+      dslash_constant.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
+      dslash_constant.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
+      dslash_constant.X4X3X2X1hmX3X2X1h = dslash_constant.X4X3X2X1mX3X2X1/2;
+
+      // used by indexFromFaceIndexStaggered
+      dslash_constant.dims[0][0]=X[1];
+      dslash_constant.dims[0][1]=X[2];
+      dslash_constant.dims[0][2]=X[3];
+
+      dslash_constant.dims[1][0]=X[0];
+      dslash_constant.dims[1][1]=X[2];
+      dslash_constant.dims[1][2]=X[3];
+
+      dslash_constant.dims[2][0]=X[0];
+      dslash_constant.dims[2][1]=X[1];
+      dslash_constant.dims[2][2]=X[3];
+
+      dslash_constant.dims[3][0]=X[0];
+      dslash_constant.dims[3][1]=X[1];
+      dslash_constant.dims[3][2]=X[2];
+    }
+    ghost_precision_allocated = ghost_precision;
 
   } // createGhostZone
 
@@ -203,26 +259,29 @@ namespace quda {
   }
 
   void ColorSpinorField::setTuningString() {
-    char vol_tmp[TuneKey::volume_n];
-    int check;
-    check = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
-    if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
-    for (int d=1; d<nDim; d++) {
-      strcpy(vol_tmp, vol_string);
-      check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_tmp, x[d]);
+    {
+      //LatticeField::setTuningString(); // FIXME - LatticeField needs correct dims for single-parity
+      char vol_tmp[TuneKey::volume_n];
+      int check  = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
       if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
+      for (int d=1; d<nDim; d++) {
+        strcpy(vol_tmp, vol_string);
+        check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_tmp, x[d]);
+        if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
+      }
     }
 
-    int aux_string_n = TuneKey::aux_n / 2;
-    char aux_tmp[aux_string_n];
-    check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d,Ns=%d,Nc=%d",
-		     volume, stride, precision, nSpin, nColor);
-    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
-
-    if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
-      strcpy(aux_tmp, aux_string);
-      check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
+    {
+      int aux_string_n = TuneKey::aux_n / 2;
+      char aux_tmp[aux_string_n];
+      int check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d,Ns=%d,Nc=%d",
+                           volume, stride, precision, nSpin, nColor);
       if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
+        strcpy(aux_tmp, aux_string);
+        check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
+        if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+      }
     }
   }
 
@@ -699,7 +758,7 @@ namespace quda {
 
   ColorSpinorField* ColorSpinorField::Create(const ColorSpinorParam &param) {
 
-    ColorSpinorField *field = NULL;
+    ColorSpinorField *field = nullptr;
     if (param.location == QUDA_CPU_FIELD_LOCATION) {
       field = new cpuColorSpinorField(param);
     } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
@@ -713,7 +772,7 @@ namespace quda {
 
   ColorSpinorField* ColorSpinorField::Create(const ColorSpinorField &src, const ColorSpinorParam &param) {
 
-    ColorSpinorField *field = NULL;
+    ColorSpinorField *field = nullptr;
     if (param.location == QUDA_CPU_FIELD_LOCATION) {
       field = new cpuColorSpinorField(src, param);
     } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
@@ -726,7 +785,8 @@ namespace quda {
   }
 
   ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
-						   QudaFieldLocation new_location) {
+                                                   QudaPrecision new_precision, QudaFieldLocation new_location,
+                                                   QudaMemoryType new_mem_type) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
     coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin
@@ -735,11 +795,21 @@ namespace quda {
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
 
+    // if new precision is not set, use this->precision
+    new_precision = (new_precision == QUDA_INVALID_PRECISION) ? Precision() : new_precision;
+
     // if new location is not set, use this->location
-    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location() : new_location;
 
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    else coarseParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    coarseParam.setPrecision(new_precision);
+
+    // set where we allocate the field
+    coarseParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
+      (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
 
     ColorSpinorField *coarse = NULL;
     if (new_location == QUDA_CPU_FIELD_LOCATION) {
@@ -754,13 +824,17 @@ namespace quda {
   }
 
   ColorSpinorField* ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec,
-						 QudaFieldLocation new_location) {
+                                                 QudaPrecision new_precision, QudaFieldLocation new_location,
+                                                 QudaMemoryType new_mem_type) {
     ColorSpinorParam fineParam(*this);
     for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
     fineParam.nSpin = nSpin * spinBlockSize;
     fineParam.nColor = Nvec;
     fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
     fineParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    // if new precision is not set, use this->precision
+    new_precision = (new_precision == QUDA_INVALID_PRECISION) ? Precision() : new_precision;
 
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
@@ -769,7 +843,15 @@ namespace quda {
     if (new_location == QUDA_CUDA_FIELD_LOCATION) {
       fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.Precision()!= QUDA_DOUBLE_PRECISION) ?
 	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
+    } else {
+      fineParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     }
+
+    fineParam.setPrecision(new_precision);
+
+    // set where we allocate the field
+    fineParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
+      (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
 
     ColorSpinorField *fine = NULL;
     if (new_location == QUDA_CPU_FIELD_LOCATION) {

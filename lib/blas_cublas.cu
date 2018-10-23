@@ -83,7 +83,7 @@ namespace quda {
 	  if (info_array[i] < 0) {
 	    errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
 	  } else if (info_array[i] > 0) {
-	    warningQuda("%d factorization completed but the factor U is exactly singular", i);
+	    errorQuda("%d factorization completed but the factor U is exactly singular", i);
 	  }
 	}
     

@@ -64,8 +64,7 @@ namespace quda {
     bool checkGrid(TuneParam &param) const {
       if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0] || param.grid.y > (unsigned int)deviceProp.maxGridSize[1]) {
         warningQuda("Autotuner is skipping blockDim=(%u,%u,%u), gridDim=(%u,%u,%u) because lattice volume is too large",
-        param.block.x, param.block.y, param.block.z, 
-        param.grid.x, param.grid.y, param.grid.z);
+                    param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z);
         return false;
       } else {
         return true;
@@ -116,14 +115,11 @@ namespace quda {
     unsigned int sharedBytesPerThread() const { return 0; }
   
   public:
-    DomainWallDslash4DPCCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
-			     const QudaReconstructType reconstruct, const cudaColorSpinorField *in, 
-			     const cudaColorSpinorField *x, const double mferm, 
-			     const double a, const double b, const int dagger, const int DS_type)
-      : DslashCuda(out, in, x, reconstruct, dagger), DS_type(DS_type)
+    DomainWallDslash4DPCCuda(cudaColorSpinorField *out, const GaugeField &gauge, const cudaColorSpinorField *in,
+			     const cudaColorSpinorField *x, const double mferm,
+			     const double a, const double b, const int parity, const int dagger, const int *commOverride, const int DS_type)
+      : DslashCuda(out, in, x, gauge, parity, dagger, commOverride), DS_type(DS_type)
     { 
-      dslashParam.gauge0 = (void*)gauge0;
-      dslashParam.gauge1 = (void*)gauge1;
       dslashParam.a = a;
       dslashParam.a_f = a;
       dslashParam.b = b;
@@ -258,41 +254,16 @@ namespace quda {
 			    const cudaColorSpinorField *x, const double &m_f, const double &a, const double &b,
 			    const int *commOverride, const int DS_type, TimeProfile &profile)
   {
-    inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->createComms(1);
-
-    dslashParam.parity = parity;
-
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    //currently splitting in space-time is impelemented:
-    int dirs = 4;
-    for(int i = 0;i < dirs; i++){
-      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
-      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
-      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
-      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
-    }  
+    const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
-    void *gauge0, *gauge1;
-    bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-    if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge precision (%d) and spinor precision (%d) not supported", gauge.Precision(), in->Precision());
-
-    DslashCuda *dslash = 0;
-    size_t regSize = sizeof(float);
-
+    DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new DomainWallDslash4DPCCuda<double2,double2>(out, (double2*)gauge0, (double2*)gauge1, 
-							     gauge.Reconstruct(), in, x, m_f, a, b, dagger, DS_type);
-      regSize = sizeof(double);
+      dslash = new DomainWallDslash4DPCCuda<double2,double2>(out, gauge, in, x, m_f, a, b, parity, dagger, commOverride, DS_type);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new DomainWallDslash4DPCCuda<float4,float4>(out, (float4*)gauge0, (float4*)gauge1, 
-							   gauge.Reconstruct(), in, x, m_f, a, b, dagger, DS_type);
+      dslash = new DomainWallDslash4DPCCuda<float4,float4>(out, gauge, in, x, m_f, a, b, parity, dagger, commOverride, DS_type);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new DomainWallDslash4DPCCuda<short4,short4>(out, (short4*)gauge0, (short4*)gauge1, 
-							   gauge.Reconstruct(), in, x, m_f, a, b, dagger, DS_type);
+      dslash = new DomainWallDslash4DPCCuda<short4,short4>(out, gauge, in, x, m_f, a, b, parity, dagger, commOverride, DS_type);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d
@@ -300,20 +271,17 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyImp* dslashImp = NULL;
+    DslashPolicyImp* dslashImp = nullptr;
     if (DS_type != 0) {
       dslashImp = DslashFactory::create(QudaDslashPolicy::QUDA_DSLASH_NC);
-      (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+      (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
       delete dslashImp;
     } else {
-      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
       dslash_policy.apply(0);
     }
 
     delete dslash;
-    unbindGaugeTex(gauge);
-
-    checkCudaError();
 #else
     errorQuda("4D preconditioned Domain wall dslash has not been built");
 #endif

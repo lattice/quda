@@ -146,29 +146,29 @@ namespace quda {
 
     if (count == 0) return;
 
-#if 0
-    QudaMemCopy copy(dst, src, count, kind, true, func, file, line);
-    copy.apply(stream);
-#else
+    if (kind == cudaMemcpyDeviceToDevice) {
+      QudaMemCopy copy(dst, src, count, kind, true, func, file, line);
+      copy.apply(stream);
+    } else {
 #ifdef USE_DRIVER_API
-    switch (kind) {
-    case cudaMemcpyDeviceToHost:
-      PROFILE(cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
-      break;
-    case cudaMemcpyHostToDevice:
-      PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
-      break;
-    case cudaMemcpyDeviceToDevice:
-      PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
-      break;
-    default:
-      errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
-    }
+      switch (kind) {
+      case cudaMemcpyDeviceToHost:
+        PROFILE(cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
+        break;
+      case cudaMemcpyHostToDevice:
+        PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+        break;
+      case cudaMemcpyDeviceToDevice:
+        PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
+        break;
+      default:
+        errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
+      }
 #else
-    PROFILE(cudaMemcpyAsync(dst, src, count, kind, stream),
-            kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+      PROFILE(cudaMemcpyAsync(dst, src, count, kind, stream),
+              kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
 #endif
-#endif
+    }
   }
 
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
@@ -202,6 +202,14 @@ namespace quda {
 #endif
   }
 
+  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
+    if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
+    return error;
+  }
+
   cudaError_t qudaEventQuery(cudaEvent_t &event)
   {
 #ifdef USE_DRIVER_API
@@ -212,7 +220,9 @@ namespace quda {
     case CUDA_ERROR_NOT_READY: // this is the only return value care about
       return cudaErrorNotReady;
     default:
-      errorQuda("cuEventQuery return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventQuery returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -229,7 +239,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuEventRecord return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventrecord returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -246,7 +258,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuStreamWaitEvent return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuStreamWaitEvent returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -263,7 +277,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuStreamSynchronize return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuStreamSynchronize returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -280,7 +296,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuEventSynchronize return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventSynchronize returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -297,7 +315,9 @@ namespace quda {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
-      errorQuda("cuCtxSynchronize return error code %d", error);
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuCtxSynchronize returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
@@ -305,6 +325,15 @@ namespace quda {
     return error;
 #endif
   }
+
+#if (CUDA_VERSION >= 9000)
+  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)
+  {
+    // no driver API variant here since we have C++ functions
+    PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    return error;
+  }
+#endif
 
   void printAPIProfile() {
 #ifdef API_PROFILE

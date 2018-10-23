@@ -95,7 +95,7 @@ namespace quda {
     }
 
     // compute the fat link max now in case it is needed later (i.e., for half precision)
-    if (param.compute_fat_link_max) fat_link_max = maxGauge(*this);
+    if (param.compute_fat_link_max) fat_link_max = this->abs_max();
   }
 
 
@@ -245,6 +245,12 @@ namespace quda {
       host_free(recv[d]);
     }
 
+  }
+
+  void cpuGaugeField::exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill) {
+    profile.TPSTART(QUDA_PROFILE_COMMS);
+    exchangeExtendedGhost(R, no_comms_fill);
+    profile.TPSTOP(QUDA_PROFILE_COMMS);
   }
 
   // defined in cudaGaugeField

@@ -72,6 +72,8 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #if defined INIT_PARAM
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
   P(reconstruct_sloppy, QUDA_RECONSTRUCT_INVALID);
+  P(cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
+  P(reconstruct_refinement_sloppy, QUDA_RECONSTRUCT_INVALID);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
   P(reconstruct_precondition, QUDA_RECONSTRUCT_INVALID);
 #else
@@ -79,6 +81,10 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
     param->cuda_prec_sloppy = param->cuda_prec;
   if (param->reconstruct_sloppy == QUDA_RECONSTRUCT_INVALID)
     param->reconstruct_sloppy = param->reconstruct;
+  if (param->cuda_prec_refinement_sloppy == QUDA_INVALID_PRECISION)
+    param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
+  if (param->reconstruct_refinement_sloppy == QUDA_RECONSTRUCT_INVALID)
+    param->reconstruct_refinement_sloppy = param->reconstruct_sloppy;
   if (param->cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->cuda_prec_precondition = param->cuda_prec_sloppy;
   if (param->reconstruct_precondition == QUDA_RECONSTRUCT_INVALID)
@@ -281,6 +287,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
+#ifndef CHECK_PARAM
+  P(reliable_delta_refinement, INVALID_DOUBLE);
+#else
+  if (param->reliable_delta_refinement == INVALID_DOUBLE) param->reliable_delta_refinement = param->reliable_delta;
+#endif
+
 #ifdef INIT_PARAM 
   P(use_sloppy_partial_accumulator, 0); /**< Default is to use a high-precision accumulator (not yet supported in all solvers) */
   P(solution_accumulator_pipeline, 1); /**< Default is solution accumulator depth of 1 */
@@ -341,12 +353,15 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cpu_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec, QUDA_INVALID_PRECISION);
 
-#if defined INIT_PARAM
+#ifndef CHECK_PARAM
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
+  P(cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
 #else
   if (param->cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_sloppy = param->cuda_prec;
+  if (param->cuda_prec_refinement_sloppy == QUDA_INVALID_PRECISION)
+    param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
   if (param->cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->cuda_prec_precondition = param->cuda_prec_sloppy;
 #endif
@@ -389,7 +404,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(gcrNkrylov, INVALID_INT);
 #else
-  if (param->inv_type == QUDA_GCR_INVERTER) {
+  if (param->inv_type == QUDA_GCR_INVERTER || param->inv_type == QUDA_CA_GCR_INVERTER) {
     P(gcrNkrylov, INVALID_INT);
   }
 #endif
@@ -437,6 +452,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(clover_cuda_prec, QUDA_INVALID_PRECISION);
 #if defined INIT_PARAM
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
+    P(clover_cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
     P(compute_clover_trlog, 0);
     P(compute_clover, 0);
@@ -447,6 +463,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #else
     if (param->clover_cuda_prec_sloppy == QUDA_INVALID_PRECISION)
       param->clover_cuda_prec_sloppy = param->clover_cuda_prec;
+    if (param->clover_cuda_prec_refinement_sloppy == QUDA_INVALID_PRECISION)
+      param->clover_cuda_prec_refinement_sloppy = param->clover_cuda_prec_sloppy;
     if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
       param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
     P(compute_clover_trlog, QUDA_INVALID_PRECISION);
@@ -531,6 +549,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(chrono_replace_last, INVALID_INT);
   P(chrono_max_dim, INVALID_INT);
   P(chrono_index, INVALID_INT);
+#endif
+
+#if !defined CHECK_PARAM
+  P(chrono_precision, QUDA_INVALID_PRECISION);
+#else
+  // default the chrono precision to using outer precision
+  if (param->chrono_precision == QUDA_INVALID_PRECISION) param->chrono_precision = param->cuda_prec;
 #endif
 
 #if defined INIT_PARAM
@@ -668,6 +693,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_location[i], QUDA_INVALID_FIELD_LOCATION);
 #endif
   }
+
+#ifdef INIT_PARAM
+  P(setup_minimize_memory, QUDA_BOOLEAN_NO);
+#else
+  P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
+#endif
 
   P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(generate_all_levels, QUDA_BOOLEAN_INVALID);

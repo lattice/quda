@@ -1,4 +1,5 @@
 #include <quda_internal.h>
+#include <timer.h>
 
 namespace quda {
 
@@ -35,10 +36,11 @@ namespace quda {
   }
 
   std::string TimeProfile::pname[] = { "download",  "upload", "init", "preamble", "compute",
-				       "comms", "epilogue", "free", "file i/o", "dummy", "pack kernel",
-				       "dslash kernel", "gather", "scatter", "event record",
-				       "event query", "stream wait event", "event synchronize",
-                                       "stream synchronize", "device synchronize",
+				       "comms", "epilogue", "free", "file i/o", "chronology", "eigen",
+                                       "dummy", "pack kernel", "dslash kernel", "gather", "scatter",
+                                       "kernel launch", "event record",
+				       "event query", "stream wait event", "set func attribute",
+                                       "event synchronize", "stream synchronize", "device synchronize",
                                        "memcpy d2d async", "memcpy d2h async", "memcpy2d d2h async",
                                        "memcpy h2d async", "comms start", "comms query", "constant", "total" };
 
