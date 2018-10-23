@@ -588,7 +588,7 @@ namespace quda{
     } else if(strncmp(L, spectrum, 1) == 0 && arpack_param->usePolyAcc) {
       inverse = false;
     }
-    
+        
     sortAbs<float>(mod_h_evals_sorted, nconv, inverse, h_evals_sorted_idx);
     
     printfQuda("Sorted eigenvalues based on their absolute values:\n");
@@ -1297,10 +1297,12 @@ namespace quda{
       blas::zero(*(d_ritzVecs[i]));
     }
 
+    bool *locked = (bool*)malloc(nev*sizeof(bool));
+    for(int i=0; i<nev; i++) locked[i] = false;
+    
     //Populate source with randoms.
     printfQuda("Using random guess\n");
     d_v -> Source(QUDA_RANDOM_SOURCE);
-    //*d_v = *h_v;
     
     //Ensure we are not trying to compute on a zero-field source    
     const Float norm = sqrt(blas::norm2(*d_v));
@@ -1411,6 +1413,8 @@ namespace quda{
       }
     }
 
+    int restart = 0;
+    
     using Eigen::MatrixXd;
     MatrixXd triDiag = MatrixXd::Zero(nkv, nkv);
     
@@ -1421,10 +1425,6 @@ namespace quda{
     for(int i=0; i<nkv; i++) {
       triDiag(i,i) = alpha[i];
       if(i<nkv-1) {
-	triDiag(i+1,i  ) = beta[i];
-	triDiag(i,  i+1) = beta[i];
-      }
-      else if(i<nkv-1) {
 	triDiag(i+1,i  ) = beta[i];
 	triDiag(i,  i+1) = beta[i];
       }
@@ -1440,7 +1440,7 @@ namespace quda{
     for(int i=0; i<nkv; i++)
       for(int j=0; j<nkv; j++) 
 	Ymat[i][j] = eigenSolver.eigenvectors().col(i)[j];
-
+    
     //Perform Rayleigh-Ritz check for convergence    
     // Q_tilde_{nkv,nkv} = Q * Y 
 
@@ -1462,7 +1462,7 @@ namespace quda{
       
       std::complex<Float> sum = 0.0;
       //loop over columns of Y 
-      for(int k=0; k<nkv; k++) {
+      for(int k=0; k<restart; k++) {
 	//take product of jth row of Q and kth column of Y
 	//to compute Q_tilde[k][j].
 	for(int l=0; l<nkv; l++) {
@@ -1483,9 +1483,20 @@ namespace quda{
       mat.MdagM(*d_v, *(d_ritzVecs[i]));      
       blas::caxpby(eigenSolver.eigenvalues()[i], *d_ritzVecs[i], -1.0, *d_v);
       h_evals_resid[i] = sqrt(blas::norm2(*d_v));
-      
+      if(h_evals_resid[i] < 1e-6) {
+	locked[i] = true;
+	restart = i+1;
+      }
     }
-    
+      
+    //Update beta and alpha
+    for(int i=0; i<nkv; i++) {
+      if(locked[i]) {
+	alpha[i] = eigenSolver.eigenvalues()[i];
+	beta[i] = beta[nkv-1]*eigenSolver.eigenvectors().col(i)[nkv-1];
+      }
+    }
+
     for(int i=0; i<nkv; i++) {
       h_evals_alt[i] = eigenSolver.eigenvalues()[i];
       h_evals_sorted_idx[i] = i;
@@ -1494,11 +1505,195 @@ namespace quda{
     
     sortAbs<Float>(mod_h_evals_sorted, nkv, true, h_evals_sorted_idx);
 
-    for(int i=0; i<nkv; i++){
+    for(int i=0; i<nev; i++){
       int idx = h_evals_sorted_idx[i];
       printfQuda("RitzValue[%04d] = %+e Residual: %+e\n",		 
 		 i, h_evals_alt[idx], h_evals_resid[idx]); 
     }
+    
+    //--------------------//
+    // Restarting Lanczos //
+    //--------------------//    
+
+    //Begin iteration    
+    for (int k = restart; k < nkv; ++k) {          
+      
+      //Abbreviated Initial Step
+      if(k == restart) {
+	
+	//q_0 = r / norm;
+	*d_ritzVecs[restart] = *d_ritzVecs[nkv];
+	
+	//r = M * q_0
+	//apply matrix-vector operation here:
+	if(eig_param->usePolyAcc) {
+	  polyOp<Float, QudaEigParam>(mat, *d_v, *(d_ritzVecs[restart]), eig_param);
+	}
+	else {
+	  if(eig_param->useNormOp && eig_param->useDagger) {
+	    mat.MMdag(*d_v, *(d_ritzVecs[restart]));
+	  }
+	  else if(eig_param->useNormOp && !eig_param->useDagger) {
+	    mat.MdagM(*d_v, *(d_ritzVecs[restart]));
+	  }
+	  else if (!eig_param->useNormOp && eig_param->useDagger) {
+	    mat.Mdag(*d_v, *(d_ritzVecs[restart]));
+	  }
+	  else {  
+	    mat.M(*d_v, *(d_ritzVecs[restart]));
+	  }
+	}
+		
+	//A = r^dag * M * r
+	alpha[restart] = blas::reDotProduct(*(d_ritzVecs[restart]), *d_v);    
+	//r = r - A * q_0 
+	blas::axpy(-alpha[restart], *d_ritzVecs[restart], *d_v);
+	//r = r - Sum_i^M beta_{i} q_{i}
+	for(int i=0; i<restart; i++) {
+	  blas::axpy(-beta[i], *d_ritzVecs[i], *d_v);
+	}
+	
+	beta[restart] = sqrt(blas::norm2(*d_v));    
+	blas::zero(*(d_ritzVecs[restart+1]));
+	blas::axpy(1.0/beta[restart], *d_v, *d_ritzVecs[restart+1]);    
+	
+      } else {
+      
+	//q_k = r / norm;
+	
+	//r = M * q_k
+	//apply matrix-vector operation here:
+	if(eig_param->usePolyAcc) {
+	  polyOp<Float, QudaEigParam>(mat, *d_v, *(d_ritzVecs[k]), eig_param);
+	  //blas::ax(1.0/sqrt(blas::norm2(*d_v)), *d_v);
+	}
+	else {
+	  if(eig_param->useNormOp && eig_param->useDagger) {
+	    mat.MMdag(*d_v, *(d_ritzVecs[k]));
+	  }
+	  else if(eig_param->useNormOp && !eig_param->useDagger) {
+	    mat.MdagM(*d_v, *(d_ritzVecs[k]));
+	  }
+	  else if (!eig_param->useNormOp && eig_param->useDagger) {
+	    mat.Mdag(*d_v, *(d_ritzVecs[k]));
+	  }
+	  else {  
+	    mat.M(*d_v, *(d_ritzVecs[k]));
+	  }
+	}
+
+	//r = r - B_{k-1} * q_{k-1}
+	blas::axpy(-beta[k-1], *d_ritzVecs[k-1], *d_v);      
+	
+	//A_k = r^dag * M * r
+	alpha[k] = blas::reDotProduct(*(d_ritzVecs[k]), *d_v);      	
+
+	//r = r - A_k * q_k 
+	blas::axpy(-alpha[k], *d_ritzVecs[k], *d_v);      
+	
+	//B_k = ||r||_2
+	beta[k] = sqrt(blas::norm2(*d_v));
+	
+	//Orthonormalise      
+	for(int i=0; i<k+1; i++) {
+	  if(!locked[i]) {
+	    Complex C = blas::cDotProduct(*(d_ritzVecs[i]), *d_v); //<i,k>
+	    blas::caxpy(-C, *d_ritzVecs[i], *d_v); // k-<i,k>i
+	    //check ortho
+	    C = blas::cDotProduct(*(d_ritzVecs[i]), *d_v); //<i,k>
+	    if(fabs(C) > 1e-8) {
+	      printfQuda("init %d %d ortho (%+e,%+e)\n", k, i, real(C), imag(C));
+	    }
+	  }
+	}
+	
+	//The final vector is the q_{m+1}
+	blas::zero(*(d_ritzVecs[k+1]));
+	blas::axpy(1.0/beta[k], *d_v, *(d_ritzVecs[k+1]));
+	
+      }
+    }
+    
+
+    //--------------------------//
+    // End Of Restarted Lanczos //
+    //--------------------------//
+
+    // Compute Y_{nkv,nev}
+    using Eigen::MatrixXd;
+    triDiag = MatrixXd::Zero(nkv, nkv);
+    
+    for(int i=0; i<nkv; i++) {
+      triDiag(i,i) = alpha[i];
+      if(i<restart) {
+	triDiag(restart-1,i  ) = beta[i];
+	triDiag(i,  restart-1) = beta[i];
+      }
+      else if(i<nkv-1) {
+	triDiag(i+1,i  ) = beta[i];
+	triDiag(i,  i+1) = beta[i];
+      }
+    }    
+
+    std::cout << "The tridiag after restart:" << std::endl << triDiag << std::endl << std::endl;
+    
+    //Eigensolve T, sort low -> high, place nev evecs in Y
+    Eigen::SelfAdjointEigenSolver<MatrixXd> eigenSolverR(triDiag);
+
+    //Place data in accessible array
+    //Float Ymat[nkv][nkv];
+    for(int i=0; i<nkv; i++)
+      for(int j=0; j<nkv; j++) 
+	Ymat[i][j] = eigenSolverR.eigenvectors().col(i)[j];
+    
+    //Perform Rayleigh-Ritz check for convergence    
+    // Q_tilde_{nkv,nkv} = Q * Y 
+
+    //Copy all q vectors to host for manipulation
+    //ritzVecs[i] references h_ritzVecs[i]
+    for(int i=0; i<nkv; i++) {
+      *h_ritzVecs[i] = *d_ritzVecs[i];
+    }
+    
+    //loop over rows of Q
+    for(int j=0; j<length/2; j++) {      
+
+      //put jth row of Q in temp
+      std::complex<Float> tmp[nkv];      
+      for(int i=0; i<nkv; i++) {
+	tmp[i] = ritzVecs[i][j];
+	//if(j==0) printfQuda("Original row %e %e\n", real(tmp[i]), imag(tmp[i]));
+      }
+      
+      std::complex<Float> sum = 0.0;
+      //loop over columns of Y 
+      for(int k=0; k<restart; k++) {
+	//take product of jth row of Q and kth column of Y
+	//to compute Q_tilde[k][j].
+	for(int l=0; l<nkv; l++) {
+	  sum += tmp[l]*Ymat[k][l];
+	  //if(j==0) printfQuda("%d %d New row %e %e %e %e %e \n", k, j, real(tmp[l]), imag(tmp[l]), Ymat[k][l], real(sum), imag(sum));
+	}
+	ritzVecs[k][j] = sum;
+	sum *= 0.0;
+      }
+    }
+    
+    //Error estimates given by || M * q_tilde  -  lambda q_tilde ||
+    for(int i=0; i<nkv; i++) {
+      
+      //Copy q vector to device
+      *d_ritzVecs[i] = *h_ritzVecs[i];
+      //M * q_tilde
+      mat.MdagM(*d_v, *(d_ritzVecs[i]));      
+      blas::caxpby(eigenSolverR.eigenvalues()[i], *d_ritzVecs[i], -1.0, *d_v);
+      h_evals_resid[i] = sqrt(blas::norm2(*d_v));
+      if(h_evals_resid[i] < 1e-6) {
+	locked[i] = true;
+	restart = i+1;
+      }
+    }
+
     
     for(int i=0 ; i < nev ; i++){
 
@@ -1533,7 +1728,6 @@ namespace quda{
 		 i, h_evals_alt[idx], sqrt(L2norm));
     }
     
-       
     free(mod_h_evals_sorted);
     free(h_evals_resid);
     free(h_evals_alt);
