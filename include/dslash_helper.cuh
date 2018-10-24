@@ -298,12 +298,12 @@ namespace quda {
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : 0)) * 2 * in.GhostFace()[arg.kernel_type];
+        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops/2)) * 2 * in.GhostFace()[arg.kernel_type];
         break;
       case EXTERIOR_KERNEL_ALL:
         {
           long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-          flops_ = (ghost_flops + (arg.xpay ? xpay_flops : 0)) * ghost_sites;
+          flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops/2)) * ghost_sites;
           break;
         }
       case INTERIOR_KERNEL:
@@ -319,7 +319,7 @@ namespace quda {
           // now correct for flops done by exterior kernel
           long long ghost_sites = 0;
           for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
-          flops_ -= (ghost_flops + (arg.xpay ? xpay_flops : 0)) * ghost_sites;
+          flops_ -= ghost_flops * ghost_sites;
 
           break;
         }
@@ -334,7 +334,7 @@ namespace quda {
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
       int proj_spinor_bytes = in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
-      int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + spinor_bytes;
+      int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + 2*spinor_bytes; // 2 since we have to load the partial
       int num_dir = 2 * in.Ndim(); // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
 
       long long bytes_=0;
@@ -344,12 +344,12 @@ namespace quda {
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        bytes_ = (ghost_bytes + (arg.xpay ? spinor_bytes : 0)) * 2 * in.GhostFace()[arg.kernel_type];
+        bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type];
         break;
       case EXTERIOR_KERNEL_ALL:
         {
           long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-          bytes_ = (ghost_bytes + (arg.xpay ? spinor_bytes : 0)) * ghost_sites;
+          bytes_ = ghost_bytes * ghost_sites;
           break;
         }
       case INTERIOR_KERNEL:
@@ -363,7 +363,7 @@ namespace quda {
           // now correct for bytes done by exterior kernel
           long long ghost_sites = 0;
           for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
-          bytes_ -= (ghost_bytes + (arg.xpay ? spinor_bytes : 0)) * ghost_sites;
+          bytes_ -= ghost_bytes * ghost_sites;
 
           break;
         }

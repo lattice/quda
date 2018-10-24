@@ -16,8 +16,8 @@
    - fused halo kernel
    - commDim vs ghostDim
    - host dslash halo
-   - half precision ghost
    - all the policies
+   - ghost texture support in accessors
 
 */
 
@@ -53,12 +53,15 @@ namespace quda {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
 
-      // need to reset ghost pointers since Ghost() returns ghost_buf but this is only set with exchangeGhost
+      // FIXME: need to reset ghost pointers since Ghost() returns ghost_buf but this is only presently set with exchangeGhost
+      void *ghost[8];
       for (int dim=0; dim<4; dim++) {
-        const_cast<F&>(this->in).ghost[2*dim+0] = (Float*)((char*)in.Ghost2() + in.GhostOffset(dim,0)*in.GhostPrecision());
-        const_cast<F&>(this->in).ghost[2*dim+1] = (Float*)((char*)in.Ghost2() + in.GhostOffset(dim,1)*in.GhostPrecision());
-        // we really just want to point to from_face_dim_dir_d[bufferIndex][d][dir] / from_face_dim_dir_h[bufferIndex][d][dir]
+        for (int dir=0; dir<2; dir++) {
+          // really pointing to from_face_dim_dir_d[bufferIndex][d][dir] / from_face_dim_dir_h[bufferIndex][d][dir]
+          ghost[2*dim+dir] = (Float*)((char*)in.Ghost2() + in.GhostOffset(dim,dir)*in.GhostPrecision());
+        }
       }
+      this->in.resetGhost(in, ghost);
     }
   };
 
@@ -152,19 +155,17 @@ namespace quda {
       coordsFromFaceIndex<4,QUDA_4D_PC,kernel_type,1>(X, x_cb, coord, face_idx, face_num, arg);
     }
 
-#if 0 && defined(__CUDA_ARCH__)
-    printf("tid=%d bid=%d x_cb = %d, coord = %d %d %d %d doHalo %d\n",
-           threadIdx.x, blockIdx.x, x_cb, coord[0], coord[1], coord[2], coord[3], doHalo<kernel_type>());
-#endif
-
     const int my_spinor_parity = nParity == 2 ? parity : 0;
-    Vector out = doHalo<kernel_type>() ? arg.out(x_cb, my_spinor_parity) : Vector();
+    Vector out;
 
     applyWilson<Float,nDim,nColor,dagger,kernel_type>(out, arg, coord, x_cb, parity, nParity);
 
-    if (xpay && isComplete<kernel_type>(arg, coord)) {
+    if (xpay && kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
       out = x + arg.kappa * out;
+    } else if (kernel_type != INTERIOR_KERNEL) {
+      Vector x = arg.out(x_cb, my_spinor_parity);
+      out = x + (xpay ? arg.kappa * out : out);
     }
 
     arg.out(x_cb, my_spinor_parity) = out;
@@ -196,7 +197,7 @@ namespace quda {
     // for full fields set parity from y thread index else use arg setting
     int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
 
-#if 1
+#if 0
     wilson<Float,nDim,nColor,dagger,xpay,kernel_type>(arg, x_cb, parity, arg.nParity);
 #else
     switch(arg.nParity) { // better code if parity is explicit
@@ -235,13 +236,6 @@ namespace quda {
     template <bool dagger, bool xpay>
     inline void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-#if 0
-      printf("kernel = %d,vol = %d volCB = %d threads = %d block = %d %d %d grid = %d %d %d\n",
-             arg.kernel_type, meta.Volume(), meta.VolumeCB(), arg.threads,
-             tp.block.x, tp.block.y, tp.block.z, tp.grid.x, tp.grid.y, tp.grid.z);
-      std::cout << arg;
-#endif
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
         switch (arg.kernel_type) {
@@ -344,14 +338,12 @@ namespace quda {
 
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
       ApplyWilson<double>(out, in, U, kappa, x, parity, dagger);
-#if 0
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
       ApplyWilson<float>(out, in, U, kappa, x, parity, dagger);
     } else if (U.Precision() == QUDA_HALF_PRECISION) {
       ApplyWilson<short>(out, in, U, kappa, x, parity, dagger);
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
       ApplyWilson<char>(out, in, U, kappa, x, parity, dagger);
-#endif
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
