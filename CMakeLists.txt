@@ -636,13 +636,6 @@ SET(COMP_CAP "${COMP_CAP}0")
 add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by default )
-mark_as_advanced(CUDA_NVCC_FLAGS_DEVEL)
-mark_as_advanced(CUDA_NVCC_FLAGS_STRICT)
-mark_as_advanced(CUDA_NVCC_FLAGS_RELEASE)
-mark_as_advanced(CUDA_NVCC_FLAGS_DEBUG)
-mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
-mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
-
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
