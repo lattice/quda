@@ -59,7 +59,8 @@ struct DslashCommsPattern {
 };
 
 
-inline void setFusedParam(DslashParam& param, DslashCuda &dslash, const int* faceVolumeCB){
+template <typename Arg, typename Dslash>
+inline void setFusedParam(Arg & param, Dslash &dslash, const int* faceVolumeCB){
   int prev = -1;
 
   param.threads = 0;
@@ -143,7 +144,8 @@ namespace {
      @param[in] stream Stream were the receive is being posted (effectively ignored)
      @param[in] gdr Whether we are using GPU Direct RDMA or not
   */
-  inline void issueRecv(cudaColorSpinorField &input, const DslashCuda &dslash, cudaStream_t *stream, bool gdr) {
+  template <typename Dslash>
+  inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, cudaStream_t *stream, bool gdr) {
     for(int i=3; i>=0; i--){
       if (!dslash.dslashParam.commDim[i]) continue;
       for(int dir=1; dir>=0; dir--) {
@@ -162,7 +164,8 @@ namespace {
      - if Remote is requested, the p2p halos will be written directly
      @param[in] packIndex Stream index where the packing kernel will run
   */
-  inline void issuePack(cudaColorSpinorField &in, const DslashCuda &dslash, int parity, MemoryLocation location, int packIndex) {
+  template <typename Dslash>
+  inline void issuePack(cudaColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location, int packIndex) {
 
     if ( (location & Device) & Host) errorQuda("MemoryLocation cannot be both Device and Host");
 
@@ -202,7 +205,8 @@ namespace {
      @param[out] in Field that whose halos we are communicating
      @param[in] dslash The dslash object
   */
-  inline void issueGather(cudaColorSpinorField &in, const DslashCuda &dslash) {
+  template<typename Dslash>
+  inline void issueGather(cudaColorSpinorField &in, const Dslash &dslash) {
 
     using namespace dslash;
 
@@ -276,7 +280,8 @@ namespace {
      @param[in] async Whether GPU Direct Async is being used
      @param[in] scatterIndex The stream index used for posting the host-to-device memory copy in
    */
-  inline bool commsComplete(cudaColorSpinorField &in, const DslashCuda &dslash, int dim, int dir,
+  template <typename Dslash>
+  inline bool commsComplete(cudaColorSpinorField &in, const Dslash &dslash, int dim, int dir,
 			    bool gdr_send, bool gdr_recv, bool zero_copy_recv, bool async, int scatterIndex=-1) {
 
     using namespace dslash;
@@ -352,7 +357,8 @@ namespace {
      @param[in,out] in The ColorSpinorField source
      @param[in] to_mapped Whether we are switching to mapped ghosts or not
    */
-  inline void setMappedGhost(DslashCuda &dslash, cudaColorSpinorField &in, bool to_mapped) {
+  template <typename Dslash>
+  inline void setMappedGhost(Dslash &dslash, cudaColorSpinorField &in, bool to_mapped) {
 
     static char aux_copy[TuneKey::aux_n];
     static bool set_mapped = false;
@@ -373,9 +379,10 @@ namespace {
     }
   }
 
+  template <typename Dslash>
   struct DslashPolicyImp {
 
-    virtual void operator()(DslashCuda &dslash, cudaColorSpinorField* in,
+    virtual void operator()(Dslash &dslash, cudaColorSpinorField* in,
 			    const int volume, const int *faceVolumeCB, TimeProfile &profile) = 0;
 
     virtual ~DslashPolicyImp(){}
@@ -384,9 +391,10 @@ namespace {
 /**
    Standard dslash parallelization with host staging for send and receive
  */
-struct DslashBasic : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashBasic : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -470,9 +478,10 @@ struct DslashBasic : DslashPolicyImp {
 
 };
 
-struct DslashPthreads : DslashPolicyImp {
+template <typename Dslash>
+struct DslashPthreads : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 #ifdef PTHREADS
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -636,9 +645,10 @@ struct DslashPthreads : DslashPolicyImp {
 /**
    Standard dslash parallelization with host staging for send and receive, and fused halo update kernel
  */
-struct DslashFusedExterior : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashFusedExterior : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -718,9 +728,10 @@ struct DslashFusedExterior : DslashPolicyImp {
 /**
    Dslash parallelization with GDR for send and receive
  */
-struct DslashGDR : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashGDR : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -796,9 +807,10 @@ struct DslashGDR : DslashPolicyImp {
 /**
    Dslash parallelization with GDR for send and receive with fused halo update kernel
  */
-struct DslashFusedGDR : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashFusedGDR : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -868,9 +880,10 @@ struct DslashFusedGDR : DslashPolicyImp {
 /**
    Dslash parallelization with host staging for send and GDR for receive
  */
-struct DslashGDRRecv : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashGDRRecv : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -946,9 +959,10 @@ struct DslashGDRRecv : DslashPolicyImp {
 /**
    Dslash parallelization with host staging for send and GDR for receive, with fused halo update kernel
  */
-struct DslashFusedGDRRecv : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashFusedGDRRecv : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1033,11 +1047,12 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
 /**
    Experimental Dslash parallelization with host staging for send and receive, with GPU Direct Async
  */
-struct DslashAsync : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashAsync : DslashPolicyImp<Dslash> {
 
 #if (CUDA_VERSION >= 8000) && 0
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1128,7 +1143,7 @@ struct DslashAsync : DslashPolicyImp {
   }
 #else
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
     errorQuda("Async dslash policy variants require CUDA 8.0 and above");
   }
 
@@ -1141,11 +1156,12 @@ struct DslashAsync : DslashPolicyImp {
    Experimental Dslash parallelization with host staging for send and
    receive, with GPU Direct Async, and fused hao update kernel
  */
-struct DslashFusedExteriorAsync : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashFusedExteriorAsync : DslashPolicyImp<Dslash> {
 
 #if (CUDA_VERSION >= 8000) && 0
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1232,7 +1248,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 
 #else
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
     errorQuda("Async dslash policy variants require CUDA 8.0 and above");
   }
 
@@ -1245,9 +1261,10 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
    Variation of multi-gpu dslash where the packing kernel writes
    buffers directly to host memory
 */
-struct DslashZeroCopyPack : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashZeroCopyPack : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1339,9 +1356,10 @@ struct DslashZeroCopyPack : DslashPolicyImp {
    Variation of multi-gpu dslash where the packing kernel writes
    buffers directly to host memory with fused halo update kernel
 */
-struct DslashFusedZeroCopyPack : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashFusedZeroCopyPack : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1427,9 +1445,10 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
 /**
    Multi-GPU Dslash zero-copy for the send and GDR for the receive
  */
-struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashZeroCopyPackGDRRecv : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1512,9 +1531,10 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
    Multi-GPU Dslash zero-copy for the send and GDR for the receive,
    with fused halo update kernel
  */
-struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1592,9 +1612,10 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
    Variation of multi-gpu dslash where the packing kernel writes
    buffers directly to host memory
 */
-struct DslashZeroCopy : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashZeroCopy : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1679,9 +1700,10 @@ struct DslashZeroCopy : DslashPolicyImp {
    Variation of multi-gpu dslash where the packing kernel writes
    buffers directly to host memory with fused halo update kernel
 */
-struct DslashFusedZeroCopy : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashFusedZeroCopy : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1759,9 +1781,10 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 };
 
 
-struct DslashNC : DslashPolicyImp {
+  template <typename Dslash>
+  struct DslashNC : DslashPolicyImp<Dslash> {
 
-  void operator()(DslashCuda &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     profile.TPSTART(QUDA_PROFILE_TOTAL);
     
@@ -1807,66 +1830,67 @@ struct DslashNC : DslashPolicyImp {
 
   static std::vector<QudaP2PPolicy> p2p_policies(static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
-struct DslashFactory {
+  template <typename Dslash>
+  struct DslashFactory {
 
-  static DslashPolicyImp* create(const QudaDslashPolicy &dslashPolicy)
+  static DslashPolicyImp<Dslash>* create(const QudaDslashPolicy &dslashPolicy)
   {
-    DslashPolicyImp* result = nullptr;
+    DslashPolicyImp<Dslash>* result = nullptr;
 
     switch(dslashPolicy){
     case QudaDslashPolicy::QUDA_DSLASH:
-      result = new DslashBasic;
+      result = new DslashBasic<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_DSLASH_ASYNC:
-      result = new DslashAsync;
+      result = new DslashAsync<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_PTHREADS_DSLASH:
-      result = new DslashPthreads;
+      result = new DslashPthreads<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_FUSED_DSLASH:
-      result = new DslashFusedExterior;
+      result = new DslashFusedExterior<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC:
-      result = new DslashFusedExteriorAsync;
+      result = new DslashFusedExteriorAsync<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_GDR_DSLASH:
-      if (!comm_gdr_blacklist()) result = new DslashGDR;
-      else result = new DslashBasic;
+      if (!comm_gdr_blacklist()) result = new DslashGDR<Dslash>;
+      else result = new DslashBasic<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH:
-      if (!comm_gdr_blacklist()) result = new DslashFusedGDR;
-      else result = new DslashFusedExterior;
+      if (!comm_gdr_blacklist()) result = new DslashFusedGDR<Dslash>;
+      else result = new DslashFusedExterior<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_GDR_RECV_DSLASH:
-      if (!comm_gdr_blacklist()) result = new DslashGDRRecv;
-      else result = new DslashBasic;
+      if (!comm_gdr_blacklist()) result = new DslashGDRRecv<Dslash>;
+      else result = new DslashBasic<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH:
-      if (!comm_gdr_blacklist()) result = new DslashFusedGDRRecv;
-      else result = new DslashFusedExterior;
+      if (!comm_gdr_blacklist()) result = new DslashFusedGDRRecv<Dslash>;
+      else result = new DslashFusedExterior<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH:
-      result = new DslashZeroCopyPack;
+      result = new DslashZeroCopyPack<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH:
-      result = new DslashFusedZeroCopyPack;
+      result = new DslashFusedZeroCopyPack<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH:
-      if (!comm_gdr_blacklist()) result = new DslashZeroCopyPackGDRRecv;
-      else result = new DslashZeroCopyPack;
+      if (!comm_gdr_blacklist()) result = new DslashZeroCopyPackGDRRecv<Dslash>;
+      else result = new DslashZeroCopyPack<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH:
-      if (!comm_gdr_blacklist()) result = new DslashFusedZeroCopyPackGDRRecv;
-      else result = new DslashFusedZeroCopyPack;
+      if (!comm_gdr_blacklist()) result = new DslashFusedZeroCopyPackGDRRecv<Dslash>;
+      else result = new DslashFusedZeroCopyPack<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH:
-      result = new DslashZeroCopy;
+      result = new DslashZeroCopy<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH:
-      result = new DslashFusedZeroCopy;
+      result = new DslashFusedZeroCopy<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_DSLASH_NC:
-      result = new DslashNC;
+      result = new DslashNC<Dslash>;
       break;
     default:
       errorQuda("Dslash policy %d not recognized",static_cast<int>(dslashPolicy));
@@ -1892,10 +1916,11 @@ struct DslashFactory {
     policies[static_cast<std::size_t>(p)] = QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED;
   }
 
- class DslashPolicyTune : public Tunable {
+  template <typename Dslash>
+  class DslashPolicyTune : public Tunable {
 
-   DslashCuda &dslash;
-   DslashParam &dslashParam;
+   Dslash &dslash;
+   decltype(dslash.dslashParam) &dslashParam;
    cudaColorSpinorField *in;
    const int volume;
    const int *ghostFace;
@@ -1907,7 +1932,7 @@ struct DslashFactory {
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
  public:
-   DslashPolicyTune(DslashCuda &dslash, cudaColorSpinorField *in,
+   DslashPolicyTune(Dslash &dslash, cudaColorSpinorField *in,
 		    const int volume, const int *ghostFace, TimeProfile &profile)
      : dslash(dslash), dslashParam(dslash.dslashParam), in(in), volume(volume), ghostFace(ghostFace), profile(profile)
    {
@@ -2052,7 +2077,7 @@ struct DslashFactory {
                  i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC) &&
                 !dslashParam.remote_write) {
 
-             DslashPolicyImp* dslashImp = DslashFactory::create(i);
+             DslashPolicyImp<Dslash>* dslashImp = DslashFactory<Dslash>::create(i);
              (*dslashImp)(dslash, in, volume, ghostFace, profile);
              delete dslashImp;
 
@@ -2089,7 +2114,7 @@ struct DslashFactory {
                    i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH) && !dslashParam.remote_write ) {
                QudaDslashPolicy policy = (i==QudaDslashPolicy::QUDA_GDR_DSLASH || i==QudaDslashPolicy::QUDA_GDR_RECV_DSLASH) ?
                  QudaDslashPolicy::QUDA_DSLASH : QudaDslashPolicy::QUDA_FUSED_DSLASH;
-               DslashPolicyImp* dslashImp = DslashFactory::create(policy);
+               DslashPolicyImp<Dslash>* dslashImp = DslashFactory<Dslash>::create(policy);
                setKernelPackT(false);
                (*dslashImp)(dslash, in, volume, ghostFace, profile);
                setKernelPackT(true);
@@ -2099,7 +2124,7 @@ struct DslashFactory {
 
              setKernelPackT(true);
 
-             DslashPolicyImp* dslashImp = DslashFactory::create(i);
+             DslashPolicyImp<Dslash>* dslashImp = DslashFactory<Dslash>::create(i);
              (*dslashImp)(dslash, in, volume, ghostFace, profile);
              delete dslashImp;
 
@@ -2154,7 +2179,7 @@ struct DslashFactory {
        setKernelPackT(true);
      }
 
-     DslashPolicyImp* dslashImp = DslashFactory::create(static_cast<QudaDslashPolicy>(tp.aux.x));
+     DslashPolicyImp<Dslash>* dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
      (*dslashImp)(dslash, in, volume, ghostFace, profile);
      delete dslashImp;
 
