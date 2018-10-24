@@ -26,9 +26,10 @@ set (QUDA_OBJS
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
   dslash_twisted_clover.cu dslash_domain_wall.cu
   dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu staggered_dslash.cu
+  dslash4_wilson.cu dslash5_domain_wall.cu
   dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
   multi_blas_quda.cu copy_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu
+  multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
@@ -47,7 +48,8 @@ set (QUDA_OBJS
   copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
   copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   copy_gauge_double.cu copy_gauge_single.cu
-  copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
+  copy_gauge_half.cu copy_gauge_quarter.cu
+  copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
@@ -89,9 +91,7 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   mark_as_advanced(QUDA_GITDIR)
 endif()
 
-# include_directories
-include_directories(dslash_core)
-include_directories(.)
+
 
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
@@ -109,6 +109,12 @@ if(QUDA_BUILD_SHAREDLIB)
 else()
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
+
+# include_directories
+target_include_directories(quda PRIVATE dslash_core)
+target_include_directories(quda SYSTEM PRIVATE ../include/externals)
+target_include_directories(quda PRIVATE .)
+
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
@@ -126,10 +132,12 @@ endif()
 
 # some clang warnings shouds be warning even when turning warnings into errors
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field>)
+    target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field" "SHELL:-Xcompiler -Wno-error=unused-function" >)
+
 # this is a hack to get colored diagnostics back when using Ninja and clang
     if(CMAKE_GENERATOR MATCHES "Ninja")
-      target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
+      target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
     endif()
 endif()
 
@@ -181,6 +189,7 @@ endif()
 
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
+
 # some hackery to prevent having old shared / static builds of quda messing with the current build
 ADD_CUSTOM_COMMAND(TARGET quda PRE_LINK COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 

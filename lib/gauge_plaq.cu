@@ -21,7 +21,7 @@ namespace quda {
 #ifdef JITIFY
       create_jitify_program("kernels/gauge_plaq.cuh");
 #endif
-      strcpy(aux,compile_type_str);
+      strcpy(aux,compile_type_str(meta));
     }
 
     ~GaugePlaq () { }

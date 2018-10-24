@@ -31,13 +31,9 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/coarse_op_preconditioned.cuh");
 #endif
-        strcpy(aux, "GPU-");
-        strcat(aux, compile_type_str);
-        strcat(aux,",");
-      } else {
-        strcpy(aux, "CPU,");
       }
-      strcat(aux,comm_dim_partitioned_string());
+      strcpy(aux, compile_type_str(meta));
+      strcat(aux, comm_dim_partitioned_string());
     }
     virtual ~CalculateYhat() { }
 
@@ -230,7 +226,7 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Yhat field\n");
 #else
-    errorQuda("Multigrid has not been enabled");
+    errorQuda("Multigrid has not been built");
 #endif
   }
 

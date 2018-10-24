@@ -946,6 +946,39 @@ namespace quda {
   */
   void spinorNoise(ColorSpinorField &src, int seed, QudaNoiseType type);
 
+
+  /**
+     @brief Helper function for determining if the preconditioning
+     type of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If PCtype is unique return this
+   */
+  inline QudaDWFPCType PCType_(const char *func, const char *file, int line,
+			       const ColorSpinorField &a, const ColorSpinorField &b) {
+    QudaDWFPCType type = QUDA_PC_INVALID;
+    if (a.DWFPCtype() == b.DWFPCtype()) type = a.DWFPCtype();
+    else errorQuda("PCTypes %d %d do not match (%s:%d in %s())\n",
+		   a.DWFPCtype(), b.DWFPCtype(), file, line, func);
+    return type;
+  }
+
+  /**
+     @brief Helper function for determining if the precision of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check precision on
+     @return If precision is unique return the precision
+   */
+  template <typename... Args>
+  inline QudaDWFPCType PCType_(const char *func, const char *file, int line,
+			       const ColorSpinorField &a, const ColorSpinorField &b,
+			       const Args &... args) {
+    return static_cast<QudaDWFPCType>(PCType_(func,file,line,a,b) & PCType_(func,file,line,a,args...));
+  }
+
+#define checkPCType(...) PCType_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
 } // namespace quda
 
 #endif // _COLOR_SPINOR_FIELD_H

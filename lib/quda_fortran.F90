@@ -93,8 +93,8 @@ module quda_fortran
      real(8) :: m5    ! Domain wall height
      integer(4) :: Ls       ! Extent of the 5th dimension (for domain wall)
 
-     real(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
-     real(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! will be used only for the mobius type of Fermion
+     complex(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
+     complex(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! MDWF coefficients
 
      real(8) :: mu    ! Twisted mass parameter
      real(8) :: epsilon ! Twisted mass parameter
@@ -108,6 +108,7 @@ module quda_fortran
      real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance
+     real(8) :: reliable_delta_refinement ! Reliable update tolerance used in post multi-shift solver refinement
      integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
      integer(4) :: solution_accumulator_pipeline ! How many direction vectors we accumulate into the solution vector at once
      integer(4) :: max_res_increase ! How many residual increases we tolerate when doing reliable updates

@@ -5,7 +5,6 @@
 #include <tune_quda.h>
 #include <dirac_quda.h>
 #include <gauge_field.h>
-
 #include <worker.h>
 
 namespace quda {
@@ -33,6 +32,32 @@ namespace quda {
   void createDslashEvents();
   void destroyDslashEvents();
 
+  enum Dslash4Type {
+    DSLASH4_WILSON
+  };
+
+  /**
+     @brief Driver for applying the Wilson stencil
+
+     out = - kappa * D * in
+
+     where D is the gauged Wilson linear operator.
+
+     If x is defined, the operation is given by out = x - kapp * D in.
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the gauge Laplace
+     @param[in] kappa Scale factor applied
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] type Type of dslash we are applying
+  */
+  void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                   double kappa, const ColorSpinorField &x, int parity, bool dagger, Dslash4Type type);
 
   // plain Wilson Dslash  
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
@@ -61,6 +86,34 @@ namespace quda {
   */
   void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in,
 		   const CloverField &clover, bool inverse, int parity);
+
+  enum Dslash5Type {
+    DSLASH5_DWF,
+    DSLASH5_MOBIUS_PRE,
+    DSLASH5_MOBIUS,
+    M5_INV_DWF,
+    M5_INV_MOBIUS,
+    M5_INV_ZMOBIUS
+  };
+
+  /**
+     @brief Apply either the domain-wall / mobius Dslash5 operator or
+     the M5 inverse operator.  In the current implementation, it is
+     expected that the color-spinor fields are 4-d preconditioned.
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] x Auxilary input color-spinor field
+     @param[in] m_f Fermion mass parameter
+     @param[in] m_5 Wilson mass shift
+     @param[in] b_5 Mobius coefficient array (length Ls)
+     @param[in] c_5 Mobius coefficient array (length Ls)
+     @param[in] a Scale factor use in xpay operator
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] type Type of dslash we are applying
+  */
+  void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+		    double a, bool dagger, Dslash5Type type);
 
   // domain wall Dslash  
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,

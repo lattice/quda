@@ -8,6 +8,8 @@
    directly.
 */
 
+#include <lattice_field.h>
+
 #ifdef JITIFY
 
 #ifdef HOST_DEBUG
@@ -26,9 +28,15 @@
 #define JITIFY_PRINT_LAUNCH        0
 #endif
 
+
+#include "jitify_options.hpp"
 #include <jitify.hpp>
 
+#endif
+
 namespace quda {
+
+#ifdef JITIFY
 
   static jitify::JitCache *kernel_cache;
   static jitify::Program *program;
@@ -53,13 +61,20 @@ namespace quda {
     }
   }
 
-} // namespace quda
-
-const constexpr char *compile_type_str = "jitify";
-
-#else // else not JITIFY
-
-const constexpr char *compile_type_str = "offline";
-
 #endif
 
+  /**
+     @brief Helper function for setting auxilary string
+     @param[in] meta LatticeField used for querying field location
+     @return String containing location and compilation type
+   */
+
+  inline const char* compile_type_str(const LatticeField &meta) {
+#ifdef JITIFY
+    return meta.Location() == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+#else
+    return meta.Location() == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+#endif
+  }
+
+} // namespace quda

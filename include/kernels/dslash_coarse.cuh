@@ -80,31 +80,6 @@ namespace quda {
   }
 
   /**
-     Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
-
-     @param x Computed spatial index
-     @param cb_index 1-d checkerboarded index
-     @param X Full lattice dimensions
-     @param parity Site parity
-   */
-  template <typename I>
-  static __device__ __host__ inline void getCoordsCB(int x[], int cb_index, const I X[], const I X0h, int parity) {
-    //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-    //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-    //x[1] = (cb_index/(X[0]/2)) % X[1];
-    //x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-
-    int za = (cb_index / X0h);
-    int zb =  (za / X[1]);
-    x[1] = (za - zb * X[1]);
-    x[3] = (zb / X[2]);
-    x[2] = (zb - x[3] * X[2]);
-    int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
-    x[0] = (2 * cb_index + x1odd  - za * X[0]);
-    return;
-  }
-
-  /**
      Applies the coarse dslash on a given parity and checkerboard site index
 
      @param out The result - kappa * Dslash in

@@ -15,7 +15,10 @@
 #include <launch_kernel.cuh>
 
 #include <jitify_helper.cuh>
+
+#ifdef GPU_MULTIGRID
 #include <kernels/block_orthogonalize.cuh>
+#endif
 
 namespace quda {
 
@@ -48,17 +51,15 @@ namespace quda {
       : V(V), B(B), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine), geo_bs(geo_bs)
     {
       if (nColor_ != nColor) errorQuda("Number of colors %d not supported with this precision %lu\n", nColor_, sizeof(bFloat));
-      strcpy(aux, V.AuxString());
+
       if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         create_jitify_program("kernels/block_orthogonalize.cuh");
 #endif
-        strcat(aux, ",GPU-");
-        strcat(aux, compile_type_str);
-        strcat(aux,",block_size=");
-      } else {
-        strcat(aux, ",CPU,block_size=");
       }
+      strcat(aux, compile_type_str(V));
+      strcat(aux, V.AuxString());
+      strcat(aux,",block_size=");
 
       char size[8];
       geoBlockSize = 1;

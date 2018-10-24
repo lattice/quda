@@ -442,7 +442,7 @@ template <int nDim, QudaDWFPCType type, int dim_, int nLayers, typename Int, typ
 static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int * const x, int face_idx,
 						  const int &face_num, const Param &param)
 {
-  constexpr int dim = (dim_ == INTERIOR_KERNEL) ? 0 : dim_; // silence compiler warning
+  constexpr int dim = (dim_ == INTERIOR_KERNEL || dim_ == EXTERIOR_KERNEL_ALL) ? 0 : dim_; // silence compiler warning
 
   const auto *X = param.dc.X;
   const auto &face_X = param.dc.face_X[dim];

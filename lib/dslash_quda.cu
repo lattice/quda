@@ -6,44 +6,7 @@
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
-
-// these control the Wilson-type actions
-#ifdef GPU_WILSON_DIRAC
-//#define DIRECT_ACCESS_LINK
-//#define DIRECT_ACCESS_WILSON_SPINOR
-//#define DIRECT_ACCESS_WILSON_ACCUM
-//#define DIRECT_ACCESS_WILSON_INTER
-//#define DIRECT_ACCESS_WILSON_PACK_SPINOR
-//#define DIRECT_ACCESS_CLOVER
-#endif // GPU_WILSON_DIRAC
-
-//these are access control for staggered action
-#ifdef GPU_STAGGERED_DIRAC
-#if (__COMPUTE_CAPABILITY__ >= 300) // Kepler works best with texture loads only
-//#define DIRECT_ACCESS_FAT_LINK
-//#define DIRECT_ACCESS_LONG_LINK
-//#define DIRECT_ACCESS_SPINOR
-//#define DIRECT_ACCESS_ACCUM
-//#define DIRECT_ACCESS_INTER
-//#define DIRECT_ACCESS_PACK
-#else // fermi
-//#define DIRECT_ACCESS_FAT_LINK
-//#define DIRECT_ACCESS_LONG_LINK
-#define DIRECT_ACCESS_SPINOR
-//#define DIRECT_ACCESS_ACCUM
-//#define DIRECT_ACCESS_INTER
-//#define DIRECT_ACCESS_PACK
-#endif
-#endif // GPU_STAGGERED_DIRAC
-
-#include <quda_internal.h>
 #include <dslash_quda.h>
-#include <sys/time.h>
-#include <blas_quda.h>
-
-#include <inline_ptx.h>
-
-
 #include <color_spinor_field_order.h>
 #include <clover_field_order.h>
 #include <index_helper.cuh>
@@ -785,5 +748,3 @@ namespace quda {
   }
 
 } // namespace quda
-
-#include "contract.cu"

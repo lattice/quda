@@ -18,6 +18,7 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
+#include <dslash_helper.cuh>
 #include <sys/time.h>
 #include <blas_quda.h>
 
@@ -170,7 +171,7 @@ namespace quda {
       dslash = new AsymCloverDslashCuda<short4, short4, short4>(out, gauge, clover, in, x, a, parity, dagger, commOverride);
     }
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
+    DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
     dslash_policy.apply(0);
 
     delete dslash;

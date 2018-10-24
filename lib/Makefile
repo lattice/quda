@@ -29,8 +29,9 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dslash_ndeg_twisted_mass.o dslash_twisted_clover.o		\
 	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
 	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
+	dslash4_wilson.o dslash5_domain_wall.o				\
 	blas_quda.o multi_blas_quda.o copy_quda.o 			\
-	reduce_quda.o multi_reduce_quda.o				\
+	reduce_quda.o multi_reduce_quda.o contract.o			\
 	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	copy_color_spinor.o copy_color_spinor_dd.o			\
@@ -43,8 +44,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	copy_color_spinor_qs.o copy_color_spinor_qh.o			\
 	copy_color_spinor_qq.o						\
 	extract_gauge_ghost_extended.o copy_gauge_double.o		\
-	copy_gauge_single.o copy_gauge_half.o copy_gauge.o		\
-	copy_clover.o staggered_oprod.o					\
+	copy_gauge_single.o copy_gauge_half.o copy_gauge_quarter.o	\
+	copy_gauge.o copy_clover.o staggered_oprod.o			\
 	clover_trace_quda.o						\
 	ks_force_quda.o hisq_paths_force_quda.o				\
 	unitarize_force_quda.o unitarize_links_quda.o			\

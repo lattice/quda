@@ -28,18 +28,18 @@
 
 namespace quda {
 
-    /**
-       @brief colorspinor_wrapper is an internal class that is used to
-       wrap instances of colorspinor accessors, currying in a specifc
-       location on the field.  The operator() accessors in
-       colorspinor-field accessors return instances to this class,
-       allowing us to then use operator overloading upon this class
-       to interact with the ColorSpinor class.  As a result we can
-       include colorspinor-field accessors directly in ColorSpinor
-       expressions in kernels without having to declare temporaries
-       with explicit calls to the load/save methods in the
-       colorspinor-field accessors.
-    */
+  /**
+     @brief colorspinor_wrapper is an internal class that is used to
+     wrap instances of colorspinor accessors, currying in a specifc
+     location on the field.  The operator() accessors in
+     colorspinor-field accessors return instances to this class,
+     allowing us to then use operator overloading upon this class
+     to interact with the ColorSpinor class.  As a result we can
+     include colorspinor-field accessors directly in ColorSpinor
+     expressions in kernels without having to declare temporaries
+     with explicit calls to the load/save methods in the
+     colorspinor-field accessors.
+  */
   template <typename Float, typename T>
     struct colorspinor_wrapper {
       T &field;
@@ -47,21 +47,21 @@ namespace quda {
       const int parity;
 
       /**
-   @brief colorspinor_wrapper constructor
-   @param[in] a colorspinor field accessor we are wrapping
-   @param[in] x_cb checkerboarded space-time index we are accessing
-   @param[in] parity Parity we are accessing
-       */
+         @brief colorspinor_wrapper constructor
+         @param[in] a colorspinor field accessor we are wrapping
+         @param[in] x_cb checkerboarded space-time index we are accessing
+         @param[in] parity Parity we are accessing
+      */
       __device__ __host__ inline colorspinor_wrapper<Float,T>(T &field, int x_cb, int parity)
-  : field(field), x_cb(x_cb), parity(parity) { }
+        : field(field), x_cb(x_cb), parity(parity) { }
 
       /**
-   @brief Assignment operator with ColorSpinor instance as input
-   @param[in] C ColorSpinor we want to store in this accessor
-       */
+         @brief Assignment operator with ColorSpinor instance as input
+         @param[in] C ColorSpinor we want to store in this accessor
+      */
       template<typename C>
       __device__ __host__ inline void operator=(const C &a) {
-  field.save((Float*)a.data, x_cb, parity);
+        field.save((Float*)a.data, x_cb, parity);
       }
     };
 
@@ -101,18 +101,18 @@ namespace quda {
     a.field.load((T*)data, a.x_cb, a.parity);
   }
 
-    /**
-       @brief colorspinor_ghost_wrapper is an internal class that is
-       used to wrap instances of colorspinor accessors, currying in a
-       specifc location on the field.  The Ghost() accessors in
-       colorspinor-field accessors return instances to this class,
-       allowing us to then use operator overloading upon this class to
-       interact with the ColorSpinor class.  As a result we can
-       include colorspinor-field accessors directly in ColorSpinor
-       expressions in kernels without having to declare temporaries
-       with explicit calls to the loadGhost/saveGhost methods in the
-       colorspinor-field accessors.
-    */
+  /**
+     @brief colorspinor_ghost_wrapper is an internal class that is
+     used to wrap instances of colorspinor accessors, currying in a
+     specifc location on the field.  The Ghost() accessors in
+     colorspinor-field accessors return instances to this class,
+     allowing us to then use operator overloading upon this class to
+     interact with the ColorSpinor class.  As a result we can
+     include colorspinor-field accessors directly in ColorSpinor
+     expressions in kernels without having to declare temporaries
+     with explicit calls to the loadGhost/saveGhost methods in the
+     colorspinor-field accessors.
+  */
   template <typename Float, typename T>
     struct colorspinor_ghost_wrapper {
       const int dim;
@@ -122,23 +122,23 @@ namespace quda {
       T &field;
 
       /**
-   @brief colorspinor_ghost_wrapper constructor
-   @param[in] a colorspinor field accessor we are wrapping
-   @param[in] dim Dimension of the ghost we are accessing
-   @param[in] dir Direction of the ghost we are accessing
-   @param[in] ghost_idx Checkerboarded space-time ghost index we are accessing
-   @param[in] parity Parity we are accessing
-       */
+         @brief colorspinor_ghost_wrapper constructor
+         @param[in] a colorspinor field accessor we are wrapping
+         @param[in] dim Dimension of the ghost we are accessing
+         @param[in] dir Direction of the ghost we are accessing
+         @param[in] ghost_idx Checkerboarded space-time ghost index we are accessing
+         @param[in] parity Parity we are accessing
+      */
       __device__ __host__ inline colorspinor_ghost_wrapper<Float,T>(T &field, int dim, int dir, int ghost_idx, int parity)
-  : field(field), dim(dim), dir(dir), ghost_idx(ghost_idx), parity(parity) { }
+        : field(field), dim(dim), dir(dir), ghost_idx(ghost_idx), parity(parity) { }
 
       /**
-   @brief Assignment operator with Matrix instance as input
-   @param[in] C ColorSpinor we want to store in this accessot
-       */
+         @brief Assignment operator with Matrix instance as input
+         @param[in] C ColorSpinor we want to store in this accessot
+      */
       template<typename C>
       __device__ __host__ inline void operator=(const C &a) {
-  field.saveGhost((Float*)a.data, ghost_idx, dim, dir, parity);
+        field.saveGhost((Float*)a.data, ghost_idx, dim, dir, parity);
       }
     };
 
@@ -151,6 +151,18 @@ namespace quda {
   template <typename T, int Nc, int Ns>
     template <typename S>
     __device__ __host__ inline ColorSpinor<T,Nc,Ns>::ColorSpinor(const colorspinor_ghost_wrapper<T,S> &a) {
+    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
+  }
+
+  template <typename T, int Nc>
+    template <typename S>
+    __device__ __host__ inline void ColorSpinor<T,Nc,2>::operator=(const colorspinor_ghost_wrapper<T,S> &a) {
+    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
+  }
+
+  template <typename T, int Nc>
+    template <typename S>
+    __device__ __host__ inline ColorSpinor<T,Nc,2>::ColorSpinor(const colorspinor_ghost_wrapper<T,S> &a) {
     a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
@@ -763,35 +775,38 @@ namespace quda {
        @tparam Ns Number of spin components
        @tparam Nc Number of colors
        @tparam N Number of real numbers per short vector
+       @tparam spin_project Whether the ghosts are spin projected or not
        @tparam huge_alloc Template parameter that enables 64-bit
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <typename Float, int Ns, int Nc, int N, bool huge_alloc=false>
+    template <typename Float, int Ns, int Nc, int N, bool spin_project=false, bool huge_alloc=false>
       struct FloatNOrder {
-  typedef typename mapper<Float>::type RegType;
-  typedef typename VectorType<Float,N>::type Vector;
-  typedef typename VectorType<RegType,N>::type RegVector;
-  typedef typename AllocType<huge_alloc>::type AllocInt;
-  static const int length = 2 * Ns * Nc;
-  static const int M = length / N;
-  Float *field;
-  float *norm;
-  const AllocInt offset; // offset can be 32-bit or 64-bit
-  const AllocInt norm_offset;
+        typedef typename mapper<Float>::type RegType;
+        typedef typename VectorType<Float,N>::type Vector;
+        typedef typename VectorType<RegType,N>::type RegVector;
+        typedef typename AllocType<huge_alloc>::type AllocInt;
+        static constexpr int length = 2 * Ns * Nc;
+        static constexpr int length_ghost = spin_project ? length/2 : length;
+        static constexpr int M = length / N;
+        static constexpr int M_ghost = spin_project ? M/2 : M;
+        Float *field;
+        float *norm;
+        const AllocInt offset; // offset can be 32-bit or 64-bit
+        const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
-  typedef typename TexVectorType<RegType,N>::type TexVector;
-  cudaTextureObject_t tex;
-  cudaTextureObject_t texNorm;
-  const int tex_offset;
+        typedef typename TexVectorType<RegType,N>::type TexVector;
+        cudaTextureObject_t tex;
+        cudaTextureObject_t texNorm;
+        const int tex_offset;
 #endif
-  int volumeCB;
-  int faceVolumeCB[4];
-  int stride;
-  Float *ghost[8];
-  int nParity;
-  void *backup_h; //! host memory for backing up the field when tuning
-  size_t bytes;
+        int volumeCB;
+        int faceVolumeCB[4];
+        int stride;
+        Float *ghost[8];
+        int nParity;
+        void *backup_h; //! host memory for backing up the field when tuning
+        size_t bytes;
 
       FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0, bool override=false)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
@@ -847,28 +862,31 @@ namespace quda {
   }
 
   __device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
-    RegType scale = 0.0;
     RegType tmp[length];
 
     if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
+      RegType max_[length/2];
+      // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-      for (int i=0; i<length; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
+      for (int i=0; i<length/2; i++) max_[i] = fmaxf(fabsf(v[i]),fabsf(v[i+length/2]));
+      RegType scale = 0.0;
+#pragma unroll
+      for (int i=0; i<length/2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
-    }
 
-    if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
-      RegType scale_inv = static_cast<RegType>(1.0) / scale;
+      RegType scale_inv = fixedMaxValue<Float>::value / scale;
 #pragma unroll
       for (int i=0; i<length; i++) tmp[i] = v[i] * scale_inv;
     } else {
 #pragma unroll
       for (int i=0; i<length; i++) tmp[i] = v[i];
     }
+
 #pragma unroll
     for (int i=0; i<M; i++) {
       Vector vecTmp;
       // first do vectorized copy converting into storage type
-      copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
+      copy_scaled(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
       // second do vectorized copy into memory
       vector_store(field + parity*offset, x + stride*i, vecTmp);
     }
@@ -883,9 +901,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N> >
+        __device__ __host__ inline colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
     operator()(int x_cb, int parity) {
-    return colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N> >(*this, x_cb, parity);
+          return colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >(*this, x_cb, parity);
   }
 
   /**
@@ -897,36 +915,35 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N> >
+        __device__ __host__ inline const colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
     operator()(int x_cb, int parity) const {
-    return colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N> >
-      (const_cast<FloatNOrder<Float,Ns,Nc,N>&>(*this), x_cb, parity);
+          return colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
+          (const_cast<FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc>&>(*this), x_cb, parity);
   }
 
-  // no parity argument since we only presently exchange single parity field
   // add support for half-precision ghosts
-  __device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
+  __device__ __host__ inline void loadGhost(RegType v[length_ghost], int x, int dim, int dir, int parity=0) const {
+
 #pragma unroll
-          for (int i=0; i<M; i++) {
+    for (int i=0; i<M_ghost; i++) {
       // first do vectorized copy from memory into registers
-      Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M*N,
-            i*faceVolumeCB[dim]+x);
+      Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N,
+                                          i*faceVolumeCB[dim]+x);
       // second do vectorized copy converting into register type
       copy(reinterpret_cast< RegVector* >(v)[i], vecTmp);
-          }
+    }
   }
 
-  // no parity argument since we only presently exchange single parity field
   // add support for half-precision ghosts
-  __device__ __host__ inline void saveGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
+  __device__ __host__ inline void saveGhost(RegType v[length_ghost], int x, int dim, int dir, int parity=0) const {
 #pragma unroll
-          for (int i=0; i<M; i++) {
+    for (int i=0; i<M_ghost; i++) {
       Vector vecTmp;
       // first do vectorized copy converting into storage type
       copy(vecTmp, reinterpret_cast< RegVector* >(v)[i]);
       // second do vectorized copy into memory
-      vector_store(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M*N, i*faceVolumeCB[dim]+x, vecTmp);
-          }
+      vector_store(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N, i*faceVolumeCB[dim]+x, vecTmp);
+    }
   }
 
   /**
@@ -939,9 +956,9 @@ namespace quda {
      @return Instance of a colorspinor_ghost_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >
+        __device__ __host__ inline colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
     Ghost(int dim, int dir, int ghost_idx, int parity) {
-    return colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >(*this, dim, dir, ghost_idx, parity);
+          return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >(*this, dim, dir, ghost_idx, parity);
   }
 
   /**
@@ -955,10 +972,10 @@ namespace quda {
      @return Instance of a colorspinor_ghost+wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >
+        __device__ __host__ inline const colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
     Ghost(int dim, int dir, int ghost_idx, int parity) const {
-    return colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >
-      (const_cast<FloatNOrder<Float,Ns,Nc,N>&>(*this), dim, dir, ghost_idx, parity);
+          return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
+          (const_cast<FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc>&>(*this), dim, dir, ghost_idx, parity);
   }
 
   /**
@@ -1482,27 +1499,31 @@ namespace quda {
   }
 
   // Use traits to reduce the template explosion
-  template<typename T,int Ns, int Nc> struct colorspinor_mapper { };
+  template<typename T,int Ns, int Nc, bool project=false, bool huge_alloc=false> struct colorspinor_mapper { };
   
   // double precision
-  template<int Nc> struct colorspinor_mapper<double,4,Nc> { typedef colorspinor::FloatNOrder<double, 4, Nc, 2> type; };
-  template<int Nc> struct colorspinor_mapper<double,2,Nc> { typedef colorspinor::FloatNOrder<double, 2, Nc, 2> type; };
-  template<int Nc> struct colorspinor_mapper<double,1,Nc> { typedef colorspinor::FloatNOrder<double, 1, Nc, 2> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<double,4,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<double, 4, Nc, 2, false, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<double,4,Nc, true,huge_alloc> { typedef colorspinor::FloatNOrder<double, 4, Nc, 2,  true, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<double,2,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<double, 2, Nc, 2, false, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<double,1,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<double, 1, Nc, 2, false, huge_alloc> type; };
   
   // single precision
-  template<int Nc> struct colorspinor_mapper<float,4,Nc> { typedef colorspinor::FloatNOrder<float, 4, Nc, 4> type; };
-  template<int Nc> struct colorspinor_mapper<float,2,Nc> { typedef colorspinor::FloatNOrder<float, 2, Nc, 2> type; };
-  template<int Nc> struct colorspinor_mapper<float,1,Nc> { typedef colorspinor::FloatNOrder<float, 1, Nc, 2> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<float,4,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<float, 4, Nc, 4, false, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<float,4,Nc, true,huge_alloc> { typedef colorspinor::FloatNOrder<float, 4, Nc, 4,  true, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<float,2,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<float, 2, Nc, 2, false, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<float,1,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<float, 1, Nc, 2, false, huge_alloc> type; };
   
   // half precision
-  template<int Nc> struct colorspinor_mapper<short,4,Nc> { typedef colorspinor::FloatNOrder<short, 4, Nc, 4> type; };
-  template<int Nc> struct colorspinor_mapper<short,2,Nc> { typedef colorspinor::FloatNOrder<short, 2, Nc, 2> type; };
-  template<int Nc> struct colorspinor_mapper<short,1,Nc> { typedef colorspinor::FloatNOrder<short, 1, Nc, 2> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<short,4,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<short, 4, Nc, 4, false, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<short,4,Nc, true,huge_alloc> { typedef colorspinor::FloatNOrder<short, 4, Nc, 4,  true, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<short,2,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<short, 2, Nc, 2, false, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<short,1,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<short, 1, Nc, 2, false, huge_alloc> type; };
     
   // quarter precision
-  template<int Nc> struct colorspinor_mapper<char,4,Nc> { typedef colorspinor::FloatNOrder<char, 4, Nc, 4> type; };
-  template<int Nc> struct colorspinor_mapper<char,2,Nc> { typedef colorspinor::FloatNOrder<char, 2, Nc, 2> type; };
-  template<int Nc> struct colorspinor_mapper<char,1,Nc> { typedef colorspinor::FloatNOrder<char, 1, Nc, 2> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<char,4,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<char, 4, Nc, 4, false, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<char,4,Nc, true,huge_alloc> { typedef colorspinor::FloatNOrder<char, 4, Nc, 4,  true, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<char,2,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<char, 2, Nc, 2, false, huge_alloc> type; };
+  template<int Nc,bool huge_alloc> struct colorspinor_mapper<char,1,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<char, 1, Nc, 2, false, huge_alloc> type; };
     
 
   template<typename T, QudaFieldOrder order, int Ns, int Nc> struct colorspinor_order_mapper { };

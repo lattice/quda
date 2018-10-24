@@ -15,7 +15,6 @@ namespace quda {
 
 #ifdef GPU_MULTIGRID
 
-
   template <typename Float, typename yFloat, typename ghostFloat, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool dagger, DslashType type>
   class DslashCoarse : public TunableVectorY {
 
@@ -190,12 +189,8 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/dslash_coarse.cuh");
 #endif
-        strcat(aux, "GPU-");
-        strcat(aux, compile_type_str);
-        strcat(aux,",");
-      } else {
-        strcat(aux, "CPU,");
       }
+      strcat(aux, compile_type_str(out));
       strcat(aux, out.AuxString());
       strcat(aux, comm_dim_partitioned_string());
 
