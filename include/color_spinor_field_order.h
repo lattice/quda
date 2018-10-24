@@ -861,7 +861,7 @@ namespace quda {
       }
     }
 
-    if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
+    if ( isFixed<Float>::value ) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
       // use textures unless we have a large alloc
       RegType nrm = !huge_alloc ? tex1Dfetch<float>(texNorm,x+parity*norm_offset) : norm[x+parity*norm_offset];
@@ -876,7 +876,7 @@ namespace quda {
   __device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
     RegType tmp[length];
 
-    if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
+    if ( isFixed<Float>::value ) {
       RegType max_[length/2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
@@ -944,7 +944,7 @@ namespace quda {
       copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
     }
 
-    if (sizeof(Float)==sizeof(short) || sizeof(Float) == sizeof(char)) {
+    if ( isFixed<Float>::value ) {
       RegType nrm = ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x];
 #pragma unroll
       for (int i=0; i<length; i++) v[i] *= nrm;
@@ -955,7 +955,7 @@ namespace quda {
   __device__ __host__ inline void saveGhost(RegType v[length_ghost], int x, int dim, int dir, int parity=0) const {
     RegType tmp[length_ghost];
 
-    if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
+    if ( isFixed<Float>::value ) {
       RegType max_[length_ghost/2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll

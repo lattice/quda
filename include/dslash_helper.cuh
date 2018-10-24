@@ -130,7 +130,7 @@ namespace quda {
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
         // create comms buffers - need to do this before we grab the dslash constants
         ColorSpinorField *in_ = const_cast<ColorSpinorField*>(&in);
-        static_cast<cudaColorSpinorField*>(in_)->createComms(1);
+        static_cast<cudaColorSpinorField*>(in_)->createComms(nFace);
       }
       dc = in.getDslashConstant();
     }
@@ -252,7 +252,7 @@ namespace quda {
       fillAux(KERNEL_POLICY, "policy");
     }
 
-    int Nface() const { return 2; }
+    int Nface() const { return 2*arg.nFace; } // factor of 2 is for forwards/backwards (convention used in dslash policy)
     int Dagger() const { return arg.dagger; }
 
     const char* getAux(KernelType type) const {
