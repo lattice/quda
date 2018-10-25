@@ -216,8 +216,8 @@ namespace quda {
 
   public:
 
-    Wilson(Arg &arg, const ColorSpinorField &meta)
-      : Dslash<Float>(arg, meta), arg(arg), meta(meta)
+    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
+      : Dslash<Float>(arg, out, in), arg(arg), meta(in)
     {  }
 
     virtual ~Wilson() { }
@@ -269,7 +269,7 @@ namespace quda {
   {
     constexpr int nDim = 4;
     WilsonArg<Float,nColor,recon> arg(out, in, U, kappa, x, parity, dagger, comm_override);
-    Wilson<Float,nDim,nColor,WilsonArg<Float,nColor,recon> > wilson(arg, in);
+    Wilson<Float,nDim,nColor,WilsonArg<Float,nColor,recon> > wilson(arg, out, in);
 
     TimeProfile profile("dummy");
     DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)), in.VolumeCB(), in.GhostFace(), profile);

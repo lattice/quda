@@ -192,6 +192,7 @@ namespace quda {
   protected:
 
     DslashArg<Float> &arg;
+    const ColorSpinorField &out;
     const ColorSpinorField &in;
 
     const int nDimComms;
@@ -243,8 +244,8 @@ namespace quda {
   public:
     DslashArg<Float> &dslashParam; // temporary addition for policy compatibility
 
-    Dslash(DslashArg<Float> &arg, const ColorSpinorField &in)
-      : TunableVectorY(arg.nParity), arg(arg), in(in), nDimComms(4), dslashParam(arg)
+    Dslash(DslashArg<Float> &arg, const ColorSpinorField &out, const ColorSpinorField &in)
+      : TunableVectorY(arg.nParity), arg(arg), out(out), in(in), nDimComms(4), dslashParam(arg)
     {
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
@@ -287,6 +288,17 @@ namespace quda {
     void augmentAux(KernelType type, const char *extra) {
       strcat(aux[type], extra);
     }
+
+    /**
+       @brief Save the output field since the output field is both
+       read from and written to in the exterior kernels
+     */
+    virtual void preTune() { if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.backup(); }
+
+    /**
+       @brief Restore the output field if doing exterior kernel
+     */
+    virtual void postTune() { if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.restore(); }
 
     /*
       per direction / dimension flops
