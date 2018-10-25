@@ -54,10 +54,12 @@ namespace quda {
      @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
      @param[in] type Type of dslash we are applying
   */
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                   double kappa, const ColorSpinorField &x, int parity, bool dagger, Dslash4Type type);
+                   double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                   const int *comm_override, Dslash4Type type);
 
   // plain Wilson Dslash  
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,

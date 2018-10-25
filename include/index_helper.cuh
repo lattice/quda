@@ -331,4 +331,113 @@ namespace quda {
     return index;
   }
 
+  enum KernelType {
+    INTERIOR_KERNEL = 5,
+    EXTERIOR_KERNEL_ALL = 6,
+    EXTERIOR_KERNEL_X = 0,
+    EXTERIOR_KERNEL_Y = 1,
+    EXTERIOR_KERNEL_Z = 2,
+    EXTERIOR_KERNEL_T = 3,
+    KERNEL_POLICY = 7
+  };
+
+  /**
+     @brief Compute the full-lattice coordinates from the input face
+     index.  This is used by the Wilson-like halo update kernels, and
+     can deal with 4-d or 5-d field and 4-d or 5-d preconditioning.
+
+     @param idx[out] The full lattice coordinate
+     @param cb_idx[out] The checkboarded lattice coordinate
+     @param x[out] Coordinates we are computing
+     @param.dc.face_idx[in] Input checkerboarded face index
+     @param[in] param Parameter struct with required meta data
+  */
+  template <int nDim, QudaDWFPCType type, int dim_, int nLayers, typename Int, typename Param>
+  inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int * const x, int face_idx,
+                                             const int &face_num, const Param &param)
+  {
+    constexpr int dim = (dim_ == INTERIOR_KERNEL || dim_ == EXTERIOR_KERNEL_ALL) ? 0 : dim_; // silence compiler warning
+
+    const auto *X = param.dc.X;
+    const auto &face_X = param.dc.face_X[dim];
+    const auto &face_Y = param.dc.face_Y[dim];
+    const auto &face_Z = param.dc.face_Z[dim];
+    const auto &face_T = param.dc.face_T[dim];
+    const auto &face_XYZT = param.dc.face_XYZT[dim];
+    const auto &face_XYZ = param.dc.face_XYZ[dim];
+    const auto &face_XY = param.dc.face_XY[dim];
+
+    // intrinsic parity of the face depends on offset of first element
+    int face_parity = (param.parity + face_num * (param.dc.X[dim] - nLayers)) & 1;
+
+    // compute coordinates from (checkerboard) face index
+    face_idx *= 2;
+
+    if (!(face_X & 1)) { // face_X even
+      //   s = face_idx / face_XYZT;
+      //   t = (face_idx / face_XYZ) % face_T;
+      //   z = (face_idx / face_XY) % face_Z;
+      //   y = (face_idx / face_X) % face_Y;
+      //   face_idx += (face_parity + s + t + z + y) & 1;
+      //   x = face_idx % face_X;
+    // equivalent to the above, but with fewer divisions/mods:
+      int aux1 = face_idx / face_X;
+      int aux2 = aux1 / face_Y;
+      int aux3 = aux2 / face_Z;
+      int aux4 = (nDim == 5 ? aux3 / face_T : 0);
+
+      x[0] = face_idx - aux1 * face_X;
+      x[1] = aux1 - aux2 * face_Y;
+      x[2] = aux2 - aux3 * face_Z;
+      x[3] = aux3 - aux4 * face_T;
+      x[4] = aux4;
+
+      if (type == QUDA_5D_PC) x[0] += (face_parity + x[4] + x[3] + x[2] + x[1]) & 1;
+      else x[0] += (face_parity + x[3] + x[2] + x[1]) & 1;
+
+    } else if (!(face_Y & 1)) { // face_Y even
+
+      x[4] = (nDim == 5 ? face_idx / face_XYZT : 0);
+      x[3] = (nDim == 5 ? (face_idx / face_XYZ) % face_T : (face_idx/face_XYZ) );
+      x[2] = (face_idx / face_XY) % face_Z;
+
+      if (type == QUDA_5D_PC) face_idx += (face_parity + x[4] + x[3] + x[2]) & 1;
+      else face_idx += (face_parity + x[3] + x[2]) & 1;
+
+      x[1] = (face_idx / face_X) % face_Y;
+      x[0] = face_idx % face_X;
+
+    } else if (!(face_Z & 1)) { // face_Z even
+
+      x[4] = (nDim == 5 ? face_idx / face_XYZT : 0);
+      x[3] = (nDim == 5 ? (face_idx / face_XYZ) % face_T : (face_idx / face_XYZ) );
+
+      if (type == QUDA_5D_PC)      face_idx += (face_parity + x[4] + x[3]) & 1;
+      else if (type == QUDA_4D_PC) face_idx += (face_parity + x[3]) & 1;
+
+      x[2] = (face_idx / face_XY) % face_Z;
+      x[1] = (face_idx / face_X) % face_Y;
+      x[0] = face_idx % face_X;
+
+    } else {
+
+      x[4] = (nDim == 5 ? face_idx / face_XYZT : 0);
+      face_idx += face_parity;
+      x[3] = (nDim == 5 ? (face_idx / face_XYZ) % face_T : (face_idx / face_XYZ) );
+      x[2] = (face_idx / face_XY) % face_Z;
+      x[1] = (face_idx / face_X) % face_Y;
+      x[0] = face_idx % face_X;
+
+    }
+
+    // need to convert to global coords, not face coords
+    x[dim] += face_num * (X[dim]-nLayers);
+
+    // compute index into the full local volume
+    idx = X[0]*(X[1]*(X[2]*(X[3]*x[4] + x[3]) + x[2]) + x[1]) + x[0];
+
+    // compute index into the checkerboard
+    cb_idx = idx >> 1;
+  }
+
 } // namespace quda

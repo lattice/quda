@@ -8,16 +8,6 @@ namespace quda {
 
   void setPackComms(const int *);
 
-  enum KernelType {
-    INTERIOR_KERNEL = 5,
-    EXTERIOR_KERNEL_ALL = 6,
-    EXTERIOR_KERNEL_X = 0,
-    EXTERIOR_KERNEL_Y = 1,
-    EXTERIOR_KERNEL_Z = 2,
-    EXTERIOR_KERNEL_T = 3,
-    KERNEL_POLICY = 7
-  };
-
   /**
      @brief Helper function to determine if we should do halo
      computation
@@ -85,6 +75,33 @@ namespace quda {
     return !incomplete;
   }
 
+  /**
+     @brief Compute the space-time coordinates we are at.
+     @param[out] coord The computed space-time coordinates
+     @param[in] arg DslashArg struct
+     @param[in,out] idx Space-time index (usually equal to global
+     x-thread index).  When doing EXTERIOR kernels we overwrite this
+     with the index into our face (ghost index).
+     @param[in] parity Field parity
+     @return checkerboard space-time index
+  */
+  template <int nDim, QudaDWFPCType pc_type, KernelType kernel_type, typename Arg>
+  __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity) {
+
+    int x_cb;
+    if (kernel_type == INTERIOR_KERNEL) {
+      x_cb = idx;
+      getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+    } else { // FIXME not for fused halo
+      const int face_num = idx >= arg.dc.ghostFace[kernel_type];
+      idx -= face_num*arg.dc.ghostFace[kernel_type];
+      int X;
+      coordsFromFaceIndex<nDim,pc_type,kernel_type,1>(X, x_cb, coord, idx, face_num, arg);
+    }
+
+    return x_cb;
+  }
+
   template <typename Float>
   struct DslashArg {
 
@@ -96,9 +113,10 @@ namespace quda {
     const QudaReconstructType reconstruct;
 
     const int_fastdiv X0h;
-    const int_fastdiv dim[5];     // full lattice dimensions
-    const int commDim[4]; // whether a given dimension is partitioned or not
-    const int volumeCB;   // checkerboarded volume
+    const int_fastdiv dim[5]; // full lattice dimensions
+    const int volumeCB;       // checkerboarded volume
+    int ghostDim[4];          // determines whether to use regular or ghost indexing at boundary
+    int commDim[4];           // whether a given dimension is partitioned or not
 
     const real kappa;     // kappa parameter = 1/(8+m)
     const bool dagger;    // dagger
@@ -118,15 +136,18 @@ namespace quda {
     real twist_a;
     real twist_b;
 
-    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger)
+    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int* comm_override)
       : parity(parity), nParity(in.SiteSubset()), nFace(1), reconstruct(U.Reconstruct()),
-        X0h(nParity == 2 ? in.X(0)/2 : in.X(0)),
-        dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
-        commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+        X0h(nParity == 2 ? in.X(0)/2 : in.X(0)), dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
         volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(kappa == 0.0 ? false : true),
         kernel_type(INTERIOR_KERNEL), threads(in.VolumeCB()), threadDimMapLower{ }, threadDimMapUpper{ },
         twist_a(0.0), twist_b(0.0)
     {
+      for (int d=0; d<4; d++) {
+        ghostDim[d] = comm_dim_partitioned(d);
+        commDim[d] = (!comm_override[d]) ? 0 : comm_dim_partitioned(d);
+      }
+
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
         // create comms buffers - need to do this before we grab the dslash constants
         ColorSpinorField *in_ = const_cast<ColorSpinorField*>(&in);
