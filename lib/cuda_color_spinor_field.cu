@@ -517,7 +517,7 @@ namespace quda {
     backed_up = true;
   }
 
-  void cudaColorSpinorField::restore() {
+  void cudaColorSpinorField::restore() const {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
     cudaMemcpy(v, backup_h, bytes, cudaMemcpyHostToDevice);
     delete []backup_h;
@@ -961,7 +961,7 @@ namespace quda {
     createComms(nFace); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
- 
+
     packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label, a, b);
   }
 

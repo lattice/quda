@@ -593,8 +593,8 @@ namespace quda {
     /** @brief Backs up the LatticeField */
     virtual void backup() const { errorQuda("Not implemented"); }
 
-    /** @brief Restores the cpuGaugeField */
-    virtual void restore() { errorQuda("Not implemented"); }
+    /** @brief Restores the LatticeField */
+    virtual void restore() const { errorQuda("Not implemented"); }
   };
   
   /**

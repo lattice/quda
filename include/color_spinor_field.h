@@ -818,7 +818,7 @@ namespace quda {
     /**
        @brief Restores the cudaColorSpinorField
     */
-    void restore();
+    void restore() const;
   };
 
   // CPU implementation
@@ -899,7 +899,7 @@ namespace quda {
     /**
        @brief Restores the cpuColorSpinorField
     */
-    void restore();
+    void restore() const ;
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,

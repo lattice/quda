@@ -360,7 +360,7 @@ namespace quda {
     backed_up = true;
   }
 
-  void cpuGaugeField::restore() {
+  void cpuGaugeField::restore() const {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
