@@ -83,23 +83,138 @@ namespace quda {
      x-thread index).  When doing EXTERIOR kernels we overwrite this
      with the index into our face (ghost index).
      @param[in] parity Field parity
+     @param[out] the dimension we are working on (fused kernel only)
      @return checkerboard space-time index
   */
   template <int nDim, QudaDWFPCType pc_type, KernelType kernel_type, typename Arg>
-  __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity) {
+  __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity, int &dim) {
 
-    int x_cb;
+    int x_cb, X;
+    dim = kernel_type; // keep compiler happy
     if (kernel_type == INTERIOR_KERNEL) {
       x_cb = idx;
       getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
-    } else { // FIXME not for fused halo
+    } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
+
+      // compute face index and then compute coords
       const int face_num = idx >= arg.dc.ghostFace[kernel_type];
       idx -= face_num*arg.dc.ghostFace[kernel_type];
-      int X;
       coordsFromFaceIndex<nDim,pc_type,kernel_type,1>(X, x_cb, coord, idx, face_num, arg);
+
+    } else { // fused kernel
+
+      // work out which dimension this thread corresponds to, then compute coords
+      if (idx < arg.threadDimMapUpper[0]) { // x face
+        dim = 0;
+        const int face_num = idx >= arg.dc.ghostFace[0];
+        idx -= face_num*arg.dc.ghostFace[0];
+        coordsFromFaceIndex<nDim,pc_type,0,1>(X, x_cb, coord, idx, face_num, arg);
+      } else if (idx < arg.threadDimMapUpper[1]) { // y face
+        dim = 1;
+        idx -= arg.threadDimMapLower[1];
+        const int face_num = idx >= arg.dc.ghostFace[1];
+        idx -= face_num*arg.dc.ghostFace[1];
+        coordsFromFaceIndex<nDim,pc_type,1,1>(X, x_cb, coord, idx, face_num, arg);
+      } else if (idx < arg.threadDimMapUpper[2]){ // z face
+        dim = 2;
+        idx -= arg.threadDimMapLower[2];
+        const int face_num = idx >= arg.dc.ghostFace[2];
+        idx -= face_num*arg.dc.ghostFace[2];
+        coordsFromFaceIndex<nDim,pc_type,2,1>(X, x_cb, coord, idx, face_num, arg);
+      } else { // t face
+        dim = 3;
+        idx -= arg.threadDimMapLower[3];
+        const int face_num = idx >= arg.dc.ghostFace[3];
+        idx -= face_num*arg.dc.ghostFace[3];
+        coordsFromFaceIndex<nDim,pc_type,3,1>(X, x_cb, coord, idx, face_num, arg);
+      }
+
     }
 
     return x_cb;
+  }
+
+  /**
+     @brief Compute whether the provided coordinate is within the halo
+     region boundary of a given dimension.
+
+     @param[in] coord Coordinates
+     @param[in] Arg Dslash argument struct
+     @return True if in boundary, else false
+  */
+  template <int dim, typename Arg>
+  inline __host__ __device__ bool inBoundary(const int coord[], const Arg &arg){
+    return ( (coord[dim] >= arg.dim[dim] - arg.nFace) || (coord[dim] < arg.nFace) );
+  }
+
+  /**
+     @brief Compute whether this thread should be active for updating
+     the a given offsetDim halo.  For non-fused halo update kernels
+     this is a trivial kernel that just checks if the given dimension
+     is partitioned and if so, return true.
+
+     For fused halo region update kernels: here every thread has a
+     prescribed dimension it is tasked with updating, but for the
+     edges and vertices, the thread responsible for the entire update
+     is the "greatest" one.  Hence some threads may be labelled as a
+     given dimension, but they have to update other dimensions too.
+     Conversely, a given thread may be labeled for a given dimension,
+     but if that thread lies at en edge or vertex, and we have
+     partitioned a higher dimension, then that thread will cede to the
+     higher thread.
+
+     @param[in,out] Whether this thread is "cumulatively" active
+     (cumulative over all dimensions)
+     @param[in] threadDim Prescribed dimension of this thread
+     @param[in] offsetDim The dimension we are querying whether this
+     thread should be responsible
+     @param[in] offset The size of the hop
+     @param[in] y Site coordinate
+     @param[in] partitioned Array of which dimensions have been partitioned
+     @param[in] X Lattice dimensions
+     @return true if this thread is active
+  */
+  template <KernelType kernel_type, typename Arg>
+  inline __device__ bool isActive(bool &active, int threadDim, int offsetDim, const int coord[], const Arg &arg)
+  {
+    // Threads with threadDim = t can handle t,z,y,x offsets
+    // Threads with threadDim = z can handle z,y,x offsets
+    // Threads with threadDim = y can handle y,x offsets
+    // Threads with threadDim = x can handle x offsets
+    if (!arg.commDim[offsetDim]) return false;
+
+    if (kernel_type == EXTERIOR_KERNEL_ALL) {
+      if (threadDim < offsetDim) return false;
+
+      switch (threadDim) {
+      case 3: // threadDim = T
+        break;
+
+      case 2: // threadDim = Z
+        if (!arg.commDim[3]) break;
+        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
+        break;
+
+      case 1: // threadDim = Y
+        if ((!arg.commDim[3]) && (!arg.commDim[2])) break;
+        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
+        break;
+
+      case 0: // threadDim = X
+        if ((!arg.commDim[3]) && (!arg.commDim[2]) && (!arg.commDim[1])) break;
+        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
+        if (arg.commDim[1] && inBoundary<1>(coord, arg)) return false;
+        break;
+
+      default:
+        break;
+      }
+    }
+
+    active = true;
+    return true;
   }
 
   template <typename Float>
