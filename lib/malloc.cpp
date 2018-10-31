@@ -395,6 +395,7 @@ namespace quda {
 	printfQuda("ERROR: Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
 	errorQuda("Aborting");
       }
+      free(ptr);
 #endif
       track_free(MAPPED, ptr);
     } else {
