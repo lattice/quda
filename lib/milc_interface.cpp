@@ -101,7 +101,7 @@ void qudaFinalize()
   endQuda();
   qudamilc_called<false>(__func__);
 }
-#ifdef MULTI_GPU
+#if defined(MULTI_GPU) && !defined(QMP_COMMS)
 /**
  *  Implements a lexicographical mapping of node coordinates to ranks,
  *  with t varying fastest.
