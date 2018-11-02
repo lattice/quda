@@ -1,12 +1,16 @@
 #pragma once
 
+#include <color_spinor_field.h>
+#include <gauge_field.h>
 #include <register_traits.h>
 #include <index_helper.cuh>
 #include <tune_quda.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
-  void setPackComms(const int *);
+  void setPackComms(const int *); // original packing kernel
+  void setPackComms2(const int *); // rewriten packing kernel
 
   /**
      @brief Helper function to determine if we should do halo
@@ -97,36 +101,36 @@ namespace quda {
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
-      const int face_num = idx >= arg.dc.ghostFace[kernel_type];
-      idx -= face_num*arg.dc.ghostFace[kernel_type];
-      coordsFromFaceIndex<nDim,pc_type,kernel_type,1>(X, x_cb, coord, idx, face_num, arg);
+      const int face_num = idx >= arg.dc.ghostFaceCB[kernel_type];
+      idx -= face_num*arg.dc.ghostFaceCB[kernel_type];
+      coordsFromFaceIndex<nDim,pc_type,kernel_type,1>(X, x_cb, coord, idx, face_num, parity, arg);
 
     } else { // fused kernel
 
       // work out which dimension this thread corresponds to, then compute coords
       if (idx < arg.threadDimMapUpper[0]) { // x face
         dim = 0;
-        const int face_num = idx >= arg.dc.ghostFace[0];
-        idx -= face_num*arg.dc.ghostFace[0];
-        coordsFromFaceIndex<nDim,pc_type,0,1>(X, x_cb, coord, idx, face_num, arg);
+        const int face_num = idx >= arg.dc.ghostFaceCB[0];
+        idx -= face_num*arg.dc.ghostFaceCB[0];
+        coordsFromFaceIndex<nDim,pc_type,0,1>(X, x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[1]) { // y face
         dim = 1;
         idx -= arg.threadDimMapLower[1];
-        const int face_num = idx >= arg.dc.ghostFace[1];
-        idx -= face_num*arg.dc.ghostFace[1];
-        coordsFromFaceIndex<nDim,pc_type,1,1>(X, x_cb, coord, idx, face_num, arg);
+        const int face_num = idx >= arg.dc.ghostFaceCB[1];
+        idx -= face_num*arg.dc.ghostFaceCB[1];
+        coordsFromFaceIndex<nDim,pc_type,1,1>(X, x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[2]){ // z face
         dim = 2;
         idx -= arg.threadDimMapLower[2];
-        const int face_num = idx >= arg.dc.ghostFace[2];
-        idx -= face_num*arg.dc.ghostFace[2];
-        coordsFromFaceIndex<nDim,pc_type,2,1>(X, x_cb, coord, idx, face_num, arg);
+        const int face_num = idx >= arg.dc.ghostFaceCB[2];
+        idx -= face_num*arg.dc.ghostFaceCB[2];
+        coordsFromFaceIndex<nDim,pc_type,2,1>(X, x_cb, coord, idx, face_num, parity, arg);
       } else { // t face
         dim = 3;
         idx -= arg.threadDimMapLower[3];
-        const int face_num = idx >= arg.dc.ghostFace[3];
-        idx -= face_num*arg.dc.ghostFace[3];
-        coordsFromFaceIndex<nDim,pc_type,3,1>(X, x_cb, coord, idx, face_num, arg);
+        const int face_num = idx >= arg.dc.ghostFaceCB[3];
+        idx -= face_num*arg.dc.ghostFaceCB[3];
+        coordsFromFaceIndex<nDim,pc_type,3,1>(X, x_cb, coord, idx, face_num, parity, arg);
       }
 
     }
@@ -251,7 +255,7 @@ namespace quda {
     real twist_a;
     real twist_b;
 
-    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int* comm_override)
+    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
       : parity(parity), nParity(in.SiteSubset()), nFace(1), reconstruct(U.Reconstruct()),
         X0h(nParity == 2 ? in.X(0)/2 : in.X(0)), dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
         volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(kappa == 0.0 ? false : true),
@@ -347,6 +351,32 @@ namespace quda {
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
 
+    template <typename Arg>
+    inline void setParam(Arg &arg) {
+      arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
+
+      // Need to reset ghost pointers prior to every call since the
+      // ghost buffer may have been changed during policy tuning.
+      // Also, the accessor constructor calls Ghost(), which uses
+      // ghost_buf, but this is only presently set with the
+      // synchronous exchangeGhost.
+      static void *ghost[8]; // needs to be persistent across interior and exterior calls
+      for (int dim=0; dim<4; dim++) {
+
+        for (int dir=0; dir<2; dir++) {
+          // if doing interior kernel, then this is the initial call,
+          // so we set all ghost pointers else if doing exterior
+          // kernel, then we only have to update the non-p2p ghosts,
+          // since these may have been assigned to zero-copy memory
+          if (!comm_peer2peer_enabled(1-dir, dim) || arg.kernel_type == INTERIOR_KERNEL) {
+            ghost[2*dim+dir] = (Float*)((char*)in.Ghost2() + in.GhostOffset(dim,dir)*in.GhostPrecision());
+          }
+        }
+      }
+
+      arg.in.resetGhost(in, ghost);
+    }
+
     template <typename T, typename Arg>
     inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
       if (1) { // test on Volta
@@ -364,6 +394,7 @@ namespace quda {
     {
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
+      setPackComms2(arg.commDim);
 
       if (!init) { // these parameters are constant across all dslash instances for a given run
         char ghost[5]; // set the ghost string

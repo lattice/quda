@@ -799,6 +799,8 @@ namespace quda {
         cudaTextureObject_t tex;
         cudaTextureObject_t texNorm;
         const int tex_offset;
+        cudaTextureObject_t ghostTex;
+        cudaTextureObject_t ghostTexNorm;
 #endif
         int volumeCB;
         int faceVolumeCB[4];
@@ -817,10 +819,10 @@ namespace quda {
 #endif
     volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset()), backup_h(nullptr), bytes(a.Bytes())
   {
-    resetGhost(a, ghost_ ? (void**)ghost_ : a.Ghost());
     for (int i=0; i<4; i++) {
       faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
     }
+    resetGhost(a, ghost_ ? (void**)ghost_ : a.Ghost());
 #ifdef USE_TEXTURE_OBJECTS
     if (a.Location() == QUDA_CUDA_FIELD_LOCATION) {
       tex = static_cast<const cudaColorSpinorField&>(a).Tex();
@@ -839,8 +841,7 @@ namespace quda {
       for (int dir=0; dir<2; dir++) {
         ghost[2*dim+dir] = static_cast<Float*>(ghost_[2*dim+dir]);
         ghost_norm[2*dim+dir] =
-        reinterpret_cast<float*>(static_cast<char*>(ghost_[2*dim+dir]) +
-                                 a.GhostNormOffset(dim,dir)*QUDA_SINGLE_PRECISION - a.GhostOffset(dim,dir)*sizeof(Float));
+        reinterpret_cast<float*>(static_cast<char*>(ghost_[2*dim+dir]) + nParity*length_ghost*faceVolumeCB[dim]*sizeof(Float));
       }
     }
   }
@@ -938,16 +939,24 @@ namespace quda {
 #pragma unroll
     for (int i=0; i<M_ghost; i++) { // to do - add texture support
       // first do vectorized copy from memory into registers
-      Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N,
-                                          i*faceVolumeCB[dim]+x);
-      // second do vectorized copy converting into register type
-      copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__) && 0 // buggy - need to account for dim/dir offset
+      if (!huge_alloc) { // use textures unless we have a huge alloc
+        TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity*tex_offset + stride*i + x);
+        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+      } else
+#endif
+      {
+        Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N,
+                                            i*faceVolumeCB[dim]+x);
+        // second do vectorized copy converting into register type
+        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+      }
     }
 
     if ( isFixed<Float>::value ) {
       RegType nrm = ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x];
 #pragma unroll
-      for (int i=0; i<length; i++) v[i] *= nrm;
+      for (int i=0; i<length_ghost; i++) v[i] *= nrm;
     }
 
   }
@@ -977,7 +986,7 @@ namespace quda {
     for (int i=0; i<M_ghost; i++) {
       Vector vecTmp;
       // first do vectorized copy converting into storage type
-      copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
+      copy_scaled(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
       // second do vectorized copy into memory
       vector_store(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N, i*faceVolumeCB[dim]+x, vecTmp);
     }
@@ -993,9 +1002,9 @@ namespace quda {
      @return Instance of a colorspinor_ghost_wrapper that curries in access to
      this field at the above coordinates.
   */
-        __device__ __host__ inline colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
+  __device__ __host__ inline colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
     Ghost(int dim, int dir, int ghost_idx, int parity) {
-          return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >(*this, dim, dir, ghost_idx, parity);
+    return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >(*this, dim, dir, ghost_idx, parity);
   }
 
   /**
@@ -1009,10 +1018,10 @@ namespace quda {
      @return Instance of a colorspinor_ghost+wrapper that curries in access to
      this field at the above coordinates.
   */
-        __device__ __host__ inline const colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
+  __device__ __host__ inline const colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
     Ghost(int dim, int dir, int ghost_idx, int parity) const {
-          return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
-          (const_cast<FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc>&>(*this), dim, dir, ghost_idx, parity);
+    return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
+      (const_cast<FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc>&>(*this), dim, dir, ghost_idx, parity);
   }
 
   /**
@@ -1036,7 +1045,7 @@ namespace quda {
   }
 
   size_t Bytes() const { return nParity * volumeCB * (Nc * Ns * 2 * sizeof(Float) + (typeid(Float) == typeid(short) ? sizeof(float) : 0)); }
-      };
+  };
 
     /**
        @brief This is just a dummy structure we use for trove to define the

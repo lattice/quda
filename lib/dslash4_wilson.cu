@@ -14,11 +14,9 @@
    TODO
    - gauge fix support
    - commDim vs ghostDim
-   - host dslash halo
-   - all the policies
    - ghost texture support in accessors
-   - full fields
    - CPU support
+   - peer-to-peer
 */
 
 namespace quda {
@@ -52,18 +50,6 @@ namespace quda {
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
-
-      // FIXME: need to reset ghost pointers since Ghost() (called in
-      // accessor constructor) uses ghost_buf but this is only
-      // presently set with exchangeGhost
-      void *ghost[8];
-      for (int dim=0; dim<4; dim++) {
-        for (int dir=0; dir<2; dir++) {
-          // really pointing to from_face_dim_dir_d[bufferIndex][d][dir] / from_face_dim_dir_h[bufferIndex][d][dir]
-          ghost[2*dim+dir] = (Float*)((char*)in.Ghost2() + in.GhostOffset(dim,dir)*in.GhostPrecision());
-        }
-      }
-      this->in.resetGhost(in, ghost);
     }
   };
 
@@ -220,13 +206,14 @@ namespace quda {
 
   protected:
     Arg &arg;
-    const ColorSpinorField &meta;
+    const ColorSpinorField &in;
+    using Dslash<Float>::setParam;
     using Dslash<Float>::launch;
 
   public:
 
     Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), meta(in)
+      : Dslash<Float>(arg, out, in), arg(arg), in(in)
     {  }
 
     virtual ~Wilson() { }
@@ -235,7 +222,9 @@ namespace quda {
     inline void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+      if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
+        errorQuda("Not implemented");
+#if 0
         switch (arg.kernel_type) {
         case   INTERIOR_KERNEL: wilsonCPU<Float,nDim,nColor,dagger,xpay,INTERIOR_KERNEL  >(arg); break;
         case EXTERIOR_KERNEL_X: wilsonCPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_X>(arg); break;
@@ -244,6 +233,7 @@ namespace quda {
         case EXTERIOR_KERNEL_T: wilsonCPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_T>(arg); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
         }
+#endif
       } else {
         switch(arg.kernel_type) {
         case INTERIOR_KERNEL:
@@ -264,12 +254,12 @@ namespace quda {
     }
 
     void apply(const cudaStream_t &stream) {
-      arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
+      setParam(arg);
       if (arg.xpay) arg.dagger ? apply<true, true>(stream) : apply<false, true>(stream);
       else          arg.dagger ? apply<true,false>(stream) : apply<false,false>(stream);
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
+    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
@@ -281,9 +271,9 @@ namespace quda {
     Wilson<Float,nDim,nColor,WilsonArg<Float,nColor,recon> > wilson(arg, out, in);
 
     TimeProfile profile("dummy");
-    DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)), in.VolumeCB(), in.GhostFace(), profile);
+    DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+                                              in.VolumeCB(), in.GhostFaceCB(), profile);
     policy.apply(0);
-    //wilson.apply(0);
 
     checkCudaError();
   }

@@ -358,7 +358,7 @@ namespace {
      @param[in] to_mapped Whether we are switching to mapped ghosts or not
    */
   template <typename Dslash>
-  inline void setMappedGhost(Dslash &dslash, cudaColorSpinorField &in, bool to_mapped) {
+  inline void setMappedGhost(Dslash &dslash, ColorSpinorField &in, bool to_mapped) {
 
     static char aux_copy[TuneKey::aux_n];
     static bool set_mapped = false;
@@ -388,9 +388,9 @@ namespace {
     virtual ~DslashPolicyImp(){}
   };
 
-/**
-   Standard dslash parallelization with host staging for send and receive
- */
+  /**
+     Standard dslash parallelization with host staging for send and receive
+  */
   template <typename Dslash>
   struct DslashBasic : DslashPolicyImp<Dslash> {
 

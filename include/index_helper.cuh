@@ -346,29 +346,31 @@ namespace quda {
      index.  This is used by the Wilson-like halo update kernels, and
      can deal with 4-d or 5-d field and 4-d or 5-d preconditioning.
 
-     @param idx[out] The full lattice coordinate
-     @param cb_idx[out] The checkboarded lattice coordinate
-     @param x[out] Coordinates we are computing
-     @param.dc.face_idx[in] Input checkerboarded face index
-     @param[in] param Parameter struct with required meta data
+     @param[out] idx The full lattice coordinate
+     @param[out] cb_idx The checkboarded lattice coordinate
+     @param[out] x Coordinates we are computing
+     @param[in] face_idx Input checkerboarded face index
+     @param[in] face_num Face number
+     @param[in] parity Parity index
+     @param[in] arg Argument struct with required meta data
   */
-  template <int nDim, QudaDWFPCType type, int dim_, int nLayers, typename Int, typename Param>
-  inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int * const x, int face_idx,
-                                             const int &face_num, const Param &param)
+  template <int nDim, QudaDWFPCType type, int dim_, int nLayers, typename Int, typename Arg>
+  inline __device__ __host__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int * const x, int face_idx,
+                                                      const int &face_num, int parity, const Arg &arg)
   {
     constexpr int dim = (dim_ == INTERIOR_KERNEL || dim_ == EXTERIOR_KERNEL_ALL) ? 0 : dim_; // silence compiler warning
 
-    const auto *X = param.dc.X;
-    const auto &face_X = param.dc.face_X[dim];
-    const auto &face_Y = param.dc.face_Y[dim];
-    const auto &face_Z = param.dc.face_Z[dim];
-    const auto &face_T = param.dc.face_T[dim];
-    const auto &face_XYZT = param.dc.face_XYZT[dim];
-    const auto &face_XYZ = param.dc.face_XYZ[dim];
-    const auto &face_XY = param.dc.face_XY[dim];
+    const auto *X = arg.dc.X;
+    const auto &face_X = arg.dc.face_X[dim];
+    const auto &face_Y = arg.dc.face_Y[dim];
+    const auto &face_Z = arg.dc.face_Z[dim];
+    const auto &face_T = arg.dc.face_T[dim];
+    const auto &face_XYZT = arg.dc.face_XYZT[dim];
+    const auto &face_XYZ = arg.dc.face_XYZ[dim];
+    const auto &face_XY = arg.dc.face_XY[dim];
 
     // intrinsic parity of the face depends on offset of first element
-    int face_parity = (param.parity + face_num * (param.dc.X[dim] - nLayers)) & 1;
+    int face_parity = (parity + face_num * (arg.dc.X[dim] - nLayers)) & 1;
 
     // compute coordinates from (checkerboard) face index
     face_idx *= 2;
@@ -438,6 +440,201 @@ namespace quda {
 
     // compute index into the checkerboard
     cb_idx = idx >> 1;
+  }
+
+  /**
+     @brief Overloaded variant of indexFromFaceIndex where we use the
+     parity declared in arg.
+   */
+  template <int nDim, QudaDWFPCType type, int dim_, int nLayers, typename Int, typename Arg>
+  inline __device__ __host__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int * const x, int face_idx,
+                                                      const int &face_num, const Arg &arg)
+  { coordsFromFaceIndex<nDim,type,dim_,nLayers>(idx, cb_idx, x, face_idx, face_num, arg.parity, arg); }
+
+  /**
+     @brief Compute the checkerboard lattice index from the input face
+     index.  This is used by the Wilson-like halo packing kernels, and
+     can deal with 4-d or 5-d field and 4-d or 5-d preconditioning.
+     @param[in] face_idx Checkerboard halo index
+     @param[in] parity Parity index
+     @param[in] arg Argument struct with required meta data
+     @return Checkerboard lattice index
+  */
+  template <int nDim, QudaDWFPCType type, int dim, int nLayers, int face_num, typename Arg>
+  inline __device__ __host__ int indexFromFaceIndex(int face_idx, int parity, const Arg &arg)
+  {
+    // intrinsic parity of the face depends on offset of first element
+    int face_parity = (parity + face_num * (arg.dc.X[dim] - nLayers)) & 1;
+
+    // reconstruct full face index from index into the checkerboard
+    face_idx *= 2;
+
+    if (!(arg.dc.face_X[dim] & 1)) { // face_X even
+      //   int s = face_idx / face_XYZT;
+      //   int t = (face_idx / face_XYZ) % face_T;
+      //   int z = (face_idx / face_XY) % face_Z;
+      //   int y = (face_idx / face_X) % face_Y;
+      //   face_idx += (face_parity + s + t + z + y) & 1;
+      // equivalent to the above, but with fewer divisions/mods:
+      int aux1 = face_idx / arg.dc.face_X[dim];
+      int aux2 = aux1 / arg.dc.face_Y[dim];
+      int aux3 = aux2 / arg.dc.face_Z[dim];
+      int aux4 = (nDim == 5 ? aux3 / arg.dc.face_T[dim] : 0);
+
+      int y = aux1 - aux2 * arg.dc.face_Y[dim];
+      int z = aux2 - aux3 * arg.dc.face_Z[dim];
+      int t = aux3 - aux4 * arg.dc.face_T[dim];
+      int s = aux4;
+
+      if (type == QUDA_5D_PC)      face_idx += (face_parity + s + t + z + y) & 1;
+      else if (type == QUDA_4D_PC) face_idx += (face_parity + t + z + y) & 1;
+
+    } else if (!(arg.dc.face_Y[dim] & 1)) { // face_Y even
+
+      int s = face_idx / arg.dc.face_XYZT[dim];
+      int t = (nDim == 5 ? (face_idx / arg.dc.face_XYZ[dim]) % arg.dc.face_T[dim] : (face_idx / arg.dc.face_XYZ[dim]) );
+      int z = (face_idx / arg.dc.face_XY[dim]) % arg.dc.face_Z[dim];
+      if (type == QUDA_5D_PC)      face_idx += (face_parity + s + t + z) & 1;
+      else if (type == QUDA_4D_PC) face_idx += (face_parity + t + z) & 1;
+
+    } else if (!(arg.dc.face_Z[dim] & 1)) { // face_Z even
+
+      int s = face_idx / arg.dc.face_XYZT[dim];
+      int t = (nDim == 5 ? (face_idx / arg.dc.face_XYZ[dim]) % arg.dc.face_T[dim] : (face_idx / arg.dc.face_XYZ[dim]) );
+      if (type == QUDA_5D_PC)      face_idx += (face_parity + s + t) & 1;
+      else if (type == QUDA_4D_PC) face_idx += (face_parity + t) & 1;
+
+    } else if (!(arg.dc.face_T[dim]) && nDim == 5) {
+
+      int s = face_idx / arg.dc.face_XYZT[dim];
+      if (type == QUDA_5D_PC)      face_idx += (face_parity + s) & 1;
+      else if (type == QUDA_4D_PC) face_idx += face_parity;
+
+    } else {
+      face_idx += face_parity;
+    }
+
+    // compute index into the full local volume
+    int gap = arg.dc.X[dim] - nLayers;
+    int idx = face_idx;
+    int aux;
+    switch (dim) {
+    case 0:
+      aux = face_idx / arg.dc.face_X[dim];
+      idx += (aux + face_num) * gap;
+      break;
+    case 1:
+      aux = face_idx / arg.dc.face_XY[dim];
+      idx += (aux + face_num) * gap * arg.dc.face_X[dim];
+      break;
+    case 2:
+      aux = face_idx / arg.dc.face_XYZ[dim];
+      idx += (aux + face_num) * gap * arg.dc.face_XY[dim];
+      break;
+    case 3:
+      aux = (nDim == 5 ? face_idx / arg.dc.face_XYZT[dim] : 0);
+      idx += (aux + face_num) * gap * arg.dc.face_XYZ[dim];
+      break;
+    }
+
+    // return index into the checkerboard
+    return idx >> 1;
+  }
+
+  /**
+     @brief Overloaded variant of indexFromFaceIndex where we use the
+     parity declared in arg.
+   */
+  template <int nDim, QudaDWFPCType type, int dim, int nLayers, int face_num, typename Arg>
+  inline __device__ __host__ int indexFromFaceIndex(int face_idx, const Arg &arg)
+  {
+    return indexFromFaceIndex<nDim,type,dim,nLayers,face_num>(face_idx, arg.parity, arg);
+  }
+
+  /**
+     @brief Determines which face a given thread is computing.  Also
+     rescale face_idx so that is relative to a given dimension.  If 5-d
+     variant if called, then it is assumed that arg.threads contains
+     only the 3-d surface of threads but face_idx is a 4-d index
+     (surface * fifth dimension).  At present multi-src staggered uses
+     the 4-d variant since the face_idx that is passed in is the 3-d
+     surface not the 4-d one.
+
+     @param[out] face_idx Face index
+     @param[in] tid Checkerboard volume index
+     @param[in] arg Input parameters
+     @return dimension this face_idx corresponds to
+  */
+  template <int nDim=4, typename Arg>
+  __host__ __device__ inline int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg){
+
+    // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
+    const int s = (nDim == 5 ? tid/arg.threads : 0);
+
+    face_idx = tid - s*arg.threads; // face_idx = face_idx % arg.threads
+
+    if (face_idx < arg.threadDimMapUpper[0]) {
+      face_idx += s*arg.threadDimMapUpper[0];
+      return 0;
+    } else if (face_idx < arg.threadDimMapUpper[1]) {
+      face_idx -= arg.threadDimMapLower[1];
+      face_idx += s*(arg.threadDimMapUpper[1] - arg.threadDimMapLower[1]);
+      return 1;
+    } else if (face_idx < arg.threadDimMapUpper[2]) {
+      face_idx -= arg.threadDimMapLower[2];
+      face_idx += s*(arg.threadDimMapUpper[2] - arg.threadDimMapLower[2]);
+      return 2;
+    } else {
+      face_idx -= arg.threadDimMapLower[3];
+      face_idx += s*(arg.threadDimMapUpper[3] - arg.threadDimMapLower[3]);
+      return 3;
+    }
+
+  }
+
+  template <int nDim=4, typename Arg>
+  __host__ __device__ inline int dimFromFaceIndex(int &face_idx, const Arg &arg)
+  { return dimFromFaceIndex<nDim>(face_idx, face_idx, arg); }
+
+  /**
+     @brief Swizzler for reordering the (x) thread block indices - use on
+     conjunction with swizzle-factor autotuning to find the optimum
+     swizzle factor.  Specfically, the thread block id is remapped by
+     transposing its coordinates: if the original order can be
+     parametrized by
+
+     blockIdx.x = j * swizzle + i,
+
+     then the new order is
+
+     block_idx = i * (gridDim.x / swizzle) + j
+
+     We need to factor out any remainder and leave this in original
+     ordering.
+
+     @param[in] swizzle Swizzle factor to be applied
+     @return Swizzled block index
+  */
+  //#define SWIZZLE
+  template <typename T>
+  __device__ inline int block_idx(const T &swizzle) {
+#ifdef SWIZZLE
+    // the portion of the grid that is exactly divisible by the number of SMs
+    const int gridp = gridDim.x - gridDim.x % swizzle;
+
+    int block_idx = blockIdx.x;
+    if (blockIdx.x < gridp) {
+      // this is the portion of the block that we are going to transpose
+      const int i = blockIdx.x % swizzle;
+      const int j = blockIdx.x / swizzle;
+
+      // transpose the coordinates
+      block_idx = i * (gridp / swizzle) + j;
+    }
+    return block_idx;
+#else
+    return blockIdx.x;
+#endif
   }
 
 } // namespace quda
