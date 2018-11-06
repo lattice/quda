@@ -321,7 +321,7 @@ namespace quda {
     }
 
     double r2_old=0.0;
-    if(r2_old_init != 0.0 and p_init){
+    if (r2_old_init != 0.0 and p_init) {
       r2_old = r2_old_init;
       Complex rp = blas::cDotProduct(rSloppy, *p[0]) / (r2);
       blas::caxpy(-rp, rSloppy, *p[0]);

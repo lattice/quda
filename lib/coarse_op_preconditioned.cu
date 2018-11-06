@@ -1,116 +1,14 @@
 #include <gauge_field.h>
-#include <gauge_field_order.h>
-#include <complex_quda.h>
-#include <index_helper.cuh>
 #include <blas_cublas.h>
 #include <blas_quda.h>
+#include <tune_quda.h>
+
+#include <jitify_helper.cuh>
+#include <kernels/coarse_op_preconditioned.cuh>
 
 namespace quda {
 
-  template <typename PreconditionedGauge, typename Gauge, int n>
-  struct CalculateYhatArg {
-    PreconditionedGauge Yhat;
-    const Gauge Y;
-    const Gauge Xinv;
-    int dim[QUDA_MAX_DIM];
-    int comm_dim[QUDA_MAX_DIM];
-    int nFace;
-    const int coarseVolumeCB;   /** Coarse grid volume */
-
-    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim, const int *comm_dim, int nFace)
-      : Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), coarseVolumeCB(Y.VolumeCB()) {
-      for (int i=0; i<4; i++) {
-	this->comm_dim[i] = comm_dim[i];
-	this->dim[i] = dim[i];
-      }
-    }
-  };
-
-  // complex multiply-add with optimal use of fma
-  template<typename Float>
-  inline __device__ __host__ void caxpy(const complex<Float> &a, const complex<Float> &x, complex<Float> &y) {
-    y.x += a.x*x.x;
-    y.x -= a.y*x.y;
-    y.y += a.y*x.x;
-    y.y += a.x*x.y;
-  }
-
-  template<typename Float, int n, typename Arg>
-  inline __device__ __host__ void computeYhat(Arg &arg, int d, int x_cb, int parity, int i) {
-
-    int coord[5];
-    getCoords(coord, x_cb, arg.dim, parity);
-    coord[4] = 0;
-
-    const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-
-    // first do the backwards links Y^{+\mu} * X^{-\dagger}
-    if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
-
-#pragma unroll
-      for (int j = 0; j<n; j++) {
-	complex<Float> yHat = 0.0;
-#pragma unroll
-	for(int k = 0; k<n; k++) {
-	  caxpy(arg.Y.Ghost(d,1-parity,ghost_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
-	}
-	arg.Yhat.Ghost(d,1-parity,ghost_idx,i,j) = yHat;
-      }
-
-    } else {
-      const int back_idx = linkIndexM1(coord, arg.dim, d);
-
-#pragma unroll
-      for (int j = 0; j<n; j++) {
-	complex<Float> yHat = 0.0;
-#pragma unroll
-	for (int k = 0; k<n; k++) {
-	  caxpy(arg.Y(d,1-parity,back_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
-	}
-	arg.Yhat(d,1-parity,back_idx,i,j) = yHat;
-      }
-
-    }
-
-    // now do the forwards links X^{-1} * Y^{-\mu}
-#pragma unroll
-    for(int j = 0; j<n; j++) {
-      complex<Float> yHat = 0.0;
-#pragma unroll
-      for (int k = 0; k<n; k++) {
-	caxpy(arg.Xinv(0,parity,x_cb,i,k), arg.Y(d+4,parity,x_cb,k,j), yHat);
-      }
-      arg.Yhat(d+4,parity,x_cb,i,j) = yHat;
-    }
-
-  }
-
-  template<typename Float, int n, typename Arg>
-  void CalculateYhatCPU(Arg &arg) {
-
-    for (int d=0; d<4; d++) {
-      for (int parity=0; parity<2; parity++) {
-#pragma omp parallel for
-	for (int x_cb=0; x_cb<arg.Y.VolumeCB(); x_cb++) {
-	  for (int i=0; i<n; i++) computeYhat<Float,n>(arg, d, x_cb, parity, i);
-	} // x_cb
-      } //parity
-    } // dimension
-  }
-
-  template<typename Float, int n, typename Arg>
-  __global__ void CalculateYhatGPU(Arg arg) {
-    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.coarseVolumeCB) return;
-    int i_parity = blockDim.y*blockIdx.y + threadIdx.y;
-    if (i_parity >= 2*n) return;
-    int d = blockDim.z*blockIdx.z + threadIdx.z;
-    if (d >= 4) return;
-
-    int i = i_parity % n;
-    int parity = i_parity / n;
-    computeYhat<Float,n>(arg, d, x_cb, parity, i);
-  }
+#ifdef GPU_MULTIGRID
 
   template <typename Float, int n, typename Arg>
   class CalculateYhat : public TunableVectorYZ {
@@ -120,16 +18,22 @@ namespace quda {
     const LatticeField &meta;
 
     long long flops() const { return 2l * arg.coarseVolumeCB * 8 * n * n * (8*n-2); } // 8 from dir, 8 from complexity,
-    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + 8*arg.Yhat.Bytes()); }
+    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + 8*arg.Yhat.Bytes()) * n; }
 
     unsigned int minThreads() const { return arg.coarseVolumeCB; }
 
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
-    CalculateYhat(Arg &arg, const LatticeField &meta) : TunableVectorYZ(2*n,4), arg(arg), meta(meta)
+    CalculateYhat(Arg &arg, const LatticeField &meta) : TunableVectorYZ(2*n,4*n), arg(arg), meta(meta)
     {
-      strcpy(aux,comm_dim_partitioned_string());
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+#ifdef JITIFY
+        create_jitify_program("kernels/coarse_op_preconditioned.cuh");
+#endif
+      }
+      strcpy(aux, compile_type_str(meta));
+      strcat(aux, comm_dim_partitioned_string());
     }
     virtual ~CalculateYhat() { }
 
@@ -138,7 +42,14 @@ namespace quda {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	CalculateYhatCPU<Float,n,Arg>(arg);
       } else {
+#ifdef JITIFY
+        using namespace jitify::reflection;
+        jitify_error = program->kernel("quda::CalculateYhatGPU")
+          .instantiate(Type<Float>(),n,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
 	CalculateYhatGPU<Float,n,Arg> <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#endif
       }
     }
 
@@ -185,12 +96,8 @@ namespace quda {
       cudaGaugeField Xinv_(param);
       X_.copy(X);
       blas::flops += cublas::BatchInvertMatrix((void*)Xinv_.Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
-      if (Xinv.Precision() < QUDA_SINGLE_PRECISION) {
-        typedef typename gauge::FieldOrder<Float,N,1,QUDA_MILC_GAUGE_ORDER> G;
-        G x(X_);
-        G xinv(Xinv_);
-        Xinv.Scale(xinv.abs_max());
-      }
+
+      if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_.abs_max() );
 
       Xinv.copy(Xinv_);
 
@@ -219,7 +126,7 @@ namespace quda {
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gPreconditionedCoarse yHatAccessor(const_cast<GaugeField&>(Yhat));
       gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", xInvAccessor.norm2(0));
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
 
       int comm_dim[4];
       for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
@@ -227,7 +134,7 @@ namespace quda {
       yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
 
       if (Yhat.Precision() == QUDA_HALF_PRECISION) {
-	double max = 3.0 * arg.Y.abs_max() * arg.Xinv.abs_max();
+	double max = 3.0 * Y.abs_max() * Xinv.abs_max();
 	Yhat.Scale(max);
 	arg.Yhat.resetScale(max);
       }
@@ -236,9 +143,9 @@ namespace quda {
       yHat.apply(0);
 
       if (getVerbosity() >= QUDA_VERBOSE)
-	for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, arg.Yhat.norm2(d),
-					   arg.Yhat.abs_max(d), arg.Y.abs_max(d) * arg.Xinv.abs_max(0),
-					   arg.Y.abs_max(d), arg.Xinv.abs_max(0));
+	for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d),
+					   Yhat.abs_max(d), Y.abs_max(d) * Xinv.abs_max(0),
+					   Y.abs_max(d), Xinv.abs_max(0));
 
     }
 
@@ -285,8 +192,12 @@ namespace quda {
     }
   }
 
+#endif
+
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
+
+#ifdef GPU_MULTIGRID
     QudaPrecision precision = checkPrecision(Xinv, Y, X);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Yhat field......\n");
 
@@ -314,6 +225,9 @@ namespace quda {
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Yhat field\n");
+#else
+    errorQuda("Multigrid has not been enabled");
+#endif
   }
 
 } //namespace quda

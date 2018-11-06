@@ -143,7 +143,7 @@ namespace quda {
   }
 
 
-  void Solver::solve(ColorSpinorField& out, ColorSpinorField& in){
+  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in){
     for (int i = 0; i < param.num_src; i++) {
       (*this)(out.Component(i), in.Component(i));
       param.true_res_offset[i] = param.true_res;

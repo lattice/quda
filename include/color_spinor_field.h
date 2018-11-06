@@ -353,8 +353,10 @@ namespace quda {
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
-    char aux_string[TuneKey::aux_n]; // used as a label in the autotuner
-    void setTuningString(); // set the vol_string and aux_string for use in tuning
+    /**
+       @brief Set the vol_string and aux_string for use in tuning
+    */
+    void setTuningString();
 
   public:
     //ColorSpinorField();
@@ -383,8 +385,6 @@ namespace quda {
     size_t GhostBytes() const { return ghost_bytes; }
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
-
-    inline const char *AuxString() const { return aux_string; }
 
     void* V() {return v;}
     const void* V() const {return v;}

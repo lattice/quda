@@ -160,6 +160,7 @@ set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
 set(QUDA_SWIZZLE OFF CACHE BOOL "use swizzle optimization for Dslash")
+set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -186,6 +187,8 @@ mark_as_advanced(QUDA_ALTRELIABLE)
 mark_as_advanced(QUDA_SWIZZLE)
 mark_as_advanced(QUDA_CXX_STANDARD)
 
+mark_as_advanced(QUDA_JITIFY)
+
 #######################################################################
 # options that are not exposed at all because only one option exists
 set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
@@ -201,9 +204,11 @@ find_package(PythonInterp)
 ## QUDA depends on Eigen
 ## this part makes sure we can download eigen if it is not found
 if (QUDA_DOWNLOAD_EIGEN)
-  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2)
-  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2)
-  set(EIGEN_SHA dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6)
+  set(EIGEN_VERSION 3.3.5)
+
+  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
+  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
+  set(EIGEN_SHA 7352bff3ea299e4c7d7fbe31c504f8eb9149d7e685dec5a12fbaa26379f603e2)
   if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION} )
     message(STATUS "Checking for Eigen tarball and downloading if necessary.")
   endif()
@@ -216,7 +221,7 @@ if (QUDA_DOWNLOAD_EIGEN)
 
   include(ExternalProject)
   ExternalProject_Add(Eigen
-    URL ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2
+    URL ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2
     URL_HASH SHA256=${EIGEN_SHA}
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
     CONFIGURE_COMMAND ""
@@ -414,6 +419,16 @@ if(QUDA_BLOCKSOLVER)
   add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})
 endif()
 
+if(QUDA_JITIFY)
+  add_definitions(-DJITIFY)
+  find_package(LibDL)
+#  find_library(LibDL_Libraries nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
+  LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
+  LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
+  configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
+  include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
+endif()
+
 if(QUDA_ALTRELIABLE)
   add_definitions(-DALTRELIABLE)
 endif()
@@ -501,13 +516,7 @@ if(QUDA_BLOCKSOLVER_NVTX)
 endif(QUDA_BLOCKSOLVER_NVTX)
 
 if(QUDA_NVTX)
-  if(CMAKE_VERSION VERSION_GREATER  3.7.99)
-    get_filename_component(cuda_dir "${CMAKE_CUDA_COMPILER}" DIRECTORY)
-    FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt PATHS  ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} "${cuda_dir}/..")
-  else()
-  FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64/)
-  endif()
-  LIST(APPEND QUDA_LIBS ${CUDA_NVTX_LIB})
+  LIST(APPEND QUDA_LIBS ${CUDA_nvToolsExt_LIBRARY})
 endif(QUDA_NVTX)
 
 if(NOT QUDA_BLAS_TEX)
@@ -642,13 +651,6 @@ SET(COMP_CAP "${COMP_CAP}0")
 add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by default )
-mark_as_advanced(CUDA_NVCC_FLAGS_DEVEL)
-mark_as_advanced(CUDA_NVCC_FLAGS_STRICT)
-mark_as_advanced(CUDA_NVCC_FLAGS_RELEASE)
-mark_as_advanced(CUDA_NVCC_FLAGS_DEBUG)
-mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
-mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
-
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)

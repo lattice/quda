@@ -355,7 +355,7 @@ namespace quda {
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
 
-    virtual void solve(ColorSpinorField &out, ColorSpinorField &in);
+    virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
        Solver factory
@@ -458,7 +458,7 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
 
 
-    void solve(ColorSpinorField& out, ColorSpinorField& in);
+    void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
   };
 
 
