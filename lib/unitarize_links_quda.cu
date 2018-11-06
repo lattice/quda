@@ -58,12 +58,13 @@ namespace{
 		      int max_iter, double unitarize_eps, double max_error,
 		      int reunit_allow_svd, int reunit_svd_only, double svd_rel_error,
 		      double svd_abs_error)
-      : threads(data.VolumeCB()), output(output), input(input), fails(fails), unitarize_eps(unitarize_eps),
+      : output(output), input(input), fails(fails), unitarize_eps(unitarize_eps),
 	max_iter(max_iter), max_error(max_error), reunit_allow_svd(reunit_allow_svd),
 	reunit_svd_only(reunit_svd_only), svd_rel_error(svd_rel_error),
 	svd_abs_error(svd_abs_error)
     {
-      for (int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
+      for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
+      threads = X[0]*X[1]*X[2]*X[3];
     }
   };
 
@@ -280,7 +281,7 @@ namespace{
     u = in;
 
     for(int i=0; i<max_iter; ++i){
-      uinv = inverse(u);
+      computeMatrixInverse(u, &uinv);
       u = 0.5*(u + conj(uinv));
     }
 
@@ -363,46 +364,56 @@ namespace{
   template<typename Float, typename Out, typename In>
   __global__ void DoUnitarizedLink(UnitarizeLinksArg<Out,In> arg){
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
-    int parity = threadIdx.y + blockIdx.y*blockDim.y;
-    int mu = threadIdx.z + blockIdx.z*blockDim.z;
-    if (idx >= arg.threads) return;
-    if (mu >= 4) return;
-
+    if(idx >= arg.threads) return;
+    int parity = 0;
+    if(idx >= arg.threads/2) {
+      parity = 1;
+      idx -= arg.threads/2;
+    }
+    int X[4]; 
+    for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
+    int x[4];
+    getCoords(x, idx, X, parity);
+    
+    idx = linkIndex(x,X);
     // result is always in double precision
     Matrix<complex<double>,3> v, result;
-    Matrix<complex<Float>,3> tmp = arg.input(mu, idx, parity);
+    Matrix<complex<Float>,3> tmp;
+    for (int mu = 0; mu < 4; mu++) { 
+      arg.input.load((Float*)(tmp.data),idx, mu, parity);
 
-    v = tmp;
-    unitarizeLinkMILC(v, &result, arg);
-    if (arg.check_unitarization) {
-      if (isUnitary(result,arg.max_error) == false) atomicAdd(arg.fails, 1);
+      v = tmp;
+      unitarizeLinkMILC(v, &result, arg);
+      if (arg.check_unitarization) {
+        if (isUnitary(result,arg.max_error) == false) atomicAdd(arg.fails, 1);
+      }
+      //WRITE BACK IF FAIL??????????
+      tmp = result;
+
+      arg.output.save((Float*)(tmp.data),idx, mu, parity); 
     }
-    tmp = result;
-
-    arg.output(mu, idx, parity) = tmp;
   }
 
 
 
   template<typename Float, typename Out, typename In>
-  class UnitarizeLinks : TunableVectorYZ {
+  class UnitarizeLinks : Tunable {
     UnitarizeLinksArg<Out,In> arg;
-    const GaugeField &meta;
-
+    
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
+    
     // don't tune the grid dimension
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
-
+    
   public:
-    UnitarizeLinks(UnitarizeLinksArg<Out,In> &arg, const GaugeField &meta)
-      : TunableVectorYZ(2,4), arg(arg), meta(meta) { }
+    UnitarizeLinks(UnitarizeLinksArg<Out,In> &arg) : arg(arg) { }
+    
     
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      DoUnitarizedLink<Float,Out,In><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      DoUnitarizedLink<Float,Out,In><<<tp.grid, tp.block, 0, stream>>>(arg);
     }
     void preTune() { if (arg.input.gauge == arg.output.gauge) arg.output.save(); }
     void postTune() {
@@ -412,23 +423,27 @@ namespace{
     
     long long flops() const { 
       // Accounted only the minimum flops for the case reunitarize_svd_only=0
-      return 4ll * 2 * arg.threads * 1147;
+      return 4588LL*arg.threads; 
     }
-    long long bytes() const { return 4ll * 2 * arg.threads * (arg.input.Bytes() + arg.output.Bytes()); }
+    long long bytes() const { return 4ll * arg.threads * (arg.input.Bytes() + arg.output.Bytes()); }
     
     TuneKey tuneKey() const {
-      std::stringstream aux;
+      std::stringstream vol, aux;
+      vol << arg.X[0] << "x";
+      vol << arg.X[1] << "x";
+      vol << arg.X[2] << "x";
+      vol << arg.X[3];
       aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
     }  
   }; 
   
   
   template<typename Float, typename Out, typename In>
-  void unitarizeLinks(Out output, const In input, const cudaGaugeField& meta, int* fails) {
+  void unitarizeLinks(Out output,  const In input, const cudaGaugeField& meta, int* fails) {
     UnitarizeLinksArg<Out,In> arg(output, input, meta, fails, max_iter, unitarize_eps, max_error,
-                                  reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
-    UnitarizeLinks<Float, Out, In> unitlinks(arg, meta);
+				      reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
+    UnitarizeLinks<Float, Out, In> unitlinks(arg) ;
     unitlinks.apply(0);
     qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
   }
@@ -525,35 +540,37 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
     G u;
     Float tol;
     int *fails;
+    int X[4];
     ProjectSU3Arg(G u, const GaugeField &meta, Float tol, int *fails) 
-      : threads(meta.VolumeCB()), u(u), tol(tol), fails(fails) { }
+      : u(u), tol(tol), fails(fails) {
+      for(int dir=0; dir<4; ++dir) X[dir] = meta.X()[dir];
+      threads = meta.VolumeCB();
+    }
   };
 
   template<typename Float, typename G>
   __global__ void ProjectSU3kernel(ProjectSU3Arg<Float,G> arg){
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
-    int parity = threadIdx.y + blockIdx.y*blockDim.y;
-    int mu = threadIdx.z + blockIdx.z*blockDim.z;
-    if (idx >= arg.threads) return;
-    if (mu >= 4) return;
+    int parity = blockIdx.y;
+    if(idx >= arg.threads) return;
+    
+    Matrix<complex<Float>,3> u;
 
-    Matrix<complex<Float>,3> u = arg.u(mu, idx, parity);
+    for (int mu = 0; mu < 4; mu++) { 
+      arg.u.load((Float*)(u.data),idx, mu, parity);
+      polarSu3<Float>(u, arg.tol);
 
-    polarSu3<Float>(u, arg.tol);
+      // count number of failures
+      if(isUnitary(u, arg.tol) == false) atomicAdd(arg.fails, 1);
 
-    // count number of failures
-    if (isUnitary(u, arg.tol) == false) {
-      atomicAdd(arg.fails, 1);
+      arg.u.save((Float*)(u.data),idx, mu, parity); 
     }
-
-    arg.u(mu, idx, parity) = u;
   }
 
   template<typename Float, typename G>
-  class ProjectSU3 : TunableVectorYZ {
+  class ProjectSU3 : Tunable {    
     ProjectSU3Arg<Float,G> arg;
-    const GaugeField &meta;
-
+    
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
     
@@ -562,26 +579,23 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
     unsigned int minThreads() const { return arg.threads; }
     
   public:
-    ProjectSU3(ProjectSU3Arg<Float,G> &arg, const GaugeField &meta)
-      : TunableVectorYZ(2, 4), arg(arg), meta(meta) { }
+    ProjectSU3(ProjectSU3Arg<Float,G> &arg) : arg(arg) { }
     
     void apply(const cudaStream_t &stream){
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE); //getVerbosity());
-      ProjectSU3kernel<Float,G><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      ProjectSU3kernel<Float,G><<<tp.grid, tp.block, 0, stream>>>(arg);
     }
     void preTune() { arg.u.save(); }
-    void postTune() {
-      arg.u.load();
-      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
-    }
+    void postTune() { arg.u.load(); }
   
     long long flops() const { return 0; } // depends on number of iterations
-    long long bytes() const { return 4ll * 2 * arg.threads * 2 * arg.u.Bytes(); }
+    long long bytes() const { return 4ll * arg.threads * arg.u.Bytes(); }
     
     TuneKey tuneKey() const {
-      std::stringstream aux;
+      std::stringstream vol, aux;
+      vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
       aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
     }
   };
   
@@ -591,7 +605,7 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
     if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
       ProjectSU3Arg<Float,G> arg(G(u), u, static_cast<Float>(tol), fails);
-      ProjectSU3<Float,G> project(arg, u);
+      ProjectSU3<Float,G> project(arg);
       project.apply(0);
       qudaDeviceSynchronize();
       checkCudaError();
@@ -601,7 +615,6 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
   }
   
   void projectSU3(cudaGaugeField &u, double tol, int *fails) {
-
 #ifdef GPU_UNITARIZE
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied()) 
@@ -617,7 +630,6 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
 #else
     errorQuda("Unitarization has not been built");
 #endif
-
   }
 
 } // namespace quda

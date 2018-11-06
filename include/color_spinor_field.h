@@ -5,7 +5,6 @@
 #include <quda.h>
 
 #include <iostream>
-#include <memory>
 
 #include <lattice_field.h>
 #include <random_quda.h>
@@ -533,34 +532,6 @@ namespace quda {
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
-
-   /**
-    * 
-    * Currently, this is needed to convert 5-d into 4-d parity field and vice versa
-    */
-
-    void ReduceDimensionality() {
-      if (nDim-1 < 1) errorQuda("Cannot reduce field dimension less than 1");
-      nDim--;
-      x[nDim] = 1; //that is, after reduction/extension 5d direction is trivial
-      setTuningString();
-    }
-    void ExtendDimensionality() {
-      if (nDim+1 > QUDA_MAX_DIM) errorQuda("Cannot extend field dimension beyond QUDA_MAX_DIM=%d", QUDA_MAX_DIM);
-      x[nDim] = 1;
-      nDim++;
-      setTuningString();
-    }
- 
-    void ExtendLastDimension() {
-      if(composite_descr.is_composite && (x[nDim-1] == 1)) {
-        x[nDim-1] = composite_descr.dim;
-      } else {
-        errorQuda("Cannot apply extension of dimension size.\n");
-      }
-      setTuningString();
-    } 
-
   };
 
   // CUDA implementation

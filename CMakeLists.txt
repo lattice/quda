@@ -146,7 +146,6 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
-set(QUDA_BLOCKSOLVER_NVTX OFF CACHE BOOL "add nvtx markup to block solver calls for the visual profiler")
 
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
@@ -155,12 +154,12 @@ set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
-
+set(QUDA_TRILINOS OFF CACHE BOOL "use Trilinos library (currently experimental)")
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
-set(QUDA_SWIZZLE OFF CACHE BOOL "use swizzle optimization for Dslash")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
+set(QUDA_JULIA OFF CACHE BOOL "build QUDA for Julia binding")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -177,21 +176,20 @@ mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
-mark_as_advanced(QUDA_BLOCKSOLVER_NVTX)
-
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
-mark_as_advanced(QUDA_SWIZZLE)
 mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_JITIFY)
+mark_as_advanced(QUDA_JULIA)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
 set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
+
 
 #######################################################################
 # everything below here is processing the setup
@@ -372,6 +370,100 @@ if(QUDA_MAGMA)
   endif()  
 endif(QUDA_MAGMA)
 
+if(QUDA_TRILINOS)
+
+  set(CMAKE_PREFIX_PATH ${Trilinos_PREFIX} ${CMAKE_PREFIX_PATH}) 
+  find_package(Trilinos REQUIRED)
+
+  message("\nFound Trilinos!  Here are the details: ")
+  message("   Trilinos_DIR = ${Trilinos_DIR}")
+  message("   Trilinos_VERSION = ${Trilinos_VERSION}")
+  message("   Trilinos_PACKAGE_LIST = ${Trilinos_PACKAGE_LIST}")
+  message("   Trilinos_LIBRARIES = ${Trilinos_LIBRARIES}")
+  message("   Trilinos_INCLUDE_DIRS = ${Trilinos_INCLUDE_DIRS}")
+  message("   Trilinos_LIBRARY_DIRS = ${Trilinos_LIBRARY_DIRS}")
+  message("   Trilinos_TPL_LIST = ${Trilinos_TPL_LIST}")
+  message("   Trilinos_TPL_INCLUDE_DIRS = ${Trilinos_TPL_INCLUDE_DIRS}")
+  message("   Trilinos_TPL_LIBRARIES = ${Trilinos_TPL_LIBRARIES}")
+  message("   Trilinos_TPL_LIBRARY_DIRS = ${Trilinos_TPL_LIBRARY_DIRS}")
+  message("   Trilinos_BUILD_SHARED_LIBS = ${Trilinos_BUILD_SHARED_LIBS}")
+  #if(DEFINED ENV{OMPI_CXX})
+  #  message ("   Found NVCC wrapper for Trilinos. Make sure that OMPI_CXX path is available during the compilation stage.")
+  #else()
+  #  message ("   Building QUDA for Trilinos without NVCC wrapper (requires OMPI_CXX varibale).")
+  #endif()
+  message("   Building Trilinos applications requires OMPI_CXX variable set to NVCC wrapper path. Make sure that OMPI_CXX path is available during the compilation stage.")
+  message("End of Trilinos details\n")
+
+
+#  set(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER} )
+#  set(CMAKE_C_COMPILER ${Trilinos_C_COMPILER} )
+#  set(CMAKE_Fortran_COMPILER ${Trilinos_Fortran_COMPILER} )
+
+#  set(CMAKE_CXX_FLAGS_DEVEL  "${CMAKE_CXX_FLAGS_DEVEL} ${Trilinos_CXX_COMPILER_FLAGS}")
+#  set(CMAKE_CXX_FLAGS_STRICT "${CMAKE_CXX_FLAGS_STRICT} ${Trilinos_CXX_COMPILER_FLAGS}")
+#  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${Trilinos_CXX_COMPILER_FLAGS}")
+#  set(CMAKE_CXX_FLAGS_HOSTDEBUG "${CMAKE_CXX_FLAGS_HOSTDEBUG} ${Trilinos_CXX_COMPILER_FLAGS}")
+#  set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${CMAKE_CXX_FLAGS_DEVICEDEBUG} ${Trilinos_CXX_COMPILER_FLAGS}")
+#  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${Trilinos_CXX_COMPILER_FLAGS}")
+
+#  set(CMAKE_C_FLAGS  "${Trilinos_C_COMPILER_FLAGS} ${CMAKE_C_FLAGS}")
+#  set(CMAKE_Fortran_FLAGS  "${Trilinos_Fortran_COMPILER_FLAGS} ${CMAKE_Fortran_FLAGS}")
+
+# MPI check 
+  list(FIND Trilinos_TPL_LIST MPI MPI_List_ID)
+  if (MPI_List_ID GREATER -1)
+    message("-- Checking if MPI is enabled in Trilinos: MPI ENABLED")
+  else()
+    message("-- Checking if MPI is enabled in Trilinos: MPI NOT ENABLED")
+  endif()
+
+#Kokkos check
+  list(FIND Trilinos_PACKAGE_LIST Kokkos Kokkos_List_ID)
+  if (Kokkos_List_ID GREATER -1)
+    message("-- Looking for Kokkos: -- found, compiling with -DQUDA_KOKKOS")
+    add_definitions(-DQUDA_KOKKOS)
+    set(QUDA_KOKKOS TRUE)
+  else()
+    message("-- Looking for Kokkos: -- not found.")
+    set(QUDA_KOKKOS FALSE)
+  endif()
+
+#Tpetra check
+  list(FIND Trilinos_PACKAGE_LIST Tpetra Tpetra_List_ID)
+  if (Tpetra_List_ID GREATER -1)
+    message("-- Looking for Tpetra: -- found, compiling with -DQUDA_TPETRA")
+    add_definitions(-DQUDA_TPETRA)
+    set(QUDA_TPETRA TRUE)
+  else()
+    message("-- Looking for Tpetra: -- not found.")
+    set(QUDA_TPETRA FALSE)
+  endif()
+
+#TpetraTSQR check
+  list(FIND Trilinos_PACKAGE_LIST TpetraTSQR TpetraTSQR_List_ID)
+  if (TpetraTSQR_List_ID GREATER -1)
+    message("-- Looking for TpetraTSQR: -- found, compiling with -DQUDA_TPETRATSQR")
+    add_definitions(-DQUDA_TPETRATSQR)
+    set(QUDA_TPETRATSQR TRUE)
+  else()
+    message("-- Looking for Tpetra: -- not found.")
+    set(QUDA_TPETRATSQR FALSE)
+  endif()
+
+#Belos check
+  list(FIND Trilinos_PACKAGE_LIST Belos Belos_List_ID)
+  if (Belos_List_ID GREATER -1)
+    message("-- Looking for Belos: -- found, compiling with -DQUDA_BELOS")
+    add_definitions(-DQUDA_BELOS)
+    set(QUDA_BELOS TRUE)
+  else()
+    message("-- Looking for Belos: -- not found.")
+    set(QUDA_BELOS FALSE)
+  endif()
+
+endif(QUDA_TRILINOS)
+
 # This selects arpack or parpack for Multi GPU
 if(QUDA_ARPACK)
   add_definitions(-DARPACK_LIB)
@@ -403,10 +495,6 @@ if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
 
-if(QUDA_SWIZZLE)
-  add_definitions(-DSWIZZLE)
-endif()
-
 if (QUDA_MULTIGRID)
   add_definitions(-DCUBLAS_LIB)
   add_definitions(-DGPU_MULTIGRID)
@@ -415,8 +503,6 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
-# MAX_MULTI_BLAS_N
-  add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})
 endif()
 
 if(QUDA_JITIFY)
@@ -435,6 +521,15 @@ endif()
 
 if(QUDA_USE_EIGEN)
   add_definitions(-DEIGEN)
+endif()
+
+if(QUDA_TRILINOS)
+  add_definitions(-DTRILINOS)
+  LIST(APPEND QUDA_LIBS ${Trilinos_TPL_LIBRARIES})
+endif()
+
+if(QUDA_JULIA)
+  add_definitions(-DJULIA_INTERFACE)
 endif()
 
 if(QUDA_POSIX_THREADS)
@@ -509,11 +604,6 @@ if(QUDA_INTERFACE_NVTX)
   add_definitions(-DINTERFACE_NVTX)
   set(QUDA_NVTX ON)
 endif(QUDA_INTERFACE_NVTX)
-
-if(QUDA_BLOCKSOLVER_NVTX)
-  add_definitions(-DBLOCKSOLVER_NVTX)
-  set(QUDA_NVTX ON)
-endif(QUDA_BLOCKSOLVER_NVTX)
 
 if(QUDA_NVTX)
   LIST(APPEND QUDA_LIBS ${CUDA_nvToolsExt_LIBRARY})
@@ -679,4 +769,7 @@ include( CTest )
 ### add tests and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
+if(QUDA_TRILINOS)
+add_subdirectory(trilinos)
+endif()
 add_subdirectory(doc)

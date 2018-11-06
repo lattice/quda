@@ -48,7 +48,6 @@ extern QudaReconstructType link_recon_precondition;
 extern QudaInverterType  inv_type;
 extern double reliable_delta; // reliable update parameter
 extern QudaInverterType  precon_type;
-extern int nstep;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
 extern double kappa; // kappa of Dirac operator
@@ -226,8 +225,9 @@ int main(int argc, char **argv)
       dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
       dslash_type == QUDA_TWISTED_MASS_DSLASH || 
       dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
-      multishift || inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER || inv_type == QUDA_PIPEPCG_INVERTER || inv_type == QUDA_SRE_PCG_INVERTER || inv_type == QUDA_LRE_PCG_INVERTER || inv_type == QUDA_PIPE2PCG_INVERTER || inv_type == QUDA_CG3_INVERTER || inv_type == QUDA_CA_CG_INVERTER ) {
-    inv_param.solution_type = QUDA_MAT_SOLUTION; 
+      multishift || inv_type == QUDA_CG_INVERTER ||
+      inv_type == QUDA_CG3_INVERTER || inv_type == QUDA_CA_CG_INVERTER || inv_type == QUDA_PIPEPCG_INVERTER || inv_type == QUDA_PIPE2PCG_INVERTER) {
+    inv_param.solution_type = QUDA_MAT_SOLUTION;     
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -236,7 +236,7 @@ int main(int argc, char **argv)
 
   inv_param.pipeline = pipeline;
 
-  inv_param.Nsteps = nstep;//should be adjustable via interface, default value 2
+  inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 

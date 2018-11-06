@@ -80,8 +80,7 @@ namespace quda {
 
     DslashConstant dc;
 
-    bool is_composite;
-    int sp_stride;//warning: for composite field, stride of it's 4d component
+    int sp_stride;
 
     int_fastdiv swizzle;
     int sites_per_block;
@@ -101,7 +100,6 @@ namespace quda {
     output << "ghostFace = {" << param.dc.ghostFace[0] << ","<< param.dc.ghostFace[1] << ","
 	   << param.dc.ghostFace[2] << "," << param.dc.ghostFace[3] << "}" << std::endl;
     output << "sp_stride = " << param.sp_stride << std::endl;
-    output << "is_composite = " << param.is_composite << std::endl;
     return output;
   }
 
@@ -879,9 +877,7 @@ namespace quda {
 #endif
 
       param.threads = threads();
-
-      param.is_composite = in->IsComposite();
-      param.sp_stride = in->IsComposite() ? in->ComponentStride() : in->Stride(); 
+      param.sp_stride = in->Stride();
 
       int prev = -1; // previous dimension that was partitioned
       for (int i=0; i<4; i++) {
@@ -1245,30 +1241,6 @@ namespace quda {
     outNorm[out_idx] = inNorm[in_idx];
   }
 
-//NEW:
-  template <typename Float2>
-    __device__ void packCompositeFaceStaggeredCore(Float2 *out, float *outNorm, const int out_idx, 
-					  const int out_stride, const Float2 *in, const float *inNorm, 
-					  const int2 in_idx, const PackParam<double2> &param) {
-    const int scal   = param.is_composite ? 3 : 1;
-    const int offset = scal*in_idx.y*(param.volume_4d >> 1);
-    out[out_idx + 0*out_stride] = in[in_idx.x + 0*param.sp_stride + offset];
-    out[out_idx + 1*out_stride] = in[in_idx.x + 1*param.sp_stride + offset];
-    out[out_idx + 2*out_stride] = in[in_idx.x + 2*param.sp_stride + offset];
-  }	
-  template<> 
-    __device__ void packCompositeFaceStaggeredCore(short2 *out, float *outNorm, const int out_idx, 
-					  const int out_stride, const short2 *in, const float *inNorm, 
-					  const int2 in_idx, const PackParam<double2> &param) {
-    const int scal   = param.is_composite ? 3 : 1;
-    const int V4     = (param.volume_4d >> 1);
-    const int offset = scal*in_idx.y*V4;
-    out[out_idx + 0*out_stride] = in[in_idx.x + 0*param.sp_stride + offset];
-    out[out_idx + 1*out_stride] = in[in_idx.x + 1*param.sp_stride + offset];
-    out[out_idx + 2*out_stride] = in[in_idx.x + 2*param.sp_stride + offset];
-    outNorm[out_idx] = inNorm[in_idx.x + in_idx.y*V4];
-  }
-
 
 #else
   __device__ void packFaceStaggeredCore(double2 *out, float *outNorm, const int out_idx,
@@ -1308,41 +1280,6 @@ namespace quda {
     outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXHALFNORM, in_idx);
   }
 
-  __device__ void packCompositeFaceStaggeredCore(double2 *out, float *outNorm, const int out_idx, 
-					const int out_stride, const double2 *in, const float *inNorm, 
-					const int2 in_idx, const PackParam<double2> &param) {
-    const int scal   = param.is_composite ? 3 : 1;
-    const int offset = scal*in_idx.y*(param.volume_4d >> 1);
-    out[out_idx + 0*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx.x + 0*param.sp_stride + offset);
-    out[out_idx + 1*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx.x + 1*param.sp_stride + offset);
-    out[out_idx + 2*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx.x + 2*param.sp_stride + offset);
-  }	
-
-  __device__ void packCompositeFaceStaggeredCore(float2 *out, float *outNorm, const int out_idx, 
-					const int out_stride, const float2 *in, 
-					const float *inNorm, const int2 in_idx, 
-					const PackParam<float2> &param) {
-    const int scal   = param.is_composite ? 3 : 1;
-    const int offset = scal*in_idx.y*(param.volume_4d >> 1);
-    out[out_idx + 0*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx.x + 0*param.sp_stride + offset);
-    out[out_idx + 1*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx.x + 1*param.sp_stride + offset);
-    out[out_idx + 2*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx.x + 2*param.sp_stride + offset);	
-  }
-
-  __device__ void packCompositeFaceStaggeredCore(short2 *out, float *outNorm, const int out_idx, 
-					const int out_stride, const short2 *in, 
-					const float *inNorm, const int2 in_idx, 
-					const PackParam<short2> &param) {
-    const int scal   = param.is_composite ? 3 : 1;
-    const int V4     = (param.volume_4d >> 1);
-    const int offset = scal*in_idx.y*V4; 
-    out[out_idx + 0*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx.x + 0*param.sp_stride + offset));
-    out[out_idx + 1*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx.x + 1*param.sp_stride + offset));
-    out[out_idx + 2*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx.x + 2*param.sp_stride + offset));
-    outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXHALFNORM, in_idx.x + in_idx.y*V4);
-  }
-
-
   __device__ void packFaceStaggeredCore(char2 *out, float *outNorm, const int out_idx, 
           const int out_stride, const char2 *in, 
           const float *inNorm, const int in_idx, 
@@ -1358,6 +1295,7 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void packFaceStaggeredKernel(PackParam<FloatN> param)
   {
+
 #ifdef STRIPED
     const int sites_per_block = param.sites_per_block;
     int local_tid = threadIdx.x;

@@ -4,13 +4,12 @@ set (QUDA_OBJS
   coarse_op_preconditioned.cu
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
-  solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bcgrq_quda.cpp inv_bicgstabl_quda.cpp
+  solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
-  inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp inv_pipe2pcg_quda.cpp
-  inv_pipepcg_quda.cpp inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  eks_utils.cu inv_eks_pcg_quda.cpp
   inv_cg3_quda.cpp inv_cg3ne_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
+  inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
+  inv_pcg_quda.cpp inv_pipepcg_quda.cpp inv_pipe2pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
   color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
@@ -60,7 +59,6 @@ set (QUDA_OBJS
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
   quda_cuda_api.cpp quda_arpack_interface.cpp deflation.cpp checksum.cu version.cpp )
-
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})

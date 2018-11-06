@@ -2,33 +2,23 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 
-#include <random>
-
 namespace quda {
 
   using namespace colorspinor;
-
-  static unsigned int _sd = 6699u;
 
   /**
      Random number insertion over all field elements
   */
   template <class T>
   void random(T &t) {
-
-    std::mt19937 _1gen(_sd);
-    std::normal_distribution<> _1dist(0.0, 1.0);
-
     for (int parity=0; parity<t.Nparity(); parity++) {
       for (int x_cb=0; x_cb<t.VolumeCB(); x_cb++) {
-	for (int s=0; s<t.Nspin(); s++) {
-	  for (int c=0; c<t.Ncolor(); c++) {
-	    //t(parity,x_cb,s,c).real(comm_drand());
-	    //t(parity,x_cb,s,c).imag(comm_drand());
-            t(parity,x_cb,s,c).real(_1dist(_1gen));
-            t(parity,x_cb,s,c).imag(_1dist(_1gen));
-	  }
-	}
+      	for (int s=0; s<t.Nspin(); s++) {
+      	  for (int c=0; c<t.Ncolor(); c++) {
+      	    t(parity,x_cb,s,c).real(comm_drand());
+      	    t(parity,x_cb,s,c).imag(comm_drand());
+      	  }
+      	}
       }
     }
   }

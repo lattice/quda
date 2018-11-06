@@ -162,9 +162,6 @@ A.S. edit: extended to 16 for CA solvers
 #include <reduce_core.cuh>
 #include <reduce_core.h>
 #include <reduce_mixed_core.h>
-
-//EXPERIMENTAL STUFF:
-//#include <exp_reduce_core.cuh>
 #include <exp_reduce_core.h>
 
     } // namespace reduce
@@ -813,9 +810,678 @@ A.S. edit: extended to 16 for CA solvers
     }
 
 #endif
+    /**
+       double quadrupleCG3InitNorm(d a, d b, V x, V y, V z, V w, V v){}
+        z = x;
+        w = y;
+        x += a*y;
+        y -= a*v;
+        norm2(y);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct quadrupleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      quadrupleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+        z = x;
+        w = y;
+        x += a.x*y;
+        y -= a.x*v;
+        norm2_<ReduceType>(sum,y);
+      }
+      static int streams() { return 6; } //! total number of input and output streams
+      static int flops() { return 6; } //! flops per element check if it's right
+    };
+
+    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
+      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3InitNorm_,1,1,1,1,0,false>
+	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, w, v);
+    }
 
 
-///EXPERIMENTAL:
+    /**
+       double quadrupleCG3UpdateNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
+        tmpx = x;
+        tmpy = y;
+        x = b*(x + a*y) + (1-b)*z;
+        y = b*(y + a*v) + (1-b)*w;
+        z = tmpx;
+        w = tmpy;
+        norm2(y);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a,b;
+      quadrupleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      FloatN tmpx{}, tmpy{};
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+        tmpx = x;
+        tmpy = y;
+        x = b.x*(x + a.x*y) + b.y*z;
+        y = b.x*(y - a.x*v) + b.y*w;
+        z = tmpx;
+        w = tmpy;
+        norm2_<ReduceType>(sum,y);
+      }
+      static int streams() { return 7; } //! total number of input and output streams
+      static int flops() { return 16; } //! flops per element check if it's right
+    };
+
+    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
+      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3UpdateNorm_,1,1,1,1,0,false>
+	(make_double2(a, 0.0), make_double2(b, 1.-b), x, y, z, w, v);
+    }
+
+    /**
+       void doubleCG3InitNorm(d a, V x, V y, V z){}
+        y = x;
+        x -= a*z;
+        norm2(x);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct doubleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      doubleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+        y = x;
+        x -= a.x*z;
+        norm2_<ReduceType>(sum,x);
+      }
+      static int streams() { return 3; } //! total number of input and output streams
+      static int flops() { return 5; } //! flops per element
+    };
+
+    double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3InitNorm_,1,1,0,0,0,false>
+        (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, z, z);
+    }
+
+    /**
+       void doubleCG3UpdateNorm(d a, d b, V x, V y, V z){}
+        tmp = x;
+        x = b*(x-a*z) + (1-b)*y;
+        y = tmp;
+        norm2(x);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct doubleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a, b;
+      doubleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      FloatN tmp{};
+      __device__ __host__ void operator()(ReduceType &sum,FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
+        tmp = x;
+        x = b.x*(x-a.x*z) + b.y*y;
+        y = tmp;
+        norm2_<ReduceType>(sum,x);
+      }
+      static int streams() { return 4; } //! total number of input and output streams
+      static int flops() { return 9; } //! flops per element
+    };
+
+    double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3UpdateNorm_,1,1,0,0,0,false>
+        (make_double2(a, 0.0), make_double2(b, 1.0-b), x, y, z, z, z);
+    }
+
+
+/*
+    Reduction routines for a number of pipelined methods
+*/
+
+
+    template<typename ReduceType>
+    __device__ __host__ void hp_axpby_reduce(ReduceType &sum, const double &a, const double &b, double2 &x, double2 &p, double2 &u, double2 &r, double2 &s, double2 &m, double2 &q, double2 &w, double2 &n, double2 &z){
+
+#if defined( __CUDA_ARCH__)
+
+      //the first component
+      //z = n + b*z;    
+      z.x  = __fma_rn (b, z.x, n.x);
+      //s = w + b*s;
+      s.x  = __fma_rn (b, s.x, w.x);
+      //q = m + b*q;
+      //q.x  = __fma_rn (b, q.x, m.x);
+      q.x = s.x;
+      //p = u/r + b*p;
+      p.x  = __fma_rn (b, p.x, u.x);
+
+      //x = x + a*p;
+      x.x  = __fma_rn (a, p.x, x.x);
+      //r = r - a*s;
+      r.x  = __fma_rn (-a, s.x, r.x);        
+      //u = u - a*q;
+      //u.x  = __fma_rn (-a, q.x, u.x);
+      u.x  = r.x;         
+      //w = w - a*z;
+      w.x  = __fma_rn (-a, z.x, w.x);
+   
+      //the second component:
+      //z = n + b*z;    
+      z.y  = __fma_rn (b, z.y, n.y);
+      //s = w + b*s;
+      s.y  = __fma_rn (b, s.y, w.y);
+      //q = m + b*q;
+      //q.y  = __fma_rn (b, q.y, m.y);
+      q.y = s.y;
+      //p = u/r + b*p;
+      p.y  = __fma_rn (b, p.y, u.y);
+
+      //x = x + a*p;
+      x.y  = __fma_rn (a, p.y, x.y);
+      //r = r - a*s;
+      r.y  = __fma_rn (-a, s.y, r.y);        
+      //u = u - a*q;
+      //u.y  = __fma_rn (-a, q.y, u.y);
+      u.y  = r.y;         
+      //w = w - a*z;
+      w.y  = __fma_rn (-a, z.y, w.y);        
+
+      double sum_0_x = (double) sum.x;
+      double sum_0_y = (double) sum.y;
+      double sum_0_z = (double) sum.z;
+
+      sum_0_x  = __fma_rn (r.x, u.x, sum_0_x);
+      sum_0_x  = __fma_rn (r.y, u.y, sum_0_x);
+
+      sum_0_y  = __fma_rn (w.x, u.x, sum_0_y);
+      sum_0_y  = __fma_rn (w.y, u.y, sum_0_y);
+
+      sum_0_z  = __fma_rn (r.x, r.x, sum_0_z);
+      sum_0_z  = __fma_rn (r.y, r.y, sum_0_z);
+
+      sum.x = sum_0_x;
+      sum.y = sum_0_y;
+      sum.z = sum_0_z;
+      sum.w = 0.0;
+#else
+//cpu code
+#endif
+
+      return; 
+    }
+
+
+    template<typename ReduceType>
+    __device__ __host__  void hp_axpby_reduce(ReduceType &sum, const double &a, const double &b, float2 &x, float2 &p, float2 &u, float2 &r, float2 &s, float2 &m, float2 &q, float2 &w, float2 &n, float2 &z){
+#if defined( __CUDA_ARCH__)      
+      double s_, p_, z_, r_x, r_y, x_, w_x, w_y, q_, u_x, u_y, m_, n_;
+      //the first component
+      //z = n + b*z;
+      z_ = z.x, n_ = n.x;     
+      z_ = __fma_rn (b, z_, n_);
+      z.x= z_;
+      //s = w + b*s;
+      s_ = s.x, w_x = w.x;     
+      s_ = __fma_rn (b, s_, w_x);
+      s.x= s_;
+      //q = m + b*q;
+      //q_ = q.x, m_ = m.x;
+      //q_ = __fma_rn (b, q_, m_);
+      //q.x = q_;
+      q.x = s.x;
+      //p = u/r + b*p;
+      p_ = p.x, u_x = u.x;     
+      p_ = __fma_rn (b, p_, u_x);
+      p.x = p_;
+
+      //x = x + a*p;
+      x_ = x.x;     
+      x_ = __fma_rn (a, p_, x_);
+      x.x = x_;
+      //r = r - a*s;
+      r_x = r.x;
+      r_x = __fma_rn (-a, s_, r_x);        
+      r.x = r_x;  
+      //u = u - a*q;
+      //u_x = __fma_rn (-a, q_, u_x);
+      //u.x = u_x;
+      u_x = r_x; 
+      u.x = r.x;         
+      //w = w - a*z;
+      w_x = __fma_rn (-a, z_, w_x);
+      w.x = w_x;
+   
+      //the second component:
+      //z = n + b*z;
+      z_ = z.y, n_ = n.y;     
+      z_ = __fma_rn (b, z_, n_);
+      z.y= z_;
+      //s = w + b*s;
+      s_ = s.y, w_y = w.y;     
+      s_ = __fma_rn (b, s_, w_y);
+      s.y= s_;
+      //q = m + b*q;
+      //q_ = q.y, m_ = m.y;
+      //q_ = __fma_rn (b, q_, m_);
+      //q.y = q_;
+      q.y = s.y;
+      //p = u/r + b*p;
+      p_ = p.y, u_y = u.y;     
+      p_ = __fma_rn (b, p_, u_x);
+      p.y = p_;
+
+      //x = x + a*p;
+      x_ = x.y;     
+      x_ = __fma_rn (a, p_, x_);
+      x.y = x_;
+      //r = r - a*s;
+      r_y = r.y;
+      r_y = __fma_rn (-a, s_, r_y);        
+      r.y = r_y;  
+      //u = u - a*q;
+      //u_y = __fma_rn (-a, q_, u_y);
+      //u.y = u_y;
+      u_y = r_y;
+      u.y  = r.y; 
+      //w = w - a*z;
+      w_y = __fma_rn (-a, z_, w_y);
+      w.y = w_y;
+
+      double sum_0_x = (double) sum.x;
+      double sum_0_y = (double) sum.y;
+      double sum_0_z = (double) sum.z;
+
+      sum_0_x  = __fma_rn (r_x, u_x, sum_0_x);
+      sum_0_x  = __fma_rn (r_y, u_y, sum_0_x);
+
+      sum_0_y  = __fma_rn (w_x, u_x, sum_0_y);
+      sum_0_y  = __fma_rn (w_y, u_y, sum_0_y);
+
+      sum_0_z  = __fma_rn (r_x, r_x, sum_0_z);
+      sum_0_z  = __fma_rn (r_y, r_y, sum_0_z);
+
+      sum.x = sum_0_x;
+      sum.y = sum_0_y;
+      sum.z = sum_0_z;
+      sum.w = 0.0;
+#else
+//cpu code
+#endif
+
+      return; 
+    }
+
+    template<typename ReduceType>
+    __device__ __host__ void hp_axpby_reduce(ReduceType &sum, const double &a, const double &b, float4 &x, float4 &p, float4 &u, float4 &r, float4 &s, float4 &m, float4 &q, float4 &w, float4 &n, float4 &z){
+#if defined( __CUDA_ARCH__)      
+      double s_, p_, z_, r_x, r_y, r_z, r_w, x_, w_x, w_y, w_z, w_w, q_, u_x, u_y, u_z, u_w, m_, n_;
+      //the first component
+      //z = n + b*z;
+      z_ = z.x, n_ = n.x;     
+      z_ = __fma_rn (b, z_, n_);
+      z.x= z_;
+      //s = w + b*s;
+      s_ = s.x, w_x = w.x;     
+      s_ = __fma_rn (b, s_, w_x);
+      s.x= s_;
+      //q = m + b*q;
+      //q_ = q.x, m_ = m.x;
+      //q_ = __fma_rn (b, q_, m_);
+      //q.x = q_;
+      q.x = s.x;
+      //p = u/r + b*p;
+      p_ = p.x, u_x = u.x;     
+      p_ = __fma_rn (b, p_, u_x);
+      p.x = p_;
+
+      //x = x + a*p;
+      x_ = x.x;     
+      x_ = __fma_rn (a, p_, x_);
+      x.x = x_;
+      //r = r - a*s;
+      r_x = r.x;
+      r_x = __fma_rn (-a, s_, r_x);        
+      r.x = r_x;  
+      //u = u - a*q;
+      //u_x = __fma_rn (-a, q_, u_x);
+      //u.x = u_x;
+      u_x = r_x; 
+      u.x = r.x;         
+      //w = w - a*z;
+      w_x = __fma_rn (-a, z_, w_x);
+      w.x = w_x;
+   
+      //the second component:
+      //z = n + b*z;
+      z_ = z.y, n_ = n.y;     
+      z_ = __fma_rn (b, z_, n_);
+      z.y= z_;
+      //s = w + b*s;
+      s_ = s.y, w_y = w.y;     
+      s_ = __fma_rn (b, s_, w_y);
+      s.y= s_;
+      //q = m + b*q;
+      //q_ = q.y, m_ = m.y;
+      //q_ = __fma_rn (b, q_, m_);
+      //q.y = q_;
+      q.y = s.y;
+      //p = u/r + b*p;
+      p_ = p.y, u_y = u.y;     
+      p_ = __fma_rn (b, p_, u_x);
+      p.y = p_;
+
+      //x = x + a*p;
+      x_ = x.y;     
+      x_ = __fma_rn (a, p_, x_);
+      x.y = x_;
+      //r = r - a*s;
+      r_y = r.y;
+      r_y = __fma_rn (-a, s_, r_y);        
+      r.y = r_y;  
+      //u = u - a*q;
+      //u_y = __fma_rn (-a, q_, u_y);
+      //u.y = u_y;
+      u_y = r_y;
+      u.y  = r.y; 
+      //w = w - a*z;
+      w_y = __fma_rn (-a, z_, w_y);
+      w.y = w_y;
+
+      //the third component:
+      //z = n + b*z;
+      z_ = z.z, n_ = n.z;     
+      z_ = __fma_rn (b, z_, n_);
+      z.z= z_;
+      //s = w + b*s;
+      s_ = s.z, w_z = w.z;     
+      s_ = __fma_rn (b, s_, w_z);
+      s.z= s_;
+      //q = m + b*q;
+      //q_ = q.z, m_ = m.z;
+      //q_ = __fma_rn (b, q_, m_);
+      //q.z = q_;
+      q.z = s.z;
+      //p = u/r + b*p;
+      p_ = p.z, u_z = u.z;     
+      p_ = __fma_rn (b, p_, u_z);
+      p.z = p_;
+
+      //x = x + a*p;
+      x_ = x.z;     
+      x_ = __fma_rn (a, p_, x_);
+      x.z = x_;
+      //r = r - a*s;
+      r_z = r.z;
+      r_z = __fma_rn (-a, s_, r_z);        
+      r.z = r_z;  
+      //u = u - a*q;
+      //u_z = __fma_rn (-a, q_, u_z);
+      //u.z = u_z;
+      u_z = r_z;
+      u.z  = r.z; 
+      //w = w - a*z;
+      w_z = __fma_rn (-a, z_, w_z);
+      w.z = w_z;
+
+      //the fourth component:
+      //z = n + b*z;
+      z_ = z.w, n_ = n.w;     
+      z_ = __fma_rn (b, z_, n_);
+      z.w= z_;
+      //s = w + b*s;
+      s_ = s.w, w_w = w.w;     
+      s_ = __fma_rn (b, s_, w_w);
+      s.w= s_;
+      //q = m + b*q;
+      //q_ = q.w, m_ = m.w;
+      //q_ = __fma_rn (b, q_, m_);
+      //q.w = q_;
+      q.w = s.w;
+      //p = u/r + b*p;
+      p_ = p.w, u_w = u.w;     
+      p_ = __fma_rn (b, p_, u_w);
+      p.w = p_;
+
+      //x = x + a*p;
+      x_ = x.w;     
+      x_ = __fma_rn (a, p_, x_);
+      x.w = x_;
+      //r = r - a*s;
+      r_w = r.w;
+      r_w = __fma_rn (-a, s_, r_w);        
+      r.w = r_w;  
+      //u = u - a*q;
+      //u_w = __fma_rn (-a, q_, u_w);
+      //u.w = u_w;
+      u_w = r_w;
+      u.w  = r.w; 
+      //w = w - a*z;
+      w_w = __fma_rn (-a, z_, w_w);
+      w.w = w_w;
+
+
+
+      double sum_0_x = (double) sum.x;
+      double sum_0_y = (double) sum.y;
+      double sum_0_z = (double) sum.z;
+
+      sum_0_x  = __fma_rn (r_x, u_x, sum_0_x);
+      sum_0_x  = __fma_rn (r_y, u_y, sum_0_x);
+      sum_0_x  = __fma_rn (r_z, u_z, sum_0_x);
+      sum_0_x  = __fma_rn (r_w, u_w, sum_0_x);
+
+      sum_0_y  = __fma_rn (w_x, u_x, sum_0_y);
+      sum_0_y  = __fma_rn (w_y, u_y, sum_0_y);
+      sum_0_y  = __fma_rn (w_z, u_z, sum_0_y);
+      sum_0_y  = __fma_rn (w_w, u_w, sum_0_y);
+
+      sum_0_z  = __fma_rn (r_x, r_x, sum_0_z);
+      sum_0_z  = __fma_rn (r_y, r_y, sum_0_z);
+      sum_0_z  = __fma_rn (r_z, r_z, sum_0_z);
+      sum_0_z  = __fma_rn (r_w, r_w, sum_0_z);
+
+      sum.x = sum_0_x;
+      sum.y = sum_0_y;
+      sum.z = sum_0_z;
+      sum.w = 0.0;
+#else
+//cpu code
+#endif
+
+      return; 
+    }
+
+///for the preconditioned system:
+//     y = x + a*y;
+//     z = z + b*y;
+
+
+    __device__ __host__ void hp_xpaybz(const double &a, const double2 &x, double2 &y, const double &b, double2 &z){
+
+      _fma2(a, y, x);
+      _fma3(b, y, z);
+
+    }
+
+    __device__ __host__ void hp_xpaybz(const double &a, const float2 &x, float2 &y, const double &b, float2 &z){
+
+      double2 x_ = make_FloatN(x);
+      double2 y_ = make_FloatN(y);
+      double2 z_ = make_FloatN(z);
+
+      _fma2(a, y_, x_);
+      _fma3(b, y_, z_);
+
+      y = make_FloatN(y_);
+      z = make_FloatN(z_);
+
+    }
+
+
+    __device__ __host__ void hp_xpaybz(const double &a, const float4 &x, float4 &y, const double &b, float4 &z){
+
+      double4 x_ = make_FloatN(x);
+      double4 y_ = make_FloatN(y);
+      double4 z_ = make_FloatN(z);
+
+      _fma2(a, y_, x_);
+      _fma3(b, y_, z_);
+
+      y = make_FloatN(y_);
+      z = make_FloatN(z_);
+
+    }
+
+
+//q = m + a*q;
+//u = u + b*q;
+
+//(r,u)
+ 
+//s = w + a*s;
+//r = r + b*s;
+
+//z = n + a*z;
+//w = w + b*z;
+
+// (r, u);
+// (w, u);
+// norm2_(r);
+
+    __device__ __host__ void dot_fma(double &sum, const double2 &a, const double2 &b) {
+#if defined( __CUDA_ARCH__)
+      sum  = __fma_rn (a.x, b.x, sum);
+      sum  = __fma_rn (a.y, b.y, sum);
+#else
+      sum += a.x*b.x;
+      sum += a.y*b.y;
+#endif
+    }
+
+    __device__ __host__ void dot_fma(double &sum, const double4 &a, const double4 &b) {
+#if defined( __CUDA_ARCH__)
+      sum  = __fma_rn (a.x, b.x, sum);
+      sum  = __fma_rn (a.y, b.y, sum);
+      sum  = __fma_rn (a.z, b.z, sum);
+      sum  = __fma_rn (a.w, b.w, sum);
+#else
+      sum += a.x*b.x;
+      sum += a.y*b.y;
+      sum += a.z*b.z;
+      sum += a.w*b.w;
+#endif
+    }
+
+
+    template<typename ReduceType>
+    __device__ __host__ void hp_xpaybz_combo_reduce(ReduceType &sum, const double &a, const double2 &m, double2 &q, const double &b, double2 &u, double2 &w, double2 &s, double2 &r, const double2 &n, double2 &z){
+
+      _fma2(a, q, m);
+      _fma3(b, q, u);
+
+      double& sum_w = static_cast<double&> (sum.w);
+
+      dot_fma (sum_w, r, u);
+
+      _fma2(a, s, w);
+      _fma3(b, s, r);
+
+      double& sum_x = static_cast<double&> (sum.x);
+      dot_fma ( sum_x, r, u);
+      double& sum_z = static_cast<double&> (sum.z);
+      dot_fma (sum_z, r, r);
+
+      _fma2(a, z, n);
+      _fma3(b, z, w);
+      double& sum_y = static_cast<double&> (sum.y);
+      dot_fma (sum_y, w, u);
+    }
+
+    template<typename ReduceType>
+    __device__ __host__ void hp_xpaybz_combo_reduce(ReduceType &sum, const double &a, const float2 &m, float2 &q, const double &b, float2 &u, float2 &w, float2 &s, float2 &r, const float2 &n, float2 &z){
+
+      double2 x_ = make_FloatN(q);
+      double2 y_ = make_FloatN(m);
+      double2 u_ = make_FloatN(u);
+      double2 w_ = make_FloatN(w);
+
+      _fma2(a, x_, y_);
+      _fma3(b, x_, u_);
+
+      q = make_FloatN(x_);
+      u = make_FloatN(u_);
+
+      x_ = make_FloatN(s);
+      y_ = make_FloatN(r);
+
+      double& sum_w = static_cast<double&> (sum.w);
+      dot_fma (sum_w, y_, u_);
+
+      _fma2(a, x_, w_);
+      _fma3(b, x_, y_);
+
+      s = make_FloatN(x_);
+      r = make_FloatN(y_);
+
+      double& sum_x = static_cast<double&> (sum.x);
+      dot_fma ( sum_x, y_, u_);
+      double& sum_z = static_cast<double&> (sum.z);
+      dot_fma (sum_z, y_, y_);
+
+      x_ = make_FloatN(n);
+      y_ = make_FloatN(z);
+
+      _fma2(a, y_, x_);
+      _fma3(b, y_, w_);
+
+      z = make_FloatN(y_);
+      w = make_FloatN(w_);
+
+      double& sum_y = static_cast<double&> (sum.y);
+      dot_fma (sum_y, w_, u_);
+
+    }
+
+
+    template<typename ReduceType>
+    __device__ __host__ void hp_xpaybz_combo_reduce(ReduceType &sum, const double &a, const float4 &m, float4 &q, const double &b, float4 &u, float4 &w, float4 &s, float4 &r, const float4 &n, float4 &z){
+
+      double4 x_ = make_FloatN(q);
+      double4 y_ = make_FloatN(m);
+      double4 u_ = make_FloatN(u);
+      double4 w_ = make_FloatN(w);
+
+      _fma2(a, x_, y_);
+      _fma3(b, x_, u_);
+
+      q = make_FloatN(x_);
+      u = make_FloatN(u_);
+
+      x_ = make_FloatN(s);
+      y_ = make_FloatN(r);
+
+      double& sum_w = static_cast<double&> (sum.w);
+      dot_fma (sum_w, y_, u_);
+
+      _fma2(a, x_, w_);
+      _fma3(b, x_, y_);
+
+      s = make_FloatN(x_);
+      r = make_FloatN(y_);
+
+      double& sum_x = static_cast<double&> (sum.x);
+      dot_fma ( sum_x, y_, u_);
+      double& sum_z = static_cast<double&> (sum.z);
+      dot_fma (sum_z, y_, y_);
+
+      x_ = make_FloatN(n);
+      y_ = make_FloatN(z);
+
+      _fma2(a, y_, x_);
+      _fma3(b, y_, w_);
+
+      z = make_FloatN(y_);
+      w = make_FloatN(w_);
+
+      double& sum_y = static_cast<double&> (sum.y);
+      dot_fma (sum_y, w_, u_);
+
+    }
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+//#define ERROR_CONTROL
 
     template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
     struct ReduceFunctorExp {
@@ -862,6 +1528,11 @@ A.S. edit: extended to 16 for CA solvers
       pipePCGRRMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
       __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
 	typedef typename ScalarType<ReduceType>::type scalar;
+#ifndef ERROR_CONTROL
+         norm2_<scalar> (sum[1].x, p);
+         norm2_<scalar> (sum[1].y, s);
+         norm2_<scalar> (sum[1].z, q);
+         norm2_<scalar> (sum[1].w, z);
 
          z = n + b.x*z;
          q = m + b.x*q;
@@ -889,6 +1560,12 @@ A.S. edit: extended to 16 for CA solvers
          dot_<scalar>   (sum[0].x, r, u);
          dot_<scalar>   (sum[0].y, w, u);
          norm2_<scalar> (sum[0].z, r);
+#else
+         double a_ = a.x;
+         double b_ = b.x;
+
+         hp_axpby_reduce<ReduceType>(sum[0], a_, b_, x, p, u, r, s, m, q, w, n, z);
+#endif
       }
 
      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
@@ -900,53 +1577,98 @@ A.S. edit: extended to 16 for CA solvers
       static int flops() { return (16+6); } //! flops per real element
     };
 
-    void pipePCGRRMergedOp(double4 *buffer, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
-                                ColorSpinorField &r, ColorSpinorField &s,  
+    void pipePCGRRMergedOp(double4 *buffer, const int buffer_size, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, ColorSpinorField &r, ColorSpinorField &s,  
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
       if (x.Precision() != p.Precision()) {
          errorQuda("\nMixed blas is not implemented.\n");
       } 
+      if(buffer_size != 3) errorQuda("Incorrect buffer size. \n");
+
       reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
 	  (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
       return;
     }
 
     template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
-    struct pipePCGRRPolakRibiereMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
+    struct pipePCGRRFletcherReevesMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
       Float2 a;
       Float2 b;
-      pipePCGRRPolakRibiereMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      pipePCGRRFletcherReevesMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
       __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
 	 typedef typename ScalarType<ReduceType>::type scalar;
+#ifndef ERROR_CONTROL
 
-         z = n + b.x*z;
-         q = m + b.x*q;
-         s = w + b.x*s;
-         p = u + b.x*p;
+         if(Nreduce == 3) {
+           norm2_<scalar> (sum[2].x, x);
+           norm2_<scalar> (sum[2].y, u);
+           norm2_<scalar> (sum[2].z, w);
+           norm2_<scalar> (sum[2].w, m);
+         }
 
-         norm2_<scalar> (sum[1].x, p);
-         norm2_<scalar> (sum[1].y, s);
-         norm2_<scalar> (sum[1].z, q);
-         norm2_<scalar> (sum[1].w, z);
+//         z = n + b.x*z;
+         _fma2(b.x, z, n);
+//         q = m + b.x*q;
+         _fma2(b.x, q, m);
+//         s = w + b.x*s;
+         _fma2(b.x, s, w);
+//         p = u + b.x*p;
+         _fma2(b.x, p, u);
 
-         norm2_<scalar> (sum[2].x, x);
-         norm2_<scalar> (sum[2].y, u);
-         norm2_<scalar> (sum[2].z, w);
-         norm2_<scalar> (sum[2].w, m);
+//         x = x + a.x*p;
+         _fma3(+a.x, p, x);
+//         u = u - a.x*q;
+         _fma3(-a.x, q, u);
 
-         u = u - a.x*q;
-         w = w - a.x*z;
+         dot_<scalar>   (sum[0].w, r, u);
 
-         dot_<scalar> (sum[0].w, r, u);
+//         r = r - a.x*s;
+         _fma3(-a.x, s, r);
+//         w = w - a.x*z;
+         _fma3(-a.x, z, w);
 
-         x = x + a.x*p;
-         r = r - a.x*s;
+         dot_<scalar>   (sum[0].x, r, u);
+         dot_<scalar>   (sum[0].y, w, u);
+         dot_<scalar>   (sum[0].z, r, r);
 
-         dot_<scalar> (sum[0].x, r, u);
-         dot_<scalar> (sum[0].y, w, u);
+         if(Nreduce == 3) {
+           norm2_<scalar> (sum[1].x, p);
+           norm2_<scalar> (sum[1].y, s);
+           norm2_<scalar> (sum[1].z, q);
+           norm2_<scalar> (sum[1].w, z);
+         }
 
-         norm2_<scalar> (sum[0].z, r);
+#else
+         if(Nreduce == 3) {
+           norm2_<scalar> (sum[2].x, x);
+           norm2_<scalar> (sum[2].y, u);
+           norm2_<scalar> (sum[2].z, w);
+           norm2_<scalar> (sum[2].w, m);
+         }
+
+         //p = u + b.x*p;
+         //x = x + a.x*p;
+         hp_xpaybz(b.x, u, p, a.x, x);
+
+         //q = m + b.x*q;
+         //u = u - a.x*q;
+         //<r,u> 
+         //s = w + b.x*s;
+         //r = r - a.x*s;
+         //z = n + b.x*z;
+         //w = w - a.x*z;
+         //<r,u>
+         //<w,u>
+         //<r,r>
+         hp_xpaybz_combo_reduce<ReduceType>(sum[0], b.x, m, q, -a.x, u, w, s, r, n, z);
+
+         if(Nreduce == 3) {
+           norm2_<scalar> (sum[1].x, p);
+           norm2_<scalar> (sum[1].y, s);
+           norm2_<scalar> (sum[1].z, q);
+           norm2_<scalar> (sum[1].w, z);
+         }
+#endif
       }
 
       __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
@@ -957,15 +1679,24 @@ A.S. edit: extended to 16 for CA solvers
       static int flops() { return (16+6); } //! flops per real element
     };
 
-    void pipePCGRRPolakRibiereMergedOp(double4 *buffer, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+
+    void pipePCGRRFletcherReevesMergedOp(double4 *buffer, const int buffer_size,  ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
                                 ColorSpinorField &r, ColorSpinorField &s,  
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
       if (x.Precision() != p.Precision()) {
          errorQuda("\nMixed blas is not implemented.\n");
-      } 
-      reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRPolakRibiereMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+      }
+      if( buffer_size == 3 ) {
+         reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRFletcherReevesMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
 	  (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
+      } else if ( buffer_size == 1 ) {
+         reduce::reduceCudaExp<1, double4, QudaSumFloat4,pipePCGRRFletcherReevesMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+          (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
+      } else {
+         errorQuda("Buffer size is not implemented. \n");
+      } 
+
       return;
     }
 
@@ -1109,120 +1840,6 @@ A.S. edit: extended to 16 for CA solvers
        return;
     }
 
-///END EXPERIMENTAL
-
-    /**
-       double quadrupleCG3InitNorm(d a, d b, V x, V y, V z, V w, V v){}
-        z = x;
-        w = y;
-        x += a*y;
-        y -= a*v;
-        norm2(y);
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct quadrupleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      quadrupleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-        z = x;
-        w = y;
-        x += a.x*y;
-        y -= a.x*v;
-        norm2_<ReduceType>(sum,y);
-      }
-      static int streams() { return 6; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per element check if it's right
-    };
-
-    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
-      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3InitNorm_,1,1,1,1,0,false>
-	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, w, v);
-    }
-
-
-    /**
-       double quadrupleCG3UpdateNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
-        tmpx = x;
-        tmpy = y;
-        x = b*(x + a*y) + (1-b)*z;
-        y = b*(y + a*v) + (1-b)*w;
-        z = tmpx;
-        w = tmpy;
-        norm2(y);
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a,b;
-      quadrupleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      FloatN tmpx{}, tmpy{};
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-        tmpx = x;
-        tmpy = y;
-        x = b.x*(x + a.x*y) + b.y*z;
-        y = b.x*(y - a.x*v) + b.y*w;
-        z = tmpx;
-        w = tmpy;
-        norm2_<ReduceType>(sum,y);
-      }
-      static int streams() { return 7; } //! total number of input and output streams
-      static int flops() { return 16; } //! flops per element check if it's right
-    };
-
-    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
-      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3UpdateNorm_,1,1,1,1,0,false>
-	(make_double2(a, 0.0), make_double2(b, 1.-b), x, y, z, w, v);
-    }
-
-    /**
-       void doubleCG3InitNorm(d a, V x, V y, V z){}
-        y = x;
-        x -= a*z;
-        norm2(x);
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct doubleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      doubleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-        y = x;
-        x -= a.x*z;
-        norm2_<ReduceType>(sum,x);
-      }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 5; } //! flops per element
-    };
-
-    double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3InitNorm_,1,1,0,0,0,false>
-        (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, z, z);
-    }
-
-    /**
-       void doubleCG3UpdateNorm(d a, d b, V x, V y, V z){}
-        tmp = x;
-        x = b*(x-a*z) + (1-b)*y;
-        y = tmp;
-        norm2(x);
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct doubleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a, b;
-      doubleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      FloatN tmp{};
-      __device__ __host__ void operator()(ReduceType &sum,FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
-        tmp = x;
-        x = b.x*(x-a.x*z) + b.y*y;
-        y = tmp;
-        norm2_<ReduceType>(sum,x);
-      }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 9; } //! flops per element
-    };
-
-    double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3UpdateNorm_,1,1,0,0,0,false>
-        (make_double2(a, 0.0), make_double2(b, 1.0-b), x, y, z, z, z);
-    }
-   } // namespace blas
+  } // namespace blas
 
 } // namespace quda

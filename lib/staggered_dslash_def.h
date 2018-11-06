@@ -904,7 +904,7 @@
 #define DD_CONCAT(n,p,r1,r2,d,x) n ## p ## r1 ## r2 ## d ## x ## Kernel
 #define DD_FUNC(n,p,r1,r2,d,x) DD_CONCAT(n,p,r1,r2,d,x)
 
-template <KernelType kernel_type, int reg_block_size>
+template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_LONG_RECON_F, DD_DAG_F, DD_AXPY_F)(const DslashParam param) {
 #if defined(GPU_STAGGERED_DIRAC) && DD_FAT_RECON == 18 // improved staggered only supports no reconstruct fat-links 
   #include "staggered_dslash_core.h"
@@ -934,7 +934,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_LONG_RECON_F, DD
 
 #if (DD_LONG_RECON == 18) // avoid kernel aliasing over non-existant long-links
 
-template <KernelType kernel_type, int reg_block_size>
+template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_FNAME, DD_PREC_F, DD_FAT_RECON_F, DD_DAG_F, DD_AXPY_F)(const DslashParam param) {
 #if defined(GPU_STAGGERED_DIRAC) && DD_FAT_RECON != 9 && DD_FAT_RECON != 13
 #include "staggered_dslash_core.h"

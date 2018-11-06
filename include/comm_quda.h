@@ -269,6 +269,7 @@ extern "C" {
   void comm_broadcast(void *data, size_t nbytes);
   void comm_barrier(void);
   void comm_abort(int status);
+
   void reduceMaxDouble(double &);
   void reduceDouble(double &);
   void reduceDoubleArray(double *, const int len);

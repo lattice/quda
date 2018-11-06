@@ -52,6 +52,12 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
   QUDA_CHECKBUILDTEST(deflated_invert_test QUDA_BUILD_ALL_TESTS)
 endif()
 
+if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_STAGGERED)
+  cuda_add_executable(prototype_test prototype_test.cpp wilson_dslash_reference.cpp staggered_dslash_reference.cpp blas_reference.cpp)
+  target_link_libraries(prototype_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(prototype_test QUDA_BUILD_ALL_TESTS)
+endif()
+
 if(QUDA_DIRAC_STAGGERED)
   cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
@@ -64,9 +70,11 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(staggered_invert_test QUDA_BUILD_ALL_TESTS)
 
-  cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp  staggered_dslash_reference.cpp  blas_reference.cpp)
-  target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
-  QUDA_CHECKBUILDTEST(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
+  if(QUDA_BLOCKSOLVER)
+    cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp  staggered_dslash_reference.cpp  blas_reference.cpp)
+    target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
+    QUDA_CHECKBUILDTEST(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
+  endif()
 endif()
 
 if(QUDA_MULTIGRID)

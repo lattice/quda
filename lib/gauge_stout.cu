@@ -142,7 +142,7 @@ namespace quda {
 	//Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
 
 	//Get U^{\dagger}
-	UDag = inverse(U);
+	computeMatrixInverse(U,&UDag);
 	
 	//Compute \Omega = \rho * S * U^{\dagger}
 	Omega = (arg.rho * Stap) * UDag;
@@ -637,7 +637,7 @@ namespace quda {
 	//-------------------------------------------------------------------
 
 	//Get U^{\dagger}
-	UDag = inverse(U);
+	computeMatrixInverse(U,&UDag);
 	
 	//Compute \rho * staple_coeff * S
 	Omega = (arg.rho*staple_coeff)*(Stap);

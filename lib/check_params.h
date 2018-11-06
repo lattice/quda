@@ -363,6 +363,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   // domain decomposition parameters
   //P(inv_type_sloppy, QUDA_INVALID_INVERTER); // disable since invalid means no preconditioner
 #if defined INIT_PARAM
+  P(dslash_type_precondition, QUDA_INVALID_DSLASH);
   P(inv_type_precondition, QUDA_INVALID_INVERTER);
   P(preconditioner, 0);
   P(tol_precondition, INVALID_DOUBLE);
@@ -374,6 +375,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || 
       param->inv_type_precondition == QUDA_CG_INVERTER || 
       param->inv_type_precondition == QUDA_MR_INVERTER) {
+    P(dslash_type_precondition, QUDA_INVALID_DSLASH);
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);

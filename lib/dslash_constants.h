@@ -40,8 +40,6 @@ enum KernelType {
 #ifdef GPU_STAGGERED_DIRAC
     int long_gauge_stride;
     float fat_link_max;
-    bool is_composite;//currently staggered only
-    int composite_Vh;
 #endif 
 
     int gauge_fixed; // whether the gauge field is fixed to axial gauge

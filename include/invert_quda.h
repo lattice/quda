@@ -9,7 +9,7 @@
 #include <memory>
 
 namespace quda {
-
+  
   using ColorSpinorFieldSet = ColorSpinorField;
 
   /**
@@ -145,22 +145,22 @@ namespace quda {
     int num_offset;
 
     /** Offsets for multi-shift solver */
-    double offset[QUDA_MAX_ARRAY_SIZE];
+    double offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Solver tolerance for each offset */
-    double tol_offset[QUDA_MAX_ARRAY_SIZE];
+    double tol_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Solver tolerance for each shift when refinement is applied using the heavy-quark residual */
-    double tol_hq_offset[QUDA_MAX_ARRAY_SIZE];
+    double tol_hq_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Actual L2 residual norm achieved in solver for each offset */
-    double true_res_offset[QUDA_MAX_ARRAY_SIZE];
+    double true_res_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Iterated L2 residual norm achieved in multi shift solver for each offset */
-    double iter_res_offset[QUDA_MAX_ARRAY_SIZE];
+    double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
-    double true_res_hq_offset[QUDA_MAX_ARRAY_SIZE];
+    double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Number of steps in s-step algorithms */
     int Nsteps;
@@ -431,7 +431,7 @@ namespace quda {
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
     std::vector<ColorSpinorField*> p;
-   bool init;
+    bool init;
 
   public:
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
@@ -468,22 +468,12 @@ namespace quda {
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
-    const DiracMatrix &matPrecon;
-
-    Solver *K;
-    SolverParam Kparam; // parameters for preconditioner solve
-
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp, *tmp2Sp;
     bool init;
 
   public:
-    CG3(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
-    /**
-        @param K Preconditioner
-    */
-    CG3(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
-
+    CG3(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG3();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -555,6 +545,8 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+
+
   class PreconCG : public Solver {
     private:
       const DiracMatrix &mat;
@@ -584,14 +576,14 @@ namespace quda {
       bool init;
 
       ColorSpinorField *rp;       //! residual vector
-      ColorSpinorField *pp;        
-      ColorSpinorField *sp; 
-      ColorSpinorField *qp; 
-      ColorSpinorField *mp; 
+      ColorSpinorField *pp;
+      ColorSpinorField *sp;
+      ColorSpinorField *qp;
+      ColorSpinorField *mp;
       ColorSpinorField *np;
       ColorSpinorField *zp;
-      ColorSpinorField *up;   
-      ColorSpinorField *wp;       
+      ColorSpinorField *up;
+      ColorSpinorField *wp;
       ColorSpinorField *tmpp;
       ColorSpinorField *r_pre;    //! residual passed to preconditioner
       ColorSpinorField *p_pre;    //! preconditioner result
@@ -608,6 +600,7 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+
   class Pipe2PCG : public Solver {
     private:
       const DiracMatrix &mat;
@@ -621,14 +614,14 @@ namespace quda {
 
       ColorSpinorField *rp;       //! residual vector
 
-      ColorSpinorFieldSet *xp_sloppy; 
-      ColorSpinorFieldSet *rp_sloppy;       
+      ColorSpinorFieldSet *xp_sloppy;
+      ColorSpinorFieldSet *rp_sloppy;
 
       ColorSpinorFieldSet *wp;
       ColorSpinorFieldSet *qp;
       ColorSpinorFieldSet *dp;
       ColorSpinorFieldSet *zp;
-      ColorSpinorFieldSet *pp;       
+      ColorSpinorFieldSet *pp;
       ColorSpinorFieldSet *cp;
 
       ColorSpinorField *gp;
@@ -654,7 +647,6 @@ namespace quda {
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
-
 
   class BiCGstab : public Solver {
 
@@ -1052,92 +1044,7 @@ namespace quda {
 
   };
 
-  class BlockSolver  {
 
-  protected:
-    SolverParam &param;
-    TimeProfile &profile;
-
-  public:
-    BlockSolver(SolverParam &param, TimeProfile &profile) :
-    param(param), profile(profile) { ; }
-    virtual ~BlockSolver() { ; }
-
-    virtual void operator()(ColorSpinorField& out, ColorSpinorField& in) = 0;
-    bool convergence(const double &r2, const double &hq2, const double &r2_tol,
-         const double &hq_tol) const;
-    static double stopping(const double &tol, const double &b2, QudaResidualType residual_type);
-        /**
-       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
-     */
-    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
-
-    /**
-  Prints out the summary of the solver convergence (requires a
-  versbosity of QUDA_SUMMARIZE).  Assumes
-  SolverParam.true_res and SolverParam.true_res_hq has
-  been set
-    */
-    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
-  };
-
-  class BlockCG : public BlockSolver {
-
-  private:
-    const DiracMatrix &mat;
-    const DiracMatrix &matSloppy;
-    // pointers to fields to avoid multiple creation overhead
-    std::shared_ptr<ColorSpinorField> yp, rp, App, tmpp;
-    std::vector<ColorSpinorField*> p;
-    std::shared_ptr<ColorSpinorField> x_sloppy_savedp, pp, qp, tmp_matsloppyp;
-    std::shared_ptr<ColorSpinorField> p_oldp; // only for BLOCKSOLVER_PRECISE_Q
-    bool init;
-
-    template <int n>
-    void solve_n(ColorSpinorField& out, ColorSpinorField& in);
-    int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
-
-    
-
-  public:
-    BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
-    virtual ~BlockCG();
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-
-    
-  };
-
-  class EKS_PCG : public BlockSolver {
-
-  private:
-    const DiracMatrix &mat;
-    const DiracMatrix &matSloppy;
-    const DiracMatrix &matPrecon;
-    // pointers to fields to avoid multiple creation overhead
-    std::shared_ptr<ColorSpinorField> yp, rp, App, tmpp;
-    std::vector<ColorSpinorField*> p;
-
-    /** Decomposed source */
-    std::shared_ptr<ColorSpinorFieldSet> B;
-
-    /** The lattice grid blocking, correlated with nsrc */
-    std::array<int, 5>    latt_bs;
-    std::shared_ptr<int>  index_map;//might be useful for the next RHS
-
-    bool init;
-
-    template <int n>
-    void solve_n(ColorSpinorField& out, ColorSpinorField& in);
-
-  public:
-    EKS_PCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
-    virtual ~EKS_PCG();
-
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
-    void CreateSourceBlock(ColorSpinorField& b); 
-    
-  };
 
   /**
      @brief This computes the optimum guess for the system Ax=b in the L2
@@ -1199,6 +1106,8 @@ namespace quda {
 		    std::vector<ColorSpinorField*> p,
 		    std::vector<ColorSpinorField*> q);
   };
+
+  using ColorSpinorFieldSet = ColorSpinorField;
 
   //forward declaration
   class EigCGArgs;

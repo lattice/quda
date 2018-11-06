@@ -153,7 +153,6 @@ namespace quda {
       if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      constexpr int register_block_size = 1;
       setParam();
       DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }

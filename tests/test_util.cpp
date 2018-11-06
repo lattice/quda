@@ -1669,7 +1669,6 @@ char vec_infile[256] = "";
 char vec_outfile[256] = "";
 QudaInverterType inv_type;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
-int nstep = 2;
 int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
@@ -1799,7 +1798,6 @@ void usage(char** argv )
   printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n");
-  printf("    --nstep <n>                             # Set maximum number of mr inner cycles.\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");

@@ -115,32 +115,6 @@ namespace quda {
     }
 
     /**
-       Functor to perform the operation z = a*x + b*y + c*z
-    */
-    template <typename Float2, typename FloatN>
-    struct axpbypcz_ : public BlasFunctor<Float2,FloatN> {
-      const Float2 a;
-      const Float2 b;
-      const Float2 c;
-      axpbypcz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-      { z = a.x*x + b.x*y + c.x*z; }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 5; } //! flops per element
-    };
-
-    void axpbypcz(const double &a, ColorSpinorField &x, const double &b, ColorSpinorField &y, const double &c, ColorSpinorField &z) {
-      if (x.Precision() != y.Precision()) {
-	// call hacked mixed precision kernel
-	mixed::blasCuda<axpbypcz_,0,0,1,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(c,0.0),
-				       x, y, z, x);
-      } else {
-	blasCuda<axpbypcz_,0,0,1,0>(make_double2(a, 0.0), make_double2(b, 0.0), make_double2(c, 0.0),
-				 x, y, z, x);
-      }
-    }
-
-    /**
        Functor to perform the operation y += x
     */
     template <typename Float2, typename FloatN>

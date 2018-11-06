@@ -491,10 +491,6 @@ double benchmark(int kernel, const int niter) {
       for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymD->Components());
       break;
 
-    case 42:
-      for (int i=0; i < niter; ++i) blas::caxpy(a2, *xmD, *zmD);
-      break;
-
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -937,23 +933,6 @@ double test(int kernel) {
       }
     }
     error /= Nsrc*Msrc;
-    break;
-
-  case 42:
-    for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    for (int i=0; i < Nsrc; i++) zmD->Component(i) = *(zmH[i]);
-
-    blas::caxpy(a2, *xmD, *zmD);
-
-    for (int i=0; i < Nsrc; i++){
-      blas::caxpy(a2, *(xmH[i]), *(zmH[i]));
-    }
-
-    error = 0;
-    for (int i=0; i < Nsrc; i++){
-      error+= fabs(blas::norm2((zmD->Component(i))) - blas::norm2(*(zmH[i]))) / blas::norm2(*(zmH[i]));
-    }
-    error/= Nsrc;
     break;
 
   default:

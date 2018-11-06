@@ -24,9 +24,8 @@
 *                   pipelined Conjugate Gredient method ",  arXiv:1601.07068  
 ***/
 
-//#define USE_WORKER
+//#define FULL_PIPELINE
 
-#ifndef USE_WORKER
 
 #include <mpi.h>
 
@@ -41,8 +40,6 @@
     errorQuda("(MPI) %s", err_string);              \
   }                                                 \
 } while (0)
-
-#endif
 
 namespace quda {
 
@@ -113,31 +110,59 @@ namespace quda {
 
     if(K) delete K;
 
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   class GlobalMPIallreduce : public Worker {
+
+     ColorSpinorField *xp;
+     ColorSpinorField *up;
+     ColorSpinorField *wp;
+     ColorSpinorField *mp;
+     ColorSpinorField *pp;
+     ColorSpinorField *sp;
+     ColorSpinorField *qp;
+     ColorSpinorField *zp;
+
      double *buffer;
-     int     size;
-     int     vals_to_update;
-     int     stages; 
-    public:
-    GlobalMPIallreduce(double *buffer, int size, int stages=4) : buffer(buffer), size(size), vals_to_update(size/4), stages(stages) { }
+     int     n_update; 
 
-    virtual ~GlobalMPIallreduce() { }
+  
+   public:
+     GlobalMPIallreduce(ColorSpinorField *xp, ColorSpinorField *up, ColorSpinorField *wp, ColorSpinorField *mp, ColorSpinorField *pp, ColorSpinorField *sp, ColorSpinorField *qp, ColorSpinorField *zp, double *buffer) : xp(xp), up(up), wp(wp), mp(mp), pp(pp), sp(sp), qp(qp), zp(zp),  buffer(buffer), n_update( xp->Nspin()==4 ? 4 : 2 ) { }
 
-    void apply(const cudaStream_t &stream) {  //this has nothing to do with GPU streaming but should work as well, we may need non-blocked MPI allreduce, see cooments below
-      static int count = 0;
-      if (count < (stages -1) ) {
-        reduceDoubleArray( &buffer[count*vals_to_update] , vals_to_update );
-        count += 1;
-      } else {
-        reduceDoubleArray( &buffer[count*vals_to_update] , (size-vals_to_update) );
-        count = 0; 
-      } 
+     virtual ~GlobalMPIallreduce() { }
 
-      return;
-    }
+     void apply(const cudaStream_t &stream) {
+ 
+       static int count = 0;
+
+       if (count == 0 ) {
+         //(x, x)
+         //(u, u)
+         buffer[4] = norm2 ( *xp );
+         buffer[5] = norm2 ( *up );
+       } else if ( count == 1 ) {
+         //(w, w)
+         //(m, m)
+         buffer[6] = norm2 ( *wp );
+         buffer[7] = norm2 ( *mp );
+       } else if ( count == 2 ) {
+         //(p, p)
+         //(s, s)
+         buffer[0] = norm2 ( *pp );
+         buffer[1] = norm2 ( *sp );
+       } else if ( count == 3 ) {
+         //(p, p)
+         //(s, s)
+         buffer[2] = norm2 ( *qp );
+         buffer[3] = norm2 ( *zp );
+       } 
+
+       if (++count == n_update ) count = 0;
+
+       return;
+     }
   };
 
   // this is the Worker pointer 
@@ -151,7 +176,7 @@ namespace quda {
 
     ColorSpinorParam csParam(b);
 
-    auto  MergedLocalReducer = K ? pipePCGRRPolakRibiereMergedOp : pipePCGRRMergedOp;
+    auto  MergedLocalReducer = K ? pipePCGRRFletcherReevesMergedOp : pipePCGRRMergedOp;
 
     if (!init) {
       // high precision fields:
@@ -184,6 +209,11 @@ namespace quda {
       init = true;
     }
 
+    csParam.setPrecision(param.precision);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    ColorSpinorField *lp = ColorSpinorField::Create(csParam);
+
     csParam.setPrecision(param.precision_sloppy);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
@@ -205,6 +235,7 @@ namespace quda {
     ColorSpinorField &z = *zp;
 
     ColorSpinorField &y = *yp;
+    ColorSpinorField &l = *lp;
 
     ColorSpinorField &r_sloppy = *rp_sloppy;
     ColorSpinorField &x_sloppy = *xp_sloppy;
@@ -217,6 +248,7 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
     const double bnorm = sqrt(b2);
+    y = x;//copy initial guess 
 
     if(b2 == 0){
       profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -229,8 +261,7 @@ namespace quda {
 //TEST:
     csParam.setPrecision(param.precision);
     ColorSpinorField *Ax_cuda = ColorSpinorField::Create(csParam);
-    
-
+   
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     csParam.location   = QUDA_CPU_FIELD_LOCATION;
     ColorSpinorField *Ax = ColorSpinorField::Create(csParam);
@@ -245,7 +276,12 @@ namespace quda {
     delete Ax;
     delete Ax_cuda;
 
-    const double mu    = K ? 1000.0 : 1000.0; 
+//?    const double mu    = K ? 1000.0 : 1000.0;
+/*
+32*64 : 1000
+32*32 : 100 => better
+*/ 
+    const double mu    = K ? 100.0 : 1000.0; 
     const double blen  = b.RealLength();
     const double Anorm = sqrt(blas::norm2(r));
     const double msqrn = mu*sqrt(blen); 
@@ -261,6 +297,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    printfQuda("Stopping condition: %le\n", stop);
 
     double4 *local_reduce = new double4[3];//to keep double3 or double4 registers
 
@@ -274,6 +311,9 @@ namespace quda {
     double pi_old  = 0.0, sigma_old  = 0.0,  phi_old  = 0.0,  psi_old  = 0.0;
     double chi_old = 0.0, omega_old  = 0.0,  ksi_old  = 0.0,  nu_old   = 0.0;
     double pi_old2 = 0.0, sigma_old2 = 0.0,  phi_old2 = 0.0,  psi_old2 = 0.0;
+#ifdef FULL_PIPELINE
+    double chi_old2= 0.0, omega_old2 = 0.0,  ksi_old2 = 0.0,  nu_old2 = 0.0;
+#endif
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -281,7 +321,6 @@ namespace quda {
     if(K) {
       rPre = r_sloppy;
 
-      zero(pPre);
       commGlobalReductionSet(false);
       (*K)(pPre, rPre);
       commGlobalReductionSet(true);
@@ -295,23 +334,8 @@ namespace quda {
 
     matSloppy(w, u, tmp_sloppy); // => w = A*u;
 
-    //Remark : no overlap here. 
-    //double2 gammamNorm = reDotProductNormA(r_sloppy, u);
-    //gamma = gammamNorm.y; 
-    //mNorm = gammamNorm.x;
-
-    gamma = blas::reDotProduct(r_sloppy,u); 
-    mNorm = blas::norm2(r_sloppy);
-    delta = blas::reDotProduct(w,u);
-
-    mNorm_old = mNorm;
-    gamma_aux = gamma;
-
     alpha = 1.0;
     beta  = 0.0;
-
-    //const int maxResIncrease      = param.max_res_increase; // check if we reached the limit of our tolerance
-    //const int maxResIncreaseTotal = param.max_res_increase_total;
 
     double ef = 0.0, eh = 0.0, eg = 0.0, ek = 0.0;
     double f = 0.0, g = 0.0, h = 0.0, k = 0.0, f_old = 0.0;
@@ -324,38 +348,67 @@ tau = 10000 * sqrt(uro) works! (212 iters)
 tau = 1000 * sqrt(uro) works! (212 iters)
 tau = 100 * sqrt(uro) works! (214 iters)
 tau = 10 * sqrt(uro) fails!
-*/
-    const double tau = 100.0*sqrt(uro);
+32x32x2.38
+tau = 5.0e+6*sqrt(uro);
 
-    //int resIncrease = 0;
-    //int resIncreaseTotal = 0;
+*/
+    const double tau = 5.0e+6*sqrt(uro);
 
     blas::flops = 0;
 
     // now create the worker class for updating the gradient vectors
-#ifdef USE_WORKER
-    GlobalMPIallreduce global_reduce((double*)&local_reduce, 12);
-    dslash::aux_worker = nullptr;//&global_reduce;
-#else
-    //MsgHandle* allreduceHandle = comm_handle();
-    MPI_Request request_handle;
-    double *recvbuff           = new double[12];//mpi buffer for async global reduction
+#ifdef FULL_PIPELINE
+    printfQuda("Running full pipeline.\n");
+    GlobalMPIallreduce global_reduce(yp, up, wp, mp, pp, sp, qp, zp, reinterpret_cast<double*>(&local_reduce[1]));
+    dslash::aux_worker = nullptr;
 #endif
 
+    double *recvbuff   = new double[12];   
+    MPI_Request request_handle;
+
+    commGlobalReductionSet(false);
+    //
     if(K) {
       rPre = w;
-
-      zero(pPre);
-      commGlobalReductionSet(false);
       (*K)(pPre, rPre);
-      commGlobalReductionSet(true);
-
       m = pPre;
     } else {
       m = w;
     }
     //
+    gamma = blas::reDotProduct(r_sloppy,u); 
+    mNorm = blas::norm2(r_sloppy);
+    delta = blas::reDotProduct(w,u);
+    local_reduce[0].w = 0.0;
+
+    local_reduce[1].x = 0.0;
+    local_reduce[1].y = 0.0;
+    local_reduce[1].z = 0.0;
+    local_reduce[1].w = 0.0;
+
+#ifdef FULL_PIPELINE
+    local_reduce[2].x = norm2 ( y );
+    local_reduce[2].y = norm2 ( u );
+    local_reduce[2].z = norm2 ( w );
+    local_reduce[2].w = norm2 ( m );
+#else
+    local_reduce[2].x = 0.0;
+    local_reduce[2].y = 0.0;
+    local_reduce[2].z = 0.0;
+    local_reduce[2].w = 0.0;
+#endif
+    commGlobalReductionSet(true);
+
+    //Start async communications:
+    MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 12, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
+    //
     matSloppy(n, m, tmp_sloppy);
+    //
+    MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
+    memcpy(local_reduce, recvbuff, 12*sizeof(double));
+
+    mNorm_old = mNorm;
+    gamma_aux = gamma;//to set beta to zero
 
     int j = 0;
 
@@ -364,6 +417,7 @@ tau = 10 * sqrt(uro) fails!
     PrintStats( "PipePCG (before main loop)", j, mNorm, b2, heavy_quark_res);
 
     int updateR = 0;
+    int j_rupd_idx = 0;
 
     while(!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter){
 
@@ -380,6 +434,13 @@ tau = 10 * sqrt(uro) fails!
       mNorm_old2 = mNorm_old;//sic! 
       mNorm_old  = mNorm;
 
+#ifdef FULL_PIPELINE
+      chi_old2   = chi_old;
+      omega_old2 = omega_old;
+      ksi_old2   = ksi_old;
+      nu_old2    = nu_old;
+#endif
+
       chi_old   = sqrt(chi);
       omega_old = sqrt(omega);
       ksi_old   = sqrt(ksi);
@@ -395,35 +456,61 @@ tau = 10 * sqrt(uro) fails!
       phi_old   = sqrt(phi);
       psi_old   = sqrt(psi);
 
+#ifndef FULL_PIPELINE
       commGlobalReductionSet(false);//disable global reduction
-      MergedLocalReducer(local_reduce,y,alpha,p,u,r_sloppy,s,m,beta,q,w,n,z);
+      MergedLocalReducer(local_reduce,3,y,alpha,p,u,r_sloppy,s,m,beta,q,w,n,z);//K ? pipePCGRRFletcherReevesMergedOp : pipePCGRRMergedOp
       commGlobalReductionSet(true);
-//finish updates
+#else
+      commGlobalReductionSet(false);//disable global reduction
+      MergedLocalReducer(local_reduce,1,y,alpha,p,u,r_sloppy,s,m,beta,q,w,n,z);
+      commGlobalReductionSet(true);
+#endif
+//finish recursion updates
 
       ajm1 = fabs(alpha_old);
       bjm1 = fabs(beta_old);
 
       constexpr double fma_factor = 1.0;//1.0 for FMA instructions and 2.0 for separate fp operations leading to classical relations
 
-      if(j > 0) {
+      if( j_rupd_idx > 0 ) {
         PrintStats( "PipePCG", j, mNorm_old, b2, heavy_quark_res);
+#ifndef FULL_PIPELINE
+        ef = Anorm*(chi_old+2*ajm1*pi_old ) + sqrt(mNorm_old2) + fma_factor*ajm1*sigma_old;
+//!ef = Anorm*(chi_old+2*ajm1*pi_old ) + mNorm_old2 + fma_factor*ajm1*sigma_old;
+        eh = Anorm*(ksi_old+2*ajm1*phi_old) + omega_old + fma_factor*ajm1*psi_old;
 
-        ef = Anorm*(chi+2*ajm1*pi_old ) + sqrt(mNorm_old2) + fma_factor*ajm1*sigma_old;
-        eh = Anorm*(ksi+2*ajm1*phi_old) + omega_old + fma_factor*ajm1*psi_old;
-
-        if(j > 1) {
-          eg = Anorm*(ksi+2*bjm1*pi_old2) + omega_old + fma_factor*bjm1*sigma_old2;
+        if(j_rupd_idx > 1) {
+          eg = Anorm*(ksi_old+2*bjm1*pi_old2) + omega_old + fma_factor*bjm1*sigma_old2;
           ek = Anorm*((msqrn+2)*nu_old+2*bjm1*phi_old2) + fma_factor*bjm1*psi_old2;
         }
+#else
+        ef = Anorm*(chi_old2+2*ajm1*pi_old ) + sqrt(mNorm_old2) + fma_factor*ajm1*sigma_old;
+        eh = Anorm*(ksi_old2+2*ajm1*phi_old) + omega_old2 + fma_factor*ajm1*psi_old;
 
-        if(j == 1 or updateR) {
-
+        if(j_rupd_idx > 1) {
+          eg = Anorm*(ksi_old2+2*bjm1*pi_old2) + omega_old2 + fma_factor*bjm1*sigma_old2;
+          ek = Anorm*((msqrn+2)*nu_old2+2*bjm1*phi_old2) + fma_factor*bjm1*psi_old2;
+        }
+#endif
+        if( j_rupd_idx == 1 or updateR ) {
           printfQuda("Do %s..\n", j == 1 ? "initialization" : "replace");
-
+#ifndef FULL_PIPELINE
+          if(chi_old != 0.0) warningQuda("Something is wrong...?\n");
           f = uro * sqrt( (msqrnA + Anorm) * chi_old + bnorm ) + uro * sqrt( ajm1*msqrnA*pi_old  ) + sqrt(ef)*uro;
-          g = uro * sqrt( msqrnA * pi_old );
           h = uro * sqrt( msqrnA * ksi_old ) + uro * sqrt( ajm1*msqrnA*phi_old ) + sqrt(eh)*uro;
+//f = uro * ( (msqrnA + Anorm) * chi_old + bnorm ) + uro * ( ajm1*msqrnA*pi_old  ) + (ef)*uro;
+//h = uro * ( msqrnA * ksi_old ) + uro * ( ajm1*msqrnA*phi_old ) + (eh)*uro;
+#else
+          f = uro * sqrt( (msqrnA + Anorm) * chi_old2 + bnorm ) + uro * sqrt( ajm1*msqrnA*pi_old  ) + sqrt(ef)*uro;
+          h = uro * sqrt( msqrnA * ksi_old2 ) + uro * sqrt( ajm1*msqrnA*phi_old ) + sqrt(eh)*uro;
+#endif
+          g = uro * sqrt( msqrnA * pi_old );
           k = uro * sqrt( msqrnA * phi_old);
+//!g = uro * msqrnA * pi_old;
+//!k = uro * msqrnA * phi_old;
+
+
+          //updateR = 0;
 
         } else { 
           f = f + ajm1*bjm1*g + ajm1*h + sqrt(ef)*uro + ajm1*sqrt(eg)*uro; 
@@ -434,12 +521,25 @@ tau = 10 * sqrt(uro) fails!
 
       }
 
-      updateR = ( j > 1 and f_old <= tau*sqrt(mNorm_old2) and f > tau*sqrt(mNorm_old) ) ? 1 : 0;
+//NB: 1.0 default
+      const double Kscale_factor = 1.0;
+
+      updateR = ( j_rupd_idx > 2 and f_old <= tau*sqrt(mNorm_old2) and f > tau*sqrt(mNorm_old) ) ? 1 : 0;
       f_old   = f;
 
       if( updateR ) { //trigger reliable updates:
 
         printfQuda("Start relibale update.. (f_old = %le , tau*mNorm_old = %le , f = %le, tau*mNorm = %le )\n",f_old, tau*sqrt(mNorm_old2) , f , tau*sqrt(mNorm_old));
+#ifdef FULL_PIPELINE
+        commGlobalReductionSet(false);
+        //
+        local_reduce[1].x = norm2 ( p );
+        local_reduce[1].y = norm2 ( s );
+        local_reduce[1].z = norm2 ( q );
+        local_reduce[1].w = norm2 ( z );
+        //
+        commGlobalReductionSet(true);
+#endif
 
         x_sloppy = y;
         xpy(x_sloppy,x);
@@ -447,24 +547,15 @@ tau = 10 * sqrt(uro) fails!
 
         mat(r, x, tmp);
         xpay(b, -1.0, r);
-//Debug
-        mNorm_old2 = norm2(r_sloppy);
-
         r_sloppy = r;
-        mNorm = norm2(r_sloppy);
-
-        printfQuda("Old residual: %1.15le vs new residual %1.15le\n", mNorm_old2, mNorm);
-
         if(K) {
           rPre = r_sloppy;
 
-          zero(pPre);
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
 
           u = pPre;
-          blas::zero(m);
         } else {
           u = r_sloppy;
         }
@@ -472,9 +563,19 @@ tau = 10 * sqrt(uro) fails!
         matSloppy(w, u, tmp_sloppy);
         matSloppy(s, p, tmp_sloppy);
 
+#ifdef FULL_PIPELINE
+        commGlobalReductionSet(false);
+        //
+        local_reduce[2].x = 0.0; 
+        local_reduce[2].y = norm2 ( u );
+        local_reduce[2].z = norm2 ( w );
+        local_reduce[2].w = norm2 ( m );//set m to zero
+        //
+        commGlobalReductionSet(true);
+#endif
+
         if(K) {
           rPre = s;
-          zero(pPre);
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
@@ -487,23 +588,26 @@ tau = 10 * sqrt(uro) fails!
 
         mNorm_old2 = mNorm_old;
         mNorm_old  = mNorm;
+
+
+        commGlobalReductionSet(false);
         gamma = blas::reDotProduct(r_sloppy,u); 
         delta = blas::reDotProduct(w,u);
         mNorm = blas::norm2(r_sloppy);
+        commGlobalReductionSet(true);
       }
 
-#ifdef USE_WORKER
+#ifdef FULL_PIPELINE
       {
-//global_reduce.apply(0);
-//Warning! ordering is critical here: fisrt preconditioner and then matvec, since worker uses blocking MPI allreduce
-//in this approach all reduce is overlapped with matvec only.
-//more robust way just to call non-blocking allreduce and then synchronize 
+        int recvbuff_size = !updateR ? 4 : 12;
+
+        MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, recvbuff_size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
+
         if(K) {
           n = r_sloppy;
-          xpay(w, -1.0, n);
+          xpay(w, -Kscale_factor, n);
           rPre = n;
 
-          zero(pPre);
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
@@ -512,26 +616,28 @@ tau = 10 * sqrt(uro) fails!
           xpy(u, m);
         } else {
           m = w;
-        }        
-          //
-        dslash::aux_worker = &global_reduce;
+        }
+
+        //
+        dslash::aux_worker = !updateR ? &global_reduce : nullptr;
         matSloppy(n, m, tmp_sloppy);
         dslash::aux_worker = nullptr;
 
+        MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
+        memcpy(local_reduce, recvbuff, recvbuff_size*sizeof(double));
       }
-#else
+#else //regular path
       {
 #ifdef NONBLOCK_REDUCE
-        MPI_CHECK_(MPI_Iallreduce((double*)&local_reduce, recvbuff, 12, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
+        MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 12, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
 #else
-        reduceDoubleArray((double*)&local_reduce, 12);
+        reduceDoubleArray((double*)local_reduce, 12);
 #endif
         if(K) {
           n = r_sloppy;
-          xpay(w, -1.0, n);
+          xpay(w, -Kscale_factor, n);
           rPre = n;
-
-          zero(pPre);         
+         
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
@@ -543,15 +649,17 @@ tau = 10 * sqrt(uro) fails!
         }
         //
         matSloppy(n, m, tmp_sloppy);
+
 #ifdef NONBLOCK_REDUCE//sync point
         MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
-        memcpy(&local_reduce, recvbuff, 12*sizeof(double));
+        memcpy(local_reduce, recvbuff, 12*sizeof(double));
 #endif
       }
 #endif //end of USE_WORKER
       gamma_aux = local_reduce[0].w;//gamma, delta and mNorm are refs to local_reduce.[x|y|z]
 
       j += 1;
+      j_rupd_idx += 1;
       //PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
     }
 
@@ -562,7 +670,7 @@ tau = 10 * sqrt(uro) fails!
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    //param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matPrecon.flops())*1e-9;
     param.gflops = gflops;
     param.iter += j;
@@ -584,6 +692,7 @@ tau = 10 * sqrt(uro) fails!
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
+    delete lp;
     delete yp;
 
     delete[] local_reduce;

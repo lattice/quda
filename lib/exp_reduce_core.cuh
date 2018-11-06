@@ -73,7 +73,8 @@ __global__ void reduceKernelExp(ReductionArgExp<ReduceType,SpinorX,SpinorP,Spino
     i += gridSize;
   }
 
-  ::quda::array_reduce<Nreduce, block_size, ReduceType>(arg, sum, parity);
+  if(Nreduce > 1) ::quda::array_reduce<Nreduce, block_size, ReduceType>(arg, sum, parity);
+  else            ::quda::reduce<block_size, ReduceType>(arg, sum[0], parity);
 }
 
 

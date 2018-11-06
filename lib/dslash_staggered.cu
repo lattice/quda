@@ -30,7 +30,7 @@
 #include <dslash_quda.h>
 #include <sys/time.h>
 #include <blas_quda.h>
-#include <complex_quda.h>
+
 #include <inline_ptx.h>
 
 namespace quda {
@@ -66,7 +66,6 @@ namespace quda {
 
   private:
     const unsigned int nSrc;
-    const unsigned int max_register_block = 4;
 
   protected:
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
@@ -89,13 +88,9 @@ namespace quda {
       if (gauge.Reconstruct() == QUDA_RECONSTRUCT_9 || gauge.Reconstruct() == QUDA_RECONSTRUCT_13) {
         errorQuda("Reconstruct %d not supported", gauge.Reconstruct());
       }
-
       dslashParam.a = a;
       dslashParam.a_f = a;
       dslashParam.fat_link_max = gauge.LinkMax();
-
-      dslashParam.is_composite = out->IsComposite();//TODO: also one needs to check somewhere that both 'in' and 'out' are composite fields
-      dslashParam.composite_Vh = out->IsComposite() ? out->Component(0).ComponentVolumeCB() : 0 ;
     }
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
@@ -108,55 +103,23 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       setParam();
       dslashParam.swizzle = tp.aux.x;
-      switch(tp.aux.y) {
-      case 1:
-	{
-	  constexpr int register_block_size = 1;
-	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	  break;
-	}
-#ifdef BLOCKSOLVER
-      case 2:
-	{
-	  constexpr int register_block_size = 2;
-	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	  break;
-	}
-      case 4:
-	{
-	  constexpr int register_block_size = 4;
-	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	  break;
-	}
-      case 6:
-	{
-	  constexpr int register_block_size = 6;
-	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	  break;
-	}
-#endif // BLOCKSOLVER
-      default:
-	errorQuda("Register blocking factor %d not supported", tp.aux.y);
-      }
+      STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
 
     bool advanceBlockDim(TuneParam &param) const
     {
-      // note here we assume that the register block size is constant
-      // (auxiliary dimension is advanced slower than block/grid dimensions)
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
-      const unsigned int y_length = nSrc / param.aux.y; // y-thread dimension is nSrc / register block size
-      // first try to advance block.y
-      if (param.block.y < y_length && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
+      // first try to advance block.y (number of right-hand sides per block)
+      if (param.block.y < nSrc && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
 	  sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
 	  (param.block.x*(param.block.y+1u)) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
 	param.block.y++;
-	param.grid.y = (y_length + param.block.y - 1) / param.block.y;
+	param.grid.y = (nSrc + param.block.y - 1) / param.block.y;
 	return true;
-      } else { // if can't advance, reset and advance block.x
+      } else {
 	bool rtn = DslashCuda::advanceBlockDim(param);
 	param.block.y = 1;
-	param.grid.y = y_length;
+	param.grid.y = nSrc;
 	return rtn;
       }
     }
@@ -164,25 +127,16 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
 #ifdef SWIZZLE
-      if (dslashParam.kernel_type != INTERIOR_KERNEL) { // only swizzle the halo kernels
-	if (param.aux.x < 2*deviceProp.multiProcessorCount) {
-	  param.aux.x++;
-	  return true;
-	}
+      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+        param.aux.x++;
+	return true;
+      } else {
+        param.aux.x = 1;
+	return false;
       }
-#endif // SWIZZLE
-      param.aux.x = 1;
-
-#ifdef BLOCKSOLVER // register tiling of multi-src dslash only enabled if compiling the block solver
-      for (unsigned int register_block=param.aux.y+1; register_block <= max_register_block && register_block <= nSrc; register_block++) {
-	if (nSrc % register_block == 0) { // register block size must be a divisor of 5-th dimention
-	  param.aux.y = register_block;
-	  return true;
-	}
-      }
-#endif // BLOCKSOLVER
-      param.aux.y = 1;
+#else
       return false;
+#endif
     }
 
     void initTuneParam(TuneParam &param) const
@@ -191,7 +145,6 @@ namespace quda {
       param.block.y = 1;
       param.grid.y = nSrc;
       param.aux.x = 1;
-      param.aux.y = 1;
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
@@ -210,9 +163,7 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
-
     DslashCuda *dslash = nullptr;
-
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new StaggeredDslashCuda<double2, double2>(out, gauge, in, x, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {

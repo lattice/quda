@@ -153,25 +153,25 @@ extern "C" {
     int overlap; /**< Width of domain overlaps */
 
     /** Offsets for multi-shift solver */
-    double offset[QUDA_MAX_ARRAY_SIZE];
+    double offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Solver tolerance for each offset */
-    double tol_offset[QUDA_MAX_ARRAY_SIZE];
+    double tol_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Solver tolerance for each shift when refinement is applied using the heavy-quark residual */
-    double tol_hq_offset[QUDA_MAX_ARRAY_SIZE];
+    double tol_hq_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Actual L2 residual norm achieved in solver for each offset */
-    double true_res_offset[QUDA_MAX_ARRAY_SIZE];
+    double true_res_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Iterated L2 residual norm achieved in multi shift solver for each offset */
-    double iter_res_offset[QUDA_MAX_ARRAY_SIZE];
+    double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
-    double true_res_hq_offset[QUDA_MAX_ARRAY_SIZE];
+    double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Residuals in the partial faction expansion */
-    double residue[QUDA_MAX_ARRAY_SIZE];
+    double residue[QUDA_MAX_MULTI_SHIFT];
 
     /** Whether we should evaluate the action after the linear solver*/
     int compute_action;
@@ -750,6 +750,7 @@ extern "C" {
    */
   void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
                    void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
+
 
   /**
    * Perform the solve, according to the parameters set in param.  It

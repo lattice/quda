@@ -711,8 +711,20 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   profileGauge.TPSTART(QUDA_PROFILE_INIT);
   // Set the specific input parameters and create the cpu gauge field
-  GaugeFieldParam gauge_param(h_gauge, *param);
+#ifdef JULIA_INTERFACE //current hack for julia bindings
+  void *hh_gauge[4];
 
+  const int Vol = param->X[0]*param->X[1]*param->X[2]*param->X[3];
+  const int gaugeSiteSize = 18;
+
+  for (int dir = 0; dir < 4; dir++) {
+    hh_gauge[dir] = param->cpu_prec == QUDA_DOUBLE_PRECISION ? static_cast<void*>(&((static_cast<double*>(h_gauge))[dir*Vol*gaugeSiteSize])) : static_cast<void*>(&((static_cast<float*>(h_gauge))[dir*Vol*gaugeSiteSize]));
+  }
+
+  GaugeFieldParam gauge_param(hh_gauge, *param);
+#else
+  GaugeFieldParam gauge_param(h_gauge, *param);
+#endif
   // if we are using half precision then we need to compute the fat
   // link maximum while still on the cpu
   // FIXME get a kernel for this
@@ -2047,7 +2059,10 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   cudaColorSpinorField out(in, cudaParam);
 
   DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, pc);
+  if(inv_param->dslash_type_precondition == QUDA_INVALID_DSLASH)
+    setDiracParam(diracParam, inv_param, pc);
+  else 
+    setDiracPreParam(diracParam, inv_param, pc, false);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->M(out, in); // apply the operator
@@ -2121,7 +2136,10 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   //  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= gaugePrecise->anisotropy;
 
   DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, pc);
+  if(inv_param->dslash_type_precondition == QUDA_INVALID_DSLASH)
+    setDiracParam(diracParam, inv_param, pc);
+  else 
+    setDiracPreParam(diracParam, inv_param, pc, false);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->MdagM(out, in); // apply the operator
@@ -2726,6 +2744,7 @@ void destroyDeflationQuda(void *df) {
   delete static_cast<deflated_solver*>(df);
 }
 
+
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   profilerStart(__func__);
@@ -3127,8 +3146,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
  */
 void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
-  bool kernel_pack_old = getKernelPackT();
-  setKernelPackT(true);
 
   // currently that code is just a copy of invertQuda and cannot work
 
@@ -3234,25 +3251,22 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // download source
   printfQuda("Setup b\n");
   ColorSpinorParam cudaParam(cpuParam, *param);
-  cudaParam.nDim = 5;//just to be sure
-  cudaParam.x[4] = 1;//set 1, then this will be converted to param->num_src 
-  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.is_composite = true;
   cudaParam.composite_dim = param->num_src;
 
   printfQuda("Create b \n");
   ColorSpinorField *b = ColorSpinorField::Create(cudaParam);
 
+
+
+
   for(int i=0; i < param->num_src; i++) {
     b->Component(i) = *h_b[i];
   }
-
-  b->ExtendLastDimension();//ok, now cudaParam.x[4] = cudaParam.composite_dim, so we have correct 5-d field
-
   printfQuda("Done b \n");
 
-  ColorSpinorField *x = nullptr;
+    ColorSpinorField *x;
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     // initial guess only supported for single-pass solvers
     if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
@@ -3276,8 +3290,6 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       printfQuda("Done x \n");
  // solution
   }
-
-  x->ExtendLastDimension();//ok, now cudaParam.x[4] = cudaParam.composite_dim, so we have correct 5-d field
 
   profileInvert.TPSTOP(QUDA_PROFILE_H2D);
 
@@ -3365,12 +3377,10 @@ for(int i=0; i < param->num_src; i++) {
       errorQuda("Multigrid preconditioning only supported for direct non-red-black solve");
 
     if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
-      errorQuda("norm_error_solve not supported in multi source solve");
-
-      // for(int i=0; i < param->num_src; i++) {
-      //   cudaColorSpinorField tmp((in->Component(i)));
-      //   dirac.Mdag(in->Component(i), tmp);
-      // }
+      for(int i=0; i < param->num_src; i++) {
+        cudaColorSpinorField tmp((in->Component(i)));
+        dirac.Mdag(in->Component(i), tmp);
+      }
     } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
@@ -3386,27 +3396,19 @@ for(int i=0; i < param->num_src; i++) {
     if (direct_solve) {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
-      // Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      // solve->solve(*out,*in);
-      if (param->inv_type == QUDA_SRE_PCG_INVERTER) {
-        EKS_PCG ekscg(m, mSloppy, mPre, solverParam, profileMulti);
-        ekscg(*out, *in);
-        solverParam.updateInvertParam(*param);
-      } else {
-        BlockCG bcg(m, mSloppy, solverParam, profileMulti);
-        bcg(*out, *in);
-        solverParam.updateInvertParam(*param);
-      }
-      // delete solve;
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      solve->blocksolve(*out,*in);
+      solverParam.updateInvertParam(*param);
+      delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
-      BlockCG bcg(m, mSloppy, solverParam, profileMulti);
-      bcg(*out, *in);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      solve->blocksolve(*out,*in);
       solverParam.updateInvertParam(*param);
-      // delete solve;
+      delete solve;
     } else { // norm_error_solve
-      // DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       errorQuda("norm_error_solve not supported in multi source solve");
       //cudaColorSpinorField tmp(*out);
       // SolverParam solverParam(*param);
@@ -3479,8 +3481,6 @@ for(int i=0; i < param->num_src; i++) {
   saveTuneCache();
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  setKernelPackT(kernel_pack_old);
 }
 
 
@@ -4490,7 +4490,7 @@ void computeHISQForceQuda(void* const milc_momentum,
         profileHISQForce.TPSTOP(QUDA_PROFILE_H2D);
 
         profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-        computeStaggeredOprod(oprod, cudaQuark, coeff[i + num_terms], 3);
+        computeStaggeredOprod(oprod, cudaQuark, coeff[i], 3);
         profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }

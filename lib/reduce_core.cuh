@@ -273,7 +273,6 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
   return value;
 }
 
-//EXPERIMENTAL
 #include <exp_reduce_core.cuh>
 
 /**
