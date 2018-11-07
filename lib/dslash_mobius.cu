@@ -106,10 +106,10 @@ namespace quda {
       }
 
       //thread constraint
-      if ( (advance[0] || advance[1]) && param.block.x*param.block.y*param.block.z <= deviceProp.maxThreadsPerBlock) {
+      if ( (advance[0] || advance[1]) && param.block.x*param.block.y*param.block.z <= (unsigned)deviceProp.maxThreadsPerBlock) {
         param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			   (in->X(4)+param.block.y-1) / param.block.y, 1);
-	
+
         bool advance = true;
         if (!checkGrid(param)) advance = advanceBlockDim(param);
         return advance;
