@@ -765,10 +765,12 @@ namespace quda {
     ColorSpinorField *tmpp2;
     ColorSpinorField *tmp_sloppy;
     ColorSpinorField *tmp_sloppy2;
+    ColorSpinorField *x_sloppy;
 
     std::vector<ColorSpinorField*> r;  // residual vectors
     std::vector<ColorSpinorField*> q;  // mat * residual vectors
     std::vector<ColorSpinorField*> p;  // CG direction vectors
+    std::vector<ColorSpinorField*> p2; // CG direction vectors for pointer swap
 
     /**
        @brief Initiate the fields needed by the solver

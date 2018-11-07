@@ -43,6 +43,8 @@ namespace quda {
         for (int i=0; i<param.Nkrylov; i++) delete q[i];
       }
       for (int i=0; i<param.Nkrylov; i++) delete p[i];
+      for (int i=0; i<param.Nkrylov; i++) delete p2[i];
+      if (x_sloppy) delete x_sloppy;
       if (tmp_sloppy) delete tmp_sloppy;
       if (tmp_sloppy2) delete tmp_sloppy2;
       if (tmpp) delete tmpp;
@@ -64,7 +66,7 @@ namespace quda {
       alpha = new Complex[param.Nkrylov];
       beta = new Complex[param.Nkrylov*param.Nkrylov];
       phi = new Complex[param.Nkrylov];
-      W = new Complex[param.Nkrylov*(param.Nkrylov+1)];
+      W = new Complex[param.Nkrylov*param.Nkrylov];
       C = new Complex[param.Nkrylov*param.Nkrylov];
 
       bool mixed = param.precision != param.precision_sloppy;
@@ -88,6 +90,7 @@ namespace quda {
         r.resize(param.Nkrylov+1);
         q.resize(param.Nkrylov);
         p.resize(param.Nkrylov);
+        p2.resize(param.Nkrylov); // for pointer swap
         for (int i=0; i<param.Nkrylov+1; i++) {
           r[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
           if (i>0) q[i-1] = r[i];
@@ -96,6 +99,7 @@ namespace quda {
         r.resize(param.Nkrylov);
         q.resize(param.Nkrylov);
         p.resize(param.Nkrylov);
+        p2.resize(param.Nkrylov); // for pointer swap
         for (int i=0; i<param.Nkrylov; i++) {
           r[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
           q[i] = ColorSpinorField::Create(csParam);
@@ -103,10 +107,14 @@ namespace quda {
       }
 
       for (int i=0; i<param.Nkrylov; i++) p[i] = ColorSpinorField::Create(csParam);
+      for (int i=0; i<param.Nkrylov; i++) p2[i] = ColorSpinorField::Create(csParam);
 
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
       tmp_sloppy2 = mixed ? ColorSpinorField::Create(csParam) : nullptr;
+
+      // sloppy solution for sloppy mat-vec
+      x_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
 
       if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -192,6 +200,7 @@ namespace quda {
     ColorSpinorField &tmp2 = *tmpp2;
     ColorSpinorField &tmpSloppy = tmp_sloppy ? *tmp_sloppy : tmp;
     ColorSpinorField &tmpSloppy2 = tmp_sloppy2 ? *tmp_sloppy2 : tmp2;
+    ColorSpinorField &xSloppy = x_sloppy ? *x_sloppy : x;
 
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
@@ -219,13 +228,13 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-	warningQuda("inverting on zero-field source\n");
-	x = b;
-	param.true_res = 0.0;
-	param.true_res_hq = 0.0;
-	return;
+        warningQuda("inverting on zero-field source\n");
+        x = b;
+        param.true_res = 0.0;
+        param.true_res_hq = 0.0;
+        return;
       } else {
-	b2 = r2;
+        b2 = r2;
       }
     }
 
@@ -269,7 +278,7 @@ namespace quda {
       // for now just copy R into P since the beta computation is
       // buggy - this means we end up doing CG within the s-steps and
       // steepest descent between them
-      if (total_iter == 0 || 1) {
+      if (total_iter == 0) {
         // first iteration P = R
         for (int i=0; i<nKrylov; i++) *p[i] = *r[i];
       } else {
@@ -277,15 +286,16 @@ namespace quda {
         // compute the beta coefficients for updating P
         // 1. Compute matrix C = -Q^\dagger P
         // 2. Solve W beta = phi
-        blas::cDotProduct(C, q, p);
+        blas::cDotProduct(C, p, q);
+        for (int i = 0; i < param.Nkrylov*param.Nkrylov; i++) { C[i] = real(C[i]); }
 
-        // this seems buggy!
         compute_beta(beta, W, C);
 
         // update direction vectors
         std::vector<ColorSpinorField*> R;
         for (int i=0; i<nKrylov; i++) R.push_back(r[i]);
-        blas::caxpyz(beta, p, R, p);
+        blas::caxpyz(beta, p, R, p2);
+        for (int i=0; i<nKrylov; i++) std::swap(p[i],p2[i]);
       }
 
       // compute the alpha coefficients
@@ -303,10 +313,12 @@ namespace quda {
           // Construct the matrix P* Q = P* (A R) = (p_i, q_j) = (p_i, A r_j)
           //blas::cDotProduct(W, q, Q);
         */
-        blas::cDotProduct(W, q, p);
+        blas::cDotProduct(W, p, q);
+        for (int i = 0; i < param.Nkrylov*param.Nkrylov; i++) { W[i] = real(W[i]); }
         std::vector<ColorSpinorField*> R;
         R.push_back(r[0]);
         blas::cDotProduct(phi, p, R);
+        for (int i = 0; i < param.Nkrylov; i++) { phi[i] = real(phi[i]); }
 
         compute_alpha(alpha, W, phi);
       }
@@ -322,7 +334,8 @@ namespace quda {
       // vectors when we update p?
       if (!fixed_iteration || param.return_residual) {
         // update the residual vector
-        matSloppy(*r[0], x, tmpSloppy, tmpSloppy2);
+        blas::copy(xSloppy, x); // no op if uni-precision
+        matSloppy(*r[0], xSloppy, tmpSloppy, tmpSloppy2);
         if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::xmyNorm(b, *r[0]);
         else blas::xpay(b, -1.0, *r[0]);
       }
@@ -335,38 +348,28 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
-	if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
-	mat(r_, x, tmp, tmp2);
-	r2 = blas::xmyNorm(b, r_);
-	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r_).z);
+        if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
+        mat(r_, x, tmp, tmp2);
+        r2 = blas::xmyNorm(b, r_);
+        blas::copy(*r[0], r_);
+
+        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r_).z);
 
         // break-out check if we have reached the limit of the precision
-	if (r2 > r2_old) {
-	  resIncrease++;
-	  resIncreaseTotal++;
-	  warningQuda("CA-CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-		      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
-	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
-	    warningQuda("CA-CG: solver exiting due to too many true residual norm increases");
-	    break;
-	  }
-	} else {
-	  resIncrease = 0;
-	}
+        if (r2 > r2_old) {
+          resIncrease++;
+          resIncreaseTotal++;
+          warningQuda("CA-CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+                      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+            warningQuda("CA-CG: solver exiting due to too many true residual norm increases");
+            break;
+          }
+        } else {
+          resIncrease = 0;
+        }
 
-	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
-	  restart++; // restarting if residual is still too great
-
-	  PrintStats("CA-CG (restart)", restart, r2, b2, heavy_quark_res);
-          blas::copy(*p[0], r_);
-
-	  r2_old = r2;
-
-	  // prevent ending the Krylov space prematurely if other convergence criteria not met
-	  if (r2 < stop) l2_converge = true;
-	}
-
-	r2_old = r2;
+        r2_old = r2;
       }
 
     }
