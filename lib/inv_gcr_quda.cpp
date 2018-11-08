@@ -484,7 +484,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);
 
-    PrintSummary("GCR", total_iter, r2, b2);
+    PrintSummary("GCR", total_iter, r2, b2, stop, param.tol_hq);
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
 
