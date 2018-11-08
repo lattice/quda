@@ -56,6 +56,9 @@ namespace quda {
     /**< Reliable update tolerance */
     double delta;
 
+    /**< Whether to user alternative reliable updates (CG only at the moment) */
+    bool use_alternative_reliable;
+
     /**< Whether to keep the partial solution accumulator in sloppy precision */
     bool use_sloppy_partial_accumulator;
 
@@ -232,6 +235,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO), delta(param.reliable_delta),
+      use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
@@ -269,6 +273,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       compute_null_vector(param.compute_null_vector), delta(param.delta),
+      use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),

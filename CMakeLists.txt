@@ -151,7 +151,6 @@ set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for t
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
-set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
@@ -179,7 +178,6 @@ mark_as_advanced(QUDA_INTERFACE_NVTX)
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
-mark_as_advanced(QUDA_ALTRELIABLE)
 mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_JITIFY)
@@ -417,10 +415,6 @@ if(QUDA_JITIFY)
   LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
   configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
   include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
-endif()
-
-if(QUDA_ALTRELIABLE)
-  add_definitions(-DALTRELIABLE)
 endif()
 
 if(QUDA_USE_EIGEN)
