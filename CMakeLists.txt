@@ -72,8 +72,8 @@ endif()
 message(STATUS "")
 
 
-set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70)
+set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")

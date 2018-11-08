@@ -149,8 +149,12 @@ namespace quda {
 	return 16;
       case 5:
       case 6:
+        return 32;
       case 7:
-	return 32;
+        switch (deviceProp.minor) {
+        case 0: return 32;
+        case 5: return 16;
+        }
       default:
 	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
 	return 0;
