@@ -54,10 +54,12 @@ namespace quda {
      @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
      @param[in] type Type of dslash we are applying
   */
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                   double kappa, const ColorSpinorField &x, int parity, bool dagger, Dslash4Type type);
+                   double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                   const int *comm_override, Dslash4Type type);
 
   // plain Wilson Dslash  
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
@@ -219,6 +221,20 @@ namespace quda {
   void packFaceExtended(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &field, MemoryLocation location,
 			const int nFace, const int R[], const int dagger, const int parity, const int dim,
 			const int face_num, const cudaStream_t &stream, const bool unpack=false);
+
+  /**
+     @brief Dslash face packing routine
+     @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
+     @param[in] field ColorSpinorField to be packed
+     @param[in] location Locations where the packed fields are (Device, Host and/or Remote)
+     @param[in] nFace Depth of halo
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] parity Field parity
+     @param[in] stream Which stream are we executing in
+  */
+  void PackGhost(void *ghost[2*QUDA_MAX_DIM], const ColorSpinorField &field,
+                 MemoryLocation location, int nFace,
+                 bool dagger, int parity, const cudaStream_t &stream);
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)

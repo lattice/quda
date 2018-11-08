@@ -527,7 +527,7 @@ namespace quda {
     /**
        @brief Restores the cudaGaugeField to CUDA memory
     */
-    void restore();
+    void restore() const;
 
   };
 
@@ -611,7 +611,7 @@ namespace quda {
     /**
        @brief Restores the cpuGaugeField
     */
-    void restore();
+    void restore() const;
 
   };
 

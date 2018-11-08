@@ -821,7 +821,7 @@ namespace quda {
     backed_up = true;
   }
 
-  void cudaGaugeField::restore() {
+  void cudaGaugeField::restore() const {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
     cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
     delete []backup_h;

@@ -93,6 +93,7 @@ namespace quda {
       if(GhostOffset(i,0)%FieldOrder()) errorQuda("ghostOffset(%d,0) %d is not a multiple of FloatN\n", i, GhostOffset(i,0));
       if(GhostOffset(i,1)%FieldOrder()) errorQuda("ghostOffset(%d,1) %d is not a multiple of FloatN\n", i, GhostOffset(i,1));
 
+      ghostFaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET ? ghostFace[i]/2 : ghostFace[i]);
     } // dim
 
     int ghostNormVolume = num_norm_faces * ghostVolume;
@@ -136,10 +137,10 @@ namespace quda {
       }
 
       dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
-      dslash_constant.ghostFace[0] = (X[1]*X[2]*X[3])/2;
-      dslash_constant.ghostFace[1] = (X[0]*X[2]*X[3])/2;
-      dslash_constant.ghostFace[2] = (X[0]*X[1]*X[3])/2;
-      dslash_constant.ghostFace[3] = (X[0]*X[1]*X[2])/2;
+      dslash_constant.ghostFaceCB[0] = (X[1]*X[2]*X[3])/2;
+      dslash_constant.ghostFaceCB[1] = (X[0]*X[2]*X[3])/2;
+      dslash_constant.ghostFaceCB[2] = (X[0]*X[1]*X[3])/2;
+      dslash_constant.ghostFaceCB[3] = (X[0]*X[1]*X[2])/2;
 
       dslash_constant.X2X1 = X[1]*X[0];
       dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
