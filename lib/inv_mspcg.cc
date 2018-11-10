@@ -313,7 +313,7 @@ namespace quda {
 */
 
 
-    inner_dslash(*fx, *fb);
+    inner_dslash(*fx, *fb, 1.);
 
     double fx2 = norm2(*fx);
     printfQuda("Test   fx2/fb2 = %16.12e/%16.12e.\n", fx2, fb2);
@@ -325,16 +325,27 @@ namespace quda {
     double x2_ = blas::norm2(*tt);
     printfQuda("Rebuild     x2 = %16.12e.\n", x2_);
     double dd = xmyNorm(*tt, *tx);
-    printfQuda("%% diff      x2 = %16.12e (This number is SUPPOSED to be tiny).\n", dd);
+    printfQuda("  diff      x2 = %16.12e. (This number is SUPPOSED to be tiny).\n", dd);
     
     if(tc and fb->Precision() == QUDA_HALF_PRECISION){
-      mat_precondition->Dagger(QUDA_DAG_YES);
-      mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), sp_len2, RR2, Xs2);
-      mat_precondition->Dslash5inv(*ft, *fb, static_cast<QudaParity>(0));
-      mat_precondition->Dagger(QUDA_DAG_NO);
+//      mat_precondition->Dagger(QUDA_DAG_YES);
+//      mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), 1., sp_len2, RR2, Xs2);
+//      mat_precondition->Dslash5inv(*ft, *fb, static_cast<QudaParity>(0));
+      int shift[4] = {1,1,1,1};
+      int halo_shift[4] = {2,2,2,2};
+      mat_precondition->Dslash4(*fy, *fb, static_cast<QudaParity>(0));
+      mat_precondition->Dslash5inv(*ft, *fy, static_cast<QudaParity>(0));
+//      mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1, true, {2,2,2,2});
+      mat_precondition->dslash4_dslash5inv_dslash4pre(*fx, *fb, static_cast<QudaParity>(0), shift, halo_shift);
+//      mat_precondition->Dagger(QUDA_DAG_NO);
     }
+    double ft2 = blas::norm2(*ft);
+    printfQuda("           ft2 = %16.12e. (This number is SUPPOSED to be tiny).\n", ft2);
+//    zero_extended_color_spinor_interface( *fx, R, QUDA_CUDA_FIELD_LOCATION, 0);
+    fx2 = blas::norm2(*fx);
+    printfQuda("           fx2 = %16.12e. (This number is SUPPOSED to be tiny).\n", fx2);
     double mdd = xmyNorm(*ft, *fx);
-    printfQuda("%% diff      m2 = %16.12e (This number is SUPPOSED to be tiny).\n", mdd);
+    printfQuda("  diff      m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/tt->Volume());
     
     mat_precondition->Dslash4pre(*ft, *fb, static_cast<QudaParity>(0));
 
@@ -349,7 +360,7 @@ namespace quda {
     printfQuda("dslash test completed.\n");
   }
 
-  void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in ){
+  void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in, const double scale ){
     int odd_bit = (mat_precondition->getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
@@ -363,7 +374,7 @@ namespace quda {
     
     mat_precondition->Dagger(QUDA_DAG_YES);
     if(tc and out.Precision() == QUDA_HALF_PRECISION){
-      mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
+      mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], scale, sp_len2, RR2, Xs2);                  // +2
     }else{
       mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
     }
@@ -392,7 +403,7 @@ namespace quda {
       copyExtendedColorSpinor(*ifp, *ip, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
 //      copier_timer.Stop("woo", "hoo", 0);
 //      zero_extended_color_spinor_interface( *ifp, R, QUDA_CUDA_FIELD_LOCATION, 0);
-      inner_dslash(*ifmmp, *ifp);
+      inner_dslash(*ifmmp, *ifp, sqrt(rk2/ifp->Volume()));
 //      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
 //      copier_timer.Start("woo", "hoo", 0);
       copyExtendedColorSpinor(*immp, *ifmmp, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);

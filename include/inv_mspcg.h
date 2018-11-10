@@ -93,7 +93,7 @@ namespace quda {
       void operator()(ColorSpinorField& out, ColorSpinorField& in);
       void reliable_update(ColorSpinorField& dx, ColorSpinorField& db);
       
-      void inner_dslash( ColorSpinorField& out, const ColorSpinorField& in );
+      void inner_dslash( ColorSpinorField& out, const ColorSpinorField& in, const double scale = 1. );
       void inner_cg( ColorSpinorField& ix, ColorSpinorField& ib );
       int  outer_cg( ColorSpinorField& dx, ColorSpinorField& db, double quit );
   };

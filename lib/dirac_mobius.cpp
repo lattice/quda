@@ -531,7 +531,35 @@ namespace quda {
       flops += 1320LL*(long long)sp_idx_length*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL) + 72LL*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
     }
   }
-	
+	// The "new" fused kernel 
+  void DiracMobiusPC::dslash4_dslash5inv_dslash4pre(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, int shift[4], int halo_shift[4]) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+    
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
+    apply_fused_dslash(out, in, *gauge, out, in, mass, m5, b_5, c_5, dagger, parity, shift, halo_shift, dslash4_dslash5pre_dslash5inv);
+    // mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
+		//    &static_cast<const cudaColorSpinorField&>(in),
+		//    parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 4, profile, sp_idx_length, R_, Xs_, expanding_, Rz_);
+    
+//     long long Ls = in.X(4);
+// 		long long bulk = (Ls-2)*sp_idx_length;
+//     long long wall = 2*sp_idx_length;
+// 
+//     if(expanding_){
+//       long long vol = (Xs_[0]+R_[0]-Rz_[0])*(Xs_[1]+R_[1]-Rz_[1])*(Xs_[2]+R_[2]-Rz_[2])*(Xs_[3]+R_[3]-Rz_[3])/2;
+// //      flops += 1320LL*vol*(long long)in.X(4) + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+//       flops += 1320LL*vol*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL) + 72LL*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
+// //			printfQuda("ddd flops: %lld, this: %lld,\n", flops, 1320LL*vol*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL) );
+//     }else{
+//       flops += 1320LL*(long long)sp_idx_length*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL) + 72LL*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
+//     }
+  }
+
 	void DiracMobiusPC::dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
 			    const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
   {
@@ -620,7 +648,7 @@ namespace quda {
   }
 	
   void DiracMobiusPC::dslash5inv_sm_tc_partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-    int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
+    const double scale, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
@@ -631,7 +659,7 @@ namespace quda {
     for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
    
 #if 1
-    apply_dslash5_tensor_core(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, M5_INV_MOBIUS);
+    apply_dslash5_tensor_core(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, scale, M5_INV_MOBIUS);
 #else
     mdwf_dslash_cuda_partial(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),

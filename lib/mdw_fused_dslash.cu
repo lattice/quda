@@ -1,7 +1,9 @@
+#include <gauge_field.h>
+#include <gauge_field_order.h>
+
 #include <mdw_dslash5_tensor_core.cuh>
 
 namespace quda {
-namespace mdw_tensor_core {
 
 #if defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
   /**
@@ -73,6 +75,7 @@ namespace mdw_tensor_core {
     const G U;
     
     const int nParity;      // number of parities we're working on
+    const int parity;
     const int volume_cb;    // checkerboarded volume
     const int volume_4d_cb; // 4-d checkerboarded volume
     
@@ -80,7 +83,7 @@ namespace mdw_tensor_core {
     
     const int_fastdiv Ls;   // length of 5th dimension
 
-    const int shift[4] // sites where we actually calculate.
+    const int shift[4]; // sites where we actually calculate.
     const int halo_shift[4]; // halo means zero. When we are expanding we have halo of cs-field where values are zero.
     
     const int_fastdiv shrinked_dim[4]; // dimension after shifts are considered. 
@@ -94,7 +97,7 @@ namespace mdw_tensor_core {
     const real m_5;         // Wilson mass shift
 
     const bool dagger;      // dagger
-    const bool xpay;        // whether we are doing xpay or not
+//    const bool xpay;        // whether we are doing xpay or not
 
     real b;                 // real constant Mobius coefficient
     real c;                 // real constant Mobius coefficient
@@ -109,17 +112,25 @@ namespace mdw_tensor_core {
     MdwfFusedDslashType type;
     FusedDslashArg(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
                           ColorSpinorField& y, const ColorSpinorField& x, double m_f_, double m_5_, 
-                          const Complex* b_5, const Complex* c_5, MdwfFusedDslashType type)
-      : out(out), in(in), U(U), y(y), x(x), nParity(in.SiteSubset()), volume_cb(in.VolumeCB()), 
-      volume_4d_cb(volume_cb/Ls_), Ls(Ls_), m_f(m_f_), m_5(m_5_), 
-      shift{ ... }, halo_shift{ ... }, dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3)}, 
-      shrinked_dim{ (dim[0]-2*shift[0], dim[1]-2*shift[1], dim[2]-2*shift[2], dim[3]-2*shift[3]}, type(type)
+                          const Complex* b_5, const Complex* c_5, bool dagger_, int parity, 
+                          int shift_[4], int halo_shift_[4], MdwfFusedDslashType type)
+      : out(out), in(in), U(U), y(y), x(x), nParity(in.SiteSubset()), parity(parity), volume_cb(in.VolumeCB()), 
+      volume_4d_cb(volume_cb/Ls_), Ls(Ls_), m_f(m_f_), m_5(m_5_), dagger(dagger_),
+      shift{ shift_[0], shift_[1], shift_[2], shift_[3] }, halo_shift{ halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3] }, 
+      dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3)}, 
+      shrinked_dim{ dim[0]-2*shift[0], dim[1]-2*shift[1], dim[2]-2*shift[2], dim[3]-2*shift[3] }, 
+      volume_4d_cb_shift(shrinked_dim[0]*shrinked_dim[1]*shrinked_dim[2]*shrinked_dim[3]/2),
+      type(type)
 //      halo_shrinked_dim{ (dim[0]-2*halo_shift[0], dim[1]-2*halo_shift[1], dim[2]-2*halo_shift[2], dim[3]-2*halo_shift[3]}, type(type)
     {
       if(in.Nspin() != 4){
         errorQuda("nSpin = %d not support", in.Nspin());
       }
       
+      printfQuda("shift[4] =        (%d,%d,%d,%d)\n", shift[0], shift[1], shift[2], shift[3]);
+      printfQuda("dim[4] =          (%d,%d,%d,%d)\n", dim[0], dim[1], dim[2], dim[3]);
+      printfQuda("shrinked_dim[4] = (%d,%d,%d,%d)\n", (int)shrinked_dim[0], (int)shrinked_dim[1], (int)shrinked_dim[2], (int)shrinked_dim[3]);
+
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
 //      if (sizeof(coeff_5<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(coeff_5<real>));
@@ -128,16 +139,18 @@ namespace mdw_tensor_core {
 //      auto *b_5 =  coeff->b;
 //      auto *c_5 =  coeff->c;
 
-      b = b_5_[0].real();
-      c = c_5_[0].real();
-      kappa = -(c*(4.+m_5)-1.) / (b*(4.+m_5)+1.);
+      b = b_5[0].real();
+      c = c_5[0].real();
+      kappa = -(c*(4.+m_5)-1.) / (b*(4.+m_5)+1.); // This is actually -kappa in my(Jiqun Tu) notes.
       fac_inv = 0.5/(1.+std::pow(kappa,(int)Ls)*m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
 
       switch(type){
         case dslash4_dslash5pre_dslash5inv:
           // a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
-          alpha = b-c/kappa;
-          beta = c/kappa;
+          // alpha = 2.*b+c/kappa;
+          // beta = -c/kappa;
+          printfQuda("m5= %.4f, mf= %.4f, fac_inv= %.4f\n", m_5, m_f, fac_inv);
+          printfQuda("b = %.4f, c = %.4f, -kappa = %.4f, alpha = %.4f, beta = %.4f\n", b, c, kappa, alpha, beta);
           break;
         default:
           errorQuda("Unknown MdwfFusedDslashType %d", type);
@@ -148,15 +161,15 @@ namespace mdw_tensor_core {
     }
   };
 
-  __device__ inline void index_4d_cb_from_coordinate_4d(const int coordinate[], const int dim[]){
+  __device__ inline int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4]){
     return ( ((coordinate[3]*dim[2]+coordinate[2])*dim[1]+coordinate[1])*dim[0]+coordinate[0] ) >> 1;
   }
 
-  __device__ inline bool is_halo_4d(const int coordinate[], const int dim[4], const int halo_shift){
+  __device__ inline bool is_halo_4d(const int coordinate[4], const int dim[4], const int halo_shift[4]){
     bool ret = false;
     #pragma unroll
     for(int d = 0; d < 4; d++){
-      ret = ret or (coordinate[d] >= halo_dim[d]-halo_shift or coordinate[d] < halo_shift) ;
+      ret = ret or (coordinate[d] >= dim[d]-halo_shift[d] or coordinate[d] < halo_shift[d]) ;
     }
     return ret;
   }
@@ -164,18 +177,16 @@ namespace mdw_tensor_core {
   /**
   -> Everything should be understood in a 4d checkboarding sense.
   */
-  template<class Float, bool dagger, bool halo, class Vector, class Arg>
-  __device__ __host__ inline void apply_wilson_5d(Vector& out, const int coordinate_4d[], Arg& arg, int s, int parity, int nParity) {
-    typedef typename mapper<Float>::type real;
+  template<class storage_type, bool dagger, bool halo, class Vector, class Arg>
+  __device__ inline void apply_wilson_5d(Vector& out, const int coordinate[4], Arg& arg, int s) {
+    typedef typename mapper<storage_type>::type compute_type;
 //    typedef ColorSpinor<real,nColor,2> HalfVector;
-    typedef Matrix<complex<real>, 3> Link;
-    const int their_spinor_parity = nParity == 2 ? 1-parity : 0;
+    typedef Matrix<complex<compute_type>, 3> Link;
+    const int their_spinor_parity = arg.nParity == 2 ? 1-arg.parity : 0;
 
-    const int index_4d_cb = index_4d_cb_from_coordinate_4d(coordinate_4d, arg.dim);
-//    int coord[nDim];
-//    getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
+    const int index_4d_cb = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
 
-    int x[4] = { coordinate_4d[0], coordinate_4d[1], coordinate_4d[2], coordinate_4d[3] };
+    int x[4] = { coordinate[0], coordinate[1], coordinate[2], coordinate[3] };
 
     #pragma unroll
     for (int d = 0; d < 4; d++) // loop over dimension
@@ -184,7 +195,7 @@ namespace mdw_tensor_core {
       if(halo and is_halo_4d(x, arg.dim, arg.halo_shift)){
       
       }else{ // Forward gather - compute fwd offset for vector fetch
-        const int fwd_idx = 2*arg.volume_4d_cb+index_4d_cb_from_coordinate_4d(x, arg.dim);
+        const int fwd_idx = s*arg.volume_4d_cb+index_4d_cb_from_coordinate_4d(x, arg.dim);
         constexpr int proj_dir = dagger ? +1 : -1;
 
         if ( false ) {
@@ -195,17 +206,17 @@ namespace mdw_tensor_core {
 //
 //          out += (U * in).reconstruct(d, proj_dir);
         } else {
-          const Link U = arg.U(d, index_4d_cb, parity);
+          const Link U = arg.U(d, index_4d_cb, arg.parity);
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
       x[d] -= 2;
-      if(halo and  is_halo_4d(x, arg.dim, arg.halo_shift)){
+      if(halo and is_halo_4d(x, arg.dim, arg.halo_shift)){
       
       }else{ //Backward gather - compute back offset for spinor and gauge fetch
         const int gauge_idx = index_4d_cb_from_coordinate_4d(x, arg.dim);;
-        const int back_idx = 2*arg.volume_4d_cb+gauge_idx;
+        const int back_idx = s*arg.volume_4d_cb+gauge_idx;
         constexpr int proj_dir = dagger ? -1 : +1;
 
         if ( false ) {
@@ -216,7 +227,7 @@ namespace mdw_tensor_core {
 //
 //          out += (conj(U) * in).reconstruct(d, proj_dir);
         } else {
-          const Link U = arg.U(d, gauge_idx, 1-parity);
+          const Link U = arg.U(d, gauge_idx, 1-arg.parity);
           const Vector in = arg.in(back_idx, their_spinor_parity);
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -230,8 +241,8 @@ namespace mdw_tensor_core {
   -> Everything should be understood in a 4d checkboarding sense.
   */
   template<class T>
-  __device__ inline void coordinate_from_shrinked_index(int coordinate[], int shrinked_index, 
-                          int dim[], T shrinked_dim[], const int shift[], int parity) // s is the 5d stuff, 
+  __device__ inline void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, 
+                          const T shrinked_dim[4], const int shift[4], int parity) // s is the 5d stuff, 
   {
     int aux[4];
     aux[0] = shrinked_index*2;
@@ -241,9 +252,9 @@ namespace mdw_tensor_core {
       aux[i+1] = aux[i] / shrinked_dim[i]; 
     }
 
-    coordinate[0] = aux[0] - aux[1] * shrinked_index[0];
-    coordinate[1] = aux[1] - aux[2] * shrinked_index[1];
-    coordinate[2] = aux[2] - aux[3] * shrinked_index[2];
+    coordinate[0] = aux[0] - aux[1] * shrinked_dim[0];
+    coordinate[1] = aux[1] - aux[2] * shrinked_dim[1];
+    coordinate[2] = aux[2] - aux[3] * shrinked_dim[2];
     coordinate[3] = aux[3];
 
     // Find the full coordinate in the shrinked volume. 
@@ -262,8 +273,6 @@ namespace mdw_tensor_core {
   template<int block_dim_x, int Ls_, bool reload, class Arg>
   __global__ void fused_tensor_core(Arg arg)
   {
-    float scale;
-
     TensorCoreSharedMemory<half2> shared_memory_data;
     
     constexpr int M = 4*Ls_;
@@ -278,14 +287,15 @@ namespace mdw_tensor_core {
     half2* sm_b = shared_memory_data;
     half*  sm_c = (half*)sm_b;
     half*  sm_a = sm_c+M*N_sm;
-
-    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, dagger, Arg>(arg, sm_a);
+    
+    // TODO: resolve the dagger issue
+    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
     
     __syncthreads();
    
     bool idle = false;
-    int s4_base = blockIdx.x*blockDim.x; // base.
-    int s4, sid;
+    int s4_shift_base = blockIdx.x*blockDim.x; // base.
+    int s4_shift, sid;
  
     constexpr int WMMA_M = 16;
     constexpr int WMMA_N = 16;
@@ -315,17 +325,24 @@ namespace mdw_tensor_core {
       } 
     }
 
-    while(s4_base < arg.volume_4d_cb){
+    while(s4_shift_base < arg.volume_4d_cb_shift){
+      int x[4];
+      s4_shift = s4_shift_base + threadIdx.x;
+      coordinate_from_shrinked_index(x, s4_shift, arg.shrinked_dim, arg.shift, arg.parity); 
+      sid = threadIdx.y*arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(x, arg.dim);
       
-      s4 = s4_base + threadIdx.x;
-      sid = threadIdx.y*arg.volume_4d_cb + s4;
-      
-      if (s4 >= arg.volume_4d_cb){
+      if (s4_shift >= arg.volume_4d_cb_shift){
         idle = true;
       }
-    
+      
+      typedef typename mapper<short>::type real;
+      typedef ColorSpinor<real, 3, 4> Vector;
+      
       if(!idle){
-        scale = load_matrix_b_tex<N_sm, Arg>(arg, sm_b, sid);
+        Vector out;
+        apply_wilson_5d<short,false,false>(out, x, arg, threadIdx.y); // dagger = false; halo = false
+        // store result to shared memory
+        load_matrix_b_vector<N_sm/2>(out, arg, sm_b);
       }
       
       __syncthreads();
@@ -335,10 +352,11 @@ namespace mdw_tensor_core {
       __syncthreads();
     
       if(!idle){
-        store_matrix_c<N_sm, Arg>(arg, sm_b, sid, scale);
+        store_matrix_c<N_sm, Arg>(arg, sm_b, sid, 1.f);
       }
-    
-      s4_base += gridDim.x*blockDim.x;
+//      arg.out(sid, arg.parity) = out;
+
+      s4_shift_base += gridDim.x*blockDim.x;
     
     } // while
   }
@@ -362,9 +380,9 @@ namespace mdw_tensor_core {
 
         long long flops_ = 0;
         switch (arg.type) {
-          case M5_INV_MOBIUS: // FIXME flops
+          case dslash4_dslash5pre_dslash5inv: // FIXME flops
             //flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
-            flops_ = (144 * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
+            flops_ = (144 * Ls ) * meta.Volume();
             break;
           default:
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
@@ -376,8 +394,8 @@ namespace mdw_tensor_core {
       long long bytes() const {
         // long long Ls = meta.X(4);
         switch (arg.type) {
-          case M5_INV_MOBIUS:
-            return arg.out.Bytes() + arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
+          case dslash4_dslash5pre_dslash5inv:
+            return arg.out.Bytes() + arg.in.Bytes();
           default: 
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
@@ -442,7 +460,7 @@ namespace mdw_tensor_core {
 
       // overloaded to return max dynamic shared memory if doing shared-memory inverse
       unsigned int maxSharedBytesPerBlock() const {
-        if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS) ) {
+        if (shared && arg.type == dslash4_dslash5pre_dslash5inv) {
           return maxDynamicSharedBytesPerBlock();
         } else {
           return TunableVectorYZ::maxSharedBytesPerBlock();
@@ -455,9 +473,9 @@ namespace mdw_tensor_core {
       {
         strcpy(aux, meta.AuxString());
         if (arg.dagger) strcat(aux, ",Dagger");
-        if (arg.xpay) strcat(aux,",xpay");
+//        if (arg.xpay) strcat(aux,",xpay");
         switch (arg.type) {
-          case M5_INV_MOBIUS:
+          case dslash4_dslash5pre_dslash5inv:
             strcat(aux, ",dslash4_dslash5pre_dslash5inv");
             break;
           default: 
@@ -557,7 +575,8 @@ namespace mdw_tensor_core {
   
   void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
                           ColorSpinorField& y, const ColorSpinorField& x, double m_f, double m_5, 
-                          const Complex* b_5, const Complex* c_5, MdwfFusedDslashType type)
+                          const Complex* b_5, const Complex* c_5, bool dagger, int parity, int shift[4], int halo_shift[4], 
+                          MdwfFusedDslashType type)
   {
 #if defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
     if (in.DWFPCtype() != QUDA_4D_PC) errorQuda("ONLY 4D preconditioned fields are supported");
@@ -568,35 +587,35 @@ namespace mdw_tensor_core {
       switch(in.X(4)){
         case  8:
           {
-            FusedDslashArg< 8> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            FusedDslashArg< 8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
             FusedDslash< 8, FusedDslashArg< 8> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 12:
           {
-            FusedDslashArg<12> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            FusedDslashArg<12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
             FusedDslash<12, FusedDslashArg<12> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 16:
           {
-            FusedDslashArg<16> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            FusedDslashArg<16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
             FusedDslash<16, FusedDslashArg<16> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 20:
           {
-            FusedDslashArg<20> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            FusedDslashArg<20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
             FusedDslash<20, FusedDslashArg<20> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 24:
           {
-            FusedDslashArg<24> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            FusedDslashArg<24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
             FusedDslash<24, FusedDslashArg<24> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
@@ -612,6 +631,5 @@ namespace mdw_tensor_core {
 #endif
   }
 
-} // namespace mdw_tensor_core
 } // namespace quda
 

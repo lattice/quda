@@ -102,38 +102,43 @@ namespace quda {
     }
   } 
 
+  __device__ inline void block_reduction_max(){
+    
+  }
+
   // Load data(scaled short values and scale) from global memory to shared memroy.
   // (spin,Ls) by (complex,color,4d), where left most index is the fastest changing one(spin and complex).
   template<int N_sm, class Arg>
-  __device__ inline float load_matrix_b_tex(Arg& arg, half2* sm_b, int sid){
+  __device__ inline void load_matrix_b_tex(Arg& arg, half2* sm_b, int sid, const float scale){
     constexpr int N_sm_d2 = N_sm/2;
+    
+    float f = __fdividef( tex1Dfetch<float>(arg.in.texNorm, sid), scale );
+    
     float4 in_tex;
     
     in_tex = tex1Dfetch<float4>(arg.in.tex, 0*arg.volume_cb + sid); 
-    sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.x, in_tex.y);
-    sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.z, in_tex.w);
+    sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
+    sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
     in_tex = tex1Dfetch<float4>(arg.in.tex, 1*arg.volume_cb + sid); 
-    sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.x, in_tex.y);
-    sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.z, in_tex.w);
+    sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
+    sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
     in_tex = tex1Dfetch<float4>(arg.in.tex, 2*arg.volume_cb + sid); 
-    sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.x, in_tex.y);
-    sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.z, in_tex.w);
+    sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
+    sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
     in_tex = tex1Dfetch<float4>(arg.in.tex, 3*arg.volume_cb + sid); 
-    sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.x, in_tex.y);
-    sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.z, in_tex.w);
+    sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
+    sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
     in_tex = tex1Dfetch<float4>(arg.in.tex, 4*arg.volume_cb + sid); 
-    sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.x, in_tex.y);
-    sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.z, in_tex.w);
+    sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
+    sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
     in_tex = tex1Dfetch<float4>(arg.in.tex, 5*arg.volume_cb + sid); 
-    sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.x, in_tex.y);
-    sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.z, in_tex.w);
-    
-    return tex1Dfetch<float>(arg.in.texNorm, sid);
+    sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
+    sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
   } 
 
   __device__ inline short2 __half22short2_rn(const half2 input){
@@ -147,10 +152,36 @@ namespace quda {
     max = __hgt(max, reinterpret_cast<half2*>(&input_masked)->y) ? max : reinterpret_cast<half2*>(&input_masked)->y;
     return max;
   }
+  
+  // Actually does more than the function name suggests.
+  // will find the maximum absolute value among the vector, scale that, and store to sm_b
+  template<int N_sm_d2, class Vector, class Arg>
+  __device__ inline void load_matrix_b_vector(const Vector& v, Arg& arg, half2* sm_b){
+/*    
+    // First find the largest absolute value in v
+    float max = 0.;
+    #pragma unroll
+    for(int spin = 0; spin < 4; spin++){
+      #pragma unroll
+      for(int color = 0; color < 3; color++){
+        max = fmaxf(max, fabsf(v(spin, color).real()));
+        max = fmaxf(max, fabsf(v(spin, color).imag()));
+      }
+    }
+*/    
+    #pragma unroll
+    for(int spin = 0; spin < 4; spin++){
+      #pragma unroll
+      for(int color = 0; color < 3; color++){
+        sm_b[ (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color ] = 
+          __floats2half2_rn(v(spin, color).real(), v(spin, color).imag());
+      }
+    }
+  }
 
   // Store results(scaled short values and scale) in shared memroy to global memroy.
   template<int N_sm, class Arg>
-  __device__ inline void store_matrix_c(Arg& arg, half2* sm_b, int sid, float scale){
+  __device__ inline void store_matrix_c(Arg& arg, half2* sm_b, int sid, const float scale){
     half max_ = (half)0.0f;
     constexpr int N_sm_d2 = N_sm/2;
     

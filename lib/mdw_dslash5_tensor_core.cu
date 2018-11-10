@@ -73,6 +73,8 @@ namespace quda {
     const bool dagger;      // dagger
     const bool xpay;        // whether we are doing xpay or not
 
+    const float scale;
+
     real b;                 // real constant Mobius coefficient
     real c;                 // real constant Mobius coefficient
     real a;                 // real xpay coefficient
@@ -86,10 +88,10 @@ namespace quda {
     Dslash5Type type;
 
     Dslash5TensorCoreArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-        double m_f, double m_5, const Complex *b_5_, const Complex *c_5_, double a_, bool dagger, Dslash5Type type)
+        double m_f, double m_5, const Complex *b_5_, const Complex *c_5_, double a_, bool dagger, const double scale_, Dslash5Type type)
       : out(out), in(in), x(x), nParity(in.SiteSubset()),
       volume_cb(in.VolumeCB()), volume_4d_cb(volume_cb/Ls_), Ls(Ls_),
-      m_f(m_f), m_5(m_5), a(a_), dagger(dagger), xpay(a_ == 0.0 ? false : true), type(type)
+      m_f(m_f), m_5(m_5), a(a_), dagger(dagger), xpay(a_ == 0.0 ? false : true), scale(scale_), type(type)
     {
       if(in.Nspin() != 4){
         errorQuda("nSpin = %d not support", in.Nspin());
@@ -197,8 +199,6 @@ namespace quda {
   template<int block_dim_x, int Ls_, bool dagger, bool xpay, bool reload, class Arg>
   __global__ void dslash5inv_tensor_core(Arg arg)
   {
-    float scale;
-
     TensorCoreSharedMemory<half2> shared_memory_data;
     
     constexpr int M = 4*Ls_;
@@ -231,8 +231,8 @@ namespace quda {
     constexpr int tm_dim = M/WMMA_M;
     constexpr int tn_dim = N/WMMA_N;
     
-    constexpr int total_warp = block_dim_x*Ls_/32;
-    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
+    constexpr int total_warp = block_dim_x*Ls_ >> 5;
+    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x) >> 5;
     
     constexpr int total_tile = tm_dim*tn_dim;
     
@@ -263,7 +263,7 @@ namespace quda {
       }
     
       if(!idle){
-        scale = load_matrix_b_tex<N_sm, Arg>(arg, sm_b, sid);
+        load_matrix_b_tex<N_sm, Arg>(arg, sm_b, sid, arg.scale);
       }
       
       __syncthreads();
@@ -273,7 +273,7 @@ namespace quda {
       __syncthreads();
     
       if(!idle){
-        store_matrix_c<N_sm, Arg>(arg, sm_b, sid, scale);
+        store_matrix_c<N_sm, Arg>(arg, sm_b, sid, arg.scale);
       }
     
       s4_base += gridDim.x*blockDim.x;
@@ -644,7 +644,7 @@ namespace quda {
   // out = Dslash5 * in
   
   void apply_dslash5_tensor_core(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-      double m_f, double m_5, const Complex* b_5, const Complex* c_5, double a, bool dagger, Dslash5Type type)
+      double m_f, double m_5, const Complex* b_5, const Complex* c_5, double a, bool dagger, const double scale, Dslash5Type type)
   {
 #if defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
     if (in.DWFPCtype() != QUDA_4D_PC) errorQuda("ONLY 4D preconditioned fields are supported");
@@ -655,35 +655,35 @@ namespace quda {
       switch(in.X(4)){
         case  8:
           {
-            Dslash5TensorCoreArg< 8> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            Dslash5TensorCoreArg< 8> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, scale, type);
             Dslash5TensorCore<8, Dslash5TensorCoreArg<8> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 12:
           {
-            Dslash5TensorCoreArg<12> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            Dslash5TensorCoreArg<12> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, scale, type);
             Dslash5TensorCore<12, Dslash5TensorCoreArg<12> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 16:
           {
-            Dslash5TensorCoreArg<16> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            Dslash5TensorCoreArg<16> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, scale, type);
             Dslash5TensorCore<16, Dslash5TensorCoreArg<16> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 20:
           {
-            Dslash5TensorCoreArg<20> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            Dslash5TensorCoreArg<20> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, scale, type);
             Dslash5TensorCore<20, Dslash5TensorCoreArg<20> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 24:
           {
-            Dslash5TensorCoreArg<24> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type);
+            Dslash5TensorCoreArg<24> arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, scale, type);
             Dslash5TensorCore<24, Dslash5TensorCoreArg<24> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
