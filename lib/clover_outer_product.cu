@@ -57,7 +57,7 @@ namespace quda {
     return;
   }
 
-  enum KernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
+  enum OprodKernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
 
   template<typename Float, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
     struct CloverForceArg {
@@ -67,7 +67,7 @@ namespace quda {
       unsigned int dir;
       unsigned int ghostOffset[4];
       unsigned int displacement;
-      KernelType kernelType;
+      OprodKernelType kernelType;
       bool partitioned[4];
       InputA inA;
       InputB inB_shift;
@@ -81,7 +81,7 @@ namespace quda {
 		   const unsigned int dir,
 		   const unsigned int *ghostOffset,
 		   const unsigned int displacement,
-		   const KernelType kernelType,
+		   const OprodKernelType kernelType,
 		   const double coeff,
 		   InputA& inA,
 		   InputB& inB_shift,

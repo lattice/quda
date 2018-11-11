@@ -16,7 +16,7 @@ namespace quda {
 #include <texture.h>
   }
 
-  enum KernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
+  enum OprodKernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
 
   template<typename Float, typename Output, typename InputA, typename InputB>
     struct StaggeredOprodArg {
@@ -26,7 +26,7 @@ namespace quda {
       unsigned int dir;
       unsigned int ghostOffset[4];
       unsigned int displacement;
-      KernelType kernelType;
+      OprodKernelType kernelType;
       int nFace;
       bool partitioned[4];
       InputA inA;
@@ -39,7 +39,7 @@ namespace quda {
 			const unsigned int dir,
 			const unsigned int *ghostOffset,
 			const unsigned int displacement,
-			const KernelType& kernelType,
+			const OprodKernelType& kernelType,
 			const int nFace,
 			const double coeff[2],
 			InputA& inA,
