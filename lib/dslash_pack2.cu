@@ -228,7 +228,7 @@ namespace quda {
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
       strcat(aux,comm_dim_topology_string());
-      if (arg.dagger) { strcat(aux, "dagger"); }
+      if (arg.dagger) { strcat(aux, ",dagger"); }
       if (getKernelPackT()) { strcat(aux,",kernelPackT"); }
       switch (arg.nFace) {
       case 1: strcat(aux,",nFace=1,"); break;
