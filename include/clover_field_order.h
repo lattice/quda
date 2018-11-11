@@ -566,16 +566,16 @@ namespace quda {
 	    for (int i=0; i<block; i++) v[i] *= nrm;
 	  }
 
-    if (sizeof(Float)==sizeof(char)) {
+	  if (sizeof(Float)==sizeof(char)) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-      RegType nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity*norm_offset + chirality*stride + x) :
-        norm[parity*norm_offset + chirality*stride + x];
+	    RegType nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity*norm_offset + chirality*stride + x) :
+	    norm[parity*norm_offset + chirality*stride + x];
 #else
             RegType nrm = norm[parity*norm_offset + chirality*stride + x];
 #endif
 #pragma unroll
-      for (int i=0; i<block; i++) v[i] *= nrm;
-    }
+	    for (int i=0; i<block; i++) v[i] *= nrm;
+	  }
 	}
   
 	/**

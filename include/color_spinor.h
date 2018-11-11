@@ -716,7 +716,7 @@ namespace quda {
     }
 
     /**
-       @brief Reconstruct twor-component spinor to a four-component spinor
+       @brief Reconstruct two-component spinor to a four-component spinor
        @param[in] chirality Which chirality we assigning to
     */
     __device__ __host__ inline ColorSpinor<Float,Nc,4> chiral_reconstruct(int chirality) const {
