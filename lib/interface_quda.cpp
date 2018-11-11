@@ -968,8 +968,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  checkInvertParam(inv_param);
-
   if (!initialized) errorQuda("QUDA not initialized");
 
   if ( (!h_clover && !h_clovinv) || inv_param->compute_clover ) {
