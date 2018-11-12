@@ -334,18 +334,27 @@ namespace quda {
       int shift[4] = {1,1,1,1};
       int halo_shift[4] = {2,2,2,2};
       mat_precondition->Dslash4(*fy, *fb, static_cast<QudaParity>(0));
-      mat_precondition->Dslash5inv(*ft, *fy, static_cast<QudaParity>(0));
+      mat_precondition->Dslash5inv(*fx, *fy, static_cast<QudaParity>(0));
+      mat_precondition->Dslash4pre(*ft, *fx, static_cast<QudaParity>(0));
+//      double c = 1.5;
+//      double b = c + 1.;
+//      double kappa = (c*(4.-1.8)-1.)/(b*(4.-1.8)+1.);
+//      double alpha = b-c/kappa;
+//      double  beta = c/kappa;
+//      blas::axpby(beta, *fy, alpha, *fx); 
 //      mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1, true, {2,2,2,2});
-      mat_precondition->dslash4_dslash5inv_dslash4pre(*fx, *fb, static_cast<QudaParity>(0), shift, halo_shift);
-//      mat_precondition->Dagger(QUDA_DAG_NO);
+//      blas::zero(*fx);
+      mat_precondition->dslash4_dslash5inv_dslash4pre(*fx, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
+      mat_precondition->Dagger(QUDA_DAG_NO);
     }
     double ft2 = blas::norm2(*ft);
-    printfQuda("           ft2 = %16.12e. (This number is SUPPOSED to be tiny).\n", ft2);
+    printfQuda("           ft2 = %16.12e.\n", ft2);
 //    zero_extended_color_spinor_interface( *fx, R, QUDA_CUDA_FIELD_LOCATION, 0);
     fx2 = blas::norm2(*fx);
-    printfQuda("           fx2 = %16.12e. (This number is SUPPOSED to be tiny).\n", fx2);
+    printfQuda("           fx2 = %16.12e.\n", fx2);
     double mdd = xmyNorm(*ft, *fx);
-    printfQuda("  diff      m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/tt->Volume());
+    printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
+    printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/ft2);
     
     mat_precondition->Dslash4pre(*ft, *fb, static_cast<QudaParity>(0));
 
@@ -368,7 +377,10 @@ namespace quda {
     
     mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);        // +0
     
-    mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});
+    int shift[4] = {1,1,1,1};
+    int halo_shift[4] = {2,2,2,2};
+    mat_precondition->dslash4_dslash5inv_dslash4pre(*ifset, *iftmp, scale, parity[0], shift, halo_shift);
+    // mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});
 
     mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
     

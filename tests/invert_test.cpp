@@ -194,8 +194,10 @@ int main(int argc, char **argv)
     {
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 1.452;
-      inv_param.c_5[k] = 0.452;
+      inv_param.b_5[k] = 1.;
+      // inv_param.b_5[k] = 1.452;
+      inv_param.c_5[k] = 0.;
+      // inv_param.c_5[k] = 0.452;
     }
   }
 

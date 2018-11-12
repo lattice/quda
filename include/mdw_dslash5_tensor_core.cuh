@@ -40,13 +40,17 @@ namespace quda {
   template<int block_dim_x, int Ls_, int M_sm, bool dagger, class Arg>
   __device__ inline void construct_matrix_a_m5inv(Arg& arg, half* sm_a){
     const float k = arg.kappa;
-    
+    /*
+    if(threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0){
+      printf("m5= %+.4f, mf= %.4f, fac_inv= %+.8f\n", arg.m_5, arg.m_f, arg.fac_inv);
+      printf("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", arg.b, arg.c, arg.kappa, arg.alpha, arg.beta);
+    }
+    */
     // if we rescale, then the actual matrix is alpha*m5inv+beta.
     // Otherwise a = 1., b = 0.;
-    const float a = arg.alpha; 
     const float b = arg.beta; 
     
-    const float inv = a*arg.fac_inv;
+    const float inv = arg.alpha*arg.fac_inv;
 
     int offset_k = threadIdx.y*4;
     int x = threadIdx.x;
@@ -54,47 +58,55 @@ namespace quda {
     while(x < Ls_){
       int offset_m = x*4;
       int exp;
-      if(dagger){
-        exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
-      }else{
-        exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
-      }
-      float factorR = inv*__fast_pow(k, exp) * ( x>threadIdx.y ? -arg.m_f : static_cast<float>(1.0) );
-      if(dagger){
-        exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
-      }else{
-        exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
-      }
-      float factorL = inv*__fast_pow(k, exp) * ( x<threadIdx.y ? -arg.m_f : static_cast<float>(1.0) );
+      float factorR, factorL;
       
+      if(dagger){
+        exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
+        factorR = inv*powf(k, __int2float_rn(exp))*(x>threadIdx.y ? -arg.m_f : 1.f);
+      }else{
+        exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
+        factorR = inv*powf(k, __int2float_rn(exp))*(x<threadIdx.y ? -arg.m_f : 1.f);
+      }
+      
+      if(dagger){
+        exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
+        factorL = inv*powf(k, __int2float_rn(exp))*(x<threadIdx.y ? -arg.m_f : 1.f);
+      }else{
+        exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
+        factorL = inv*powf(k, __int2float_rn(exp))*(x>threadIdx.y ? -arg.m_f : 1.f);
+      }
+      
+      float RpL = factorR + factorL;
+      float RmL = factorR - factorL;
+         
       if(exp){
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL;
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = RpL;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = RpL;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = RpL;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = RpL;
       }else{ // exp = 0 means we are on the diagonal.
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL + b;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL + b;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL + b;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL + b;
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = RpL + b;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = RpL + b;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = RpL + b;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = RpL + b;
       }
       // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = factorR - factorL;
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = RmL;
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
       
       sm_a[ (offset_k+1)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
       // sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
       sm_a[ (offset_k+1)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+3) ] = factorR - factorL;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+3) ] = RmL;
       
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+0) ] = factorR - factorL;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+0) ] = RmL;
       sm_a[ (offset_k+2)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
       // sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
       sm_a[ (offset_k+2)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
       
       sm_a[ (offset_k+3)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = factorR - factorL;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = RmL;
       sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
       // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
     
@@ -156,7 +168,7 @@ namespace quda {
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store to sm_b
   template<int N_sm_d2, class Vector, class Arg>
-  __device__ inline void load_matrix_b_vector(const Vector& v, Arg& arg, half2* sm_b){
+  __device__ inline void load_matrix_b_vector(const Vector& v, Arg& arg, half2* sm_b, const float scale){
 /*    
     // First find the largest absolute value in v
     float max = 0.;
@@ -174,7 +186,7 @@ namespace quda {
       #pragma unroll
       for(int color = 0; color < 3; color++){
         sm_b[ (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color ] = 
-          __floats2half2_rn(v(spin, color).real(), v(spin, color).imag());
+          __floats2half2_rn(__fdividef(v(spin, color).real(), scale), __fdividef(v(spin, color).imag(), scale));
       }
     }
   }

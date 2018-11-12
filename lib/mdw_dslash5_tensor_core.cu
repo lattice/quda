@@ -114,6 +114,8 @@ namespace quda {
           kappa   = -(c*(4.+m_5)-1.) / (b*(4.+m_5)+1.);
           fac_inv = 0.5/(1.+std::pow(kappa,(int)Ls)*m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
           a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
+//          printfQuda("m5= %+.4f, mf= %.4f, fac_inv= %+.8f\n", this->m_5, this->m_f, this->fac_inv);
+//          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
           break;
         default:
           errorQuda("Unknown Dslash5Type %d", type);

@@ -109,27 +109,29 @@ namespace quda {
     real alpha = 1.;
     real beta = 0.;
 
+    const float scale;
+
     MdwfFusedDslashType type;
     FusedDslashArg(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
                           ColorSpinorField& y, const ColorSpinorField& x, double m_f_, double m_5_, 
                           const Complex* b_5, const Complex* c_5, bool dagger_, int parity, 
-                          int shift_[4], int halo_shift_[4], MdwfFusedDslashType type)
+                          int shift_[4], int halo_shift_[4], const double scale_, MdwfFusedDslashType type)
       : out(out), in(in), U(U), y(y), x(x), nParity(in.SiteSubset()), parity(parity), volume_cb(in.VolumeCB()), 
       volume_4d_cb(volume_cb/Ls_), Ls(Ls_), m_f(m_f_), m_5(m_5_), dagger(dagger_),
       shift{ shift_[0], shift_[1], shift_[2], shift_[3] }, halo_shift{ halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3] }, 
       dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3)}, 
       shrinked_dim{ dim[0]-2*shift[0], dim[1]-2*shift[1], dim[2]-2*shift[2], dim[3]-2*shift[3] }, 
       volume_4d_cb_shift(shrinked_dim[0]*shrinked_dim[1]*shrinked_dim[2]*shrinked_dim[3]/2),
-      type(type)
+      scale(scale_), type(type)
 //      halo_shrinked_dim{ (dim[0]-2*halo_shift[0], dim[1]-2*halo_shift[1], dim[2]-2*halo_shift[2], dim[3]-2*halo_shift[3]}, type(type)
     {
       if(in.Nspin() != 4){
         errorQuda("nSpin = %d not support", in.Nspin());
       }
       
-      printfQuda("shift[4] =        (%d,%d,%d,%d)\n", shift[0], shift[1], shift[2], shift[3]);
-      printfQuda("dim[4] =          (%d,%d,%d,%d)\n", dim[0], dim[1], dim[2], dim[3]);
-      printfQuda("shrinked_dim[4] = (%d,%d,%d,%d)\n", (int)shrinked_dim[0], (int)shrinked_dim[1], (int)shrinked_dim[2], (int)shrinked_dim[3]);
+//      printfQuda("shift[4] =        (%d,%d,%d,%d)\n", shift[0], shift[1], shift[2], shift[3]);
+//      printfQuda("dim[4] =          (%d,%d,%d,%d)\n", dim[0], dim[1], dim[2], dim[3]);
+//      printfQuda("shrinked_dim[4] = (%d,%d,%d,%d)\n", (int)shrinked_dim[0], (int)shrinked_dim[1], (int)shrinked_dim[2], (int)shrinked_dim[3]);
 
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
@@ -143,14 +145,13 @@ namespace quda {
       c = c_5[0].real();
       kappa = -(c*(4.+m_5)-1.) / (b*(4.+m_5)+1.); // This is actually -kappa in my(Jiqun Tu) notes.
       fac_inv = 0.5/(1.+std::pow(kappa,(int)Ls)*m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
-
       switch(type){
         case dslash4_dslash5pre_dslash5inv:
-          // a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
-          // alpha = 2.*b+c/kappa;
-          // beta = -c/kappa;
-          printfQuda("m5= %.4f, mf= %.4f, fac_inv= %.4f\n", m_5, m_f, fac_inv);
-          printfQuda("b = %.4f, c = %.4f, -kappa = %.4f, alpha = %.4f, beta = %.4f\n", b, c, kappa, alpha, beta);
+          // a *= pow(0.5 / (b_5[0].real() * (m_5 + 4.0) + 1.0), 2);
+          alpha = b+c/kappa;
+          beta  = -c/kappa;
+//          printfQuda("m5= %+.4f, mf= %.4f, fac_inv= %+.8f\n", this->m_5, this->m_f, this->fac_inv);
+//          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
           break;
         default:
           errorQuda("Unknown MdwfFusedDslashType %d", type);
@@ -274,7 +275,7 @@ namespace quda {
   __global__ void fused_tensor_core(Arg arg)
   {
     TensorCoreSharedMemory<half2> shared_memory_data;
-    
+  
     constexpr int M = 4*Ls_;
     constexpr int N = 6*block_dim_x;
     
@@ -288,7 +289,6 @@ namespace quda {
     half*  sm_c = (half*)sm_b;
     half*  sm_a = sm_c+M*N_sm;
     
-    // TODO: resolve the dagger issue
     construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
     
     __syncthreads();
@@ -296,7 +296,7 @@ namespace quda {
     bool idle = false;
     int s4_shift_base = blockIdx.x*blockDim.x; // base.
     int s4_shift, sid;
- 
+
     constexpr int WMMA_M = 16;
     constexpr int WMMA_N = 16;
     constexpr int WMMA_K = 16;
@@ -339,10 +339,11 @@ namespace quda {
       typedef ColorSpinor<real, 3, 4> Vector;
       
       if(!idle){
+        // Vector out = arg.in(sid, arg.parity);
         Vector out;
-        apply_wilson_5d<short,false,false>(out, x, arg, threadIdx.y); // dagger = false; halo = false
+        apply_wilson_5d<short,false, true>(out, x, arg, threadIdx.y); // dagger = false; halo = false
         // store result to shared memory
-        load_matrix_b_vector<N_sm/2>(out, arg, sm_b);
+        load_matrix_b_vector<N_sm/2>(out, arg, sm_b, arg.scale);
       }
       
       __syncthreads();
@@ -352,7 +353,7 @@ namespace quda {
       __syncthreads();
     
       if(!idle){
-        store_matrix_c<N_sm, Arg>(arg, sm_b, sid, 1.f);
+        store_matrix_c<N_sm, Arg>(arg, sm_b, sid, arg.scale);
       }
 //      arg.out(sid, arg.parity) = out;
 
@@ -576,7 +577,7 @@ namespace quda {
   void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
                           ColorSpinorField& y, const ColorSpinorField& x, double m_f, double m_5, 
                           const Complex* b_5, const Complex* c_5, bool dagger, int parity, int shift[4], int halo_shift[4], 
-                          MdwfFusedDslashType type)
+                          const double scale, MdwfFusedDslashType type)
   {
 #if defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
     if (in.DWFPCtype() != QUDA_4D_PC) errorQuda("ONLY 4D preconditioned fields are supported");
@@ -587,35 +588,35 @@ namespace quda {
       switch(in.X(4)){
         case  8:
           {
-            FusedDslashArg< 8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+            FusedDslashArg< 8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
             FusedDslash< 8, FusedDslashArg< 8> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 12:
           {
-            FusedDslashArg<12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+            FusedDslashArg<12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
             FusedDslash<12, FusedDslashArg<12> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 16:
           {
-            FusedDslashArg<16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+            FusedDslashArg<16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
             FusedDslash<16, FusedDslashArg<16> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 20:
           {
-            FusedDslashArg<20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+            FusedDslashArg<20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
             FusedDslash<20, FusedDslashArg<20> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 24:
           {
-            FusedDslashArg<24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+            FusedDslashArg<24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
             FusedDslash<24, FusedDslashArg<24> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
