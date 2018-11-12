@@ -13,7 +13,7 @@
 namespace quda {
 
   CloverFieldParam::CloverFieldParam(const CloverField &a)
-    : LatticeFieldParam(),
+    : LatticeFieldParam(a),
       direct(false),
       inverse(false),
       clover(NULL),
