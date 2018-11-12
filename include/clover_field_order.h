@@ -555,10 +555,10 @@ namespace quda {
 	    }
 	  }
 
-	  if (sizeof(Float)==sizeof(short)) {
+	  if ( isFixed<Float>::value ) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	    RegType nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity*norm_offset + chirality*stride + x) :
-	      norm[parity*norm_offset + chirality*stride + x];
+            norm[parity*norm_offset + chirality*stride + x];
 #else
             RegType nrm = norm[parity*norm_offset + chirality*stride + x];
 #endif
@@ -566,16 +566,6 @@ namespace quda {
 	    for (int i=0; i<block; i++) v[i] *= nrm;
 	  }
 
-	  if (sizeof(Float)==sizeof(char)) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-	    RegType nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity*norm_offset + chirality*stride + x) :
-	    norm[parity*norm_offset + chirality*stride + x];
-#else
-            RegType nrm = norm[parity*norm_offset + chirality*stride + x];
-#endif
-#pragma unroll
-	    for (int i=0; i<block; i++) v[i] *= nrm;
-	  }
 	}
   
 	/**
@@ -589,7 +579,7 @@ namespace quda {
 
 	  // find the norm of each chiral block
 	  RegType scale = 0.0;
-	  if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
+	  if ( isFixed<Float>::value ) {
 #pragma unroll
 	    for (int i=0; i<block; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
 	    norm[parity*norm_offset + chirality*stride + x] = scale;
@@ -599,7 +589,7 @@ namespace quda {
 	  for (int i=0; i<M; i++) {
 	    Vector vecTmp;
 	    // first do scalar copy converting into storage type and rescaling if necessary
-	    if (sizeof(Float)==sizeof(short)||sizeof(Float)==sizeof(char))
+	    if ( isFixed<Float>::value )
 #pragma unroll
 	      for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[i*N+j] / scale);
 	    else
@@ -666,7 +656,7 @@ namespace quda {
 
 	size_t Bytes() const {
 	  size_t bytes = length*sizeof(Float);
-	  if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) bytes += 2*sizeof(float);
+	  if ( isFixed<Float>::value ) bytes += 2*sizeof(float);
 	  return bytes;
 	}
       };
