@@ -331,12 +331,15 @@ namespace quda {
 //      mat_precondition->Dagger(QUDA_DAG_YES);
 //      mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), 1., sp_len2, RR2, Xs2);
 //      mat_precondition->Dslash5inv(*ft, *fb, static_cast<QudaParity>(0));
-      int shift[4] = {1,1,1,1};
-      int halo_shift[4] = {2,2,2,2};
-//      mat_precondition->Dslash4(*fy, *fb, static_cast<QudaParity>(0));
-//      mat_precondition->Dslash5inv(*fx, *fy, static_cast<QudaParity>(0));
+      int shift[4] = {0,0,0,0};
+      int halo_shift[4] = {1,1,1,1};
+      mat_precondition->Dslash4(*fy, *fb, static_cast<QudaParity>(0));
+      mat_precondition->Dslash5invXpay(*fx, *fy, static_cast<QudaParity>(0), *fb, -1.0);
+      mat_precondition->Dagger(QUDA_DAG_YES);
+      mat_precondition->Dslash5inv(*ft, *fx, static_cast<QudaParity>(0));
+      mat_precondition->Dagger(QUDA_DAG_NO);
 //      mat_precondition->Dslash4pre(*ft, *fx, static_cast<QudaParity>(0));
-      mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1);
+//      mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1);
 //      double c = 1.5;
 //      double b = c + 1.;
 //      double kappa = (c*(4.-1.8)-1.)/(b*(4.-1.8)+1.);
@@ -344,9 +347,9 @@ namespace quda {
 //      double  beta = c/kappa;
 //      blas::axpby(beta, *fy, alpha, *fx); 
 //      mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1, true, {2,2,2,2});
-//      blas::zero(*fx);
-      mat_precondition->fused_f2(*fx, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
-      mat_precondition->Dagger(QUDA_DAG_NO);
+      blas::zero(*fx);
+//      mat_precondition->fused_f2(*fx, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
+      mat_precondition->fused_f1(*fx, *fb, *fy, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
     }
     double ft2 = blas::norm2(*ft);
     printfQuda("           ft2 = %16.12e.\n", ft2);
@@ -382,16 +385,20 @@ namespace quda {
     int halo_shift[4] = {2,2,2,2};
     mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift, halo_shift);
     // mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});
-
-    mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
     
-    mat_precondition->Dagger(QUDA_DAG_YES);
-    if(tc and out.Precision() == QUDA_HALF_PRECISION){
-      mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], scale, sp_len2, RR2, Xs2);                  // +2
-    }else{
-      mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
-    }
-    mat_precondition->Dagger(QUDA_DAG_NO);
+    int shift_f1[4] = {0,0,0,0};
+    int halo_shift_f1[4] = {1,1,1,1};
+    // in: *ifset; aux_in: in; out: out; aux_out: *iftmp
+    mat_precondition->fused_f1(out, *ifset, *iftmp, in, scale, parity[1], shift_f1, halo_shift_f1);
+//    mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
+//    
+//    mat_precondition->Dagger(QUDA_DAG_YES);
+//    if(tc and out.Precision() == QUDA_HALF_PRECISION){
+//      mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], scale, sp_len2, RR2, Xs2);                  // +2
+//    }else{
+//      mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
+//    }
+//    mat_precondition->Dagger(QUDA_DAG_NO);
     
     mat_precondition->fused_f2(*ifset, out, scale, parity[0], shift, halo_shift);
     // mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);

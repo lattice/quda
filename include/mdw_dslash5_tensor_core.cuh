@@ -120,35 +120,35 @@ namespace quda {
 
   // Load data(scaled short values and scale) from global memory to shared memroy.
   // (spin,Ls) by (complex,color,4d), where left most index is the fastest changing one(spin and complex).
-  template<int N_sm, class Arg>
-  __device__ inline void load_matrix_b_tex(Arg& arg, half2* sm_b, int sid, const float scale){
+  template<int N_sm, class Input>
+  __device__ inline void load_matrix_b_tex(Input& input, half2* sm_b, int sid, const float scale){
     constexpr int N_sm_d2 = N_sm/2;
     
-    float f = __fdividef( tex1Dfetch<float>(arg.in.texNorm, sid), scale );
+    float f = __fdividef( tex1Dfetch<float>(input.texNorm, sid), scale );
     
     float4 in_tex;
     
-    in_tex = tex1Dfetch<float4>(arg.in.tex, 0*arg.volume_cb + sid); 
+    in_tex = tex1Dfetch<float4>(input.tex, 0*input.volumeCB + sid); 
     sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
     sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
-    in_tex = tex1Dfetch<float4>(arg.in.tex, 1*arg.volume_cb + sid); 
+    in_tex = tex1Dfetch<float4>(input.tex, 1*input.volumeCB + sid); 
     sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
     sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
-    in_tex = tex1Dfetch<float4>(arg.in.tex, 2*arg.volume_cb + sid); 
+    in_tex = tex1Dfetch<float4>(input.tex, 2*input.volumeCB + sid); 
     sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
     sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
-    in_tex = tex1Dfetch<float4>(arg.in.tex, 3*arg.volume_cb + sid); 
+    in_tex = tex1Dfetch<float4>(input.tex, 3*input.volumeCB + sid); 
     sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
     sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
-    in_tex = tex1Dfetch<float4>(arg.in.tex, 4*arg.volume_cb + sid); 
+    in_tex = tex1Dfetch<float4>(input.tex, 4*input.volumeCB + sid); 
     sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
     sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
     
-    in_tex = tex1Dfetch<float4>(arg.in.tex, 5*arg.volume_cb + sid); 
+    in_tex = tex1Dfetch<float4>(input.tex, 5*input.volumeCB + sid); 
     sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
     sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
   } 
@@ -167,7 +167,7 @@ namespace quda {
   
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store to sm_b
-  template<int N_sm_d2, class Vector, class Arg>
+  template<int N_sm_d2, bool acc, class Vector, class Arg>
   __device__ inline void load_matrix_b_vector(const Vector& v, Arg& arg, half2* sm_b, const float scale){
 /*    
     // First find the largest absolute value in v
@@ -185,15 +185,21 @@ namespace quda {
     for(int spin = 0; spin < 4; spin++){
       #pragma unroll
       for(int color = 0; color < 3; color++){
-        sm_b[ (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color ] = 
-          __floats2half2_rn(__fdividef(v(spin, color).real(), scale), __fdividef(v(spin, color).imag(), scale));
+        if(acc){
+          int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
+          sm_b[ idx ] = __hadd2( sm_b[ idx ], 
+            __floats2half2_rn(__fdividef(v(spin, color).real(), scale), __fdividef(v(spin, color).imag(), scale)) );
+        }else{
+          sm_b[ (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color ] = 
+            __floats2half2_rn(__fdividef(v(spin, color).real(), scale), __fdividef(v(spin, color).imag(), scale));
+        }
       }
     }
   }
 
   // Store results(scaled short values and scale) in shared memroy to global memroy.
-  template<int N_sm, class Arg>
-  __device__ inline void store_matrix_c(Arg& arg, half2* sm_b, int sid, const float scale){
+  template<int N_sm, class Output>
+  __device__ inline void store_matrix_c(Output& output, half2* sm_b, int sid, const float scale){
     half max_ = (half)0.0f;
     constexpr int N_sm_d2 = N_sm/2;
     
@@ -210,36 +216,36 @@ namespace quda {
     max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ]);
     max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ]);
 
-    arg.out.norm[sid] = __half2float(max_)*scale;
+    output.norm[sid] = __half2float(max_)*scale;
     
     const half2 max_short_div_max2_ = __half2half2( __hdiv(fixedMaxValue<short>::value, max_) );
 
-    short4* out = reinterpret_cast<short4*>(arg.out.field);
+    short4* out = reinterpret_cast<short4*>(output.field);
     short2 a, b;
     
     a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
     b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
-    out[sid + 0*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+    out[sid + 0*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
     
     a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
     b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
-    out[sid + 1*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+    out[sid + 1*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
     
     a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
     b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
-    out[sid + 2*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+    out[sid + 2*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
     
     a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
     b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
-    out[sid + 3*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+    out[sid + 3*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
     
     a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
     b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
-    out[sid + 4*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y); 
+    out[sid + 4*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
     
     a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
     b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
-    out[sid + 5*arg.volume_cb] = make_short4(a.x, a.y, b.x, b.y);  
+    out[sid + 5*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y);  
   } 
 
 #if 0

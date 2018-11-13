@@ -154,9 +154,9 @@ namespace quda {
 //          printfQuda("m5= %+.4f, mf= %.4f, fac_inv= %+.8f\n", this->m_5, this->m_f, this->fac_inv);
 //          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
           break;
-//        case dslash4_dslash5inv_dslash5invdag:
-//          alpha = -(b*(4.+m_5)+1.)*(b*(4.+m_5)+1.); // -kappa_b^2
-//          break;
+        case dslash4_dslash5inv_dslash5invdag:
+          alpha = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.)); // -kappa_b^2
+          break;
         default:
           errorQuda("Unknown MdwfFusedDslashType %d", type);
       }
@@ -357,7 +357,7 @@ namespace quda {
         }
         // store result to shared memory
         
-        load_matrix_b_vector<N_sm/2>(out, arg, sm_b, arg.scale);
+        load_matrix_b_vector<N_sm/2,false>(out, arg, sm_b, arg.scale); // acc(accumulation) = false
       }
       
       __syncthreads();
@@ -367,7 +367,7 @@ namespace quda {
       __syncthreads();
     
       if(!idle){
-        store_matrix_c<N_sm, Arg>(arg, sm_b, sid, arg.scale);
+        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale);
       }
 //      arg.out(sid, arg.parity) = out;
 
@@ -375,7 +375,123 @@ namespace quda {
     
     } // while
   }
- 
+
+#if 1
+  /**
+    @brief Tensor core kernel for applying the beta + alpha*M5inv operator
+  */
+  template<int block_dim_x, int Ls_, bool reload, class Arg>
+  __global__ void fused_f1(Arg arg)
+  {
+    static_assert(reload == false); // ONLY support the preload version
+    
+    TensorCoreSharedMemory<half2> shared_memory_data;
+  
+    constexpr int M = 4*Ls_;
+    constexpr int N = 6*block_dim_x;
+    
+    constexpr int sm_m_pad_size = 0;
+    constexpr int sm_n_pad_size = 16;
+    
+    constexpr int N_sm = N + sm_n_pad_size;
+    constexpr int M_sm = M + sm_m_pad_size;
+    
+    half2* sm_b = shared_memory_data;
+    half*  sm_c = (half*)sm_b;
+    half*  sm_a = sm_c+M*N_sm;
+   
+    bool idle = false;
+    int s4_shift_base = blockIdx.x*blockDim.x; // base.
+    int s4_shift, sid;
+
+    constexpr int WMMA_M = 16;
+    constexpr int WMMA_N = 16;
+    constexpr int WMMA_K = 16;
+    
+    constexpr int tm_dim = M/WMMA_M;
+    constexpr int tn_dim = N/WMMA_N;
+    
+    constexpr int total_warp = block_dim_x*Ls_/32;
+    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
+    
+    constexpr int total_tile = tm_dim*tn_dim;
+    
+    constexpr int warp_cycle = total_tile/total_warp;
+    const int warp_m = this_warp*warp_cycle/tn_dim;
+     
+    typedef typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_type;
+    a_type a_frag_red[reload?1:tm_dim];
+    a_type a_frag_black[reload?1:tm_dim];
+   
+    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm,false, Arg>(arg, sm_a); // dagger = false
+    __syncthreads();
+    if(!reload){ // in the preload case we preload ... 
+      #pragma unroll
+      for( int k = 0; k < tm_dim; k++ ){
+        const int a_row = warp_m*WMMA_M;
+        const int a_col = k*WMMA_K;
+        // Load Matrix
+        nvcuda::wmma::load_matrix_sync(a_frag_red[k], sm_a+a_row+a_col*M_sm, M_sm);
+      } 
+    }
+    
+    arg.alpha = 1.;
+    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger = true
+    __syncthreads();
+    if(!reload){ // in the preload case we preload ... 
+      #pragma unroll
+      for( int k = 0; k < tm_dim; k++ ){
+        const int a_row = warp_m*WMMA_M;
+        const int a_col = k*WMMA_K;
+        // Load Matrix
+        nvcuda::wmma::load_matrix_sync(a_frag_black[k], sm_a+a_row+a_col*M_sm, M_sm);
+      } 
+    }
+
+    while(s4_shift_base < arg.volume_4d_cb_shift){
+      int x[4];
+      s4_shift = s4_shift_base + threadIdx.x;
+      coordinate_from_shrinked_index(x, s4_shift, arg.shrinked_dim, arg.shift, arg.parity); 
+      sid = threadIdx.y*arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(x, arg.dim);
+      
+      if (s4_shift >= arg.volume_4d_cb_shift){
+        idle = true;
+      }
+      
+      typedef typename mapper<short>::type real;
+      typedef ColorSpinor<real, 3, 4> Vector;
+      
+      if(!idle){
+        Vector aux_in;
+        apply_wilson_5d<short,false, true>(aux_in, x, arg, threadIdx.y); // dagger = false; halo = true
+        // store result to shared memory
+        load_matrix_b_vector<N_sm/2,false>(aux_in, arg, sm_b, arg.scale);
+      }
+      
+      __syncthreads();
+      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_red, sm_a, sm_c, sm_c);        
+      __syncthreads();
+    
+      if(!idle){
+        Vector aux_in = arg.x(sid, arg.parity);
+        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale);
+        store_matrix_c<N_sm>(arg.y, sm_b, sid, arg.scale);
+      }
+    
+      __syncthreads();
+      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a, sm_c, sm_c);        
+      __syncthreads();
+      
+      if(!idle){
+        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale);
+      }
+
+      s4_shift_base += gridDim.x*blockDim.x;
+    
+    } // while
+  }
+#endif
+  
   template<int Ls_, class Arg>
   class FusedDslash : public TunableVectorYZ {
 
@@ -397,6 +513,7 @@ namespace quda {
         switch (arg.type) {
           case dslash4_dslash5pre_dslash5inv: // FIXME flops
           case dslash4dag_dslash5predag_dslash5invdag:
+          case dslash4_dslash5inv_dslash5invdag:
             //flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
             flops_ = (144 * Ls ) * meta.Volume();
             break;
@@ -412,6 +529,7 @@ namespace quda {
         switch (arg.type) {
           case dslash4_dslash5pre_dslash5inv:
           case dslash4dag_dslash5predag_dslash5invdag:
+          case dslash4_dslash5inv_dslash5invdag:
             return arg.out.Bytes() + arg.in.Bytes();
           default: 
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
@@ -472,7 +590,7 @@ namespace quda {
       virtual unsigned int maxGridSize() const { return 32*deviceProp.multiProcessorCount; }
       virtual unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
       unsigned int min_block_size() const { return  8; }
-      unsigned int max_block_size() const { return 64; }
+      unsigned int max_block_size() const { return 32; }
       unsigned int step_block_size() const { return  8; }
 
       // overloaded to return max dynamic shared memory if doing shared-memory inverse
@@ -502,6 +620,12 @@ namespace quda {
           case dslash4dag_dslash5predag_dslash5invdag:
             sprintf(config, ",dslash4dag_dslash5predag_dslash5invdag,shift%d,%d,%d,%d",
               arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
+            strcat(aux, config);
+            break;
+          case dslash4_dslash5inv_dslash5invdag:
+            sprintf(config, ",dslash4_dslash5inv_dslash5invdag,shift%d,%d,%d,%d,halo%d,%d,%d,%d",
+              arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3],
+              arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
             strcat(aux, config);
             break;
           default: 
@@ -550,26 +674,6 @@ namespace quda {
                   launch(fused_tensor_core<32, Ls_, true, Arg, 0>, tp, arg, stream) :
                   launch(fused_tensor_core<32, Ls_,false, Arg, 0>, tp, arg, stream) ;
                   break;
-                case 40:
-                  tp.aux.x?
-                  launch(fused_tensor_core<40, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<40, Ls_,false, Arg, 0>, tp, arg, stream) ;
-                  break;
-                case 48:
-                  tp.aux.x?
-                  launch(fused_tensor_core<48, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<48, Ls_,false, Arg, 0>, tp, arg, stream) ;
-                  break;
-                case 56:
-                  tp.aux.x?
-                  launch(fused_tensor_core<56, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<56, Ls_,false, Arg, 0>, tp, arg, stream) ;
-                  break;
-                case 64:
-                  tp.aux.x?
-                  launch(fused_tensor_core<64, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<64, Ls_,false, Arg, 0>, tp, arg, stream) ;
-                  break;
                 default:
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
               }
@@ -596,25 +700,23 @@ namespace quda {
                   launch(fused_tensor_core<32, Ls_, true, Arg, 2>, tp, arg, stream) :
                   launch(fused_tensor_core<32, Ls_,false, Arg, 2>, tp, arg, stream) ;
                   break;
-                case 40:
-                  tp.aux.x?
-                  launch(fused_tensor_core<40, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<40, Ls_,false, Arg, 2>, tp, arg, stream) ;
+                default:
+                  errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
+              }
+              break;
+            case 1:
+              switch(tp.block.x){
+                case  8:
+                  launch(fused_f1< 8, Ls_,false, Arg>, tp, arg, stream);
                   break;
-                case 48:
-                  tp.aux.x?
-                  launch(fused_tensor_core<48, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<48, Ls_,false, Arg, 2>, tp, arg, stream) ;
+                case 16:
+                  launch(fused_f1<16, Ls_,false, Arg>, tp, arg, stream);
                   break;
-                case 56:
-                  tp.aux.x?
-                  launch(fused_tensor_core<56, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<56, Ls_,false, Arg, 2>, tp, arg, stream) ;
+                case 24:
+                  launch(fused_f1<24, Ls_,false, Arg>, tp, arg, stream);
                   break;
-                case 64:
-                  tp.aux.x?
-                  launch(fused_tensor_core<64, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<64, Ls_,false, Arg, 2>, tp, arg, stream) ;
+                case 32:
+                  launch(fused_f1<32, Ls_,false, Arg>, tp, arg, stream);
                   break;
                 default:
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);

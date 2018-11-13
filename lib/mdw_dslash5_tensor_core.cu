@@ -265,7 +265,7 @@ namespace quda {
       }
     
       if(!idle){
-        load_matrix_b_tex<N_sm, Arg>(arg, sm_b, sid, arg.scale);
+        load_matrix_b_tex<N_sm>(arg.in, sm_b, sid, arg.scale);
       }
       
       __syncthreads();
@@ -275,7 +275,7 @@ namespace quda {
       __syncthreads();
     
       if(!idle){
-        store_matrix_c<N_sm, Arg>(arg, sm_b, sid, arg.scale);
+        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale);
       }
     
       s4_base += gridDim.x*blockDim.x;

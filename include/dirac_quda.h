@@ -525,7 +525,10 @@ namespace quda {
          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
 	  void fused_f2(ColorSpinorField &out, const ColorSpinorField &in,
          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
-	
+    void fused_f1(ColorSpinorField &out, const ColorSpinorField &in,
+          ColorSpinorField& aux_out, const ColorSpinorField& aux_in,
+          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
+
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
