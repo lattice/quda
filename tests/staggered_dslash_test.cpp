@@ -843,7 +843,7 @@ static int dslashTest()
 
 
 
-int xx[4];
+// int xx[4];
     // for verification
 // for(int i=0; i< 128; i++){
 
@@ -852,7 +852,7 @@ int xx[4];
 //     printfQuda("\tCPU:  %f\n", ((double*)(spinorRef->V()))[6*i+4]);
 //         printfQuda("%i : %i %i %i %i CUDA: %f", i,xx[0], xx[1], xx[2], xx[3], ((double*)(spinorOut->V()))[6*i+5]);
 //     printfQuda("\tCPU:  %f\n", ((double*)(spinorRef->V()))[6*i+5]);
-}
+// }
     // Catching nans is weird.
     if (std::isnan(spinor_ref_norm2)) { failed = true; }
     if (std::isnan(spinor_out_norm2)) { failed = true; }

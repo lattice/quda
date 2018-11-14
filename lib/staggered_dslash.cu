@@ -6,6 +6,7 @@
 #include <stencil.h>
 #include <color_spinor.h>
 #include <worker.h>
+#include <tune_quda.h>
 
 /**
    This is a staggered Dirac operator
