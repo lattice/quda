@@ -110,6 +110,7 @@ namespace quda {
     real beta = 0.;
 
     const float scale;
+    real m_scale = 1.;
 
     MdwfFusedDslashType type;
     FusedDslashArg(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
@@ -156,6 +157,13 @@ namespace quda {
           break;
         case dslash4_dslash5inv_dslash5invdag:
           alpha = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.)); // -kappa_b^2
+          break;
+        case dslash4dag_dslash5predag:
+          m_scale = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.))*b;
+          alpha = c/b;
+          beta = 1.;
+          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
+          printfQuda("scale = %+.4f\n", this->scale);
           break;
         default:
           errorQuda("Unknown MdwfFusedDslashType %d", type);
@@ -375,8 +383,111 @@ namespace quda {
     
     } // while
   }
+  
+  /**
+    @brief Tensor core kernel for applying the beta + alpha*M5inv operator
+  */
+  template<int block_dim_x, int Ls_, bool reload, class Arg>
+  __global__ void fused_f3(Arg arg)
+  {
+    TensorCoreSharedMemory<half2> shared_memory_data;
+  
+    constexpr int M = 4*Ls_;
+    constexpr int N = 6*block_dim_x;
+    
+    constexpr int sm_m_pad_size = 0;
+    constexpr int sm_n_pad_size = 16;
+    
+    constexpr int N_sm = N + sm_n_pad_size;
+    constexpr int M_sm = M + sm_m_pad_size;
+    
+    half2* sm_b = shared_memory_data;
+    half*  sm_c = (half*)sm_b;
+    half*  sm_a = sm_c+M*N_sm;
+   
+    construct_matrix_a_d5<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
+    __syncthreads();
+   
+    bool idle = false;
+    int s4_shift_base = blockIdx.x*blockDim.x; // base.
+    int s4_shift, sid;
 
-#if 1
+    constexpr int WMMA_M = 16;
+    constexpr int WMMA_N = 16;
+    constexpr int WMMA_K = 16;
+    
+    constexpr int tm_dim = M/WMMA_M;
+    constexpr int tn_dim = N/WMMA_N;
+    
+    constexpr int total_warp = block_dim_x*Ls_/32;
+    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
+    
+    constexpr int total_tile = tm_dim*tn_dim;
+    
+    constexpr int warp_cycle = total_tile/total_warp;
+    const int warp_m = this_warp*warp_cycle/tn_dim;
+     
+    typedef typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_type;
+    
+    a_type a_frag[reload?1:tm_dim];
+    if(!reload){ // in the preload case we preload ... 
+      #pragma unroll
+      for( int k = 0; k < tm_dim; k++ ){
+        const int a_row = warp_m*WMMA_M;
+        const int a_col = k*WMMA_K;
+        // Load Matrix
+        nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a+a_row+a_col*M_sm, M_sm);
+      } 
+    }
+
+    while(s4_shift_base < arg.volume_4d_cb_shift){
+      int x[4];
+      s4_shift = s4_shift_base + threadIdx.x;
+      coordinate_from_shrinked_index(x, s4_shift, arg.shrinked_dim, arg.shift, arg.parity); 
+      sid = threadIdx.y*arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(x, arg.dim);
+      
+      if (s4_shift >= arg.volume_4d_cb_shift){
+        idle = true;
+      }
+      
+      typedef typename mapper<short>::type real;
+      typedef ColorSpinor<real, 3, 4> Vector;
+      
+      if(!idle){
+        // Vector out = arg.in(sid, arg.parity);
+        Vector out;
+        apply_wilson_5d<short, true,false>(out, x, arg, threadIdx.y); // dagger = false; halo = false
+//        Vector aux_in = arg.x(sid, arg.parity);
+//        out = aux_in + arg.beta*out;
+//        arg.out(sid, arg.parity) = arg.beta*out;
+        // store result to shared memory
+        load_matrix_b_vector<N_sm/2,false>(out, arg, sm_b, arg.scale); // acc(accumulation) = false
+      }
+      
+      __syncthreads();
+      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);        
+      __syncthreads();
+    
+      if(!idle){
+//        Vector aux_in = arg.x(sid, arg.parity);
+//        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale);
+        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale*arg.m_scale);
+//        Vector send_out;
+//        #pragma unroll
+//        for(int spin = 0; spin < 4; spin++){
+//        #pragma unroll
+//        for(int color = 0; color < 3; color++){
+//          (send_out.data)[spin*4+color].real( __half2float(sm_c[ (threadIdx.y*4+spin)*N_sm+6*threadIdx.x+color*2+0 ]) ); 
+//          (send_out.data)[spin*4+color].imag( __half2float(sm_c[ (threadIdx.y*4+spin)*N_sm+6*threadIdx.x+color*2+1 ]) ); 
+//        }}
+//        arg.out(sid, arg.parity) = send_out;
+      }
+
+      s4_shift_base += gridDim.x*blockDim.x;
+    
+    } // while
+  }
+
   /**
     @brief Tensor core kernel for applying the beta + alpha*M5inv operator
   */
@@ -398,7 +509,7 @@ namespace quda {
     
     half2* sm_b = shared_memory_data;
     half*  sm_c = (half*)sm_b;
-    half*  sm_a = sm_c+M*N_sm;
+//    half*  sm_a = sm_c+M*N_sm;
    
     bool idle = false;
     int s4_shift_base = blockIdx.x*blockDim.x; // base.
@@ -423,7 +534,7 @@ namespace quda {
     a_type a_frag_red[reload?1:tm_dim];
     a_type a_frag_black[reload?1:tm_dim];
    
-    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm,false, Arg>(arg, sm_a); // dagger = false
+    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm,false, Arg>(arg, sm_c); // dagger = false
     __syncthreads();
     if(!reload){ // in the preload case we preload ... 
       #pragma unroll
@@ -431,12 +542,12 @@ namespace quda {
         const int a_row = warp_m*WMMA_M;
         const int a_col = k*WMMA_K;
         // Load Matrix
-        nvcuda::wmma::load_matrix_sync(a_frag_red[k], sm_a+a_row+a_col*M_sm, M_sm);
+        nvcuda::wmma::load_matrix_sync(a_frag_red[k], sm_c+a_row+a_col*M_sm, M_sm);
       } 
     }
     
     arg.alpha = 1.;
-    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger = true
+    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_c); // dagger = true
     __syncthreads();
     if(!reload){ // in the preload case we preload ... 
       #pragma unroll
@@ -444,7 +555,7 @@ namespace quda {
         const int a_row = warp_m*WMMA_M;
         const int a_col = k*WMMA_K;
         // Load Matrix
-        nvcuda::wmma::load_matrix_sync(a_frag_black[k], sm_a+a_row+a_col*M_sm, M_sm);
+        nvcuda::wmma::load_matrix_sync(a_frag_black[k], sm_c+a_row+a_col*M_sm, M_sm);
       } 
     }
 
@@ -469,17 +580,17 @@ namespace quda {
       }
       
       __syncthreads();
-      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_red, sm_a, sm_c, sm_c);        
+      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_red, sm_c, sm_c, sm_c);        
       __syncthreads();
     
       if(!idle){
         Vector aux_in = arg.x(sid, arg.parity);
-        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale);
+        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale); // acc = true
         store_matrix_c<N_sm>(arg.y, sm_b, sid, arg.scale);
       }
     
       __syncthreads();
-      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a, sm_c, sm_c);        
+      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_c, sm_c, sm_c);        
       __syncthreads();
       
       if(!idle){
@@ -490,7 +601,6 @@ namespace quda {
     
     } // while
   }
-#endif
   
   template<int Ls_, class Arg>
   class FusedDslash : public TunableVectorYZ {
@@ -514,6 +624,7 @@ namespace quda {
           case dslash4_dslash5pre_dslash5inv: // FIXME flops
           case dslash4dag_dslash5predag_dslash5invdag:
           case dslash4_dslash5inv_dslash5invdag:
+          case dslash4dag_dslash5predag:
             //flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
             flops_ = (144 * Ls ) * meta.Volume();
             break;
@@ -530,6 +641,7 @@ namespace quda {
           case dslash4_dslash5pre_dslash5inv:
           case dslash4dag_dslash5predag_dslash5invdag:
           case dslash4_dslash5inv_dslash5invdag:
+          case dslash4dag_dslash5predag:
             return arg.out.Bytes() + arg.in.Bytes();
           default: 
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
@@ -544,7 +656,11 @@ namespace quda {
   
       unsigned int shared_bytes_per_block(int x, int y) const { 
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
-        return ( (y*4)*(y*4+0)+(y*4)*(x*6+16) )*2;
+        if(arg.type == 1){
+          return ( (y*4)*(x*6+16) )*2;
+        }else{
+          return ( (y*4)*(y*4+0)+(y*4)*(x*6+16) )*2;
+        }
       }
    
       virtual bool advanceBlockDim(TuneParam &param) const
@@ -589,7 +705,7 @@ namespace quda {
 
       virtual unsigned int maxGridSize() const { return 32*deviceProp.multiProcessorCount; }
       virtual unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
-      unsigned int min_block_size() const { return  8; }
+      unsigned int min_block_size() const { return 16; }
       unsigned int max_block_size() const { return 32; }
       unsigned int step_block_size() const { return  8; }
 
@@ -612,20 +728,25 @@ namespace quda {
         char config[512];
         switch (arg.type) {
           case dslash4_dslash5pre_dslash5inv:
-            sprintf(config, ",dslash4_dslash5pre_dslash5inv,shift%d,%d,%d,%d,halo%d,%d,%d,%d",
+            sprintf(config, ",f0,shift%d,%d,%d,%d,halo%d,%d,%d,%d",
               arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3],
               arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
             strcat(aux, config);
             break;
           case dslash4dag_dslash5predag_dslash5invdag:
-            sprintf(config, ",dslash4dag_dslash5predag_dslash5invdag,shift%d,%d,%d,%d",
+            sprintf(config, ",f1,shift%d,%d,%d,%d",
               arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
             strcat(aux, config);
             break;
           case dslash4_dslash5inv_dslash5invdag:
-            sprintf(config, ",dslash4_dslash5inv_dslash5invdag,shift%d,%d,%d,%d,halo%d,%d,%d,%d",
+            sprintf(config, ",f2,shift%d,%d,%d,%d,halo%d,%d,%d,%d",
               arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3],
               arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
+            strcat(aux, config);
+            break;
+          case dslash4dag_dslash5predag:
+            sprintf(config, ",f3,shift%d,%d,%d,%d",
+              arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
             strcat(aux, config);
             break;
           default: 
@@ -649,16 +770,11 @@ namespace quda {
 
       void apply(const cudaStream_t &stream) {
         // By its name we ONLY have a GPU version
-        // TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        // TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
           switch(arg.type){
             case 0:
               switch(tp.block.x){
-                case  8:
-                  tp.aux.x?
-                  launch(fused_tensor_core< 8, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core< 8, Ls_,false, Arg, 0>, tp, arg, stream) ;
-                  break;
                 case 16:
                   tp.aux.x?
                   launch(fused_tensor_core<16, Ls_, true, Arg, 0>, tp, arg, stream) :
@@ -680,11 +796,6 @@ namespace quda {
               break;
             case 2:
               switch(tp.block.x){
-                case  8:
-                  tp.aux.x?
-                  launch(fused_tensor_core< 8, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core< 8, Ls_,false, Arg, 2>, tp, arg, stream) ;
-                  break;
                 case 16:
                   tp.aux.x?
                   launch(fused_tensor_core<16, Ls_, true, Arg, 2>, tp, arg, stream) :
@@ -706,9 +817,6 @@ namespace quda {
               break;
             case 1:
               switch(tp.block.x){
-                case  8:
-                  launch(fused_f1< 8, Ls_,false, Arg>, tp, arg, stream);
-                  break;
                 case 16:
                   launch(fused_f1<16, Ls_,false, Arg>, tp, arg, stream);
                   break;
@@ -717,6 +825,27 @@ namespace quda {
                   break;
                 case 32:
                   launch(fused_f1<32, Ls_,false, Arg>, tp, arg, stream);
+                  break;
+                default:
+                  errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
+              }
+              break;
+            case 3:
+              switch(tp.block.x){
+                case 16:
+                  tp.aux.x?
+                  launch(fused_f3<16, Ls_, true, Arg>, tp, arg, stream) :
+                  launch(fused_f3<16, Ls_,false, Arg>, tp, arg, stream) ;
+                  break;
+                case 24:
+                  tp.aux.x?
+                  launch(fused_f3<24, Ls_, true, Arg>, tp, arg, stream) :
+                  launch(fused_f3<24, Ls_,false, Arg>, tp, arg, stream) ;
+                  break;
+                case 32:
+                  tp.aux.x?
+                  launch(fused_f3<32, Ls_, true, Arg>, tp, arg, stream) :
+                  launch(fused_f3<32, Ls_,false, Arg>, tp, arg, stream) ;
                   break;
                 default:
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);

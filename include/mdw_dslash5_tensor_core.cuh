@@ -78,18 +78,13 @@ namespace quda {
       
       float RpL = factorR + factorL;
       float RmL = factorR - factorL;
-         
-      if(exp){
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = RpL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = RpL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = RpL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = RpL;
-      }else{ // exp = 0 means we are on the diagonal.
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = RpL + b;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = RpL + b;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = RpL + b;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = RpL + b;
-      }
+      
+      // exp = 0 means we are on the diagonal.
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = exp==0 ? RpL+b : RpL;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = exp==0 ? RpL+b : RpL;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = exp==0 ? RpL+b : RpL;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = exp==0 ? RpL+b : RpL;
+        
       // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = RmL;
@@ -112,11 +107,70 @@ namespace quda {
     
       x += block_dim_x;
     }
+
   } 
 
-  __device__ inline void block_reduction_max(){
+  // matrix a for m5pre: column major, M/M_sm(size/padded size) by k
+  // (spin,Ls) by (spin,Ls), where left most index is the fastest changing one(spin).
+  // x by y
+  template<int block_dim_x, int Ls_, int M_sm, bool dagger, class Arg>
+  __device__ inline void construct_matrix_a_d5(Arg& arg, half* sm_a){
+    // if we rescale, then the actual matrix is alpha*m5inv+beta.
+    // Otherwise a = 1., b = 0.;
+    const float b = arg.beta; 
+
+    int offset_k = threadIdx.y*4;
+    int x = threadIdx.x;
     
-  }
+    while(x < Ls_){
+      int offset_m = x*4;
+      int exp = x-threadIdx.y;
+      float factorR, factorL;
+      
+      if(dagger){
+        factorR = (exp==-1?1.f:(exp==+Ls_-1?-arg.m_f:0.f)); 
+      }else{
+        factorR = (exp==+1?1.f:(exp==-Ls_+1?-arg.m_f:0.f)); 
+      }
+      
+      if(dagger){
+        factorL = (exp==+1?1.f:(exp==-Ls_+1?-arg.m_f:0.f)); 
+      }else{
+        factorL = (exp==-1?1.f:(exp==+Ls_-1?-arg.m_f:0.f)); 
+      }
+      
+      float RpL = arg.alpha*(factorR + factorL);
+      float RmL = arg.alpha*(factorR - factorL);
+         
+      // exp = 0 means we are on the diagonal.
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = exp==0 ? RpL+b : RpL;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = exp==0 ? RpL+b : RpL;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = exp==0 ? RpL+b : RpL;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = exp==0 ? RpL+b : RpL;
+      
+      // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = 0.0f;
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = RmL;
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+3) ] = 0.0f;
+      
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+0) ] = 0.0f;
+      // sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+2) ] = 0.0f;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+3) ] = RmL;
+      
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+0) ] = RmL;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+1) ] = 0.0f;
+      // sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+3) ] = 0.0f;
+      
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+0) ] = 0.0f;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = RmL;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = 0.0f;
+      // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
+    
+      x += block_dim_x;
+    }
+  } 
 
   // Load data(scaled short values and scale) from global memory to shared memroy.
   // (spin,Ls) by (complex,color,4d), where left most index is the fastest changing one(spin and complex).

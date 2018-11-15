@@ -583,6 +583,24 @@ namespace quda {
 		long long vol = (in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
     flops += vol*24ll*8ll*6ll + vol*24ll*Ls*4ll;
   }
+  
+  void DiracMobiusPC::fused_f3(ColorSpinorField &out, const ColorSpinorField &in, 
+    const ColorSpinorField& aux_in,
+    const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+    
+    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
+    for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
+    apply_fused_dslash(out, in, *gauge, out, aux_in, mass, m5, b_5, c_5, 
+      dagger, parity, shift, halo_shift, scale, dslash4dag_dslash5predag);
+    
+    long long Ls = in.X(4);
+		long long vol = (in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
+    flops += vol*24ll*8ll*6ll + vol*24ll*Ls*4ll;
+  }
 
 	void DiracMobiusPC::dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
 			    const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const
