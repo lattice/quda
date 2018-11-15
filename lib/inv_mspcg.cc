@@ -402,11 +402,13 @@ namespace quda {
 //      mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
 //    }
 //    mat_precondition->Dagger(QUDA_DAG_NO);
-    
+    int shift_f3[4] = {2,2,2,2};
+    int halo_shift_f3[4] = {1,1,1,1};
     mat_precondition->fused_f2(*ifset, out, scale, parity[0], shift, halo_shift);
     // mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
     
-    mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   
+    mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift_f3, halo_shift_f3);
+    // mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   
   }
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib )

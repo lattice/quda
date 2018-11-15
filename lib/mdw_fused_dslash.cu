@@ -156,14 +156,14 @@ namespace quda {
 //          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
           break;
         case dslash4_dslash5inv_dslash5invdag:
-          alpha = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.)); // -kappa_b^2
+          m_scale = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.)); // -kappa_b^2
           break;
         case dslash4dag_dslash5predag:
-          m_scale = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.))*b;
-          alpha = c/b;
+          m_scale = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.))*b; // -kappa_b^2
+          alpha = c/(2.f*b); // 2 to compensate for the spin projection 
           beta = 1.;
-          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
-          printfQuda("scale = %+.4f\n", this->scale);
+//          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
+//          printfQuda("scale = %+.4f\n", this->scale);
           break;
         default:
           errorQuda("Unknown MdwfFusedDslashType %d", type);
@@ -469,8 +469,8 @@ namespace quda {
       __syncthreads();
     
       if(!idle){
-//        Vector aux_in = arg.x(sid, arg.parity);
-//        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale);
+        Vector aux_in = arg.x(sid, arg.parity);
+        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale*arg.m_scale);
         store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale*arg.m_scale);
 //        Vector send_out;
 //        #pragma unroll
@@ -585,8 +585,8 @@ namespace quda {
     
       if(!idle){
         Vector aux_in = arg.x(sid, arg.parity);
-        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale); // acc = true
-        store_matrix_c<N_sm>(arg.y, sm_b, sid, arg.scale);
+        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale*arg.m_scale); // acc = true
+        store_matrix_c<N_sm>(arg.y, sm_b, sid, arg.scale*arg.m_scale);
       }
     
       __syncthreads();
@@ -594,7 +594,7 @@ namespace quda {
       __syncthreads();
       
       if(!idle){
-        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale);
+        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale*arg.m_scale);
       }
 
       s4_shift_base += gridDim.x*blockDim.x;
