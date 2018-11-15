@@ -83,6 +83,7 @@ namespace quda {
 
       // first try to advance block.x
       param.block.x += step[0];
+      //memory constraint
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0] ||
           sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
         advance[0] = false;
@@ -94,16 +95,18 @@ namespace quda {
       if (!advance[0]) {  // if failed to advance block.x, now try block.y
         param.block.y += step[1];
 
+	//memory constraint
         if (param.block.y > (unsigned)in->X(4) ||
             sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
           advance[1] = false;
-          param.block.y = step[1]; // reset block.x
+          param.block.y = step[1]; // reset block.y
         } else {
           advance[1] = true; // successfully advanced block.y
         }
       }
 
-      if (advance[0] || advance[1]) {
+      //thread constraint
+      if ( (advance[0] || advance[1]) && param.block.x*param.block.y*param.block.z <= (unsigned)deviceProp.maxThreadsPerBlock) {
         param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			   (in->X(4)+param.block.y-1) / param.block.y, 1);
 

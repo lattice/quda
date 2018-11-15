@@ -149,8 +149,12 @@ namespace quda {
 	return 16;
       case 5:
       case 6:
+        return 32;
       case 7:
-	return 32;
+        switch (deviceProp.minor) {
+        case 0: return 32;
+        case 5: return 16;
+        }
       default:
 	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
 	return 0;
@@ -275,11 +279,11 @@ namespace quda {
      * valid for the current device.
      */
     void checkLaunchParam(TuneParam &param) {
-    
-      if (param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock)
-        errorQuda("Requested block size %d greater than hardware limit %d",
-                  param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
 
+      if (param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock)
+        errorQuda("Requested block size %dx%dx%d=%d greater than hardware limit %d",
+                  param.block.x, param.block.y, param.block.z, param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
+      
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0])
 	errorQuda("Requested X-dimension block size %d greater than hardware limit %d", 
 		  param.block.x, deviceProp.maxThreadsDim[0]);

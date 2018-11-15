@@ -47,6 +47,7 @@ extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern QudaInverterType  inv_type;
 extern double reliable_delta; // reliable update parameter
+extern bool alternative_reliable;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
@@ -258,6 +259,7 @@ int main(int argc, char **argv)
   }
   inv_param.maxiter = niter;
   inv_param.reliable_delta = reliable_delta;
+  inv_param.use_alternative_reliable = alternative_reliable;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.max_res_increase = 1;
