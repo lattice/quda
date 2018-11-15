@@ -321,8 +321,8 @@ namespace quda {
     constexpr int tm_dim = M/WMMA_M;
     constexpr int tn_dim = N/WMMA_N;
     
-    constexpr int total_warp = block_dim_x*Ls_/32;
-    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
+    constexpr int total_warp = block_dim_x*Ls_ >> 5;
+    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x) >> 5;
     
     constexpr int total_tile = tm_dim*tn_dim;
     
@@ -419,8 +419,8 @@ namespace quda {
     constexpr int tm_dim = M/WMMA_M;
     constexpr int tn_dim = N/WMMA_N;
     
-    constexpr int total_warp = block_dim_x*Ls_/32;
-    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
+    constexpr int total_warp = block_dim_x*Ls_ >> 5;
+    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x) >> 5;
     
     constexpr int total_tile = tm_dim*tn_dim;
     
@@ -522,8 +522,8 @@ namespace quda {
     constexpr int tm_dim = M/WMMA_M;
     constexpr int tn_dim = N/WMMA_N;
     
-    constexpr int total_warp = block_dim_x*Ls_/32;
-    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
+    constexpr int total_warp = block_dim_x*Ls_ >> 5;
+    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x) >> 5;
     
     constexpr int total_tile = tm_dim*tn_dim;
     
@@ -621,12 +621,13 @@ namespace quda {
 
         long long flops_ = 0;
         switch (arg.type) {
-          case dslash4_dslash5pre_dslash5inv: // FIXME flops
+          // I am too lazy to fix the flops count. :(
+          case dslash4_dslash5pre_dslash5inv: // FIXME: flops
           case dslash4dag_dslash5predag_dslash5invdag:
           case dslash4_dslash5inv_dslash5invdag:
           case dslash4dag_dslash5predag:
             //flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
-            flops_ = (144 * Ls ) * meta.Volume();
+            flops_ = (144*Ls)*meta.Volume();
             break;
           default:
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
@@ -642,7 +643,7 @@ namespace quda {
           case dslash4dag_dslash5predag_dslash5invdag:
           case dslash4_dslash5inv_dslash5invdag:
           case dslash4dag_dslash5predag:
-            return arg.out.Bytes() + arg.in.Bytes();
+            return arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
           default: 
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }

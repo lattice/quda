@@ -212,7 +212,7 @@ namespace quda {
   }
   __device__ inline half __half_max_abs_half2__(half max, const half2 input){
     static constexpr uint32_t mask = ~((0x1u<<31) + (0x1u<<15)); // 01111111 11111111 01111111 11111111 
-    // Set the fisrt bit of the half to 0.
+    // Set the fisrt bit of the halves to 0.
     uint32_t input_masked = *reinterpret_cast<const uint32_t*>(&input) & mask;
     max = __hgt(max, reinterpret_cast<half2*>(&input_masked)->x) ? max : reinterpret_cast<half2*>(&input_masked)->x;
     max = __hgt(max, reinterpret_cast<half2*>(&input_masked)->y) ? max : reinterpret_cast<half2*>(&input_masked)->y;
@@ -257,18 +257,13 @@ namespace quda {
     half max_ = (half)0.0f;
     constexpr int N_sm_d2 = N_sm/2;
     
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ]);
-    max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ]);
+    #pragma unroll
+    for(int spin = 0; spin < 4; spin++){
+      #pragma unroll
+      for(int color = 0; color < 3; color++){
+        max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color ]);
+      }
+    }
 
     output.norm[sid] = __half2float(max_)*scale;
     
@@ -381,7 +376,7 @@ namespace quda {
     static_assert( (tm_dim*tn_dim)%total_warp==0, "(tm_dim*tn_dim)%%total_warp==0\n" );
     static_assert( tn_dim%(tm_dim*tn_dim/total_warp)==0, "tn_dim%%(tm_dim*tn_dim/total_warp)==0\n" );
     
-    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x)/32;
+    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x) >> 5;
     
     constexpr int total_tile = tm_dim*tn_dim;
     
