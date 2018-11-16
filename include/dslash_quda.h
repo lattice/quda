@@ -102,6 +102,7 @@ namespace quda {
     dslash4_dslash5inv_dslash5invdag = 1,
     dslash4dag_dslash5predag_dslash5invdag = 2,
     dslash4dag_dslash5predag = 3,
+    dslash5pre = 4,
   };
   
   /**
