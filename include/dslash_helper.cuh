@@ -379,6 +379,10 @@ namespace quda {
       arg.in.resetGhost(in, ghost);
     }
 
+    virtual int tuningIter() const { return 10; }
+
+  public:
+
     template <typename T, typename Arg>
     inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
       if (1) { // test on Volta
@@ -388,7 +392,103 @@ namespace quda {
       qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
     }
 
-  public:
+    /**
+       @brief The instantiate function is used to instantiate the
+       various templates required for the multi-GPU dslash kernels.
+
+       @tparam Launch This is an unbound template helper class that, given
+       the appropriate list of templates (precision, number of colors,
+       etc.) will instantiate the appropriate templated Dslash kernel.
+       @tparam nDim Number of dimensions for the operator
+       @tparam nColor Number of colors
+       @tparam xpay Whether the operator is xpay
+       @tparam Arg Argument struct type
+
+       @param[in] tp The tuning parameters to use for this kernel
+       @param[in,out] arg The argument struct for the kernel
+       @param[in] stream The cudaStream_t where the kernel will run
+     */
+    template < template <typename,int,int,int,bool,bool,KernelType,typename> class Launch,
+               int nDim, int nColor, bool xpay, typename Arg>
+    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+
+      if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
+        errorQuda("Not implemented");
+      } else {
+        if (arg.nParity == 1) {
+          if (arg.dagger) {
+            switch(arg.kernel_type) {
+            case INTERIOR_KERNEL:
+              Launch<Float,nDim,nColor,1,true,xpay,INTERIOR_KERNEL,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_X:
+              Launch<Float,nDim,nColor,1,true,xpay,EXTERIOR_KERNEL_X,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_Y:
+              Launch<Float,nDim,nColor,1,true,xpay,EXTERIOR_KERNEL_Y,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_Z:
+              Launch<Float,nDim,nColor,1,true,xpay,EXTERIOR_KERNEL_Z,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_T:
+              Launch<Float,nDim,nColor,1,true,xpay,EXTERIOR_KERNEL_T,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_ALL:
+              Launch<Float,nDim,nColor,1,true,xpay,EXTERIOR_KERNEL_ALL,Arg>::launch(*this, tp, arg, stream); break;
+            default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
+            }
+          } else { // not dagger
+            switch (arg.kernel_type) {
+            case INTERIOR_KERNEL:
+              Launch<Float,nDim,nColor,1,false,xpay,INTERIOR_KERNEL,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_X:
+              Launch<Float,nDim,nColor,1,false,xpay,EXTERIOR_KERNEL_X,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_Y:
+              Launch<Float,nDim,nColor,1,false,xpay,EXTERIOR_KERNEL_Y,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_Z:
+              Launch<Float,nDim,nColor,1,false,xpay,EXTERIOR_KERNEL_Z,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_T:
+              Launch<Float,nDim,nColor,1,false,xpay,EXTERIOR_KERNEL_T,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_ALL:
+              Launch<Float,nDim,nColor,1,false,xpay,EXTERIOR_KERNEL_ALL,Arg>::launch(*this, tp, arg, stream); break;
+            default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
+            }
+          }
+        } else if (arg.nParity==2) {
+          if (arg.dagger) {
+            switch(arg.kernel_type) {
+            case INTERIOR_KERNEL:
+              Launch<Float,nDim,nColor,2,true,xpay,INTERIOR_KERNEL,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_X:
+              Launch<Float,nDim,nColor,2,true,xpay,EXTERIOR_KERNEL_X,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_Y:
+              Launch<Float,nDim,nColor,2,true,xpay,EXTERIOR_KERNEL_Y,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_Z:
+              Launch<Float,nDim,nColor,2,true,xpay,EXTERIOR_KERNEL_Z,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_T:
+              Launch<Float,nDim,nColor,2,true,xpay,EXTERIOR_KERNEL_T,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_ALL:
+              Launch<Float,nDim,nColor,2,true,xpay,EXTERIOR_KERNEL_ALL,Arg>::launch(*this, tp, arg, stream); break;
+            default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
+            }
+          } else { // not dagger
+            switch (arg.kernel_type) {
+            case INTERIOR_KERNEL:
+              Launch<Float,nDim,nColor,2,false,xpay,INTERIOR_KERNEL,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_X:
+              Launch<Float,nDim,nColor,2,false,xpay,EXTERIOR_KERNEL_X,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_Y:
+              Launch<Float,nDim,nColor,2,false,xpay,EXTERIOR_KERNEL_Y,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_Z:
+              Launch<Float,nDim,nColor,2,false,xpay,EXTERIOR_KERNEL_Z,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_T:
+              Launch<Float,nDim,nColor,2,false,xpay,EXTERIOR_KERNEL_T,Arg>::launch(*this, tp, arg, stream); break;
+            case EXTERIOR_KERNEL_ALL:
+              Launch<Float,nDim,nColor,2,false,xpay,EXTERIOR_KERNEL_ALL,Arg>::launch(*this, tp, arg, stream); break;
+            default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
+            }
+          }
+        } else {
+          errorQuda("nParity = %d undefined\n", arg.nParity);
+        }
+      }
+    }
+
     DslashArg<Float> &dslashParam; // temporary addition for policy compatibility
 
     Dslash(DslashArg<Float> &arg, const ColorSpinorField &out, const ColorSpinorField &in)

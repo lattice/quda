@@ -28,62 +28,37 @@ namespace quda {
 
 namespace quda {
 
+  /**
+     @brief This is a helper class that is used to instantiate the
+     correct templated kernel for the dslash.
+   */
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  struct WilsonLaunch {
+    template <typename Dslash>
+    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+      dslash.launch(wilsonGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+    }
+  };
+
   template <typename Float, int nDim, int nColor, typename Arg>
   class Wilson : public Dslash<Float> {
 
   protected:
     Arg &arg;
     const ColorSpinorField &in;
-    using Dslash<Float>::setParam;
-    using Dslash<Float>::launch;
 
   public:
 
     Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), in(in)
-    {  }
+      : Dslash<Float>(arg, out, in), arg(arg), in(in) {  }
 
     virtual ~Wilson() { }
 
-    template <bool dagger, bool xpay>
-    inline void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-        errorQuda("Not implemented");
-#if 0
-        switch (arg.kernel_type) {
-        case   INTERIOR_KERNEL: wilsonCPU<Float,nDim,nColor,dagger,xpay,INTERIOR_KERNEL  >(arg); break;
-        case EXTERIOR_KERNEL_X: wilsonCPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_X>(arg); break;
-        case EXTERIOR_KERNEL_Y: wilsonCPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_Y>(arg); break;
-        case EXTERIOR_KERNEL_Z: wilsonCPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_Z>(arg); break;
-        case EXTERIOR_KERNEL_T: wilsonCPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_T>(arg); break;
-        default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
-        }
-#endif
-      } else {
-        switch(arg.kernel_type) {
-        case INTERIOR_KERNEL:
-          launch(wilsonGPU<Float,nDim,nColor,dagger,xpay,INTERIOR_KERNEL,Arg>, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_X:
-          launch(wilsonGPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_X,Arg>, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_Y:
-          launch(wilsonGPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_Y,Arg>, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_Z:
-          launch(wilsonGPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_Z,Arg>, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_T:
-          launch(wilsonGPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_T,Arg>, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_ALL:
-          launch(wilsonGPU<Float,nDim,nColor,dagger,xpay,EXTERIOR_KERNEL_ALL,Arg>, tp, arg, stream); break;
-        default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
-        }
-      }
-    }
-
     void apply(const cudaStream_t &stream) {
-      setParam(arg);
-      if (arg.xpay) arg.dagger ? apply<true, true>(stream) : apply<false, true>(stream);
-      else          arg.dagger ? apply<true,false>(stream) : apply<false,false>(stream);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Dslash<Float>::setParam(arg);
+      if (arg.xpay) Dslash<Float>::template instantiate<WilsonLaunch,nDim,nColor, true>(tp, arg, stream);
+      else          Dslash<Float>::template instantiate<WilsonLaunch,nDim,nColor,false>(tp, arg, stream);
     }
 
     TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }

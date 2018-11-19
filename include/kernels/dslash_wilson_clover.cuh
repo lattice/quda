@@ -25,8 +25,8 @@ namespace quda {
      - no xpay: out(x) = M*in = A(x)^{-1}D * in(x-mu)
      - with xpay:  out(x) = M*in = (1 - kappa*A(x)^{-1}D) * in(x-mu)
   */
-  template <typename Float, int nDim, int nColor, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void wilsonClover(Arg &arg, int idx, int parity, int nParity)
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  __device__ __host__ inline void wilsonClover(Arg &arg, int idx, int parity)
   {
     using namespace linalg; // for Cholesky
     typedef typename mapper<Float>::type real;
@@ -42,7 +42,7 @@ namespace quda {
     Vector out;
 
     // defined in dslash_wilson.cuh
-    applyWilson<Float,nDim,nColor,dagger,kernel_type>(out, arg, coord, x_cb, parity, nParity, idx, thread_dim, active);
+    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
 
     if (kernel_type != INTERIOR_KERNEL && active) {
       // if we're not the interior kernel, then we must sum the partial
@@ -85,45 +85,36 @@ namespace quda {
   }
 
   // CPU kernel for applying the Wilson operator to a vector
-  template <typename Float, int nDim, int nColor, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   void wilsonCloverCPU(Arg arg)
   {
 
-    for (int parity= 0; parity < arg.nParity; parity++) {
+    for (int parity= 0; parity < nParity; parity++) {
       // for full fields then set parity from loop else use arg setting
-      parity = (arg.nParity == 2) ? parity : arg.parity;
+      parity = nParity == 2 ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-        wilsonClover<Float,nDim,nColor,dagger,xpay,kernel_type>(arg, x_cb, parity, arg.nParity);
+        wilsonClover<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, parity);
       } // 4-d volumeCB
     } // parity
 
   }
 
   // GPU Kernel for applying the Wilson operator to a vector
-  template <typename Float, int nDim, int nColor, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   __global__ void wilsonCloverGPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.threads) return;
 
     // for full fields set parity from y thread index else use arg setting
-    int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+    int parity = nParity == 2 ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
 
-    switch(arg.nParity) {
-    case 1:
-      switch(parity) {
-      case 0: wilsonClover<Float,nDim,nColor,dagger,xpay,kernel_type>(arg, x_cb, 0, 1); break;
-      case 1: wilsonClover<Float,nDim,nColor,dagger,xpay,kernel_type>(arg, x_cb, 1, 1); break;
-      }
-      break;
-    case 2:
-      switch(parity) {
-      case 0: wilsonClover<Float,nDim,nColor,dagger,xpay,kernel_type>(arg, x_cb, 0, 2); break;
-      case 1: wilsonClover<Float,nDim,nColor,dagger,xpay,kernel_type>(arg, x_cb, 1, 2); break;
-      }
-      break;
+    switch(parity) {
+    case 0: wilsonClover<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0); break;
+    case 1: wilsonClover<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 1); break;
     }
+
   }
 
 } // namespace quda
