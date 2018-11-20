@@ -55,9 +55,10 @@ namespace quda {
       { // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         constexpr int proj_dir = dagger ? +1 : -1;
-        const bool ghost = (coord[d] + arg.nFace >= arg.dim[d]);
+        const bool ghost = (coord[d] + arg.nFace >= arg.dim[d]) &&
+          isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-        if ( doHalo<kernel_type>(d) && ghost && isActive<kernel_type>(active, thread_dim, d, coord, arg) ) {
+        if ( doHalo<kernel_type>(d) && ghost ) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
             ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace) : idx;
@@ -67,7 +68,7 @@ namespace quda {
           if (d == 3) in *= arg.t_proj_scale; // put this in the Ghost accessor and merge with any rescaling?
 
           out += (U * in).reconstruct(d, proj_dir);
-        } else if ( doBulk<kernel_type>() && !(ghost && arg.ghostDim[d]) ) {
+        } else if ( doBulk<kernel_type>() && !ghost ) {
 
           Link U = arg.U(d, x_cb, parity);
           Vector in = arg.in(fwd_idx, their_spinor_parity);
@@ -80,9 +81,10 @@ namespace quda {
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = back_idx;
         constexpr int proj_dir = dagger ? -1 : +1;
-        const bool ghost = (coord[d] - arg.nFace < 0);
+        const bool ghost = (coord[d] - arg.nFace < 0) &&
+          isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-        if ( doHalo<kernel_type>(d) && ghost && isActive<kernel_type>(active, thread_dim, d, coord, arg) ) {
+        if ( doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
             ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace) : idx;
@@ -92,7 +94,7 @@ namespace quda {
           if (d == 3) in *= arg.t_proj_scale;
 
           out += (conj(U) * in).reconstruct(d, proj_dir);
-        } else if ( doBulk<kernel_type>() && !(ghost && arg.ghostDim[d]) ) {
+        } else if ( doBulk<kernel_type>() && !ghost ) {
 
           Link U = arg.U(d, gauge_idx, 1-parity);
           Vector in = arg.in(back_idx, their_spinor_parity);

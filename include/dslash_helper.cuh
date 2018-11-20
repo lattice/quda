@@ -67,13 +67,13 @@ namespace quda {
     case EXTERIOR_KERNEL_ALL:
       incomplete = incomplete ? false : true; break; // all active threads are complete
     case INTERIOR_KERNEL:
-      incomplete = incomplete || (arg.commDim[3] && (coord[3]==0 || coord[3]==(arg.dc.X[3]-1)));
+      incomplete = incomplete || (arg.ghostDim[3] && (coord[3]==0 || coord[3]==(arg.dc.X[3]-1)));
     case EXTERIOR_KERNEL_T:
-      incomplete = incomplete || (arg.commDim[2] && (coord[2]==0 || coord[2]==(arg.dc.X[2]-1)));
+      incomplete = incomplete || (arg.ghostDim[2] && (coord[2]==0 || coord[2]==(arg.dc.X[2]-1)));
     case EXTERIOR_KERNEL_Z:
-      incomplete = incomplete || (arg.commDim[1] && (coord[1]==0 || coord[1]==(arg.dc.X[1]-1)));
+      incomplete = incomplete || (arg.ghostDim[1] && (coord[1]==0 || coord[1]==(arg.dc.X[1]-1)));
     case EXTERIOR_KERNEL_Y:
-      incomplete = incomplete || (arg.commDim[0] && (coord[0]==0 || coord[0]==(arg.dc.X[0]-1)));
+      incomplete = incomplete || (arg.ghostDim[0] && (coord[0]==0 || coord[0]==(arg.dc.X[0]-1)));
     case EXTERIOR_KERNEL_X:
       incomplete = incomplete;
     }
@@ -187,7 +187,7 @@ namespace quda {
     // Threads with threadDim = z can handle z,y,x offsets
     // Threads with threadDim = y can handle y,x offsets
     // Threads with threadDim = x can handle x offsets
-    if (!arg.commDim[offsetDim]) return false;
+    if (!arg.ghostDim[offsetDim]) return false;
 
     if (kernel_type == EXTERIOR_KERNEL_ALL) {
       if (threadDim < offsetDim) return false;
@@ -197,21 +197,21 @@ namespace quda {
         break;
 
       case 2: // threadDim = Z
-        if (!arg.commDim[3]) break;
-        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (!arg.ghostDim[3]) break;
+        if (arg.ghostDim[3] && inBoundary<3>(coord, arg)) return false;
         break;
 
       case 1: // threadDim = Y
-        if ((!arg.commDim[3]) && (!arg.commDim[2])) break;
-        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
-        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
+        if ((!arg.ghostDim[3]) && (!arg.ghostDim[2])) break;
+        if (arg.ghostDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (arg.ghostDim[2] && inBoundary<2>(coord, arg)) return false;
         break;
 
       case 0: // threadDim = X
-        if ((!arg.commDim[3]) && (!arg.commDim[2]) && (!arg.commDim[1])) break;
-        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
-        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
-        if (arg.commDim[1] && inBoundary<1>(coord, arg)) return false;
+        if ((!arg.ghostDim[3]) && (!arg.ghostDim[2]) && (!arg.ghostDim[1])) break;
+        if (arg.ghostDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (arg.ghostDim[2] && inBoundary<2>(coord, arg)) return false;
+        if (arg.ghostDim[1] && inBoundary<1>(coord, arg)) return false;
         break;
 
       default:
@@ -236,8 +236,8 @@ namespace quda {
     const int_fastdiv X0h;
     const int_fastdiv dim[5]; // full lattice dimensions
     const int volumeCB;       // checkerboarded volume
-    int ghostDim[4];          // determines whether to use regular or ghost indexing at boundary
-    int commDim[4];           // whether a given dimension is partitioned or not
+    int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
+    int ghostDim[4];          // always equal to actual dimension partitioning (used inside kernel to ensure corect indexing)
 
     const real kappa;     // kappa parameter = 1/(8+m)
     const bool dagger;    // dagger
@@ -289,6 +289,7 @@ namespace quda {
     out << "X0h = " << arg.X0h << std::endl;
     out << "dim = { "; for (int i=0; i<5; i++) out << arg.dim[i] << (i<4 ? ", " : " }"); out << std::endl;
     out << "commDim = { "; for (int i=0; i<4; i++) out << arg.commDim[i] << (i<3 ? ", " : " }"); out << std::endl;
+    out << "ghostDim = { "; for (int i=0; i<4; i++) out << arg.ghostDim[i] << (i<3 ? ", " : " }"); out << std::endl;
     out << "volumeCB = " << arg.volumeCB << std::endl;
     out << "kappa = " << arg.kappa << std::endl;
     out << "dagger = " << arg.dagger << std::endl;
@@ -302,10 +303,6 @@ namespace quda {
     for (int i=0; i<4; i++) out << arg.threadDimMapUpper[i] << (i<3 ? ", " : " }"); out << std::endl;
     return out;
   }
-
-  //static declarations
-  static bool init = false;
-  static char ghost_str[TuneKey::aux_n]; // string with ghostDim information
 
   template <typename Float>
   class Dslash : public TunableVectorY {
@@ -332,7 +329,7 @@ namespace quda {
       comm[2] = (arg.commDim[2] ? '1' : '0');
       comm[3] = (arg.commDim[3] ? '1' : '0');
       comm[4] = '\0';
-      strcpy(aux_base,",comm=");
+      strcpy(aux_base,",commDim=");
       strcat(aux_base,comm);
 
       if (arg.xpay) strcat(aux_base,",xpay");
@@ -346,7 +343,7 @@ namespace quda {
     */
     inline void fillAux(KernelType kernel_type, const char *kernel_str) {
       strcpy(aux[kernel_type],kernel_str);
-      if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type],ghost_str);
+      if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type],comm_dim_partitioned_string());
       strcat(aux[kernel_type],aux_base);
     }
 
@@ -497,15 +494,6 @@ namespace quda {
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
       setPackComms2(arg.commDim);
-
-      if (!init) { // these parameters are constant across all dslash instances for a given run
-        char ghost[5]; // set the ghost string
-        for (int dim=0; dim<nDimComms; dim++) ghost[dim] = (comm_dim_partitioned(dim) ? '1' : '0');
-        ghost[4] = '\0';
-        strcpy(ghost_str,",ghost=");
-        strcat(ghost_str,ghost);
-        init = true;
-      }
 
       //strcpy(aux, in.AuxString());
       fillAuxBase();

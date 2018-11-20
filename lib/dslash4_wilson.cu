@@ -20,7 +20,6 @@ namespace quda {
 
    TODO
    - gauge fix support
-   - commDim vs ghostDim
    - ghost texture support in accessors
    - CPU support
    - peer-to-peer (copy engine race condition)
