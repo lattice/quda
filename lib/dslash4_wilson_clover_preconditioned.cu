@@ -23,6 +23,8 @@ namespace quda {
 
 namespace quda {
 
+#ifdef GPU_CLOVER_DIRAC
+
   /**
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
@@ -148,12 +150,10 @@ namespace quda {
   {
     if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
       ApplyWilsonCloverPreconditioned<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
-#if 0
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
       ApplyWilsonCloverPreconditioned<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
       ApplyWilsonCloverPreconditioned<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
-#endif
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
     }
@@ -172,6 +172,8 @@ namespace quda {
     }
   }
 
+#endif // GPU_CLOVER_DIRAC
+
   // Apply the preconditioned Wilson-clover operator
   // out(x) = M*in = A(x)^{-1} (-kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
@@ -179,6 +181,7 @@ namespace quda {
                                        const CloverField &A, double kappa, const ColorSpinorField &x, int parity, bool dagger,
                                        const int *comm_override, TimeProfile &profile)
   {
+#ifdef GPU_CLOVER_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
@@ -200,6 +203,9 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
+#else
+    errorQuda("Clover dslash has not been built");
+#endif
   }
 
 

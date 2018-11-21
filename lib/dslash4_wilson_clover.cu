@@ -23,6 +23,8 @@ namespace quda {
 
 namespace quda {
 
+#ifdef GPU_CLOVER_DIRAC
+
   /**
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
@@ -66,21 +68,11 @@ namespace quda {
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-	flops += clover_flops * in.GhostFace()[arg.kernel_type];
-	break;
       case EXTERIOR_KERNEL_ALL:
-	flops += clover_flops * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-	break;
+	break; // all clover flops are in the interior kernel
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
 	flops += clover_flops * in.Volume();	  
-
-	if (arg.kernel_type == KERNEL_POLICY) break;
-	// now correct for flops done by exterior kernel
-	long long ghost_sites = 0;
-	for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
-	flops -= clover_flops * ghost_sites;
-	
 	break;
       }
       return flops;
@@ -96,21 +88,11 @@ namespace quda {
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-	bytes += clover_bytes * 2 * in.GhostFace()[arg.kernel_type];
-	break;
       case EXTERIOR_KERNEL_ALL:
-	bytes += clover_bytes * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
 	break;
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
 	bytes += clover_bytes*in.Volume();
-
-	if (arg.kernel_type == KERNEL_POLICY) break;
-	// now correct for bytes done by exterior kernel
-	long long ghost_sites = 0;
-	for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
-	bytes -= clover_bytes * ghost_sites;
-	
 	break;
       }
 
@@ -145,12 +127,10 @@ namespace quda {
   {
     if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
       ApplyWilsonClover<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
-#if 0
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
       ApplyWilsonClover<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
       ApplyWilsonClover<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
-#endif
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
     }
@@ -169,6 +149,8 @@ namespace quda {
     }
   }
 
+#endif // GPU_CLOVER_DIRAC
+
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
@@ -176,6 +158,7 @@ namespace quda {
 			 const CloverField &A, double kappa, const ColorSpinorField &x, int parity, bool dagger,
 			 const int *comm_override, TimeProfile &profile)
   {
+#ifdef GPU_CLOVER_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
@@ -197,6 +180,9 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
+#else
+    errorQuda("Clover dslash has not been built");
+#endif
   }
 
 

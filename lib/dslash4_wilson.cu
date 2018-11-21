@@ -26,6 +26,8 @@ namespace quda {
 
 namespace quda {
 
+#ifdef GPU_WILSON_DIRAC
+
   /**
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
@@ -86,12 +88,10 @@ namespace quda {
   {
     if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
       ApplyWilson<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
-#if 0
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
       ApplyWilson<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
       ApplyWilson<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
-#endif
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
     }
@@ -99,9 +99,9 @@ namespace quda {
 
   // template on the number of colors
   template <typename Float>
-    void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                     double kappa, const ColorSpinorField &x, int parity, bool dagger,
-                     const int *comm_override, TimeProfile &profile)
+  void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                   double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                   const int *comm_override, TimeProfile &profile)
   {
     if (in.Ncolor() == 3) {
       ApplyWilson<Float,3>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
@@ -110,6 +110,8 @@ namespace quda {
     }
   }
 
+#endif // GPU_WILSON_DIRAC
+
   //Apply the Wilson operator
   //out(x) = M*in = - kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   //Uses the kappa normalization for the Wilson operator.
@@ -117,6 +119,7 @@ namespace quda {
                    double kappa, const ColorSpinorField &x, int parity, bool dagger,
                    const int *comm_override, TimeProfile &profile)
   {
+#ifdef GPU_WILSON_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
@@ -138,6 +141,9 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
+#else
+    errorQuda("Wilson dslash has not been built");
+#endif // GPU_WILSON_DIRAC
   }
 
 
