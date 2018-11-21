@@ -32,39 +32,60 @@ namespace quda {
   void createDslashEvents();
   void destroyDslashEvents();
 
-  enum Dslash4Type {
-    DSLASH4_WILSON
-  };
+  // plain Wilson Dslash
+  void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
+			const double &k, const int *commDim, TimeProfile &profile);
 
   /**
      @brief Driver for applying the Wilson stencil
 
-     out = - kappa * D * in
+     out = D * in
 
      where D is the gauged Wilson linear operator.
 
-     If x is defined, the operation is given by out = x - kapp * D in.
+     If kappa is non-zer, the operation is given by out = x + kappa * D in.
      This operator can be applied to both single parity
      (checker-boarded) fields, or to full fields.
 
      @param[out] out The output result field
      @param[in] in The input field
-     @param[in] U The gauge field used for the gauge Laplace
+     @param[in] U The gauge field used for the operator
      @param[in] kappa Scale factor applied
      @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
      @param[in] comm_override Override for which dimensions are partitioned
-     @param[in] type Type of dslash we are applying
   */
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    double kappa, const ColorSpinorField &x, int parity, bool dagger,
-                   const int *comm_override, Dslash4Type type);
+                   const int *comm_override);
 
-  // plain Wilson Dslash  
-  void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-			const double &k, const int *commDim, TimeProfile &profile);
+  /**
+     @brief Driver for applying the Wilson-clover stencil
+
+     out = A^{-1} * D * in
+
+     where D is the gauged Wilson linear operator.
+
+     If kappa is non-zero, the operation is given by out = x + kappa * A^{-1} D in.
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] A The clover field used for the operator
+     @param[in] kappa Scale factor applied
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+  */
+  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in,
+                         const GaugeField &U, const CloverField &A,
+                         double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override);
 
   // clover Dslash
   void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,

@@ -30,7 +30,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
 	dslash_staggered.o dslash_improved_staggered.o			\
 	dslash_pack.o dslash_pack2.o					\
-	dslash4_wilson.o dslash5_domain_wall.o				\
+	dslash4_wilson.o dslash4_wilson_clover.o dslash5_domain_wall.o	\
 	blas_quda.o multi_blas_quda.o copy_quda.o 			\
 	reduce_quda.o multi_reduce_quda.o contract.o			\
 	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\

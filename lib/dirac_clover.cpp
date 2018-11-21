@@ -3,23 +3,17 @@
 #include <blas_quda.h>
 #include <multigrid.h>
 
+//#define NEW_DSLASH
+
 namespace quda {
 
   DiracClover::DiracClover(const DiracParam &param)
     : DiracWilson(param), clover(*(param.clover))
-  {
-#ifdef DYNAMIC_CLOVER
-    warningQuda("Dynamic clover generation/inversion is currently not supported for pure Wilson-Clover dslash.\n");
-#endif
-  }
+  { }
 
   DiracClover::DiracClover(const DiracClover &dirac) 
     : DiracWilson(dirac), clover(dirac.clover)
-  {
-#ifdef DYNAMIC_CLOVER
-    warningQuda("Dynamic clover generation/inversion is currently not supported for pure Wilson-Clover dslash.\n");
-#endif
-  }
+  { }
 
   DiracClover::~DiracClover() { }
 
@@ -178,6 +172,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#ifdef NEW_DSLASH
+    ApplyWilsonClover(out, in, *gauge, clover, 0.0, in, parity, dagger, commDim);
+#else
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover, true);
       cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
@@ -185,6 +182,7 @@ namespace quda {
     } else {
       errorQuda("Not supported");
     }
+#endif
 
     flops += 1824ll*in.Volume();
   }
@@ -197,6 +195,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#ifdef NEW_DSLASH
+    ApplyWilsonClover(out, in, *gauge, clover, k, x, parity, dagger, commDim);
+#else
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover, true);
       cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
@@ -205,6 +206,7 @@ namespace quda {
     } else {
       errorQuda("Not supported");
     }
+#endif
 
     flops += 1872ll*in.Volume();
   }

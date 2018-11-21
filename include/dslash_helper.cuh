@@ -64,6 +64,8 @@ namespace quda {
     int incomplete = 0; // Have all 8 contributions been computed for this site?
 
     switch(type) { // intentional fall-through
+    case EXTERIOR_KERNEL_ALL:
+      incomplete = incomplete ? false : true; break; // all active threads are complete
     case INTERIOR_KERNEL:
       incomplete = incomplete || (arg.commDim[3] && (coord[3]==0 || coord[3]==(arg.dc.X[3]-1)));
     case EXTERIOR_KERNEL_T:
