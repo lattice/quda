@@ -22,7 +22,6 @@ namespace quda {
    - gauge fix support
    - ghost texture support in accessors
    - CPU support
-   - peer-to-peer (copy engine race condition)
 */
 
 namespace quda {
@@ -137,8 +136,6 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
-
-    in.bufferIndex = (1 - in.bufferIndex);
   }
 
 
