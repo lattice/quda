@@ -130,10 +130,6 @@ namespace quda {
         errorQuda("nSpin = %d not support", in.Nspin());
       }
       
-//      printfQuda("shift[4] =        (%d,%d,%d,%d)\n", shift[0], shift[1], shift[2], shift[3]);
-//      printfQuda("dim[4] =          (%d,%d,%d,%d)\n", dim[0], dim[1], dim[2], dim[3]);
-//      printfQuda("shrinked_dim[4] = (%d,%d,%d,%d)\n", (int)shrinked_dim[0], (int)shrinked_dim[1], (int)shrinked_dim[2], (int)shrinked_dim[3]);
-
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
 //      if (sizeof(coeff_5<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(coeff_5<real>));
@@ -149,9 +145,9 @@ namespace quda {
       switch(type){
         case dslash4_dslash5pre_dslash5inv:
         case dslash4dag_dslash5predag_dslash5invdag:
-          // a *= pow(0.5 / (b_5[0].real() * (m_5 + 4.0) + 1.0), 2);
-          alpha = b+c/kappa;
-          beta  = -c/kappa;
+          m_scale = b;
+          alpha = 1.+c/(kappa*b); // b-c/kappa = b(1-c/(b*kappa))
+          beta  = -c/(kappa*b);
 //          printfQuda("m5= %+.4f, mf= %.4f, fac_inv= %+.8f\n", this->m_5, this->m_f, this->fac_inv);
 //          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
           break;
@@ -160,7 +156,7 @@ namespace quda {
           break;
         case dslash4dag_dslash5predag:
           m_scale = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.))*b; // -kappa_b^2
-          alpha = c/(2.f*b); // 2 to compensate for the spin projection 
+          alpha = c/(2.*b); // 2 to compensate for the spin projection 
           beta = 1.;
 //          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
 //          printfQuda("scale = %+.4f\n", this->scale);
@@ -301,7 +297,7 @@ namespace quda {
     half2* sm_b = shared_memory_data;
     half*  sm_c = (half*)sm_b;
     
-    half*  sm_a = sm_c+M*N_sm;
+    half*  sm_a;
     if(reload){
       sm_a = sm_c+M*N_sm;
     }else{
@@ -313,7 +309,7 @@ namespace quda {
     }else if(type_ == 2){
       construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
     }else if(type_ == 1){
-      construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm,false, Arg>(arg, sm_c); // dagger = false
+      construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm,false, Arg>(arg, sm_a); // dagger = false
     }else if(type_ == 3){
       construct_matrix_a_d5   <block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
     }
@@ -429,226 +425,6 @@ namespace quda {
     } // while
   }
 
-#if 0  
-  /**
-    @brief Tensor core kernel for applying the beta + alpha*M5inv operator
-  */
-  template<int block_dim_x, int Ls_, bool reload, class Arg>
-  __global__ void fused_f3(Arg arg)
-  {
-    TensorCoreSharedMemory<half2> shared_memory_data;
-  
-    constexpr int M = 4*Ls_;
-    constexpr int N = 6*block_dim_x;
-    
-    constexpr int sm_m_pad_size = 0;
-    constexpr int sm_n_pad_size = 16;
-    
-    constexpr int N_sm = N + sm_n_pad_size;
-    constexpr int M_sm = M + sm_m_pad_size;
-    
-    half2* sm_b = shared_memory_data;
-    half*  sm_c = (half*)sm_b;
-    half*  sm_a = sm_c+M*N_sm;
-   
-    construct_matrix_a_d5<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
-    __syncthreads();
-   
-    bool idle = false;
-    int s4_shift_base = blockIdx.x*blockDim.x; // base.
-    int s4_shift, sid;
-
-    constexpr int WMMA_M = 16;
-    constexpr int WMMA_N = 16;
-    constexpr int WMMA_K = 16;
-    
-    constexpr int tm_dim = M/WMMA_M;
-    constexpr int tn_dim = N/WMMA_N;
-    
-    constexpr int total_warp = block_dim_x*Ls_ >> 5;
-    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x) >> 5;
-    
-    constexpr int total_tile = tm_dim*tn_dim;
-    
-    constexpr int warp_cycle = total_tile/total_warp;
-    const int warp_m = this_warp*warp_cycle/tn_dim;
-     
-    typedef typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_type;
-    
-    a_type a_frag[reload?1:tm_dim];
-    if(!reload){ // in the preload case we preload ... 
-      #pragma unroll
-      for( int k = 0; k < tm_dim; k++ ){
-        const int a_row = warp_m*WMMA_M;
-        const int a_col = k*WMMA_K;
-        // Load Matrix
-        nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a+a_row+a_col*M_sm, M_sm);
-      } 
-    }
-
-    while(s4_shift_base < arg.volume_4d_cb_shift){
-      int x[4];
-      s4_shift = s4_shift_base + threadIdx.x;
-      coordinate_from_shrinked_index(x, s4_shift, arg.shrinked_dim, arg.shift, arg.parity); 
-      sid = threadIdx.y*arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(x, arg.dim);
-      
-      if (s4_shift >= arg.volume_4d_cb_shift){
-        idle = true;
-      }
-      
-      typedef typename mapper<short>::type real;
-      typedef ColorSpinor<real, 3, 4> Vector;
-      
-      if(!idle){
-        // Vector out = arg.in(sid, arg.parity);
-        Vector out;
-        apply_wilson_5d<short, true,false>(out, x, arg, threadIdx.y); // dagger = false; halo = false
-//        Vector aux_in = arg.x(sid, arg.parity);
-//        out = aux_in + arg.beta*out;
-//        arg.out(sid, arg.parity) = arg.beta*out;
-        // store result to shared memory
-        load_matrix_b_vector<N_sm/2,false>(out, arg, sm_b, arg.scale); // acc(accumulation) = false
-      }
-      
-      __syncthreads();
-      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);        
-      __syncthreads();
-    
-      if(!idle){
-        Vector aux_in = arg.x(sid, arg.parity);
-        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale*arg.m_scale);
-        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale*arg.m_scale);
-//        Vector send_out;
-//        #pragma unroll
-//        for(int spin = 0; spin < 4; spin++){
-//        #pragma unroll
-//        for(int color = 0; color < 3; color++){
-//          (send_out.data)[spin*4+color].real( __half2float(sm_c[ (threadIdx.y*4+spin)*N_sm+6*threadIdx.x+color*2+0 ]) ); 
-//          (send_out.data)[spin*4+color].imag( __half2float(sm_c[ (threadIdx.y*4+spin)*N_sm+6*threadIdx.x+color*2+1 ]) ); 
-//        }}
-//        arg.out(sid, arg.parity) = send_out;
-      }
-
-      s4_shift_base += gridDim.x*blockDim.x;
-    
-    } // while
-  }
-
-  /**
-    @brief Tensor core kernel for applying the beta + alpha*M5inv operator
-  */
-  template<int block_dim_x, int Ls_, bool reload, class Arg>
-  __global__ void fused_f1(Arg arg)
-  {
-    static_assert(reload == false); // ONLY support the preload version
-    
-    TensorCoreSharedMemory<half2> shared_memory_data;
-  
-    constexpr int M = 4*Ls_;
-    constexpr int N = 6*block_dim_x;
-    
-    constexpr int sm_m_pad_size = 0;
-    constexpr int sm_n_pad_size = 16;
-    
-    constexpr int N_sm = N + sm_n_pad_size;
-    constexpr int M_sm = M + sm_m_pad_size;
-    
-    half2* sm_b = shared_memory_data;
-    half*  sm_c = (half*)sm_b;
-//    half*  sm_a = sm_c+M*N_sm;
-   
-    bool idle = false;
-    int s4_shift_base = blockIdx.x*blockDim.x; // base.
-    int s4_shift, sid;
-
-    constexpr int WMMA_M = 16;
-    constexpr int WMMA_N = 16;
-    constexpr int WMMA_K = 16;
-    
-    constexpr int tm_dim = M/WMMA_M;
-    constexpr int tn_dim = N/WMMA_N;
-    
-    constexpr int total_warp = block_dim_x*Ls_ >> 5;
-    const int this_warp = (threadIdx.y*block_dim_x+threadIdx.x) >> 5;
-    
-    constexpr int total_tile = tm_dim*tn_dim;
-    
-    constexpr int warp_cycle = total_tile/total_warp;
-    const int warp_m = this_warp*warp_cycle/tn_dim;
-     
-    typedef typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_type;
-    a_type a_frag_red[reload?1:tm_dim];
-    a_type a_frag_black[reload?1:tm_dim];
-   
-    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm,false, Arg>(arg, sm_c); // dagger = false
-    __syncthreads();
-    if(!reload){ // in the preload case we preload ... 
-      #pragma unroll
-      for( int k = 0; k < tm_dim; k++ ){
-        const int a_row = warp_m*WMMA_M;
-        const int a_col = k*WMMA_K;
-        // Load Matrix
-        nvcuda::wmma::load_matrix_sync(a_frag_red[k], sm_c+a_row+a_col*M_sm, M_sm);
-      } 
-    }
-    
-    arg.alpha = 1.;
-    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_c); // dagger = true
-    __syncthreads();
-    if(!reload){ // in the preload case we preload ... 
-      #pragma unroll
-      for( int k = 0; k < tm_dim; k++ ){
-        const int a_row = warp_m*WMMA_M;
-        const int a_col = k*WMMA_K;
-        // Load Matrix
-        nvcuda::wmma::load_matrix_sync(a_frag_black[k], sm_c+a_row+a_col*M_sm, M_sm);
-      } 
-    }
-
-    while(s4_shift_base < arg.volume_4d_cb_shift){
-      int x[4];
-      s4_shift = s4_shift_base + threadIdx.x;
-      coordinate_from_shrinked_index(x, s4_shift, arg.shrinked_dim, arg.shift, arg.parity); 
-      sid = threadIdx.y*arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(x, arg.dim);
-      
-      if (s4_shift >= arg.volume_4d_cb_shift){
-        idle = true;
-      }
-      
-      typedef typename mapper<short>::type real;
-      typedef ColorSpinor<real, 3, 4> Vector;
-      
-      if(!idle){
-        Vector aux_in;
-        apply_wilson_5d<short,false, true>(aux_in, x, arg, threadIdx.y); // dagger = false; halo = true
-        // store result to shared memory
-        load_matrix_b_vector<N_sm/2,false>(aux_in, arg, sm_b, arg.scale);
-      }
-      
-      __syncthreads();
-      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_red, sm_c, sm_c, sm_c);        
-      __syncthreads();
-    
-      if(!idle){
-        Vector aux_in = arg.x(sid, arg.parity);
-        load_matrix_b_vector<N_sm/2, true>(aux_in, arg, sm_b, arg.scale*arg.m_scale); // acc = true
-        store_matrix_c<N_sm>(arg.y, sm_b, sid, arg.scale*arg.m_scale);
-      }
-    
-      __syncthreads();
-      wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_c, sm_c, sm_c);        
-      __syncthreads();
-      
-      if(!idle){
-        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale*arg.m_scale);
-      }
-
-      s4_shift_base += gridDim.x*blockDim.x;
-    
-    } // while
-  }
-#endif
-
   template<int Ls_, class Arg>
   class FusedDslash : public TunableVectorYZ {
 
@@ -702,12 +478,12 @@ namespace quda {
       virtual bool tuneSharedBytes() const { return true; }
       unsigned int minThreads() const { return arg.volume_4d_cb; }
   
-      unsigned int shared_bytes_per_block(int x, int y) const { 
+      unsigned int shared_bytes_per_block(const TuneParam& param) const { 
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
-        if(arg.type == 1){
-          return ( (y*4)*(x*6+16) )*2;
+        if(param.aux.x && arg.type != 1){ // aux.x == 1 --> reload == true
+          return ( (param.block.y*4)*(param.block.y*4+0)+(param.block.y*4)*(param.block.x*6+16) )*2;
         }else{
-          return ( (y*4)*(y*4+0)+(y*4)*(x*6+16) )*2;
+          return ( (param.block.y*4)*(param.block.x*6+16) )*2;
         }
       }
    
@@ -715,7 +491,7 @@ namespace quda {
       {
         if( param.block.x < max_block_size() ){
           param.block.x += step_block_size();
-          param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
+          param.shared_bytes = shared_bytes_per_block(param); 
           return true;
         }else{
           return false;
@@ -731,7 +507,7 @@ namespace quda {
           return false;
         } else {
           param.block.x = min_block_size();
-          param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
+          param.shared_bytes = shared_bytes_per_block(param); 
           return true;
         }
       }
@@ -743,7 +519,7 @@ namespace quda {
           // We have updated the "aux" so reset all other parameters. 
           param.grid.x = minGridSize();
           param.block.x = min_block_size();
-          param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
+          param.shared_bytes = shared_bytes_per_block(param); 
           return true;
         } else {
           param.aux.x = 0;
@@ -818,13 +594,13 @@ namespace quda {
 
       void apply(const cudaStream_t &stream) {
         // By its name we ONLY have a GPU version
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        // TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+        // TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
           switch(arg.type){
             case 0:
               switch(tp.block.x){
                 case 16:
-                  tp.aux.x?
+                  tp.aux.x? // tp.aux.x == 0 --> reload == false, preload; tp.aux.x == 1 --> reload == true
                   launch(fused_tensor_core<16, Ls_, true, Arg, 0>, tp, arg, stream) :
                   launch(fused_tensor_core<16, Ls_,false, Arg, 0>, tp, arg, stream) ;
                   break;
@@ -929,7 +705,7 @@ namespace quda {
         TunableVectorYZ::initTuneParam(param);
         param.block = dim3(min_block_size(), arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(minGridSize(), 1, 1);
-        param.shared_bytes = shared_bytes_per_block(param.block.x, param.block.y); 
+        param.shared_bytes = shared_bytes_per_block(param); 
         param.aux.x = 0;
       }
 
