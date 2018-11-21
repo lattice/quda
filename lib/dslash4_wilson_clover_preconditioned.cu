@@ -15,10 +15,10 @@ namespace quda {
 #include <dslash_policy.cuh>
 }
 
-#include <kernels/dslash_wilson_clover.cuh>
+#include <kernels/dslash_wilson_clover_preconditioned.cuh>
 
 /**
-   This is the Wilson-clover linear operator
+   This is the Wilson-clover preconditioned linear operator
 */
 
 namespace quda {
@@ -31,13 +31,12 @@ namespace quda {
   struct WilsonCloverLaunch {
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-      static_assert(xpay == true, "wilsonClover operator only defined for xpay");
-      dslash.launch(wilsonCloverGPU<Float,nDim,nColor,nParity,dagger,kernel_type,Arg>, tp, arg, stream);
+      dslash.launch(wilsonCloverGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
     }
   };
 
   template <typename Float, int nDim, int nColor, typename Arg>
-  class WilsonClover : public Dslash<Float> {
+  class WilsonCloverPreconditioned : public Dslash<Float> {
 
   protected:
     Arg &arg;
@@ -45,17 +44,21 @@ namespace quda {
 
   public:
 
-    WilsonClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
+    WilsonCloverPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
       : Dslash<Float>(arg, out, in), arg(arg), in(in)
     {  }
 
-    virtual ~WilsonClover() { }
+    virtual ~WilsonCloverPreconditioned() { }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
-      if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverLaunch,nDim,nColor,true>(tp, arg, stream);
-      else errorQuda("Wilson-clover operator only defined for xpay=true");
+      if (arg.nParity == 1) {
+        if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverLaunch,nDim,nColor,1, true>(tp, arg, stream);
+        else          Dslash<Float>::template instantiate<WilsonCloverLaunch,nDim,nColor,1,false>(tp, arg, stream);
+      } else {
+        errorQuda("Preconditioned Wilson-clover operator not defined nParity=%d", arg.nParity);
+      }
     }
 
     long long flops() const {
@@ -121,14 +124,14 @@ namespace quda {
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-			 double kappa, const ColorSpinorField &x, int parity, bool dagger,
-                         const int *comm_override, TimeProfile &profile)
+  void ApplyWilsonCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+                                       double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                                       const int *comm_override, TimeProfile &profile)
   {
     constexpr int nDim = 4;
     constexpr bool dynamic_clover = false;
     WilsonCloverArg<Float,nColor,recon,dynamic_clover> arg(out, in, U, A, kappa, x, parity, dagger, comm_override);
-    WilsonClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,dynamic_clover> > wilson(arg, out, in);
+    WilsonCloverPreconditioned<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,dynamic_clover> > wilson(arg, out, in);
 
     DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                               in.VolumeCB(), in.GhostFaceCB(), profile);
@@ -139,17 +142,17 @@ namespace quda {
 
   // template on the gauge reconstruction
   template <typename Float, int nColor>
-  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-			 double kappa, const ColorSpinorField &x, int parity, bool dagger,
-                         const int *comm_override, TimeProfile &profile)
+  void ApplyWilsonCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+                                       double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                                       const int *comm_override, TimeProfile &profile)
   {
     if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyWilsonClover<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
+      ApplyWilsonCloverPreconditioned<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
 #if 0
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyWilsonClover<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
+      ApplyWilsonCloverPreconditioned<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyWilsonClover<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
+      ApplyWilsonCloverPreconditioned<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
 #endif
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
@@ -158,23 +161,23 @@ namespace quda {
 
   // template on the number of colors
   template <typename Float>
-  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-			 double kappa, const ColorSpinorField &x, int parity, bool dagger,
-                         const int *comm_override, TimeProfile &profile)
+  void ApplyWilsonCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+                                      double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                                      const int *comm_override, TimeProfile &profile)
   {
     if (in.Ncolor() == 3) {
-      ApplyWilsonClover<Float,3>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
+      ApplyWilsonCloverPreconditioned<Float,3>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
   }
 
-  // Apply the Wilson-clover operator
-  // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
+  // Apply the preconditioned Wilson-clover operator
+  // out(x) = M*in = A(x)^{-1} (-kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
-  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-			 const CloverField &A, double kappa, const ColorSpinorField &x, int parity, bool dagger,
-			 const int *comm_override, TimeProfile &profile)
+  void ApplyWilsonCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                       const CloverField &A, double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                                       const int *comm_override, TimeProfile &profile)
   {
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
@@ -187,13 +190,13 @@ namespace quda {
     checkLocation(out, in, U, A);
 
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyWilsonClover<double>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
+      ApplyWilsonCloverPreconditioned<double>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyWilsonClover<float>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
+      ApplyWilsonCloverPreconditioned<float>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyWilsonClover<short>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
+      ApplyWilsonCloverPreconditioned<short>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyWilsonClover<char>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
+      ApplyWilsonCloverPreconditioned<char>(out, in, U, A, kappa, x, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }

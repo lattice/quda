@@ -64,13 +64,13 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                   double kappa, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override)
+                   double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                   const int *comm_override, TimeProfile &profile)
   {
     constexpr int nDim = 4;
     WilsonArg<Float,nColor,recon> arg(out, in, U, kappa, x, parity, dagger, comm_override);
     Wilson<Float,nDim,nColor,WilsonArg<Float,nColor,recon> > wilson(arg, out, in);
 
-    TimeProfile profile("dummy");
     DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                               in.VolumeCB(), in.GhostFaceCB(), profile);
     policy.apply(0);
@@ -81,15 +81,16 @@ namespace quda {
   // template on the gauge reconstruction
   template <typename Float, int nColor>
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                   double kappa, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override)
+                   double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                   const int *comm_override, TimeProfile &profile)
   {
     if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyWilson<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, kappa, x, parity, dagger, comm_override);
+      ApplyWilson<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
 #if 0
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyWilson<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, kappa, x, parity, dagger, comm_override);
+      ApplyWilson<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyWilson<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, kappa, x, parity, dagger, comm_override);
+      ApplyWilson<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
 #endif
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
@@ -99,10 +100,11 @@ namespace quda {
   // template on the number of colors
   template <typename Float>
     void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                     double kappa, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override)
+                     double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                     const int *comm_override, TimeProfile &profile)
   {
     if (in.Ncolor() == 3) {
-      ApplyWilson<Float,3>(out, in, U, kappa, x, parity, dagger, comm_override);
+      ApplyWilson<Float,3>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
@@ -113,7 +115,7 @@ namespace quda {
   //Uses the kappa normalization for the Wilson operator.
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    double kappa, const ColorSpinorField &x, int parity, bool dagger,
-                   const int *comm_override)
+                   const int *comm_override, TimeProfile &profile)
   {
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
@@ -126,13 +128,13 @@ namespace quda {
     checkLocation(out, in, U);
 
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyWilson<double>(out, in, U, kappa, x, parity, dagger, comm_override);
+      ApplyWilson<double>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyWilson<float>(out, in, U, kappa, x, parity, dagger, comm_override);
+      ApplyWilson<float>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyWilson<short>(out, in, U, kappa, x, parity, dagger, comm_override);
+      ApplyWilson<short>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
     } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyWilson<char>(out, in, U, kappa, x, parity, dagger, comm_override);
+      ApplyWilson<char>(out, in, U, kappa, x, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }

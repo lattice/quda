@@ -4,7 +4,7 @@
 #include <multigrid.h>
 
 // enable new dslash
-//#define NEW_DSLASH
+#define NEW_DSLASH
 
 namespace quda {
 
@@ -32,7 +32,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
 #ifdef NEW_DSLASH
-    ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim);
+    ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
 #else
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
@@ -53,7 +53,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
 #ifdef NEW_DSLASH
-    ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim);
+    ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
 #else
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
@@ -92,7 +92,7 @@ namespace quda {
 
     checkFullSpinor(*Out, *In);
 #ifdef NEW_DSLASH
-    ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim);
+    ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
 #else
     DslashXpay(Out->Odd(), In->Even(), QUDA_ODD_PARITY, In->Odd(), -kappa);
     DslashXpay(Out->Even(), In->Odd(), QUDA_EVEN_PARITY, In->Even(), -kappa);

@@ -65,7 +65,7 @@ namespace quda {
 
     switch(type) { // intentional fall-through
     case EXTERIOR_KERNEL_ALL:
-      incomplete = incomplete ? false : true; break; // all active threads are complete
+      incomplete = false; break; // all active threads are complete
     case INTERIOR_KERNEL:
       incomplete = incomplete || (arg.ghostDim[3] && (coord[3]==0 || coord[3]==(arg.dc.X[3]-1)));
     case EXTERIOR_KERNEL_T:
@@ -423,7 +423,21 @@ namespace quda {
 
     /**
        @brief This instantiate function is used to instantiate the
-       the nParity and dagger templates
+       the dagger template
+       @param[in] tp The tuning parameters to use for this kernel
+       @param[in,out] arg The argument struct for the kernel
+       @param[in] stream The cudaStream_t where the kernel will run
+     */
+    template < template <typename,int,int,int,bool,bool,KernelType,typename> class Launch,
+               int nDim, int nColor, int nParity, bool xpay, typename Arg>
+    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+      if (arg.dagger) instantiate<Launch,nDim,nColor,nParity, true,xpay>(tp, arg, stream);
+      else            instantiate<Launch,nDim,nColor,nParity,false,xpay>(tp, arg, stream);
+    }
+
+    /**
+       @brief This instantiate function is used to instantiate the
+       the nParity template
        @param[in] tp The tuning parameters to use for this kernel
        @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
@@ -432,14 +446,8 @@ namespace quda {
                int nDim, int nColor, bool xpay, typename Arg>
     inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
       switch (arg.nParity) {
-      case 1:
-        if (arg.dagger) instantiate<Launch,nDim,nColor,1, true,xpay>(tp, arg, stream);
-        else            instantiate<Launch,nDim,nColor,1,false,xpay>(tp, arg, stream);
-        break;
-      case 2:
-        if (arg.dagger) instantiate<Launch,nDim,nColor,2, true,xpay>(tp, arg, stream);
-        else            instantiate<Launch,nDim,nColor,2,false,xpay>(tp, arg, stream);
-        break;
+      case 1: instantiate<Launch,nDim,nColor,1,xpay>(tp, arg, stream); break;
+      case 2: instantiate<Launch,nDim,nColor,2,xpay>(tp, arg, stream); break;
       default:
         errorQuda("nParity = %d undefined\n", arg.nParity);
       }
