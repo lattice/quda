@@ -27,6 +27,7 @@
 
 // Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
 extern QudaDslashType dslash_type;
+extern QudaDslashType dslash_type_precondition;
 
 // Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;

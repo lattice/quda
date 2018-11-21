@@ -27,7 +27,7 @@ namespace quda {
   }
 
   CG::~CG() {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
       for (auto pi : p) if (pi) delete pi;
       if (rp) delete rp;
@@ -47,7 +47,7 @@ namespace quda {
 
       init = false;
     }
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -389,8 +389,11 @@ namespace quda {
     bool L2breakdown = false;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
+    
+    if (!param.is_preconditioner) {
+      blas::flops = 0;
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    }
 
     int k = 0;
     int j = 0;
@@ -661,35 +664,38 @@ namespace quda {
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
-    param.gflops = gflops;
-    param.iter += k;
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    if (k == param.maxiter)
-      warningQuda("Exceeded maximum iterations %d", param.maxiter);
+      param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+      param.gflops = gflops;
+      param.iter += k;
 
-    if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("CG: Reliable updates = %d\n", rUpdate);
+      if (k == param.maxiter)
+        warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (param.compute_true_res) {
-      // compute the true residuals
-      mat(r, x, y, tmp3);
-      param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+      if (getVerbosity() >= QUDA_VERBOSE)
+        printfQuda("CG: Reliable updates = %d\n", rUpdate);
+
+      if (param.compute_true_res) {
+        // compute the true residuals
+        mat(r, x, y, tmp3);
+        param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
+        param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+      }
+
+      PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
+
+      // reset the flops counters
+      blas::flops = 0;
+      mat.flops();
+      matSloppy.flops();
+
+      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
-
-    PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
-
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     return;
   }

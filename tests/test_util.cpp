@@ -1655,6 +1655,7 @@ int tdim = 24;
 int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
+QudaDslashType dslash_type_precondition = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 char gauge_outfile[256] = "";
 int Nsrc = 1;
@@ -1789,6 +1790,9 @@ void usage(char** argv )
   printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
+         "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
+  printf("    --dslash-type-precondition <type>         # Set the dslash type for the preconditioner, the following values are valid\n"
+         "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
@@ -2335,6 +2339,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }     
     dslash_type = get_dslash_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--dslash-type-precondition") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    dslash_type_precondition = get_dslash_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
