@@ -361,7 +361,7 @@ namespace quda {
           nvcuda::wmma::load_matrix_sync(a_frag_black[k], sm_c+a_row+a_col*M_sm, M_sm);
         } 
       }
-    }
+    } 
 
     while(s4_shift_base < arg.volume_4d_cb_shift){
       int x[4];
@@ -463,10 +463,13 @@ namespace quda {
         // long long Ls = meta.X(4);
         switch (arg.type) {
           case dslash4_dslash5pre_dslash5inv:
-          case dslash4dag_dslash5predag_dslash5invdag:
-          case dslash4_dslash5inv_dslash5invdag:
-          case dslash4dag_dslash5predag:
             return arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
+          case dslash4dag_dslash5predag_dslash5invdag:
+            return 3*arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
+          case dslash4_dslash5inv_dslash5invdag:
+            return arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
+          case dslash4dag_dslash5predag:
+            return 2*arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
           default: 
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
@@ -558,12 +561,12 @@ namespace quda {
             strcat(aux, config);
             break;
           case dslash4dag_dslash5predag_dslash5invdag:
-            sprintf(config, ",f1,shift%d,%d,%d,%d",
+            sprintf(config, ",f2,shift%d,%d,%d,%d",
               arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
             strcat(aux, config);
             break;
           case dslash4_dslash5inv_dslash5invdag:
-            sprintf(config, ",f2,shift%d,%d,%d,%d,halo%d,%d,%d,%d",
+            sprintf(config, ",f1,shift%d,%d,%d,%d,halo%d,%d,%d,%d",
               arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3],
               arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
             strcat(aux, config);
@@ -594,8 +597,8 @@ namespace quda {
 
       void apply(const cudaStream_t &stream) {
         // By its name we ONLY have a GPU version
-        // TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        // TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
           switch(arg.type){
             case 0:
               switch(tp.block.x){

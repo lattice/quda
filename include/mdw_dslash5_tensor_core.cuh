@@ -419,10 +419,12 @@ namespace quda {
         }
       } 
     
-        int c_row = warp_m*WMMA_M;
-        int c_col = warp_n*WMMA_N;
-    
-        nvcuda::wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, nvcuda::wmma::mem_row_major);
+      __syncthreads();
+      
+      int c_row = warp_m*WMMA_M;
+      int c_col = warp_n*WMMA_N;
+
+      nvcuda::wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, nvcuda::wmma::mem_row_major);
     }
   } 
 
