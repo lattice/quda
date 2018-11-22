@@ -94,7 +94,9 @@ namespace quda {
     DSLASH5_MOBIUS,
     M5_INV_DWF,
     M5_INV_MOBIUS,
-    M5_INV_ZMOBIUS
+    M5_INV_ZMOBIUS,
+    m5_eofa,
+    m5inv_eofa
   };
 
   enum MdwfFusedDslashType { // the details are too complicated to describe here.
