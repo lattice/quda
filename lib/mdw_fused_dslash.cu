@@ -116,11 +116,15 @@ namespace quda {
     FusedDslashArg(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
                           ColorSpinorField& y, const ColorSpinorField& x, double m_f_, double m_5_, 
                           const Complex* b_5, const Complex* c_5, bool dagger_, int parity, 
-                          int shift_[4], int halo_shift_[4], const double scale_, MdwfFusedDslashType type)
-      : out(out), in(in), U(U), y(y), x(x), nParity(in.SiteSubset()), parity(parity), volume_cb(in.VolumeCB()), 
+                          int shift_[4], int halo_shift_[4], const double scale_, MdwfFusedDslashType type): 
+      out(out), in(in), U(U), y(y), x(x), 
+      nParity(in.SiteSubset()), parity(parity), 
+      volume_cb(in.VolumeCB()>out.VolumeCB() ? in.VolumeCB() : out.VolumeCB()), 
       volume_4d_cb(volume_cb/Ls_), Ls(Ls_), m_f(m_f_), m_5(m_5_), dagger(dagger_),
-      shift{ shift_[0], shift_[1], shift_[2], shift_[3] }, halo_shift{ halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3] }, 
-      dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3)}, 
+      shift{ shift_[0], shift_[1], shift_[2], shift_[3] }, 
+      halo_shift{ halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3] }, 
+      dim{(3-nParity)*(in.VolumeCB()>out.VolumeCB()?in.X(0):out.X(0)), in.VolumeCB()>out.VolumeCB()?in.X(1):out.X(1), 
+        in.VolumeCB()>out.VolumeCB()?in.X(2):out.X(2), in.VolumeCB()>out.VolumeCB()?in.X(3):out.X(3)}, 
       shrinked_dim{ dim[0]-2*shift[0], dim[1]-2*shift[1], dim[2]-2*shift[2], dim[3]-2*shift[3] }, 
       volume_4d_cb_shift(shrinked_dim[0]*shrinked_dim[1]*shrinked_dim[2]*shrinked_dim[3]/2),
       scale(scale_), type(type)
@@ -396,7 +400,8 @@ namespace quda {
         }else if(type_ == 3){
           apply_wilson_5d<short, true,false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
         }else if(type_ == 4){
-          in_vec = arg.in(sid, arg.parity);
+          int sid_shift = threadIdx.y*arg.volume_4d_cb_shift + s4_shift;
+          in_vec = arg.in(sid_shift, arg.parity);
         }
         // store result to shared memory
         load_matrix_b_vector<N_sm/2,false>(in_vec, arg, sm_b, arg.scale); // acc(accumulation) = false
@@ -409,8 +414,22 @@ namespace quda {
       if(      type_ == 1){
         
         if(!idle){
-          Vector aux_in_vec = arg.x(sid, arg.parity);
-          load_matrix_b_vector<N_sm/2, true>(aux_in_vec, arg, sm_b, arg.scale*arg.m_scale); // acc = true
+          int back_x[4] = {x[0]-2, x[1]-2, x[2]-2, x[3]-2};
+          int back_dim[4] = {arg.dim[0]-4, arg.dim[1]-4, arg.dim[2]-4, arg.dim[3]-4};
+          if(
+            back_x[0] >=0 && back_x[0] < back_dim[0] &&
+            back_x[1] >=0 && back_x[1] < back_dim[1] &&
+            back_x[2] >=0 && back_x[2] < back_dim[2] &&
+            back_x[3] >=0 && back_x[3] < back_dim[3]
+          ){
+            int sid_back_shift = threadIdx.y*back_dim[0]*back_dim[1]*back_dim[2]*back_dim[3]/2 + index_4d_cb_from_coordinate_4d(back_x, back_dim);
+//            if(threadIdx.x==0 && blockIdx.x==0){
+//              printf("%d = \n", index_4d_cb_from_coordinate_4d(back_x, back_dim));
+//              printf("(%d,%d,%d,%d)-->(%d,%d,%d,%d)\n", x[0], x[1], x[2], x[3], back_x[0], back_x[1], back_x[2], back_x[3]);
+//            }
+            Vector aux_in_vec = arg.x(sid_back_shift, arg.parity);
+            load_matrix_b_vector<N_sm/2, true>(aux_in_vec, arg, sm_b, arg.scale*arg.m_scale); // acc = true
+          }
           store_matrix_c<N_sm>(arg.y, sm_b, sid, arg.scale*arg.m_scale);
         }
         __syncthreads();

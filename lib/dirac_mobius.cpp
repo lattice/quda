@@ -606,7 +606,7 @@ namespace quda {
     const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    checkParitySpinor(in, out);
+    // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
     apply_fused_dslash(out, in, *gauge, out, in, mass, m5, b_5, c_5, 
