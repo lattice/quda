@@ -426,9 +426,16 @@ namespace quda {
       
       }
       
-      if(!idle){
-        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale*arg.m_scale);
-      }  
+      if(      type_ == 3){
+        if(!idle){
+          int sid_shift = threadIdx.y*arg.volume_4d_cb_shift + s4_shift;
+          store_matrix_c<N_sm>(arg.out, sm_b, sid_shift, arg.scale*arg.m_scale);
+        }
+      }else{
+        if(!idle){
+          store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale*arg.m_scale);
+        }  
+      }
       
       s4_shift_base += gridDim.x*blockDim.x;
     

@@ -478,7 +478,7 @@ namespace quda {
     int shift_f1[4] = {0,0,0,0};
     int halo_shift_f1[4] = {1,1,1,1};
     // in: *ifset; aux_in: in; out: out; aux_out: *iftmp
-    mat_precondition->fused_f1(out, *ifset, *iftmp, in, scale, parity[1], shift_f1, halo_shift_f1);
+    mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift_f1, halo_shift_f1);
 //    mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
 //    
 //    mat_precondition->Dagger(QUDA_DAG_YES);
@@ -490,7 +490,7 @@ namespace quda {
 //    mat_precondition->Dagger(QUDA_DAG_NO);
     int shift_f3[4] = {2,2,2,2};
     int halo_shift_f3[4] = {1,1,1,1};
-    mat_precondition->fused_f2(*ifset, out, scale, parity[0], shift, halo_shift);
+    mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift, halo_shift);
     // mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
     
     mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift_f3, halo_shift_f3);
@@ -515,10 +515,10 @@ namespace quda {
       copyExtendedColorSpinor(*ifp, *ip, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
 //      copier_timer.Stop("woo", "hoo", 0);
 //      zero_extended_color_spinor_interface( *ifp, R, QUDA_CUDA_FIELD_LOCATION, 0);
-      inner_dslash(*ifmmp, *ifp, sqrt(rk2/ifp->Volume()));
+      inner_dslash(*immp, *ifp, sqrt(rk2/ifp->Volume()));
 //      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
 //      copier_timer.Start("woo", "hoo", 0);
-      copyExtendedColorSpinor(*immp, *ifmmp, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
+      // copyExtendedColorSpinor(*immp, *ifmmp, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
 //      copier_timer.Stop("woo", "hoo", 0);
       
       Mpk2 = reDotProduct(*ip, *immp);
@@ -534,8 +534,8 @@ namespace quda {
       //xpay(ib, beta, *ip);
       axpyZpbx(alpha, *ip, ix, ib, beta);
 
-//      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
-//          local_loop_count, rk2, alpha, beta, Mpk2);
+      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
+          local_loop_count, rk2, alpha, beta, Mpk2);
     }
 
     commGlobalReductionSet(true);
