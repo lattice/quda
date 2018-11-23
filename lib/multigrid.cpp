@@ -68,7 +68,7 @@ namespace quda {
     }
 
     // ESW HACK GENERATE STAGGERED WITHOUT CORRECT INTERFACE
-    if (param.level == 0) {
+    if (param.level == 0 && param.B[0]->Nspin() == 1) {
       // generate free field vectors
       buildFreeVectors(param.B);
     } else {
@@ -98,38 +98,6 @@ namespace quda {
         }
       }
     }
-
-#if 0 // ESW HACK
-    // For staggered, check if we're doing a Kahler-Dirac transform on this
-    // level
-    if (param.is_kahler_dirac_prec) { 
-      buildFreeVectors(param.B);
-    }
-    else if (param.level < param.Nlevel-1) {
-      if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-        if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) {
-
-          if (param.B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-            rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
-            rng->Init();
-          }
-
-          // Initializing to random vectors
-          for(int i=0; i<(int)param.B.size(); i++) {
-            if (param.B[i]->Location() == QUDA_CPU_FIELD_LOCATION) r->Source(QUDA_RANDOM_SOURCE);
-            else spinorNoise(*r, *rng, QUDA_NOISE_UNIFORM);
-            *param.B[i] = *r;
-          }
-
-        }
-        if ( param.mg_global.num_setup_iter[param.level] > 0 ) generateNullVectors(param.B);
-      } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
-        loadVectors(param.B);
-      } else { // generate free field vectors
-        buildFreeVectors(param.B);
-      }
-    }
-#endif
 
     // in case of iterative setup with MG the coarse level may be already built
     if (!transfer) reset();
@@ -796,43 +764,6 @@ namespace quda {
     // Re-initialize x_coarse
     x_coarse->Source(QUDA_RANDOM_SOURCE);
 
-    // Double check nvecs
-    /*for (int v = 0; v < 24; v++)
-    {
-      printfQuda("Vector %d\n", v);
-      source[0] = 6; source[1] = 6; source[2] = 6; source[3] = 6;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 7; source[1] = 6; source[2] = 6; source[3] = 6;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 6; source[1] = 7; source[2] = 6; source[3] = 6;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 7; source[1] = 7; source[2] = 6; source[3] = 6;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 6; source[1] = 6; source[2] = 7; source[3] = 6;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 7; source[1] = 6; source[2] = 7; source[3] = 6;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 6; source[1] = 7; source[2] = 7; source[3] = 6;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 7; source[1] = 7; source[2] = 7; source[3] = 6;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 6; source[1] = 6; source[2] = 6; source[3] = 7;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 7; source[1] = 6; source[2] = 6; source[3] = 7;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 6; source[1] = 7; source[2] = 6; source[3] = 7;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 7; source[1] = 7; source[2] = 6; source[3] = 7;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 6; source[1] = 6; source[2] = 7; source[3] = 7;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 7; source[1] = 6; source[2] = 7; source[3] = 7;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 6; source[1] = 7; source[2] = 7; source[3] = 7;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-      source[0] = 7; source[1] = 7; source[2] = 7; source[3] = 7;
-      param.B[v]->PrintVector(getPrintVectorIndex(latDim, source));
-    }*/
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
 
     zero(*tmp_coarse);
@@ -981,8 +912,8 @@ namespace quda {
     }
     /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("L2 relative deviation = %e\n\n", deviation);
     
-    // ESW UNCOMMENT ONCE I'VE FIXED THE ASQTAD VERIFY
-    //if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
+    // ESW need to fix asqtad verify
+    if (/*param.B[0]->Nspin() != 1 &&*/ deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators

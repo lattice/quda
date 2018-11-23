@@ -122,7 +122,8 @@ namespace quda {
     int x_coarse_cb = x_coarse - parity_coarse*coarseVolumeCB;
 
     // coarse_color = 8*fine_color + corner of the hypercube
-    int fineCoords[4];
+    int fineCoords[5];
+    fineCoords[4] = 0;
     getCoords(fineCoords,x_cb,X,parity);
     int hyperCorner = 4*(fineCoords[3]%2)+2*(fineCoords[2]%2)+(fineCoords[1]%2);
 

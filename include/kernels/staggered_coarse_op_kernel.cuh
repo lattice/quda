@@ -117,43 +117,18 @@ namespace quda {
   */
   template<typename Float, int dim, QudaDirection dir, int fineColor,
      int coarseSpin, int coarseColor, typename Wtype, typename Arg>
-  __device__ __host__ inline void computeStaggeredUV(Arg &arg, const Wtype &W, int parity, int x_cb, int ic_c) {
+  __device__ __host__ inline void computeStaggeredUV(Arg &arg, const Wtype &W, int parity, int x_cb, int ic_f, int jc_f) {
+
+    
 
     int coord[5];
     coord[4] = 0;
     getCoords(coord, x_cb, arg.x_size, parity);
+    coord[dim]++; // linkIndexP1, it's fine if this wraps because we're modding by 2.
+    int hyperCorner = 4*(coord[3]%2)+2*(coord[2]%2)+(coord[1]%2);
 
-    // UV doesn't have any spin.
-    complex<Float> UV[fineColor];
-
-    for(int c = 0; c < fineColor; c++) {
-      UV[c] = static_cast<Float>(0.0);
-    }
-
-    if ( arg.comm_dim[dim] && (coord[dim] + 1 >= arg.x_size[dim]) ) {
-      int nFace = 1;
-      int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, dim, nFace);
-
-      for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-        for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-          caxpy(arg.U(dim, parity, x_cb, ic, jc), W.Ghost(dim, 1, (parity+1)&1, ghost_idx, 0, jc, ic_c), UV[ic]);
-        }  //Fine color columns
-      }  //Fine color rows
-
-    } else {
-      int y_cb = linkIndexP1(coord, arg.x_size, dim);
-
-      for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-        for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-          caxpy(arg.U(dim, parity, x_cb, ic, jc), W((parity+1)&1, y_cb, 0, jc, ic_c), UV[ic]);
-        }  //Fine color columns
-      }  //Fine color rows
-
-    }
-
-    for(int c = 0; c < fineColor; c++) {
-      arg.UV(parity,x_cb,0,c,ic_c) = UV[c];
-    }
+    for (int h = 0; h < 8; h++)
+      arg.UV(parity,x_cb,0,ic_f,8*jc_f+h) = (h == hyperCorner) ? arg.U(dim,parity,x_cb,ic_f,jc_f) : 0.0;
 
   } // computeStaggeredUV
 
@@ -163,8 +138,10 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
       #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-        for (int ic_c=0; ic_c < coarseColor; ic_c++) { // coarse color
-          computeStaggeredUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, arg.V, parity, x_cb, ic_c);
+        for (int ic_f=0; ic_f < fineColor; ic_f++) { // fine color
+          for (int jc_f=0; jc_f < fineColor; jc_f++) { // fine color
+            computeStaggeredUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, arg.V, parity, x_cb, ic_f, jc_f);
+          }
         } // coarse color
       } // c/b volume
     }   // parity
@@ -176,9 +153,11 @@ namespace quda {
     if (x_cb >= arg.fineVolumeCB) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
-    if (ic_c >= coarseColor) return;
-    computeStaggeredUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, arg.V, parity, x_cb, ic_c);
+    int c = blockDim.z*blockIdx.z + threadIdx.z; // fine color
+    if (c >= fineColor*fineColor) return;
+    int ic_f = c/fineColor;
+    int jc_f = c%fineColor;
+    computeStaggeredUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, arg.V, parity, x_cb, ic_f, jc_f);
   }
 
   /**
@@ -256,14 +235,15 @@ namespace quda {
     int coord_coarse[QUDA_MAX_DIM];
 
     getCoords(coord, x_cb, arg.x_size, parity);
+    //int hyperCorner = 4*(coord[3]%2)+2*(coord[2]%2)+(coord[1]%2);
+
     for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/arg.geo_bs[d];
 
-    // ESW note: debug this later. We need to update
-    // multiplyStaggeredVUV to only grab the relevant component.
+    // Fine parity gives the coarse spin
+    //const int s = 0; // fine spin is always 0, since it's staggered.
+    //const int s_c_row = arg.spin_map(s,parity); // Coarse spin row index
+    //const int s_c_col = arg.spin_map(s,1-parity); // Coarse spin col index
 
-    // Can use the fine coordinates to find out s_row and s_col.
-    //const int s_row = (coord[0]+coord[1]+coord[2]+coord[3])%2;
-    //const int s_col = 1-s_row;
 
     //Check to see if we are on the edge of a block.  If adjacent site
     //is in same block, M = X, else M = Y

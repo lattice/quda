@@ -9,7 +9,7 @@ namespace quda {
 
   // All staggered operators are un-preconditioned, so we use uni-directional
   // coarsening. For debugging, though, we can force bi-directional coarsening.
-  static bool bidirectional_debug = false;
+  static bool bidirectional_debug = true; //false;
 
 
   enum ComputeType {
@@ -44,8 +44,7 @@ namespace quda {
       long long flops_ = 0;
       switch (type) {
       case COMPUTE_UV:
-        // when fine operator is coarse take into account that the link matrix has spin dependence
-        flops_ = 2l * arg.fineVolumeCB * 8 * coarseColor * fineColor * fineColor;
+        flops_ = 0; // permutation
         break;
       case COMPUTE_VUV:
         // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
@@ -75,7 +74,8 @@ namespace quda {
       long long bytes_ = 0;
       switch (type) {
       case COMPUTE_UV:
-        bytes_ = arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes()*coarseColor;
+        // 2 for complex, 2 for read/write
+        bytes_ = arg.UV.Bytes() + arg.U.Bytes();
         break;
       case COMPUTE_VUV:
         {
@@ -405,7 +405,7 @@ namespace quda {
         resizeVector(2*coarseColor,coarseColor);
         break;
       case COMPUTE_UV:
-        resizeVector(2,coarseColor);
+        resizeVector(2,fineColor*fineColor);
         break;
       default:
       	resizeVector(2,1);
@@ -662,10 +662,14 @@ namespace quda {
     // work out what to set the scales to
     // ESW hack
     if (coarseGaugeAtomic::fixedPoint()) {
-      double max = 100.0; // FIXME - more accurate computation needed?
+      double max = 10.0; // FIXME - I can probably put a bound on fat link magnitudes
       arg.Y_atomic.resetScale(max);
       arg.X_atomic.resetScale(max);
     }
+
+    // zero the atomic fields before summing to them
+    Y_atomic_.zero();
+    X_atomic_.zero();
 
     bool set_scale = false; // records where the scale has been set already or not
 
