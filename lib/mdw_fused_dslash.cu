@@ -161,6 +161,11 @@ namespace quda {
 //          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
 //          printfQuda("scale = %+.4f\n", this->scale);
           break;
+        case 4:
+          m_scale = b;
+          alpha = c/(2.*b);
+          beta = 1.;
+          break;
         default:
           errorQuda("Unknown MdwfFusedDslashType %d", type);
       }
@@ -277,7 +282,8 @@ namespace quda {
   }
   
   /**
-    @brief Tensor core kernel for applying the beta + alpha*M5inv operator
+    @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha*M5inv operator
+    The kernels goes type_ = 0, 1, 2, 3, 4. 
   */
   template<int block_dim_x, int Ls_, bool reload, class Arg, int type_>
   __global__ void fused_tensor_core(Arg arg)
@@ -312,6 +318,8 @@ namespace quda {
       construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm,false, Arg>(arg, sm_a); // dagger = false
     }else if(type_ == 3){
       construct_matrix_a_d5   <block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
+    }else if(type_ == 4){
+      construct_matrix_a_d5   <block_dim_x, Ls_, M_sm,false, Arg>(arg, sm_a); // dagger =  true
     }
     __syncthreads();
    
@@ -387,6 +395,8 @@ namespace quda {
           apply_wilson_5d<short,false, true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
         }else if(type_ == 3){
           apply_wilson_5d<short, true,false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
+        }else if(type_ == 4){
+          in_vec = arg.in(sid, arg.parity);
         }
         // store result to shared memory
         load_matrix_b_vector<N_sm/2,false>(in_vec, arg, sm_b, arg.scale); // acc(accumulation) = false
@@ -445,10 +455,11 @@ namespace quda {
         long long flops_ = 0;
         switch (arg.type) {
           // I am too lazy to fix the flops count. :(
-          case dslash4_dslash5pre_dslash5inv: // FIXME: flops
-          case dslash4dag_dslash5predag_dslash5invdag:
-          case dslash4_dslash5inv_dslash5invdag:
-          case dslash4dag_dslash5predag:
+          case 0: // FIXME: flops
+          case 1:
+          case 2:
+          case 3:
+          case 4:
             //flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
             flops_ = (144*Ls)*meta.Volume();
             break;
@@ -462,13 +473,14 @@ namespace quda {
       long long bytes() const {
         // long long Ls = meta.X(4);
         switch (arg.type) {
-          case dslash4_dslash5pre_dslash5inv:
+          case 0:
             return arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
-          case dslash4dag_dslash5predag_dslash5invdag:
+          case 1:
             return 3*arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
-          case dslash4_dslash5inv_dslash5invdag:
+          case 2:
             return arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
-          case dslash4dag_dslash5predag:
+          case 3:
+          case 4:
             return 2*arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
           default: 
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
@@ -576,6 +588,11 @@ namespace quda {
               arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
             strcat(aux, config);
             break;
+          case 4:
+            sprintf(config, ",f4,shift%d,%d,%d,%d",
+              arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
+            strcat(aux, config);
+            break; 
           default: 
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
@@ -586,8 +603,8 @@ namespace quda {
       inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
         // static bool init = false;
         if ( shared ) {
-          // if inverse kernel uses shared memory then maximize total shared memory pool
           setMaxDynamicSharedBytesPerBlock(f);
+          // printfQuda("memory set.\n");
           // set_shared_memory_on_volta((const void*)f, "Some Function");
           // init = true;
         }
@@ -678,27 +695,27 @@ namespace quda {
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
               }
               break;
-/*            case 4:
+            case 4:
               switch(tp.block.x){
                 case 16:
                   tp.aux.x?
-                  launch(fused_f3<16, Ls_, true, Arg>, tp, arg, stream) :
-                  launch(fused_f3<16, Ls_,false, Arg>, tp, arg, stream) ;
+                  launch(fused_tensor_core<16, Ls_, true, Arg, 4>, tp, arg, stream) :
+                  launch(fused_tensor_core<16, Ls_,false, Arg, 4>, tp, arg, stream) ;
                   break;
                 case 24:
                   tp.aux.x?
-                  launch(fused_f3<24, Ls_, true, Arg>, tp, arg, stream) :
-                  launch(fused_f3<24, Ls_,false, Arg>, tp, arg, stream) ;
+                  launch(fused_tensor_core<24, Ls_, true, Arg, 4>, tp, arg, stream) :
+                  launch(fused_tensor_core<24, Ls_,false, Arg, 4>, tp, arg, stream) ;
                   break;
                 case 32:
                   tp.aux.x?
-                  launch(fused_f3<32, Ls_, true, Arg>, tp, arg, stream) :
-                  launch(fused_f3<32, Ls_,false, Arg>, tp, arg, stream) ;
+                  launch(fused_tensor_core<32, Ls_, true, Arg, 4>, tp, arg, stream) :
+                  launch(fused_tensor_core<32, Ls_,false, Arg, 4>, tp, arg, stream) ;
                   break;
                 default:
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
               }
-              break; */
+              break;
             default: 
               errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
           }

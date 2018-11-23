@@ -531,6 +531,8 @@ namespace quda {
     void fused_f3(ColorSpinorField &out, const ColorSpinorField &in,
           const ColorSpinorField& aux_in,
           const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
+    void fused_f4(ColorSpinorField &out, const ColorSpinorField &in,
+          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;

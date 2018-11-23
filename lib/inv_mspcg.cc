@@ -410,6 +410,25 @@ namespace quda {
       printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/ft2);
       printfQuda("f3: ------>\n");
       } 
+// f4
+      {
+      int shift[4] = {2,2,2,2};
+      int halo_shift[4] = {1,1,1,1};
+
+      blas::zero(*fx); blas::zero(*ft);
+      mat_precondition->Dslash4prePartial(*ft, *fb, static_cast<QudaParity>(0), sp_len0, RR0, Xs0); 
+      mat_precondition->fused_f4(*fx, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
+      printfQuda("f4: <------\n");
+      ft2 = blas::norm2(*ft);
+      printfQuda("           ft2 = %16.12e.\n", ft2);
+      fx2 = blas::norm2(*fx);
+      printfQuda("           fx2 = %16.12e.\n", fx2);
+      mdd = xmyNorm(*ft, *fx);
+      printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
+      printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/ft2);
+      printfQuda("f4: ------>\n");
+      } 
+
 //      mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(*ft, *fb, static_cast<QudaParity>(0), *fy, -1.0, sp_len0, RR0, Xs0);   
 //      mat_precondition->Dslash4(*fy, *fb, static_cast<QudaParity>(0));
 //      mat_precondition->Dslash4pre(*ft, *fy, static_cast<QudaParity>(0), *fb, -1.0);
@@ -446,7 +465,10 @@ namespace quda {
 
     mat_precondition->Dagger(QUDA_DAG_NO);
     
-    mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);        // +0
+    int shift_f4[4] = {2,2,2,2};
+    int halo_shift_f4[4] = {2,2,2,2};
+    // mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);        // +0
+    mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift_f4, halo_shift_f4);
     
     int shift[4] = {1,1,1,1};
     int halo_shift[4] = {2,2,2,2};
@@ -867,7 +889,7 @@ namespace quda {
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
     double stop = stopping(param.tol, b2, param.residual_type);
 
-    test_dslash(db);
+    // test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
