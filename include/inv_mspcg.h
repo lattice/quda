@@ -69,6 +69,10 @@ namespace quda {
       int sp_len2, sp_len1, sp_len0;
       int RR2[4], RR1[4], RR0[4];
       int_fastdiv Xs2[4], Xs1[4], Xs0[4];
+      
+      int shift0[4] = {0,0,0,0};
+      int shift1[4] = {1,1,1,1};
+      int shift2[4] = {2,2,2,2};
 
       bool tc;
 

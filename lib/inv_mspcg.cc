@@ -463,22 +463,16 @@ namespace quda {
     int odd_bit = (mat_precondition->getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
-    mat_precondition->Dagger(QUDA_DAG_NO);
+    // mat_precondition->Dagger(QUDA_DAG_NO);
     
-    int shift_f4[4] = {2,2,2,2};
-    int halo_shift_f4[4] = {2,2,2,2};
     // mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);        // +0
-    mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift_f4, halo_shift_f4);
+    mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift2, shift2);
     
-    int shift[4] = {1,1,1,1};
-    int halo_shift[4] = {2,2,2,2};
-    mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift, halo_shift);
+    mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift1, shift2);
     // mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});
     
-    int shift_f1[4] = {0,0,0,0};
-    int halo_shift_f1[4] = {1,1,1,1};
     // in: *ifset; aux_in: in; out: out; aux_out: *iftmp
-    mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift_f1, halo_shift_f1);
+    mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift0, shift1);
 //    mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
 //    
 //    mat_precondition->Dagger(QUDA_DAG_YES);
@@ -488,12 +482,10 @@ namespace quda {
 //      mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
 //    }
 //    mat_precondition->Dagger(QUDA_DAG_NO);
-    int shift_f3[4] = {2,2,2,2};
-    int halo_shift_f3[4] = {1,1,1,1};
-    mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift, halo_shift);
+    mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift1, shift1);
     // mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
     
-    mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift_f3, halo_shift_f3);
+    mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift2, shift2);
     // mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   
   }
 
@@ -530,12 +522,12 @@ namespace quda {
       beta = rkp12 / rk2;
       rk2 = rkp12;
 
-      //axpy(alpha, *ip, ix);
-      //xpay(ib, beta, *ip);
+      // axpy(alpha, *ip, ix);
+      // xpay(ib, beta, *ip);
       axpyZpbx(alpha, *ip, ix, ib, beta);
 
-      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
-          local_loop_count, rk2, alpha, beta, Mpk2);
+      // printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
+      //     local_loop_count, rk2, alpha, beta, Mpk2);
     }
 
     commGlobalReductionSet(true);
