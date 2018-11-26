@@ -422,7 +422,8 @@ namespace quda {
             back_x[2] >=0 && back_x[2] < back_dim[2] &&
             back_x[3] >=0 && back_x[3] < back_dim[3]
           ){
-            int sid_back_shift = threadIdx.y*back_dim[0]*back_dim[1]*back_dim[2]*back_dim[3]/2 + index_4d_cb_from_coordinate_4d(back_x, back_dim);
+            int volume_4d_cb_back = back_dim[0]*back_dim[1]*back_dim[2]*back_dim[3]>>1;
+            int sid_back_shift = threadIdx.y*volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim);
 //            if(threadIdx.x==0 && blockIdx.x==0){
 //              printf("%d = \n", index_4d_cb_from_coordinate_4d(back_x, back_dim));
 //              printf("(%d,%d,%d,%d)-->(%d,%d,%d,%d)\n", x[0], x[1], x[2], x[3], back_x[0], back_x[1], back_x[2], back_x[3]);
@@ -473,21 +474,22 @@ namespace quda {
       static constexpr bool var_inverse = true;
 
       long long flops() const {
-        long long Ls = Ls_;
-        long long bulk = (Ls-2)*(meta.Volume()/Ls);
-        long long wall = 2*meta.Volume()/Ls;
-        long long n = meta.Ncolor() * meta.Nspin();
+        constexpr long long hop = (2ll*3ll-1ll)*8ll+7ll;
+        constexpr long long mat = 2ll*4ll*Ls_-1ll;
 
         long long flops_ = 0;
         switch (arg.type) {
           // I am too lazy to fix the flops count. :(
           case 0: // FIXME: flops
-          case 1:
           case 2:
           case 3:
+            flops_ =   arg.volume_4d_cb_shift*6ll*4ll*Ls_*(hop+mat);
+            break;
+          case 1:
+            flops_ =   arg.volume_4d_cb_shift*6ll*4ll*Ls_*(hop+2*mat);
+            break;
           case 4:
-            //flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
-            flops_ = (144*Ls)*meta.Volume();
+            flops_ =   arg.volume_4d_cb_shift*6ll*4ll*Ls_*(mat);
             break;
           default:
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
@@ -500,14 +502,14 @@ namespace quda {
         // long long Ls = meta.X(4);
         switch (arg.type) {
           case 0:
-            return arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
+            return arg.out.Bytes()+arg.in.Bytes()+arg.U.Bytes();
           case 1:
-            return 3*arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
+            return 3*arg.out.Bytes()+arg.in.Bytes()+arg.U.Bytes();
           case 2:
-            return arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
+            return arg.out.Bytes()+arg.in.Bytes()+arg.U.Bytes();
           case 3:
           case 4:
-            return 2*arg.out.Bytes()+8*arg.in.Bytes()+8*arg.U.Bytes();
+            return 2*arg.out.Bytes()+arg.in.Bytes()+arg.U.Bytes();
           default: 
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }

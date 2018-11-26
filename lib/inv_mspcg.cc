@@ -226,7 +226,7 @@ namespace quda {
     
     ColorSpinorParam csParam(b);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.print();
+    // csParam.print();
     // TODO: def
     cudaColorSpinorField* tx = NULL;
     cudaColorSpinorField* tt = NULL;
@@ -253,6 +253,11 @@ namespace quda {
     x2 = blas::norm2(*tx);
     printfQuda("Chopping x2/b2 = %16.12e/%16.12e.\n", x2, b2);
     
+    csParam.setPrecision(dirac_param_precondition.gauge->Precision());
+    cudaColorSpinorField* cb = new cudaColorSpinorField(csParam);
+    cudaColorSpinorField* cx = new cudaColorSpinorField(csParam);
+    blas::copy( *cb, *tb );
+
     cudaColorSpinorField* fx = NULL;
     cudaColorSpinorField* fy = NULL;
     cudaColorSpinorField* fb = NULL;
@@ -262,8 +267,7 @@ namespace quda {
       csParam.x[i] += 2*R[i];
     }
 
-    csParam.setPrecision(dirac_param_precondition.gauge->Precision());
-    csParam.print();
+    // csParam.print();
 
     // TODO: def
     fx  = new cudaColorSpinorField(csParam);
@@ -337,12 +341,9 @@ namespace quda {
       double ft2, mdd;
 // f0
       {
-      int shift[4] = {1,1,1,1};
-      int halo_shift[4] = {2,2,2,2};
-
       blas::zero(*fx); blas::zero(*ft);
       mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1, true, {2,2,2,2});
-      mat_precondition->fused_f0(*fx, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
+      mat_precondition->fused_f0(*fx, *fb, 1., static_cast<QudaParity>(0), shift1, shift2);
       printfQuda("f0: <------\n");
       ft2 = blas::norm2(*ft);
       printfQuda("           ft2 = %16.12e.\n", ft2);
@@ -355,15 +356,12 @@ namespace quda {
       }
 // f1
       {
-      int shift[4] = {0,0,0,0};
-      int halo_shift[4] = {1,1,1,1};
-
       blas::zero(*fx); blas::zero(*ft);
       mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*fx, *fb, static_cast<QudaParity>(0), *fb, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
       mat_precondition->Dagger(QUDA_DAG_YES);
       mat_precondition->Dslash5inv(*ft, *fx, static_cast<QudaParity>(0));
       mat_precondition->Dagger(QUDA_DAG_NO);
-      mat_precondition->fused_f1(*fx, *fb, *fy, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
+      mat_precondition->fused_f1(*fx, *fb, *fy, *cb, 1., static_cast<QudaParity>(0), shift0, shift1);
       printfQuda("f1: <------\n");
       ft2 = blas::norm2(*ft);
       printfQuda("           ft2 = %16.12e.\n", ft2);
@@ -376,12 +374,9 @@ namespace quda {
       }
 // f2
       {
-      int shift[4] = {1,1,1,1};
-      int halo_shift[4] = {1,1,1,1};
-
       blas::zero(*fx); blas::zero(*ft);
       mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1);
-      mat_precondition->fused_f2(*fx, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
+      mat_precondition->fused_f2(*fx, *fb, 1., static_cast<QudaParity>(0), shift1, shift1);
       printfQuda("f2: <------\n");
       ft2 = blas::norm2(*ft);
       printfQuda("           ft2 = %16.12e.\n", ft2);
@@ -394,12 +389,10 @@ namespace quda {
       }
 // f3
       {
-      int shift[4] = {2,2,2,2};
-      int halo_shift[4] = {1,1,1,1};
-
       blas::zero(*fx); blas::zero(*ft);
       mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(*ft, *fb, static_cast<QudaParity>(0), *fy, -1.0, sp_len0, RR0, Xs0);   
-      mat_precondition->fused_f3(*fx, *fb, *fy, 1., static_cast<QudaParity>(0), shift, halo_shift);
+      mat_precondition->fused_f3(*cx, *fb, *fy, 1., static_cast<QudaParity>(0), shift2, shift1);
+      copyExtendedColorSpinor(*fx, *cx, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
       printfQuda("f3: <------\n");
       ft2 = blas::norm2(*ft);
       printfQuda("           ft2 = %16.12e.\n", ft2);
@@ -417,7 +410,7 @@ namespace quda {
 
       blas::zero(*fx); blas::zero(*ft);
       mat_precondition->Dslash4prePartial(*ft, *fb, static_cast<QudaParity>(0), sp_len0, RR0, Xs0); 
-      mat_precondition->fused_f4(*fx, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
+      mat_precondition->fused_f4(*fx, *cb, 1., static_cast<QudaParity>(0), shift, shift);
       printfQuda("f4: <------\n");
       ft2 = blas::norm2(*ft);
       printfQuda("           ft2 = %16.12e.\n", ft2);
@@ -451,42 +444,36 @@ namespace quda {
     delete tx;
     delete tt;
     delete tb;
+    delete cb;
+    delete cx;
     delete fx;
     delete fy;
     delete fb;
     delete ft;
 
-    printfQuda("dslash test completed.\n");
+    printfQuda("dslash test completed. ----->\n");
   }
 
   void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in, const double scale ){
     int odd_bit = (mat_precondition->getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-
-    // mat_precondition->Dagger(QUDA_DAG_NO);
-    
-    // mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);        // +0
-    mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift2, shift2);
-    
-    mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift1, shift2);
-    // mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});
-    
-    // in: *ifset; aux_in: in; out: out; aux_out: *iftmp
-    mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift0, shift1);
-//    mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
-//    
-//    mat_precondition->Dagger(QUDA_DAG_YES);
-//    if(tc and out.Precision() == QUDA_HALF_PRECISION){
-//      mat_precondition->dslash5inv_sm_tc_partial(out, *iftmp, parity[1], scale, sp_len2, RR2, Xs2);                  // +2
-//    }else{
-//      mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);                  // +2
-//    }
-//    mat_precondition->Dagger(QUDA_DAG_NO);
-    mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift1, shift1);
-    // mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
-    
-    mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift2, shift2);
-    // mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   
+    if(tc && out.Precision() == QUDA_HALF_PRECISION){
+      mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift2, shift2);
+      mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift1, shift2);
+      mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift0, shift1);
+      mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift1, shift1);
+      mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift2, shift2);
+    }else{
+      mat_precondition->Dagger(QUDA_DAG_NO);
+      mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);
+      mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});
+      mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
+      mat_precondition->Dagger(QUDA_DAG_YES);
+      mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);     
+      mat_precondition->Dagger(QUDA_DAG_NO);
+      mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
+      mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   
+    }
   }
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib )
