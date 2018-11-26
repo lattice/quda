@@ -528,13 +528,8 @@ namespace quda {
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
 	  xnorm = sqrt(pnorm);
 	  d_new = d + u*rNorm + uhigh*Anorm * xnorm;
-<<<<<<< HEAD
-	  //if(steps_since_reliable==0)
-	  //  printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
-=======
 	  if (steps_since_reliable==0 && getVerbosity() >= QUDA_DEBUG_VERBOSE)
             printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
->>>>>>> develop
 	}
 	steps_since_reliable++;
 
@@ -566,12 +561,7 @@ namespace quda {
           d = d_new;
           xnorm = 0;//sqrt(norm2(x));
           pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
-<<<<<<< HEAD
-          // ESW: save time
-          //printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
-=======
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
->>>>>>> develop
           d_new = dinit;
         }
         else{
