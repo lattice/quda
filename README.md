@@ -87,7 +87,7 @@ or specify e.g. -DQUDA_GPU_ARCH=sm_60 for a Pascal GPU in step 2.
 
 ### Multi-GPU support
 
-QUDA supports using multiple GPUs through MPI and QUDA.
+QUDA supports using multiple GPUs through MPI and QMP.
 To enable multi-GPU support either set `QUDA_MPI` or `QUDA_QMP` to ON when configuring QUDA through cmake. 
 
 Note that in any case cmake will automatically try to detect your MPI installation. If you need to specify a particular MPI please set `MPI_C_COMPILER` and `MPI_CXX_COMPILER` in cmake. 

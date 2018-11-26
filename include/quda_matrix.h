@@ -69,7 +69,9 @@ namespace quda {
       public:
         T data[N*N];
 
-	__device__ __host__ inline Matrix() {
+        __device__ __host__ constexpr int size() const { return N; }
+
+        __device__ __host__ inline Matrix() {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) zero(data[i]);
 	}
@@ -496,42 +498,42 @@ namespace quda {
 
   template<class T>
     __device__  __host__ inline
-    void computeMatrixInverse(const Matrix<T,3>& u, Matrix<T,3>* uinv)
+    Matrix<T,3> inverse(const Matrix<T,3> &u)
     {
-
-      const T & det = getDeterminant(u);
-      const T & det_inv = static_cast<typename T::value_type>(1.0)/det;
+      const T det = getDeterminant(u);
+      const T det_inv = static_cast<typename T::value_type>(1.0)/det;
+      Matrix<T,3> uinv;
 
       T temp;
 
       temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
-      (*uinv)(0,0) = (det_inv*temp);
+      uinv(0,0) = (det_inv*temp);
 
       temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
-      (*uinv)(0,1) = (temp*det_inv);
+      uinv(0,1) = (temp*det_inv);
 
       temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
-      (*uinv)(0,2) = (temp*det_inv);
+      uinv(0,2) = (temp*det_inv);
 
       temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
-      (*uinv)(1,0) = (det_inv*temp);
+      uinv(1,0) = (det_inv*temp);
 
       temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
-      (*uinv)(1,1) = (temp*det_inv);
+      uinv(1,1) = (temp*det_inv);
 
       temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
-      (*uinv)(1,2) = (temp*det_inv);
+      uinv(1,2) = (temp*det_inv);
 
       temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
-      (*uinv)(2,0) = (det_inv*temp);
+      uinv(2,0) = (det_inv*temp);
 
       temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
-      (*uinv)(2,1) = (temp*det_inv);
+      uinv(2,1) = (temp*det_inv);
 
       temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
-      (*uinv)(2,2) = (temp*det_inv);
+      uinv(2,2) = (temp*det_inv);
 
-      return;
+      return uinv;
     }
 
 

@@ -782,8 +782,6 @@ namespace quda {
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
-
-#ifdef ALTRELIABLE
     /**
        double4 quadrupleCGReduction(V x, V y, V z){}
        First performs the operation norm2(x)
@@ -795,8 +793,8 @@ namespace quda {
     struct quadrupleCGReduction_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
       quadrupleCGReduction_(const Float2 &a, const Float2 &b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-  typedef typename ScalarType<ReduceType>::type scalar;
-  norm2_<scalar>(sum.x,x); norm2_<scalar>(sum.y,y); dot_<scalar>(sum.z,y,z); norm2_<scalar>(sum.w,w);
+        typedef typename ScalarType<ReduceType>::type scalar;
+        norm2_<scalar>(sum.x,x); norm2_<scalar>(sum.y,y); dot_<scalar>(sum.z,y,z); norm2_<scalar>(sum.w,w);
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 8; } //! flops per element
@@ -804,10 +802,8 @@ namespace quda {
 
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
       return reduce::reduceCuda<double4,QudaSumFloat4,quadrupleCGReduction_,0,0,0,0,0,false>
-  (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
+        (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
-
-#endif
 
     /**
        double quadrupleCG3InitNorm(d a, d b, V x, V y, V z, V w, V v){}

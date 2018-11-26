@@ -1688,6 +1688,7 @@ bool compute_fatlong = false;
 double tol = 1e-7;
 double tol_hq = 0.;
 double reliable_delta = 0.1;
+bool alternative_reliable = false;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
@@ -2506,6 +2507,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     reliable_delta = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--alternative-reliable") == 0){
+    if (i+1 >= argc) {
+      usage(argv);
+    }
+    if (strcmp(argv[i+1], "true") == 0) {
+      alternative_reliable = true;
+    } else if (strcmp(argv[i+1], "false") == 0) {
+      alternative_reliable = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid multishift boolean\n");
+      exit(1);
+    }
     i++;
     ret = 0;
     goto out;
