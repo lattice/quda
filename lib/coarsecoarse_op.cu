@@ -2,9 +2,7 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 
-// this is the storage type used when computing the coarse link variables
-// by using integers we have deterministic atomics
-typedef int storeType;
+#define COARSECOARSE
 #ifdef GPU_MULTIGRID
 #include <coarse_op.cuh>
 #endif
