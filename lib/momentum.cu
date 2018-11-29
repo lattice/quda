@@ -178,6 +178,7 @@ using namespace gauge;
 	Matrix<complex<Float>,3> m = arg.mom(d, x_cb, parity);
         Matrix<complex<Float>,3> f = arg.force(d, e_cb, parity);
 
+        // project to traceless anti-hermitian prior to taking norm
 	makeAntiHerm(f);
 
         // compute force norms
@@ -185,6 +186,9 @@ using namespace gauge;
 
         m = m + arg.coeff * f;
 
+        // strictly speaking this shouldn't be needed since the
+        // momentum should already be traceless anti-hermitian but at
+        // present the unit test will fail without this
 	makeAntiHerm(m);
 	arg.mom(d, x_cb, parity) = m;
       }
