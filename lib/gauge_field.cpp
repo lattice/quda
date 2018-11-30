@@ -4,7 +4,9 @@
 
 namespace quda {
 
-  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(u),
+  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) :
+    LatticeFieldParam(u),
+    location(u.Location()),
     nColor(u.Ncolor()),
     nFace(u.Nface()),
     reconstruct(u.Reconstruct()),

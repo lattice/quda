@@ -135,7 +135,9 @@ namespace quda {
       this->ghost_precision = precision;
 
       if (native) {
-	order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ?
+	order = (precision == QUDA_DOUBLE_PRECISION ||
+                 reconstruct == QUDA_RECONSTRUCT_NO ||
+                 reconstruct == QUDA_RECONSTRUCT_10) ?
 	  QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
       }
     }
