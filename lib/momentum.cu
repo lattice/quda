@@ -130,7 +130,7 @@ using namespace gauge;
 
 #ifdef GPU_GAUGE_TOOLS
   template<typename Float, QudaReconstructType reconstruct_>
-  struct UpdateMomArg : public ReduceArg<double3> {
+  struct UpdateMomArg : public ReduceArg<double2> {
     int threads;
     static constexpr int force_recon = (reconstruct_ == QUDA_RECONSTRUCT_10 ? 11 : 18);
     FloatNOrder<Float,18,2,11> mom;
@@ -150,13 +150,13 @@ using namespace gauge;
   };
 
   /**
-     @brief Functor for finding the maximum over a double3 field.
-     Each lane of the double3 is evaluated separately.  This functor
+     @brief Functor for finding the maximum over a double2 field.
+     Each lane of the double2 is evaluated separately.  This functor
      is passed to the reduce helper.
    */
-  struct max_reducer3 {
-    __device__ __host__ inline double3 operator()(const double3 &a, const double3 &b) {
-      return make_double3(a.x > b.x ? a.x : b.x, a.y > b.y ? a.y : b.y, a.z > b.z ? a.z : b.z);
+  struct max_reducer2 {
+    __device__ __host__ inline double2 operator()(const double2 &a, const double2 &b) {
+      return make_double2(a.x > b.x ? a.x : b.x, a.y > b.y ? a.y : b.y);
     }
   };
 
@@ -164,8 +164,8 @@ using namespace gauge;
   __global__ void UpdateMomKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = threadIdx.y;
-    double3 norm3 = make_double3(0.0,0.0,0.0);
-    max_reducer3 r;
+    double2 norm2 = make_double2(0.0,0.0);
+    max_reducer2 r;
 
     while (x_cb<arg.threads) {
       int x[4];
@@ -182,7 +182,7 @@ using namespace gauge;
 	makeAntiHerm(f);
 
         // compute force norms
-        norm3 = r(make_double3(f.L1(), f.L2(), f.Linf()), norm3);
+        norm2 = r(make_double2(f.L1(), f.L2()), norm2);
 
         m = m + arg.coeff * f;
 
@@ -197,7 +197,7 @@ using namespace gauge;
     }
 
     // perform final inter-block reduction and write out result
-    reduce2d<blockSize,2,double3,false,max_reducer3>(arg, norm3, 0);
+    reduce2d<blockSize,2,double2,false,max_reducer2>(arg, norm2, 0);
   } // UpdateMom
 
   
@@ -261,7 +261,7 @@ using namespace gauge;
     if (count == 0) {
       path += (profile_fname ? std::string("/") + profile_fname + "_force.tsv" : std::string("/force.tsv"));
       force_file.open(path.c_str());
-      force_file << "Force\tL1\tL2\tLinf\tdt" << std::endl;
+      force_file << "Force\tL1\tL2\tdt" << std::endl;
     } else {
       force_file.open(path.c_str(), std::ios_base::app);
     }
@@ -286,12 +286,11 @@ using namespace gauge;
 
     if (forceMonitor()) {
       qudaDeviceSynchronize();
-      comm_allreduce_array((double*)arg.result_h, 3);
+      comm_allreduce_array((double*)arg.result_h, 2);
 
       if (comm_rank()==0) {
         force_stream << fname << "\t" << std::setprecision(5) << arg.result_h[0].x << "\t"
                      << std::setprecision(5) << arg.result_h[0].y << "\t"
-                     << std::setprecision(5) << arg.result_h[0].z << "\t"
                      << std::setprecision(5) << abs(arg.coeff) << std::endl;
         if (++force_count % force_flush == 0) flushForceMonitor();
       }
