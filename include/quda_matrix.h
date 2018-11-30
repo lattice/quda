@@ -165,7 +165,7 @@ namespace quda {
         }
 
         /**
-           @brief Compute the matrix L1 norm - this is the maximum of
+           @brief Compute the matrix Linfinity norm - this is the maximum of
            the absolute row sums.
            @return Computed Linfinity norm
         */
