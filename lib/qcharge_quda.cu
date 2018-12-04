@@ -33,7 +33,7 @@ namespace quda {
 
       double tmpQ1 = 0.;
 
-      if(idx < arg.threads) {
+      while (idx < arg.threads) {
         int parity = 0;  
         if(idx >= arg.threads/2) {
           parity = 1;
@@ -56,6 +56,8 @@ namespace quda {
         tmpQ3 = (getTrace(temp3)).x;
         tmpQ1 += (tmpQ3 - tmpQ2);
         tmpQ1 /= (Pi2*Pi2);
+
+        idx += blockDim.x*gridDim.x;
       }
 
       double Q = tmpQ1;
@@ -68,15 +70,11 @@ namespace quda {
       const QudaFieldLocation location;
       GaugeField *vol;
 
-      private: 
+    private:
       unsigned int sharedBytesPerThread() const { return 0; };
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-//      bool tuneSharedBytes() const { return false; } // Don't tune the shared memory.
-      bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-      unsigned int minThreads() const { return arg.threads; }
-
-      public:
+    public:
       QChargeCompute(QChargeArg<Float,Gauge> &arg, GaugeField *vol, QudaFieldLocation location) 
         : arg(arg), vol(vol), location(location) {
 	writeAuxString("threads=%d,prec=%lu",arg.threads,sizeof(Float));

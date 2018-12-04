@@ -77,11 +77,12 @@ namespace quda {
   __global__ void cloverInvertKernel(Arg arg) {
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = threadIdx.y;
+    double2 trlogA = 0.0;
     double trlogA_parity = 0.0;
-    if (idx < arg.clover.volumeCB)
+    while (idx < arg.clover.volumeCB) {
       trlogA_parity = cloverInvertCompute<Float,Arg,computeTrLog,twist>(arg, idx, parity);
-    double2 trlogA = parity ? make_double2(0.0,trlogA_parity) : make_double2(trlogA_parity, 0.0);
-
+      trlogA = parity ? make_double2(0.0,trlogA.y+trlogA_parity) : make_double2(trlogA.x+trlogA_parity, 0.0);
+    }
     if (computeTrLog) reduce2d<blockSize,2>(arg, trlogA);
   }
 
@@ -93,7 +94,7 @@ namespace quda {
 
   private:
     bool tuneSharedBytes() const { return false; } // Don't tune the shared memory
-    unsigned int minThreads() const { return arg.clover.volumeCB; }
+    bool tuneGridDim() const { return true; }
 
   public:
     CloverInvert(Arg &arg, const CloverField &meta, QudaFieldLocation location)
