@@ -296,7 +296,7 @@ using namespace gauge;
     UpdateMom<Float,decltype(arg)> update(arg, force);
     update.apply(0);
 
-    if (forceMonitor()) forceRecord(*((double2*)arg.array_h), arg.coeff, fname);
+    if (forceMonitor()) forceRecord(*((double2*)arg.result_h), arg.coeff, fname);
   }
   
   template <typename Float>
