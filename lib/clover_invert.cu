@@ -77,11 +77,12 @@ namespace quda {
   __global__ void cloverInvertKernel(Arg arg) {
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = threadIdx.y;
-    double2 trlogA = 0.0;
+    double2 trlogA = make_double2(0.0,0.0);
     double trlogA_parity = 0.0;
     while (idx < arg.clover.volumeCB) {
       trlogA_parity = cloverInvertCompute<Float,Arg,computeTrLog,twist>(arg, idx, parity);
       trlogA = parity ? make_double2(0.0,trlogA.y+trlogA_parity) : make_double2(trlogA.x+trlogA_parity, 0.0);
+      idx += blockDim.x*gridDim.x;
     }
     if (computeTrLog) reduce2d<blockSize,2>(arg, trlogA);
   }
