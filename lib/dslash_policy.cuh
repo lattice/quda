@@ -2123,7 +2123,7 @@ struct DslashFactory {
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
    void apply(const cudaStream_t &stream) {
-     TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
+     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (config != tp.aux.w && comm_size() > 1) {
        errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "

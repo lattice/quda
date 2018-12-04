@@ -10,6 +10,62 @@ namespace quda {
 
 using namespace gauge;
 
+  bool forceMonitor() {
+    static bool init = false;
+    static bool monitor = false;
+    if (!init) {
+      char *path = getenv("QUDA_RESOURCE_PATH");
+      char *enable_force_monitor = getenv("QUDA_ENABLE_FORCE_MONITOR");
+      if (path && enable_force_monitor && strcmp(enable_force_monitor, "1") == 0) monitor = true;
+      init = true;
+    }
+    return monitor;
+  }
+
+  static std::stringstream force_stream;
+  static long long force_count = 0;
+  static long long force_flush = 1000; // how many force samples we accumulate before flushing
+
+  void flushForceMonitor() {
+    if (!forceMonitor() || comm_rank() != 0) return;
+
+    static std::string path = std::string(getenv("QUDA_RESOURCE_PATH"));
+    static char *profile_fname = getenv("QUDA_PROFILE_OUTPUT_BASE");
+
+    std::ofstream force_file;
+    static long long count = 0;
+    if (count == 0) {
+      path += (profile_fname ? std::string("/") + profile_fname + "_force.tsv" : std::string("/force.tsv"));
+      force_file.open(path.c_str());
+      force_file << "Force\tL1\tL2\tdt" << std::endl;
+    } else {
+      force_file.open(path.c_str(), std::ios_base::app);
+    }
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Flushing force monitor data to %s\n", path.c_str());
+    force_file << force_stream.str();
+
+    force_file.flush();
+    force_file.close();
+
+    // empty the stream buffer
+    force_stream.clear();
+    force_stream.str(std::string());
+
+    count++;
+  }
+
+  void forceRecord(double2 &force, double dt, const char *fname) {
+    qudaDeviceSynchronize();
+    comm_allreduce_max_array((double*)&force, 2);
+
+    if (comm_rank()==0) {
+      force_stream << fname << "\t" << std::setprecision(5) << force.x << "\t"
+                   << std::setprecision(5) << force.y << "\t"
+                   << std::setprecision(5) << dt << std::endl;
+      if (++force_count % force_flush == 0) flushForceMonitor();
+    }
+  }
+
 #ifdef GPU_GAUGE_TOOLS
 
   template <typename Mom>
@@ -234,67 +290,13 @@ using namespace gauge;
     long long bytes() const { return 4*2*arg.threads*(2*arg.mom.Bytes()+arg.force.Bytes()); }
   };
 
-  bool forceMonitor() {
-    static bool init = false;
-    static bool monitor = false;
-    if (!init) {
-      char *path = getenv("QUDA_RESOURCE_PATH");
-      char *enable_force_monitor = getenv("QUDA_ENABLE_FORCE_MONITOR");
-      if (path && enable_force_monitor && strcmp(enable_force_monitor, "1") == 0) monitor = true;
-      init = true;
-    }
-    return monitor;
-  }
-
-  static std::stringstream force_stream;
-  static long long force_count = 0;
-  static long long force_flush = 1000; // how many force samples we accumulate before flushing
-
-  void flushForceMonitor() {
-    if (!forceMonitor() || comm_rank() != 0) return;
-
-    static std::string path = std::string(getenv("QUDA_RESOURCE_PATH"));
-    static char *profile_fname = getenv("QUDA_PROFILE_OUTPUT_BASE");
-
-    std::ofstream force_file;
-    static long long count = 0;
-    if (count == 0) {
-      path += (profile_fname ? std::string("/") + profile_fname + "_force.tsv" : std::string("/force.tsv"));
-      force_file.open(path.c_str());
-      force_file << "Force\tL1\tL2\tdt" << std::endl;
-    } else {
-      force_file.open(path.c_str(), std::ios_base::app);
-    }
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Flushing force monitor data to %s\n", path.c_str());
-    force_file << force_stream.str();
-
-    force_file.flush();
-    force_file.close();
-
-    // empty the stream buffer
-    force_stream.clear();
-    force_stream.str(std::string());
-
-    count++;
-  }
-
   template<typename Float, QudaReconstructType reconstruct>
   void updateMomentum(GaugeField &mom, Float coeff, GaugeField &force, const char *fname) {
     UpdateMomArg<Float,reconstruct> arg(mom, coeff, force);
     UpdateMom<Float,decltype(arg)> update(arg, force);
     update.apply(0);
 
-    if (forceMonitor()) {
-      qudaDeviceSynchronize();
-      comm_allreduce_array((double*)arg.result_h, 2);
-
-      if (comm_rank()==0) {
-        force_stream << fname << "\t" << std::setprecision(5) << arg.result_h[0].x << "\t"
-                     << std::setprecision(5) << arg.result_h[0].y << "\t"
-                     << std::setprecision(5) << abs(arg.coeff) << std::endl;
-        if (++force_count % force_flush == 0) flushForceMonitor();
-      }
-    }
+    if (forceMonitor()) forceRecord(*((double2*)arg.result_h), arg.coeff, fname);
   }
   
   template <typename Float>

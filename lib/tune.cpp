@@ -649,11 +649,9 @@ namespace quda {
 #endif
 
     static const Tunable *active_tunable; // for error checking
+    it = tunecache.find(key);
 
     // first check if we have the tuned value and return if we have it
-    //if (enabled == QUDA_TUNE_YES && tunecache.count(key)) {
-
-    it = tunecache.find(key);
     if (enabled == QUDA_TUNE_YES && it != tunecache.end()) {
 
 #ifdef LAUNCH_TIMER
@@ -662,6 +660,11 @@ namespace quda {
 #endif
 
       TuneParam &param = it->second;
+
+      if (verbosity >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("Launching %s with %s at vol=%s with %s\n",
+                   key.name, key.aux, key.volume, tunable.paramString(param).c_str());
+      }
 
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -696,10 +699,14 @@ namespace quda {
     launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
 #endif
 
-
     if (enabled == QUDA_TUNE_NO) {
       tunable.defaultTuneParam(param);
       tunable.checkLaunchParam(param);
+
+      if (verbosity >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("Launching %s with %s at vol=%s with %s (untuned)\n",
+                   key.name, key.aux, key.volume, tunable.paramString(param).c_str());
+      }
     } else if (!tuning) {
 
       /* As long as global reductions are not disabled, only do the
