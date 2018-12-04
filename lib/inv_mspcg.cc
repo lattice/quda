@@ -14,6 +14,8 @@
 
 #include <inv_mspcg.h>
 
+#include <mpi.h>
+
 extern quda::cudaGaugeField* gaugePrecondition;
 extern quda::cudaGaugeField* gaugePrecise;
 extern quda::cudaGaugeField* gaugeSloppy;
@@ -190,6 +192,7 @@ namespace quda {
     precise_timer.Reset("woo", "hoo", 0);
     sloppy_timer.Reset("woo", "hoo", 0);
     preconditioner_timer.Reset("woo", "hoo", 0);
+    for(int i = 0; i < 6; i++) linalg_timer[i].Reset("Woo", "Hoo", 0);
   }
 
   MSPCG::~MSPCG(){
@@ -405,12 +408,9 @@ namespace quda {
       } 
 // f4
       {
-      int shift[4] = {2,2,2,2};
-      int halo_shift[4] = {1,1,1,1};
-
       blas::zero(*fx); blas::zero(*ft);
       mat_precondition->Dslash4prePartial(*ft, *fb, static_cast<QudaParity>(0), sp_len0, RR0, Xs0); 
-      mat_precondition->fused_f4(*fx, *cb, 1., static_cast<QudaParity>(0), shift, shift);
+      mat_precondition->fused_f4(*fx, *cb, 1., static_cast<QudaParity>(0), shift2, shift1);
       printfQuda("f4: <------\n");
       ft2 = blas::norm2(*ft);
       printfQuda("           ft2 = %16.12e.\n", ft2);
@@ -715,11 +715,11 @@ namespace quda {
 //      copier_timer.Start("woo", "hoo", 0);
 //      copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
 //      copier_timer.Stop("woo", "hoo", 0);
-
-      blas::copy(*fr, *r);
-
-      sloppy_timer.Start("woo", "hoo", 0);
       
+      blas::copy(*fr, *r);
+      
+      sloppy_timer.Start("woo", "hoo", 0);
+
       preconditioner_timer.Start("woo", "hoo", 0);
       if(inner_iterations <= 0){
         blas::copy(*z, *fr);
@@ -847,6 +847,10 @@ namespace quda {
   void MSPCG::reliable_update(ColorSpinorField& dx, ColorSpinorField& db)
   {
 
+    const char fname[] = "Woo";
+    const char cname[] = "Hoo";
+    const int lname = 0;
+
     Gflops = 0.;
     fGflops = 0.;
     
@@ -878,7 +882,10 @@ namespace quda {
 
 // START of the main loop
 
+    precise_timer.Start(fname, cname, lname);
     (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2); // r = MdagM * x
+    precise_timer.Stop(fname, cname, lname);
+    
     double r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
     printfQuda("True precise residual is %8.4e\n", r2);
     printfQuda("Using a sophisticated reliable update scheme.\n");
@@ -913,13 +920,8 @@ namespace quda {
 
     blas::copy(*r, *vct_dr); // throw true residual into the sloppy solver.
     blas::zero(*x);
-    //      copier_timer.Start("woo", "hoo", 0);
-    //      copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
-    //      copier_timer.Stop("woo", "hoo", 0);
 
     blas::copy(*fr, *r);
-
-    sloppy_timer.Start("woo", "hoo", 0);
 
     double rr2 = r2;
 
@@ -931,16 +933,16 @@ namespace quda {
     }
     preconditioner_timer.Stop("woo", "hoo", 0);
 
-    //      copier_timer.Start("woo", "hoo", 0);
-    //      copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
-    //      copier_timer.Stop("woo", "hoo", 0);
     blas::copy(*p, *z);
 
     k = 0;
     while( k < param.maxiter ){
 
+      sloppy_timer.Start(fname, cname, lname);
       (*nrm_op_sloppy)(*mmp, *p, *tmp, *tmp2);
+      sloppy_timer.Stop(fname, cname, lname);
       
+      linalg_timer[0].Start(fname, cname, lname);
       r2_old = rr2;
 #if 0
       rkzk = reDotProduct(*r, *z);
@@ -956,7 +958,6 @@ namespace quda {
       rkzk = dot[8].real();
 #endif
       //printfQuda("rkzk = %e\n", rkzk);
-      //printfQuda("pApp = %e %e %e\n", pAppp.x, pAppp.y, pAppp.z);
       //for (int i=0; i<6; i++) printfQuda("%d %e %e\n", i, dot[i].real(), dot[i].imag());
 
       //      pkApk = reDotProduct(*p, *mmp);
@@ -970,11 +971,10 @@ namespace quda {
       axpy(alpha, *p, *x); // x_k+1 = x_k + alpha * p_k
       rr2 = axpyNorm(-alpha, *mmp, *r); // r_k+1 = r_k - alpha * Ap_k
       rNorm = sqrt(rr2);
-
-      // reliable update
       
+// the more sophisticated reliable update
       if( rr2 > r2_max ) r2_max = rr2;
-//      if( rr2 < reliable_update_delta*reliable_update_delta*r2_max || rr2 < stop ){
+      // if( rr2 < reliable_update_delta*reliable_update_delta*r2_max || rr2 < stop ){
       if( rr2 < stop or ( ( (d <= deps*sqrt(r2_old)) or (dfac*dinit > deps*r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac*dinit) ) ){
         
         printfQuda("Reliable update conditions: \n    d_n-1 < eps*r2_old: %8.4e < %8.4e,\n    dn    > eps*r_n: %8.4e    > %8.4e,\n    dnew  > 1.1*dinit: %8.4e  > (1.1*)%8.4e.\n",
@@ -1016,49 +1016,43 @@ namespace quda {
       if(rr2 < stop) break;
 
       // z = M^-1 r
-      //        copier_timer.Start("woo", "hoo", 0);
-      //        copyExtendedColorSpinor(*fr, *r, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
-      //        copier_timer.Stop("woo", "hoo", 0);
-
       blas::copy(*fr, *r);
 
-      preconditioner_timer.Start("woo", "hoo", 0);
+      linalg_timer[0].Stop(fname, cname, lname);
+      
+      preconditioner_timer.Start(fname, cname, 0);
       if(inner_iterations <= 0){
         blas::copy(*z, *fr);
       }else{
         inner_cg(*z, *fr);
       }
-      preconditioner_timer.Stop("woo", "hoo", 0);
+      
+      // Want to have a barrier here.
+      // The reason is the inner cause some amount of desyncronization amount the MPI ranks
+      // The barrier here makes the precontioner timer contain this desync, other than 
+      // redirect it to the linear algebra timer.
+      comm_barrier();
+      preconditioner_timer.Stop(fname, cname, 0);
 
-      //        copier_timer.Start("woo", "hoo", 0);
-      //        copyExtendedColorSpinor(*z, *fz, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
-      //        copier_timer.Stop("woo", "hoo", 0);
-      // TODO: test
-      //        double diff_real =  cDotProduct(*z, *r_old).real();
-      //        double diff_imag =  cDotProduct(*z, *r_old).imag();
-      //        printfQuda("MSPCG/iter.count/diff: %05d %8.4e +i %8.4e\n", k, diff_real, diff_imag);
-      // TODO:
-
-      //xpay(*r, -1., *r_old);
-      //zkP1rkp1 = reDotProduct(*z, *r_old);
+      linalg_timer[1].Start(fname, cname, lname);      
+#if 0
+      xpay(*r, -1., *r_old);
+      zkP1rkp1 = reDotProduct(*z, *r_old);
+#else
       // replace with fused kernel
       Complex ztmp = xpaycDotzy(*r, -1., *r_old, *z);
       zkP1rkp1 = ztmp.real();
+#endif
 
-      //      zkP1rkp1 = reDotProduct(*z, *r);
+      // zkP1rkp1 = reDotProduct(*z, *r);
       beta = zkP1rkp1 / rkzk;
-      //        beta = (zkP1rkp1-diff_real) / rkzk;
       xpay(*z, beta, *p);
+      
+      linalg_timer[1].Stop(fname, cname, lname);
 
-//      double zz2 = blas::norm2(*z);
-//      printfQuda("z2/r2: %8.4e/%8.4e.\n", zz2, rr2);
-
-      ++k;
+      k++;
       printfQuda("MSPCG/iter.count/r2/target_r2/%%/target_%%: %05d %8.4e %8.4e %8.4e %8.4e\n", k, rr2, stop, std::sqrt(rr2/b2), param.tol);
-
     }
-
-    sloppy_timer.Stop("woo", "hoo", 0);
 
 // END of main loop 
     
@@ -1071,13 +1065,15 @@ namespace quda {
 
     double precise_tflops = nrm_op->flops()*1e-12;
     double sloppy_tflops = nrm_op_sloppy->flops()*1e-12;
-    double preconditioner_tflops = (nrm_op_precondition->flops()+blas::flops)*1e-12;
-    
-    param.gflops = (preconditioner_tflops+sloppy_tflops+precise_tflops)*1e3;
+    double preconditioner_tflops = nrm_op_precondition->flops()*1e-12;
+    double linalg_tflops = blas::flops*1e-12;
+
+    param.gflops = (preconditioner_tflops+sloppy_tflops+precise_tflops+linalg_tflops)*1e3;
     
     reduceDouble(precise_tflops);
     reduceDouble(sloppy_tflops);
     reduceDouble(preconditioner_tflops);
+    reduceDouble(linalg_tflops);
 
     double prec_time = preconditioner_timer.time; 
 //    reduceMaxDouble(prec_time);
@@ -1096,12 +1092,17 @@ namespace quda {
     printfQuda("Performance precise:        %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
       precise_tflops/precise_timer.time, precise_timer.time, precise_timer.count);
     printfQuda("Performance sloppy:         %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
-      sloppy_tflops/(sloppy_timer.time-prec_time-precise_timer.time), sloppy_timer.time-prec_time-precise_timer.time, sloppy_timer.count);
+      sloppy_tflops/sloppy_timer.time, sloppy_timer.time, sloppy_timer.count);
     printfQuda("Performance preconditioner: %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
       preconditioner_tflops/prec_time, prec_time, preconditioner_timer.count);
     printfQuda("Performance copier:                         in %8.4f secs with %05d calls.\n",
       copier_timer.time, copier_timer.count);
-    printfQuda("Flops ratio sloppy/preconditioner: %.2f.\n", preconditioner_tflops/sloppy_tflops/(double)inner_iterations);
+    for(int i = 0; i < 2; i++){
+    printfQuda("Performance linear algebra [%d]:             in %8.4f secs with %05d calls.\n",
+      i, linalg_timer[i].time, linalg_timer[i].count);
+    }
+    printf("preconditioner desync #%03d: %8.4f msecs.\n", comm_rank(), preconditioner_timer.last*1e3);
+    // printfQuda("Flops ratio sloppy/preconditioner: %.2f.\n", preconditioner_tflops/sloppy_tflops/(double)inner_iterations);
 
     // reset the flops counters
     blas::flops = 0;

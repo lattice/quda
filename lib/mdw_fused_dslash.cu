@@ -642,8 +642,8 @@ namespace quda {
 
       void apply(const cudaStream_t &stream) {
         // By its name we ONLY have a GPU version
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        // TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+        // TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
           switch(arg.type){
             case 0:
               switch(tp.block.x){

@@ -65,6 +65,7 @@ namespace quda {
       Timer preconditioner_timer;
       Timer sloppy_timer;
       Timer precise_timer;
+      Timer linalg_timer[6];
  
       int sp_len2, sp_len1, sp_len0;
       int RR2[4], RR1[4], RR0[4];
