@@ -26,15 +26,11 @@ namespace quda {
         errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
-      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
 
-      const ColorSpinorField &v = T.Vectors(g.Location());
-
-      V vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
       gFine gAccessor(const_cast<GaugeField&>(g));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
@@ -44,7 +40,7 @@ namespace quda {
 
       calculateStaggeredY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-         vAccessor, gAccessor, Y, X, Yatomic, Xatomic, uv, v, mass, dirac, matpc,
+         gAccessor, Y, X, Yatomic, Xatomic, uv, g, mass, dirac, matpc,
          T.fineToCoarse(location), T.coarseToFine(location));
 
     } else {
@@ -62,9 +58,6 @@ namespace quda {
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
 
-      const ColorSpinorField &v = T.Vectors(g.Location());
-
-      F vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
       gFine gAccessor(const_cast<GaugeField&>(g));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
@@ -74,7 +67,7 @@ namespace quda {
 
       calculateStaggeredY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-         vAccessor, gAccessor, Y, X, Yatomic, Xatomic, uv, v, mass, dirac, matpc,
+         gAccessor, Y, X, Yatomic, Xatomic, uv, g, mass, dirac, matpc,
          T.fineToCoarse(location), T.coarseToFine(location));
 
     }
