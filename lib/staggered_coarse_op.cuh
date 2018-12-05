@@ -7,13 +7,13 @@
 
 namespace quda {
 
-  // All staggered operators are un-preconditioned, so we use uni-directional
-  // coarsening. For debugging, though, we can force bi-directional coarsening.
+  // We can technically do a uni-directional build, but becauase
+  // the coarse link builds are just permutations plus lots of zeros,
+  // it's faster to skip the flip!
   static bool bidirectional_debug = true; //false;
 
 
   enum ComputeType {
-    COMPUTE_UV,
     COMPUTE_VUV,
     COMPUTE_REVERSE_Y,
     COMPUTE_MASS,
@@ -43,9 +43,6 @@ namespace quda {
     {
       long long flops_ = 0;
       switch (type) {
-      case COMPUTE_UV:
-        flops_ = 0; // permutation
-        break;
       case COMPUTE_VUV:
         flops_ = 0; // permutation
         break;
@@ -72,12 +69,8 @@ namespace quda {
     {
       long long bytes_ = 0;
       switch (type) {
-      case COMPUTE_UV:
-        // 2 for complex, 2 for read/write
-        bytes_ = arg.UV.Bytes() + arg.U.Bytes(); // needs to write 0s to arg.UV where appropriate
-        break;
       case COMPUTE_VUV:
-        bytes_ = 2*arg.U.Bytes(); // only needs to read and write non-zero elements
+        bytes_ = 2*2*arg.U.Bytes(); // only needs to read and write non-zero elements
         break; 
       case COMPUTE_REVERSE_Y:
         bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
@@ -100,7 +93,6 @@ namespace quda {
     unsigned int minThreads() const {
       unsigned int threads = 0;
       switch (type) {
-      case COMPUTE_UV:
       case COMPUTE_VUV:
         threads = arg.fineVolumeCB;
         break;
@@ -145,24 +137,7 @@ namespace quda {
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 
-      	if (type == COMPUTE_UV) {
-
-      	  if (dir == QUDA_BACKWARDS) {
-      	    if      (dim==0) ComputeStaggeredUVCPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==1) ComputeStaggeredUVCPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==2) ComputeStaggeredUVCPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==3) ComputeStaggeredUVCPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	  } else if (dir == QUDA_FORWARDS) {
-      	    if      (dim==0) ComputeStaggeredUVCPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==1) ComputeStaggeredUVCPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==2) ComputeStaggeredUVCPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==3) ComputeStaggeredUVCPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	  } else {
-      	    errorQuda("Undefined direction %d", dir);
-      	  }
-
-
-      	} else if (type == COMPUTE_VUV) {
+      	if (type == COMPUTE_VUV) {
 
           arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
@@ -203,29 +178,7 @@ namespace quda {
       	}
       } else {
 
-      	if (type == COMPUTE_UV) {
-
-          if (dir != QUDA_BACKWARDS && dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", dir);
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeStaggeredUVGPU")
-            .instantiate(Type<Float>(),dim,dir,fineColor,coarseSpin,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else // no JITIFY
-      	  if (dir == QUDA_BACKWARDS) {
-      	    if      (dim==0) ComputeStaggeredUVGPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==1) ComputeStaggeredUVGPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==2) ComputeStaggeredUVGPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==3) ComputeStaggeredUVGPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	  } else if (dir == QUDA_FORWARDS) {
-      	    if      (dim==0) ComputeStaggeredUVGPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==1) ComputeStaggeredUVGPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==2) ComputeStaggeredUVGPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==3) ComputeStaggeredUVGPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	  } 
-#endif // no JITIFY
-
-      	} else if (type == COMPUTE_VUV) {
+      	if (type == COMPUTE_VUV) {
 
 #ifdef JITIFY
           using namespace jitify::reflection;
@@ -320,7 +273,6 @@ namespace quda {
       case COMPUTE_RESCALE:
         resizeVector(2*coarseColor,coarseColor);
         break;
-      case COMPUTE_UV:
       case COMPUTE_VUV:
         resizeVector(2,fineColor*fineColor);
         break;
@@ -343,15 +295,14 @@ namespace quda {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
 
-      if      (type == COMPUTE_UV)                 strcat(Aux,",computeStaggeredUV");
-      else if (type == COMPUTE_VUV)                strcat(Aux,",computeStaggeredVUV");
+      if      (type == COMPUTE_VUV)                strcat(Aux,",computeStaggeredVUV");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeStaggeredYreverse");
       else if (type == COMPUTE_MASS)               strcat(Aux,",computeStaggeredMass");
       else if (type == COMPUTE_CONVERT)            strcat(Aux,",computeStaggeredConvert");
       else if (type == COMPUTE_RESCALE)            strcat(Aux,",ComputeStaggeredRescale");
       else errorQuda("Unknown type=%d\n", type);
 
-      if (type == COMPUTE_UV || type == COMPUTE_VUV) {
+      if (type == COMPUTE_VUV) {
       	if      (dim == 0) strcat(Aux,",dim=0");
       	else if (dim == 1) strcat(Aux,",dim=1");
       	else if (dim == 2) strcat(Aux,",dim=2");
@@ -392,7 +343,6 @@ namespace quda {
         break;
       case COMPUTE_RESCALE:
         Y.backup();
-      case COMPUTE_UV:
       case COMPUTE_REVERSE_Y:
         break;
       default:
@@ -413,7 +363,6 @@ namespace quda {
         break;
       case COMPUTE_RESCALE:
         Y.restore();
-      case COMPUTE_UV:
       case COMPUTE_REVERSE_Y:
         break;
       default:
@@ -429,7 +378,6 @@ namespace quda {
 
      @param Y[out] Coarse (fat-)link field accessor
      @param X[out] Coarse clover field accessor
-     @param UV[out] Temporary accessor used to store fine link field * null space vectors
      @param G[in] Fine grid link / gauge field accessor
      @param Y_[out] Coarse link field
      @param X_[out] Coarse clover field
@@ -440,13 +388,11 @@ namespace quda {
      @param matpc[in] The type of preconditioning of the source fine-grid operator
    */
   template<typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
-	   typename Ftmp, typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge>
+	   typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge>
   void calculateStaggeredY(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
-		  Ftmp &UV, fineGauge &G,
-		  GaugeField &Y_, GaugeField &X_, GaugeField &Y_atomic_, GaugeField &X_atomic_,
-      ColorSpinorField &uv, const GaugeField &G_, 
-		  double mass, QudaDiracType dirac, QudaMatPCType matpc,
+		  fineGauge &G, GaugeField &Y_, GaugeField &X_, GaugeField &Y_atomic_, GaugeField &X_atomic_,
+      const GaugeField &G_, double mass, QudaDiracType dirac, QudaMatPCType matpc,
 		  const int *fine_to_coarse, const int *coarse_to_fine) {
 
     // sanity checks
@@ -483,46 +429,36 @@ namespace quda {
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
-    typedef CalculateStaggeredYArg<Float,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,Ftmp> Arg;
-    Arg arg(Y, X, Y_atomic, X_atomic, UV, G, mass, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
+    typedef CalculateStaggeredYArg<Float,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge> Arg;
+    Arg arg(Y, X, Y_atomic, X_atomic, G, mass, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     CalculateStaggeredY<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, G_, Y_, X_, Y_atomic_, X_atomic_);
 
     QudaFieldLocation location = checkLocation(Y_, X_, G_);
     printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
-    // work out what to set the scales to
-    // ESW hack
+    // We know exactly what the scale should be: the max of all of the (fat) links.
+    double max_scale = 1e-12;
+    for (int d = 0; d < nDim; d++) {
+      double U_max = arg.U.abs_max(d);
+      if (U_max > max_scale) max_scale = U_max;
+    }
+    printfQuda("Global U_max = %e\n", max_scale);
+
     if (coarseGaugeAtomic::fixedPoint()) {
-      double max = 10.0; // FIXME - I can probably put a bound on fat link magnitudes
-      arg.Y_atomic.resetScale(max);
-      arg.X_atomic.resetScale(max);
+      arg.Y_atomic.resetScale(max_scale);
+      arg.X_atomic.resetScale(max_scale > mass ? max_scale : mass); // if for some pointless reason the mass is huge...
     }
 
     // zero the atomic fields before summing to them
     Y_atomic_.zero();
     X_atomic_.zero();
 
-    bool set_scale = false; // records where the scale has been set already or not
-
     // First compute the coarse forward links if needed
     if (bidirectional_links) {
       for (int d = 0; d < nDim; d++) {
       	y.setDimension(d);
       	y.setDirection(QUDA_FORWARDS);
-      	printfQuda("Computing forward %d UV and VUV\n", d);
-
-      	if (uv.Precision() == QUDA_HALF_PRECISION) {
-      	  double U_max = 3.0*arg.U.abs_max(d);
-      	  double uv_max = U_max; // uv is a permutation of U
-      	  uv.Scale(uv_max);
-      	  arg.UV.resetScale(uv_max);
-
-      	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e uv_max = %e\n", d, U_max, uv_max);
-      	}
-
-      	y.setComputeType(COMPUTE_UV);  // compute U*V product
-      	y.apply(0);
-      	printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
+      	printfQuda("Computing forward %d VUV\n", d);
 
       	// if we are writing to a temporary, we need to zero it first
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
@@ -534,22 +470,8 @@ namespace quda {
           if (coarseGauge::fixedPoint()) {
             double y_max = arg.Y_atomic.abs_max( (4+d) % arg.Y_atomic.geometry );
             if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, y_max, 4+d, Y_.Scale());
-            if (!set_scale) {
-              Y_.Scale(1.1*y_max); // slightly oversize to avoid unnecessary rescaling
-              arg.Y.resetScale(Y_.Scale());
-              set_scale = true;
-            } else if (y_max > Y_.Scale()) {
-              // we have exceeded the maximum used before so we need to reset the maximum and rescale the elements
-              arg.rescale = Y_.Scale() / y_max; // how much we need to shrink the elements by
-              y.setComputeType(COMPUTE_RESCALE);
-              for (int d_=0; d_<d; d_++) {
-                y.setDimension(d_);
-                y.apply(0);
-              }
-              y.setDimension(d);
-              Y_.Scale(y_max);
-              arg.Y.resetScale(Y_.Scale());
-            }
+            Y_.Scale(max_scale);
+            arg.Y.resetScale(Y_.Scale());
           }
           y.setComputeType(COMPUTE_CONVERT);
           y.apply(0);
@@ -563,58 +485,23 @@ namespace quda {
     for (int d = 0; d < nDim; d++) {
       y.setDimension(d);
       y.setDirection(QUDA_BACKWARDS);
-      printfQuda("Computing backward %d UV and VUV\n", d);
-
-      if (uv.Precision() == QUDA_HALF_PRECISION) {
-      	double U_max = 3.0*arg.U.abs_max(d);
-      	double uv_max = U_max; // uv is just a permutation of U
-      	uv.Scale(uv_max);
-      	arg.UV.resetScale(uv_max);
-
-      	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e uv_max = %e\n", d, U_max, uv_max);
-      }
-
-      y.setComputeType(COMPUTE_UV);  // compute U*A*V product
-      y.apply(0);
-      printfQuda("UV2[%d] = %e\n", d+4, arg.UV.norm2());
+      printfQuda("Computing backward %d VUV\n", d);
 
       // if we are writing to a temporary, we need to zero it first
       if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(0);
-            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", d, arg.Y_atomic.norm2( d%arg.Y_atomic.geometry ));
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", d, arg.Y_atomic.norm2( d%arg.Y_atomic.geometry ));
       // now convert from atomic to application computation format if necessary for Y[d]
       if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint() ) {
         if (coarseGauge::fixedPoint()) {
-          double y_max = arg.Y_atomic.abs_max( d % arg.Y_atomic.geometry );
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", d, y_max, d, Y_.Scale());
-          if (!set_scale) {
-            Y_.Scale(1.1*y_max); // slightly oversize to avoid unnecessary rescaling
-            arg.Y.resetScale(Y_.Scale());
-            set_scale = true;
-          } else if (y_max > Y_.Scale()) {
-            // we have exceeded the maximum used before so we need to reset the maximum and rescale the elements
-            arg.rescale = Y_.Scale() / y_max; // how much we need to shrink the elements by
-            y.setComputeType(COMPUTE_RESCALE);
-            // update all prior compute Y links
-            if (bidirectional_links) {
-              y.setDirection(QUDA_FORWARDS);
-              for (int d_=0; d_<4; d_++) {
-                y.setDimension(d_);
-                y.apply(0);
-              }
-            }
-            y.setDirection(QUDA_BACKWARDS);
-            for (int d_=0; d_<d; d_++) {
-              y.setDimension(d_);
-              y.apply(0);
-            }
-            y.setDimension(d);
-            Y_.Scale(y_max);
-            arg.Y.resetScale(Y_.Scale());
-          }
+          double y_max = arg.Y_atomic.abs_max( (4+d) % arg.Y_atomic.geometry );
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, y_max, 4+d, Y_.Scale());
+          Y_.Scale(max_scale);
+          arg.Y.resetScale(Y_.Scale());
         }
+
         y.setComputeType(COMPUTE_CONVERT);
         y.apply(0);
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", d, arg.Y.norm2( d ));

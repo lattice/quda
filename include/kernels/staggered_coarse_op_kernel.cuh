@@ -13,8 +13,7 @@ namespace quda {
   typedef int storeType;
 
   template <typename Float, int coarseSpin, int fineColor, int coarseColor,
-      typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge,
-      typename fineSpinorTmp>
+      typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge>
   struct CalculateStaggeredYArg {
 
     coarseGauge Y;           /** Computed coarse link field */
@@ -22,8 +21,6 @@ namespace quda {
 
     coarseGaugeAtomic Y_atomic;    /** Y atomic accessor used for computation before conversion to final format */
     coarseGaugeAtomic X_atomic;    /** X atomic accessor used for computation before conversion to final format */
-
-    fineSpinorTmp UV;        /** Temporary that stores the fine-link * spinor field product */
 
     const fineGauge U;       /** Fine grid (fat-)link field */
     // May have a long-link variable in the future.
@@ -54,11 +51,10 @@ namespace quda {
 
     CalculateStaggeredYArg(coarseGauge &Y, coarseGauge &X,
       coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
-      fineSpinorTmp &UV, const fineGauge &U,
-      double mass, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_,
+      const fineGauge &U, double mass, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_,
       const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
       : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),
-        UV(UV), U(U), spin_bs(spin_bs_), spin_map(),
+        U(U), spin_bs(spin_bs_), spin_map(),
         mass(static_cast<Float>(mass)), 
         fineVolumeCB(U.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
         fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
@@ -83,57 +79,6 @@ namespace quda {
     y.x -= a.y*x.y;
     y.y += a.y*x.x;
     y.y += a.x*x.y;
-  }
-
-
-  /**
-     Calculates the matrix UV^{c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{c}_mu(x+mu)
-     Where: mu = dir, c' = coarse color, c = fine color
-     Staggered fermions don't carry spin.
-  */
-  template<typename Float, int dim, QudaDirection dir, int fineColor,
-     int coarseSpin, int coarseColor, typename Arg>
-  __device__ __host__ inline void computeStaggeredUV(Arg &arg, int parity, int x_cb, int ic_f, int jc_f) {
-
-    
-
-    int coord[5];
-    coord[4] = 0;
-    getCoords(coord, x_cb, arg.x_size, parity);
-    coord[dim]++; // linkIndexP1, it's fine if this wraps because we're modding by 2.
-    int hyperCorner = 4*(coord[3]%2)+2*(coord[2]%2)+(coord[1]%2);
-
-    for (int h = 0; h < 8; h++)
-      arg.UV(parity,x_cb,0,ic_f,8*jc_f+h) = (h == hyperCorner) ? arg.U(dim,parity,x_cb,ic_f,jc_f) : 0.0;
-
-  } // computeStaggeredUV
-
-  template<typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  void ComputeStaggeredUVCPU(Arg &arg) {
-
-    for (int parity=0; parity<2; parity++) {
-      #pragma omp parallel for
-      for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-        for (int ic_f=0; ic_f < fineColor; ic_f++) { // fine color
-          for (int jc_f=0; jc_f < fineColor; jc_f++) { // fine color
-            computeStaggeredUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, parity, x_cb, ic_f, jc_f);
-          }
-        } // coarse color
-      } // c/b volume
-    }   // parity
-  }
-
-  template<typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  __global__ void ComputeStaggeredUVGPU(Arg arg) {
-    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.fineVolumeCB) return;
-
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    int c = blockDim.z*blockIdx.z + threadIdx.z; // fine color
-    if (c >= fineColor*fineColor) return;
-    int ic_f = c/fineColor;
-    int jc_f = c%fineColor;
-    computeStaggeredUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, parity, x_cb, ic_f, jc_f);
   }
 
 
@@ -182,9 +127,9 @@ namespace quda {
     complex<Float> vuv;
 
     if (dir == QUDA_BACKWARDS) {
-      vuv = arg.UV(parity, x_cb, 0, ic_f, c_col);
+      vuv = arg.U(dim,parity,x_cb,ic_f,jc_f);
     } else {
-      vuv = -arg.UV(parity, x_cb, 0, ic_f, c_col);
+      vuv = -arg.U(dim,parity,x_cb,ic_f,jc_f);
     }
 
     const int dim_index = arg.dim_index % arg.Y_atomic.geometry;

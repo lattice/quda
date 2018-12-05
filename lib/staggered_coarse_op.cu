@@ -12,8 +12,7 @@ namespace quda {
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-      ColorSpinorField &uv, const Transfer &T,
-		  const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
+      const Transfer &T, const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
 
     QudaFieldLocation location = Y.Location();
 
@@ -31,7 +30,6 @@ namespace quda {
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
 
-      F uvAccessor(const_cast<ColorSpinorField&>(uv));
       gFine gAccessor(const_cast<GaugeField&>(g));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gCoarse xAccessor(const_cast<GaugeField&>(X));
@@ -39,8 +37,8 @@ namespace quda {
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(Xatomic));
 
       calculateStaggeredY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
-        (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-         gAccessor, Y, X, Yatomic, Xatomic, uv, g, mass, dirac, matpc,
+        (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, 
+         gAccessor, Y, X, Yatomic, Xatomic, g, mass, dirac, matpc,
          T.fineToCoarse(location), T.coarseToFine(location));
 
     } else {
@@ -58,7 +56,6 @@ namespace quda {
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
 
-      F uvAccessor(const_cast<ColorSpinorField&>(uv));
       gFine gAccessor(const_cast<GaugeField&>(g));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gCoarse xAccessor(const_cast<GaugeField&>(X));
@@ -66,8 +63,8 @@ namespace quda {
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(Xatomic));
 
       calculateStaggeredY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
-        (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-         gAccessor, Y, X, Yatomic, Xatomic, uv, g, mass, dirac, matpc,
+        (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic,
+         gAccessor, Y, X, Yatomic, Xatomic, g, mass, dirac, matpc,
          T.fineToCoarse(location), T.coarseToFine(location));
 
     }
@@ -77,23 +74,16 @@ namespace quda {
   // template on the number of coarse degrees of freedom
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-      ColorSpinorField &uv, const Transfer &T,
-		  const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
-    if (T.Vectors().Nspin() != 1)
-      errorQuda("Unsupported fine spin %d\n",T.Vectors().Nspin());
+      const Transfer &T, const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
 #if 0
     if (coarseColor == 4) {
-      calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, c, mass dirac, matpc);
+      calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, Yatomic, Xatomic, T, g, c, mass dirac, matpc);
 #endif
     if (coarseColor == 24) { // free field staggered
-      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, mass, dirac, matpc);
-    } else if (coarseColor == 96) {
-      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, mass, dirac, matpc);
-    } else if (coarseColor == 128) {
-      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,128,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, mass, dirac, matpc);
+      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, T, g, mass, dirac, matpc);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -102,22 +92,20 @@ namespace quda {
   // template on fine spin
   template <typename Float, typename vFloat, int fineColor>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic, 
-      ColorSpinorField &uv, const Transfer &T,
-		  const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
-    if (uv.Nspin() == 1) {
-      calculateStaggeredY<Float,vFloat,fineColor,1>(Y, X, Yatomic, Xatomic, uv, T, g, mass, dirac, matpc);
+      const Transfer &T, const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
+    if (T.Vectors().Nspin() == 1) {
+      calculateStaggeredY<Float,vFloat,fineColor,1>(Y, X, Yatomic, Xatomic, T, g, mass, dirac, matpc);
     } else {
-      errorQuda("Unsupported number of spins %d\n", uv.Nspin());
+      errorQuda("Unsupported number of spins %d\n", T.Vectors(X.Location()).Nspin());
     }
   }
 
   // template on fine colors
   template <typename Float, typename vFloat>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-      ColorSpinorField &uv, const Transfer &T,
-		  const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
+      const Transfer &T, const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
     if (g.Ncolor() == 3) {
-      calculateStaggeredY<Float,vFloat,3>(Y, X, Yatomic, Xatomic, uv, T, g, mass, dirac, matpc);
+      calculateStaggeredY<Float,vFloat,3>(Y, X, Yatomic, Xatomic, T, g, mass, dirac, matpc);
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }
@@ -125,17 +113,16 @@ namespace quda {
 
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-      ColorSpinorField &uv, const Transfer &T,
-		  const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
+      const Transfer &T, const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
     checkPrecision(Xatomic, Yatomic, g);
-    checkPrecision(uv, T.Vectors(X.Location()), X, Y);
+    checkPrecision(T.Vectors(X.Location()), X, Y);
 
     printfQuda("Computing Y field......\n");
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
-        calculateStaggeredY<double,double>(Y, X, Yatomic, Xatomic, uv, T, g, mass, dirac, matpc);
+        calculateStaggeredY<double,double>(Y, X, Yatomic, Xatomic, T, g, mass, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", Y.Precision());
       }
@@ -144,13 +131,13 @@ namespace quda {
 #endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       if (T.Vectors(X.Location()).Precision() == QUDA_SINGLE_PRECISION) {
-        calculateStaggeredY<float,float>(Y, X, Yatomic, Xatomic, uv, T, g, mass, dirac, matpc);
+        calculateStaggeredY<float,float>(Y, X, Yatomic, Xatomic, T, g, mass, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
     } else if (Y.Precision() == QUDA_HALF_PRECISION) {
       if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
-        calculateStaggeredY<float,short>(Y, X, Yatomic, Xatomic, uv, T, g, mass, dirac, matpc);
+        calculateStaggeredY<float,short>(Y, X, Yatomic, Xatomic, T, g, mass, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
@@ -205,15 +192,6 @@ namespace quda {
       U->copy(gauge);
     }
 
-    //Create a field UV which holds U*V.  Has the same structure as V.
-    ColorSpinorParam UVparam(T.Vectors(location));
-    UVparam.create = QUDA_ZERO_FIELD_CREATE;
-    UVparam.location = location;
-    UVparam.setPrecision(T.Vectors(location).Precision());
-    UVparam.mem_type = Y.MemType(); // allocate temporaries to match coarse-grid link field
-
-    ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
-
     GaugeField *Yatomic = &Y;
     GaugeField *Xatomic = &X;
     if (Y.Precision() < QUDA_SINGLE_PRECISION) {
@@ -227,12 +205,10 @@ namespace quda {
       Xatomic = GaugeField::Create(param);
     }
 
-    calculateStaggeredY(Y, X, *Yatomic, *Xatomic, *uv, T, *U, mass, dirac, matpc);
+    calculateStaggeredY(Y, X, *Yatomic, *Xatomic, T, *U, mass, dirac, matpc);
 
     if (Yatomic != &Y) delete Yatomic;
     if (Xatomic != &X) delete Xatomic;
-
-    delete uv;
 
     if (U != &gauge) delete U;
 #else
