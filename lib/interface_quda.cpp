@@ -42,11 +42,6 @@
 
 #include <cuda.h>
 
-#ifdef MULTI_GPU
-extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
-    QudaPrecision gPrecision, int optflag, int geom);
-#endif // MULTI_GPU
-
 #include <ks_force_quda.h>
 
 #ifdef GPU_GAUGE_FORCE
