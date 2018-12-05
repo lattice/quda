@@ -401,7 +401,7 @@ namespace quda {
           apply_wilson_5d<short, true,false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
         }else if(type_ == 4){
           int sid_shift = threadIdx.y*arg.volume_4d_cb_shift + s4_shift;
-          in_vec = arg.in(sid_shift, arg.parity);
+          in_vec = arg.in(sid_shift, 0);
         }
         // store result to shared memory
         load_matrix_b_vector<N_sm/2,false>(in_vec, arg, sm_b, arg.scale); // acc(accumulation) = false
@@ -428,7 +428,7 @@ namespace quda {
 //              printf("%d = \n", index_4d_cb_from_coordinate_4d(back_x, back_dim));
 //              printf("(%d,%d,%d,%d)-->(%d,%d,%d,%d)\n", x[0], x[1], x[2], x[3], back_x[0], back_x[1], back_x[2], back_x[3]);
 //            }
-            Vector aux_in_vec = arg.x(sid_back_shift, arg.parity);
+            Vector aux_in_vec = arg.x(sid_back_shift, 0);
             load_matrix_b_vector<N_sm/2, true>(aux_in_vec, arg, sm_b, arg.scale*arg.m_scale); // acc = true
           }
           store_matrix_c<N_sm>(arg.y, sm_b, sid, arg.scale*arg.m_scale);
@@ -440,7 +440,7 @@ namespace quda {
       }else if(type_ == 3){
         
         if(!idle){
-          Vector aux_in_vec = arg.x(sid, arg.parity);
+          Vector aux_in_vec = arg.x(sid, 0);
           load_matrix_b_vector<N_sm/2, true>(aux_in_vec, arg, sm_b, arg.scale*arg.m_scale);
         }
       

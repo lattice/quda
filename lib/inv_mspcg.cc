@@ -171,9 +171,9 @@ namespace quda {
       dirac_param_precondition.commDim[i] = 0;
     }
 
-    dirac_param.print();
-    dirac_param_sloppy.print();
-    dirac_param_precondition.print();
+    // dirac_param.print();
+    // dirac_param_sloppy.print();
+    // dirac_param_precondition.print();
     
     mat = new DiracMobiusPC(dirac_param);
     nrm_op = new DiracMdagM(mat);
@@ -320,15 +320,16 @@ namespace quda {
 */
 
 
-    inner_dslash(*fx, *fb, 1.);
-
+    inner_dslash(*cx, *cb, 1.);
+    blas::copy( *tt, *cx );
+    
     double fx2 = norm2(*fx);
-    printfQuda("Test   fx2/fb2 = %16.12e/%16.12e.\n", fx2, fb2);
-    zero_extended_color_spinor_interface( *fx, R, QUDA_CUDA_FIELD_LOCATION, 0);
-    fx2 = norm2(*fx);
-    printfQuda("Chopping   fx2 = %16.12e.\n", fx2);
+//    printfQuda("Test   fx2/fb2 = %16.12e/%16.12e.\n", fx2, fb2);
+//    zero_extended_color_spinor_interface( *fx, R, QUDA_CUDA_FIELD_LOCATION, 0);
+//    fx2 = norm2(*fx);
+//    printfQuda("Chopping   fx2 = %16.12e.\n", fx2);
 
-    copyExtendedColorSpinor(*tt, *fx, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
+//    copyExtendedColorSpinor(*tt, *fx, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
     double x2_ = blas::norm2(*tt);
     printfQuda("Rebuild     x2 = %16.12e.\n", x2_);
     double dd = xmyNorm(*tt, *tx);
@@ -669,7 +670,7 @@ namespace quda {
 
   void MSPCG::operator()(ColorSpinorField& dx, ColorSpinorField& db)
   {
-
+#if 0
     Gflops = 0.;
     fGflops = 0.;
     
@@ -692,7 +693,7 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type);
 
-//    test_dslash(db);
+    // test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
@@ -788,7 +789,6 @@ namespace quda {
       
       blas::copy(*vct_dtmp, *x);
       xpy(*vct_dtmp, dx);
-
     }
     
     
@@ -842,6 +842,9 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
+#else
+    errorQuda("Something is wrong! :( \n");
+#endif
   }
 
   void MSPCG::reliable_update(ColorSpinorField& dx, ColorSpinorField& db)

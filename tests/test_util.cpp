@@ -1660,7 +1660,8 @@ char gauge_outfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
-int maxiter_prec = 10;
+int maxiter_inner_preconditioning = 10;
+double mobius_scale = 1.;
 int gcrNkrylov = 10;
 int pipeline = 0;
 int solution_accumulator_pipeline = 0;
@@ -3319,20 +3320,34 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
  
-  if( strcmp(argv[i], "--niter-prec") == 0){
+  if( strcmp(argv[i], "--maxiter-inner-preconditioning") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
-    maxiter_prec = atoi(argv[i+1]);
-    if (niter < 1 || niter > 1e6){
-      printf("ERROR: invalid number of iterations (%d)\n", niter);
+    maxiter_inner_preconditioning = atoi(argv[i+1]);
+    if (maxiter_inner_preconditioning < 1 || maxiter_inner_preconditioning > 1e6){
+      printf("ERROR: invalid number of inner preconditioning iterations (%d)\n", maxiter_inner_preconditioning);
       usage(argv);
     }
     i++;
     ret = 0;
     goto out;
   }
- 
+  
+  if( strcmp(argv[i], "--mobius-scale") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mobius_scale = atof(argv[i+1]);
+    if (mobius_scale < 1.){
+      printf("ERROR: invalid value of M\"obius scale (%.4f)\n", mobius_scale);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--ngcrkrylov") == 0){
     if (i+1 >= argc){
       usage(argv);

@@ -70,7 +70,8 @@ extern char latfile[];
 
 extern void usage(char** );
 
-extern int maxiter_prec;
+extern double mobius_scale;
+extern int maxiter_inner_preconditioning;
 
 void
 display_test_info()
@@ -93,8 +94,9 @@ display_test_info()
 	     dimPartitioned(2),
 	     dimPartitioned(3)); 
  	
-	printfQuda("preconditioner precision = %6s.\n", get_prec_str(prec_precondition));
-	printfQuda("maxiter_prec = 					        %02d.\n", maxiter_prec);
+	printfQuda("preconditioner precision      = %s.\n", get_prec_str(prec_precondition));
+	printfQuda("maxiter_inner_preconditioning = %02d.\n", maxiter_inner_preconditioning);
+	printfQuda("M\\\"obius scale                = %.4f.\n", mobius_scale);
 
   return ;
   
@@ -195,9 +197,9 @@ int main(int argc, char **argv)
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
       // inv_param.b_5[k] = 2.5;
-      inv_param.b_5[k] = 1.452;
+      inv_param.b_5[k] = (mobius_scale+1.)/2.;
       // inv_param.c_5[k] = 1.5;
-      inv_param.c_5[k] = 0.452;
+      inv_param.c_5[k] = (mobius_scale-1.)/2.;
     }
   }
 
@@ -212,7 +214,8 @@ int main(int argc, char **argv)
   } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH ||
 	     dslash_type == QUDA_DOMAIN_WALL_DSLASH  || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
 	     dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+    // inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+    inv_param.solution_type = QUDA_MATPC_SOLUTION;
   } else {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
   }
@@ -277,7 +280,7 @@ int main(int argc, char **argv)
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
   
-	inv_param.maxiter_precondition = maxiter_prec;
+	inv_param.maxiter_precondition = maxiter_inner_preconditioning;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
