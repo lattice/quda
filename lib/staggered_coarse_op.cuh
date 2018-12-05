@@ -7,15 +7,9 @@
 
 namespace quda {
 
-  // We can technically do a uni-directional build, but becauase
-  // the coarse link builds are just permutations plus lots of zeros,
-  // it's faster to skip the flip!
-  static bool bidirectional_debug = true; //false;
-
-
+  
   enum ComputeType {
     COMPUTE_VUV,
-    COMPUTE_REVERSE_Y,
     COMPUTE_MASS,
     COMPUTE_CONVERT,
     COMPUTE_RESCALE,
@@ -46,10 +40,6 @@ namespace quda {
       case COMPUTE_VUV:
         flops_ = 0; // permutation
         break;
-      case COMPUTE_REVERSE_Y:
-        // no floating point operations
-        flops_ = 0;
-        break;
       case COMPUTE_MASS:
         flops_ = 2l * arg.coarseVolumeCB*coarseSpin*coarseColor;
         break;
@@ -72,8 +62,6 @@ namespace quda {
       case COMPUTE_VUV:
         bytes_ = 2*2*arg.U.Bytes(); // only needs to read and write non-zero elements
         break; 
-      case COMPUTE_REVERSE_Y:
-        bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
       case COMPUTE_MASS:
         bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
         break;
@@ -96,7 +84,6 @@ namespace quda {
       case COMPUTE_VUV:
         threads = arg.fineVolumeCB;
         break;
-      case COMPUTE_REVERSE_Y:
       case COMPUTE_MASS:
       case COMPUTE_CONVERT:
       case COMPUTE_RESCALE:
@@ -155,10 +142,6 @@ namespace quda {
       	    errorQuda("Undefined direction %d", dir);
       	  }
 
-      	} else if (type == COMPUTE_REVERSE_Y) {
-
-      	  ComputeStaggeredYReverseCPU<Float,coarseSpin,coarseColor>(arg);
-
       	} else if (type == COMPUTE_MASS) {
 
       	  AddCoarseStaggeredMassCPU<Float,coarseSpin,coarseColor>(arg);
@@ -201,16 +184,6 @@ namespace quda {
           }
 #endif // JITIFY
 
-      	} else if (type == COMPUTE_REVERSE_Y) {
-
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeStaggeredYReverseGPU")
-            .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-      	  ComputeStaggeredYReverseGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#endif
       	} else if (type == COMPUTE_MASS) {
 
 #ifdef JITIFY
@@ -268,7 +241,6 @@ namespace quda {
     void setComputeType(ComputeType type_) {
       type = type_;
       switch(type) {
-      case COMPUTE_REVERSE_Y:
       case COMPUTE_CONVERT:
       case COMPUTE_RESCALE:
         resizeVector(2*coarseColor,coarseColor);
@@ -296,7 +268,6 @@ namespace quda {
       strcpy(Aux,aux);
 
       if      (type == COMPUTE_VUV)                strcat(Aux,",computeStaggeredVUV");
-      else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeStaggeredYreverse");
       else if (type == COMPUTE_MASS)               strcat(Aux,",computeStaggeredMass");
       else if (type == COMPUTE_CONVERT)            strcat(Aux,",computeStaggeredConvert");
       else if (type == COMPUTE_RESCALE)            strcat(Aux,",ComputeStaggeredRescale");
@@ -310,11 +281,9 @@ namespace quda {
 
       	if (dir == QUDA_BACKWARDS) strcat(Aux,",dir=back");
       	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
-
-        if (arg.bidirectional && type == COMPUTE_VUV) strcat(Aux,",bidirectional");
       }
 
-      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_MASS ||
+      const char *vol_str = (type == COMPUTE_MASS ||
 			     type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString () : meta.VolString();
 
       if (type == COMPUTE_VUV) {
@@ -343,7 +312,6 @@ namespace quda {
         break;
       case COMPUTE_RESCALE:
         Y.backup();
-      case COMPUTE_REVERSE_Y:
         break;
       default:
 	errorQuda("Undefined compute type %d", type);
@@ -363,7 +331,6 @@ namespace quda {
         break;
       case COMPUTE_RESCALE:
         Y.restore();
-      case COMPUTE_REVERSE_Y:
         break;
       default:
 	errorQuda("Undefined compute type %d", type);
@@ -421,16 +388,10 @@ namespace quda {
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
     int spin_bs = 0; // 0 -> spin-less types.
 
-    // If doing a preconditioned operator with a clover term then we
-    // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
-    bool bidirectional_links = bidirectional_debug;
-    if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
-    else printfQuda("Doing uni-directional link coarsening\n");
-
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
     typedef CalculateStaggeredYArg<Float,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge> Arg;
-    Arg arg(Y, X, Y_atomic, X_atomic, G, mass, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
+    Arg arg(Y, X, Y_atomic, X_atomic, G, mass, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine);
     CalculateStaggeredY<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, G_, Y_, X_, Y_atomic_, X_atomic_);
 
     QudaFieldLocation location = checkLocation(Y_, X_, G_);
@@ -453,32 +414,34 @@ namespace quda {
     Y_atomic_.zero();
     X_atomic_.zero();
 
-    // First compute the coarse forward links if needed
-    if (bidirectional_links) {
-      for (int d = 0; d < nDim; d++) {
-      	y.setDimension(d);
-      	y.setDirection(QUDA_FORWARDS);
-      	printfQuda("Computing forward %d VUV\n", d);
+    // We can technically do a uni-directional build, but becauase
+    // the coarse link builds are just permutations plus lots of zeros,
+    // it's faster to skip the flip!
 
-      	// if we are writing to a temporary, we need to zero it first
-        if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
-        y.setComputeType(COMPUTE_VUV); // compute Y += VUV
-      	y.apply(0);
-      	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", 4+d, arg.Y_atomic.norm2( (4+d) % arg.Y_atomic.geometry ));
-        // now convert from atomic to application computation format if necessary for Y[d]
-        if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint()) {
-          if (coarseGauge::fixedPoint()) {
-            double y_max = arg.Y_atomic.abs_max( (4+d) % arg.Y_atomic.geometry );
-            if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, y_max, 4+d, Y_.Scale());
-            Y_.Scale(max_scale);
-            arg.Y.resetScale(Y_.Scale());
-          }
-          y.setComputeType(COMPUTE_CONVERT);
-          y.apply(0);
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", 4+d, arg.Y.norm2( 4+d ));
+    // First compute the coarse forward links 
+    for (int d = 0; d < nDim; d++) {
+    	y.setDimension(d);
+    	y.setDirection(QUDA_FORWARDS);
+    	printfQuda("Computing forward %d VUV\n", d);
+
+    	// if we are writing to a temporary, we need to zero it first
+      if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
+      y.setComputeType(COMPUTE_VUV); // compute Y += VUV
+    	y.apply(0);
+    	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", 4+d, arg.Y_atomic.norm2( (4+d) % arg.Y_atomic.geometry ));
+      // now convert from atomic to application computation format if necessary for Y[d]
+      if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint()) {
+        if (coarseGauge::fixedPoint()) {
+          double y_max = arg.Y_atomic.abs_max( (4+d) % arg.Y_atomic.geometry );
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, y_max, 4+d, Y_.Scale());
+          Y_.Scale(max_scale);
+          arg.Y.resetScale(Y_.Scale());
         }
-
+        y.setComputeType(COMPUTE_CONVERT);
+        y.apply(0);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", 4+d, arg.Y.norm2( 4+d ));
       }
+
     }
 
     // Now compute the backward links
@@ -510,14 +473,6 @@ namespace quda {
     }
 
     printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
-
-    // if not doing a preconditioned operator then we can trivially
-    // construct the forward links from the backward links
-    if ( !bidirectional_links ) {
-      printfQuda("Reversing links\n");
-      y.setComputeType(COMPUTE_REVERSE_Y);  // reverse the links for the forwards direction
-      y.apply(0);
-    }
 
     // Add the mass.
     printfQuda("Adding diagonal mass contribution to coarse clover\n");

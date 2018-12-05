@@ -43,8 +43,6 @@ namespace quda {
     const int *fine_to_coarse;
     const int *coarse_to_fine;
 
-    const bool bidirectional;
-
     static constexpr int coarse_color = coarseColor;
 
     int dim_index; // which direction / dimension we are working on
@@ -52,13 +50,12 @@ namespace quda {
     CalculateStaggeredYArg(coarseGauge &Y, coarseGauge &X,
       coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
       const fineGauge &U, double mass, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_,
-      const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
+      const int *fine_to_coarse, const int *coarse_to_fine)
       : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),
         U(U), spin_bs(spin_bs_), spin_map(),
         mass(static_cast<Float>(mass)), 
         fineVolumeCB(U.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
-        fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-        bidirectional(bidirectional)
+        fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine)
     {
 
       for (int i=0; i<QUDA_MAX_DIM; i++) {
@@ -145,10 +142,6 @@ namespace quda {
         arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_c_row,s_c_col,c_row,c_col,vuv);
       }
 
-      if (!arg.bidirectional) {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_c_row,s_c_col,c_row,c_col,-vuv);
-      } // end (!arg.bidirectional)
-
     } // end (isDiagonal)
 
   }
@@ -183,58 +176,6 @@ namespace quda {
     int jc_f = c%fineColor;
     
     ComputeStaggeredVUV<Float,dim,dir,fineColor,coarseSpin>(arg, parity, x_cb, ic_f, jc_f);
-  }
-
-  /**
-   * Compute the forward links from backwards links by flipping the
-   * sign
-   */
-  template<typename Float, int nSpin, int nColor, typename Arg>
-  __device__ __host__ void computeStaggeredYreverse(Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
-    auto &Y = arg.Y;
-
-#pragma unroll
-    for (int d=0; d<4; d++) {
-#pragma unroll
-      for (int s_row = 0; s_row < nSpin; s_row++) { // chiral row block
-#pragma unroll
-        for (int s_col = 0; s_col < nSpin; s_col++) { // chiral col block
-          Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = -Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
-        } // chiral col
-      } // chiral row
-    } // dimension
-
-  }
-
-  template<typename Float, int nSpin, int nColor, typename Arg>
-  void ComputeStaggeredYReverseCPU(Arg &arg) {
-    for (int parity=0; parity<2; parity++) {
-#pragma omp parallel for
-      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-        for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
-          for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color col
-            computeStaggeredYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
-          }
-        }
-      } // c/b volume
-    } // parity
-  }
-
-  template<typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void ComputeStaggeredYReverseGPU(Arg arg) {
-    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.coarseVolumeCB) return;
-
-    int parity_jc_c = blockDim.y*blockIdx.y + threadIdx.y; // parity and color col
-    if (parity_jc_c >= 2*nColor) return;
-    int parity = parity_jc_c / nColor;
-    int jc_c = parity_jc_c % nColor;
-
-
-    int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // color row
-    if (ic_c >= nColor) return;
-
-    computeStaggeredYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c, jc_c);
   }
 
   //Adds the mass to the coarse local term.
