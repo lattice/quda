@@ -3098,9 +3098,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete h_x;
   delete b;
 
-  if (!param->make_resident_solution) {
+  if (param->use_resident_solution && !param->make_resident_solution) {
     for (auto v: solutionResident) if (v) delete v;
     solutionResident.clear();
+  } else if (!param->make_resident_solution) {
+    delete x;
   }
 
   delete d;
