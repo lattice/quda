@@ -477,8 +477,8 @@ int main(int argc, char **argv)
         clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
 		     inv_param.cpu_prec, gauge_param);
       } else {
-        printfQuda("Domain wall not supported for multi-shift\n");
-        exit(-1);
+        // printfQuda("Domain wall not supported for multi-shift\n");
+        // exit(-1);
       }
 
       axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);

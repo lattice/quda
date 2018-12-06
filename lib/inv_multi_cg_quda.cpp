@@ -505,7 +505,7 @@ namespace quda {
 	reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
 
       for(int i=0; i < num_offset; i++) {
-        if(param.precision == param.precision_sloppy || i ==0){
+        if(true || param.precision == param.precision_sloppy){
 	mat(*r, *x[i], *tmp4_p, *tmp5_p);
 	if (r->Nspin()==4) {
 	  blas::axpy(offset[i], *x[i], *r); // Offset it.
