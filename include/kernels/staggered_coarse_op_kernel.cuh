@@ -133,13 +133,13 @@ namespace quda {
 
 
     if (!isDiagonal) {
-      arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_col,c_row,c_col,vuv);
+      arg.Y_atomic(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_col,c_row,c_col) = vuv;
     } else { // (isDiagonal)
 
       if (dir == QUDA_BACKWARDS) {
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_c_col,s_c_row,c_col,c_row,conj(vuv));
+        arg.X_atomic(0,coarse_parity,coarse_x_cb,s_c_col,s_c_row,c_col,c_row) = conj(vuv);
       } else { // (dir == QUDA_FORWARDS)
-        arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_c_row,s_c_col,c_row,c_col,vuv);
+        arg.X_atomic(0,coarse_parity,coarse_x_cb,s_c_row,s_c_col,c_row,c_col) = vuv;
       }
 
     } // end (isDiagonal)
@@ -186,7 +186,7 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
         for(int s = 0; s < nSpin; s++) { //Spin
           for(int c = 0; c < nColor; c++) { //Color
-            arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(2.0*arg.mass,0.0); // staggered conventions
+            arg.X_atomic(0,parity,x_cb,s,s,c,c) = complex<Float>(2.0*arg.mass,0.0); // staggered conventions. No need to +=
           } //Color
         } //Spin
       } // x_cb
@@ -203,7 +203,7 @@ namespace quda {
 
     for(int s = 0; s < nSpin; s++) { //Spin
       for(int c = 0; c < nColor; c++) { //Color
-        arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<Float>(2.0*arg.mass,0.0); // staggered conventions
+        arg.X_atomic(0,parity,x_cb,s,s,c,c) = complex<Float>(2.0*arg.mass,0.0); // staggered conventions. No need to +=.
       } //Color
     } //Spin
    }

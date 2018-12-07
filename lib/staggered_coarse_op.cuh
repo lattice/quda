@@ -407,7 +407,7 @@ namespace quda {
 
     if (coarseGaugeAtomic::fixedPoint()) {
       arg.Y_atomic.resetScale(max_scale);
-      arg.X_atomic.resetScale(max_scale > mass ? max_scale : mass); // if for some pointless reason the mass is huge...
+      arg.X_atomic.resetScale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
     }
 
     // zero the atomic fields before summing to them
