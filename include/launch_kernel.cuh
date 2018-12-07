@@ -326,6 +326,10 @@
     kernel<32,__VA_ARGS__>            \
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);    \
     break;                \
+  case 36:                \
+    kernel<36,__VA_ARGS__>            \
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);    \
+    break;                \
   case 54:                \
     kernel<54,__VA_ARGS__>            \
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);    \
