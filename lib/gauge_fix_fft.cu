@@ -293,7 +293,7 @@ namespace quda {
       //35
       //T=36*gauge_dir+65
 
-      idx += blockDim.x*gridDim.x
+      idx += blockDim.x*gridDim.x;
     }
 
     reduce2d<blockSize,2>(argQ, data);
