@@ -192,7 +192,7 @@ namespace quda {
 
     prec_tol[0] = mixed ? sloppy_tol : fine_tol;
     for (int i=1; i<num_offset; i++) {
-       prec_tol[i] = std::max(fine_tol,sqrt(param.tol_offset[i]*sloppy_tol));
+      prec_tol[i] = std::min(sloppy_tol,std::max(fine_tol,sqrt(param.tol_offset[i]*sloppy_tol)));
     }
 
     double zeta[QUDA_MAX_MULTI_SHIFT];
