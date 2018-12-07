@@ -308,9 +308,8 @@ namespace quda {
 
      @param clover The clover field (contains both the field itself and its inverse)
      @param computeTraceLog Whether to compute the trace logarithm of the clover term
-     @param location The location of the field
   */
-  void cloverInvert(CloverField &clover, bool computeTraceLog, QudaFieldLocation location);
+  void cloverInvert(CloverField &clover, bool computeTraceLog);
 
   /**
      @brief This function adds a real scalar onto the clover diagonal (only to the direct field not the inverse)

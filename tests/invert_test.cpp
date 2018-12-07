@@ -62,6 +62,9 @@ extern QudaMatPCType matpc_type; // preconditioning type
 extern double clover_coeff;
 extern bool compute_clover;
 
+extern QudaVerbosity verbosity;
+extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL]; // use this for preconditioner verbosity
+
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter; // max solver iterations
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
@@ -100,6 +103,8 @@ display_test_info()
 
 int main(int argc, char **argv)
 {
+
+  mg_verbosity[0] = QUDA_SILENT; // set default preconditioner verbosity
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
@@ -270,7 +275,7 @@ int main(int argc, char **argv)
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 10;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
 
@@ -310,7 +315,7 @@ int main(int argc, char **argv)
     inv_param.clover_coeff = clover_coeff;
   }
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.

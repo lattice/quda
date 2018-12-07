@@ -321,7 +321,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     // don't tune the grid dimension
-    bool tuneGridDim() const { return false; }
+    virtual bool tuneGridDim() const { return false; }
 
     /**
        The maximum block size in the x dimension is the total number

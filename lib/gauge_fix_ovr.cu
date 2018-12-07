@@ -241,7 +241,7 @@ namespace quda {
     int parity = threadIdx.y;
 
     double2 data = make_double2(0.0,0.0);
-    if ( idx < argQ.threads ) {
+    while ( idx < argQ.threads ) {
       int X[4];
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = argQ.X[dr];
@@ -281,6 +281,8 @@ namespace quda {
       data.y = getRealTraceUVdagger(delta, delta);
       //35
       //T=36*gauge_dir+65
+
+      idx += blockDim.x*gridDim.x;
     }
     reduce2d<blockSize,2>(argQ, data);
   }
@@ -293,11 +295,11 @@ namespace quda {
   class GaugeFixQuality : TunableLocalParity {
     GaugeFixQualityArg<Gauge> argQ;
     mutable char aux_string[128]; // used as a label in the autotuner
-    private:
 
-    unsigned int minThreads() const { return argQ.threads; }
+  private:
+    bool tuneGridDim() const { return true; }
 
-    public:
+  public:
     GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ) : argQ(argQ) { }
     ~GaugeFixQuality () { }
 
