@@ -1075,7 +1075,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if ((!h_clovinv || inv_param->compute_clover_inverse) && pc_solve) {
       profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
       if (!dynamic_clover) {
-	cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog, QUDA_CUDA_FIELD_LOCATION);
+	cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
 	if (inv_param->compute_clover_trlog) {
 	  inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
 	  inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
@@ -1113,7 +1113,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     } else {
       auto *hackOfTheHack = new cudaCloverField(clover_param);	// Hack of the hack
       hackOfTheHack->copy(*cloverPrecise, false);
-      cloverInvert(*hackOfTheHack, inv_param->compute_clover_trlog, QUDA_CUDA_FIELD_LOCATION);
+      cloverInvert(*hackOfTheHack, inv_param->compute_clover_trlog);
       if (inv_param->compute_clover_trlog) {
 	inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
 	inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
@@ -1442,6 +1442,9 @@ void endQuda(void)
 
   saveTuneCache();
   saveProfile();
+
+  // flush any outstanding force monitoring (if enabled)
+  flushForceMonitor();
 
   initialized = false;
 
@@ -4049,7 +4052,17 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  gaugeForce(*cudaMom, *cudaGauge, eb3, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
+  if (!forceMonitor()) {
+    gaugeForce(*cudaMom, *cudaGauge, eb3, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
+  } else {
+    // if we are monitoring the force, separate the force computation from the momentum update
+    GaugeFieldParam gParam(*cudaMom);
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    GaugeField *force = GaugeField::Create(gParam);
+    gaugeForce(*force, *cudaGauge, 1.0, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
+    updateMomentum(*cudaMom, eb3, *force, "gauge");
+    delete force;
+  }
   profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (qudaGaugeParam->return_result_mom) {
@@ -4283,7 +4296,7 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
   for (int i=0; i<nvector; i++) {
     ColorSpinorField &x = *(X[i]);
     // second component is zero since we have no three hop term
-    double coeff[2] = {dt * inv_param->residue[i], 0.0};
+    double coeff[2] = {inv_param->residue[i], 0.0};
 
     // Operate on even-parity sites
     computeStaggeredOprod(cudaForce_, x, coeff, 1);
@@ -4291,7 +4304,7 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
 
   // mom += delta * [U * force]TA
   applyU(cudaForce, *gaugePrecise);
-  updateMomentum(*cudaMom, delta, cudaForce);
+  updateMomentum(*cudaMom, dt * delta, cudaForce, "staggered");
   qudaDeviceSynchronize();
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -4322,7 +4335,7 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
 }
 
 void computeHISQForceQuda(void* const milc_momentum,
-                          long long *flops,
+                          double dt,
                           const double level2_coeff[6],
                           const double fat7_coeff[6],
                           const void* const w_link,
@@ -4496,7 +4509,7 @@ void computeHISQForceQuda(void* const milc_momentum,
   cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff, flops);
+  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Load naik outer product
@@ -4506,7 +4519,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   // Compute Naik three-link term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqLongLinkForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff[1], flops);
+  hisqLongLinkForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff[1]);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
@@ -4517,7 +4530,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   *num_failures_h = 0;
-  unitarizeForce(*cudaInForce, *cudaOutForce, *cudaGauge, num_failures_d, flops);
+  unitarizeForce(*cudaInForce, *cudaOutForce, *cudaGauge, num_failures_d);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
@@ -4530,19 +4543,21 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   // Compute Fat7-staple term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, fat7_coeff, flops);
+  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, fat7_coeff);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   delete cudaInForce;
   cudaGaugeField* cudaMom = new cudaGaugeField(momParam);
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqCompleteForce(*cudaMom, *cudaOutForce, *cudaGauge, flops);
+  hisqCompleteForce(*cudaOutForce, *cudaGauge);
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (gParam->use_resident_mom) {
     if (!momResident) errorQuda("No resident momentum field to use");
-    updateMomentum(*momResident, 1.0, *cudaMom);
+    updateMomentum(*momResident, dt, *cudaOutForce, "hisq");
+  } else {
+    updateMomentum(*cudaMom, dt, *cudaOutForce, "hisq");
   }
 
   if (gParam->return_result_mom) {
@@ -4575,7 +4590,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 			    double *coeff, double kappa2, double ck,
 			    int nvector, double multiplicity, void *gauge,
 			    QudaGaugeParam *gauge_param, QudaInvertParam *inv_param) {
-
 
   using namespace quda;
   profileCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4727,7 +4741,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   if (u != &gaugeEx) delete u;
 
-  updateMomentum(cudaMom, -1.0, cudaForce);
+  updateMomentum(cudaMom, -1.0, cudaForce, "clover");
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // copy the outer product field back to the host

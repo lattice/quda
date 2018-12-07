@@ -89,24 +89,16 @@ namespace quda {
 	   of size MAX_MULTI_BLAS_N^2 of vectors (max length 4), with
 	   possible parity dimension, and a grid-stride loop with
 	   maximum number of blocks = 2 x SM count
-
-	- inline reductions in kernels where we cannot assume a grid
-           stride loop - hence max blocks is given by the architecture
-           limit
-
       */
 
-      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount; // FIXME - should set this according to what's used in tune_quda.h
+      const int reduce_size = 4 * sizeof(QudaSumFloat);
+      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount;
 
-      const int max_reduce = 2 * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
-      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
-
-      const int max_generic_blocks = 65336; // FIXME - this isn't quite right
-      const int max_generic_reduce = 2 * MAX_MULTI_BLAS_N * max_generic_blocks * 4 * sizeof(QudaSumFloat);
+      const int max_reduce = 2 * max_reduce_blocks * reduce_size;
+      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * reduce_size;
 
       // reduction buffer size
       size_t bytes = max_reduce > max_multi_reduce ? max_reduce : max_multi_reduce;
-      bytes = bytes > max_generic_reduce ? bytes : max_generic_reduce;
 
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 

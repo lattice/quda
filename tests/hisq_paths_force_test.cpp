@@ -8,6 +8,7 @@
 #include "misc.h"
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
+#include "momentum.h"
 #include <dslash_quda.h> 
 #include <sys/time.h>
 
@@ -363,17 +364,18 @@ static int hisq_force_test(void)
 
   gettimeofday(&t2, NULL);
 
-  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.create = QUDA_ZERO_FIELD_CREATE; // initialize to zero
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.pad = 0; //X1*X2*X3/2;
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaMom = new cudaGaugeField(gParam); // Are the elements initialised to zero? - No!
+  cudaMom = new cudaGaugeField(gParam);
 
   //record the mom pad
   qudaGaugeParam.mom_ga_pad = gParam.pad;
 
-  fermion_force::hisqCompleteForce(*cudaMom, *cudaForce_ex, *cudaGauge_ex);
+  fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
+  updateMomentum(*cudaMom, 1.0, *cudaForce_ex, __func__);
 
   cudaDeviceSynchronize();
   gettimeofday(&t3, NULL);

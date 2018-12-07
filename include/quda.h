@@ -1021,8 +1021,9 @@ extern "C" {
 				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
-   * Compute the fermion force for the HISQ quark action.
-   * @param momentum        The momentum contribution from the quark action.
+   * Compute the fermion force for the HISQ quark action and integrate the momentum.
+   * @param momentum        The momentum field we are integrating
+   * @param dt              The stepsize used to integrate the momentum
    * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
    * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
    * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
@@ -1035,7 +1036,7 @@ extern "C" {
    * @param param.          The field parameters.
    */
   void computeHISQForceQuda(void* momentum,
-                            long long* flops,
+                            double dt,
                             const double level2_coeff[6],
                             const double fat7_coeff[6],
                             const void* const w_link,

@@ -52,7 +52,7 @@ namespace quda {
 
     double2 plaq = make_double2(0.0,0.0);
 
-    if(idx < arg.threads) {
+    while (idx < arg.threads) {
       int x[4];
       getCoords(x, idx, arg.X, parity);
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
@@ -64,6 +64,8 @@ namespace quda {
 
 	plaq.y += plaquette<Float>(arg, x, parity, mu, 3);
       }
+
+      idx += blockDim.x*gridDim.x;
     }
 
     // perform final inter-block reduction and write out result
