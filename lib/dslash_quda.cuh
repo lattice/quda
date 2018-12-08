@@ -442,10 +442,11 @@ protected:
 
     // update the ghosts for the non-p2p directions
     for (int dim=0; dim<4; dim++) {
+      if (!dslashParam.commDim[dim]) continue;
 
       for (int dir=0; dir<2; dir++) {
         /* if doing interior kernel, then this is the initial call, so
-        we must all ghost pointers else if doing exterior kernel, then
+        we must set all ghost pointers else if doing exterior kernel, then
         we only have to update the non-p2p ghosts, since these may
         have been assigned to zero-copy memory */
         if (!comm_peer2peer_enabled(1-dir, dim) || dslashParam.kernel_type == INTERIOR_KERNEL) {
