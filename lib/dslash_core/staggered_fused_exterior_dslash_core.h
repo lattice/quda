@@ -440,7 +440,7 @@ if (threadId.z & 1)
     norm_idx1 = param.ghostNormOffset[0][1] + src_idx*NFACE*param.dc.ghostFace[0] + (y[0]-(X[0]-1))*param.dc.ghostFace[0] + space_con;
 #endif		    
 #endif
-    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 1);
+    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 0);
     RECONSTRUCT_FAT_GAUGE_MATRIX(0, fat, ga_idx, fat_sign);
     MAT_MUL_V(A, fat, i);    
     o00_re += A0_re;
@@ -474,7 +474,7 @@ if (threadId.z & 1)
 #endif	
 #endif
     spinorFloat2 T0, T1, T2;
-    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 1);
+    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 0);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(0, long, ga_idx, long_sign);
     MAT_MUL_V(B, long, t);        
@@ -530,7 +530,7 @@ if (!(threadIdx.z & 1))
     norm_idx1 = param.ghostNormOffset[0][0] + src_idx*NFACE*param.dc.ghostFace[0] + (y[0]+NFACE-1)*param.dc.ghostFace[0] + space_con;
 #endif	
 #endif
-    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 0);
+    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 1);
     RECONSTRUCT_FAT_GAUGE_MATRIX(1, fat, ga_idx, fat_sign);
     ADJ_MAT_MUL_V(A, fat, i);       
     o00_re -= A0_re;
@@ -571,7 +571,7 @@ if (!(threadIdx.z & 1))
 #endif
 
     spinorFloat2 T0, T1, T2;
-    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 0);
+    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 1);
     RECONSTRUCT_LONG_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, long_sign);
     ADJ_MAT_MUL_V(B, long, t);    
     o00_re -= B0_re;
@@ -620,7 +620,7 @@ if (threadId.z & 1)
     norm_idx1 = param.ghostNormOffset[1][1] + src_idx*NFACE*param.dc.ghostFace[1] + (y[1]-(X[1]-1))*param.dc.ghostFace[1] + space_con;
 #endif		    
 #endif 
-    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 3);
+    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 2);
     RECONSTRUCT_FAT_GAUGE_MATRIX(2, fat, ga_idx, fat_sign);
     MAT_MUL_V(A, fat, i);
     o00_re += A0_re;
@@ -654,7 +654,7 @@ if (threadId.z & 1)
 #endif		    
 #endif    
     spinorFloat2 T0, T1, T2;
-    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 3);
+    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 2);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(2, long, ga_idx, long_sign);
     MAT_MUL_V(B, long, t);            
@@ -709,7 +709,7 @@ if (!(threadIdx.z & 1))
     norm_idx1 = param.ghostNormOffset[1][0] + src_idx*NFACE*param.dc.ghostFace[1] + (y[1]+NFACE-1)*param.dc.ghostFace[1] + space_con;
 #endif	
 #endif
-    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 2);
+    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 3);
     RECONSTRUCT_FAT_GAUGE_MATRIX(3, fat, ga_idx, fat_sign);
     ADJ_MAT_MUL_V(A, fat, i);
     o00_re -= A0_re;
@@ -749,7 +749,7 @@ if (!(threadIdx.z & 1))
 #endif
 #endif
     spinorFloat2 T0, T1, T2;
-    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 2);
+    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 3);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,long_sign);
     ADJ_MAT_MUL_V(B, long, t);    
@@ -800,7 +800,7 @@ if (threadId.z & 1)
     norm_idx1 = param.ghostNormOffset[2][1] + src_idx*NFACE*param.dc.ghostFace[2] + (y[2]-(X[2]-1))*param.dc.ghostFace[2] + space_con;
 #endif		
 #endif
-    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 5);
+    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 4);
     RECONSTRUCT_FAT_GAUGE_MATRIX(4, fat, ga_idx, fat_sign);
     MAT_MUL_V(A, fat, i);	 
     o00_re += A0_re;
@@ -834,7 +834,7 @@ if (threadId.z & 1)
 #endif
 #endif
     spinorFloat2 T0, T1, T2;
-    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 5);
+    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 4);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(4, long, ga_idx, long_sign);
     MAT_MUL_V(B, long, t);        
@@ -891,7 +891,7 @@ if (!(threadIdx.z & 1))
     norm_idx1 = param.ghostNormOffset[2][0] + src_idx*NFACE*param.dc.ghostFace[2] + (y[2]+NFACE-1)*param.dc.ghostFace[2] + space_con;
 #endif			    
 #endif
-    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 4);
+    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 5);
     RECONSTRUCT_FAT_GAUGE_MATRIX(5, fat, ga_idx, fat_sign);
     ADJ_MAT_MUL_V(A, fat, i);
     o00_re -= A0_re;
@@ -931,7 +931,7 @@ if (!(threadIdx.z & 1))
 #endif			    
 #endif
     spinorFloat2 T0, T1, T2;
-    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 4);
+    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 5);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,long_sign);
     ADJ_MAT_MUL_V(B, long, t);    	    
@@ -981,7 +981,7 @@ if (threadId.z & 1)
     norm_idx1 = param.ghostNormOffset[3][1] + src_idx*NFACE*param.dc.ghostFace[3] + (y[3]-(X[3]-1))*param.dc.ghostFace[3] + space_con;
 #endif
 #endif
-    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 7);
+    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 6);
     RECONSTRUCT_FAT_GAUGE_MATRIX(6, fat, ga_idx, fat_sign);
     MAT_MUL_V(A, fat, i);
     o00_re += A0_re;
@@ -1017,7 +1017,7 @@ if (threadId.z & 1)
 #endif
 
     spinorFloat2 T0, T1, T2;
-    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 7);
+    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 6);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(6, long, ga_idx, long_sign);
     MAT_MUL_V(B, long, t);    
@@ -1069,7 +1069,7 @@ if (!(threadIdx.z & 1))
 #endif		    
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 6);
+    READ_1ST_NBR_SPINOR_GHOST( GHOSTSPINORTEX, nbr_idx1, stride1, 7);
     RECONSTRUCT_FAT_GAUGE_MATRIX(7, fat, ga_idx, fat_sign);
     ADJ_MAT_MUL_V(A, fat, i);
     o00_re -= A0_re;
@@ -1106,7 +1106,7 @@ if (!(threadIdx.z & 1))
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);
 
     spinorFloat2 T0, T1, T2;
-    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 6);
+    READ_3RD_NBR_SPINOR_GHOST(T, GHOSTSPINORTEX, nbr_idx3, stride3, 7);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, long_sign);
     ADJ_MAT_MUL_V(B, long, t);    
