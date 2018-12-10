@@ -181,6 +181,14 @@
     GENERIC_DSLASH(staggeredDslash, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
       }
 
+// macro used for staggered dslash
+#define STAGGERED_DSLASH_TIFR(gridDim, blockDim, shared, stream, param)	\
+  if (!dagger) {                                                        \
+    GENERIC_DSLASH(staggeredDslashTIFR, , Axpy, gridDim, blockDim, shared, stream, param) \
+      } else {                                                          \
+    GENERIC_DSLASH(staggeredDslashTIFR, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
+      }
+
 #define IMPROVED_STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param) \
   if (!dagger) {                                                        \
     GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) \

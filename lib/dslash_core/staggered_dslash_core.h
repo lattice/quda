@@ -414,7 +414,11 @@ if (threadId.z & 1)
 
 
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+#ifndef TIFR
   int fat_sign = (y[3]%2 == 1) ? -1 : 1;
+#else
+  int fat_sign = (y[3]+y[2]+y[1])%2 == 0 ? -1 : 1;
+#endif
 #endif
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
   int long_sign = (y[3]%2 == 1) ? -1 : 1;
@@ -514,7 +518,11 @@ if (!(threadIdx.z & 1))
 {
   // direction: -X
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+#ifndef TIFR
   int fat_sign = (y[3]%2 == 1) ? -1 : 1;
+#else
+  int fat_sign = (y[3]+y[2]+y[1])%2 == 0 ? -1 : 1;
+#endif
 #endif
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
   int long_sign = (y[3]%2 == 1) ? -1 : 1;
@@ -625,7 +633,11 @@ if (threadIdx.z & 1)
 {
   //direction: +Y
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+#ifndef TIFR
   int fat_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#else
+  int fat_sign = ((y[3]+y[2])%2 == 1) ? -1 : 1;
+#endif
 #endif
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
   int long_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
@@ -724,7 +736,11 @@ if (!(threadIdx.z & 1))
   //direction: -Y
 
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+#ifndef TIFR
   int fat_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#else
+  int fat_sign = ((y[3]+y[2])%2 == 1) ? -1 : 1;
+#endif
 #endif
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
   int long_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
@@ -833,7 +849,11 @@ if (threadIdx.z&1)
   //direction: +Z
 
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+#ifndef TIFR
   int fat_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#else
+  int fat_sign = (y[3]%2 == 0) ? -1 : 1;
+#endif
 #endif
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
   int long_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
@@ -933,7 +953,11 @@ if (!(threadIdx.z & 1))
   //direction: -Z
 
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+#ifndef TIFR
   int fat_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#else
+  int fat_sign = (y[3]%2 == 0) ? -1 : 1;
+#endif
 #endif
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
   int long_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
