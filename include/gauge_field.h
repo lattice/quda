@@ -246,8 +246,11 @@ namespace quda {
 
     /**
        Apply the staggered phase factors to the gauge field.
+       @param[in] phase The phase we will apply to the field.  If this
+       is QUDA_STAGGERED_PHASE_INVALID, the default value, then apply
+       the phase set internal to the field.
     */
-    void applyStaggeredPhase();
+    void applyStaggeredPhase(QudaStaggeredPhase phase=QUDA_STAGGERED_PHASE_INVALID);
 
     /**
        Remove the staggered phase factors from the gauge field.

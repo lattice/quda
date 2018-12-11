@@ -42,11 +42,6 @@
 
 #include <cuda.h>
 
-#ifdef MULTI_GPU
-extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
-    QudaPrecision gPrecision, int optflag, int geom);
-#endif // MULTI_GPU
-
 #include <ks_force_quda.h>
 
 #ifdef GPU_GAUGE_FORCE
@@ -2803,19 +2798,24 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // now check if we need to invalidate the solutionResident vectors
   bool invalidate = false;
-  for (auto v : solutionResident)
-    if (cudaParam.Precision() != v->Precision()) { invalidate = true; break; }
+  if (param->use_resident_solution == 1) {
+    for (auto v : solutionResident)
+      if (b->Precision() != v->Precision() || b->SiteSubset() != v->SiteSubset()) { invalidate = true; break; }
 
-  if (invalidate) {
-    for (auto v : solutionResident) if (v) delete v;
-    solutionResident.clear();
-  }
+    if (invalidate) {
+      for (auto v : solutionResident) if (v) delete v;
+      solutionResident.clear();
+    }
 
-  if (!solutionResident.size()) {
+    if (!solutionResident.size()) {
+      cudaParam.create = QUDA_NULL_FIELD_CREATE;
+      solutionResident.push_back(new cudaColorSpinorField(cudaParam)); // solution
+    }
+    x = solutionResident[0];
+  } else {
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
-    solutionResident.push_back(new cudaColorSpinorField(cudaParam)); // solution
+    x = new cudaColorSpinorField(cudaParam);
   }
-  x = solutionResident[0];
 
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     // initial guess only supported for single-pass solvers
@@ -3098,9 +3098,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete h_x;
   delete b;
 
-  if (!param->make_resident_solution) {
+  if (param->use_resident_solution && !param->make_resident_solution) {
     for (auto v: solutionResident) if (v) delete v;
     solutionResident.clear();
+  } else if (!param->make_resident_solution) {
+    delete x;
   }
 
   delete d;

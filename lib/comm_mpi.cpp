@@ -44,7 +44,7 @@ static int size = -1;
 static int gpuid = -1;
 
 static char partition_string[16];
-static char topology_string[16];
+static char topology_string[128];
 
 
 void comm_gather_hostname(char *hostname_recv_buf) {
@@ -114,7 +114,37 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   host_free(hostname_recv_buf);
 
   snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
-  snprintf(topology_string, 16, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+
+  // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
+  char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
+  if (device_order_env) {
+
+    // to ensure we have process consistency define using rank 0
+    if (comm_rank() == 0) {
+      std::stringstream device_list_raw(device_order_env); // raw input
+      std::stringstream device_list;                       // formatted (no commas)
+
+      int device;
+      int deviceCount;
+      cudaGetDeviceCount(&deviceCount);
+      while (device_list_raw >> device) {
+        // check this is a valid policy choice
+        if ( device < 0 || device >= device_count) {
+          errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device);
+        }
+
+        device_list << device;
+        if (device_list_raw.peek() == ',') device_list_raw.ignore();
+      }
+      snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s",
+               comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3), device_list.str().c_str());
+    }
+
+    comm_broadcast(topology_string, 128);
+  } else {
+    snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+  }
+
 }
 
 int comm_rank(void)

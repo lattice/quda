@@ -767,7 +767,7 @@ namespace quda {
       if (bufferIndex < 2) {
         return ghost_recv_buffer_d[bufferIndex];
       } else {
-        return static_cast<char*>(ghost_pinned_buffer_hd[bufferIndex%2])+ghost_bytes;
+        return ghost_pinned_recv_buffer_hd[bufferIndex%2];
       }
     }
 

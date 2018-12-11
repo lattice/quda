@@ -124,8 +124,10 @@ namespace quda {
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
   } // createGhostZone
 
-  void GaugeField::applyStaggeredPhase() {
+  void GaugeField::applyStaggeredPhase(QudaStaggeredPhase phase) {
     if (staggeredPhaseApplied) errorQuda("Staggered phases already applied");
+
+    if (phase != QUDA_STAGGERED_PHASE_INVALID) staggeredPhaseType = phase;
     applyGaugePhase(*this);
     if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) {
       if (typeid(*this)==typeid(cudaGaugeField)) {
