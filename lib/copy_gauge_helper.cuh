@@ -22,6 +22,11 @@ namespace quda {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return size; }
 
+    bool advanceTuneParam(TuneParam &param) const {
+      // only do autotuning if we are doing the copy on the GPU
+      return location == QUDA_CUDA_FIELD_LOCATION ? TunableVectorYZ::advanceTuneParam(param) : false;
+    }
+
 public:
     CopyGauge(Arg &arg, const GaugeField &out, const GaugeField &in, QudaFieldLocation location)
 #ifndef FINE_GRAINED_ACCESS
