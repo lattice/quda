@@ -239,16 +239,8 @@ namespace quda {
 
   template <typename FloatOut, typename FloatIn, int length, typename Out, typename In, typename Arg>
   void copyMom(Arg &arg, const GaugeField &out, const GaugeField &in, QudaFieldLocation location) {
-
-    if (location == QUDA_CPU_FIELD_LOCATION) {
-      copyGauge<FloatOut,FloatIn,length>(arg);
-    } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-      CopyGauge<FloatOut,FloatIn,length, Arg> momCopier(arg, out, in, location);
-      momCopier.apply(0);
-    } else {
-      errorQuda("Undefined field location %d for copyMom", location);
-    }
-
+    CopyGauge<FloatOut,FloatIn,length, Arg> momCopier(arg, out, in, location);
+    momCopier.apply(0);
   }
 
   template <typename FloatOut, typename FloatIn>

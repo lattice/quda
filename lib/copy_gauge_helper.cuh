@@ -38,7 +38,7 @@ public:
 
       set_ghost(is_ghost); // initial state is not ghost
 
-      strcpy(aux, compile_type_str(in));
+      strcpy(aux, compile_type_str(in,location));
       strcat(aux, "out:");
       strcat(aux, out.AuxString());
       strcat(aux, ",in:");
