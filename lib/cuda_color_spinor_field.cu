@@ -578,7 +578,7 @@ namespace quda {
 
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
-    if (reorder_location() == QUDA_CPU_FIELD_LOCATION &&typeid(src) == typeid(cpuColorSpinorField)) {
+    if ( reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(src) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes + norm_bytes);
       memset(buffer, 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
 
@@ -591,26 +591,36 @@ namespace quda {
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
     } else {
-      void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
-      if (!zeroCopy) {
-	buffer = pool_device_malloc(src.Bytes()+src.NormBytes());
-	Src = buffer;
-	srcNorm = static_cast<char*>(Src) + src.Bytes();
-	qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
-	qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
+
+      if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
+        // special case where we use mapped memory to read/write directly from application's array
+        void *src_d;
+        cudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.V()), 0);
+        if (error != cudaSuccess) errorQuda("Failed to get device pointer for padded vector field");
+
+        copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
       } else {
-	buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
-	memcpy(buffer, src.V(), src.Bytes());
-	memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
-	cudaHostGetDevicePointer(&Src, buffer, 0);
-	srcNorm = static_cast<char*>(Src) + src.Bytes();
+        void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
+        if (!zeroCopy) {
+          buffer = pool_device_malloc(src.Bytes()+src.NormBytes());
+          Src = buffer;
+          srcNorm = static_cast<char*>(Src) + src.Bytes();
+          qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
+          qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
+        } else {
+          buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
+          memcpy(buffer, src.V(), src.Bytes());
+          memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
+          cudaHostGetDevicePointer(&Src, buffer, 0);
+          srcNorm = static_cast<char*>(Src) + src.Bytes();
+        }
+
+        cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
+        copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
+
+        if (zeroCopy) pool_pinned_free(buffer);
+        else pool_device_free(buffer);
       }
-
-      cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
-      copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
-
-      if (zeroCopy) pool_pinned_free(buffer);
-      else pool_device_free(buffer);
     }
 
     return;
@@ -618,7 +628,7 @@ namespace quda {
 
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
-    if (reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
+    if ( reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes+norm_bytes);
       qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
       qudaMemcpy(static_cast<char*>(buffer)+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
@@ -628,31 +638,41 @@ namespace quda {
     } else if (typeid(dest) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION);
     } else {
-      void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr, *vNorm=nullptr;
-      if (!zeroCopy) {
-	buffer = pool_device_malloc(dest.Bytes()+dest.NormBytes());
-	dst = buffer;
-	dstNorm = static_cast<char*>(dst) + dest.Bytes();
-      } else {
-	buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
-	cudaHostGetDevicePointer(&dst, buffer, 0);
-	dstNorm = static_cast<char*>(dst)+dest.Bytes();
-      }
-      vNorm = static_cast<char*>(v)+this->Bytes();
-      copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, vNorm);
 
-      if (!zeroCopy) {
-	qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
-	qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
+      if (dest.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
+	// special case where we use zero-copy memory to read/write directly from application's array
+	void *dest_d;
+	cudaError_t error = cudaHostGetDevicePointer(&dest_d, const_cast<void*>(dest.V()), 0);
+        if (error != cudaSuccess) errorQuda("Failed to get device pointer for padded vector field");
+        copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dest_d, v);
       } else {
-	memcpy(dest.V(), buffer, dest.Bytes());
-	memcpy(dest.Norm(), static_cast<char*>(buffer) + dest.Bytes(), dest.NormBytes());
-      }
+        void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr, *vNorm=nullptr;
+        if (!zeroCopy) {
+          buffer = pool_device_malloc(dest.Bytes()+dest.NormBytes());
+          dst = buffer;
+          dstNorm = static_cast<char*>(dst) + dest.Bytes();
+        } else {
+          buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
+          cudaHostGetDevicePointer(&dst, buffer, 0);
+          dstNorm = static_cast<char*>(dst)+dest.Bytes();
+        }
+        vNorm = static_cast<char*>(v)+this->Bytes();
+        copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, vNorm);
 
-      if (zeroCopy) pool_pinned_free(buffer);
-      else pool_device_free(buffer);
+        if (!zeroCopy) {
+          qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
+          qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
+        } else {
+          memcpy(dest.V(), buffer, dest.Bytes());
+          memcpy(dest.Norm(), static_cast<char*>(buffer) + dest.Bytes(), dest.NormBytes());
+        }
+
+        if (zeroCopy) pool_pinned_free(buffer);
+        else pool_device_free(buffer);
+      }
     }
 
+    qudaDeviceSynchronize(); // need to sync before data can be used on CPU
     return;
   }
 
