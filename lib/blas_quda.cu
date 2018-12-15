@@ -90,108 +90,29 @@ namespace quda {
     };
 
     /**
-       Functor to perform the operation y = a*x + b*y
+       Functor to perform the operation z = a*x + b*y
     */
     template <typename Float2, typename FloatN>
-    struct axpby_ : public BlasFunctor<Float2,FloatN> {
+    struct axpbyz_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
-      axpby_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+      axpbyz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-      { y = a.x*x + b.x*y; }
+      { z = a.x*x + b.x*y; }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 3; } //! flops per element
     };
 
-    void axpby(const double &a, ColorSpinorField &x, const double &b, ColorSpinorField &y) {
+    void axpbyz(double a, ColorSpinorField &x, double b,
+                ColorSpinorField &y, ColorSpinorField &z) {
       if (x.Precision() != y.Precision()) {
 	// call hacked mixed precision kernel
-	mixed::blasCuda<axpby_,0,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
-				       x, y, x, x);
+	mixed::blasCuda<axpbyz_,0,0,1,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+				       x, y, z, x);
       } else {
-	blasCuda<axpby_,0,1,0,0>(make_double2(a, 0.0), make_double2(b, 0.0), make_double2(0.0, 0.0),
-				 x, y, x, x);
+	blasCuda<axpbyz_,0,0,1,0>(make_double2(a, 0.0), make_double2(b, 0.0), make_double2(0.0, 0.0),
+				 x, y, z, x);
       }
-    }
-
-    /**
-       Functor to perform the operation y += x
-    */
-    template <typename Float2, typename FloatN>
-    struct xpy_ : public BlasFunctor<Float2,FloatN> {
-      xpy_(const Float2 &a, const Float2 &b, const Float2 &c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y += x ; }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 1; } //! flops per element
-    };
-
-    void xpy(ColorSpinorField &x, ColorSpinorField &y) {
-      if (x.Precision() != y.Precision()) {
-        mixed::blasCuda<xpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
-                                      make_double2(0.0, 0.0), x, y, x, x);
-      } else {
-        blasCuda<xpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
-                               make_double2(0.0, 0.0), x, y, x, x);
-      }
-    }
-
-    /**
-       Functor to perform the operation y += a*x
-    */
-    template <typename Float2, typename FloatN>
-    struct axpy_ : public BlasFunctor<Float2,FloatN> {
-      const Float2 a;
-      axpy_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y = a.x*x + y; }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 2; } //! flops per element
-    };
-
-    void axpy(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
-      if (x.Precision() != y.Precision()) {
-	// call hacked mixed precision kernel
-	mixed::blasCuda<axpy_,0,1,0,0>(make_double2(a,0.0), make_double2(1.0,0.0), make_double2(0.0,0.0),
-				       x, y, x, x);
-      } else {
-	blasCuda<axpy_,0,1,0,0>(make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0),
-			       x, y, x, x);
-      }
-    }
-
-    /**
-       Functor to perform the operation z = x + a*y
-    */
-    template <typename Float2, typename FloatN>
-    struct xpayz_ : public BlasFunctor<Float2,FloatN> {
-      const Float2 a;
-      xpayz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { z = x + a.x*y; }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 2; } //! flops per element
-    };
-
-    void xpay(ColorSpinorField &x, const double &a, ColorSpinorField &y) {
-      blasCuda<xpayz_,0,0,1,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, x);
-    }
-
-    void xpayz(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z) {
-      blasCuda<xpayz_,0,0,1,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x);
-    }
-
-    /**
-       Functor to perform the operation y -= x;
-    */
-    template <typename Float2, typename FloatN>
-    struct mxpy_ : public BlasFunctor<Float2,FloatN> {
-      mxpy_(const Float2 &a, const Float2 &b, const Float2 &c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y -= x; }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 1; } //! flops per element
-    };
-
-    void mxpy(ColorSpinorField &x, ColorSpinorField &y) {
-      blasCuda<mxpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
-			     make_double2(0.0, 0.0), x, y, x, x);
     }
 
     /**
@@ -206,11 +127,10 @@ namespace quda {
       static int flops() { return 1; } //! flops per element
     };
 
-    void ax(const double &a, ColorSpinorField &x) {
+    void ax(double a, ColorSpinorField &x) {
       blasCuda<ax_,1,0,0,0>(make_double2(a, 0.0), make_double2(0.0, 0.0),
 			   make_double2(0.0, 0.0), x, x, x, x);
     }
-
 
     /**
        Functor to perform the operation y += a * x  (complex-valued)
@@ -353,8 +273,8 @@ namespace quda {
       static int flops() { return 5; } //! flops per element
     };
 
-    void axpyBzpcx(const double &a, ColorSpinorField& x, ColorSpinorField& y, const double &b,
-		   ColorSpinorField& z, const double &c) {
+    void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b,
+		   ColorSpinorField& z, double c) {
       if (x.Precision() != y.Precision()) {
 	// call hacked mixed precision kernel
 	mixed::blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0),
@@ -381,8 +301,8 @@ namespace quda {
       static int flops() { return 4; } //! flops per element
     };
 
-    void axpyZpbx(const double &a, ColorSpinorField& x, ColorSpinorField& y,
-		  ColorSpinorField& z, const double &b) {
+    void axpyZpbx(double a, ColorSpinorField& x, ColorSpinorField& y,
+		  ColorSpinorField& z, double b) {
       if (x.Precision() != y.Precision()) {
 	// call hacked mixed precision kernel
 	mixed::blasCuda<axpyZpbx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
@@ -481,54 +401,10 @@ namespace quda {
       static int flops() { return 5; } //! flops per element
     };
 
-    void cabxpyAx(const double &a, const Complex &b,
-		  ColorSpinorField &x, ColorSpinorField &y) {
+    void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y) {
       // swap arguments around
       blasCuda<cabxpyAx_,1,1,0,0>(make_double2(a,0.0), make_double2(REAL(b),IMAG(b)),
 				  make_double2(0.0,0.0), x, y, x, x);
-    }
-
-    /**
-       Functor performing the operation z[i] = a*x[i] + b*y[i] + z[i]
-    */
-    template <typename Float2, typename FloatN>
-    struct caxpbypz_ : public BlasFunctor<Float2,FloatN> {
-      const Float2 a;
-      const Float2 b;
-      caxpbypz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-      { _caxpy(a, x, z); _caxpy(b, y, z); }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 8; } //! flops per element
-    };
-
-    void caxpbypz(const Complex &a, ColorSpinorField &x, const Complex &b,
-		  ColorSpinorField &y, ColorSpinorField &z) {
-      blasCuda<caxpbypz_,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)),
-				  make_double2(0.0,0.0), x, y, z, z);
-    }
-
-    /**
-       Functor Performing the operation w[i] = a*x[i] + b*y[i] + c*z[i] + w[i]
-    */
-    template <typename Float2, typename FloatN>
-    struct caxpbypczpw_ : public BlasFunctor<Float2,FloatN> {
-      const Float2 a;
-      const Float2 b;
-      const Float2 c;
-      caxpbypczpw_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-      { _caxpy(a, x, w); _caxpy(b, y, w); _caxpy(c, z, w); }
-
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 12; } //! flops per element
-    };
-
-    void caxpbypczpw(const Complex &a, ColorSpinorField &x, const Complex &b,
-		     ColorSpinorField &y, const Complex &c, ColorSpinorField &z,
-		     ColorSpinorField &w) {
-      blasCuda<caxpbypczpw_,0,0,0,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)),
-				     make_double2(REAL(c),IMAG(c)), x, y, z, w);
     }
 
     /**
@@ -607,7 +483,7 @@ namespace quda {
       static int flops() { return 6; } //! flops per element
     };
 
-    void tripleCGUpdate(const double &a, const double &b, ColorSpinorField &x,
+    void tripleCGUpdate(double a, double b, ColorSpinorField &x,
 			ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w) {
       if (x.Precision() != y.Precision()) {
       // call hacked mixed precision kernel
