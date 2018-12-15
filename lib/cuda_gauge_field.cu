@@ -726,6 +726,7 @@ namespace quda {
     staggeredPhaseApplied = src.StaggeredPhaseApplied();
     staggeredPhaseType = src.StaggeredPhase();
 
+    qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
     checkCudaError();
   }
 
