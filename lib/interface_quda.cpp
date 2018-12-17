@@ -1007,7 +1007,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   bool twisted = inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? true : false;
 #ifdef DYNAMIC_CLOVER
-  bool dynamic_clover = twisted ? true : false; // dynamic clover only supported on twisted clover currently
+  bool dynamic_clover = true;
 #else
   bool dynamic_clover = false;
 #endif

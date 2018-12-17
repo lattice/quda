@@ -131,7 +131,11 @@ namespace quda {
                                        const int *comm_override, TimeProfile &profile)
   {
     constexpr int nDim = 4;
+#ifdef DYNAMIC_CLOVER
+    constexpr bool dynamic_clover = true;
+#else
     constexpr bool dynamic_clover = false;
+#endif
     WilsonCloverArg<Float,nColor,recon,dynamic_clover> arg(out, in, U, A, kappa, x, parity, dagger, comm_override);
     WilsonCloverPreconditioned<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,dynamic_clover> > wilson(arg, out, in);
 
