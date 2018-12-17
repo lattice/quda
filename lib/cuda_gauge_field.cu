@@ -670,7 +670,9 @@ namespace quda {
 	pool_pinned_free(buffer);
       } else { // else on the GPU
 
-	if (src.Order() == QUDA_MILC_SITE_GAUGE_ORDER || src.Order() == QUDA_BQCD_GAUGE_ORDER) {
+        if (src.Order() == QUDA_MILC_SITE_GAUGE_ORDER ||
+            src.Order() == QUDA_BQCD_GAUGE_ORDER      ||
+            src.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	  // special case where we use zero-copy memory to read/write directly from application's array
 	  void *src_d;
 	  cudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.Gauge_p()), 0);
@@ -724,6 +726,7 @@ namespace quda {
     staggeredPhaseApplied = src.StaggeredPhaseApplied();
     staggeredPhaseType = src.StaggeredPhase();
 
+    qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
     checkCudaError();
   }
 
@@ -745,7 +748,9 @@ namespace quda {
 
     if (reorder_location() == QUDA_CUDA_FIELD_LOCATION) {
 
-      if (cpu.Order() == QUDA_MILC_SITE_GAUGE_ORDER || cpu.Order() == QUDA_BQCD_GAUGE_ORDER) {
+      if (cpu.Order() == QUDA_MILC_SITE_GAUGE_ORDER ||
+          cpu.Order() == QUDA_BQCD_GAUGE_ORDER      ||
+          cpu.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
 	void *cpu_d;
 	cudaError_t error = cudaHostGetDevicePointer(&cpu_d, const_cast<void*>(cpu.Gauge_p()), 0);
