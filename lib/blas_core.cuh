@@ -232,7 +232,7 @@ template <typename Float, typename yFloat, int nSpin, QudaFieldOrder order,
   } else if (x.Ncolor() == 32) {
     genericBlas<Float,yFloat,nSpin,32,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else {
-    errorQuda("nColor = %d not implemeneted",x.Ncolor());
+    errorQuda("nColor = %d not implemented",x.Ncolor());
   }
 }
 
@@ -247,7 +247,7 @@ template <typename Float, typename yFloat, QudaFieldOrder order, int writeX, int
     genericBlas<Float,yFloat,1,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
 #endif
   } else {
-    errorQuda("nSpin = %d not implemeneted",x.Nspin());
+    errorQuda("nSpin = %d not implemented",x.Nspin());
   }
 }
 
@@ -257,6 +257,6 @@ template <typename Float, typename yFloat, int writeX, int writeY, int writeZ, i
     genericBlas<Float,yFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,Functor>
       (x, y, z, w, f);
   } else {
-    errorQuda("Not implemeneted");
+    errorQuda("Not implemented");
   }
 }

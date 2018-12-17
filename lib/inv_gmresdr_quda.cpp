@@ -627,7 +627,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
    param.true_res = sqrt(xmyNorm(b, r) / b2);
 
-   PrintSummary("FGMResDR:", tot_iters, r2, b2);
+   PrintSummary("FGMResDR:", tot_iters, r2, b2, stop, param.tol_hq);
 
    blas::flops = 0;
    mat.flops();

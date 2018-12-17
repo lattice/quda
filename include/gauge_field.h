@@ -135,7 +135,9 @@ namespace quda {
       this->ghost_precision = precision;
 
       if (native) {
-	order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ?
+	order = (precision == QUDA_DOUBLE_PRECISION ||
+                 reconstruct == QUDA_RECONSTRUCT_NO ||
+                 reconstruct == QUDA_RECONSTRUCT_10) ?
 	  QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
       }
     }
@@ -244,8 +246,11 @@ namespace quda {
 
     /**
        Apply the staggered phase factors to the gauge field.
+       @param[in] phase The phase we will apply to the field.  If this
+       is QUDA_STAGGERED_PHASE_INVALID, the default value, then apply
+       the phase set internal to the field.
     */
-    void applyStaggeredPhase();
+    void applyStaggeredPhase(QudaStaggeredPhase phase=QUDA_STAGGERED_PHASE_INVALID);
 
     /**
        Remove the staggered phase factors from the gauge field.

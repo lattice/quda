@@ -56,6 +56,7 @@ cpuColorSpinorField* tmp;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern double reliable_delta;
+extern bool alternative_reliable;
 extern int test_type;
 extern int xdim;
 extern int ydim;
@@ -202,6 +203,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol_restart = 1e-3; //now theoretical background for this parameter... 
   inv_param->maxiter = niter;
   inv_param->reliable_delta = reliable_delta;
+  inv_param->use_alternative_reliable = alternative_reliable;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param->pipeline = pipeline;

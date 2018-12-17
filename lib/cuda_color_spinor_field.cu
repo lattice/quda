@@ -410,7 +410,7 @@ namespace quda {
 	cudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
 
 	// second set of ghost texture map to the host-mapped pinned receive buffers
-	resDesc.res.linear.devPtr = static_cast<char*>(ghost_pinned_buffer_hd[b])+ghost_bytes;
+	resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
 	cudaCreateTextureObject(&ghostTex[2+b], &resDesc, &texDesc, NULL);
 
 	if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
@@ -432,12 +432,12 @@ namespace quda {
 
 	  cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
 
-	  resDesc.res.linear.devPtr = static_cast<char*>(ghost_pinned_buffer_hd[b])+ghost_bytes;
+	  resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
 	  cudaCreateTextureObject(&ghostTexNorm[2+b], &resDesc, &texDesc, NULL);
 	}
 
 	ghost_field_tex[b] = ghost_recv_buffer_d[b];
-	ghost_field_tex[2+b] = static_cast<char*>(ghost_pinned_buffer_hd[b])+ghost_bytes;
+	ghost_field_tex[2+b] = ghost_pinned_recv_buffer_hd[b];
       } // buffer index
 
       ghostTexInit = true;
@@ -925,7 +925,8 @@ namespace quda {
 
     // ascertain if this instance needs its comms buffers to be updated
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
-      (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]) || // pinned buffers
+      (my_face_h[0] != ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != ghost_pinned_send_buffer_h[1]) ||
+      (from_face_h[0] != ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != ghost_pinned_recv_buffer_h[1]) ||
       (ghost_field_tex[0] != ghost_recv_buffer_d[0]) || (ghost_field_tex[1] != ghost_recv_buffer_d[1]) || // receive buffers
       ghost_precision_reset; // ghost_precision has changed
 

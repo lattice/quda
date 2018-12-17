@@ -45,7 +45,7 @@ namespace quda {
                                        "memcpy h2d async", "comms start", "comms query", "constant", "total" };
 
 #ifdef INTERFACE_NVTX
-  const uint32_t TimeProfile::nvtx_colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+  const uint32_t TimeProfile::nvtx_colors[] = { 0xff00ff00, 0xff0000ff, 0xffffff00, 0xffff00ff, 0xff00ffff, 0xffff0000, 0xffffffff };
   const int TimeProfile::nvtx_num_colors = sizeof(nvtx_colors)/sizeof(uint32_t);
 #endif
 

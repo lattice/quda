@@ -254,7 +254,7 @@ namespace quda {
     int parity = threadIdx.y;
 
     double2 data = make_double2(0.0,0.0);
-    if ( idx < argQ.threads ) {
+    while ( idx < argQ.threads ) {
       typedef complex<Float> Cmplx;
 
       int x[4];
@@ -292,6 +292,8 @@ namespace quda {
       data.y = getRealTraceUVdagger(delta, delta);
       //35
       //T=36*gauge_dir+65
+
+      idx += blockDim.x*gridDim.x;
     }
 
     reduce2d<blockSize,2>(argQ, data);
@@ -303,11 +305,11 @@ namespace quda {
   class GaugeFixQuality : TunableLocalParity {
     GaugeFixQualityArg<Float, Gauge> argQ;
     mutable char aux_string[128];     // used as a label in the autotuner
-    private:
 
-    unsigned int minThreads() const { return argQ.threads; }
+  private:
+    bool tuneGridDim() const { return true; }
 
-    public:
+  public:
     GaugeFixQuality(GaugeFixQualityArg<Float, Gauge> &argQ)
       : argQ(argQ) {
     }

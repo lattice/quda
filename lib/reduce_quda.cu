@@ -89,24 +89,16 @@ namespace quda {
 	   of size MAX_MULTI_BLAS_N^2 of vectors (max length 4), with
 	   possible parity dimension, and a grid-stride loop with
 	   maximum number of blocks = 2 x SM count
-
-	- inline reductions in kernels where we cannot assume a grid
-           stride loop - hence max blocks is given by the architecture
-           limit
-
       */
 
-      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount; // FIXME - should set this according to what's used in tune_quda.h
+      const int reduce_size = 4 * sizeof(QudaSumFloat);
+      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount;
 
-      const int max_reduce = 2 * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
-      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
-
-      const int max_generic_blocks = 65336; // FIXME - this isn't quite right
-      const int max_generic_reduce = 2 * MAX_MULTI_BLAS_N * max_generic_blocks * 4 * sizeof(QudaSumFloat);
+      const int max_reduce = 2 * max_reduce_blocks * reduce_size;
+      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * reduce_size;
 
       // reduction buffer size
       size_t bytes = max_reduce > max_multi_reduce ? max_reduce : max_multi_reduce;
-      bytes = bytes > max_generic_reduce ? bytes : max_generic_reduce;
 
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 
@@ -782,8 +774,6 @@ namespace quda {
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
-
-#ifdef ALTRELIABLE
     /**
        double4 quadrupleCGReduction(V x, V y, V z){}
        First performs the operation norm2(x)
@@ -795,8 +785,8 @@ namespace quda {
     struct quadrupleCGReduction_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
       quadrupleCGReduction_(const Float2 &a, const Float2 &b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-  typedef typename ScalarType<ReduceType>::type scalar;
-  norm2_<scalar>(sum.x,x); norm2_<scalar>(sum.y,y); dot_<scalar>(sum.z,y,z); norm2_<scalar>(sum.w,w);
+        typedef typename ScalarType<ReduceType>::type scalar;
+        norm2_<scalar>(sum.x,x); norm2_<scalar>(sum.y,y); dot_<scalar>(sum.z,y,z); norm2_<scalar>(sum.w,w);
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 8; } //! flops per element
@@ -804,10 +794,8 @@ namespace quda {
 
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
       return reduce::reduceCuda<double4,QudaSumFloat4,quadrupleCGReduction_,0,0,0,0,0,false>
-  (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
+        (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
-
-#endif
 
     /**
        double quadrupleCG3InitNorm(d a, d b, V x, V y, V z, V w, V v){}

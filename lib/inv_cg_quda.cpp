@@ -127,7 +127,7 @@ namespace quda {
       }
       param.true_res = sqrt(r2 / b2);
 
-      PrintSummary("CGNE", param.iter - iter0, r2, b2);
+      PrintSummary("CGNE", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
     }
 
   }
@@ -188,7 +188,7 @@ namespace quda {
         r2 = blas::norm2(B);
       }
       param.true_res = sqrt(r2 / b2);
-      PrintSummary("CGNR", param.iter - iter0, r2, b2);
+      PrintSummary("CGNR", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
 
     } else if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
       mdagm.Expose()->M(*bp, x);
@@ -211,13 +211,9 @@ namespace quda {
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
     if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline\n", Np);
 
-#ifdef ALTRELIABLE
-    // hack to select alternative reliable updates
-    constexpr bool alternative_reliable = true;
-    warningQuda("Using alternative reliable updates. This feature is mostly ok but needs a little more testing in the real world.\n");
-#else
-    constexpr bool alternative_reliable = false;
-#endif
+    // whether to select alternative reliable updates
+    bool alternative_reliable = param.use_alternative_reliable;
+
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -532,8 +528,8 @@ namespace quda {
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
 	  xnorm = sqrt(pnorm);
 	  d_new = d + u*rNorm + uhigh*Anorm * xnorm;
-	  if(steps_since_reliable==0)
-	    printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
+	  if (steps_since_reliable==0 && getVerbosity() >= QUDA_DEBUG_VERBOSE)
+            printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
 	}
 	steps_since_reliable++;
 
@@ -565,7 +561,7 @@ namespace quda {
           d = d_new;
           xnorm = 0;//sqrt(norm2(x));
           pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
-          printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
           d_new = dinit;
         }
         else{
@@ -686,7 +682,7 @@ namespace quda {
       param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
     }
 
-    PrintSummary("CG", k, r2, b2);
+    PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
 
     // reset the flops counters
     blas::flops = 0;
@@ -1054,7 +1050,7 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
     param.true_res_offset[i] = param.true_res;
     param.true_res_hq_offset[i] = param.true_res_hq;
 
-    PrintSummary("CG", k, r2(i,i).real(), b2[i]);
+    PrintSummary("CG", k, r2(i,i).real(), b2[i], stop[i], 0.0);
   }
 
   // reset the flops counters
@@ -1638,7 +1634,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     param.true_res_offset[i] = param.true_res;
     param.true_res_hq_offset[i] = param.true_res_hq;
 
-    PrintSummary("CG", k, r2(i,i).real(), b2[i]);
+    PrintSummary("CG", k, r2(i,i).real(), b2[i], stop[i], 0.0);
   }
 
   // reset the flops counters

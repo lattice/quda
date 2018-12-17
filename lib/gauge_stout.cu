@@ -142,7 +142,7 @@ namespace quda {
 	//Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
 
 	//Get U^{\dagger}
-	computeMatrixInverse(U,&UDag);
+	UDag = inverse(U);
 	
 	//Compute \Omega = \rho * S * U^{\dagger}
 	Omega = (arg.rho * Stap) * UDag;
@@ -163,7 +163,7 @@ namespace quda {
 	Q = i_2 * Q;
 	//Q is now defined.
 	
-#ifdef HOST_DEBUG
+#if 0
 	//Test for Tracless:
 	//reuse OmegaDiffTr
 	OmegaDiffTr = getTrace(Q);
@@ -183,14 +183,14 @@ namespace quda {
 
 	exponentiate_iQ(Q,&exp_iQ);
 
-#ifdef HOST_DEBUG
+#if 0
 	//Test for expiQ unitarity:
 	error = ErrorSU3(exp_iQ);
 	printf("expiQ test %d %d %.15e\n", idx, dir, error);
 #endif
 
 	U = exp_iQ * U;
-#ifdef HOST_DEBUG
+#if 0
 	//Test for expiQ*U unitarity:
 	error = ErrorSU3(U);
 	printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
@@ -230,6 +230,9 @@ namespace quda {
         aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
         return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
       }
+
+      void preTune() { arg.dest.save(); } // defensive measure in case they alias
+      void postTune() { arg.dest.load(); }
 
       long long flops() const { return 3*(2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
       long long bytes() const { return 3*((1+2*6)*arg.origin.Bytes()+arg.dest.Bytes())*arg.threads; }
@@ -637,7 +640,7 @@ namespace quda {
 	//-------------------------------------------------------------------
 
 	//Get U^{\dagger}
-	computeMatrixInverse(U,&UDag);
+	UDag = inverse(U);
 	
 	//Compute \rho * staple_coeff * S
 	Omega = (arg.rho*staple_coeff)*(Stap);
@@ -662,7 +665,7 @@ namespace quda {
 	Q = i_2 * Q;
 	//Q is now defined.
 
-#ifdef HOST_DEBUG
+#if 0
 	//Test for Tracless:
 	//reuse OmegaDiffTr
 	OmegaDiffTr = getTrace(Q);
@@ -682,14 +685,14 @@ namespace quda {
 
 	exponentiate_iQ(Q,&exp_iQ);
 
-#ifdef HOST_DEBUG
+#if 0
 	//Test for expiQ unitarity:
 	error = ErrorSU3(exp_iQ);
 	printf("expiQ test %d %d %.15e\n", idx, dir, error);
 #endif
 
 	U = exp_iQ * U;
-#ifdef HOST_DEBUG
+#if 0
 	//Test for expiQ*U unitarity:
 	error = ErrorSU3(U);
 	printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
@@ -730,7 +733,10 @@ namespace quda {
         aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
         return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
       }
-    
+
+    void preTune() { arg.dest.save(); } // defensive measure in case they alias
+    void postTune() { arg.dest.load(); }
+
     long long flops() const { return 4*(18+2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
     long long bytes() const { return 4*((1+2*12)*arg.origin.Bytes()+arg.dest.Bytes())*arg.threads; }
   }; // GaugeSTOUT

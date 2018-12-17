@@ -109,6 +109,7 @@ module quda_fortran
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance
      real(8) :: reliable_delta_refinement ! Reliable update tolerance used in post multi-shift solver refinement
+     integer(4) :: use_alternative_reliable ! Whether to use alternative reliable updates
      integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
      integer(4) :: solution_accumulator_pipeline ! How many direction vectors we accumulate into the solution vector at once
      integer(4) :: max_res_increase ! How many residual increases we tolerate when doing reliable updates

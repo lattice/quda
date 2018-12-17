@@ -428,6 +428,14 @@ int comm_coord(int dim)
 }
 
 
+inline bool isHost(const cudaPointerAttributes &attributes) {
+#if CUDA_VERSION >= 10000
+  return (attributes.type == cudaMemoryTypeHost);
+#else
+  return (attributes.memoryType == cudaMemoryTypeHost);
+#endif
+}
+
 /**
  * Send to the "dir" direction in the "dim" dimension
  */
@@ -438,7 +446,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+  if (err != cudaSuccess || isHost(attributes)) {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = safe_malloc(nbytes);
     try {
@@ -477,7 +485,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
   checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+  if (err != cudaSuccess || isHost(attributes)) {
     // test this memory allocation is ok by filling it
     try {
       std::fill(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, 0);
@@ -512,7 +520,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+  if (err != cudaSuccess || isHost(attributes)) {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = safe_malloc(blksize*nblocks);
     try {
@@ -555,7 +563,7 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
   checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+  if (err != cudaSuccess || isHost(attributes)) {
     // test this memory allocation is ok by filling it
     try {
       for (int i=0; i<nblocks; i++)
