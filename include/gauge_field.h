@@ -319,6 +319,13 @@ namespace quda {
     virtual void copy(const GaugeField &src) = 0;
 
     /**
+       @brief Compute the L1 norm of the field
+       @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+       @return L1 norm
+     */
+    double norm1(int dim=-1) const;
+
+    /**
        @brief Compute the L2 norm squared of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L2 norm squared

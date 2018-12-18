@@ -6,6 +6,7 @@ namespace quda {
   using namespace gauge;
 
   enum norm_type_ {
+    NORM1,
     NORM2,
     ABS_MAX,
     ABS_MIN
@@ -16,6 +17,7 @@ namespace quda {
     typedef typename mapper<real>::type reg_type;
     double norm_ = 0.0;
     switch(type) {
+    case   NORM1: norm_ = FieldOrder<reg_type,Nc,1,order,true,real>(const_cast<GaugeField &>(u)).norm1(d);   break;
     case   NORM2: norm_ = FieldOrder<reg_type,Nc,1,order,true,real>(const_cast<GaugeField &>(u)).norm2(d);   break;
     case ABS_MAX: norm_ = FieldOrder<reg_type,Nc,1,order,true,real>(const_cast<GaugeField &>(u)).abs_max(d); break;
     case ABS_MIN: norm_ = FieldOrder<reg_type,Nc,1,order,true,real>(const_cast<GaugeField &>(u)).abs_min(d); break;
@@ -52,6 +54,18 @@ namespace quda {
     default: errorQuda("Unsupported color %d", u.Ncolor());
     }
     return norm_;
+  }
+
+  double GaugeField::norm1(int d) const {
+    if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
+    double nrm1 = 0.0;
+    switch(precision) {
+    case QUDA_DOUBLE_PRECISION: nrm1 = norm<double>(*this, d, NORM1); break;
+    case QUDA_SINGLE_PRECISION: nrm1 = norm< float>(*this, d, NORM1); break;
+    case   QUDA_HALF_PRECISION: nrm1 = norm< short>(*this, d, NORM1); break;
+    default: errorQuda("Unsupported precision %d", precision);
+    }
+    return nrm1;
   }
 
   double GaugeField::norm2(int d) const {
