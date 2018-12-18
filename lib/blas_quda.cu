@@ -98,7 +98,7 @@ namespace quda {
       const Float2 b;
       axpbyz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { v = a.x*x + b.x*y; } // use w not z to ensure same precision as y
+      { v = a.x*x + b.x*y; } // use v not z to ensure same precision as y
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 3; } //! flops per element
     };

@@ -13,7 +13,7 @@ namespace mixed {
     checkPrecision(x, z, w);
     checkPrecision(y, v);
 
-    if (checkLocation(x, y, z, w) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
       if (!x.isNative()) {
         warningQuda("Device blas on non-native fields is not supported\n");
