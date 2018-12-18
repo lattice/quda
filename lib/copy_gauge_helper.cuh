@@ -87,7 +87,7 @@ public:
         } else {
           copyGhost<FloatOut, FloatIn, length>(arg);
         }
-      } else {
+      } else if (location == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel(!is_ghost ? "quda::copyGaugeKernel" : "quda::copyGhostKernel")
@@ -102,6 +102,8 @@ public:
             <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         }
 #endif
+      } else {
+        errorQuda("Invalid field location %d\n", location);
       }
     }
 
