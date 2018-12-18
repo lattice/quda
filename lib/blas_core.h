@@ -8,9 +8,9 @@ template <template <typename Float, typename FloatN> class Functor,
 		ColorSpinorField &z, ColorSpinorField &w,
                 ColorSpinorField &v) {
 
-  checkPrecision(x, y, z, w);
+  checkPrecision(x, y, z, w, v);
 
-  if (checkLocation(x, y, z, w) == QUDA_CUDA_FIELD_LOCATION) {
+  if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
     if (!x.isNative() &&
         !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION ||
