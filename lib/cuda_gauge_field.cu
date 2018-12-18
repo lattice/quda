@@ -236,9 +236,7 @@ namespace quda {
 
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
-	// receive from backwards is first half of each ghost_recv_buffer
 	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; if (bidir) offset += ghost_face_bytes[d];
-	// send forwards is second half of each ghost_send_buffer
 	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
       }
 
@@ -520,6 +518,10 @@ namespace quda {
       if ( !(comm_dim_partitioned(dim) || (no_comms_fill && R[dim])) ) continue;
       send_d[dim] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
       recv_d[dim] = static_cast<char*>(ghost_recv_buffer_d[b]) + offset;
+
+      // silence cuda-memcheck initcheck errors that arise since we
+      // have an oversized ghost buffer when doing the extended exchange
+      cudaMemsetAsync(send_d[dim], 0, 2*ghost_face_bytes[dim]);
       offset += 2*ghost_face_bytes[dim]; // factor of two from fwd/back
     }
 
