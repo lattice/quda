@@ -490,12 +490,13 @@ namespace quda {
     blas::copy(*ip, ib);
 
     for(int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++){
-      
+     
+      double ip2 = blas::norm2(*ip); 
 //      copier_timer.Start("woo", "hoo", 0);
       // copyExtendedColorSpinor(*ifp, *ip, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
 //      copier_timer.Stop("woo", "hoo", 0);
 //      zero_extended_color_spinor_interface( *ifp, R, QUDA_CUDA_FIELD_LOCATION, 0);
-      inner_dslash(*immp, *ip, sqrt(rk2/ifp->Volume()));
+      inner_dslash(*immp, *ip, sqrt(ip2/ip->Volume()/24.));
 //      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
 //      copier_timer.Start("woo", "hoo", 0);
       // copyExtendedColorSpinor(*immp, *ifmmp, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
@@ -514,8 +515,8 @@ namespace quda {
       // xpay(ib, beta, *ip);
       axpyZpbx(alpha, *ip, ix, ib, beta);
 
-      // printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
-      //     local_loop_count, rk2, alpha, beta, Mpk2);
+      // printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e p2 = %8.4e\n",
+      //   local_loop_count, rk2, alpha, beta, Mpk2, sqrt(ip2/ip->Volume()/24.));
     }
 
     commGlobalReductionSet(true);
