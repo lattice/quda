@@ -137,7 +137,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
       cudaGetDeviceCount(&deviceCount);
       while (device_list_raw >> device) {
         // check this is a valid policy choice
-        if ( device < 0 || device >= device_count) {
+        if ( device < 0 ) {
           errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device);
         }
 

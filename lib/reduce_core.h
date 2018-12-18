@@ -22,6 +22,8 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 		   ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
 		   ColorSpinorField &v) {
 
+  checkPrecision(x,y,z,w,v);
+
   doubleN value;
   if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 

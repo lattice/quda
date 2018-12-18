@@ -69,11 +69,12 @@ namespace quda {
      @return String containing location and compilation type
    */
 
-  inline const char* compile_type_str(const LatticeField &meta) {
+  inline const char* compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION) {
+    QudaFieldLocation location = (location_ == QUDA_INVALID_FIELD_LOCATION ? meta.Location() : location_);
 #ifdef JITIFY
-    return meta.Location() == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
 #else
-    return meta.Location() == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
 #endif
   }
 
