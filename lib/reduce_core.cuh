@@ -357,7 +357,7 @@ template <typename ReduceType, typename Float, typename zFloat, int nSpin, QudaF
 #endif
   } else {
     ::quda::zero(value);
-    errorQuda("nColor = %d not implemeneted",x.Ncolor());
+    errorQuda("nColor = %d not implemented",x.Ncolor());
   }
   return value;
 }
@@ -376,7 +376,7 @@ template <typename ReduceType, typename Float, typename zFloat, QudaFieldOrder o
     value = genericReduce<ReduceType,Float,zFloat,1,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
 #endif
   } else {
-    errorQuda("nSpin = %d not implemeneted",x.Nspin());
+    errorQuda("nSpin = %d not implemented",x.Nspin());
   }
   return value;
 }
@@ -391,7 +391,7 @@ doubleN genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField
     value = genericReduce<ReduceType,Float,zFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,writeV,R>
       (x, y, z, w, v, r);
   } else {
-    warningQuda("CPU reductions not implemeneted for %d field order", x.FieldOrder());
+    warningQuda("CPU reductions not implemented for %d field order", x.FieldOrder());
   }
   return set(value);
 }

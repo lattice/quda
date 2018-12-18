@@ -60,9 +60,10 @@ namespace quda {
 #endif
       }
 
-      strcpy(aux, compile_type_str(meta));
-      strcat(aux, meta.AuxString());
+      strcpy(aux,compile_type_str(meta));
+      strcat(aux,meta.AuxString());
       strcat(aux,comm_dim_partitioned_string());
+      strcat(aux,comm_dim_topology_string());
 
       // record the location of where each pack buffer is in [2*dim+dir] ordering
       // 0 - no packing
