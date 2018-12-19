@@ -260,7 +260,7 @@ namespace quda {
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XYZT[4];
 
-    int ghostFace[QUDA_MAX_DIM+1];
+    int ghostFaceCB[QUDA_MAX_DIM+1];
 
     int X2X1;
     int X3X2X1;
@@ -317,7 +317,8 @@ namespace quda {
     void* ghost[2][QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
-    mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
+    mutable int ghostFace[QUDA_MAX_DIM];  // the size of each face
+    mutable int ghostFaceCB[QUDA_MAX_DIM];// the size of each checkboarded face
 
     mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
@@ -352,8 +353,10 @@ namespace quda {
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
-    char aux_string[TuneKey::aux_n]; // used as a label in the autotuner
-    void setTuningString(); // set the vol_string and aux_string for use in tuning
+    /**
+       @brief Set the vol_string and aux_string for use in tuning
+    */
+    void setTuningString();
 
   public:
     //ColorSpinorField();
@@ -382,8 +385,6 @@ namespace quda {
     size_t GhostBytes() const { return ghost_bytes; }
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
-
-    inline const char *AuxString() const { return aux_string; }
 
     void* V() {return v;}
     const void* V() const {return v;}
@@ -448,6 +449,7 @@ namespace quda {
     QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
     const int *GhostFace() const { return ghostFace; }
+    const int *GhostFaceCB() const { return ghostFaceCB; }
     int GhostOffset(const int i) const { return ghostOffset[i][0]; }
     int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
     int GhostNormOffset(const int i ) const { return ghostNormOffset[i][0]; }
@@ -818,7 +820,7 @@ namespace quda {
     /**
        @brief Restores the cudaColorSpinorField
     */
-    void restore();
+    void restore() const;
   };
 
   // CPU implementation
@@ -899,7 +901,7 @@ namespace quda {
     /**
        @brief Restores the cpuColorSpinorField
     */
-    void restore();
+    void restore() const ;
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,

@@ -216,6 +216,11 @@ namespace quda {
     */
     void createGhostZone(const int *R, bool no_comms_fill, bool bidir=true) const;
 
+    /**
+       @brief Set the vol_string and aux_string for use in tuning
+    */
+    void setTuningString();
+
   public:
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
@@ -307,6 +312,27 @@ namespace quda {
      * @param[in] src Source from which we are copying
      */
     virtual void copy(const GaugeField &src) = 0;
+
+    /**
+       @brief Compute the L2 norm squared of the field
+       @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+       @return L2 norm squared
+     */
+    double norm2(int dim=-1) const;
+
+    /**
+       @brief Compute the absolute maximum of the field (Linfinity norm)
+       @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+       @return Absolute maximum value
+     */
+    double abs_max(int dim=-1) const;
+
+    /**
+       @brief Compute the absolute minimum of the field
+       @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+       @return Absolute minimum value
+     */
+    double abs_min(int dim=-1) const;
 
     /**
        Compute checksum of this gauge field: this uses a XOR-based checksum method
@@ -501,7 +527,7 @@ namespace quda {
     /**
        @brief Restores the cudaGaugeField to CUDA memory
     */
-    void restore();
+    void restore() const;
 
   };
 
@@ -585,7 +611,7 @@ namespace quda {
     /**
        @brief Restores the cpuGaugeField
     */
-    void restore();
+    void restore() const;
 
   };
 
@@ -662,13 +688,6 @@ namespace quda {
   */
   void extractExtendedGaugeGhost(const GaugeField &u, int dim, const int *R, 
 				 void **ghost, bool extract);
-
-  /**
-     This function is used to calculate the maximum absolute value of
-     a gauge field array.  Defined in max_gauge.cu.  
-     @param[in] u The gauge field from which we want to compute the max
-  */
-  double maxGauge(const GaugeField &u);
 
   /** 
      Apply the staggered phase factor to the gauge field.

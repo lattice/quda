@@ -203,8 +203,7 @@ template <QudaDWFPCType type, typename Float>
 
 #ifdef MULTI_GPU
 
-static inline int
-x4_mg(int i, int oddBit)
+inline int x4_mg(int i, int oddBit)
 {
   int Y = fullLatticeIndex(i, oddBit);
   int x4 = Y/(Z[2]*Z[1]*Z[0]);

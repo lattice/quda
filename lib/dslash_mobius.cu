@@ -18,6 +18,7 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
+#include <dslash_helper.cuh>
 #include <sys/time.h>
 #include <blas_quda.h>
 
@@ -160,11 +161,13 @@ namespace quda {
           }
         }
       }
-
+      
       if (advance[0] || advance[1]) {
-        if(DS_type == 9){
+        if( param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock ){
+          return false;
+        }
         
-        }else{
+        if(DS_type < 9){
           param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			      (in->X(4)+param.block.y-1) / param.block.y, 1);
         }
@@ -580,13 +583,13 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyImp* dslashImp = nullptr;
+    DslashPolicyImp<DslashCuda>* dslashImp = nullptr;
     if (DS_type != 0) {
-      dslashImp = DslashFactory::create(QudaDslashPolicy::QUDA_DSLASH_NC);
+      dslashImp = DslashFactory<DslashCuda>::create(QudaDslashPolicy::QUDA_DSLASH_NC);
       (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
       delete dslashImp;
     } else {
-      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
+      DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
       dslash_policy.apply(0);
     }
 
@@ -697,13 +700,13 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyImp* dslashImp = nullptr;
+    DslashPolicyImp<DslashCuda>* dslashImp = nullptr;
     if (DS_type != 0) {
-      dslashImp = DslashFactory::create(QudaDslashPolicy::QUDA_DSLASH_NC);
+      dslashImp = DslashFactory<DslashCuda>::create(QudaDslashPolicy::QUDA_DSLASH_NC);
       (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), sp_idx_length, ghostFace, profile);
       delete dslashImp;
     } else {
-      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), sp_idx_length, ghostFace, profile);
+      DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), sp_idx_length, ghostFace, profile);
       dslash_policy.apply(0);
     }
     // sp_idx_length is the param.threads

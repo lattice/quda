@@ -278,6 +278,8 @@ namespace quda {
       ApplyGamma<float>(out, in, d);
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
       ApplyGamma<short>(out, in, d);
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyGamma<char>(out, in, d);
     } else {
       errorQuda("Unsupported precision %d\n", in.Precision());
     }
@@ -403,6 +405,8 @@ namespace quda {
       ApplyTwistGamma<float>(out, in, d, kappa, mu, epsilon, dagger, type);
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
       ApplyTwistGamma<short>(out, in, d, kappa, mu, epsilon, dagger, type);
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyTwistGamma<char>(out, in, d, kappa, mu, epsilon, dagger, type);
     } else {
       errorQuda("Unsupported precision %d\n", in.Precision());
     }
@@ -578,6 +582,8 @@ namespace quda {
       ApplyClover<float>(out, in, clover, inverse, parity);
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
       ApplyClover<short>(out, in, clover, inverse, parity);
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyClover<char>(out, in, clover, inverse, parity);
     } else {
       errorQuda("Unsupported precision %d\n", in.Precision());
     }
@@ -739,6 +745,8 @@ namespace quda {
       ApplyTwistClover<float>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
       ApplyTwistClover<short>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyTwistClover<char>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
     } else {
       errorQuda("Unsupported precision %d\n", in.Precision());
     }

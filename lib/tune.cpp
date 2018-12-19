@@ -741,8 +741,7 @@ namespace quda {
 	  cudaDeviceSynchronize();
 	  cudaGetLastError(); // clear error counter
 	  tunable.checkLaunchParam(param);
-	  if (policyTuning()) tunable.apply(0);  // do a pre call if doing policy tuning
-
+	  tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
 	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
 	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
 		       param.block.x, param.block.y, param.block.z,
@@ -768,18 +767,28 @@ namespace quda {
 	  }
 
 	  elapsed_time /= (1e3 * tunable.tuningIter());
-	  if ((elapsed_time < best_time) && (error == cudaSuccess)) {
+	  if ( (elapsed_time < best_time) && (error == cudaSuccess) && (tunable.jitifyError() == CUDA_SUCCESS) ) {
 	    best_time = elapsed_time;
 	    best_param = param;
 	  }
 	  if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-	    if (error == cudaSuccess)
+	    if (error == cudaSuccess && tunable.jitifyError() == CUDA_SUCCESS) {
 	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
 			 tunable.perfString(elapsed_time).c_str());
-	    else
-	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
+            } else {
+	      if (tunable.jitifyError() == CUDA_SUCCESS) {
+                // if not jitify error must be regular error
+		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
+	      } else {
+                // else is a jitify error
+		const char *str;
+		cuGetErrorString(tunable.jitifyError(), &str);
+		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), str);
+	      }
+            }
 	  }
 	  tuning = tunable.advanceTuneParam(param);
+    tunable.jitifyError() = CUDA_SUCCESS;
 	}
 
         tune_timer.Stop(__func__, __FILE__, __LINE__);

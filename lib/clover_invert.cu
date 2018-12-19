@@ -46,7 +46,7 @@ namespace quda {
 	A += arg.mu2;
       }
 
-      // compute the Colesky decomposition
+      // compute the Cholesky decomposition
       linalg::Cholesky<HMatrix,Float,N> cholesky(A);
 
       // Accumulate trlogA

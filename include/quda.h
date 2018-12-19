@@ -118,6 +118,7 @@ extern "C" {
     double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
     int maxiter; /**< Maximum number of iterations in the linear solver */
     double reliable_delta; /**< Reliable update tolerance */
+    double reliable_delta_refinement; /**< Reliable update tolerance used in post multi-shift solver refinement */
     int use_sloppy_partial_accumulator; /**< Whether to keep the partial solution accumuator in sloppy precision */
 
     /**< This parameter determines how often we accumulate into the

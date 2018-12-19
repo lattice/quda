@@ -246,6 +246,7 @@ void init(int precision, QudaReconstructType link_recon) {
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_cuda_prec_precondition = inv_param.clover_cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_refinement_sloppy = inv_param.clover_cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
     hostClover = malloc((size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);

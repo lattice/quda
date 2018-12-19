@@ -22,8 +22,8 @@ namespace quda {
     //QudaGammaBasis basis;
 
   public:
-    Gamma() { }
-    Gamma(const Gamma &g) { }
+    __device__ __host__ inline Gamma() { }
+    __device__ __host__ inline Gamma(const Gamma &g) { }
 
     __device__ __host__ inline int getcol(int row) const {
       if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
@@ -95,7 +95,7 @@ namespace quda {
       return 0;
     }
 
-    __device__ __host__ complex<ValueType> getelem(int row) const {
+    __device__ __host__ inline complex<ValueType> getelem(int row) const {
       complex<ValueType> I(0,1);
       if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
 	switch(dir) {

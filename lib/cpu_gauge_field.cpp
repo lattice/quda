@@ -95,7 +95,7 @@ namespace quda {
     }
 
     // compute the fat link max now in case it is needed later (i.e., for half precision)
-    if (param.compute_fat_link_max) fat_link_max = maxGauge(*this);
+    if (param.compute_fat_link_max) fat_link_max = this->abs_max();
   }
 
 
@@ -360,7 +360,7 @@ namespace quda {
     backed_up = true;
   }
 
-  void cpuGaugeField::restore() {
+  void cpuGaugeField::restore() const {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
 
     if (order == QUDA_QDP_GAUGE_ORDER) {

@@ -158,6 +158,8 @@ set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
+set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
+
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
@@ -180,6 +182,8 @@ mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
 mark_as_advanced(QUDA_CXX_STANDARD)
 
+mark_as_advanced(QUDA_JITIFY)
+
 #######################################################################
 # options that are not exposed at all because only one option exists
 set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
@@ -196,9 +200,11 @@ find_package(PythonInterp)
 ## QUDA depends on Eigen
 ## this part makes sure we can download eigen if it is not found
 if (QUDA_DOWNLOAD_EIGEN)
-  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2)
-  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2)
-  set(EIGEN_SHA dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6)
+  set(EIGEN_VERSION 3.3.5)
+
+  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
+  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
+  set(EIGEN_SHA 7352bff3ea299e4c7d7fbe31c504f8eb9149d7e685dec5a12fbaa26379f603e2)
   if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION} )
     message(STATUS "Checking for Eigen tarball and downloading if necessary.")
   endif()
@@ -211,7 +217,7 @@ if (QUDA_DOWNLOAD_EIGEN)
 
   include(ExternalProject)
   ExternalProject_Add(Eigen
-    URL ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2
+    URL ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2
     URL_HASH SHA256=${EIGEN_SHA}
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
     CONFIGURE_COMMAND ""
@@ -401,6 +407,16 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
+endif()
+
+if(QUDA_JITIFY)
+  add_definitions(-DJITIFY)
+  find_package(LibDL)
+#  find_library(LibDL_Libraries nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
+  LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
+  LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
+  configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
+  include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 endif()
 
 if(QUDA_ALTRELIABLE)

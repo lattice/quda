@@ -1,19 +1,11 @@
 #include <transfer.h>
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
 #include <gauge_field.h>
-#include <gauge_field_order.h>
-#include <complex_quda.h>
-#include <index_helper.cuh>
-#include <gamma.cuh>
-#include <blas_cublas.h>
 
-// this is the storage type used when computing the coarse link variables
-// by using integers we have deterministic atomics
-typedef int storeType;
-
+#define COARSECOARSE
+#ifdef GPU_MULTIGRID
 #include <coarse_op.cuh>
-
+#endif
 namespace quda {
 
 #ifdef GPU_MULTIGRID

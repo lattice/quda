@@ -1,5 +1,6 @@
 #pragma once
 
+#ifndef __CUDACC_RTC__
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <quda_cuda_api.h>
@@ -138,3 +139,5 @@ namespace quda {
   void printAPIProfile();
 
 } // namespace quda
+
+#endif

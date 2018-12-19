@@ -1,16 +1,12 @@
-#ifndef _QUDA_MATRIX_H_
-#define _QUDA_MATRIX_H_
+#pragma once
 
 #include <cstdio>
-
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
-#include <cuda.h>
 
 #include <register_traits.h>
 #include <float_vector.h>
-
 #include <complex_quda.h>
 
 namespace quda {
@@ -26,7 +22,7 @@ namespace quda {
 
   template<>
     __device__ __host__ inline
-    float2 Zero<float2>::val()  
+    float2 Zero<float2>::val()
     {
       return make_float2(0.,0.);
     }
@@ -279,6 +275,18 @@ namespace quda {
 	return result;
       }
 
+      /**
+	 @brief Compute the absolute max element of the Hermitian matrix
+	 @return Abosolue Max element
+      */
+      __device__ __host__ inline T max() const {
+	HMatrix<T,N> result;
+	T max = static_cast<T>(0.0);
+#pragma unroll
+	for (int i=0; i<N*N; i++) max = (abs(data[i]) > max ? abs(data[i]) : max);
+        return max;
+      }
+
       __device__ __host__ void print() const {
 	for (int i=0; i<N; i++) {
 	  printf("i=%d ", i);
@@ -498,7 +506,7 @@ namespace quda {
     }
 
 
-  template<class T> 
+  template<class T>
     __device__  __host__ inline
     void computeMatrixInverse(const Matrix<T,3>& u, Matrix<T,3>* uinv)
     {
@@ -536,7 +544,7 @@ namespace quda {
       (*uinv)(2,2) = (temp*det_inv);
 
       return;
-    } 
+    }
 
 
 
@@ -565,7 +573,7 @@ namespace quda {
         (*m)(i,i) = make_float2(1,0);
 #pragma unroll
         for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = make_float2(0.,0.);    
+          (*m)(i,j) = (*m)(j,i) = make_float2(0.,0.);
         }
       }
       return;
@@ -581,7 +589,7 @@ namespace quda {
         (*m)(i,i) = make_double2(1,0);
 #pragma unroll
         for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = make_double2(0.,0.);    
+          (*m)(i,j) = (*m)(j,i) = make_double2(0.,0.);
         }
       }
       return;
@@ -654,10 +662,10 @@ namespace quda {
 
 
   // Matrix and array are very similar
-  // Maybe I should factor out the similar 
-  // code. However, I want to make sure that 
-  // the compiler knows to store the 
-  // data elements in registers, so I won't do 
+  // Maybe I should factor out the similar
+  // code. However, I want to make sure that
+  // the compiler knows to store the
+  // data elements in registers, so I won't do
   // it right now.
   template<class T, int N>
     class Array
@@ -673,7 +681,7 @@ namespace quda {
           }
 
         // assignment function
-        __device__ __host__ inline 
+        __device__ __host__ inline
           T & operator[](int i){
             return data[i];
           }
@@ -706,7 +714,7 @@ namespace quda {
     }
 
   template<class T, int N>
-    __device__ __host__ inline 
+    __device__ __host__ inline
     void outerProd(const T (&a)[N], const T (&b)[N], Matrix<T,N>* m){
 #pragma unroll
       for (int i=0; i<N; ++i){
@@ -757,7 +765,7 @@ namespace quda {
 
 
   template<class T, class U, int N>
-    __device__ inline 
+    __device__ inline
     void loadMatrixFromArray(const T* const array, const int idx, const int stride, Matrix<U,N> *mat)
     {
 #pragma unroll
@@ -767,10 +775,10 @@ namespace quda {
     }
 
 
-  __device__ inline  
+  __device__ inline
     void loadLinkVariableFromArray(const float2* const array, const int dir, const int idx, const int stride, Matrix<complex<double>,3> *link)
-    { 
-      float2 single_temp; 
+    {
+      float2 single_temp;
 #pragma unroll
       for (int i=0; i<9; ++i){
         single_temp = array[idx + (dir*9 + i)*stride];
@@ -783,7 +791,7 @@ namespace quda {
 
 
   template<class T, int N, class U>
-    __device__ inline 
+    __device__ inline
     void writeMatrixToArray(const Matrix<T,N>& mat, const int idx, const int stride, U* const array)
     {
 #pragma unroll
@@ -792,7 +800,7 @@ namespace quda {
       }
     }
 
-  __device__ inline 
+  __device__ inline
     void appendMatrixToArray(const Matrix<complex<double>,3>& mat, const int idx, const int stride, double2* const array)
     {
 #pragma unroll
@@ -802,7 +810,7 @@ namespace quda {
       }
     }
 
-  __device__ inline 
+  __device__ inline
     void appendMatrixToArray(const Matrix<complex<float>,3>& mat, const int idx, const int stride, float2* const array)
     {
 #pragma unroll
@@ -818,7 +826,7 @@ namespace quda {
     void writeLinkVariableToArray(const Matrix<T,3> & link, const int dir, const int idx, const int stride, U* const array)
     {
 #pragma unroll
-      for (int i=0; i<9; ++i){ 
+      for (int i=0; i<9; ++i){
         array[idx + (dir*9 + i)*stride] = link.data[i];
       }
       return;
@@ -827,13 +835,13 @@ namespace quda {
 
 
 
-  __device__ inline 
+  __device__ inline
     void writeLinkVariableToArray(const Matrix<complex<double>,3> & link, const int dir, const int idx, const int stride, float2* const array)
     {
       float2 single_temp;
 
 #pragma unroll
-      for (int i=0; i<9; ++i){ 
+      for (int i=0; i<9; ++i){
         single_temp.x = link.data[i].x;
         single_temp.y = link.data[i].y;
         array[idx + (dir*9 + i)*stride] = single_temp;
@@ -879,7 +887,7 @@ namespace quda {
 
 
   template<class T, class U>
-    __device__  inline 
+    __device__  inline
     void writeMomentumToArray(const Matrix<T,3> & mom, const int dir, const int idx, const U coeff, const int stride, T* const array)
     {
       typedef typename T::value_type real;
@@ -910,7 +918,7 @@ namespace quda {
 
 
 
-  template<class Cmplx> 
+  template<class Cmplx>
     __device__  __host__ inline
     void computeLinkInverse(Matrix<Cmplx,3>* uinv, const Matrix<Cmplx,3>& u)
     {
@@ -948,8 +956,8 @@ namespace quda {
       (*uinv)(2,2) = (temp*det_inv);
 
       return;
-    } 
-  // template this! 
+    }
+  // template this!
   inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
 #pragma unroll
     for (int i=0; i<3; ++i){
@@ -1069,7 +1077,7 @@ namespace quda {
       }
     }
 
-#pragma unroll 
+#pragma unroll
     for (int i=0; i<3; i++) {
 #pragma unroll
       for (int j=0; j<3; j++) {
@@ -1089,12 +1097,12 @@ namespace quda {
       Cmplx temp(0,0);
       int i=0;
       int j=0;
-      
+
       //error = ||U^dagger U - I||_L2
 #pragma unroll
-      for (i=0; i<3; ++i) 
+      for (i=0; i<3; ++i)
 #pragma unroll
-	for (j=0; j<3; ++j) 
+	for (j=0; j<3; ++j)
 	  if(i==j) {
 	    temp = identity_comp(i,j);
 	    temp -= 1.0;
@@ -1106,8 +1114,8 @@ namespace quda {
       //error is L2 norm, should be (very close) to zero.
       return error;
     }
-  
-  template<class T> 
+
+  template<class T>
     __device__  __host__ inline
     void exponentiate_iQ(const Matrix<T,3>& Q, Matrix<T,3>* exp_iQ)
     {
@@ -1119,7 +1127,7 @@ namespace quda {
       //Declarations
       typedef decltype(Q(0,0).x) undMatType;
 
-      undMatType inv3 = 1.0/3.0;      
+      undMatType inv3 = 1.0/3.0;
       undMatType c0, c1, c0_max, Tr_re;
       undMatType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
       undMatType theta;
@@ -1135,23 +1143,23 @@ namespace quda {
       temp1 = temp1 * Q;
       Tr_re = getTrace(temp1).x;
       c1 = 0.5*Tr_re;
-      
+
       //We now have the coeffiecients c0 and c1.
       //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
       //      where       fj = fj(c0,c1), j=0,1,2.
-      
+
       //[17]
       c0_max = 2*pow(c1*inv3,1.5);
-      
+
       //[25]
       theta  = acos(c0/c0_max);
-      
+
       //[23]
       u_p = sqrt(c1*inv3)*cos(theta*inv3);
-      
+
       //[24]
       w_p = sqrt(c1)*sin(theta*inv3);
-      
+
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
       undMatType u_sq = u_p*u_p;
       undMatType w_sq = w_p*w_p;
@@ -1164,15 +1172,15 @@ namespace quda {
       undMatType sinc_w;
       undMatType hj_re = 0.0;
       undMatType hj_im = 0.0;
-  
+
       //[33] Added one more term to the series given in the paper.
-      if (w_p < 0.05 && w_p > -0.05) {      
+      if (w_p < 0.05 && w_p > -0.05) {
 	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       }
       else sinc_w = sin(w_p)/w_p;
-      
-    
+
+
       //[34] Test for c0 < 0.
       int parity = 0;
       if(c0 < 0) {
@@ -1180,43 +1188,43 @@ namespace quda {
 	parity = 1;
 	//calculate fj with c0 > 0 and then convert all fj.
       }
-      
+
       //Get all the numerators for fj,
       //[30] f0
       hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
       hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
       f0_re = hj_re*denom_inv;
       f0_im = hj_im*denom_inv;
-      
+
       //[31] f1
       hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
       hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
       f1_re = hj_re*denom_inv;
       f1_im = hj_im*denom_inv;
-      
+
       //[32] f2
       hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
-      hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;  
+      hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;
       f2_re = hj_re*denom_inv;
       f2_im = hj_im*denom_inv;
-      
+
       //[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
       if (parity == 1) {
-	f0_im *= -1.0; 
+	f0_im *= -1.0;
 	f1_re *= -1.0;
 	f2_im *= -1.0;
       }
-      
+
       T f0_c;
       T f1_c;
       T f2_c;
-      
+
       f0_c.x = f0_re;
       f0_c.y = f0_im;
-      
-      f1_c.x = f1_re;  
-      f1_c.y = f1_im;  
-      
+
+      f1_c.x = f1_re;
+      f1_c.y = f1_im;
+
       f2_c.x = f2_re;
       f2_c.y = f2_im;
 
@@ -1227,7 +1235,7 @@ namespace quda {
       // +f0*I
       temp1 = f0_c * UnitM;
       *exp_iQ = temp1;
-      
+
       // +f1*Q
       temp1 = f1_c * Q;
       *exp_iQ += temp1;
@@ -1243,4 +1251,4 @@ namespace quda {
 
 
 } // end namespace quda
-#endif // _QUDA_MATRIX_H_
+

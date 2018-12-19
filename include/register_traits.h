@@ -9,6 +9,7 @@
  */
 
 #include <quda_internal.h>
+#include <convert.h>
 #include <generics/ldg.h>
 #include <complex_quda.h>
 #include <inline_ptx.h>
@@ -163,32 +164,6 @@ namespace quda {
     a.x = __hiloint2double(b.y, b.x); a.y = __hiloint2double(b.w, b.z);
 #else
     errorQuda("Undefined");
-#endif
-  }
-
-  // specializations for char-float conversion
-  static inline __host__ __device__ float c2f(const char &a) { return static_cast<float>(a) * fixedInvMaxValue<char>::value; }
-  static inline __host__ __device__ double c2d(const char &a) { return static_cast<double>(a) * fixedInvMaxValue<char>::value; }
-
-  // specializations for short-float conversion
-  static inline __host__ __device__ float s2f(const short &a) { return static_cast<float>(a) * fixedInvMaxValue<short>::value; }
-  static inline __host__ __device__ double s2d(const short &a) { return static_cast<double>(a) * fixedInvMaxValue<short>::value; }
-
-  // Fast float to integer round
-  __device__ __host__ inline int f2i(float f) {
-#ifdef __CUDA_ARCH__
-    f += 12582912.0f; return reinterpret_cast<int&>(f);
-#else
-    return static_cast<int>(f);
-#endif
-  }
-
-  // Fast double to integer round
-  __device__ __host__ inline int d2i(double d) {
-#ifdef __CUDA_ARCH__
-    d += 6755399441055744.0; return reinterpret_cast<int&>(d);
-#else
-    return static_cast<int>(d);
 #endif
   }
 
@@ -381,7 +356,7 @@ namespace quda {
 
   template <typename VectorType>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value) {
-    reinterpret_cast< __restrict__ VectorType* >(ptr)[idx] = value;
+    reinterpret_cast< VectorType* >(ptr)[idx] = value;
   }
 
   template <>

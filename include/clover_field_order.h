@@ -159,7 +159,7 @@ namespace quda {
 
     */
 
-    template<typename Float> struct abs_ { __host__ __device__ Float operator()(quda::complex<Float> x) { return abs(x); } };
+    template<typename Float> struct abs_ { __host__ __device__ Float operator()(Float x) { return abs(x); } };
 
     template<typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
@@ -221,21 +221,19 @@ namespace quda {
 
       }
 
-      __host__ double device_absmax() const {
-	thrust_allocator alloc;
-	thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
-	// just use offset_cb, since factor of two from parity is equivalent to complexity
-	return thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb,
-					abs_<Float>(), 0.0, thrust::maximum<Float>());
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const {
+        double result = init;
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          thrust_allocator alloc;
+          thrust::device_ptr<Float> ptr(reinterpret_cast<Float*>(a));
+          result = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb, h, result, r);
+        } else {
+          result = thrust::transform_reduce(thrust::seq, a, a+offset_cb, h, result, r);
+        }
+        return 2.0*result; // factor two is normalization
       }
 
-      __host__ double device_absmin() const {
-	thrust_allocator alloc;
-	thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
-	// just use offset_cb, since factor of two from parity is equivalent to complexity
-	return thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb,
-					abs_<Float>(), 0.0, thrust::minimum<Float>());
-      }
     };
 
     template<typename Float, int nColor, int nSpin> 
@@ -276,15 +274,12 @@ namespace quda {
 	}
       }
 
-      __host__ double device_absmax() const {
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const {
 	errorQuda("Not implemented");
 	return 0.0;
       }
 
-      __host__ double device_absmin() const {
-	errorQuda("Not implemented");
-	return 0.0;
-      }
     };
 
     /**
@@ -299,6 +294,7 @@ namespace quda {
 	/** An internal reference to the actual field we are accessing */
 	CloverField &A;
 	const int volumeCB;
+        const QudaFieldLocation location;
 	const Accessor<Float,nColor,nSpin,order> accessor;
 	bool inverse;
 
@@ -308,7 +304,7 @@ namespace quda {
 	 * @param field The field that we are accessing
 	 */
       FieldOrder(CloverField &A, bool inverse=false)
-      : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse), inverse(inverse)
+      : A(A), volumeCB(A.VolumeCB()), location(A.Location()), accessor(A,inverse), inverse(inverse)
 	{ }
 	
 	CloverField& Field() { return A; }
@@ -385,22 +381,11 @@ namespace quda {
 
 	/**
 	 * @brief Returns the Linfinity norm of the field
-	 * @param[in] dim Which dimension we are taking the Linfinity norm of
+	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
 	 * @return Linfinity norm
 	 */
 	__host__ double abs_max(int dim) const {
-	  double absmax = 0;
-	  if (A.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	    // call device version - specialized for ordering
-	    absmax = accessor.device_absmax();
-	  } else {
-	    // do simple norm on host memory
-	    complex<Float> *a = static_cast<complex<Float>*>(A.V(inverse));
-	    absmax = 0.0;
-	    for (size_t i=0; i<A.Bytes()/sizeof(complex<Float>); i++) {
-	      absmax = (abs(a[i]) > absmax) ? abs(a[i]) : absmax;
-	    }
-	  }
+	  double absmax = accessor.transform_reduce(location, abs_<Float>(), thrust::maximum<Float>(), 0.0);
 	  comm_allreduce_max(&absmax);
 	  return absmax;
 	}
@@ -411,18 +396,8 @@ namespace quda {
 	 * @return Minimum norm
 	 */
 	__host__ double abs_min(int dim) const {
-	  double absmin = 0;
-	  if (A.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	    // call device version - specialized for ordering
-	    absmin = accessor.device_absmin();
-	  } else {
-	    // do simple norm on host memory
-	    complex<Float> *a = static_cast<complex<Float>*>(A.V(inverse));
-	    absmin = 0.0;
-	    for (size_t i=0; i<A.Bytes()/sizeof(complex<Float>); i++) {
-	      absmin = (abs(a[i]) > absmin) ? abs(a[i]) : absmin;
-	    }
-	  }
+	  double absmin = accessor.transform_reduce(location, abs_<Float>(), thrust::minimum<Float>(),
+                                                    std::numeric_limits<double>::max());
 	  comm_allreduce_min(&absmin);
 	  return absmin;
 	}
@@ -555,10 +530,10 @@ namespace quda {
 	    }
 	  }
 
-	  if (sizeof(Float)==sizeof(short)) {
+	  if ( isFixed<Float>::value ) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	    RegType nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity*norm_offset + chirality*stride + x) :
-	      norm[parity*norm_offset + chirality*stride + x];
+            norm[parity*norm_offset + chirality*stride + x];
 #else
             RegType nrm = norm[parity*norm_offset + chirality*stride + x];
 #endif
@@ -566,16 +541,6 @@ namespace quda {
 	    for (int i=0; i<block; i++) v[i] *= nrm;
 	  }
 
-    if (sizeof(Float)==sizeof(char)) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-      RegType nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity*norm_offset + chirality*stride + x) :
-        norm[parity*norm_offset + chirality*stride + x];
-#else
-            RegType nrm = norm[parity*norm_offset + chirality*stride + x];
-#endif
-#pragma unroll
-      for (int i=0; i<block; i++) v[i] *= nrm;
-    }
 	}
   
 	/**
@@ -589,7 +554,7 @@ namespace quda {
 
 	  // find the norm of each chiral block
 	  RegType scale = 0.0;
-	  if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
+	  if ( isFixed<Float>::value ) {
 #pragma unroll
 	    for (int i=0; i<block; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
 	    norm[parity*norm_offset + chirality*stride + x] = scale;
@@ -599,7 +564,7 @@ namespace quda {
 	  for (int i=0; i<M; i++) {
 	    Vector vecTmp;
 	    // first do scalar copy converting into storage type and rescaling if necessary
-	    if (sizeof(Float)==sizeof(short)||sizeof(Float)==sizeof(char))
+	    if ( isFixed<Float>::value )
 #pragma unroll
 	      for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[i*N+j] / scale);
 	    else
@@ -666,7 +631,7 @@ namespace quda {
 
 	size_t Bytes() const {
 	  size_t bytes = length*sizeof(Float);
-	  if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) bytes += 2*sizeof(float);
+	  if ( isFixed<Float>::value ) bytes += 2*sizeof(float);
 	  return bytes;
 	}
       };

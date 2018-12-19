@@ -318,24 +318,26 @@ namespace quda {
     
     mat_precondition->Dagger(QUDA_DAG_NO);
 */
-
-
-    inner_dslash(*cx, *cb, 1.);
-    blas::copy( *tt, *cx );
-    
     double fx2 = norm2(*fx);
-//    printfQuda("Test   fx2/fb2 = %16.12e/%16.12e.\n", fx2, fb2);
-//    zero_extended_color_spinor_interface( *fx, R, QUDA_CUDA_FIELD_LOCATION, 0);
-//    fx2 = norm2(*fx);
-//    printfQuda("Chopping   fx2 = %16.12e.\n", fx2);
+    for(double s = 0.00390625; s < 256.5; s *= 1.189207115){ // 2^-8 ~ 2^+8
+      inner_dslash(*cx, *cb, s);
+      blas::copy( *tt, *cx );
+      
+  //    printfQuda("Test   fx2/fb2 = %16.12e/%16.12e.\n", fx2, fb2);
+  //    zero_extended_color_spinor_interface( *fx, R, QUDA_CUDA_FIELD_LOCATION, 0);
+  //    fx2 = norm2(*fx);
+  //    printfQuda("Chopping   fx2 = %16.12e.\n", fx2);
+  
+  //    copyExtendedColorSpinor(*tt, *fx, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
+      double x2_ = blas::norm2(*tt);
+      double dd = xmyNorm(*tx, *tt);
+      printfQuda(" loss scale        = %8.4e ------> \n", s);
+      printfQuda(" | a |^2           = %16.12e. \n", x2_);
+      printfQuda(" |a-b|^2           = %16.12e. (This number is SUPPOSED to be tiny).\n", dd);
+      printfQuda(" |a-b|^2/|b|^2     = %16.12e. (This number is SUPPOSED to be tiny).\n", dd/x2);
+    }
 
-//    copyExtendedColorSpinor(*tt, *fx, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
-    double x2_ = blas::norm2(*tt);
-    printfQuda("Rebuild     x2 = %16.12e.\n", x2_);
-    double dd = xmyNorm(*tt, *tx);
-    printfQuda("  diff      x2 = %16.12e. (This number is SUPPOSED to be tiny).\n", dd);
-    
-    if(tc and fb->Precision() == QUDA_HALF_PRECISION){
+    if(tc && (fb->Precision() == QUDA_HALF_PRECISION || fb->Precision() == QUDA_QUARTER_PRECISION)){
 //      mat_precondition->Dagger(QUDA_DAG_YES);
 //      mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), 1., sp_len2, RR2, Xs2);
 //      mat_precondition->Dslash5inv(*ft, *fb, static_cast<QudaParity>(0));
@@ -458,7 +460,7 @@ namespace quda {
   void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in, const double scale ){
     int odd_bit = (mat_precondition->getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-    if(tc && out.Precision() == QUDA_HALF_PRECISION){
+    if(tc && (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION)){
       mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift2, shift2);
       mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift1, shift2);
       mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift0, shift1);

@@ -82,10 +82,20 @@ namespace quda {
       if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;
+
+    setTuningString();
   }
 
   GaugeField::~GaugeField() {
 
+  }
+
+  void GaugeField::setTuningString() {
+    LatticeField::setTuningString();
+    int aux_string_n = TuneKey::aux_n / 2;
+    int check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d,geometry=%d,Nc=%d",
+                         volume, stride, precision, geometry, nColor);
+    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
   }
 
   void GaugeField::createGhostZone(const int *R, bool no_comms_fill, bool bidir) const
@@ -142,7 +152,8 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
     } else if (precision == QUDA_SINGLE_PRECISION || 
-	       precision == QUDA_HALF_PRECISION) {
+	       precision == QUDA_HALF_PRECISION ||
+	       precision == QUDA_QUARTER_PRECISION) {
       if (reconstruct == QUDA_RECONSTRUCT_NO) {
 	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
       } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
@@ -283,8 +294,8 @@ namespace quda {
     if (a.LinkType() == QUDA_COARSE_LINKS) errorQuda("Not implemented for coarse-link type");
     if (a.Ncolor() != 3) errorQuda("Not implemented for Ncolor = %d", a.Ncolor());
 
-    if (a.Precision() == QUDA_HALF_PRECISION)
-      errorQuda("Casting a GaugeField into ColorSpinorField not possible in half precision");
+    if (a.Precision() == QUDA_HALF_PRECISION || a.Precision() == QUDA_QUARTER_PRECISION)
+      errorQuda("Casting a GaugeField into ColorSpinorField not possible in half or quarter precision");
 
     ColorSpinorParam spinor_param;
     spinor_param.nColor = (a.Geometry()*a.Reconstruct())/2;

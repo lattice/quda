@@ -33,11 +33,14 @@ extern QudaPrecision prec;
 extern QudaPrecision prec_sloppy;
 extern double anisotropy;
 
+extern bool verify_results;
+
 extern char latfile[];
+extern bool verify_results;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-QudaPrecision &cpu_prec = prec;
+QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 
@@ -101,8 +104,7 @@ void SU3test(int argc, char **argv) {
 
   setGaugeParam(gauge_param);
   setDims(gauge_param.X);
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? 
-    sizeof(double) : sizeof(float);
+  size_t gSize = gauge_param.cpu_prec;
 
   void *gauge[4], *new_gauge[4];
 
@@ -122,9 +124,9 @@ void SU3test(int argc, char **argv) {
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { 
     // generate a random SU(3) field
-    printf("Randomizing fields...");
+    printfQuda("Randomizing fields...");
     construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    printf("done.\n");
+    printfQuda("done.\n");
   }
 
   loadGaugeQuda(gauge, &gauge_param);
@@ -191,10 +193,11 @@ void SU3test(int argc, char **argv) {
   printfQuda("Computed topological charge after is %.16e \n", qCharge);
 
 #else
-  printfQuda("Skipping gauge tests since gauge tools have not been compiled\n");
+  printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
 #endif
-  
-  check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
+
+  if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
+
   freeGaugeQuda();
   endQuda();
 

@@ -60,6 +60,15 @@ namespace quda {
 	return *this;
       }
 
+      template <typename T>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator*=(const T &a) {
+#pragma unroll
+        for (int i=0; i<size; i++) {
+          data[i] *= a;
+        }
+	return *this;
+      }
+
       template<typename S>
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
 
@@ -144,6 +153,15 @@ namespace quda {
 	for (int i=0; i<size; i++) {
 	  data[i] += a.data[i];
 	}
+      }
+      return *this;
+    }
+
+    template <typename T>
+      __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator*=(const T &a) {
+#pragma unroll
+      for (int i=0; i<size; i++) {
+        data[i] *= a;
       }
       return *this;
     }
@@ -688,8 +706,17 @@ namespace quda {
       return *this;
     }
 
+    template <typename T>
+      __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator*=(const T &a) {
+#pragma unroll
+      for (int i=0; i<size; i++) {
+        data[i] *= a;
+      }
+      return *this;
+    }
+
     /**
-       @brief Reconstruct twor-component spinor to a four-component spinor
+       @brief Reconstruct two-component spinor to a four-component spinor
        @param[in] chirality Which chirality we assigning to
     */
     __device__ __host__ inline ColorSpinor<Float,Nc,4> chiral_reconstruct(int chirality) const {

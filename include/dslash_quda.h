@@ -5,7 +5,6 @@
 #include <tune_quda.h>
 #include <dirac_quda.h>
 #include <gauge_field.h>
-
 #include <worker.h>
 
 namespace quda {
@@ -33,37 +32,90 @@ namespace quda {
   void createDslashEvents();
   void destroyDslashEvents();
 
-  enum Dslash4Type {
-    DSLASH4_WILSON
-  };
+  // plain Wilson Dslash
+  void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
+			const double &k, const int *commDim, TimeProfile &profile);
 
   /**
      @brief Driver for applying the Wilson stencil
 
-     out = - kappa * D * in
+     out = D * in
 
      where D is the gauged Wilson linear operator.
 
-     If x is defined, the operation is given by out = x - kapp * D in.
+     If kappa is non-zer, the operation is given by out = x + kappa * D in.
      This operator can be applied to both single parity
      (checker-boarded) fields, or to full fields.
 
      @param[out] out The output result field
      @param[in] in The input field
-     @param[in] U The gauge field used for the gauge Laplace
+     @param[in] U The gauge field used for the operator
      @param[in] kappa Scale factor applied
      @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
-     @param[in] type Type of dslash we are applying
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                   double kappa, const ColorSpinorField &x, int parity, bool dagger, Dslash4Type type);
+                   double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                   const int *comm_override, TimeProfile &profile);
 
-  // plain Wilson Dslash  
-  void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-			const double &k, const int *commDim, TimeProfile &profile);
+  /**
+     @brief Driver for applying the Wilson-clover stencil
+
+     out = A * x + kappa * D * in
+
+     where D is the gauged Wilson linear operator.
+
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in Input field that D is applied to
+     @param[in] x Input field that A is applied to
+     @param[in] U The gauge field used for the operator
+     @param[in] A The clover field used for the operator
+     @param[in] kappa Scale factor applied
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in,
+                         const GaugeField &U, const CloverField &A,
+                         double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the preconditioned Wilson-clover
+     stencil
+
+     out = A^{-1} * D * in
+
+     where D is the gauged Wilson linear operator.
+
+     If kappa is non-zero, the operation is given by out = x + kappa * A^{-1} D in.
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] A The clover field used for the operator
+     @param[in] kappa Scale factor applied
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyWilsonCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in,
+                                       const GaugeField &U, const CloverField &A,
+                                       double kappa, const ColorSpinorField &x, int parity, bool dagger,
+                                       const int *comm_override, TimeProfile &profile);
 
   // clover Dslash
   void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
@@ -241,6 +293,20 @@ namespace quda {
   void packFaceExtended(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &field, MemoryLocation location,
 			const int nFace, const int R[], const int dagger, const int parity, const int dim,
 			const int face_num, const cudaStream_t &stream, const bool unpack=false);
+
+  /**
+     @brief Dslash face packing routine
+     @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
+     @param[in] field ColorSpinorField to be packed
+     @param[in] location Locations where the packed fields are (Device, Host and/or Remote)
+     @param[in] nFace Depth of halo
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] parity Field parity
+     @param[in] stream Which stream are we executing in
+  */
+  void PackGhost(void *ghost[2*QUDA_MAX_DIM], const ColorSpinorField &field,
+                 MemoryLocation location, int nFace,
+                 bool dagger, int parity, const cudaStream_t &stream);
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
