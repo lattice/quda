@@ -429,6 +429,8 @@ namespace quda {
       extractGhostEx(u, dim, R, (float**)ghost, extract);
     } else if (u.Precision() == QUDA_HALF_PRECISION) {
       extractGhostEx(u, dim, R, (short**)ghost, extract);      
+    } else if (u.Precision() == QUDA_QUARTER_PRECISION) {
+      extractGhostEx(u, dim, R, (char**)ghost, extract);      
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }

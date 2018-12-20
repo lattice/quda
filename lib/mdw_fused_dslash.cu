@@ -57,15 +57,15 @@ namespace quda {
   /**
     @brief Parameter structure for applying the Dslash
   */
-  template<int Ls_>
+  template<class storage_type, int Ls_>
   struct FusedDslashArg {
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    typedef typename colorspinor_mapper<short, 4, 3, spin_project, spinor_direct_load>::type F;
-    typedef typename mapper<short>::type real;
+    typedef typename colorspinor_mapper<storage_type, 4, 3, spin_project, spinor_direct_load>::type F; // color spin field order
+    typedef typename mapper<storage_type>::type real; // the compute type for the in kernel computation
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    typedef typename gauge_mapper<short, QUDA_RECONSTRUCT_NO, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G;
+    typedef typename gauge_mapper<storage_type, QUDA_RECONSTRUCT_NO, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G; // gauge field order
 
     F out;                  // output vector field
     const F in;             // input vector field
@@ -106,17 +106,18 @@ namespace quda {
     real kappa;
     real fac_inv;
 
-    real alpha = 1.;
+    // (beta + alpha*m5inv) @ in
+    real alpha = 1.; 
     real beta = 0.;
 
-    const float scale;
-    real m_scale = 1.;
+    const float scale; // scale factor for the input color spin field
+    real m_scale = 1.; // scale factor for the matrix
 
     MdwfFusedDslashType type;
     FusedDslashArg(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
                           ColorSpinorField& y, const ColorSpinorField& x, double m_f_, double m_5_, 
                           const Complex* b_5, const Complex* c_5, bool dagger_, int parity, 
-                          int shift_[4], int halo_shift_[4], const double scale_, MdwfFusedDslashType type): 
+                          int shift_[4], int halo_shift_[4], const double scale_, MdwfFusedDslashType type_): 
       out(out), in(in), U(U), y(y), x(x), 
       nParity(in.SiteSubset()), parity(parity), 
       volume_cb(in.VolumeCB()>out.VolumeCB() ? in.VolumeCB() : out.VolumeCB()), 
@@ -127,7 +128,7 @@ namespace quda {
         in.VolumeCB()>out.VolumeCB()?in.X(2):out.X(2), in.VolumeCB()>out.VolumeCB()?in.X(3):out.X(3)}, 
       shrinked_dim{ dim[0]-2*shift[0], dim[1]-2*shift[1], dim[2]-2*shift[2], dim[3]-2*shift[3] }, 
       volume_4d_cb_shift(shrinked_dim[0]*shrinked_dim[1]*shrinked_dim[2]*shrinked_dim[3]/2),
-      scale(scale_), type(type)
+      scale(scale_), type(type_)
 //      halo_shrinked_dim{ (dim[0]-2*halo_shift[0], dim[1]-2*halo_shift[1], dim[2]-2*halo_shift[2], dim[3]-2*halo_shift[3]}, type(type)
     {
       if(in.Nspin() != 4){
@@ -152,8 +153,6 @@ namespace quda {
           m_scale = b;
           alpha = 1.+c/(kappa*b); // b-c/kappa = b(1-c/(b*kappa))
           beta  = -c/(kappa*b);
-//          printfQuda("m5= %+.4f, mf= %.4f, fac_inv= %+.8f\n", this->m_5, this->m_f, this->fac_inv);
-//          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
           break;
         case dslash4_dslash5inv_dslash5invdag:
           m_scale = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.)); // -kappa_b^2
@@ -162,8 +161,6 @@ namespace quda {
           m_scale = -0.25/((b*(4.+m_5)+1.)*(b*(4.+m_5)+1.))*b; // -kappa_b^2
           alpha = c/(2.*b); // 2 to compensate for the spin projection 
           beta = 1.;
-//          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
-//          printfQuda("scale = %+.4f\n", this->scale);
           break;
         case 4:
           m_scale = b;
@@ -289,7 +286,7 @@ namespace quda {
     @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha*M5inv operator
     The kernels goes type_ = 0, 1, 2, 3, 4. 
   */
-  template<int block_dim_x, int Ls_, bool reload, class Arg, int type_>
+  template<class storage_type, int block_dim_x, int Ls_, bool reload, class Arg, int type_>
   __global__ void fused_tensor_core(Arg arg)
   {
     static_assert( type_ != 1 || reload == false); 
@@ -385,20 +382,20 @@ namespace quda {
         idle = true;
       }
       
-      typedef typename mapper<short>::type real;
+      typedef typename mapper<storage_type>::type real;
       typedef ColorSpinor<real, 3, 4> Vector;
       
       if(!idle){
         Vector in_vec;
         // the Wilson hopping terms
         if(      type_ == 0){
-          apply_wilson_5d<short,false, true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
+          apply_wilson_5d<storage_type,false, true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
         }else if(type_ == 2){
-          apply_wilson_5d<short, true,false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
+          apply_wilson_5d<storage_type, true,false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
         }else if(type_ == 1){
-          apply_wilson_5d<short,false, true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
+          apply_wilson_5d<storage_type,false, true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
         }else if(type_ == 3){
-          apply_wilson_5d<short, true,false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
+          apply_wilson_5d<storage_type, true,false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
         }else if(type_ == 4){
           int sid_shift = threadIdx.y*arg.volume_4d_cb_shift + s4_shift;
           in_vec = arg.in(sid_shift, 0);
@@ -431,7 +428,7 @@ namespace quda {
             Vector aux_in_vec = arg.x(sid_back_shift, 0);
             load_matrix_b_vector<N_sm/2, true>(aux_in_vec, arg, sm_b, arg.scale*arg.m_scale); // acc = true
           }
-          store_matrix_c<N_sm>(arg.y, sm_b, sid, arg.scale*arg.m_scale);
+          store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid, arg.scale*arg.m_scale);
         }
         __syncthreads();
         wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_c, sm_c, sm_c);        
@@ -449,11 +446,11 @@ namespace quda {
       if(      type_ == 3){
         if(!idle){
           int sid_shift = threadIdx.y*arg.volume_4d_cb_shift + s4_shift;
-          store_matrix_c<N_sm>(arg.out, sm_b, sid_shift, arg.scale*arg.m_scale);
+          store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid_shift, arg.scale*arg.m_scale);
         }
       }else{
         if(!idle){
-          store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale*arg.m_scale);
+          store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, arg.scale*arg.m_scale);
         }  
       }
       
@@ -462,7 +459,7 @@ namespace quda {
     } // while
   }
 
-  template<int Ls_, class Arg>
+  template<class storage_type, int Ls_, class Arg>
   class FusedDslash : public TunableVectorYZ {
 
     protected:
@@ -572,7 +569,7 @@ namespace quda {
 
       virtual unsigned int maxGridSize() const { return 32*deviceProp.multiProcessorCount; }
       virtual unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
-      unsigned int min_block_size() const { return 16; }
+      unsigned int min_block_size() const { return  8; }
       unsigned int max_block_size() const { return 32; }
       unsigned int step_block_size() const { return  8; }
 
@@ -647,20 +644,25 @@ namespace quda {
           switch(arg.type){
             case 0:
               switch(tp.block.x){
+                case  8:
+                  tp.aux.x? // tp.aux.x == 0 --> reload == false, preload; tp.aux.x == 1 --> reload == true
+                  launch(fused_tensor_core<storage_type,  8, Ls_, true, Arg, 0>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 0>, tp, arg, stream) ;
+                  break;
                 case 16:
                   tp.aux.x? // tp.aux.x == 0 --> reload == false, preload; tp.aux.x == 1 --> reload == true
-                  launch(fused_tensor_core<16, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<16, Ls_,false, Arg, 0>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 16, Ls_, true, Arg, 0>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 0>, tp, arg, stream) ;
                   break;
                 case 24:
                   tp.aux.x?
-                  launch(fused_tensor_core<24, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<24, Ls_,false, Arg, 0>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 24, Ls_, true, Arg, 0>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 0>, tp, arg, stream) ;
                   break;
                 case 32:
                   tp.aux.x?
-                  launch(fused_tensor_core<32, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<32, Ls_,false, Arg, 0>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 32, Ls_, true, Arg, 0>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 0>, tp, arg, stream) ;
                   break;
                 default:
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
@@ -668,20 +670,25 @@ namespace quda {
               break;
             case 2:
               switch(tp.block.x){
+                case  8:
+                  tp.aux.x?
+                  launch(fused_tensor_core<storage_type,  8, Ls_, true, Arg, 2>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 2>, tp, arg, stream) ;
+                  break;
                 case 16:
                   tp.aux.x?
-                  launch(fused_tensor_core<16, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<16, Ls_,false, Arg, 2>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 16, Ls_, true, Arg, 2>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 2>, tp, arg, stream) ;
                   break;
                 case 24:
                   tp.aux.x?
-                  launch(fused_tensor_core<24, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<24, Ls_,false, Arg, 2>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 24, Ls_, true, Arg, 2>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 2>, tp, arg, stream) ;
                   break;
                 case 32:
                   tp.aux.x?
-                  launch(fused_tensor_core<32, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<32, Ls_,false, Arg, 2>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 32, Ls_, true, Arg, 2>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 2>, tp, arg, stream) ;
                   break;
                 default:
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
@@ -689,14 +696,17 @@ namespace quda {
               break;
             case 1:
               switch(tp.block.x){
+                case  8:
+                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 1>, tp, arg, stream);
+                  break;
                 case 16:
-                  launch(fused_tensor_core<16, Ls_,false, Arg, 1>, tp, arg, stream);
+                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 1>, tp, arg, stream);
                   break;
                 case 24:
-                  launch(fused_tensor_core<24, Ls_,false, Arg, 1>, tp, arg, stream);
+                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 1>, tp, arg, stream);
                   break;
                 case 32:
-                  launch(fused_tensor_core<32, Ls_,false, Arg, 1>, tp, arg, stream);
+                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 1>, tp, arg, stream);
                   break;
                 default:
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
@@ -704,20 +714,25 @@ namespace quda {
               break;
             case 3:
               switch(tp.block.x){
+                case  8:
+                  tp.aux.x?
+                  launch(fused_tensor_core<storage_type,  8, Ls_, true, Arg, 3>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 3>, tp, arg, stream) ;
+                  break;
                 case 16:
                   tp.aux.x?
-                  launch(fused_tensor_core<16, Ls_, true, Arg, 3>, tp, arg, stream) :
-                  launch(fused_tensor_core<16, Ls_,false, Arg, 3>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 16, Ls_, true, Arg, 3>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 3>, tp, arg, stream) ;
                   break;
                 case 24:
                   tp.aux.x?
-                  launch(fused_tensor_core<24, Ls_, true, Arg, 3>, tp, arg, stream) :
-                  launch(fused_tensor_core<24, Ls_,false, Arg, 3>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 24, Ls_, true, Arg, 3>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 3>, tp, arg, stream) ;
                   break;
                 case 32:
                   tp.aux.x?
-                  launch(fused_tensor_core<32, Ls_, true, Arg, 3>, tp, arg, stream) :
-                  launch(fused_tensor_core<32, Ls_,false, Arg, 3>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 32, Ls_, true, Arg, 3>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 3>, tp, arg, stream) ;
                   break;
                 default:
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
@@ -725,20 +740,25 @@ namespace quda {
               break;
             case 4:
               switch(tp.block.x){
+                case  8:
+                  tp.aux.x?
+                  launch(fused_tensor_core<storage_type,  8, Ls_, true, Arg, 4>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 4>, tp, arg, stream) ;
+                  break;
                 case 16:
                   tp.aux.x?
-                  launch(fused_tensor_core<16, Ls_, true, Arg, 4>, tp, arg, stream) :
-                  launch(fused_tensor_core<16, Ls_,false, Arg, 4>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 16, Ls_, true, Arg, 4>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 4>, tp, arg, stream) ;
                   break;
                 case 24:
                   tp.aux.x?
-                  launch(fused_tensor_core<24, Ls_, true, Arg, 4>, tp, arg, stream) :
-                  launch(fused_tensor_core<24, Ls_,false, Arg, 4>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 24, Ls_, true, Arg, 4>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 4>, tp, arg, stream) ;
                   break;
                 case 32:
                   tp.aux.x?
-                  launch(fused_tensor_core<32, Ls_, true, Arg, 4>, tp, arg, stream) :
-                  launch(fused_tensor_core<32, Ls_,false, Arg, 4>, tp, arg, stream) ;
+                  launch(fused_tensor_core<storage_type, 32, Ls_, true, Arg, 4>, tp, arg, stream) :
+                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 4>, tp, arg, stream) ;
                   break;
                 default:
                   errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
@@ -783,36 +803,77 @@ namespace quda {
       switch(in.X(4)){
         case  8:
           {
-            FusedDslashArg< 8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash< 8, FusedDslashArg< 8> > dslash(arg, in);
+            FusedDslashArg<short,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<short,  8, FusedDslashArg<short,  8> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 12:
           {
-            FusedDslashArg<12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<12, FusedDslashArg<12> > dslash(arg, in);
+            FusedDslashArg<short, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<short, 12, FusedDslashArg<short, 12> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 16:
           {
-            FusedDslashArg<16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<16, FusedDslashArg<16> > dslash(arg, in);
+            FusedDslashArg<short, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<short, 16, FusedDslashArg<short, 16> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 20:
           {
-            FusedDslashArg<20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<20, FusedDslashArg<20> > dslash(arg, in);
+            FusedDslashArg<short, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<short, 20, FusedDslashArg<short, 20> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;
         case 24:
           {
-            FusedDslashArg<24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<24, FusedDslashArg<24> > dslash(arg, in);
+            FusedDslashArg<short, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<short, 24, FusedDslashArg<short, 24> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        default: 
+          errorQuda("Ls = %d is NOT supported.\n", in.X(4));
+      }
+    }else if( checkPrecision(out, in) == QUDA_QUARTER_PRECISION && in.Ncolor() == 3){
+      // switch for Ls
+      switch(in.X(4)){
+        case  8:
+          {
+            FusedDslashArg<char,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<char,  8, FusedDslashArg<char,  8> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 12:
+          {
+            FusedDslashArg<char, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<char, 12, FusedDslashArg<char, 12> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 16:
+          {
+            FusedDslashArg<char, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<char, 16, FusedDslashArg<char, 16> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 20:
+          {
+            FusedDslashArg<char, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<char, 20, FusedDslashArg<char, 20> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 24:
+          {
+            FusedDslashArg<char, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            FusedDslash<char, 24, FusedDslashArg<char, 24> > dslash(arg, in);
             dslash.apply(streams[Nstream-1]);
           }
         break;

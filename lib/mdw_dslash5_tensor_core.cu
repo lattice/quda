@@ -275,7 +275,7 @@ namespace quda {
       __syncthreads();
     
       if(!idle){
-        store_matrix_c<N_sm>(arg.out, sm_b, sid, arg.scale);
+        store_matrix_c<short, N_sm>(arg.out, sm_b, sid, arg.scale);
       }
     
       s4_base += gridDim.x*blockDim.x;

@@ -206,10 +206,17 @@ namespace quda {
     sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ] = __floats2half2_rn(in_tex.x*f, in_tex.y*f);
     sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ] = __floats2half2_rn(in_tex.z*f, in_tex.w*f);
   } 
-
-  __device__ inline short2 __half22short2_rn(const half2 input){
-    return make_short2(__half2short_rn(input.x), __half2short_rn(input.y));
+  
+  template<class integer_vec>
+  __device__ inline integer_vec __2half22integer4_rn(const half2& a, const half2& b){
+    integer_vec c;
+    c.x = __half2short_rn(a.x);
+    c.y = __half2short_rn(a.y);
+    c.z = __half2short_rn(b.x);
+    c.w = __half2short_rn(b.y);
+    return c;
   }
+  
   __device__ inline half __half_max_abs_half2__(half max, const half2 input){
     static constexpr uint32_t mask = ~((0x1u<<31) + (0x1u<<15)); // 01111111 11111111 01111111 11111111 
     // Set the fisrt bit of the halves to 0.
@@ -251,8 +258,8 @@ namespace quda {
     }
   }
 
-  // Store results(scaled short values and scale) in shared memroy to global memroy.
-  template<int N_sm, class Output>
+  // Store results(scaled short/char values and scale) in shared memroy to global memroy.
+  template<class storage_type, int N_sm, class Output>
   __device__ inline void store_matrix_c(Output& output, half2* sm_b, int sid, const float scale){
     half max_ = (half)0.0f;
     constexpr int N_sm_d2 = N_sm/2;
@@ -267,34 +274,35 @@ namespace quda {
 
     output.norm[sid] = __half2float(max_)*scale;
     
-    const half2 max_short_div_max2_ = __half2half2( __hdiv(fixedMaxValue<short>::value, max_) );
+    const half2 max_i_div_max2_ = __half2half2( __hdiv(fixedMaxValue<storage_type>::value, max_) );
 
-    short4* out = reinterpret_cast<short4*>(output.field);
-    short2 a, b;
+    typedef typename VectorType<storage_type, 4>::type storage_vec;
+    storage_vec* out = reinterpret_cast<storage_vec*>(output.field);
+    half2 a, b;
+
+    a = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ], max_i_div_max2_);
+    out[sid + 0*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
-    b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
-    out[sid + 0*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
+    a = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ], max_i_div_max2_);
+    out[sid + 1*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
-    b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
-    out[sid + 1*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
+    a = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ], max_i_div_max2_);
+    out[sid + 2*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
-    b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
-    out[sid + 2*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
+    a = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ], max_i_div_max2_);
+    out[sid + 3*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
-    b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
-    out[sid + 3*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
+    a = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ], max_i_div_max2_);
+    out[sid + 4*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
-    b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ], max_short_div_max2_));
-    out[sid + 4*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y); 
-    
-    a = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ], max_short_div_max2_));
-    b = __half22short2_rn(__hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ], max_short_div_max2_));
-    out[sid + 5*output.volumeCB] = make_short4(a.x, a.y, b.x, b.y);  
+    a = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ], max_i_div_max2_);
+    out[sid + 5*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
   } 
 
 #if 0

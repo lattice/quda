@@ -349,6 +349,12 @@ namespace quda {
       } else {
         errorQuda("Precision %d not instantiated", in.Precision());
       }
+    } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+      if (in.Precision() == QUDA_QUARTER_PRECISION) {
+        copyGaugeEx(out, in, location, (char*)Out, (char*)In);
+      } else {
+        errorQuda("Precision %d not instantiated", in.Precision());
+      }
     } else {
       errorQuda("Precision %d not instantiated", out.Precision());
     }
