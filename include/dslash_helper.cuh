@@ -257,10 +257,12 @@ namespace quda {
     real twist_a;
     real twist_b;
 
-    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
+
+// constructor needed for staggered to set xpay from derived class
+   DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, bool xpay, const int *comm_override)
       : parity(parity), nParity(in.SiteSubset()), nFace(1), reconstruct(U.Reconstruct()),
         X0h(nParity == 2 ? in.X(0)/2 : in.X(0)), dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
-        volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(kappa == 0.0 ? false : true),
+        volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(xpay),
         kernel_type(INTERIOR_KERNEL), threads(in.VolumeCB()), threadDimMapLower{ }, threadDimMapUpper{ },
         twist_a(0.0), twist_b(0.0)
     {
@@ -277,7 +279,13 @@ namespace quda {
       dc = in.getDslashConstant();
     }
 
+    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
+      : DslashArg(in, U, kappa, parity, dagger, kappa == 0.0 ? false : true, comm_override)
+      {
+      };
+
   };
+
 
   template <typename Float>
   std::ostream& operator<<(std::ostream& out, const DslashArg<Float> &arg)

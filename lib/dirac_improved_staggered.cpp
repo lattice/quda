@@ -1,6 +1,8 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 
+#define NEW_DSLASH
+
 namespace quda {
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param)
@@ -52,13 +54,15 @@ namespace quda {
   {
     checkParitySpinor(in, out);
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-#if 0
+#ifndef NEW_DSLASH
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 				  &static_cast<const cudaColorSpinorField&>(in), parity, 
 				  dagger, 0, 0, commDim, profile);
 #else
     constexpr bool improved = true;
-    ApplyDslashStaggered(out, in, fatGauge, longGauge , 0., nullptr, parity, improved);
+
+    ApplyDslashStaggered(out, in, fatGauge, longGauge , 0., in,
+                         parity, dagger, improved, commDim, profile);
 #endif
     } else {
       errorQuda("Not supported");
@@ -74,9 +78,17 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+
+#ifndef NEW_DSLASH
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+#else
+    constexpr bool improved = true;
+
+    ApplyDslashStaggered(out, in, fatGauge, longGauge , k, x,
+                         parity, dagger, improved, commDim, profile);
+#endif
     } else {
       errorQuda("Not supported");
     }  
