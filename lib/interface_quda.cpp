@@ -2523,6 +2523,14 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   csParam.fieldOrder = mg_param.setup_location[0] == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_YES ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
+  if (mg_param.is_staggered == QUDA_BOOLEAN_YES) { 
+    // Create the ColorSpinorField as a "container" for metadata.
+    csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+
+    // These never get accessed, `nullptr` on its own leads to an error in texture binding
+    csParam.v = (void*)std::numeric_limits<long long unsigned int>::max();
+    csParam.norm = (void*)std::numeric_limits<long long unsigned int>::max();
+  }
   for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = ColorSpinorField::Create(csParam);
 
   // fill out the MG parameters for the fine level

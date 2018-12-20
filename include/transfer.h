@@ -110,6 +110,10 @@ namespace quda {
 	enable_gpu=true in the constructor) */
     mutable bool use_gpu;
 
+    /** Whether or not the fine level is a staggered operator, in which
+    case we don't actually need to allocate any memory. */
+    mutable bool is_staggered;
+
     /**
      * @brief Allocate V field
      * @param[in] location Where to allocate the V field

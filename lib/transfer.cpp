@@ -22,7 +22,8 @@ namespace quda {
       fine_tmp_h(nullptr), fine_tmp_d(nullptr), coarse_tmp_h(nullptr), coarse_tmp_d(nullptr), geo_bs(nullptr),
       fine_to_coarse_h(nullptr), coarse_to_fine_h(nullptr), fine_to_coarse_d(nullptr), coarse_to_fine_d(nullptr),
       spin_bs(spin_bs), spin_map(0), nspin_fine(B[0]->Nspin()), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
-      enable_gpu(false), enable_cpu(false), gpu_setup(true), use_gpu(true), flops_(0), profile(profile)
+      enable_gpu(false), enable_cpu(false), gpu_setup(true), use_gpu(true),
+      is_staggered(B[0]->Nspin() == 1), flops_(0), profile(profile)
   {
     postTrace();
     int ndim = B[0]->Ndim();
@@ -93,6 +94,7 @@ namespace quda {
   void Transfer::createV(QudaFieldLocation location) const
   {
     postTrace();
+
     // create the storage for the final block orthogonal elements
     ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
 
@@ -113,6 +115,16 @@ namespace quda {
     param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.setPrecision(location == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0]->Precision());
 
+    if (is_staggered) { 
+      // Need to create V_d and V_h as metadata containers, but we don't
+      // actually need to allocate the memory.
+      param.create = QUDA_REFERENCE_FIELD_CREATE;
+
+      // These never get accessed, `nullptr` on its own leads to an error in texture binding
+      param.v = (void*)std::numeric_limits<long long unsigned int>::max();
+      param.norm = (void*)std::numeric_limits<long long unsigned int>::max();
+    }
+
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       V_d = ColorSpinorField::Create(param);
       enable_gpu = true;
@@ -125,6 +137,9 @@ namespace quda {
 
   void Transfer::createTmp(QudaFieldLocation location) const
   {
+    // The CPU temporaries are needed for creating geometry mappings.
+    if (is_staggered && location != QUDA_CPU_FIELD_LOCATION) { return; }
+
     postTrace();
     ColorSpinorParam param(*B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
@@ -174,6 +189,8 @@ namespace quda {
   void Transfer::reset()
   {
     postTrace();
+
+    if (is_staggered) { return; }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
 
     if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -222,6 +239,8 @@ namespace quda {
 
     if (site_subset == site_subset_) return;
     site_subset = site_subset_;
+
+    if (is_staggered) { return; }
 
     return; // FIXME apply memory optimization
 
@@ -334,30 +353,30 @@ namespace quda {
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
     initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
-    const ColorSpinorField *V = use_gpu ? V_d : V_h;
+
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
 
-    if (use_gpu) {
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
-      if (out.Location() == QUDA_CPU_FIELD_LOCATION ||  out.GammaBasis() != V->GammaBasis())
-        output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
-      if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
-    } else {
-      if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
-        output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
-    }
-
-    *input = in; // copy result to input field (aliasing handled automatically)
-    
-    if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
-
-    // ESW assumption for staggered MG
-    if (output->Nspin() == 1) {
-
+    if (is_staggered) {
       StaggeredProlongate(*output, *input, fine_to_coarse, spin_map, parity);
       flops_ += 0; // it's only a permutation
-    } else { // coarse->(wilson or coarse)
+    } else {
+
+      const ColorSpinorField *V = use_gpu ? V_d : V_h;
+
+      if (use_gpu) {
+        if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
+        if (out.Location() == QUDA_CPU_FIELD_LOCATION ||  out.GammaBasis() != V->GammaBasis())
+          output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
+        if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
+      } else {
+        if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
+          output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
+      }
+
+      *input = in; // copy result to input field (aliasing handled automatically)
+      
+      if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+        errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
       if ((V->Nspin() != 1) && ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))){
         errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
@@ -367,6 +386,7 @@ namespace quda {
       Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
 
       flops_ += 8*in.Ncolor()*out.Ncolor()*out.VolumeCB()*out.SiteSubset();
+
     }
 
     out = *output; // copy result to out field (aliasing handled automatically)
@@ -381,40 +401,47 @@ namespace quda {
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;
-    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
-    const ColorSpinorField *V = use_gpu ? V_d : V_h;
+
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
 
-    if (use_gpu) {
-      if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())
-        input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
-      if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
-    } else {
-      if (in.Location() == QUDA_CUDA_FIELD_LOCATION)
-        input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
-    }
-
-    *input = in;
-
-    if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot restrict a full field since only have single parity null-space components");
-
-    // ESW assumption for staggered MG
-    if (input->Nspin() == 1) {
+    if (is_staggered) {
       StaggeredRestrict(*output, *input, fine_to_coarse, spin_map, parity);
       flops_ += 0; // it's only a permutation
-    } else { // (wilson or coarse)->coarse}
-      if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
-      errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
-        out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
+    } else {
 
-      Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
+      initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
+      const ColorSpinorField *V = use_gpu ? V_d : V_h;  
 
-      flops_ += 8*out.Ncolor()*in.Ncolor()*in.VolumeCB()*in.SiteSubset();
+      if (use_gpu) {
+        if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
+        if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())
+          input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
+        if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
+      } else {
+        if (in.Location() == QUDA_CUDA_FIELD_LOCATION)
+          input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
+      }
 
-    }
+      *input = in;
+
+      if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+        errorQuda("Cannot restrict a full field since only have single parity null-space components");
+
+      // ESW assumption for staggered MG
+      if (input->Nspin() == 1) {
+        
+      } else { // (wilson or coarse)->coarse}
+        if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
+        errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
+          out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
+
+        Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
+
+        flops_ += 8*out.Ncolor()*in.Ncolor()*in.VolumeCB()*in.SiteSubset();
+
+      }
+    } 
     
     out = *output; // copy result to out field (aliasing handled automatically)
 

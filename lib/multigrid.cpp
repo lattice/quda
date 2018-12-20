@@ -68,9 +68,8 @@ namespace quda {
     }
 
     // ESW HACK GENERATE STAGGERED WITHOUT CORRECT INTERFACE
-    if (param.level == 0 && param.B[0]->Nspin() == 1) {
-      // generate free field vectors
-      buildFreeVectors(param.B);
+    if (param.level == 0 && param.is_staggered == QUDA_BOOLEAN_YES) {
+      // no op, don't need near-null vectors
     } else {
       if (param.level < param.Nlevel-1) {
         if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
@@ -126,7 +125,7 @@ namespace quda {
 
 
     // ESW HACK GENERATE STAGGERED WITHOUT CORRECT INTERFACE
-    if (param.level != 0) {
+    if (param.level != 0 || param.is_staggered == QUDA_BOOLEAN_NO) {
       // Refresh the null-space vectors if we need to
       if (refresh && param.level < param.Nlevel-1) {
         if (param.mg_global.setup_maxiter_refresh[param.level]) generateNullVectors(param.B, refresh);
@@ -179,12 +178,7 @@ namespace quda {
         /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Transfer operator done\n");
       }
 
-      // Call a different function if we're doing the Kahler-Dirac prec step.
-      //if (param.is_kahler_dirac_prec) {
-      //  createKahlerDiracPrec();
-      //} else {
-        createCoarseDirac();
-      //}
+      createCoarseDirac();
 
     }
 
@@ -626,23 +620,26 @@ namespace quda {
     // these were set while hacking in tests of quarter precision ghosts
     double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
+    // No need to check (1 - P P^dagger) v_k for staggered case
+    if (!(param.level == 0 && param.is_staggered == QUDA_BOOLEAN_YES)) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
-    for (int i=0; i<param.Nvec; i++) {
-      // as well as copying to the correct location this also changes basis if necessary
-      *tmp1 = *param.B[i];
+      for (int i=0; i<param.Nvec; i++) {
+        // as well as copying to the correct location this also changes basis if necessary
+        *tmp1 = *param.B[i];
 
-      transfer->R(*r_coarse, *tmp1);
-      transfer->P(*tmp2, *r_coarse);
+        transfer->R(*r_coarse, *tmp1);
+        transfer->P(*tmp2, *r_coarse);
 
-      // ESW lots of verbosity comments
-      /*if (getVerbosity() >= QUDA_VERBOSE)*/
-      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
-              i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+        // ESW lots of verbosity comments
+        /*if (getVerbosity() >= QUDA_VERBOSE)*/
+        printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
+                i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
 
-      deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
-      /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("L2 relative deviation = %e\n", deviation);
-      if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
+        deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
+        /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("L2 relative deviation = %e\n", deviation);
+        if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
+      }
     }
 
 #if 0

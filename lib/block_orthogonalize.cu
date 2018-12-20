@@ -310,6 +310,10 @@ namespace quda {
 			  const int *fine_to_coarse, const int *coarse_to_fine,
 			  const int *geo_bs, const int spin_bs) {
 #ifdef GPU_MULTIGRID
+    if (B[0]->V() == nullptr) {
+      warningQuda("Trying to BlockOrthogonalize staggered transform, skipping...");
+      return;
+    }
     if (V.Precision() == QUDA_DOUBLE_PRECISION && B[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       BlockOrthogonalize<double>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
