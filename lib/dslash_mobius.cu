@@ -194,7 +194,7 @@ namespace quda {
 				if ((size_t)param.shared_bytes > max_shared) {
 				  TuneParam next(param);
 				  advanceBlockDim(next); // to get next blockDim
-				  int nthreads = next.block.x * next.block.y * next.block.z;
+				  // int nthreads = next.block.x * next.block.y * next.block.z;
 				  param.shared_bytes = shared_bytes_per_block(next.block.x,next.block.y) > sharedBytesPerBlock(param) ?
 				     shared_bytes_per_block(next.block.x,next.block.y) : sharedBytesPerBlock(param);
 				  return false;
@@ -427,8 +427,7 @@ namespace quda {
 #ifndef USE_TEXTURE_OBJECTS
       if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
-//      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       setParam();
       switch(DS_type){
         case 0:

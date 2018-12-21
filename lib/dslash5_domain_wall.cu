@@ -10,25 +10,6 @@
 namespace quda {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
-	
-  static void set_shared_memory_on_volta(const void* f, const char* name){
-		cudaDeviceProp device_prop;
-		cudaGetDeviceProperties( &device_prop, 0 );
-		if(device_prop.major < 7) return;
-		
-		auto found = qudaFuncSetAttribute(f, cudaFuncAttributeMaxDynamicSharedMemorySize, 96*1024);
-		printfQuda("Found %s: %s\n", name, cudaGetErrorString(found));
-		
-		found = qudaFuncSetAttribute(f, cudaFuncAttributePreferredSharedMemoryCarveout, 100);
-		printfQuda("Found %s: %s\n", name, cudaGetErrorString(found));
-		
-		cudaFuncAttributes cfa;
-		found = cudaFuncGetAttributes(&cfa, f);
-		printfQuda("Found %s: %s\n", name, cudaGetErrorString(found));
-		
-		printfQuda("Actual maximum:         %d\n", (int)cfa.maxDynamicSharedSizeBytes);
-		printfQuda("Actual maximum percent: %d\n", (int)cfa.preferredShmemCarveout);
-	}
 
   /**
      @brief Structure containing zMobius / Zolotarev coefficients

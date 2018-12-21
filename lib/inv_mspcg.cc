@@ -283,53 +283,11 @@ namespace quda {
 
     copyExtendedColorSpinor(*fb, *tb, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
 
-    //    quda::pack::initConstants(*dirac_param_precondition.gauge, profile);
-    double fb2 = norm2(*fb);
-
-//    (*nrm_op_precondition)(*fx, *fb, *ft);
-/*    
-    int odd_bit = 0;
-    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-
-    mat_precondition->Dagger(QUDA_DAG_NO);
-    
-    mat_precondition->Dslash4pre(*ft, *fb, parity[1]);                   // +0
-//    mat_precondition->Dslash4prePartial(*ft, *fb, parity[1], sp_len0, RR0, Xs0);                   // +0
-    mat_precondition->Dslash4Partial(*fy, *ft, parity[0], sp_len1, RR1, Xs1); // +1
-//    mat_precondition->Dslash5inv(*ft, *fy, parity[0]);                   // +1
-    mat_precondition->Dslash5invPartial(*ft, *fy, parity[0], sp_len1, RR1, Xs1);                   // +1
-    mat_precondition->Dslash4pre(*fy, *ft, parity[0]);                   // +1
-//    mat_precondition->Dslash4prePartial(*fy, *ft, parity[0], sp_len1, RR1, Xs1);                   // +1
-    mat_precondition->Dslash4(*ft, *fy, parity[1]);                      // +2
-    mat_precondition->Dslash5invXpay(*fy, *ft, parity[1], *fb, -1.0);      // +2
-
-    mat_precondition->Dagger(QUDA_DAG_YES);
-    
-    mat_precondition->Dslash5inv(*ft, *fy, parity[1]);                  // +2
-//    mat_precondition->Dslash4Partial(*fx, *ft, parity[0], sp_len1, RR1, Xs1); // +1
-    mat_precondition->Dslash4(*fx, *ft, parity[0]);
-    mat_precondition->Dslash4pre(*ft, *fx, parity[0]);                 // +1
-//    mat_precondition->Dslash4prePartial(*ft, *fx, parity[0], sp_len1, RR1, Xs1);                 // +1
-//    mat_precondition->Dslash5inv(*fx, *ft, parity[0]);                 // +1
-    mat_precondition->Dslash5invPartial(*fx, *ft, parity[0], sp_len1, RR1, Xs1);                 // +1
-//    mat_precondition->Dslash4(*ft, *fx, parity[1]);
-    mat_precondition->Dslash4Partial(*ft, *fx, parity[1], sp_len0, RR0, Xs0); // +0
-    mat_precondition->Dslash4preXpay(*fx, *ft, parity[1], *fy, -1.0);   // +0
-//    mat_precondition->Dslash4preXpayPartial(*fx, *ft, parity[1], *fy, -1.0, sp_len0, RR0, Xs0);   // +0
-    
-    mat_precondition->Dagger(QUDA_DAG_NO);
-*/
     double fx2 = norm2(*fx);
     for(double s = 0.00390625; s < 256.5; s *= 1.189207115){ // 2^-8 ~ 2^+8
       inner_dslash(*cx, *cb, s);
       blas::copy( *tt, *cx );
       
-  //    printfQuda("Test   fx2/fb2 = %16.12e/%16.12e.\n", fx2, fb2);
-  //    zero_extended_color_spinor_interface( *fx, R, QUDA_CUDA_FIELD_LOCATION, 0);
-  //    fx2 = norm2(*fx);
-  //    printfQuda("Chopping   fx2 = %16.12e.\n", fx2);
-  
-  //    copyExtendedColorSpinor(*tt, *fx, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
       double x2_ = blas::norm2(*tt);
       double dd = xmyNorm(*tx, *tt);
       printfQuda(" loss scale        = %8.4e ------> \n", s);
@@ -337,13 +295,11 @@ namespace quda {
       printfQuda(" |a-b|^2           = %16.12e. (This number is SUPPOSED to be tiny).\n", dd);
       printfQuda(" |a-b|^2/|b|^2     = %16.12e. (This number is SUPPOSED to be tiny).\n", dd/x2);
     }
-/*
-    if(tc && (fb->Precision() == QUDA_HALF_PRECISION || fb->Precision() == QUDA_QUARTER_PRECISION)){
-//      mat_precondition->Dagger(QUDA_DAG_YES);
-//      mat_precondition->dslash5inv_sm_tc_partial(*fx, *fb, static_cast<QudaParity>(0), 1., sp_len2, RR2, Xs2);
-//      mat_precondition->Dslash5inv(*ft, *fb, static_cast<QudaParity>(0));
+
+    if(tc && (fb->Precision() == QUDA_HALF_PRECISION || false)){
       blas::zero(*fy);
-      printfQuda("Testing fused kernels with tensor cores.\n");
+      printfQuda("Detailed test of fused kernels with tensor cores. \n"
+        "Since the legacy kernel does NOT support quarter precision, This test is ONLY available for half precision\n");
 
       double ft2, mdd;
 // f0
@@ -425,26 +381,8 @@ namespace quda {
       printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/ft2);
       printfQuda("f4: ------>\n");
       } 
-
-//      mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(*ft, *fb, static_cast<QudaParity>(0), *fy, -1.0, sp_len0, RR0, Xs0);   
-//      mat_precondition->Dslash4(*fy, *fb, static_cast<QudaParity>(0));
-//      mat_precondition->Dslash4pre(*ft, *fy, static_cast<QudaParity>(0), *fb, -1.0);
-//      mat_precondition->Dagger(QUDA_DAG_YES);
-//      mat_precondition->Dslash5inv(*ft, *fx, static_cast<QudaParity>(0));
-//      mat_precondition->Dagger(QUDA_DAG_NO);
-//      mat_precondition->Dslash4pre(*ft, *fx, static_cast<QudaParity>(0));
-//      mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1);
-//      double c = 1.5;
-//      double b = c + 1.;
-//      double kappa = (c*(4.-1.8)-1.)/(b*(4.-1.8)+1.);
-//      double alpha = b-c/kappa;
-//      double  beta = c/kappa;
-//      blas::axpby(beta, *fy, alpha, *fx); 
-//      mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1, true, {2,2,2,2});
-//      mat_precondition->fused_f2(*fx, *fb, 1., static_cast<QudaParity>(0), shift, halo_shift);
-//      mat_precondition->fused_f3(*fx, *fb, *fy, 1., static_cast<QudaParity>(0), shift, halo_shift);
     }
-*/
+
     delete tx;
     delete tt;
     delete tb;
@@ -468,6 +406,9 @@ namespace quda {
       mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift1, shift1);
       mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift2, shift2);
     }else{
+      errorQuda("Since the preconditioner does NOT use copy_color_spin_field_extended functionalities"
+        "anymore the legacy non-tensor-core code does Not work.\n");
+      /*
       mat_precondition->Dagger(QUDA_DAG_NO);
       mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);
       mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true, {2,2,2,2});
@@ -477,6 +418,7 @@ namespace quda {
       mat_precondition->Dagger(QUDA_DAG_NO);
       mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1, Xs1);
       mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0, sp_len0, RR0, Xs0);   
+      */
     }
   }
 
@@ -489,21 +431,12 @@ namespace quda {
     double rk2 = blas::norm2(ib);
     double Mpk2, alpha, beta, rkp12;
 
-//    printfQuda("inner_cg: before starting: r2 = %8.4e \n", rk2);
     blas::copy(*ip, ib);
 
     for(int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++){
      
       double ip2 = blas::norm2(*ip); 
-//      copier_timer.Start("woo", "hoo", 0);
-      // copyExtendedColorSpinor(*ifp, *ip, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
-//      copier_timer.Stop("woo", "hoo", 0);
-//      zero_extended_color_spinor_interface( *ifp, R, QUDA_CUDA_FIELD_LOCATION, 0);
       inner_dslash(*immp, *ip, sqrt(ip2/ip->Volume()/24.));
-//      (*nrm_op_precondition)(*ifmmp, *ifp, *iftmp);
-//      copier_timer.Start("woo", "hoo", 0);
-      // copyExtendedColorSpinor(*immp, *ifmmp, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL);
-//      copier_timer.Stop("woo", "hoo", 0);
       
       Mpk2 = reDotProduct(*ip, *immp);
 
@@ -514,12 +447,13 @@ namespace quda {
       beta = rkp12 / rk2;
       rk2 = rkp12;
 
-      // axpy(alpha, *ip, ix);
-      // xpay(ib, beta, *ip);
       axpyZpbx(alpha, *ip, ix, ib, beta);
-
-      // printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e p2 = %8.4e\n",
-      //   local_loop_count, rk2, alpha, beta, Mpk2, sqrt(ip2/ip->Volume()/24.));
+      
+      // Want to leave this debug code here since this might be useful.
+      /*
+      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e p2 = %8.4e\n",
+        local_loop_count, rk2, alpha, beta, Mpk2, sqrt(ip2/ip->Volume()/24.));
+      */
     }
 
     commGlobalReductionSet(true);
@@ -551,8 +485,6 @@ namespace quda {
 
       axpy(alpha, *vct_dp, dx);
       rkp12 = axpyNorm(-alpha, *vct_dmmp, *vct_dr);
-
-//      rkp12 = blas::norm2(*vct_dr);
       
       beta = rkp12 / rk2;
       rk2 = rkp12;
@@ -672,6 +604,7 @@ namespace quda {
     delete vct_dtmp2;
    
   }
+  
   void MSPCG::operator()(ColorSpinorField& dx, ColorSpinorField& db)
   {
     errorQuda("Something is wrong! :( \n");
@@ -680,9 +613,9 @@ namespace quda {
   void MSPCG::reliable_update(ColorSpinorField& dx, ColorSpinorField& db)
   {
 
-    const char fname[] = "Woo";
+    const char fname[] = "MSPCG::reliable_update(ColorSpinorField&, ColorSpinorField&)";
     const char cname[] = "Hoo";
-    const int lname = 0;
+    const int lname = 657;
 
     Gflops = 0.;
     fGflops = 0.;
@@ -807,7 +740,6 @@ namespace quda {
       
 // the more sophisticated reliable update
       if( rr2 > r2_max ) r2_max = rr2;
-      // if( rr2 < reliable_update_delta*reliable_update_delta*r2_max || rr2 < stop ){
       if( rr2 < stop or ( ( (d <= deps*sqrt(r2_old)) or (dfac*dinit > deps*r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac*dinit) ) ){
         
         printfQuda("Reliable update conditions: \n    d_n-1 < eps*r2_old: %8.4e < %8.4e,\n    dn    > eps*r_n: %8.4e    > %8.4e,\n    dnew  > 1.1*dinit: %8.4e  > (1.1*)%8.4e.\n",
@@ -847,7 +779,6 @@ namespace quda {
       }
       
       if(rr2 < stop) break;
-
 
       linalg_timer[0].Stop(fname, cname, lname);
       

@@ -6,58 +6,13 @@
 namespace quda {
 
 #if defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
-  /**
-    @brief Structure containing zMobius / Zolotarev coefficients
-
 //    FIXME
 //    - fix flops counters
-//    - use kappa notation and not b/c for consistency with other codes and sanity
-//  */
-//  template <typename real>
-//    struct coeff_5 {
-//      complex<real> a[QUDA_MAX_DWF_LS]; // xpay coefficients
-//      complex<real> b[QUDA_MAX_DWF_LS];
-//      complex<real> c[QUDA_MAX_DWF_LS];
-//    };
-//
-//  constexpr int size = 4096;
-//  static __constant__ char mobius_d[size]; // constant buffer used for Mobius coefficients for GPU kernel
-//  static char mobius_h[size];              // constant buffer used for Mobius coefficients for CPU kernel
-//
-//  /**
-//    @brief Helper function for grabbing the constant struct, whether
-//    we are on the GPU or CPU.
-//   */
-//  template <typename real>
-//    inline __device__ __host__ const coeff_5<real>* coeff() {
-//#ifdef __CUDA_ARCH__
-//      return reinterpret_cast<const coeff_5<real>*>(mobius_d);
-//#else
-//      return reinterpret_cast<const coeff_5<real>*>(mobius_h);
-//#endif
-//    }
-//
-//  template <typename real, Dslash5Type, typename Arg> struct coeff_type {
-//    typedef real type;
-//    const Arg &arg;
-//    __device__ __host__ coeff_type(const Arg &arg) : arg(arg) { }
-//    __device__ __host__ real a(int s) { return arg.a; }
-//    __device__ __host__ real b(int s) { return arg.b; }
-//    __device__ __host__ real c(int s) { return arg.c; }
-//  };
-//
-//  template <typename real, typename Arg> struct coeff_type<real,M5_INV_ZMOBIUS,Arg> {
-//    typedef complex<real> type;
-//    __device__ __host__ coeff_type(const Arg &arg) { }
-//    __device__ __host__ complex<real> a(int s) { return coeff<real>()->a[s]; }
-//    __device__ __host__ complex<real> b(int s) { return coeff<real>()->b[s]; }
-//    __device__ __host__ complex<real> c(int s) { return coeff<real>()->c[s]; }
-//  };
   
   /**
     @brief Parameter structure for applying the Dslash
   */
-  template<class storage_type, int Ls_>
+  template<class storage_type, int Ls_> // storage_type is the usual "Float" in other places in QUDA
   struct FusedDslashArg {
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
@@ -72,10 +27,10 @@ namespace quda {
     F y;                    // auxiliary output vector field
     const F x;              // auxiliary input vector field
     
-    const G U;
+    const G U;              // The gauge field
     
     const int nParity;      // number of parities we're working on
-    const int parity;
+    const int parity;       // output parity of this dslash operator
     const int volume_cb;    // checkerboarded volume
     const int volume_4d_cb; // 4-d checkerboarded volume
     
@@ -87,7 +42,6 @@ namespace quda {
     const int halo_shift[4]; // halo means zero. When we are expanding we have halo of cs-field where values are zero.
     
     const int_fastdiv shrinked_dim[4]; // dimension after shifts are considered. 
-    // const int_fastdiv halo_shrinked_dim[4]; // dimension after halo shifts are considered.
 
     // partial kernel and expansion parameters
     const int volume_4d_cb_shift; // number of 4d sites we need calculate 
@@ -129,19 +83,12 @@ namespace quda {
       shrinked_dim{ dim[0]-2*shift[0], dim[1]-2*shift[1], dim[2]-2*shift[2], dim[3]-2*shift[3] }, 
       volume_4d_cb_shift(shrinked_dim[0]*shrinked_dim[1]*shrinked_dim[2]*shrinked_dim[3]/2),
       scale(scale_), type(type_)
-//      halo_shrinked_dim{ (dim[0]-2*halo_shift[0], dim[1]-2*halo_shift[1], dim[2]-2*halo_shift[2], dim[3]-2*halo_shift[3]}, type(type)
     {
       if(in.Nspin() != 4){
         errorQuda("nSpin = %d not support", in.Nspin());
       }
       
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
-
-//      if (sizeof(coeff_5<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(coeff_5<real>));
-//      coeff_5<real> *coeff = reinterpret_cast<coeff_5<real>*>(&mobius_h);
-//      auto *a_5 =  coeff->a;
-//      auto *b_5 =  coeff->b;
-//      auto *c_5 =  coeff->c;
 
       b = b_5[0].real();
       c = c_5[0].real();
@@ -170,9 +117,6 @@ namespace quda {
         default:
           errorQuda("Unknown MdwfFusedDslashType %d", type);
       }
-
-//      cudaMemcpyToSymbolAsync(mobius_d, mobius_h, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
-
     }
   };
 
@@ -194,58 +138,37 @@ namespace quda {
   */
   template<class storage_type, bool dagger, bool halo, class Vector, class Arg>
   __device__ inline void apply_wilson_5d(Vector& out, const int coordinate[4], Arg& arg, int s) {
+    
     typedef typename mapper<storage_type>::type compute_type;
-//    typedef ColorSpinor<real,nColor,2> HalfVector;
     typedef Matrix<complex<compute_type>, 3> Link;
     const int their_spinor_parity = arg.nParity == 2 ? 1-arg.parity : 0;
 
     const int index_4d_cb = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
-
     int x[4] = { coordinate[0], coordinate[1], coordinate[2], coordinate[3] };
 
     #pragma unroll
     for (int d = 0; d < 4; d++) // loop over dimension
     {
       x[d]++;
-      if(halo and is_halo_4d(x, arg.dim, arg.halo_shift)){
-      
-      }else{ // Forward gather - compute fwd offset for vector fetch
+      if(!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)){
+        // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = s*arg.volume_4d_cb+index_4d_cb_from_coordinate_4d(x, arg.dim);
         constexpr int proj_dir = dagger ? +1 : -1;
 
-        if ( false ) {
-//          const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
-//
-//          const Link U = arg.U(d, x_cb, parity);
-//          const HalfVector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-//
-//          out += (U * in).reconstruct(d, proj_dir);
-        } else {
-          const Link U = arg.U(d, index_4d_cb, arg.parity);
-          const Vector in = arg.in(fwd_idx, their_spinor_parity);
-          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
-        }
+        const Link U = arg.U(d, index_4d_cb, arg.parity);
+        const Vector in = arg.in(fwd_idx, their_spinor_parity);
+        out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
       }
       x[d] -= 2;
-      if(halo and is_halo_4d(x, arg.dim, arg.halo_shift)){
-      
-      }else{ //Backward gather - compute back offset for spinor and gauge fetch
+      if(!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)){
+        //Backward gather - compute back offset for spinor and gauge fetch
         const int gauge_idx = index_4d_cb_from_coordinate_4d(x, arg.dim);;
         const int back_idx = s*arg.volume_4d_cb+gauge_idx;
         constexpr int proj_dir = dagger ? -1 : +1;
 
-        if ( false ) {
-//          const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-//
-//          const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
-//          const HalfVector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-//
-//          out += (conj(U) * in).reconstruct(d, proj_dir);
-        } else {
-          const Link U = arg.U(d, gauge_idx, 1-arg.parity);
-          const Vector in = arg.in(back_idx, their_spinor_parity);
-          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
-        }
+        const Link U = arg.U(d, gauge_idx, 1-arg.parity);
+        const Vector in = arg.in(back_idx, their_spinor_parity);
+        out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
       }
       x[d]++;
     } //nDim
@@ -284,7 +207,7 @@ namespace quda {
   
   /**
     @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha*M5inv operator
-    The kernels goes type_ = 0, 1, 2, 3, 4. 
+    The kernels type(type_) will be specified in some documentations. 
   */
   template<class storage_type, int block_dim_x, int Ls_, bool reload, class Arg, int type_>
   __global__ void fused_tensor_core(Arg arg)
@@ -421,10 +344,6 @@ namespace quda {
           ){
             int volume_4d_cb_back = back_dim[0]*back_dim[1]*back_dim[2]*back_dim[3]>>1;
             int sid_back_shift = threadIdx.y*volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim);
-//            if(threadIdx.x==0 && blockIdx.x==0){
-//              printf("%d = \n", index_4d_cb_from_coordinate_4d(back_x, back_dim));
-//              printf("(%d,%d,%d,%d)-->(%d,%d,%d,%d)\n", x[0], x[1], x[2], x[3], back_x[0], back_x[1], back_x[2], back_x[3]);
-//            }
             Vector aux_in_vec = arg.x(sid_back_shift, 0);
             load_matrix_b_vector<N_sm/2, true>(aux_in_vec, arg, sm_b, arg.scale*arg.m_scale); // acc = true
           }
@@ -496,7 +415,6 @@ namespace quda {
       }
 
       long long bytes() const {
-        // long long Ls = meta.X(4);
         switch (arg.type) {
           case 0:
             return arg.out.Bytes()+arg.in.Bytes()+arg.U.Bytes();
@@ -626,21 +544,16 @@ namespace quda {
 
       template<typename T>
       inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-        // static bool init = false;
         if ( shared ) {
           setMaxDynamicSharedBytesPerBlock(f);
-          // printfQuda("memory set.\n");
-          // set_shared_memory_on_volta((const void*)f, "Some Function");
-          // init = true;
         }
         void *args[] = { &arg };
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }
 
       void apply(const cudaStream_t &stream) {
-        // By its name we ONLY have a GPU version
-        // TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+        // We ONLY have a GPU version
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           switch(arg.type){
             case 0:
               switch(tp.block.x){
