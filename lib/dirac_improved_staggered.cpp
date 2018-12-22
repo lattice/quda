@@ -4,10 +4,18 @@
 namespace quda {
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param)
-    : Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)) { }
+    : Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)) {
+    printfQuda("%s Fat gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, fatGauge.norm1(),fatGauge.norm2(),fatGauge.abs_max());
+    if (longGauge.Reconstruct() == QUDA_RECONSTRUCT_NO)
+      printfQuda("%s Long gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, longGauge.norm1(),longGauge.norm2(),longGauge.abs_max());
+  }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac)
-    : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge) { }
+    : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge) {
+    printfQuda("%s Fat gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, fatGauge.norm1(),fatGauge.norm2(),fatGauge.abs_max());
+    if (longGauge.Reconstruct() == QUDA_RECONSTRUCT_NO)
+      printfQuda("%s Long gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, longGauge.norm1(),longGauge.norm2(),longGauge.abs_max());
+  }
 
   DiracImprovedStaggered::~DiracImprovedStaggered() { }
 

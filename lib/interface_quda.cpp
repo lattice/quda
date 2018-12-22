@@ -1364,6 +1364,7 @@ void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondit
       gaugeLongPrecondition = gaugeLongSloppy;
     }
   }
+
 }
 
 void freeSloppyCloverQuda()
@@ -3940,7 +3941,13 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   cudaInLink->loadCPUField(cpuInLink);
   profileFatLink.TPSTOP(QUDA_PROFILE_H2D);
 
+  if (cudaInLink->Reconstruct() == QUDA_RECONSTRUCT_NO)
+    printfQuda("%s Input gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, cudaInLink->norm1(), cudaInLink->norm2(), cudaInLink->abs_max());
+
   cudaGaugeField *cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileFatLink);
+
+  if (cudaInLinkEx->Reconstruct() == QUDA_RECONSTRUCT_NO)
+    printfQuda("%s Extended gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, cudaInLinkEx->norm1(), cudaInLinkEx->norm2(), cudaInLinkEx->abs_max());
 
   profileFatLink.TPSTART(QUDA_PROFILE_FREE);
   delete cudaInLink;
@@ -3958,6 +3965,10 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
   fatLongKSLink(cudaFatLink, cudaLongLink, *cudaInLinkEx, path_coeff);
   profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  printfQuda("%s Fat gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, cudaFatLink->norm1(),cudaFatLink->norm2(),cudaFatLink->abs_max());
+  if (cudaLongLink && cudaLongLink->Reconstruct() == QUDA_RECONSTRUCT_NO)
+    printfQuda("%s Long gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, cudaLongLink->norm1(),cudaLongLink->norm2(),cudaLongLink->abs_max());
 
   if (ulink) {
     profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
