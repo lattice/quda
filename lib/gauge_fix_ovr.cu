@@ -241,7 +241,7 @@ namespace quda {
     int parity = threadIdx.y;
 
     double2 data = make_double2(0.0,0.0);
-    if ( idx < argQ.threads ) {
+    while ( idx < argQ.threads ) {
       int X[4];
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = argQ.X[dr];
@@ -281,6 +281,8 @@ namespace quda {
       data.y = getRealTraceUVdagger(delta, delta);
       //35
       //T=36*gauge_dir+65
+
+      idx += blockDim.x*gridDim.x;
     }
     reduce2d<blockSize,2>(argQ, data);
   }
@@ -293,11 +295,11 @@ namespace quda {
   class GaugeFixQuality : TunableLocalParity {
     GaugeFixQualityArg<Gauge> argQ;
     mutable char aux_string[128]; // used as a label in the autotuner
-    private:
 
-    unsigned int minThreads() const { return argQ.threads; }
+  private:
+    bool tuneGridDim() const { return true; }
 
-    public:
+  public:
     GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ) : argQ(argQ) { }
     ~GaugeFixQuality () { }
 
@@ -321,12 +323,7 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     long long flops() const {
       return (36LL * gauge_dir + 65LL) * 2 * argQ.threads;
     }                                                                   // Only correct if there is no link reconstruction, no cub reduction accounted also

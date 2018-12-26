@@ -359,7 +359,7 @@ namespace quda {
       blas::copy(b, r);
     }
 
-    PrintSummary(name, k, r2, b2);
+    PrintSummary(name, k, r2, b2, stop, param.tol_hq);
 
     // reset the flops counters
     blas::flops = 0;

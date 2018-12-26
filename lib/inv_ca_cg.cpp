@@ -410,7 +410,7 @@ namespace quda {
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
-    PrintSummary("CA-CG", total_iter, r2, b2);
+    PrintSummary("CA-CG", total_iter, r2, b2, stop, param.tol_hq);
   }
 
 } // namespace quda

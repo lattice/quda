@@ -56,6 +56,9 @@ namespace quda {
     /**< Reliable update tolerance */
     double delta;
 
+    /**< Whether to user alternative reliable updates (CG only at the moment) */
+    bool use_alternative_reliable;
+
     /**< Whether to keep the partial solution accumulator in sloppy precision */
     bool use_sloppy_partial_accumulator;
 
@@ -232,6 +235,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO), delta(param.reliable_delta),
+      use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
@@ -269,6 +273,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       compute_null_vector(param.compute_null_vector), delta(param.delta),
+      use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
@@ -362,53 +367,65 @@ namespace quda {
 			  DiracMatrix &matPrecon, TimeProfile &profile);
 
     /**
-       Set the solver stopping condition
-       @param b2 L2 norm squared of the source vector
-     */
-    static double stopping(const double &tol, const double &b2, QudaResidualType residual_type);
-
-    /**
-       Test for solver convergence
-       @param r2 L2 norm squared of the residual
-       @param hq2 Heavy quark residual
-       @param r2_tol Solver L2 tolerance
-       @param hq_tol Solver heavy-quark tolerance
-     */
-    bool convergence(const double &r2, const double &hq2, const double &r2_tol,
-		     const double &hq_tol);
-
-    /**
-       Test for HQ solver convergence -- ignore L2 residual
-       @param r2 L2 norm squared of the residual
-       @param hq2 Heavy quark residual
-       @param r2_tol Solver L2 tolerance
-       @param hq_tol Solver heavy-quark tolerance
-     */
-    bool convergenceHQ(const double &r2, const double &hq2, const double &r2_tol,
-         const double &hq_tol);
-
-    /**
-       Test for L2 solver convergence -- ignore HQ residual
-       @param r2 L2 norm squared of the residual
-       @param hq2 Heavy quark residual
-       @param r2_tol Solver L2 tolerance
-       @param hq_tol Solver heavy-quark tolerance
-     */
-    bool convergenceL2(const double &r2, const double &hq2, const double &r2_tol,
-         const double &hq_tol);
-
-    /**
-       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
-     */
-    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
-
-    /**
-	Prints out the summary of the solver convergence (requires a
-	verbosity of QUDA_SUMMARIZE).  Assumes
-	SolverParam.true_res and SolverParam.true_res_hq has
-	been set
+       @brief Set the solver L2 stopping condition
+       @param[in] Desired solver tolerance
+       @param[in] b2 L2 norm squared of the source vector
+       @param[in] residual_type The type of residual we want to solve for
+       @return L2 stopping condition
     */
-    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
+    static double stopping(double tol, double b2, QudaResidualType residual_type);
+
+    /**
+       @briefTest for solver convergence
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+       @param[in] r2_tol Solver L2 tolerance
+       @param[in] hq_tol Solver heavy-quark tolerance
+       @return Whether converged
+     */
+    bool convergence(double r2, double hq2, double r2_tol, double hq_tol);
+
+    /**
+       @brief Test for HQ solver convergence -- ignore L2 residual
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+       @param[in] r2_tol Solver L2 tolerance
+       @param[in[ hq_tol Solver heavy-quark tolerance
+       @return Whether converged
+     */
+    bool convergenceHQ(double r2, double hq2, double r2_tol, double hq_tol);
+
+    /**
+       @brief Test for L2 solver convergence -- ignore HQ residual
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+       @param[in] r2_tol Solver L2 tolerance
+       @param[in] hq_tol Solver heavy-quark tolerance
+     */
+    bool convergenceL2(double r2, double hq2, double r2_tol, double hq_tol);
+
+    /**
+       @brief Prints out the running statistics of the solver
+       (requires a verbosity of QUDA_VERBOSE)
+       @param[in] name Name of solver that called this
+       @param[in] k iteration count
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+     */
+    void PrintStats(const char *name, int k, double r2, double b2, double hq2);
+
+    /**
+       @brief Prints out the summary of the solver convergence
+       (requires a verbosity of QUDA_SUMMARIZE).  Assumes
+       SolverParam.true_res and SolverParam.true_res_hq has been set
+       @param[in] name Name of solver that called this
+       @param[in] k iteration count
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+       @param[in] r2_tol Solver L2 tolerance
+       @param[in] hq_tol Solver heavy-quark tolerance
+    */
+    void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
      * Return flops

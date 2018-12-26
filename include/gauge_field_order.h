@@ -1051,6 +1051,18 @@ namespace quda {
 	__device__ __host__ inline int NcolorCoarse() const { return nColorCoarse; }
 
 	/**
+	 * @brief Returns the L1 norm of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+	 * @return L1 norm
+	 */
+	__host__ double norm1(int dim=-1, bool global=true) const {
+	  double nrm1 = accessor.transform_reduce(location, dim, abs_<double,storeFloat>(accessor.scale_inv),
+                                                  thrust::plus<double>(), 0.0);
+	  if (global) comm_allreduce(&nrm1);
+	  return nrm1;
+	}
+
+	/**
 	 * @brief Returns the L2 norm squared of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return L2 norm squared
