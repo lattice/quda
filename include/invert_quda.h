@@ -771,23 +771,26 @@ namespace quda {
     const DiracMatrix &matSloppy;
     bool init;
 
-    Complex *W; // inner product matrix
-    Complex *C; // inner product matrix
-    Complex *alpha;
-    Complex *beta;
-    Complex *phi;
+    Complex *Q_AQandg; // Fused inner product matrix
+    Complex *Q_AS; // inner product matrix
+    Complex *alpha; // QAQ^{-1} g
+    Complex *beta; // QAQ^{-1} QpolyS
 
     ColorSpinorField *rp;
     ColorSpinorField *tmpp;
     ColorSpinorField *tmpp2;
     ColorSpinorField *tmp_sloppy;
     ColorSpinorField *tmp_sloppy2;
-    ColorSpinorField *x_sloppy;
 
-    std::vector<ColorSpinorField*> r;  // residual vectors
-    std::vector<ColorSpinorField*> q;  // mat * residual vectors
-    std::vector<ColorSpinorField*> p;  // CG direction vectors
-    std::vector<ColorSpinorField*> p2; // CG direction vectors for pointer swap
+    std::vector<ColorSpinorField*> S;  // residual vectors
+    std::vector<ColorSpinorField*> AS;  // mat * residual vectors
+    std::vector<ColorSpinorField*> Q;  // CG direction vectors
+    std::vector<ColorSpinorField*> Qtmp; // CG direction vectors for pointer swap
+    std::vector<ColorSpinorField*> AQ; // mat * CG direction vectors.
+                                       // it's possible to avoid carrying these
+                                       // around, but there's a stability penalty,
+                                       // and computing QAQ becomes a pain (though
+                                       // it does let you fuse the reductions...)
 
     /**
        @brief Initiate the fields needed by the solver
@@ -800,12 +803,12 @@ namespace quda {
     /**
        @brief Compute the alpha coefficients
     */
-    void compute_alpha(Complex *x, Complex *W, Complex *phi);
+    void compute_alpha();
 
     /**
        @brief Compute the beta coefficients
     */
-    void compute_beta(Complex *beta, Complex *W, Complex *C);
+    void compute_beta();
 
   public:
     CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
