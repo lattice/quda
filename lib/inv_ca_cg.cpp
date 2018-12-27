@@ -14,10 +14,11 @@ namespace quda {
 
   enum Basis {
     POWER_BASIS,
+    CHEBYSHEV_BASIS,
     INVALID_BASIS
   };
 
-  const static Basis basis = POWER_BASIS;
+  const static Basis basis = CHEBYSHEV_BASIS;
 
   CACG::CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
     : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
@@ -99,7 +100,8 @@ namespace quda {
         S.resize(param.Nkrylov);
         AS.resize(param.Nkrylov);
         Q.resize(param.Nkrylov);
-        AQ.resize(param.Nkrylov); // for pointer swap
+        AQ.resize(param.Nkrylov);
+        Qtmp.resize(param.Nkrylov);
         for (int i=0; i<param.Nkrylov; i++) {
           S[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
           AS[i] = ColorSpinorField::Create(csParam);
@@ -199,6 +201,14 @@ namespace quda {
   {
     const int nKrylov = param.Nkrylov;
 
+    // Hard code this for now...
+    const double lambda_min = 0.;
+    const double lambda_max = 20.;
+    
+    // Factors which map linear operator onto [-1,1]    
+    double m_map = 2./(lambda_max-lambda_min);
+    double b_map = -(lambda_max+lambda_min)/(lambda_max-lambda_min);
+
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
     if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES) errorQuda("Cannot preserve source and return the residual");
 
@@ -283,10 +293,39 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size nKrylov
-      for (int k=0; k<nKrylov; k++) {
-        matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
-        // this gets more complicated if the basis != POWER_BASIS
-        //if (k<nKrylov-1 && basis != POWER_BASIS) blas::copy(*r[k+1], *q[k]);
+      if (basis == POWER_BASIS) {
+        for (int k=0; k<nKrylov; k++) {
+          matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
+        }
+      } else { // chebyshev basis
+
+        matSloppy(*AS[0], *S[0], tmpSloppy, tmpSloppy2);
+
+        if (nKrylov > 1) {
+          Complex facs1[2] = { m_map, b_map };
+          std::vector<ColorSpinorField*> recur1{AS[0],S[0]};
+          std::vector<ColorSpinorField*> S1{S[1]};
+          blas::zero(*S[1]);
+          blas::caxpy(facs1,recur1,S1);
+          matSloppy(*AS[1], *S[1], tmpSloppy, tmpSloppy2);
+
+          // Enter recursion relation
+          if (nKrylov > 2) {
+            Complex factors[3] = { 2.*m_map, 2.*b_map, -1. };
+            for (int k = 2; k < nKrylov; k++) {
+              std::vector<ColorSpinorField*> recurse;
+              recurse.push_back(AS[k-1]);
+              recurse.push_back(S[k-1]);
+              recurse.push_back(S[k-2]);
+              std::vector<ColorSpinorField*> Sk;
+              Sk.push_back(S[k]);
+              blas::zero(*S[k]);
+              blas::caxpy(factors, recurse, Sk);
+              matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
+            }
+          }
+        }
+
       }
 
       // first iteration, copy S and AS into Q and AQ
