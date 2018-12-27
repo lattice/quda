@@ -313,14 +313,10 @@ namespace quda {
           if (nKrylov > 2) {
             Complex factors[3] = { 2.*m_map, 2.*b_map, -1. };
             for (int k = 2; k < nKrylov; k++) {
-              std::vector<ColorSpinorField*> recurse;
-              recurse.push_back(AS[k-1]);
-              recurse.push_back(S[k-1]);
-              recurse.push_back(S[k-2]);
-              std::vector<ColorSpinorField*> Sk;
-              Sk.push_back(S[k]);
+              std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2]};
+              std::vector<ColorSpinorField*> Sk{S[k]};
               blas::zero(*S[k]);
-              blas::caxpy(factors, recurse, Sk);
+              blas::caxpy(factors, recur2, Sk);
               matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
             }
           }
