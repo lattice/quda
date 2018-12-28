@@ -63,7 +63,9 @@ namespace quda {
   template<class T, int N>
     class Matrix
     {
-      private:
+      typedef typename RealType<T>::type real;
+
+    private:
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
       public:
@@ -84,7 +86,7 @@ namespace quda {
 	  for (int i=0; i<N*N; i++) data[i] = data_[i];
 	}
 
-	__device__ __host__ inline Matrix(const HMatrix<typename RealType<T>::type,N> &a);
+	__device__ __host__ inline Matrix(const HMatrix<real,N> &a);
 
         __device__ __host__ inline T const & operator()(int i, int j) const {
           return data[index(i,j)];
@@ -113,18 +115,73 @@ namespace quda {
 	}
 
 	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline Matrix(const gauge_wrapper<real, S> &s);
 
 	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline void operator=(const gauge_wrapper<real, S> &s);
 
 	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<real, S> &s);
 
 	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<real, S> &s);
 
-	/**
+        /**
+           @brief Compute the matrix L1 norm - this is the maximum of
+           the absolute column sums.
+           @return Compute L1 norm
+        */
+        __device__ __host__ inline real L1() {
+          real l1 = 0;
+#pragma unroll
+          for (int j=0; j<N; j++) {
+            real col_sum = 0;
+#pragma unroll
+            for (int i=0; i<N; i++) {
+              col_sum += abs(data[i*N + j]);
+            }
+            l1 = col_sum > l1 ? col_sum : l1;
+          }
+          return l1;
+        }
+
+        /**
+           @brief Compute the matrix L2 norm.  We actually compute the
+           Frobenius norm which is an upper bound on the L2 norm.
+           @return Computed L2 norm
+        */
+        __device__ __host__ inline real L2() {
+          real l2 = 0;
+#pragma unroll
+          for (int j=0; j<N; j++) {
+#pragma unroll
+            for (int i=0; i<N; i++) {
+              l2 += norm(data[i*N + j]);
+            }
+          }
+          return sqrt(l2);
+        }
+
+        /**
+           @brief Compute the matrix Linfinity norm - this is the maximum of
+           the absolute row sums.
+           @return Computed Linfinity norm
+        */
+        __device__ __host__ inline real Linf() {
+          real linf = 0;
+#pragma unroll
+          for (int i=0; i<N; i++) {
+            real row_sum = 0;
+#pragma unroll
+            for (int j=0; j<N; j++) {
+              row_sum += abs(data[i*N + j]);
+            }
+            linf = row_sum > linf ? row_sum : linf;
+          }
+          return linf;
+        }
+
+        /**
 	   Return 64-bit XOR checksum computed from the
 	   elements of the matrix.  Compute the checksum on each
 	   64-bit word that constitutes the Matrix

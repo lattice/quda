@@ -89,25 +89,16 @@ A.S. edit: extended to 16 for CA solvers
 	   of size MAX_MULTI_BLAS_N^2 of vectors (max length 4), with
 	   possible parity dimension, and a grid-stride loop with
 	   maximum number of blocks = 2 x SM count
-
-	- inline reductions in kernels where we cannot assume a grid
-           stride loop - hence max blocks is given by the architecture
-           limit
-
       */
 
-      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount; // FIXME - should set this according to what's used in tune_quda.h
+      const int reduce_size = 16 * sizeof(QudaSumFloat); //A.S. extended from 4 to 16 for CA solvers
+      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount;
 
-      //const int max_reduce = 2 * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
-      const int max_reduce = 2 * max_reduce_blocks * 16 * sizeof(QudaSumFloat);//A.S. extended to 16 for CA solvers
-      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
-
-      const int max_generic_blocks = 65336; // FIXME - this isn't quite right
-      const int max_generic_reduce = 2 * MAX_MULTI_BLAS_N * max_generic_blocks * 4 * sizeof(QudaSumFloat);
+      const int max_reduce = 2 * max_reduce_blocks * reduce_size;
+      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * reduce_size;
 
       // reduction buffer size
       size_t bytes = max_reduce > max_multi_reduce ? max_reduce : max_multi_reduce;
-      bytes = bytes > max_generic_reduce ? bytes : max_generic_reduce;
 
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 
@@ -209,14 +200,9 @@ A.S. edit: extended to 16 for CA solvers
     };
 
     double norm1(const ColorSpinorField &x) {
-#ifdef HOST_DEBUG
       ColorSpinorField &y = const_cast<ColorSpinorField&>(x); // FIXME
       return reduce::reduceCuda<double,QudaSumFloat,Norm1,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
-#else
-	errorQuda("L1 norm kernel only built when HOST_DEBUG is enabled");
-      return 0.0;
-#endif
     }
 
     /**
@@ -292,50 +278,24 @@ A.S. edit: extended to 16 for CA solvers
 
 
     /**
-     * Returns the real component of the dot product of a and b and
-     * the norm of a
-    */
-    template<typename ReduceType, typename InputType>
-    __device__ __host__ ReduceType dotNormA_(const InputType &a, const InputType &b) {
-      typedef typename ScalarType<ReduceType>::type scalar;
-      ReduceType c;
-      dot_<scalar>(c.x,a,b);
-      norm2_<scalar>(c.y,a);
-      return c;
-    }
-
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct DotNormA : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      DotNormA(const Float2 &a, const Float2 &b){}
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,  FloatN &w, FloatN &v)
-      {sum += dotNormA_<ReduceType,FloatN>(x,y);}
-      static int streams() { return 2; }
-      static int flops() { return 4; }
-    };
-
-    double2 reDotProductNormA(ColorSpinorField &x,ColorSpinorField &y){
-      return reduce::reduceCuda<double2,QudaSumFloat2,DotNormA,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-    }
-
-
-    /**
-       First performs the operation y[i] += a*x[i]
+       First performs the operation z[i] = a*x[i] + b*y[i]
        Return the norm of y
     */
     template <typename ReduceType, typename Float2, typename FloatN>
-    struct axpyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
+    struct axpbyzNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Float2 a;
-      axpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
+      Float2 b;
+      axpbyzNorm2(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	y += a.x*x; norm2_<ReduceType>(sum,y); }
+	z = a.x*x + b.x*y; norm2_<ReduceType>(sum,z); }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; } //! flops per element
     };
 
-    double axpyNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,axpyNorm2,0,1,0,0,0,false>
-	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    double axpbyzNorm(double a, ColorSpinorField &x, double b, ColorSpinorField &y,
+                      ColorSpinorField &z) {
+      return reduce::reduceCuda<double,QudaSumFloat,axpbyzNorm2,0,0,1,0,0,false>
+	(make_double2(a, 0.0), make_double2(b, 0.0), x, y, z, x, x);
     }
 
 
@@ -353,28 +313,9 @@ A.S. edit: extended to 16 for CA solvers
       static int flops() { return 4; } //! flops per element
     };
 
-    double axpyReDot(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
+    double axpyReDot(double a, ColorSpinorField &x, ColorSpinorField &y) {
       return reduce::reduceCuda<double,QudaSumFloat,AxpyReDot,0,1,0,0,0,false>
 	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-    }
-
-
-    /**
-       First performs the operation y[i] = x[i] - y[i]
-       Second returns the norm of y
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct xmyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      xmyNorm2(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	y = x - y; norm2_<ReduceType>(sum,y); }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 3; } //! flops per element
-    };
-
-    double xmyNorm(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,xmyNorm2,0,1,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
 
@@ -457,7 +398,7 @@ A.S. edit: extended to 16 for CA solvers
     };
 
 
-    double cabxpyzAxNorm(const double &a, const Complex &b,
+    double cabxpyzAxNorm(double a, const Complex &b,
 			ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
       return reduce::reduceCuda<double,QudaSumFloat,cabxpyzaxnorm,1,0,1,0,0,false>
 	(make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, z, x, x);
@@ -507,31 +448,9 @@ A.S. edit: extended to 16 for CA solvers
       static int flops() { return 4; } //! flops per element
     };
 
-
     Complex cDotProduct(ColorSpinorField &x, ColorSpinorField &y) {
       double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-      return Complex(cdot.x, cdot.y);
-    }
-
-    /**
-       double2 xpaycDotzyCuda(float2 *x, float a, float2 *y, float2 *z, int n) {}
-       First performs the operation y = x + a*y
-       Second returns cdot product (z,y)
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct xpaycdotzy : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      xpaycdotzy(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { y = x + a.x*y; cdot_<ReduceType>(sum,z,y); }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per element
-    };
-
-    Complex xpaycDotzy(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z) {
-      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,xpaycdotzy,0,1,0,0,0,false>
-	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
       return Complex(cdot.x, cdot.y);
     }
 
@@ -550,7 +469,6 @@ A.S. edit: extended to 16 for CA solvers
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 8; } //! flops per element
     };
-
 
     Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
       double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,caxpydotzy,0,1,0,0,0,false>
@@ -571,6 +489,18 @@ A.S. edit: extended to 16 for CA solvers
       norm2_<scalar>(sum.z,a);
     }
 
+    /**
+       First returns the dot product (x,y)
+       Returns the norm of y
+    */
+    template<typename ReduceType, typename InputType>
+    __device__ __host__ void cdotNormB_(ReduceType &sum, const InputType &a, const InputType &b) {
+      typedef typename ScalarType<ReduceType>::type scalar;
+      typedef typename Vec2Type<scalar>::type vec2;
+      cdot_<ReduceType>(sum,a,b);
+      norm2_<scalar>(sum.z,b);
+    }
+
     template <typename ReduceType, typename Float2, typename FloatN>
     struct CdotNormA : public ReduceFunctor<ReduceType, Float2, FloatN> {
       CdotNormA(const Float2 &a, const Float2 &b) { ; }
@@ -587,33 +517,6 @@ A.S. edit: extended to 16 for CA solvers
 
 
     /**
-       First returns the dot product (x,y)
-       Returns the norm of y
-    */
-    template<typename ReduceType, typename InputType>
-    __device__ __host__ void cdotNormB_(ReduceType &sum, const InputType &a, const InputType &b) {
-      typedef typename ScalarType<ReduceType>::type scalar;
-      typedef typename Vec2Type<scalar>::type vec2;
-      cdot_<ReduceType>(sum,a,b);
-      norm2_<scalar>(sum.z,b);
-    }
-
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct CdotNormB : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      CdotNormB(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { cdotNormB_<ReduceType>(sum,x,y); }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per element
-    };
-
-    double3 cDotProductNormB(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double3,QudaSumFloat3,CdotNormB,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-    }
-
-
-    /**
        This convoluted kernel does the following:
        z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
     */
@@ -622,7 +525,8 @@ A.S. edit: extended to 16 for CA solvers
       Float2 a;
       Float2 b;
       caxpbypzYmbwcDotProductUYNormY_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { Caxpy_(a, x, z); Caxpy_(b, y, z); Caxpy_(-b, w, y); cdotNormB_<ReduceType>(sum,v,y); }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      { Caxpy_(a, x, z); Caxpy_(b, y, z); Caxpy_(-b, w, y); cdotNormB_<ReduceType>(sum,v,y); }
       static int streams() { return 7; } //! total number of input and output streams
       static int flops() { return 18; } //! flops per element
     };
@@ -662,7 +566,7 @@ A.S. edit: extended to 16 for CA solvers
       static int flops() { return 6; } //! flops per real element
     };
 
-    Complex axpyCGNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
+    Complex axpyCGNorm(double a, ColorSpinorField &x, ColorSpinorField &y) {
       // swizzle since mixed is on z
       double2 cg_norm ;
       if (x.Precision() != y.Precision()) {

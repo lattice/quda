@@ -319,6 +319,7 @@ namespace quda {
       errorQuda("Invalid clover field type");
     }
 
+    qudaDeviceSynchronize();
     checkCudaError();
   }
 
@@ -353,6 +354,9 @@ namespace quda {
     } 
 
     pool_pinned_free(packClover);
+
+    qudaDeviceSynchronize();
+    checkCudaError();
   }
 
   /**

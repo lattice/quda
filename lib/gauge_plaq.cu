@@ -12,8 +12,7 @@ namespace quda {
     const GaugeField &meta;
 
   private:
-    bool tuneGridDim() const { return false; }
-    unsigned int minThreads() const { return arg.threads; }
+    bool tuneGridDim() const { return true; }
 
   public:
     GaugePlaq(GaugePlaqArg<Gauge> &arg, const GaugeField &meta)

@@ -2,24 +2,25 @@
   Parameter struct for generic blas kernel
 */
 template <typename SpinorX, typename SpinorY, typename SpinorZ,
-  typename SpinorW, typename Functor>
+          typename SpinorW, typename SpinorV, typename Functor>
 struct BlasArg {
   SpinorX X;
   SpinorY Y;
   SpinorZ Z;
   SpinorW W;
+  SpinorV V;
   Functor f;
   const int length;
-  BlasArg(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, Functor f, int length)
-  : X(X), Y(Y), Z(Z), W(W), f(f), length(length) { ; }
+  BlasArg(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Functor f, int length)
+    : X(X), Y(Y), Z(Z), W(W), V(V), f(f), length(length) { ; }
 };
 
 /**
    Generic blas kernel with four loads and up to four stores.
  */
 template <typename FloatN, int M, typename SpinorX, typename SpinorY,
-  typename SpinorZ, typename SpinorW, typename Functor>
-  __global__ void blasKernel(BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
+          typename SpinorZ, typename SpinorW, typename SpinorV, typename Functor>
+__global__ void blasKernel(BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Functor> arg) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int parity = blockIdx.y;
   unsigned int gridSize = gridDim.x*blockDim.x;
@@ -27,36 +28,38 @@ template <typename FloatN, int M, typename SpinorX, typename SpinorY,
   arg.f.init();
 
   while (i < arg.length) {
-    FloatN x[M], y[M], z[M], w[M];
+    FloatN x[M], y[M], z[M], w[M], v[M];
     arg.X.load(x, i, parity);
     arg.Y.load(y, i, parity);
     arg.Z.load(z, i, parity);
     arg.W.load(w, i, parity);
+    arg.V.load(v, i, parity);
 
 #pragma unroll
-    for (int j=0; j<M; j++) arg.f(x[j], y[j], z[j], w[j]);
+    for (int j=0; j<M; j++) arg.f(x[j], y[j], z[j], w[j], v[j]);
 
     arg.X.save(x, i, parity);
     arg.Y.save(y, i, parity);
     arg.Z.save(z, i, parity);
     arg.W.save(w, i, parity);
+    arg.V.save(v, i, parity);
     i += gridSize;
   }
 }
 
 template <typename FloatN, int M, typename SpinorX, typename SpinorY,
-  typename SpinorZ, typename SpinorW, typename Functor>
+          typename SpinorZ, typename SpinorW, typename SpinorV, typename Functor>
 class BlasCuda : public Tunable {
 
 private:
-  mutable BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg;
+  mutable BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Functor> arg;
 
   const int nParity;
 
   // host pointers used for backing up fields when tuning
   // dont't these curry these in to minimize Arg size
-  char *X_h, *Y_h, *Z_h, *W_h;
-  char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h;
+  char *X_h, *Y_h, *Z_h, *W_h, *V_h;
+  char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h, *Vnorm_h;
   const size_t *bytes_;
   const size_t *norm_bytes_;
 
@@ -74,10 +77,10 @@ private:
   }
 
 public:
-  BlasCuda(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor &f,
+  BlasCuda(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Functor &f,
 	   int length, int nParity, const size_t *bytes, const size_t *norm_bytes) :
-    arg(X, Y, Z, W, f, length/nParity), nParity(nParity), X_h(0), Y_h(0), Z_h(0), W_h(0),
-    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), bytes_(bytes), norm_bytes_(norm_bytes) { }
+    arg(X, Y, Z, W, V, f, length/nParity), nParity(nParity), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0),
+    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0), bytes_(bytes), norm_bytes_(norm_bytes) { }
 
   virtual ~BlasCuda() { }
 
@@ -95,6 +98,7 @@ public:
     arg.Y.backup(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
     arg.Z.backup(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
     arg.W.backup(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.backup(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
   void postTune() {
@@ -102,6 +106,7 @@ public:
     arg.Y.restore(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
     arg.Z.restore(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
     arg.W.restore(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.restore(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
   void initTuneParam(TuneParam &param) const {
@@ -133,12 +138,13 @@ public:
 
 template <typename RegType, typename StoreType, typename yType, int M,
 	  template <typename,typename> class Functor,
-	  int writeX, int writeY, int writeZ, int writeW>
+	  int writeX, int writeY, int writeZ, int writeW, int writeV>
 void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	      ColorSpinorField &x, ColorSpinorField &y,
-	      ColorSpinorField &z, ColorSpinorField &w, int length) {
+	      ColorSpinorField &z, ColorSpinorField &w,
+              ColorSpinorField &v, int length) {
 
-  checkLength(x, y); checkLength(x, z); checkLength(x, w);
+  checkLength(x, y); checkLength(x, z); checkLength(x, w); checkLength(x,v);
 
   blasStrings.vol_str = x.VolString();
   strcpy(blasStrings.aux_tmp, x.AuxString());
@@ -147,13 +153,14 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     strcat(blasStrings.aux_tmp, y.AuxString());
   }
 
-  size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes()};
-  size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
+  size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes(), v.Bytes()};
+  size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes(), v.NormBytes()};
 
   Spinor<RegType,StoreType,M,writeX,0> X(x);
   Spinor<RegType,    yType,M,writeY,1> Y(y);
   Spinor<RegType,StoreType,M,writeZ,2> Z(z);
   Spinor<RegType,StoreType,M,writeW,3> W(w);
+  Spinor<RegType,    yType,M,writeV,4> V(v);
 
   typedef typename scalar<RegType>::type Float;
   typedef typename vector<Float,2>::type Float2;
@@ -161,10 +168,9 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   Functor<Float2, RegType> f( (Float2)vec2(a), (Float2)vec2(b), (Float2)vec2(c));
 
   int partitions = (x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset());
-  BlasCuda<RegType,M,
-    decltype(X), decltype(Y), decltype(Z), decltype(W),
-    Functor<Float2, RegType> >
-    blas(X, Y, Z, W, f, length, partitions, bytes, norm_bytes);
+  BlasCuda<RegType,M, decltype(X), decltype(Y), decltype(Z), decltype(W), decltype(V),
+           Functor<Float2, RegType> >
+    blas(X, Y, Z, W, V, f, length, partitions, bytes, norm_bytes);
   blas.apply(*blasStream);
 
   blas::bytes += blas.bytes();
@@ -177,10 +183,10 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 /**
    Generic blas kernel with four loads and up to four stores.
   */
-template <typename Float, int writeX, int writeY, int writeZ, int writeW,
-  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
-  typename Functor>
-void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
+template <typename Float, int writeX, int writeY, int writeZ, int writeW, int writeV,
+          typename SpinorX, typename SpinorY, typename SpinorZ,
+          typename SpinorW, typename SpinorV, typename Functor>
+void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Functor f) {
 
   for (int parity=0; parity<X.Nparity(); parity++) {
     for (int x=0; x<X.VolumeCB(); x++) {
@@ -190,11 +196,13 @@ void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
 	  complex<Float> Y_ = Y(parity, x, s, c);
 	  complex<Float> Z_ = Z(parity, x, s, c);
 	  complex<Float> W_ = W(parity, x, s, c);
-	  f(X_, Y_, Z_, W_);
+	  complex<Float> V_ = V(parity, x, s, c);
+	  f(X_, Y_, Z_, W_, V_);
 	  if (writeX) X(parity, x, s, c) = X_;
 	  if (writeY) Y(parity, x, s, c) = Y_;
 	  if (writeZ) Z(parity, x, s, c) = Z_;
 	  if (writeW) W(parity, x, s, c) = W_;
+	  if (writeV) V(parity, x, s, c) = V_;
 	}
       }
     }
@@ -202,61 +210,65 @@ void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
 }
 
 template <typename Float, typename yFloat, int nSpin, int nColor, QudaFieldOrder order,
-  int writeX, int writeY, int writeZ, int writeW, typename Functor>
+          int writeX, int writeY, int writeZ, int writeW, int writeV, typename Functor>
   void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
-		   ColorSpinorField &w, Functor f) {
+		   ColorSpinorField &w, ColorSpinorField &v, Functor f) {
   colorspinor::FieldOrderCB<Float,nSpin,nColor,1,order> X(x), Z(z), W(w);
-  colorspinor::FieldOrderCB<yFloat,nSpin,nColor,1,order> Y(y);
-  genericBlas<yFloat,writeX,writeY,writeZ,writeW>(X, Y, Z, W, f);
+  colorspinor::FieldOrderCB<yFloat,nSpin,nColor,1,order> Y(y), V(v);
+  genericBlas<yFloat,writeX,writeY,writeZ,writeW,writeV>(X, Y, Z, W, V, f);
 }
 
 template <typename Float, typename yFloat, int nSpin, QudaFieldOrder order,
-	  int writeX, int writeY, int writeZ, int writeW, typename Functor>
-  void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
+	  int writeX, int writeY, int writeZ, int writeW, int writeV, typename Functor>
+  void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
+                   ColorSpinorField &w, ColorSpinorField &v, Functor f) {
   if (x.Ncolor() == 3) {
-    genericBlas<Float,yFloat,nSpin,3,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,nSpin,3,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 4) {
-    genericBlas<Float,yFloat,nSpin,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,nSpin,4,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 6) { // free field Wilson
-    genericBlas<Float,yFloat,nSpin,6,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,nSpin,6,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 8) {
-    genericBlas<Float,yFloat,nSpin,8,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,nSpin,8,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 12) {
-    genericBlas<Float,yFloat,nSpin,12,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,nSpin,12,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 16) {
-    genericBlas<Float,yFloat,nSpin,16,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,nSpin,16,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 20) {
-    genericBlas<Float,yFloat,nSpin,20,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,nSpin,20,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 24) {
-    genericBlas<Float,yFloat,nSpin,24,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,nSpin,24,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 32) {
-    genericBlas<Float,yFloat,nSpin,32,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,nSpin,32,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else {
-    errorQuda("nColor = %d not implemeneted",x.Ncolor());
+    errorQuda("nColor = %d not implemented",x.Ncolor());
   }
 }
 
-template <typename Float, typename yFloat, QudaFieldOrder order, int writeX, int writeY, int writeZ, int writeW, typename Functor>
-  void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
+template <typename Float, typename yFloat, QudaFieldOrder order,
+          int writeX, int writeY, int writeZ, int writeW, int writeV, typename Functor>
+void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
+                 ColorSpinorField &w, ColorSpinorField &v, Functor f) {
   if (x.Nspin() == 4) {
-    genericBlas<Float,yFloat,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,4,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
   } else if (x.Nspin() == 2) {
-    genericBlas<Float,yFloat,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,2,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
 #ifdef GPU_STAGGERED_DIRAC
   } else if (x.Nspin() == 1) {
-    genericBlas<Float,yFloat,1,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericBlas<Float,yFloat,1,order,writeX,writeY,writeZ,writeW,writeV,Functor>(x, y, z, w, v, f);
 #endif
   } else {
-    errorQuda("nSpin = %d not implemeneted",x.Nspin());
+    errorQuda("nSpin = %d not implemented",x.Nspin());
   }
 }
 
-template <typename Float, typename yFloat, int writeX, int writeY, int writeZ, int writeW, typename Functor>
-  void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
+template <typename Float, typename yFloat, int writeX, int writeY, int writeZ, int writeW, int writeV, typename Functor>
+void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
+                 ColorSpinorField &w, ColorSpinorField &v, Functor f) {
   if (x.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-    genericBlas<Float,yFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,Functor>
-      (x, y, z, w, f);
+    genericBlas<Float,yFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,writeV,Functor>
+      (x, y, z, w, v, f);
   } else {
-    errorQuda("Not implemeneted");
+    errorQuda("Not implemented");
   }
 }
