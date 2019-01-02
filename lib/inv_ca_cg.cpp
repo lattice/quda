@@ -336,7 +336,7 @@ namespace quda {
         // Compute the beta coefficients for updating Q, AQ
         // 1. compute matrix Q_AS = -Q^\dagger AS
         // 2. Solve Q_AQ beta = Q_AS
-        blas::cDotProduct(Q_AS, Q, AS);
+        blas::cDotProduct(Q_AS, AQ, S);
         for (int i = 0; i < param.Nkrylov*param.Nkrylov; i++) { Q_AS[i] = real(Q_AS[i]); }
 
         compute_beta();
@@ -375,12 +375,13 @@ namespace quda {
       // vectors when we update p?
       if (!fixed_iteration) {
         for (int i = 0; i < param.Nkrylov; i++) { alpha[i] = -alpha[i]; }
-        std::vector<ColorSpinorField*> S0;
-        S0.push_back(S[0]);
+        std::vector<ColorSpinorField*> S0{S[0]};
 
         // Can we fuse these? We don't need this reduce in all cases...
         blas::caxpy(alpha, AQ, S0);
-        r2 = blas::norm2(*S[0]);
+        //if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(*S[0]);
+        /*else*/ r2 = real(Q_AQandg[param.Nkrylov]); // actually the old r2... so we do one more iter than needed...
+
       }
 
       total_iter+=nKrylov;

@@ -783,7 +783,7 @@ namespace quda {
     ColorSpinorField *tmp_sloppy2;
 
     std::vector<ColorSpinorField*> S;  // residual vectors
-    std::vector<ColorSpinorField*> AS;  // mat * residual vectors
+    std::vector<ColorSpinorField*> AS; // mat * residual vectors. Can be replaced by a single temporary.
     std::vector<ColorSpinorField*> Q;  // CG direction vectors
     std::vector<ColorSpinorField*> Qtmp; // CG direction vectors for pointer swap
     std::vector<ColorSpinorField*> AQ; // mat * CG direction vectors.
