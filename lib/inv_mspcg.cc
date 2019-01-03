@@ -638,7 +638,7 @@ namespace quda {
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
     double stop = stopping(param.tol, b2, param.residual_type);
 
-    test_dslash(db);
+    // test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
@@ -796,7 +796,7 @@ namespace quda {
       // The reason is the inner cause some amount of desyncronization amount the MPI ranks
       // The barrier here makes the precontioner timer contain this desync, other than 
       // redirect it to the linear algebra timer.
-      comm_barrier();
+      // comm_barrier();
       preconditioner_timer.Stop(fname, cname, 0);
 
       linalg_timer[1].Start(fname, cname, lname);      
@@ -852,7 +852,7 @@ namespace quda {
     param.true_res = sqrt(true_res/b2);
 
     printfQuda("-------- END --------\n");
-    printfQuda("MSPCG CONVERGED in %05d iterations with %03d reliable updates.\n", k, num_reliable_updates);
+    printfQuda("MSPCG CONVERGED in %05d iterations(with %02d inner_iterations each) with %03d reliable updates.\n", k, inner_iterations, num_reliable_updates);
     printfQuda("True residual/target_r2: %8.4e/%8.4e.\n", true_res, stop);
     printfQuda("Performance precise:        %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
       precise_tflops/precise_timer.time, precise_timer.time, precise_timer.count);
@@ -866,7 +866,8 @@ namespace quda {
     printfQuda("Performance linear algebra [%d]:             in %8.4f secs with %05d calls.\n",
       i, linalg_timer[i].time, linalg_timer[i].count);
     }
-    printf("preconditioner desync #%03d: %8.4f msecs.\n", comm_rank(), preconditioner_timer.last*1e3);
+    printfQuda("Total time %8.4f secs.\n", param.secs); 
+    // printf("preconditioner desync #%03d: %8.4f msecs.\n", comm_rank(), preconditioner_timer.last*1e3);
     // printfQuda("Flops ratio sloppy/preconditioner: %.2f.\n", preconditioner_tflops/sloppy_tflops/(double)inner_iterations);
 
     // reset the flops counters
