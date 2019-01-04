@@ -122,19 +122,14 @@ namespace quda {
     } // init
   }
 
-  void CACG::compute_alpha()
+  // template!
+  template <int N>
+  void compute_alpha_N(Complex* Q_AQandg, Complex* alpha)
   {
-    if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
-    }
-
     using namespace Eigen;
-    typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
-    typedef Matrix<Complex, Dynamic, 1> vector;
+    typedef Matrix<Complex, N, N, RowMajor> matrix;
+    typedef Matrix<Complex, N, 1> vector;
 
-    const int N = Q.size();
     matrix matQ_AQ(N,N);
     vector vecg(N);
     for (int i=0; i<N; i++) {
@@ -149,6 +144,52 @@ namespace quda {
     
     //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
     //psi = svd.solve(phi);
+  }
+
+  void CACG::compute_alpha()
+  {
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
+      profile.TPSTART(QUDA_PROFILE_EIGEN);
+    }
+
+    const int N = Q.size();
+    switch (N) {
+      case 1: compute_alpha_N<1>(Q_AQandg, alpha); break;
+      case 2: compute_alpha_N<2>(Q_AQandg, alpha); break;
+      case 3: compute_alpha_N<3>(Q_AQandg, alpha); break;
+      case 4: compute_alpha_N<4>(Q_AQandg, alpha); break;
+      case 5: compute_alpha_N<5>(Q_AQandg, alpha); break;
+      case 6: compute_alpha_N<6>(Q_AQandg, alpha); break;
+      case 7: compute_alpha_N<7>(Q_AQandg, alpha); break;
+      case 8: compute_alpha_N<8>(Q_AQandg, alpha); break;
+      case 9: compute_alpha_N<9>(Q_AQandg, alpha); break;
+      case 10: compute_alpha_N<10>(Q_AQandg, alpha); break;
+      case 11: compute_alpha_N<11>(Q_AQandg, alpha); break;
+      case 12: compute_alpha_N<12>(Q_AQandg, alpha); break;
+      default: // failsafe
+        using namespace Eigen;
+        typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
+        typedef Matrix<Complex, Dynamic, 1> vector;
+
+        const int N = Q.size();
+        matrix matQ_AQ(N,N);
+        vector vecg(N);
+        for (int i=0; i<N; i++) {
+          vecg(i) = Q_AQandg[i*(N+1)+N];
+          for (int j=0; j<N; j++) {
+            matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
+          }
+        }
+        Map<vector> vecalpha(alpha,N);
+
+        vecalpha = matQ_AQ.fullPivLu().solve(vecg);
+        
+        //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
+        //psi = svd.solve(phi);
+        break;
+    }
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_EIGEN);
@@ -157,18 +198,13 @@ namespace quda {
     }
   }
 
-  void CACG::compute_beta()
+  // template!
+  template <int N>
+  void compute_beta_N(Complex* Q_AQandg, Complex* Q_AS, Complex* beta)
   {
-    if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
-    }
-
     using namespace Eigen;
-    typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
+    typedef Matrix<Complex, N, N, RowMajor> matrix;
 
-    const int N = Q.size();
     matrix matQ_AQ(N,N);
     for (int i=0; i<N; i++) {
       for (int j=0; j<N; j++) {
@@ -182,6 +218,49 @@ namespace quda {
 
     //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
     //psi = svd.solve(phi);
+  }
+
+  void CACG::compute_beta()
+  {
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
+      profile.TPSTART(QUDA_PROFILE_EIGEN);
+    }
+
+    const int N = Q.size();
+    switch (N) {
+      case 1: compute_beta_N<1>(Q_AQandg, Q_AS, beta); break;
+      case 2: compute_beta_N<2>(Q_AQandg, Q_AS, beta); break;
+      case 3: compute_beta_N<3>(Q_AQandg, Q_AS, beta); break;
+      case 4: compute_beta_N<4>(Q_AQandg, Q_AS, beta); break;
+      case 5: compute_beta_N<5>(Q_AQandg, Q_AS, beta); break;
+      case 6: compute_beta_N<6>(Q_AQandg, Q_AS, beta); break;
+      case 7: compute_beta_N<7>(Q_AQandg, Q_AS, beta); break;
+      case 8: compute_beta_N<8>(Q_AQandg, Q_AS, beta); break;
+      case 9: compute_beta_N<9>(Q_AQandg, Q_AS, beta); break;
+      case 10: compute_beta_N<10>(Q_AQandg, Q_AS, beta); break;
+      case 11: compute_beta_N<11>(Q_AQandg, Q_AS, beta); break;
+      case 12: compute_beta_N<12>(Q_AQandg, Q_AS, beta); break;
+      default: // failsafe
+        using namespace Eigen;
+        typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
+
+        const int N = Q.size();
+        matrix matQ_AQ(N,N);
+        for (int i=0; i<N; i++) {
+          for (int j=0; j<N; j++) {
+            matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
+          }
+        }
+        Map<matrix> matQ_AS(Q_AS,N,N), matbeta(beta,N,N);
+
+        matQ_AQ = -matQ_AQ;
+        matbeta = matQ_AQ.fullPivLu().solve(matQ_AS);
+
+        //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
+        //psi = svd.solve(phi);
+    }
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_EIGEN);
@@ -336,14 +415,14 @@ namespace quda {
         // Compute the beta coefficients for updating Q, AQ
         // 1. compute matrix Q_AS = -Q^\dagger AS
         // 2. Solve Q_AQ beta = Q_AS
-        blas::cDotProduct(Q_AS, AQ, S);
+        std::vector<ColorSpinorField*> R;
+        for (int i=0; i < nKrylov; i++) R.push_back(S[i]);
+        blas::cDotProduct(Q_AS, AQ, R);
         for (int i = 0; i < param.Nkrylov*param.Nkrylov; i++) { Q_AS[i] = real(Q_AS[i]); }
 
         compute_beta();
 
         // update direction vectors
-        std::vector<ColorSpinorField*> R;
-        for (int i=0; i<nKrylov; i++) R.push_back(S[i]); // needed because S is size N+1 in power basis
         blas::caxpyz(beta, Q, R, Qtmp);
         for (int i=0; i<nKrylov; i++) std::swap(Q[i],Qtmp[i]);
 
@@ -386,6 +465,8 @@ namespace quda {
 
       total_iter+=nKrylov;
 
+      // NOTE: Because of our cheat on the residual, this is behind an iteration
+      // through the loop
       PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
 
       // update since nKrylov or maxiter reached, converged or reliable update required
