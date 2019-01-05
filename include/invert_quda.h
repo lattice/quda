@@ -771,6 +771,10 @@ namespace quda {
     const DiracMatrix &matSloppy;
     bool init;
 
+    bool lambda_init;
+    double lambda_min; // for chebyshev basis
+    double lambda_max;
+
     Complex *Q_AQandg; // Fused inner product matrix
     Complex *Q_AS; // inner product matrix
     Complex *alpha; // QAQ^{-1} g

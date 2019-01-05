@@ -22,6 +22,7 @@ namespace quda {
 
   CACG::CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
     : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
+      lambda_init(false), lambda_min(0), lambda_max(100),
       Q_AQandg(nullptr), Q_AS(nullptr), alpha(nullptr), beta(nullptr), rp(nullptr),
       tmpp(nullptr), tmpp2(nullptr), tmp_sloppy(nullptr), tmp_sloppy2(nullptr) { }
 
@@ -280,14 +281,6 @@ namespace quda {
   {
     const int nKrylov = param.Nkrylov;
 
-    // Hard code this for now...
-    const double lambda_min = 0.;
-    const double lambda_max = 20.;
-    
-    // Factors which map linear operator onto [-1,1]    
-    double m_map = 2./(lambda_max-lambda_min);
-    double b_map = -(lambda_max+lambda_min)/(lambda_max-lambda_min);
-
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
     if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES) errorQuda("Cannot preserve source and return the residual");
 
@@ -365,6 +358,34 @@ namespace quda {
     int restart = 0;
     double r2_old = r2;
     bool l2_converge = false;
+
+    // Use power iterations to approx lambda_max
+    if (basis == CHEBYSHEV_BASIS && !lambda_init) {
+      *Q[0] = r_; // do power iterations on this
+      // Do 100 iterations, normalize every 10.
+      for (int i = 0; i < 10; i++) {
+        double tmpnrm = blas::norm2(*Q[0]);
+        blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
+        for (int j = 0; j < 10; j++) {
+          matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy2);
+          if (j == 0 && getVerbosity() >= QUDA_VERBOSE) {
+            printfQuda("Current Rayleigh Quotient step %d is %e\n", i*10+1, sqrt(blas::norm2(*AQ[0])));
+          }
+          std::swap(AQ[0], Q[0]);
+        }
+      }
+      // Get Rayleigh quotient
+      double tmpnrm = blas::norm2(*Q[0]);
+      blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
+      matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy);
+      lambda_max = 1.1*(sqrt(blas::norm2(*AQ[0])));
+      printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
+      lambda_init = true;
+    }
+
+    // Factors which map linear operator onto [-1,1]    
+    double m_map = 2./(lambda_max-lambda_min);
+    double b_map = -(lambda_max+lambda_min)/(lambda_max-lambda_min);
 
     blas::copy(*S[0], r_); // no op if uni-precision
 
