@@ -831,6 +831,37 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  class CACGNE : public CACG {
+
+  private:
+    DiracMMdag mmdag;
+    DiracMMdag mmdagSloppy;
+    ColorSpinorField *xp;
+    ColorSpinorField *yp;
+    bool init;
+
+  public:
+    CACGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CACGNE();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class CACGNR : public CACG {
+
+  private:
+    DiracMdagM mdagm;
+    DiracMdagM mdagmSloppy;
+    ColorSpinorField *bp;
+    bool init;
+
+  public:
+    CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CACGNR();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
   /**
      @brief Communication-avoiding GCR solver.  This solver does
      un-preconditioned GCR, first building up a polynomial in the

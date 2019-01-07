@@ -50,6 +50,153 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
+  CACGNE::CACGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    CACG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()),
+    xp(nullptr), yp(nullptr), init(false) {
+  }
+
+  CACGNE::~CACGNE() {
+    if ( init ) {
+      if (xp) delete xp;
+      if (yp) delete yp;
+      init = false;
+    }
+  }
+
+  // CACGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
+  void CACGNE::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+    if (param.maxiter == 0 || param.Nsteps == 0) {
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      return;
+    }
+
+    const int iter0 = param.iter;
+
+    if (!init) {
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      xp = ColorSpinorField::Create(x, csParam);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      yp = ColorSpinorField::Create(x, csParam);
+      init = true;
+    }
+
+    double b2 = blas::norm2(b);
+
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+
+      // compute initial residual
+      mmdag.Expose()->M(*xp,x);
+      double r2 = blas::xmyNorm(b,*xp);
+      if (b2 == 0.0) b2 = r2;
+
+      // compute solution to residual equation
+      CACG::operator()(*yp,*xp);
+
+      mmdag.Expose()->Mdag(*xp,*yp);
+
+      // compute full solution
+      blas::xpy(*xp, x);
+
+    } else {
+
+      CACG::operator()(*yp,b);
+      mmdag.Expose()->Mdag(x,*yp);
+
+    }
+
+    // future optimization: with preserve_source == QUDA_PRESERVE_SOURCE_NO; b is already
+    // expected to be the CG residual which matches the CGNE residual
+    // (but only with zero initial guess).  at the moment, CG does not respect this convention
+    if (param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+
+      // compute the true residual
+      mmdag.Expose()->M(*xp, x);
+
+      ColorSpinorField &A = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? b : *xp;
+      ColorSpinorField &B = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? *xp : b;
+      blas::axpby(-1.0, A, 1.0, B);
+
+      double r2;
+      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+        double3 h3 = blas::HeavyQuarkResidualNorm(x, B);
+        r2 = h3.y;
+        param.true_res_hq = sqrt(h3.z);
+      } else {
+        r2 = blas::norm2(B);
+      }
+      param.true_res = sqrt(r2 / b2);
+
+      PrintSummary("CA-CGNE", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
+    }
+
+  }
+
+  CACGNR::CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    CACG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()),
+    bp(nullptr), init(false) {
+  }
+
+  CACGNR::~CACGNR() {
+    if ( init ) {
+      if (bp) delete bp;
+      init = false;
+    }
+  }
+
+  // CACGNR: Mdag M x = Mdag b is solved.
+  void CACGNR::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+    if (param.maxiter == 0 || param.Nsteps == 0) {
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      return;
+    }
+
+    const int iter0 = param.iter;
+
+    if (!init) {
+      ColorSpinorParam csParam(b);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      bp = ColorSpinorField::Create(csParam);
+
+      init = true;
+    }
+
+    double b2 = blas::norm2(b);
+    if (b2 == 0.0) { // compute initial residual vector
+      mdagm.Expose()->M(*bp,x);
+      b2 = blas::norm2(*bp);
+    }
+
+    mdagm.Expose()->Mdag(*bp,b);
+    CACG::operator()(x,*bp);
+
+    if ( param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO ) {
+
+      // compute the true residual
+      mdagm.Expose()->M(*bp, x);
+
+      ColorSpinorField &A = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? b : *bp;
+      ColorSpinorField &B = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? *bp : b;
+      blas::axpby(-1.0, A, 1.0, B);
+
+      double r2;
+      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+        double3 h3 = blas::HeavyQuarkResidualNorm(x, B);
+        r2 = h3.y;
+        param.true_res_hq = sqrt(h3.z);
+      } else {
+        r2 = blas::norm2(B);
+      }
+      param.true_res = sqrt(r2 / b2);
+      PrintSummary("CA-CGNR", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
+
+    } else if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+      mdagm.Expose()->M(*bp, x);
+      blas::axpby(-1.0, *bp, 1.0, b);
+    }
+
+  }
+
   void CACG::create(ColorSpinorField &b)
   {
     if (!init) {

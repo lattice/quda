@@ -359,7 +359,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #else
   if (param->inv_type == QUDA_GCR_INVERTER ||
       param->inv_type == QUDA_CA_GCR_INVERTER ||
-      param->inv_type == QUDA_CA_CG_INVERTER) {
+      param->inv_type == QUDA_CA_CG_INVERTER ||
+      param->inv_type == QUDA_CA_CGNE_INVERTER ||
+      param->inv_type == QUDA_CA_CGNR_INVERTER) {
     P(gcrNkrylov, INVALID_INT);
   }
 #endif
@@ -404,7 +406,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(ca_lambda_min, 0.0);
   P(ca_lambda_max, -1.0);
 #else
-  if (param->inv_type == QUDA_CA_CG_INVERTER) {
+  if (param->inv_type == QUDA_CA_CG_INVERTER ||
+      param->inv_type == QUDA_CA_CGNE_INVERTER ||
+      param->inv_type == QUDA_CA_CGNR_INVERTER) {
     P(ca_basis, QUDA_INVALID_BASIS);
     if (param->ca_basis == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min, INVALID_DOUBLE);
