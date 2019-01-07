@@ -9,6 +9,11 @@
 #include <worker.h>
 #include <tune_quda.h>
 
+namespace quda {
+#include <dslash_events.cuh>
+#include <dslash_policy.cuh>
+}
+
 /**
    This is a staggered Dirac operator
 */
@@ -199,45 +204,39 @@ namespace quda {
     dslashStaggered<Float,nDim,nColor>(arg, x_cb, parity);
   }
 
+
+//MW TODO - derive from Dslash
   template <typename Float, int nDim, int nColor, typename Arg>
-  class DslashStaggered : public TunableVectorY {
+  class Staggered : public Dslash<Float> {
 
   protected:
     Arg &arg;
-    const ColorSpinorField &meta;
+    const ColorSpinorField &in;
 
+//TODO: fix flop / byte count?
+
+/*
     long long flops() const
     {
-      return (2*nDim*(8*nColor*nColor)-2*nColor + (arg.xpay ? 2*2*nColor : 0) )*arg.nParity*(long long)meta.VolumeCB();
+      return (2*nDim*(8*nColor*nColor)-2*nColor + (arg.xpay ? 2*2*nColor : 0) )*arg.nParity*(long long)in.VolumeCB();
     }
     long long bytes() const
     {
-      return arg.out.Bytes() + 2*nDim*arg.in.Bytes() + arg.nParity*2*nDim*arg.U.Bytes()*meta.VolumeCB() +
+      return arg.out.Bytes() + 2*nDim*arg.in.Bytes() + arg.nParity*2*nDim*arg.U.Bytes()*in.VolumeCB() +
   (arg.xpay ? arg.x.Bytes() : 0);
     }
+
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
-
+*/
   public:
-    DslashStaggered(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
-    {
-      strcpy(aux, meta.AuxString());
-#ifdef MULTI_GPU
-      char comm[5];
-      comm[0] = (arg.commDim[0] ? '1' : '0');
-      comm[1] = (arg.commDim[1] ? '1' : '0');
-      comm[2] = (arg.commDim[2] ? '1' : '0');
-      comm[3] = (arg.commDim[3] ? '1' : '0');
-      comm[4] = '\0';
-      strcat(aux,",comm=");
-      strcat(aux,comm);
-#endif
-      if (arg.xpay) strcat(aux,",xpay");
-    }
-    virtual ~DslashStaggered() { }
+    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
+      : Dslash<Float>(arg, out, in), arg(arg), in(in) {  }
+
+    virtual ~Staggered() { }
 
     void apply(const cudaStream_t &stream) {
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+      if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
   dslashStaggeredCPU<Float,nDim,nColor>(arg);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -245,24 +244,26 @@ namespace quda {
       }
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
   };
 
 
-// //MW TODO 20181219
-#if 0
+//MW TODO 20181219
+// - add staggered helper class
+// - use instantiate cf wilspn
+#if 1
   template <typename Float, int nColor, QudaReconstructType recon_u, QudaReconstructType recon_l, bool improved>
   void ApplyDslashStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
-                            double a, const ColorSpinorField &x, int parity, bool dagger, bool improved,
+                            double a, const ColorSpinorField &x, int parity, bool dagger,
                             const int *comm_override, TimeProfile &profile) 
   {
     constexpr int nDim = 4;
-    StaggeredArg<Float,nColor,recon_u,recon_l,improved> arg(out, in, U, kappa, x, parity, dagger, comm_override);
-    Staggered<Float,nDim,nColor, decltype(arg) > > staggered(arg, out, in);
+    StaggeredArg<Float,nColor,recon_u,recon_l,improved> arg(out, in, U, L, a, x, parity, dagger, comm_override); 
+    Staggered<Float,nDim,nColor,decltype(arg) > staggered(arg, out, in);
 
     DslashPolicyTune<decltype(staggered)> policy(staggered, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                               in.VolumeCB(), in.GhostFaceCB(), profile);
-    policy.apply(0);
+    staggered.apply(0);
 
     checkCudaError();
   }

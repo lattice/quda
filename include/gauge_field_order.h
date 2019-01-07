@@ -1165,12 +1165,15 @@ namespace quda {
                                                   int firstTimeSliceBound, int lastTimeSliceBound,
                                                   bool isFirstTimeSlice, bool isLastTimeSlice,
                                                   QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_NO) {
+
+//MWTODO: should this return tBoundary : scale or tBoundary*scale : scale 
+
 	if (ghostExchange_==QUDA_GHOST_EXCHANGE_PAD ||
             (ghostExchange_==QUDA_GHOST_EXCHANGE_INVALID && ghostExchange!=QUDA_GHOST_EXCHANGE_EXTENDED) ) {
 	  if ( idx >= firstTimeSliceBound ) { // halo region on the first time slice
-	    return isFirstTimeSlice ? tBoundary : scale;
+	    return isFirstTimeSlice ? tBoundary*scale : scale;
 	  } else if ( idx >= lastTimeSliceBound ) { // last link on the last time slice
-	    return isLastTimeSlice ? tBoundary : scale;
+	    return isLastTimeSlice ? tBoundary*scale : scale;
 	  } else {
 	    return scale;
 	  }
@@ -1178,10 +1181,10 @@ namespace quda {
                    (ghostExchange_==QUDA_GHOST_EXCHANGE_INVALID && ghostExchange==QUDA_GHOST_EXCHANGE_EXTENDED) ) {
 	  if ( idx >= (R[3]-1)*X[0]*X[1]*X[2]/2 && idx < R[3]*X[0]*X[1]*X[2]/2 ) {
 	    // the boundary condition is on the R[3]-1 time slice
-	    return isFirstTimeSlice ? tBoundary : scale;
+	    return isFirstTimeSlice ? tBoundary*scale : scale;
 	  } else if ( idx >= (X[3]-R[3]-1)*X[0]*X[1]*X[2]/2 && idx < (X[3]-R[3])*X[0]*X[1]*X[2]/2 ) {
 	    // the boundary condition lies on the X[3]-R[3]-1 time slice
-	    return isLastTimeSlice ? tBoundary : scale;
+	    return isLastTimeSlice ? tBoundary*scale : scale;
 	  } else {
 	    return scale;
 	  }
