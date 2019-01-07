@@ -446,6 +446,18 @@ extern "C" {
     /** Maximum number of iterations for refreshing the null-space vectors */
     int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
 
+    /** Basis to use for CA-CGN(E/R) setup */
+    QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
+
+    /** Basis size for CACG setup */
+    int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
+
+    /** Minimum eigenvalue for Chebyshev CA basis */
+    double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum eigenvalue for Chebyshev CA basis */
+    double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
+
     /** Null-space type to use in the setup phase */
     QudaSetupType setup_type;
 
@@ -463,6 +475,18 @@ extern "C" {
 
     /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
     double coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
+    /** Basis to use for CA-CGN(E/R) coarse solver */
+    QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+
+    /** Basis size for CACG coarse solver */
+    int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
+
+    /** Minimum eigenvalue for Chebyshev CA basis */
+    double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum eigenvalue for Chebyshev CA basis */
+    double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL];
 
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];

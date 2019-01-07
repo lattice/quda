@@ -403,6 +403,15 @@ namespace quda {
 
       param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level+1];
       param_coarse_solver->Nkrylov = param_coarse_solver->maxiter < 20 ? param_coarse_solver->maxiter : 20;
+      // Hard coded for now...
+      if (param_coarse_solver->inv_type == QUDA_CA_CG_INVERTER ||
+          param_coarse_solver->inv_type == QUDA_CA_CGNE_INVERTER ||
+          param_coarse_solver->inv_type == QUDA_CA_CGNR_INVERTER) {
+        param_coarse_solver->ca_basis = QUDA_CHEBYSHEV_BASIS;
+        param_coarse_solver->ca_lambda_min = 0.0;
+        param_coarse_solver->ca_lambda_max = -1.0;
+        param_coarse_solver->Nkrylov = 4;
+      }
       param_coarse_solver->inv_type_precondition = (param.level<param.Nlevel-2 || coarse->presmoother) ? QUDA_MG_INVERTER : QUDA_INVALID_INVERTER;
       param_coarse_solver->preconditioner = (param.level<param.Nlevel-2 || coarse->presmoother) ? coarse : nullptr;
       param_coarse_solver->mg_instance = true;
@@ -971,6 +980,14 @@ namespace quda {
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-1;
     solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
+    // Hard coded for now...
+    if (solverParam.inv_type == QUDA_CA_CG_INVERTER ||
+        solverParam.inv_type == QUDA_CA_CGNE_INVERTER ||
+        solverParam.inv_type == QUDA_CA_CGNR_INVERTER) {
+      solverParam.ca_basis = QUDA_CHEBYSHEV_BASIS;
+      solverParam.ca_lambda_min = 0.0;
+      solverParam.ca_lambda_max = -1.0; // use power iters to find
+    }
     solverParam.Nkrylov = 4;
     solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
     solverParam.precision = r->Precision();
