@@ -273,6 +273,15 @@ extern "C" {
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;
 
+    /** Basis for CA algorithms */
+    QudaCABasis ca_basis;
+
+    /** Minimum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_min;
+
+    /** Maximum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_max;
+
     /** Number of preconditioner cycles to perform per iteration */
     int precondition_cycle;
 

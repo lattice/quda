@@ -181,7 +181,14 @@ namespace quda {
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;
 
+    /** Basis for CA algorithms */
+    QudaCABasis ca_basis;
 
+    /** Minimum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_min;
+
+    /** Maximum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_max; // -1 -> power iter generate
 
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
@@ -250,7 +257,8 @@ namespace quda {
       num_src(param.num_src), num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle),
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      omega(param.omega), ca_basis(param.ca_basis), ca_lambda_min(param.ca_lambda_min), ca_lambda_max(param.ca_lambda_max),
+      schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim),
       deflation_grid(param.deflation_grid), rhs_idx(0),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
@@ -287,7 +295,8 @@ namespace quda {
       num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.Nkrylov), precondition_cycle(param.precondition_cycle),
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      omega(param.omega), ca_basis(param.ca_basis), ca_lambda_min(param.ca_lambda_min), ca_lambda_max(param.ca_lambda_max),
+      schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.precision_ritz), nev(param.nev), m(param.m),
       deflation_grid(param.deflation_grid), rhs_idx(0),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
@@ -772,6 +781,7 @@ namespace quda {
     bool init;
 
     bool lambda_init;
+    QudaCABasis basis;
     double lambda_min; // for chebyshev basis
     double lambda_max;
 

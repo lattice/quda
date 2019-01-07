@@ -12,17 +12,10 @@
 
 namespace quda {
 
-  enum Basis {
-    POWER_BASIS,
-    CHEBYSHEV_BASIS,
-    INVALID_BASIS
-  };
-
-  const static Basis basis = CHEBYSHEV_BASIS;
-
   CACG::CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
     : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
-      lambda_init(false), lambda_min(0), lambda_max(100),
+      lambda_init(false), basis(param.ca_basis),
+      lambda_min(param.ca_lambda_min), lambda_max(param.ca_lambda_max),
       Q_AQandg(nullptr), Q_AS(nullptr), alpha(nullptr), beta(nullptr), rp(nullptr),
       tmpp(nullptr), tmpp2(nullptr), tmp_sloppy(nullptr), tmp_sloppy2(nullptr) { }
 
@@ -37,7 +30,7 @@ namespace quda {
       bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
                          param.precision == param.precision_sloppy &&
                          param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
-      if (basis == POWER_BASIS) {
+      if (basis == QUDA_POWER_BASIS) {
         for (int i=0; i<param.Nkrylov+1; i++) if (i>0 || !use_source) delete S[i];
       } else {
         for (int i=0; i<param.Nkrylov; i++) if (i>0 || !use_source) delete S[i];
@@ -86,7 +79,7 @@ namespace quda {
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
 
-      if (basis == POWER_BASIS) {
+      if (basis == QUDA_POWER_BASIS) {
         // in power basis AS[k] = S[k+1], so we don't need a separate array
         S.resize(param.Nkrylov+1);
         AS.resize(param.Nkrylov);
@@ -360,7 +353,7 @@ namespace quda {
     bool l2_converge = false;
 
     // Use power iterations to approx lambda_max
-    if (basis == CHEBYSHEV_BASIS && !lambda_init) {
+    if (basis == QUDA_CHEBYSHEV_BASIS && lambda_max < lambda_min && !lambda_init) {
       *Q[0] = r_; // do power iterations on this
       // Do 100 iterations, normalize every 10.
       for (int i = 0; i < 10; i++) {
@@ -377,7 +370,7 @@ namespace quda {
       // Get Rayleigh quotient
       double tmpnrm = blas::norm2(*Q[0]);
       blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
-      matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy);
+      matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy2);
       lambda_max = 1.1*(sqrt(blas::norm2(*AQ[0])));
       printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
       lambda_init = true;
@@ -393,7 +386,7 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size nKrylov
-      if (basis == POWER_BASIS) {
+      if (basis == QUDA_POWER_BASIS) {
         for (int k=0; k<nKrylov; k++) {
           matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
         }
