@@ -28,7 +28,7 @@ namespace quda {
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    using F= typename colorspinor_mapper<Float,nSpin,nColor,spin_project,spinor_direct_load>::type;
+    using F = typename colorspinor_mapper<Float,nSpin,nColor,spin_project,spinor_direct_load>::type;
 
     static constexpr QudaReconstructType reconstruct_u = reconstruct_u_;
     static constexpr QudaReconstructType reconstruct_l = reconstruct_l_;
@@ -79,9 +79,15 @@ namespace quda {
     getCoords(coord, x_cb, arg.dim, parity);
     coord[4] = 0;
 
+#define FULL 1
 
+#if FULL
 #pragma unroll
     for (int d = 0; d<4; d++) {// loop over dimension{
+#else
+#pragma unroll
+    for (int d = 0; d<1; d++) {// loop over dimension{
+#endif 
       //         Float sign = (d == 0 && ((coords[3] ) & 1) != 0) ||
       // ( d == 1 && ((coords[0] + coords[3] ) & 1) != 0) ||
       // ( d == 2 && ((coords[0] + coords[1] + coords[3] ) & 1) != 0) ? -1.0 : 1.0;
@@ -93,14 +99,18 @@ namespace quda {
   const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
   const Link U = arg.U(d, x_cb, parity);
   const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+ #if FULL
   out += U * in;
+ #endif
   } else {
   const Link U = arg.U(d, x_cb, parity);
   // U[6] *= sign;
   // U[7] *= sign;
   // U[8] *= sign;
   const Vector in = arg.in(fwd_idx, their_spinor_parity);
+     #if FULL
           out += U * in;
+     #endif
         }
       }
       if(arg.improved){
@@ -116,7 +126,116 @@ namespace quda {
           out += L * in;
         }  
       }
-#if 1
+#if FULL
+
+      {
+      //Backward gather - compute back offset for spinor and gauge fetch
+      const int back_idx = linkIndexM1(coord, arg.dim, d);
+      const int gauge_idx = back_idx;
+
+      if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+  const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+  const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
+  const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+          out -= conj(U) * in;
+      } else {
+  const Link U = arg.U(d, gauge_idx, 1-parity);
+  const Vector in = arg.in(back_idx, their_spinor_parity);
+          out -= conj(U) * in;
+        }
+      }
+      if(arg.improved){
+        //Backward gather - compute back offset for spinor and gauge fetch
+        const int back3_idx = linkIndexM3(coord, arg.dim, d);
+        const int gauge_idx = back3_idx;
+
+        if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+          const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+          const Link L = arg.L.Ghost(d, ghost_idx, 1-parity);
+          const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+          out -= conj(L) * in;
+        } else {
+          const Link L = arg.L(d, gauge_idx, 1-parity);
+          const Vector in = arg.in(back3_idx, their_spinor_parity);
+          out -= conj(L) * in;
+        }
+      }
+      #endif
+    } //nDim
+
+  }
+
+/**
+     Applies the off-diagonal part of the Laplace operator
+
+     @param[out] out The out result field
+     @param[in] U The gauge field
+     @param[in] kappa Kappa value
+     @param[in] in The input field
+     @param[in] parity The site parity
+     @param[in] x_cb The checkerboarded site index
+   */
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
+  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, int coord[nDim], int x_cb,
+                                              int parity, int idx, int thread_dim, bool &active) {
+    typedef Matrix<complex<Float>,nColor> Link;
+    const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
+  // const int their_spinor_parity =  1-parity ;
+
+
+    // int coord[5];
+    // getCoords(coord, x_cb, arg.dim, parity);
+    // coord[4] = 0;
+
+//#define FULL 0
+
+#if FULL
+#pragma unroll
+    for (int d = 0; d<4; d++) {// loop over dimension{
+#else
+#pragma unroll
+    for (int d = 0; d<1; d++) {// loop over dimension{
+#endif 
+      //         Float sign = (d == 0 && ((coords[3] ) & 1) != 0) ||
+      // ( d == 1 && ((coords[0] + coords[3] ) & 1) != 0) ||
+      // ( d == 2 && ((coords[0] + coords[1] + coords[3] ) & 1) != 0) ? -1.0 : 1.0;
+      //Forward gather - compute fwd offset for vector fetch
+      {
+      const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+
+      if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+  const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+  const Link U = arg.U(d, x_cb, parity);
+  const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+ #if FULL
+  out += U * in;
+ #endif
+  } else {
+  const Link U = arg.U(d, x_cb, parity);
+  // U[6] *= sign;
+  // U[7] *= sign;
+  // U[8] *= sign;
+  const Vector in = arg.in(fwd_idx, their_spinor_parity);
+     #if FULL
+          out += U * in;
+     #endif
+        }
+      }
+      if(arg.improved){
+        const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
+        if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+          const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+          const Link L = arg.L(d, x_cb, parity);
+          const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+        out += L * in;
+        } else {
+          const Link L = arg.L(d, x_cb, parity);
+          const Vector in = arg.in(fwd3_idx, their_spinor_parity);
+          out += L * in;
+        }  
+      }
+#if FULL
+
       {
       //Backward gather - compute back offset for spinor and gauge fetch
       const int back_idx = linkIndexM1(coord, arg.dim, d);
@@ -155,6 +274,37 @@ namespace quda {
   }
 
   //out(x) = M*in = (-D + m) * in(x-mu)
+ template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  __device__ __host__ inline void staggered(Arg &arg, int idx, int parity)
+  {
+    using real = typename mapper<Float>::type;
+    using Vector = ColorSpinor<real,nColor,1>;
+
+    bool active = true;//kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+    int thread_dim=0;//TODO // which dimension is thread working on (fused kernel only)
+    int coord[nDim];
+    int x_cb = getCoords<nDim,QUDA_4D_PC,kernel_type>(coord, arg, idx, parity, thread_dim);
+    // coord[4] = 0;
+    //TODO
+    // int x_cb = idx; //getCoords<nDim,QUDA_4D_PC,kernel_type>(coord, arg, idx, parity, thread_dim);
+
+    const int my_spinor_parity = nParity == 2 ? parity : 0;
+
+    Vector out;
+
+    applyStaggered<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+
+    if (xpay) {
+      Vector x = arg.x(x_cb, parity);
+      out = arg.a * x -out ;
+    }
+    if (dagger){
+      out = Float(-1)*out;
+    }
+    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+  }
+
+  //out(x) = M*in = (-D + m) * in(x-mu)
   template <typename Float, int nDim, int nColor, typename Arg>
   __device__ __host__ inline void dslashStaggered(Arg &arg, int x_cb, int parity)
   {
@@ -189,6 +339,23 @@ namespace quda {
 
   }
 
+ // GPU Kernel for applying the staggered operator to a vector
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  __global__ void staggeredGPU(Arg arg)
+   {
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    if (x_cb >= arg.threads) return;
+
+    // for full fields set parity from y thread index else use arg setting
+    int parity = nParity == 2 ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+
+    switch(parity) {
+    case 0: staggered<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0); break;
+    case 1: staggered<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 1); break;
+    // dslashStaggered<Float,nDim,nColor>(arg, x_cb, parity);
+  }
+}
+
   // GPU Kernel for applying the Laplace operator to a vector
   template <typename Float, int nDim, int nColor, typename Arg>
   __global__ void  dslashStaggeredGPU(Arg arg)
@@ -204,8 +371,15 @@ namespace quda {
     dslashStaggered<Float,nDim,nColor>(arg, x_cb, parity);
   }
 
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  struct StaggeredLaunch {
+    template <typename Dslash>
+    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+      dslash.launch(staggeredGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+    }
+  };
 
-//MW TODO - derive from Dslash
+
   template <typename Float, int nDim, int nColor, typename Arg>
   class Staggered : public Dslash<Float> {
 
@@ -231,25 +405,32 @@ namespace quda {
 */
   public:
     Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), in(in) {  }
+    : Dslash<Float>(arg, out, in), arg(arg), in(in) {  }
 
     virtual ~Staggered() { }
 
     void apply(const cudaStream_t &stream) {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-  dslashStaggeredCPU<Float,nDim,nColor>(arg);
+        dslashStaggeredCPU<Float,nDim,nColor>(arg);
       } else {
+#if 0
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-  dslashStaggeredGPU<Float,nDim,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+        dslashStaggeredGPU<Float,nDim,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+# else
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        Dslash<Float>::setParam(arg);
+        if (arg.xpay) Dslash<Float>::template instantiate<StaggeredLaunch,nDim,nColor, true>(tp, arg, stream);
+        else          Dslash<Float>::template instantiate<StaggeredLaunch,nDim,nColor,false>(tp, arg, stream);
+#endif
       }
     }
 
-    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
-  };
+  TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
+};
 
 
 //MW TODO 20181219
-// - add staggered helper class
+
 // - use instantiate cf wilspn
 #if 1
   template <typename Float, int nColor, QudaReconstructType recon_u, QudaReconstructType recon_l, bool improved>
@@ -263,7 +444,9 @@ namespace quda {
 
     DslashPolicyTune<decltype(staggered)> policy(staggered, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                               in.VolumeCB(), in.GhostFaceCB(), profile);
-    staggered.apply(0);
+    //TODO: launch policy
+    //staggered.apply(0);
+    policy.apply(0);
 
     checkCudaError();
   }
