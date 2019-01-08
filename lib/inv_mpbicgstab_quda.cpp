@@ -283,7 +283,7 @@ namespace quda {
     mat(r, x, temp);
     param.true_res = sqrt(blas::xmyNorm(b, r)/b2);
 
-    PrintSummary("MPBiCGstab", it, r2, b2);
+    PrintSummary("MPBiCGstab", it, r2, b2, stop, param.tol_hq);
 
 
 

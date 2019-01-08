@@ -50,6 +50,16 @@ namespace quda {
 #undef DD_DAG
 #define DD_DAG 1
 #include <staggered_dslash_def.h> // staggered Dslash dagger kernels
+#undef DD_DAG
+
+#define TIFR
+#define DD_DAG 0
+#include <staggered_dslash_def.h> // staggered Dslash kernels
+#undef DD_DAG
+#define DD_DAG 1
+#include <staggered_dslash_def.h> // staggered Dslash dagger kernels
+#undef DD_DAG
+#undef TIFR
 
 #undef DD_IMPROVED
 
@@ -92,6 +102,20 @@ namespace quda {
       dslashParam.a = a;
       dslashParam.a_f = a;
       dslashParam.fat_link_max = gauge.LinkMax();
+
+      if (gauge.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+#ifdef MULTI_GPU
+        strcat(aux[INTERIOR_KERNEL],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_ALL],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_X],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_Y],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_Z],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_T],",TIFR");
+#else
+        strcat(aux[INTERIOR_KERNEL],",TIFR");
+#endif // MULTI_GPU
+        strcat(aux[KERNEL_POLICY],",TIFR");
+      }
     }
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
@@ -104,7 +128,15 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       setParam();
       dslashParam.swizzle = tp.aux.x;
-      STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+      if (gauge.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+#ifdef BUILD_TIFR_INTERFACE
+        STAGGERED_DSLASH_TIFR(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+#else
+        errorQuda("TIFR interface has not been built");
+#endif
+      } else {
+        STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+      }
     }
 
     bool advanceBlockDim(TuneParam &param) const

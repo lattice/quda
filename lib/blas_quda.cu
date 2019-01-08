@@ -86,112 +86,33 @@ namespace quda {
       virtual __device__ __host__ void init() { ; }
 
       //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) = 0;
+      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) = 0;
     };
 
     /**
-       Functor to perform the operation y = a*x + b*y
+       Functor to perform the operation z = a*x + b*y
     */
     template <typename Float2, typename FloatN>
-    struct axpby_ : public BlasFunctor<Float2,FloatN> {
+    struct axpbyz_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
-      axpby_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-      { y = a.x*x + b.x*y; }
+      axpbyz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      { v = a.x*x + b.x*y; } // use v not z to ensure same precision as y
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 3; } //! flops per element
     };
 
-    void axpby(const double &a, ColorSpinorField &x, const double &b, ColorSpinorField &y) {
+    void axpbyz(double a, ColorSpinorField &x, double b,
+                ColorSpinorField &y, ColorSpinorField &z) {
       if (x.Precision() != y.Precision()) {
 	// call hacked mixed precision kernel
-	mixed::blasCuda<axpby_,0,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
-				       x, y, x, x);
+	mixed::blasCuda<axpbyz_,0,0,0,0,1>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+                                           x, y, x, x, z);
       } else {
-	blasCuda<axpby_,0,1,0,0>(make_double2(a, 0.0), make_double2(b, 0.0), make_double2(0.0, 0.0),
-				 x, y, x, x);
+	blasCuda<axpbyz_,0,0,0,0,1>(make_double2(a, 0.0), make_double2(b, 0.0), make_double2(0.0, 0.0),
+                                    x, y, x, x, z);
       }
-    }
-
-    /**
-       Functor to perform the operation y += x
-    */
-    template <typename Float2, typename FloatN>
-    struct xpy_ : public BlasFunctor<Float2,FloatN> {
-      xpy_(const Float2 &a, const Float2 &b, const Float2 &c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y += x ; }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 1; } //! flops per element
-    };
-
-    void xpy(ColorSpinorField &x, ColorSpinorField &y) {
-      if (x.Precision() != y.Precision()) {
-        mixed::blasCuda<xpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
-                                      make_double2(0.0, 0.0), x, y, x, x);
-      } else {
-        blasCuda<xpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
-                               make_double2(0.0, 0.0), x, y, x, x);
-      }
-    }
-
-    /**
-       Functor to perform the operation y += a*x
-    */
-    template <typename Float2, typename FloatN>
-    struct axpy_ : public BlasFunctor<Float2,FloatN> {
-      const Float2 a;
-      axpy_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y = a.x*x + y; }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 2; } //! flops per element
-    };
-
-    void axpy(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
-      if (x.Precision() != y.Precision()) {
-	// call hacked mixed precision kernel
-	mixed::blasCuda<axpy_,0,1,0,0>(make_double2(a,0.0), make_double2(1.0,0.0), make_double2(0.0,0.0),
-				       x, y, x, x);
-      } else {
-	blasCuda<axpy_,0,1,0,0>(make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0),
-			       x, y, x, x);
-      }
-    }
-
-    /**
-       Functor to perform the operation z = x + a*y
-    */
-    template <typename Float2, typename FloatN>
-    struct xpayz_ : public BlasFunctor<Float2,FloatN> {
-      const Float2 a;
-      xpayz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { z = x + a.x*y; }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 2; } //! flops per element
-    };
-
-    void xpay(ColorSpinorField &x, const double &a, ColorSpinorField &y) {
-      blasCuda<xpayz_,0,0,1,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, x);
-    }
-
-    void xpayz(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z) {
-      blasCuda<xpayz_,0,0,1,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x);
-    }
-
-    /**
-       Functor to perform the operation y -= x;
-    */
-    template <typename Float2, typename FloatN>
-    struct mxpy_ : public BlasFunctor<Float2,FloatN> {
-      mxpy_(const Float2 &a, const Float2 &b, const Float2 &c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y -= x; }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 1; } //! flops per element
-    };
-
-    void mxpy(ColorSpinorField &x, ColorSpinorField &y) {
-      blasCuda<mxpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
-			     make_double2(0.0, 0.0), x, y, x, x);
     }
 
     /**
@@ -201,16 +122,15 @@ namespace quda {
     struct ax_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       ax_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { x *= a.x; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { x *= a.x; }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 1; } //! flops per element
     };
 
-    void ax(const double &a, ColorSpinorField &x) {
-      blasCuda<ax_,1,0,0,0>(make_double2(a, 0.0), make_double2(0.0, 0.0),
-			   make_double2(0.0, 0.0), x, x, x, x);
+    void ax(double a, ColorSpinorField &x) {
+      blasCuda<ax_,1>(make_double2(a, 0.0), make_double2(0.0, 0.0),
+                       make_double2(0.0, 0.0), x, x, x, x, x);
     }
-
 
     /**
        Functor to perform the operation y += a * x  (complex-valued)
@@ -237,7 +157,7 @@ namespace quda {
     struct caxpy_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       caxpy_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { _caxpy(a, x, y); }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; } //! flops per element
@@ -245,11 +165,11 @@ namespace quda {
 
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y) {
       if (x.Precision() != y.Precision()) {
-        mixed::blasCuda<caxpy_,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0),
-               make_double2(0.0, 0.0), x, y, x, x);
+        mixed::blasCuda<caxpy_,0,1>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0),
+                                    make_double2(0.0, 0.0), x, y, x, x, y);
       } else {
-        blasCuda<caxpy_,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0),
-               make_double2(0.0, 0.0), x, y, x, x);
+        blasCuda<caxpy_,0,1>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0),
+                             make_double2(0.0, 0.0), x, y, x, x, y);
       }
     }
 
@@ -283,15 +203,15 @@ namespace quda {
       const Float2 a;
       const Float2 b;
       caxpby_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { _caxpby(a, x, b, y); }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 7; } //! flops per element
     };
 
     void caxpby(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y) {
-      blasCuda<caxpby_,0,1,0,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
-			       make_double2(0.0, 0.0), x, y, x, x);
+      blasCuda<caxpby_,0,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
+                            make_double2(0.0, 0.0), x, y, x, x, y);
     }
 
     /**
@@ -326,7 +246,7 @@ namespace quda {
       const Float2 a;
       const Float2 b;
       cxpaypbz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { _cxpaypbz(x, a, y, b, z); }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 8; } //! flops per element
@@ -334,8 +254,8 @@ namespace quda {
 
     void cxpaypbz(ColorSpinorField &x, const Complex &a, ColorSpinorField &y,
 		  const Complex &b, ColorSpinorField &z) {
-      blasCuda<cxpaypbz_,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
-				 make_double2(0.0, 0.0), x, y, z, z);
+      blasCuda<cxpaypbz_,0,0,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
+                                make_double2(0.0, 0.0), x, y, z, z, y);
     }
 
     /**
@@ -347,22 +267,22 @@ namespace quda {
       const Float2 b;
       const Float2 c;
       axpyBzpcx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { y += a.x*x; x = b.x*z + c.x*x; }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 5; } //! flops per element
     };
 
-    void axpyBzpcx(const double &a, ColorSpinorField& x, ColorSpinorField& y, const double &b,
-		   ColorSpinorField& z, const double &c) {
+    void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b,
+		   ColorSpinorField& z, double c) {
       if (x.Precision() != y.Precision()) {
 	// call hacked mixed precision kernel
-	mixed::blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0),
-					    make_double2(c,0.0), x, y, z, x);
+	mixed::blasCuda<axpyBzpcx_,1,1>(make_double2(a,0.0), make_double2(b,0.0),
+                                        make_double2(c,0.0), x, y, z, x, y);
       } else {
 	// swap arguments around
-	blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0),
-				     make_double2(c,0.0), x, y, z, x);
+	blasCuda<axpyBzpcx_,1,1>(make_double2(a,0.0), make_double2(b,0.0),
+                                 make_double2(c,0.0), x, y, z, x, y);
       }
     }
 
@@ -375,22 +295,22 @@ namespace quda {
       const Float2 a;
       const Float2 b;
       axpyZpbx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { y += a.x*x; x = z + b.x*x; }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 4; } //! flops per element
     };
 
-    void axpyZpbx(const double &a, ColorSpinorField& x, ColorSpinorField& y,
-		  ColorSpinorField& z, const double &b) {
+    void axpyZpbx(double a, ColorSpinorField& x, ColorSpinorField& y,
+		  ColorSpinorField& z, double b) {
       if (x.Precision() != y.Precision()) {
 	// call hacked mixed precision kernel
-	mixed::blasCuda<axpyZpbx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
-					   x, y, z, x);
+	mixed::blasCuda<axpyZpbx_,1,1>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+                                       x, y, z, x, y);
       } else {
 	// swap arguments around
-	blasCuda<axpyZpbx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
-				    x, y, z, x);
+	blasCuda<axpyZpbx_,1,1>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+                                x, y, z, x, y);
       }
     }
     
@@ -402,7 +322,7 @@ namespace quda {
       const Float2 a;
       const Float2 b;
       caxpyBzpx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { _caxpy(a, x, y); _caxpy(b, z, x); }
 
       static int streams() { return 5; } //! total number of input and output streams
@@ -411,13 +331,13 @@ namespace quda {
 
     void caxpyBzpx(const Complex &a, ColorSpinorField &x,
 		      ColorSpinorField &y, const Complex &b, ColorSpinorField &z) {
-          if (x.Precision() != y.Precision()) {
-            mixed::blasCuda<caxpyBzpx_,1,1,0,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
-				     make_double2(0.0,0.0), x, y, z, x);
-          } else {
-            blasCuda<caxpyBzpx_,1,1,0,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
-				     make_double2(0.0,0.0), x, y, z, x);
-          }
+      if (x.Precision() != y.Precision()) {
+        mixed::blasCuda<caxpyBzpx_,1,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
+                                        make_double2(0.0,0.0), x, y, z, x, y);
+      } else {
+        blasCuda<caxpyBzpx_,1,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
+                                 make_double2(0.0,0.0), x, y, z, x, y);
+      }
     }
     
     /**
@@ -428,7 +348,7 @@ namespace quda {
       const Float2 a;
       const Float2 b;
       caxpyBxpz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { _caxpy(a, x, y); _caxpy(b, x, z); }
 
       static int streams() { return 5; } //! total number of input and output streams
@@ -437,13 +357,13 @@ namespace quda {
 
     void caxpyBxpz(const Complex &a, ColorSpinorField &x,
 		      ColorSpinorField &y, const Complex &b, ColorSpinorField &z) {
-          if (x.Precision() != y.Precision()) {
-            mixed::blasCuda<caxpyBxpz_,0,1,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
-				       make_double2(0.0,0.0), x, y, z, x);
-            } else {
-              blasCuda<caxpyBxpz_,0,1,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
-				       make_double2(0.0,0.0), x, y, z, x);
-            }
+      if (x.Precision() != y.Precision()) {
+        mixed::blasCuda<caxpyBxpz_,0,1,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
+                                          make_double2(0.0,0.0), x, y, z, x, y);
+      } else {
+        blasCuda<caxpyBxpz_,0,1,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
+                                   make_double2(0.0,0.0), x, y, z, x, y);
+      }
     }
 
     /**
@@ -454,7 +374,7 @@ namespace quda {
       const Float2 a;
       const Float2 b;
       caxpbypzYmbw_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { _caxpy(a, x, z); _caxpy(b, y, z); _caxpy(-b, w, y); }
 
       static int streams() { return 6; } //! total number of input and output streams
@@ -463,8 +383,8 @@ namespace quda {
 
     void caxpbypzYmbw(const Complex &a, ColorSpinorField &x, const Complex &b,
 		      ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w) {
-      blasCuda<caxpbypzYmbw_,0,1,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
-				     make_double2(0.0,0.0), x, y, z, w);
+      blasCuda<caxpbypzYmbw_,0,1,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
+                                    make_double2(0.0,0.0), x, y, z, w, y);
     }
 
     /**
@@ -475,60 +395,16 @@ namespace quda {
       const Float2 a;
       const Float2 b;
       cabxpyAx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { x *= a.x; _caxpy(b, x, y); }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 5; } //! flops per element
     };
 
-    void cabxpyAx(const double &a, const Complex &b,
-		  ColorSpinorField &x, ColorSpinorField &y) {
+    void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y) {
       // swap arguments around
-      blasCuda<cabxpyAx_,1,1,0,0>(make_double2(a,0.0), make_double2(REAL(b),IMAG(b)),
-				  make_double2(0.0,0.0), x, y, x, x);
-    }
-
-    /**
-       Functor performing the operation z[i] = a*x[i] + b*y[i] + z[i]
-    */
-    template <typename Float2, typename FloatN>
-    struct caxpbypz_ : public BlasFunctor<Float2,FloatN> {
-      const Float2 a;
-      const Float2 b;
-      caxpbypz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-      { _caxpy(a, x, z); _caxpy(b, y, z); }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 8; } //! flops per element
-    };
-
-    void caxpbypz(const Complex &a, ColorSpinorField &x, const Complex &b,
-		  ColorSpinorField &y, ColorSpinorField &z) {
-      blasCuda<caxpbypz_,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)),
-				  make_double2(0.0,0.0), x, y, z, z);
-    }
-
-    /**
-       Functor Performing the operation w[i] = a*x[i] + b*y[i] + c*z[i] + w[i]
-    */
-    template <typename Float2, typename FloatN>
-    struct caxpbypczpw_ : public BlasFunctor<Float2,FloatN> {
-      const Float2 a;
-      const Float2 b;
-      const Float2 c;
-      caxpbypczpw_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-      { _caxpy(a, x, w); _caxpy(b, y, w); _caxpy(c, z, w); }
-
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 12; } //! flops per element
-    };
-
-    void caxpbypczpw(const Complex &a, ColorSpinorField &x, const Complex &b,
-		     ColorSpinorField &y, const Complex &c, ColorSpinorField &z,
-		     ColorSpinorField &w) {
-      blasCuda<caxpbypczpw_,0,0,0,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)),
-				     make_double2(REAL(c),IMAG(c)), x, y, z, w);
+      blasCuda<cabxpyAx_,1,1>(make_double2(a,0.0), make_double2(REAL(b),IMAG(b)),
+                              make_double2(0.0,0.0), x, y, x, x, y);
     }
 
     /**
@@ -540,7 +416,7 @@ namespace quda {
     struct caxpyxmaz_ : public BlasFunctor<Float2,FloatN> {
       Float2 a;
       caxpyxmaz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { _caxpy(a, x, y); _caxpy(-a, z, x); }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 8; } //! flops per element
@@ -548,8 +424,8 @@ namespace quda {
 
     void caxpyXmaz(const Complex &a, ColorSpinorField &x,
 		   ColorSpinorField &y, ColorSpinorField &z) {
-      blasCuda<caxpyxmaz_,1,1,0,0>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0),
-				   make_double2(0.0, 0.0), x, y, z, x);
+      blasCuda<caxpyxmaz_,1,1>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0),
+                               make_double2(0.0, 0.0), x, y, z, x, y);
     }
 
     /**
@@ -573,7 +449,7 @@ namespace quda {
 #endif
       }
 
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { _caxpy(a, x, y); _caxpy(-a, z, x); }
 
       static int streams() { return 5; } //! total number of input and output streams
@@ -587,8 +463,8 @@ namespace quda {
       if (x.Location() == QUDA_CPU_FIELD_LOCATION)
 	errorQuda("This kernel cannot be run on CPU fields");
 
-      blasCuda<caxpyxmazMR_,1,1,0,0>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0),
-				     make_double2(0.0, 0.0), x, y, z, x);
+      blasCuda<caxpyxmazMR_,1,1>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0),
+                                 make_double2(0.0, 0.0), x, y, z, x, y);
     }
 
     /**
@@ -601,21 +477,21 @@ namespace quda {
     struct tripleCGUpdate_ : public BlasFunctor<Float2,FloatN> {
       Float2 a, b;
       tripleCGUpdate_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       { y += a.x*w; z -= a.x*x; w = z + b.x*w; }
       static int streams() { return 7; } //! total number of input and output streams
       static int flops() { return 6; } //! flops per element
     };
 
-    void tripleCGUpdate(const double &a, const double &b, ColorSpinorField &x,
+    void tripleCGUpdate(double a, double b, ColorSpinorField &x,
 			ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w) {
       if (x.Precision() != y.Precision()) {
       // call hacked mixed precision kernel
 	mixed::blasCuda<tripleCGUpdate_,0,1,1,1>(make_double2(a,0.0), make_double2(b,0.0),
-						 make_double2(0.0,0.0), x, y, z, w);
+						 make_double2(0.0,0.0), x, y, z, w, y);
       } else {
 	blasCuda<tripleCGUpdate_,0,1,1,1>(make_double2(a, 0.0), make_double2(b, 0.0),
-					  make_double2(0.0, 0.0), x, y, z, w);
+					  make_double2(0.0, 0.0), x, y, z, w, y);
       }
     }
 
@@ -628,7 +504,7 @@ namespace quda {
     struct doubleCG3Init_ : public BlasFunctor<Float2,FloatN> {
       Float2 a;
       doubleCG3Init_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) {
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
         y = x;
         x += a.x*z;
       }
@@ -637,8 +513,8 @@ namespace quda {
     };
 
     void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-	blasCuda<doubleCG3Init_,1,1,0,0>(make_double2(a, 0.0), make_double2(0.0, 0.0),
-                                         make_double2(0.0, 0.0), x, y, z, z);
+      blasCuda<doubleCG3Init_,1,1,0,0>(make_double2(a, 0.0), make_double2(0.0, 0.0),
+                                       make_double2(0.0, 0.0), x, y, z, z, y);
     }
 
     /**
@@ -652,7 +528,7 @@ namespace quda {
       Float2 a, b;
       doubleCG3Update_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
       FloatN tmp{};
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) {
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
         tmp = x;
         x = b.x*(x+a.x*z) + b.y*y;
         y = tmp;
@@ -663,7 +539,7 @@ namespace quda {
 
     void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
 	blasCuda<doubleCG3Update_,1,1,0,0>(make_double2(a, 0.0), make_double2(b, 1.0-b),
-                                           make_double2(0.0, 0.0), x, y, z, z);
+                                           make_double2(0.0, 0.0), x, y, z, z, y);
     }
 
   } // namespace blas

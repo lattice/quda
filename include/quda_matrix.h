@@ -63,13 +63,17 @@ namespace quda {
   template<class T, int N>
     class Matrix
     {
-      private:
+      typedef typename RealType<T>::type real;
+
+    private:
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
       public:
         T data[N*N];
 
-	__device__ __host__ inline Matrix() {
+        __device__ __host__ constexpr int size() const { return N; }
+
+        __device__ __host__ inline Matrix() {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) zero(data[i]);
 	}
@@ -84,7 +88,7 @@ namespace quda {
 	  for (int i=0; i<N*N; i++) data[i] = data_[i];
 	}
 
-	__device__ __host__ inline Matrix(const HMatrix<typename RealType<T>::type,N> &a);
+	__device__ __host__ inline Matrix(const HMatrix<real,N> &a);
 
         __device__ __host__ inline T const & operator()(int i, int j) const {
           return data[index(i,j)];
@@ -113,18 +117,73 @@ namespace quda {
 	}
 
 	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline Matrix(const gauge_wrapper<real, S> &s);
 
 	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline void operator=(const gauge_wrapper<real, S> &s);
 
 	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<real, S> &s);
 
 	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<real, S> &s);
 
-	/**
+        /**
+           @brief Compute the matrix L1 norm - this is the maximum of
+           the absolute column sums.
+           @return Compute L1 norm
+        */
+        __device__ __host__ inline real L1() {
+          real l1 = 0;
+#pragma unroll
+          for (int j=0; j<N; j++) {
+            real col_sum = 0;
+#pragma unroll
+            for (int i=0; i<N; i++) {
+              col_sum += abs(data[i*N + j]);
+            }
+            l1 = col_sum > l1 ? col_sum : l1;
+          }
+          return l1;
+        }
+
+        /**
+           @brief Compute the matrix L2 norm.  We actually compute the
+           Frobenius norm which is an upper bound on the L2 norm.
+           @return Computed L2 norm
+        */
+        __device__ __host__ inline real L2() {
+          real l2 = 0;
+#pragma unroll
+          for (int j=0; j<N; j++) {
+#pragma unroll
+            for (int i=0; i<N; i++) {
+              l2 += norm(data[i*N + j]);
+            }
+          }
+          return sqrt(l2);
+        }
+
+        /**
+           @brief Compute the matrix Linfinity norm - this is the maximum of
+           the absolute row sums.
+           @return Computed Linfinity norm
+        */
+        __device__ __host__ inline real Linf() {
+          real linf = 0;
+#pragma unroll
+          for (int i=0; i<N; i++) {
+            real row_sum = 0;
+#pragma unroll
+            for (int j=0; j<N; j++) {
+              row_sum += abs(data[i*N + j]);
+            }
+            linf = row_sum > linf ? row_sum : linf;
+          }
+          return linf;
+        }
+
+        /**
 	   Return 64-bit XOR checksum computed from the
 	   elements of the matrix.  Compute the checksum on each
 	   64-bit word that constitutes the Matrix
@@ -508,42 +567,42 @@ namespace quda {
 
   template<class T>
     __device__  __host__ inline
-    void computeMatrixInverse(const Matrix<T,3>& u, Matrix<T,3>* uinv)
+    Matrix<T,3> inverse(const Matrix<T,3> &u)
     {
-
-      const T & det = getDeterminant(u);
-      const T & det_inv = static_cast<typename T::value_type>(1.0)/det;
+      const T det = getDeterminant(u);
+      const T det_inv = static_cast<typename T::value_type>(1.0)/det;
+      Matrix<T,3> uinv;
 
       T temp;
 
       temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
-      (*uinv)(0,0) = (det_inv*temp);
+      uinv(0,0) = (det_inv*temp);
 
       temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
-      (*uinv)(0,1) = (temp*det_inv);
+      uinv(0,1) = (temp*det_inv);
 
       temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
-      (*uinv)(0,2) = (temp*det_inv);
+      uinv(0,2) = (temp*det_inv);
 
       temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
-      (*uinv)(1,0) = (det_inv*temp);
+      uinv(1,0) = (det_inv*temp);
 
       temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
-      (*uinv)(1,1) = (temp*det_inv);
+      uinv(1,1) = (temp*det_inv);
 
       temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
-      (*uinv)(1,2) = (temp*det_inv);
+      uinv(1,2) = (temp*det_inv);
 
       temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
-      (*uinv)(2,0) = (det_inv*temp);
+      uinv(2,0) = (det_inv*temp);
 
       temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
-      (*uinv)(2,1) = (temp*det_inv);
+      uinv(2,1) = (temp*det_inv);
 
       temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
-      (*uinv)(2,2) = (temp*det_inv);
+      uinv(2,2) = (temp*det_inv);
 
-      return;
+      return uinv;
     }
 
 

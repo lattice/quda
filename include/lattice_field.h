@@ -201,14 +201,24 @@ namespace quda {
     static void *ghost_recv_buffer_d[2];
 
     /**
-       Double buffered static pinned send/recv buffers
+       Double buffered static pinned send buffers
     */
-    static void *ghost_pinned_buffer_h[2];
+    static void *ghost_pinned_send_buffer_h[2];
 
     /**
-       Mapped version of ghost_pinned
+       Double buffered static pinned recv buffers
     */
-    static void *ghost_pinned_buffer_hd[2];
+    static void *ghost_pinned_recv_buffer_h[2];
+
+    /**
+       Mapped version of pinned send buffers
+    */
+    static void *ghost_pinned_send_buffer_hd[2];
+
+    /**
+       Mapped version of pinned recv buffers
+    */
+    static void *ghost_pinned_recv_buffer_hd[2];
 
     /**
        Remove ghost pointer for sending to
@@ -250,9 +260,14 @@ namespace quda {
     */
     mutable int ghostNormOffset[QUDA_MAX_DIM][2];
 
-    /** Pinned memory buffer used for sending all messages */
+    /**
+       Pinned memory buffer used for sending all messages
+    */
     void *my_face_h[2];
-    /** Mapped version of my_face_h */
+
+    /**
+       Mapped version of my_face_h
+    */
     void *my_face_hd[2];
 
     /** Local pointers to the pinned my_face buffer */

@@ -125,9 +125,6 @@ namespace quda {
 
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
                    const char *func, const char *file, const char *line) {
-    if (getVerbosity() == QUDA_DEBUG_VERBOSE)
-      printfQuda("%s bytes = %llu\n", __func__, (long long unsigned int)count);
-
     if (count == 0) return;
 #if 1
     QudaMemCopy copy(dst, src, count, kind, false, func, file, line);
@@ -141,9 +138,6 @@ namespace quda {
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
                         const char *func, const char *file, const char *line)
   {
-    if (getVerbosity() == QUDA_DEBUG_VERBOSE)
-      printfQuda("%s bytes = %llu\n", __func__, (long long unsigned int)count);
-
     if (count == 0) return;
 
     if (kind == cudaMemcpyDeviceToDevice) {

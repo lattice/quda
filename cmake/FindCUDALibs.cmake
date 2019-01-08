@@ -183,3 +183,4 @@ if(NOT CUDA_VERSION VERSION_LESS "7.0")
 endif()
 
 find_cuda_helper_libs(cuda)
+find_cuda_helper_libs(nvToolsExt)
