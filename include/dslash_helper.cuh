@@ -305,7 +305,7 @@ namespace quda {
   }
 
   template <typename Float>
-  class Dslash : public TunableVectorY {
+  class Dslash : public TunableVectorYZ {
 
   protected:
 
@@ -456,7 +456,7 @@ namespace quda {
     DslashArg<Float> &dslashParam; // temporary addition for policy compatibility
 
     Dslash(DslashArg<Float> &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : TunableVectorY(arg.nParity), arg(arg), out(out), in(in), nDimComms(4), dslashParam(arg)
+      : TunableVectorYZ(1,arg.nParity), arg(arg), out(out), in(in), nDimComms(4), dslashParam(arg)
     {
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);

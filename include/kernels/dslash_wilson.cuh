@@ -157,7 +157,7 @@ namespace quda {
     if (x_cb >= arg.threads) return;
 
     // for full fields set parity from y thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+    int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     switch(parity) {
     case 0: wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0); break;
