@@ -47,26 +47,26 @@ namespace mixed {
       } else if (x.Precision() == QUDA_QUARTER_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
 	if (x.Nspin() == 4) {
 	  const int M = 6;
-	  blas::blasCuda<double2,char4,double2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x.Volume());
+	  blas::blasCuda<double2,char4,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
 	} else if (x.Nspin() == 1) {
 	  const int M = 3;
-	  blas::blasCuda<double2,char2,double2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x.Volume());
+	  blas::blasCuda<double2,char2,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
 	}
       } else if (x.Precision() == QUDA_QUARTER_PRECISION && y.Precision() == QUDA_SINGLE_PRECISION) {
 	if (x.Nspin() == 4) {
 	  const int M = 6;
-	  blas::blasCuda<float4,char4,float4,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x.Volume());
+	  blas::blasCuda<float4,char4,float4,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
 	} else if (x.Nspin() == 1) {
 	  const int M = 3;
-	  blas::blasCuda<float2,char2,float2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x.Volume());
+	  blas::blasCuda<float2,char2,float2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
 	}
       } else if (x.Precision() == QUDA_QUARTER_PRECISION && y.Precision() == QUDA_HALF_PRECISION) {
 	if (x.Nspin() == 4) {
 	  const int M = 6;
-	  blas::blasCuda<float4,char4,short4,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x.Volume());
+	  blas::blasCuda<float4,char4,short4,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
 	} else if (x.Nspin() == 1) {
 	  const int M = 3;
-	  blas::blasCuda<float2,char2,short2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x.Volume());
+	  blas::blasCuda<float2,char2,short2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
 	}
       } else {
 	errorQuda("Not implemented for this precision combination %d %d", x.Precision(), y.Precision());
