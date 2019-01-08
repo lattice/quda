@@ -12,7 +12,9 @@ template<int NXZ, typename doubleN, typename ReduceType,
 
   int reduce_length = siteUnroll ? x[0]->RealLength() : x[0]->Length();
 
-  if (x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
+  QudaPrecision precision = checkPrecision(*x[0],*y[0],*z[0],*w[0]);
+
+  if (precision == QUDA_DOUBLE_PRECISION) {
     if (x[0]->Nspin() == 4 || x[0]->Nspin() == 2) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
       const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
@@ -31,7 +33,7 @@ template<int NXZ, typename doubleN, typename ReduceType,
       errorQuda("blas has not been built for Nspin=%d field", x[0]->Nspin());
 #endif
     } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
-  } else if (x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+  } else if (precision == QUDA_SINGLE_PRECISION) {
     if (x[0]->Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
@@ -50,7 +52,7 @@ template<int NXZ, typename doubleN, typename ReduceType,
       errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
     } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
-  } else { // half precision
+  } else if (precision == QUDA_HALF_PRECISION) { // half precision
     if (x[0]->Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       const int M = 6;
@@ -68,6 +70,26 @@ template<int NXZ, typename doubleN, typename ReduceType,
       errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
     } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+  } else if (precision == QUDA_QUARTER_PRECISION) { // quarter precision
+    if (x[0]->Nspin() == 4) { // wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+      const int M = 6;
+      multiReduceCuda<doubleN,ReduceType,float4,char4,char4,M,NXZ,Reducer,write>
+	(result, a, b, c, x, y, z, w, x[0]->Volume());
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+    } else if(x[0]->Nspin() == 1) { // staggered
+#ifdef GPU_STAGGERED_DIRAC
+      const int M = 3;
+      multiReduceCuda<doubleN,ReduceType,float2,char2,char2,M,NXZ,Reducer,write>
+	(result, a, b, c, x, y, z, w, x[0]->Volume());
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+    } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+  } else {
+    errorQuda("Precision %d not supported\n", precision);
   }
 
   return;

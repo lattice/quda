@@ -738,7 +738,7 @@ double test(int kernel) {
     *yD = *yH;
     { double3 d = blas::cDotProductNormA(*xD, *yD);
       double3 h = blas::cDotProductNormA(*xH, *yH);
-      error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+      error = abs(Complex(d.x-h.x, d.y-h.y)) / abs(Complex(h.x, h.y)) + fabs(d.z - h.z) / fabs(h.z); }
     break;
 
   case 27:
@@ -746,7 +746,7 @@ double test(int kernel) {
     *yD = *yH;
     { double3 d = blas::cDotProductNormB(*xD, *yD);
       double3 h = blas::cDotProductNormB(*xH, *yH);
-      error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+      error = abs(Complex(d.x-h.x, d.y-h.y)) / abs(Complex(h.x, h.y)) + fabs(d.z - h.z) / fabs(h.z); }
     break;
 
   case 28:
@@ -757,8 +757,8 @@ double test(int kernel) {
     *vD = *vH;
     { double3 d = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zD, *wD, *vD);
       double3 h = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xH, b2, *yH, *zH, *wH, *vH);
-      error = ERROR(z) + ERROR(y) + fabs(d.x - h.x) / fabs(h.x) +
-	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+      error = ERROR(z) + ERROR(y) + abs(Complex(d.x-h.x, d.y-h.y)) / abs(Complex(h.x, h.y))
+        + fabs(d.z - h.z) / fabs(h.z); }
     break;
 
   case 29:
@@ -1031,7 +1031,7 @@ TEST_P(BlasTest, verify) {
   // failed without running
   double deviation = skip_kernel(prec,kernel) ? 1.0 : test(kernel); 
   // printfQuda("%-35s error = %e\n", names[kernel], deviation);
-  double tol = (prec == 3 ? 1e-10 : (prec == 2 ? 1e-5 : (prec == 1 ? 1e-3 : 1e-1 )));
+  double tol = (prec == 3 ? 1e-12 : (prec == 2 ? 1e-6 : (prec == 1 ? 1e-4 : 1e-2 )));
   tol = (kernel < 4) ? 5e-2 : tol; // use different tolerance for copy
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
