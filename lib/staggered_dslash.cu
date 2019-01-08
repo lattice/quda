@@ -55,8 +55,8 @@ namespace quda {
     }
   };
 
-
-
+#define FULL 1
+#if 0
 
   /**
      Applies the off-diagonal part of the Laplace operator
@@ -79,7 +79,7 @@ namespace quda {
     getCoords(coord, x_cb, arg.dim, parity);
     coord[4] = 0;
 
-#define FULL 1
+
 
 #if FULL
 #pragma unroll
@@ -164,6 +164,8 @@ namespace quda {
     } //nDim
 
   }
+
+#endif
 
 /**
      Applies the off-diagonal part of the Laplace operator
@@ -304,6 +306,7 @@ namespace quda {
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
   }
 
+#if 0
   //out(x) = M*in = (-D + m) * in(x-mu)
   template <typename Float, int nDim, int nColor, typename Arg>
   __device__ __host__ inline void dslashStaggered(Arg &arg, int x_cb, int parity)
@@ -338,6 +341,7 @@ namespace quda {
     } // parity
 
   }
+#endif
 
  // GPU Kernel for applying the staggered operator to a vector
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
@@ -356,6 +360,7 @@ namespace quda {
   }
 }
 
+#if 0
   // GPU Kernel for applying the Laplace operator to a vector
   template <typename Float, int nDim, int nColor, typename Arg>
   __global__ void  dslashStaggeredGPU(Arg arg)
@@ -371,6 +376,7 @@ namespace quda {
     dslashStaggered<Float,nDim,nColor>(arg, x_cb, parity);
   }
 
+#endif
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct StaggeredLaunch {
     template <typename Dslash>
@@ -411,7 +417,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-        dslashStaggeredCPU<Float,nDim,nColor>(arg);
+        // dslashStaggeredCPU<Float,nDim,nColor>(arg);
       } else {
 #if 0
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
