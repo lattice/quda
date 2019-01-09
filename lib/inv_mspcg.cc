@@ -695,7 +695,12 @@ namespace quda {
     if(inner_iterations <= 0){
       blas::copy(*z, *fr);
     }else{
-      inner_cg(*z, *fr);
+      if(dirac_param_sloppy.gauge->Precision() == dirac_param_precondition.gauge->Precision()){
+        inner_cg(*z, *fr);
+      }else{
+        inner_cg(*fz, *fr);
+        blas::copy(*z, *fz);
+      }
     }
     preconditioner_timer.Stop("woo", "hoo", 0);
 
@@ -788,15 +793,14 @@ namespace quda {
       }else{
         // z = M^-1 r
         blas::copy(*fr, *r);
-        inner_cg(*fz, *fr);
-        blas::copy(*z, *fz);
+        if(dirac_param_sloppy.gauge->Precision() == dirac_param_precondition.gauge->Precision()){
+          inner_cg(*z, *fr);
+        }else{
+          inner_cg(*fz, *fr);
+          blas::copy(*z, *fz);
+        }
       }
-      
-      // Want to have a barrier here.
-      // The reason is the inner cause some amount of desyncronization amount the MPI ranks
-      // The barrier here makes the precontioner timer contain this desync, other than 
-      // redirect it to the linear algebra timer.
-      // comm_barrier();
+     
       preconditioner_timer.Stop(fname, cname, 0);
 
       linalg_timer[1].Start(fname, cname, lname);      
@@ -854,19 +858,19 @@ namespace quda {
     printfQuda("-------- END --------\n");
     printfQuda("MSPCG CONVERGED in %05d iterations(with %02d inner_iterations each) with %03d reliable updates.\n", k, inner_iterations, num_reliable_updates);
     printfQuda("True residual/target_r2: %8.4e/%8.4e.\n", true_res, stop);
-    printfQuda("Performance precise:        %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
-      precise_tflops/precise_timer.time, precise_timer.time, precise_timer.count);
-    printfQuda("Performance sloppy:         %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
-      sloppy_tflops/sloppy_timer.time, sloppy_timer.time, sloppy_timer.count);
-    printfQuda("Performance preconditioner: %8.4f TFLOPS in %8.4f secs with %05d calls.\n", 
-      preconditioner_tflops/prec_time, prec_time, preconditioner_timer.count);
-    printfQuda("Performance copier:                         in %8.4f secs with %05d calls.\n",
+    printfQuda("Performance precise:        %8.2f TFLOPS in %8.2f secs(%02d%%) with %05d calls.\n", 
+      precise_tflops/precise_timer.time, precise_timer.time, int(precise_timer.time/param.secs*100.), precise_timer.count);
+    printfQuda("Performance sloppy:         %8.2f TFLOPS in %8.2f secs(%02d%%) with %05d calls.\n", 
+      sloppy_tflops/sloppy_timer.time, sloppy_timer.time, int(sloppy_timer.time/param.secs*100.), sloppy_timer.count);
+    printfQuda("Performance preconditioner: %8.2f TFLOPS in %8.2f secs(%02d%%) with %05d calls.\n", 
+      preconditioner_tflops/prec_time, prec_time, int(prec_time/param.secs*100.), preconditioner_timer.count);
+    printfQuda("Performance copier:                         in %8.2f secs with %05d calls.\n",
       copier_timer.time, copier_timer.count);
     for(int i = 0; i < 2; i++){
-    printfQuda("Performance linear algebra [%d]:             in %8.4f secs with %05d calls.\n",
+    printfQuda("Performance linear algebra [%d]:             in %8.2f secs with %05d calls.\n",
       i, linalg_timer[i].time, linalg_timer[i].count);
     }
-    printfQuda("Total time %8.4f secs.\n", param.secs); 
+    printfQuda("Total time %8.2f secs.\n", param.secs); 
     // printf("preconditioner desync #%03d: %8.4f msecs.\n", comm_rank(), preconditioner_timer.last*1e3);
     // printfQuda("Flops ratio sloppy/preconditioner: %.2f.\n", preconditioner_tflops/sloppy_tflops/(double)inner_iterations);
 

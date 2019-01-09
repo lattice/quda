@@ -85,7 +85,11 @@ namespace quda {
       scale(scale_), type(type_)
     {
       if(in.Nspin() != 4){
-        errorQuda("nSpin = %d not support", in.Nspin());
+        errorQuda("nSpin = %d NOT supported.\n", in.Nspin());
+      }
+      
+      if(nParity == 2){
+        errorQuda("nParity = 2 NOT supported, yet.\n");
       }
       
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
@@ -212,6 +216,8 @@ namespace quda {
   template<class storage_type, int block_dim_x, int Ls_, bool reload, class Arg, int type_>
   __global__ void fused_tensor_core(Arg arg)
   {
+    const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
+    
     static_assert( type_ != 1 || reload == false); 
     TensorCoreSharedMemory<half2> shared_memory_data;
   
@@ -321,7 +327,7 @@ namespace quda {
           apply_wilson_5d<storage_type, true,false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
         }else if(type_ == 4){
           int sid_shift = threadIdx.y*arg.volume_4d_cb_shift + s4_shift;
-          in_vec = arg.in(sid_shift, 0);
+          in_vec = arg.in(sid_shift, explicit_parity);
         }
         // store result to shared memory
         load_matrix_b_vector<N_sm/2,false>(in_vec, arg, sm_b, arg.scale); // acc(accumulation) = false
@@ -344,7 +350,7 @@ namespace quda {
           ){
             int volume_4d_cb_back = back_dim[0]*back_dim[1]*back_dim[2]*back_dim[3]>>1;
             int sid_back_shift = threadIdx.y*volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim);
-            Vector aux_in_vec = arg.x(sid_back_shift, 0);
+            Vector aux_in_vec = arg.x(sid_back_shift, explicit_parity);
             load_matrix_b_vector<N_sm/2, true>(aux_in_vec, arg, sm_b, arg.scale*arg.m_scale); // acc = true
           }
           store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid, arg.scale*arg.m_scale);
@@ -356,7 +362,7 @@ namespace quda {
       }else if(type_ == 3){
         
         if(!idle){
-          Vector aux_in_vec = arg.x(sid, 0);
+          Vector aux_in_vec = arg.x(sid, explicit_parity);
           load_matrix_b_vector<N_sm/2, true>(aux_in_vec, arg, sm_b, arg.scale*arg.m_scale);
         }
       

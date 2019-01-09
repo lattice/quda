@@ -540,6 +540,24 @@ namespace quda {
 		 ColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
+  
+// 4d Even-odd preconditioned Mobius domain wall with EOFA
+  class DiracMobiusPCEofa : public DiracMobiusPC {
+
+  protected:
+
+  private:
+    // TODO: add all the eofa parameters that don't already exist in the base classes. 
+
+  public:
+    DiracMobiusPCEofa(const DiracParam &param);
+    DiracMobiusPCEofa(const DiracMobiusPC &dirac);
+    virtual ~DiracMobiusPCEofa();
+    DiracMobiusPCEofa& operator=(const DiracMobiusPC &dirac);
+
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+  };
 
   // Full twisted mass
   class DiracTwistedMass : public DiracWilson {

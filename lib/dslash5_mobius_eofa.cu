@@ -99,11 +99,10 @@ namespace quda {
         real a;                 // real xpay coefficient
 
         int  eofa_pm;
-        real eofa_norm;
-        real eofa_shift;
+        real eofa_norm; // k in Grid impl. (A12)
+        real eofa_shift; // \beta in (B16)
 
-        real eofa_m_numerator;
-        real eofa_m_denominator;
+        real mq1, mq2, mq3;
 
         Dslash5Type type;
 
