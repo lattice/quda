@@ -1264,9 +1264,9 @@ namespace quda {
 					const int out_stride, const float2 *in,
 					const float *inNorm, const int in_idx,
 					const PackParam<float2> &param) {
-    out[out_idx + 0*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx + 0*param.sp_stride);
-    out[out_idx + 1*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx + 1*param.sp_stride);
-    out[out_idx + 2*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx + 2*param.sp_stride);
+    out[out_idx + 0*out_stride] = tex1Dfetch<float2>(SPINORTEXSINGLE, in_idx + 0*param.sp_stride);
+    out[out_idx + 1*out_stride] = tex1Dfetch<float2>(SPINORTEXSINGLE, in_idx + 1*param.sp_stride);
+    out[out_idx + 2*out_stride] = tex1Dfetch<float2>(SPINORTEXSINGLE, in_idx + 2*param.sp_stride);
   }
 
   // this is rather dumb: undoing the texture load because cudaNormalizedReadMode is used
@@ -1283,20 +1283,20 @@ namespace quda {
 					const int out_stride, const short2 *in,
 					const float *inNorm, const int in_idx,
 					const PackParam<short2> &param) {
-    out[out_idx + 0*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+0*param.sp_stride));
-    out[out_idx + 1*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+1*param.sp_stride));
-    out[out_idx + 2*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+2*param.sp_stride));
-    outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXHALFNORM, in_idx);
+    out[out_idx + 0*out_stride] = float22short2(1.0f,tex1Dfetch<float2>(SPINORTEXHALF,in_idx+0*param.sp_stride));
+    out[out_idx + 1*out_stride] = float22short2(1.0f,tex1Dfetch<float2>(SPINORTEXHALF,in_idx+1*param.sp_stride));
+    out[out_idx + 2*out_stride] = float22short2(1.0f,tex1Dfetch<float2>(SPINORTEXHALF,in_idx+2*param.sp_stride));
+    outNorm[out_idx] = tex1Dfetch<float>(SPINORTEXHALFNORM, in_idx);
   }
 
   __device__ void packFaceStaggeredCore(char2 *out, float *outNorm, const int out_idx, 
           const int out_stride, const char2 *in, 
           const float *inNorm, const int in_idx, 
           const PackParam<char2> &param) {
-    out[out_idx + 0*out_stride] = float22char2(1.0f,TEX1DFETCH(float2,SPINORTEXQUARTER,in_idx+0*param.sp_stride));
-    out[out_idx + 1*out_stride] = float22char2(1.0f,TEX1DFETCH(float2,SPINORTEXQUARTER,in_idx+1*param.sp_stride));
-    out[out_idx + 2*out_stride] = float22char2(1.0f,TEX1DFETCH(float2,SPINORTEXQUARTER,in_idx+2*param.sp_stride));
-    outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXQUARTERNORM, in_idx);
+    out[out_idx + 0*out_stride] = float22char2(1.0f,tex1Dfetch<float2>(SPINORTEXQUARTER,in_idx+0*param.sp_stride));
+    out[out_idx + 1*out_stride] = float22char2(1.0f,tex1Dfetch<float2>(SPINORTEXQUARTER,in_idx+1*param.sp_stride));
+    out[out_idx + 2*out_stride] = float22char2(1.0f,tex1Dfetch<float2>(SPINORTEXQUARTER,in_idx+2*param.sp_stride));
+    outNorm[out_idx] = tex1Dfetch<float>(SPINORTEXQUARTERNORM, in_idx);
   }
 #endif
 

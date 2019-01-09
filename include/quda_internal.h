@@ -30,17 +30,6 @@
 #include <malloc_quda.h>
 #include <object.h>
 
-// Use bindless texture on Kepler
-#if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300)
-#define USE_TEXTURE_OBJECTS
-#endif
-
-// if not using texture objects then we need to disable multi-blas support since these don't work with texture references
-#ifndef USE_TEXTURE_OBJECTS
-#undef MAX_MULTI_BLAS_N
-#define MAX_MULTI_BLAS_N 1
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
