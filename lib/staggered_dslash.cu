@@ -48,7 +48,7 @@ namespace quda {
     static constexpr bool improved = improved_;
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
         Float a, const ColorSpinorField &x, int parity, bool dagger,  const int *comm_override)
-      : DslashArg<Float>(in, U, 0.0, parity, dagger, a == 0.0 ? false : true, comm_override), out(out), in(in), U(U), L(L), x(x), a(a) 
+      : DslashArg<Float>(in, U, 0.0, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, comm_override), out(out), in(in), U(U), L(L), x(x), a(a) 
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -173,8 +173,8 @@ namespace quda {
     using real = typename mapper<Float>::type;
     using Vector = ColorSpinor<real,nColor,1>;
 
-    bool active = true;//kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-    int thread_dim=0;//TODO // which dimension is thread working on (fused kernel only)
+    bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+    int thread_dim; // which dimension is thread working on (fused kernel only)
     int coord[nDim];
     int x_cb = getCoords<nDim,QUDA_4D_PC,kernel_type>(coord, arg, idx, parity, thread_dim);
     // coord[4] = 0;
@@ -276,10 +276,6 @@ namespace quda {
 };
 
 
-//MW TODO 20181219
-
-// - use instantiate cf wilspn
-#if 1
   template <typename Float, int nColor, QudaReconstructType recon_u, QudaReconstructType recon_l, bool improved>
   void ApplyDslashStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
                             double a, const ColorSpinorField &x, int parity, bool dagger,
@@ -297,8 +293,6 @@ namespace quda {
 
     checkCudaError();
   }
-
-#endif
 
   // template on the gauge reconstruction
   template <typename Float, int nColor>

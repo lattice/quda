@@ -95,6 +95,8 @@ namespace quda {
   template <int nDim, QudaDWFPCType pc_type, KernelType kernel_type, typename Arg>
   __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity, int &dim) {
 
+    
+    constexpr int nface_=1;
     int x_cb, X;
     dim = kernel_type; // keep compiler happy
     if (kernel_type == INTERIOR_KERNEL) {
@@ -105,7 +107,7 @@ namespace quda {
       // compute face index and then compute coords
       const int face_num = idx >= arg.dc.ghostFaceCB[kernel_type];
       idx -= face_num*arg.dc.ghostFaceCB[kernel_type];
-      coordsFromFaceIndex<nDim,pc_type,kernel_type,1>(X, x_cb, coord, idx, face_num, parity, arg);
+      coordsFromFaceIndex<nDim,pc_type,kernel_type,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
 
     } else { // fused kernel
 
@@ -114,25 +116,25 @@ namespace quda {
         dim = 0;
         const int face_num = idx >= arg.dc.ghostFaceCB[0];
         idx -= face_num*arg.dc.ghostFaceCB[0];
-        coordsFromFaceIndex<nDim,pc_type,0,1>(X, x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim,pc_type,0,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[1]) { // y face
         dim = 1;
         idx -= arg.threadDimMapLower[1];
         const int face_num = idx >= arg.dc.ghostFaceCB[1];
         idx -= face_num*arg.dc.ghostFaceCB[1];
-        coordsFromFaceIndex<nDim,pc_type,1,1>(X, x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim,pc_type,1,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[2]){ // z face
         dim = 2;
         idx -= arg.threadDimMapLower[2];
         const int face_num = idx >= arg.dc.ghostFaceCB[2];
         idx -= face_num*arg.dc.ghostFaceCB[2];
-        coordsFromFaceIndex<nDim,pc_type,2,1>(X, x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim,pc_type,2,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       } else { // t face
         dim = 3;
         idx -= arg.threadDimMapLower[3];
         const int face_num = idx >= arg.dc.ghostFaceCB[3];
         idx -= face_num*arg.dc.ghostFaceCB[3];
-        coordsFromFaceIndex<nDim,pc_type,3,1>(X, x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim,pc_type,3,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       }
 
     }
@@ -259,8 +261,8 @@ namespace quda {
 
 
 // constructor needed for staggered to set xpay from derived class
-   DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, bool xpay, const int *comm_override)
-      : parity(parity), nParity(in.SiteSubset()), nFace(1), reconstruct(U.Reconstruct()),
+   DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, bool xpay, int nFace, const int *comm_override)
+      : parity(parity), nParity(in.SiteSubset()), nFace(nFace), reconstruct(U.Reconstruct()),
         X0h(nParity == 2 ? in.X(0)/2 : in.X(0)), dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
         volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(xpay),
         kernel_type(INTERIOR_KERNEL), threads(in.VolumeCB()), threadDimMapLower{ }, threadDimMapUpper{ },
@@ -280,7 +282,7 @@ namespace quda {
     }
 
     DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
-      : DslashArg(in, U, kappa, parity, dagger, kappa == 0.0 ? false : true, comm_override)
+      : DslashArg(in, U, kappa, parity, dagger, kappa == 0.0 ? false : true, 1, comm_override)
       {
       };
 
