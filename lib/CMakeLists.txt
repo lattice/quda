@@ -51,8 +51,8 @@ set (QUDA_OBJS
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
-  extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
-  ritz_quda.cpp eig_solver.cpp blas_cublas.cu blas_magma.cu
+  extended_color_spinor_utilities.cu eigensolve_quda.cpp
+  blas_cublas.cu blas_magma.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu

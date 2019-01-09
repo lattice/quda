@@ -16,9 +16,9 @@
 #include <ritz_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
-#include <lanczos_quda.h>
+#include <eigensolve_quda.h>
 #include <color_spinor_field.h>
-#include <eig_variables.h>
+//#include <eig_variables.h>
 #include <clover_field.h>
 #include <llfat_quda.h>
 #include <unitarization_links.h>
@@ -186,6 +186,9 @@ static TimeProfile profileInvert("invertQuda");
 
 //!< Profiler for invertMultiShiftQuda
 static TimeProfile profileMulti("invertMultiShiftQuda");
+
+//!< Profiler for eigensolveQuda
+static TimeProfile profileEigensolve("eigensolveQuda");
 
 //!< Profiler for computeFatLinkQuda
 static TimeProfile profileFatLink("computeKSLinkQuda");
@@ -2310,7 +2313,54 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
+void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param) {
 
+  //Transfer the inv param structure
+  QudaInvertParam *inv_param;
+  inv_param = eig_param->invert_param;
+  
+  profilerStart(__func__);
+  
+  profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
+  
+  if (!initialized) errorQuda("QUDA not initialized");
+  
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printQudaInvertParam(inv_param);
+    printQudaEigParam(eig_param);
+  }
+
+  bool pc_solve =
+    (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  
+  checkInvertParam(inv_param);
+  checkEigParam(eig_param);
+  cudaGaugeField *cudaGauge = checkGauge(inv_param);
+  
+  //Define problem matrix
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc_solve);
+  
+  //Construct operator.
+  Dirac *mat = Dirac::create(diracParam);
+  
+  //For QUDA data type eigenvectors
+  ColorSpinorParam cpuParam(&host_evecs, *inv_param, cudaGauge->X(),
+			    inv_param->solution_type);
+  
+  lanczosSolve(host_evecs, host_evals, *mat, eig_param, &cpuParam);
+  //irlmSolve(host_evecs, host_evals, *mat, eig_param, &cpuParam);
+  
+  profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
+  profilerStop(__func__);
+
+}
+
+
+/*
 void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
                  void *hp_alpha, void *hp_beta, QudaEigParam *eig_param)
 {
@@ -2463,6 +2513,9 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
   saveTuneCache();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+*/
+
+
 
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
   : profile(profile) {

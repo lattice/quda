@@ -343,30 +343,56 @@ extern "C" {
   } QudaInvertParam;
 
 
-  // Parameter set for solving the eigenvalue problems.
-  // Eigen problems are tightly related with Ritz algorithm.
-  // And the Lanczos algorithm use the Ritz operator.
-  // For Ritz matrix operation,
-  // we need to know about the solution type of dirac operator.
-  // For acceleration, we are also using chevisov polynomial method.
-  // And nk, np values are needed Implicit Restart Lanczos method
-  // which is optimized form of Lanczos algorithm
+  // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
 
+    /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
-//specific for Lanczos method:
-    QudaSolutionType  RitzMat_lanczos;
-    QudaSolutionType  RitzMat_Convcheck;
+
+    /** Type of eigensolver algorithm to employ **/
     QudaEigType eig_type;
 
-    double *MatPoly_param;
-    int NPoly;
-    double Stp_residual;
+    /** Use Polynomial Acceleration **/
+    QudaBoolean use_poly_acc;
+
+    /** Degree of the Chebysev polynomial **/
+    int poly_deg;
+
+    /** Range used in polynomial acceleration **/
+    double a_min;    
+    double a_max;
+
+    /** What type of Dirac operator we are using **/
+    /** If !(use_norm_op && use_dagger) use M. **/
+    /** If use_dagger == true, use Mdag  instead of M. **/
+    /** If use_norm_op == true, use MdagM instead of M. **/
+    /** If use_norm_op && use_dagger use MMdag. **/    
+    QudaBoolean use_dagger;
+    QudaBoolean use_norm_op;
+
+    /** Performs an MdagM solve, then constructs the left and right SVD. **/
+    QudaBoolean compute_svd;
+
+    /** Which part of the spectrum to solve **/
+    QudaEigSpectrumType spectrum;
+    
+    /** Tolerance on the least well known eigenvalue's residual **/
+    double tol;
+
+    //EIGENSOLVER PARAMS
+    //-------------------------------------------------
+    /** Number of the eigenvectors requested **/
+    int nEv;
+    /** Total size of Krylov space **/
+    int nKr;         
+    //-------------------------------------------------
+    
+    //EIG-CG PARAMS
+    //-------------------------------------------------
     int nk;
-    int np;
-    int f_size;
-    double eigen_shift;
-//more general stuff:
+    int np;         
+    //-------------------------------------------------
+    
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
 
@@ -388,10 +414,10 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 
-    /** The Gflops rate of the multigrid solver setup */
+    /** The Gflops rate of the eigensolver setup */
     double gflops;
 
-    /**< The time taken by the multigrid solver setup */
+    /**< The time taken by the eigensolver setup */
     double secs;
 
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
@@ -399,6 +425,54 @@ extern "C" {
 
   } QudaEigParam;
 
+#if 0
+  // Parameter set for using the ARPACK interface.    
+  typedef struct QudaArpackParam_s {
+
+    /** Specifies the problem type to be solved by Arpack **/
+    int arpackMode;
+    
+    /** Number of the eigenvectors requested **/
+    int nEv;
+
+    /** Total size of Krylov space **/
+    int nKv;         
+
+    /** Which part of the spectrum to solve **/
+    QudaArpackSpectrumType spectrum;
+    
+    /** Use Polynomial Acceleration **/
+    QudaBoolean usePolyAcc;
+
+    /** degree of the Chebysev polynomial **/
+    int polyDeg;
+
+    /** Range used in polynomial acceleration **/
+    double amin;    
+    double amax;
+    
+    /** Tolerance on the least well known eigenvalue **/
+    double arpackTol;
+
+    /** Maximum allowed iteration in the Arpack solver **/
+    int arpackMaxiter;
+
+    /** Name of the logfile to store Arpack's stdout **/    
+    char arpackLogfile[512];
+
+    /** Precision to be used in Arpack **/    
+    QudaPrecision arpackPrec;
+     
+    /** What type of Dirac operator we are using **/
+    /** If !(useNormOp && useDagger) use M. **/
+    /** If useDagger == true, use Mdag  instead of M. **/
+    /** If useNormOp == true, use MdagM instead of M. **/
+    /** If useNormOp && useDagger use MMdag. **/    
+    QudaBoolean useDagger;
+    QudaBoolean useNormOp;    
+
+  } QudaArpackParam;
+#endif
 
   typedef struct QudaMultigridParam_s {
 
@@ -753,6 +827,17 @@ extern "C" {
                    void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
 
   /**
+   * Perform the eigensolve. The problem matrix is defined by the invert param, the 
+   * mode of solution is specified by the eig param. It is assumed that the gauge
+   * field has already been loaded via
+   * loadGaugeQuda().
+   * @param h_els  Host side eigenvalues
+   * @param h_evs  Host side eigenvectors
+   * @param param  Contains all metadata regarding the type of solve.
+   */
+  void eigensolveQuda(void *h_els, void *h_evs, QudaEigParam *param);
+  
+  /**
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
    * loadGaugeQuda().
@@ -760,9 +845,9 @@ extern "C" {
    * @param h_b    Source spinor field
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
-   */
+   */  
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
-
+  
   /**
    * Perform the solve like @invertQuda but for multiples right hand sides.
    *
@@ -773,7 +858,6 @@ extern "C" {
    *               storage and solver parameters
    */
   void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
-
 
   /**
    * Solve for multiple shifts (e.g., masses).

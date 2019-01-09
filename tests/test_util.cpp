@@ -1738,6 +1738,20 @@ QudaExtLibType deflation_ext_lib  = QUDA_EIGEN_EXTLIB;
 QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
+int eig_nEv = 10;
+int eig_nKr = 20;
+double eig_tol = 1e-4;
+int eig_maxiter = 10000;
+bool eig_use_poly_acc = false;
+int eig_poly_deg = 15;
+double eig_amin = 0.0;
+double eig_amax = 4;
+bool eig_use_normop = false;
+bool eig_use_dagger = false;
+bool eig_compute_svd = false;
+QudaEigSpectrumType eig_spectrum = QUDA_LR_EIG_SPECTRUM;
+QudaEigType eig_type = QUDA_LANCZOS;
+
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
 int heatbath_num_steps = 10;
@@ -1865,6 +1879,23 @@ void usage(char** argv )
   printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory location)\n");
   printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory type for the ritz vectors  (default device memory type)\n");
 
+
+  //DMH new stuff
+  
+  printf("    --eig-nEv <n>                             # The number of eigenmodes requested from the eigensolver\n");
+  printf("    --eig-nKr <n>                             # The size of the Krylov subspace to use in the eigensolver\n");
+  printf("    --eig-tol <tol>                           # The tolerance to use in the eigensolver\n");
+  printf("    --eig-maxiter <n>                         # The maximum iterations to use in the eigensolver\n");
+  printf("    --eig-use-poly-acc <true/false>           # Use Chebyshev polynomial acceleration in the eigensolver\n");
+  printf("    --eig-poly-deg <n>                        # Set the degree of the Chebyshev polynomial acceleration in the eigensolver\n");
+  printf("    --eig-amin <Float>                        # The minimum in the polynomial acceleration\n");
+  printf("    --eig-amax <Float>                        # The maximum in the polynomial acceleration\n");
+  printf("    --eig-use-normop <true/false>             # Solve the MdagM problem instead of M (MMdag if eig-useDagger == true) (default false)\n");
+  printf("    --eig-use-dagger <true/false>             # Solve the Mdag  problem instead of M (MMdag if eig-useNormOp == true) (default false)\n");
+  printf("    --eig-compute-svd <true/false>            # Solve the MdagM problem, use to compute SVD of M (default false)\n");
+  printf("    --eig-spectrum <SR/LR/SM/LM/SI/LI>        # The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary\n");
+  printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (lanczos, iram, ...)\n");
+  
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
 
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
@@ -3322,6 +3353,173 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--eig-nEv") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_nEv = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-nKr") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_nKr = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-tol") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-maxiter") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_maxiter = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--eig-use-poly-acc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      eig_use_poly_acc = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      eig_use_poly_acc = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for use-poly-acc (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-poly-deg") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_poly_deg = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-amin") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_amin = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--eig-amax") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_amax = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-use-normop") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      eig_use_normop = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      eig_use_normop = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for eig-use-normop (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+    
+  if( strcmp(argv[i], "--eig-use-dagger") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      eig_use_dagger = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      eig_use_dagger = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for eig-use-dagger (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+    if( strcmp(argv[i], "--eig-compute-svd") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      eig_compute_svd = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      eig_compute_svd = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-spectrum") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    eig_spectrum = get_eig_spectrum_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    eig_type = get_eig_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);

@@ -47,6 +47,12 @@ extern "C" {
   QudaInverterType get_solver_type(char* s);
   const char* get_solver_str(QudaInverterType type);
 
+  QudaEigSpectrumType get_eig_spectrum_type(char* spec);
+  const char* get_eig_spectrum_str(QudaEigSpectrumType type);
+
+  QudaEigType get_eig_type(char* s);
+  const char* get_eig_type_str(QudaEigSpectrumType type);
+  
   const char* get_quda_ver_str();
 
   QudaExtLibType get_solve_ext_lib_type(char* s);

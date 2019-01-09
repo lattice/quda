@@ -13,17 +13,19 @@
 
 #include <iostream>
 
+
+#if 0
 namespace quda {
 
   Lanczos::Lanczos(RitzMat &ritz_mat, QudaEigParam &eigParam, TimeProfile &profile) :
     Eig_Solver(eigParam, profile), ritz_mat(ritz_mat)
   {
-
+    
   }
-
+  
   Lanczos::~Lanczos() 
   {
-
+    
   }
 
   void Lanczos::operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m) 
@@ -105,3 +107,4 @@ namespace quda {
 #endif
 
 } // namespace quda
+#endif

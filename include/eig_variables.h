@@ -9,6 +9,8 @@
 
 #include <lattice_field.h>
 
+#if 0
+
 namespace quda {
   typedef std::complex<double> Complex;
 
@@ -24,10 +26,10 @@ namespace quda {
     void *v; // pointer to eigen-value set
 
 
-    EigParam()
+  EigParam()
       : nk(0), np(0), f_size(0), precision(QUDA_INVALID_PRECISION), CSPparam(0), 
-        create(QUDA_INVALID_FIELD_CREATE), v(0)
-    {}
+      create(QUDA_INVALID_FIELD_CREATE), v(0)
+      {}
 
 
     // used to create cpu params
@@ -85,5 +87,6 @@ namespace quda {
   };
 
 } // namespace quda
+#endif
 
 #endif // _EIG_VARIABLES_H

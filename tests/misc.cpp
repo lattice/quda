@@ -959,6 +959,115 @@ get_dslash_str(QudaDslashType type)
     
 }
 
+QudaEigSpectrumType get_eig_spectrum_type(char* s) {
+
+  QudaEigSpectrumType ret =  QUDA_INVALID_EIG_SPECTRUM;
+  
+  if (strcmp(s, "SR") == 0){
+    ret = QUDA_SR_EIG_SPECTRUM;
+  }else if (strcmp(s, "LR") == 0){
+    ret = QUDA_LR_EIG_SPECTRUM;
+  }else if (strcmp(s, "SM") == 0){
+    ret = QUDA_SM_EIG_SPECTRUM;
+  }else if (strcmp(s, "LM") == 0){
+    ret = QUDA_LM_EIG_SPECTRUM;
+  }else if (strcmp(s, "SI") == 0){
+    ret = QUDA_SI_EIG_SPECTRUM;
+  }else if (strcmp(s, "LI") == 0){
+    ret = QUDA_LI_EIG_SPECTRUM;
+  }else{
+    fprintf(stderr, "Error: invalid eigen spectrum type\n");	
+    exit(1);
+  }
+  
+  return ret;
+}
+
+const char* get_eig_spectrum_str(QudaEigSpectrumType type)
+{  
+  const char* ret;
+  
+  switch(type){	
+  case QUDA_SR_EIG_SPECTRUM:
+    ret=  "SR";
+    break;
+  case QUDA_LR_EIG_SPECTRUM:
+    ret=  "LR";
+    break;
+  case QUDA_SM_EIG_SPECTRUM:
+    ret=  "SM";
+    break;
+  case QUDA_LM_EIG_SPECTRUM:
+    ret=  "LM";
+    break;
+  case QUDA_SI_EIG_SPECTRUM:
+    ret=  "SI";
+    break;
+  case QUDA_LI_EIG_SPECTRUM:
+    ret=  "LI";
+    break;
+  default:
+    ret = "unknown eigenspectrum";	
+    break;
+  }
+  
+  return ret;
+    
+}
+
+QudaEigType get_eig_type(char* s) {
+
+  QudaEigType ret =  QUDA_INVALID_EIG_TYPE;
+  
+  if (strcmp(s, "lanczos") == 0){
+    ret = QUDA_LANCZOS;
+  }else if (strcmp(s, "irlm") == 0){
+    ret = QUDA_IMP_RST_LANCZOS;
+  }else if (strcmp(s, "trlm") == 0){
+    ret = QUDA_THICK_RST_LANCZOS;
+  }else if (strcmp(s, "arnoldi") == 0){
+    ret = QUDA_ARNOLDI;
+  }else if (strcmp(s, "iram") == 0){
+    ret = QUDA_IMP_RST_ARNOLDI;
+  }else{
+    fprintf(stderr, "Error: invalid quda eigensolver type\n");	
+    exit(1);
+  }
+  
+  return ret;
+}
+
+const char* get_eig_type_str(QudaEigSpectrumType type)
+{  
+  const char* ret;
+  
+  switch(type){	
+  case QUDA_LANCZOS:
+    ret=  "lanczos";
+    break;
+  case QUDA_IMP_RST_LANCZOS:
+    ret=  "irlm";
+    break;
+  case QUDA_THICK_RST_LANCZOS:
+    ret=  "trlm";
+    break;
+  case QUDA_ARNOLDI:
+    ret=  "arnoldi";
+    break;
+  case QUDA_IMP_RST_ARNOLDI:
+    ret=  "iram";
+    break;
+  default:
+    ret = "unknown eigensolver";	
+    break;
+  }
+  
+  return ret;
+    
+}
+
+
+
 QudaMassNormalization
 get_mass_normalization_type(char* s)
 {
