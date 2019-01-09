@@ -598,6 +598,7 @@ extern "C" {
    * @param precision       The precision of the fields
    * @param num_terms The number of quark fields
    * @param num_naik_terms The number of naik contributions
+   * @param dt Integrating step size
    * @param coeff The coefficients multiplying the fermion fields in the outer product
    * @param quark_field The input fermion field.
    * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
@@ -610,6 +611,7 @@ extern "C" {
   void qudaHisqForce(int precision,
                      int num_terms,
                      int num_naik_terms,
+                     double dt,
                      double** coeff,
                      void** quark_field,
 		     const double level2_coeff[6],

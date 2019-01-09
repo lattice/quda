@@ -819,7 +819,7 @@ namespace quda {
 
     } // hisqStaplesForce
 
-    void hisqStaplesForce(GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link, const double path_coeff_array[6], long long* flops)
+    void hisqStaplesForce(GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link, const double path_coeff_array[6])
     {
       if (!link.isNative()) errorQuda("Unsupported gauge order %d", link.Order());
       if (!oprod.isNative()) errorQuda("Unsupported gauge order %d", oprod.Order());
@@ -852,27 +852,18 @@ namespace quda {
 
       cudaDeviceSynchronize();
       checkCudaError();
-
-      if (flops) {
-        int volume = 1;
-        for (int d=0; d<4; d++) volume += link.X()[d]-2*link.R()[d]; // compute physical volume for useful flops
-        // Middle Link, side link, short side link, AllLink, OneLink
-        *flops += (long long)volume*(134784 + 24192 + 103680 + 864 + 397440 + 72 + (path_coeff_array[5] != 0 ? 28944 : 0));
-      }
-
     }
 
     template <typename real, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
     struct CompleteForceArg : public BaseForceArg<real,reconstruct> {
 
-      typedef typename gauge::FloatNOrder<real,18,2,11> M;
       typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
-      M outA;
-      const F oProd;
+      F outA;        // force output accessor
+      const F oProd; // force input accessor
       const real coeff;
 
-      CompleteForceArg(GaugeField &force, const GaugeField &link, const GaugeField &oprod)
-        : BaseForceArg<real,reconstruct>(link, 0), outA(force), oProd(oprod), coeff(0.0)
+      CompleteForceArg(GaugeField &force, const GaugeField &link)
+        : BaseForceArg<real,reconstruct>(link, 0), outA(force), oProd(force), coeff(0.0)
       { }
 
     };
@@ -901,7 +892,7 @@ namespace quda {
         makeAntiHerm(Ow);
 
         real coeff = (parity==1) ? -1.0 : 1.0;
-        arg.outA(sig, x_cb, parity) = coeff*Ow;
+        arg.outA(sig, e_cb, parity) = coeff*Ow;
       }
     }
 
@@ -1028,16 +1019,18 @@ namespace quda {
 
       void preTune() {
         switch (type) {
-        case FORCE_LONG_LINK: arg.outA.save(); break;
-        case FORCE_COMPLETE: break;          
+        case FORCE_LONG_LINK:
+        case FORCE_COMPLETE:
+          arg.outA.save(); break;
         default: errorQuda("Undefined force type %d", type);
         }
       }
 
       void postTune() {
         switch (type) {
-        case FORCE_LONG_LINK: arg.outA.load(); break;
-        case FORCE_COMPLETE: break;
+        case FORCE_LONG_LINK:
+        case FORCE_COMPLETE:
+          arg.outA.load(); break;
         default: errorQuda("Undefined force type %d", type);
         }
       }
@@ -1061,7 +1054,7 @@ namespace quda {
       }
     };
 
-    void hisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff, long long* flops)
+    void hisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
     {
       if (!link.isNative()) errorQuda("Unsupported gauge order %d", link.Order());
       if (!oldOprod.isNative()) errorQuda("Unsupported gauge order %d", oldOprod.Order());
@@ -1075,7 +1068,6 @@ namespace quda {
           Arg arg(newOprod, link, oldOprod, coeff);
           HisqForce<double,Arg> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
           longLink.apply(0);
-          if (flops) (*flops) += longLink.flops();
         } else {
           errorQuda("Reconstruct %d not supported", link.Reconstruct());
         }
@@ -1085,7 +1077,6 @@ namespace quda {
           Arg arg(newOprod, link, oldOprod, coeff);
           HisqForce<float, Arg> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
           longLink.apply(0);
-          if (flops) (*flops) += longLink.flops();
         } else {
           errorQuda("Reconstruct %d not supported", link.Reconstruct());
         }
@@ -1096,31 +1087,28 @@ namespace quda {
       cudaDeviceSynchronize();
     }
 
-    void hisqCompleteForce(GaugeField &force, const GaugeField &oprod, const GaugeField &link, long long* flops)
+    void hisqCompleteForce(GaugeField &force, const GaugeField &link)
     {
       if (!link.isNative()) errorQuda("Unsupported gauge order %d", link.Order());
-      if (!oprod.isNative()) errorQuda("Unsupported gauge order %d", oprod.Order());
       if (!force.isNative()) errorQuda("Unsupported gauge order %d", force.Order());
-      if (checkLocation(force,oprod,link) == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU not implemented");
+      if (checkLocation(force,link) == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU not implemented");
 
-      QudaPrecision precision = checkPrecision(oprod, link, force);
+      QudaPrecision precision = checkPrecision(link, force);
       if (precision == QUDA_DOUBLE_PRECISION) {
         if (link.Reconstruct() == QUDA_RECONSTRUCT_NO) {
           typedef CompleteForceArg<double,QUDA_RECONSTRUCT_NO> Arg;
-          Arg arg(force, link, oprod);
+          Arg arg(force, link);
           HisqForce<double,Arg> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
           completeForce.apply(0);
-          if (flops) *flops += completeForce.flops();
         } else {
           errorQuda("Reconstruct %d not supported", link.Reconstruct());
         }
       } else if (precision == QUDA_SINGLE_PRECISION) {
         if (link.Reconstruct() == QUDA_RECONSTRUCT_NO) {
           typedef CompleteForceArg<float,QUDA_RECONSTRUCT_NO> Arg;
-          Arg arg(force, link, oprod);
+          Arg arg(force, link);
           HisqForce<float, Arg> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
           completeForce.apply(0);
-          if (flops) *flops += completeForce.flops();
         } else {
           errorQuda("Reconstruct %d not supported", link.Reconstruct());
         }

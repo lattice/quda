@@ -102,11 +102,6 @@ namespace quda {
     size_t ghost_length = ghostVolume*nColor*nSpin*2;
     size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ? ghostNormVolume : 0;
 
-    if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-      printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
-      printfQuda("ghost length = %lu, ghost norm length = %lu\n", ghost_length, ghost_norm_length);
-    }
-
     ghost_bytes = (size_t)ghost_length*ghost_precision;
     if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
@@ -397,12 +392,6 @@ namespace quda {
     }
 
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
-
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("\nPrinting out reset field\n");
-      std::cout << *this << std::endl;
-      printfQuda("\n");
-    }
 
     setTuningString();
   }

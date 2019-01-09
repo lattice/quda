@@ -1332,7 +1332,7 @@ namespace quda {
     dim[0] *= (nParity == 1) ? 2 : 1; // need to full dimensions
     exDim[0] *= (nParity == 1) ? 2 : 1; // need to full dimensions
 
-    offset = (exVolumeCB*Ns*Nc*2) / 2; // compute manually since Bytes is likely wrong due to z-padding
+    offset = exVolumeCB*Ns*Nc*2; // compute manually since Bytes is likely wrong due to z-padding
   }
   virtual ~PaddedSpaceSpinorColorOrder() { ; }
 

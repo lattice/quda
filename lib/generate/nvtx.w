@@ -24,6 +24,8 @@ MPI_Sendrecv MPI_Barrier MPI_Start MPI_Test MPI_Send_init MPI_Recv_init }}
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "{{name}}";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   {{callfn}}

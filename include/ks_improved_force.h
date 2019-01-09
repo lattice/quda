@@ -13,13 +13,11 @@ namespace quda {
        @param[in] oprod The previously computed input force
        @param[in] link Thin-link gauge field
        @param[in] path_coeff Coefficients of the contributions to the operator
-       @param[out] flops number of flops performed
     */
     void hisqStaplesForce(GaugeField &newOprod,
                           const GaugeField& oprod,
                           const GaugeField& link,
-                          const double path_coeff[6],
-                          long long* flops = nullptr);
+                          const double path_coeff[6]);
 
     /**
        @brief Compute the long-link contribution to the fermion force
@@ -27,26 +25,21 @@ namespace quda {
        @param[in] oprod The previously computed input force
        @param[in] link Thin-link gauge field
        @param[in] coeff Long-link Coefficient
-       @param[out] flops number of flops performed
     */
     void hisqLongLinkForce(GaugeField &newOprod,
                            const GaugeField &oprod,
                            const GaugeField &link,
-                           double coeff,
-                           long long* flops = nullptr);
+                           double coeff);
 
     /**
        @brief Multiply the computed the force matrix by the gauge
        field and perform traceless anti-hermitian projection
-       @param[out] momentum The computed momentum
-       @param[in] oprod The previously computed force
+       @param[in,out] oprod The previously computed force, overwritten
+       with new projection
        @param[in] link Thin-link gauge field
-       @param[out] flops number of flops performed
     */
-    void hisqCompleteForce(GaugeField &momentum,
-                           const GaugeField &oprod,
-                           const GaugeField &link,
-                           long long* flops = nullptr);
+    void hisqCompleteForce(GaugeField &oprod,
+                           const GaugeField &link);
 
     /**
        @brief Set the constant parameters for the force unitarization
@@ -62,13 +55,11 @@ namespace quda {
        @param[in] oldForce Input force
        @param[in] gauge Gauge field
        @param[out] unitarization_failed Whether the unitarization failed (number of failures)
-       @param[out] flops number of flops performed
     */
     void unitarizeForce(cudaGaugeField &newForce,
                         const cudaGaugeField &oldForce,
                         const cudaGaugeField &gauge,
-                        int* unitarization_failed,
-                        long long* flops = NULL);
+                        int* unitarization_failed);
 
     /**
        @brief Unitarize the fermion force on CPU

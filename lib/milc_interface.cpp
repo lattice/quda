@@ -101,7 +101,7 @@ void qudaFinalize()
   endQuda();
   qudamilc_called<false>(__func__);
 }
-#ifdef MULTI_GPU
+#if defined(MULTI_GPU) && !defined(QMP_COMMS)
 /**
  *  Implements a lexicographical mapping of node coordinates to ranks,
  *  with t varying fastest.
@@ -136,7 +136,11 @@ void qudaSetLayout(QudaLayout_t input)
 
 #ifdef MULTI_GPU
   for(int dir=0; dir<4; ++dir)  gridDim[dir] = input.machsize[dir];
+#ifdef QMP_COMMS
+  initCommsGridQuda(4, gridDim, nullptr, nullptr);
+#else
   initCommsGridQuda(4, gridDim, rankFromCoords, (void *)(gridDim));
+#endif
   static int device = -1;
 #else
   for(int dir=0; dir<4; ++dir)  gridDim[dir] = 1;
@@ -268,7 +272,7 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 }
 
 
-void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double** coeff, void** quark_field,
+void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, double** coeff, void** quark_field,
                    const double level2_coeff[6], const double fat7_coeff[6],
                    const void* const w_link, const void* const v_link, const void* const u_link,
                    void* const milc_momentum)
@@ -287,8 +291,7 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double** coeff, 
     gParam.return_result_mom = true;
   }
 
-  long long flops;
-  computeHISQForceQuda(milc_momentum, &flops, level2_coeff, fat7_coeff,
+  computeHISQForceQuda(milc_momentum, dt, level2_coeff, fat7_coeff,
                        w_link, v_link, u_link,
                        quark_field, num_terms, num_naik_terms, coeff,
                        &gParam);

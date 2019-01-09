@@ -10,6 +10,9 @@ namespace mixed {
 			 CompositeColorSpinorField& z, CompositeColorSpinorField& w){
     const int NYW = y.size();
 
+    checkPrecision(*x[0],*z[0]);
+    checkPrecision(*y[0],*w[0]);
+
     assert(siteUnroll==true);
     int reduce_length = siteUnroll ? x[0]->RealLength() : x[0]->Length();
 

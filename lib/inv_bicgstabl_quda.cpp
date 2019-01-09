@@ -727,7 +727,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_FREE);
     
     // ...yup...
-    PrintSummary(solver_name.c_str(), k, r2, b2);
+    PrintSummary(solver_name.c_str(), k, r2, b2, stop, param.tol_hq);
     
     // Done!
     profile.TPSTOP(QUDA_PROFILE_FREE);

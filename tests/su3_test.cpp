@@ -36,7 +36,8 @@ extern double anisotropy;
 extern bool verify_results;
 
 extern char latfile[];
-extern bool verify_results;
+
+extern QudaVerbosity verbosity;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -115,6 +116,8 @@ void SU3test(int argc, char **argv) {
 
   initQuda(device);
 
+  setVerbosity(verbosity);
+
   // call srand() with a rank-dependent seed
   initRand();
 
@@ -153,8 +156,6 @@ void SU3test(int argc, char **argv) {
   unsigned int nSteps = 50;
   double coeff_APE = 0.6;
   double coeff_STOUT = coeff_APE/(2*(4-1));
-  QudaVerbosity verbosity = QUDA_VERBOSE;
-  setVerbosity(verbosity);
   
   //STOUT
   // start the timer

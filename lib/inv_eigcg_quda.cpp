@@ -559,7 +559,7 @@ namespace quda {
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
-    PrintSummary("eigCG", k, r2, b2);
+    PrintSummary("eigCG", k, r2, b2, args.global_stop, param.tol_hq);
 
     // reset the flops counters
     blas::flops = 0;
@@ -734,7 +734,7 @@ namespace quda {
 
        param.true_res = sqrt(r2 / b2);
        param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r).z);
-       PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2);
+       PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2, stop, param.tol_hq);
 
        if( getVerbosity() >= QUDA_VERBOSE ) { 
          if( !dcg_cycle &&  (eigcg_args->restarts > 1) && !defl.is_complete() ) defl.verify();
