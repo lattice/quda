@@ -2315,13 +2315,18 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param) {
 
-  //Transfer the inv param structure
+  profilerStart(__func__);
+
+  //Transfer the inv param structure contained in eig_param
   QudaInvertParam *inv_param;
   inv_param = eig_param->invert_param;
-  
-  profilerStart(__func__);
+
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
   
   profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
+  profileEigensolve.TPSTART(QUDA_PROFILE_INIT);
   
   if (!initialized) errorQuda("QUDA not initialized");
   
@@ -2331,32 +2336,73 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     printQudaEigParam(eig_param);
   }
 
-  bool pc_solve =
-    (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) ||
-    (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
-  
   checkInvertParam(inv_param);
   checkEigParam(eig_param);
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
   
+  bool pc_solution = (inv_param->solution_type == QUDA_MATPC_SOLUTION) ||
+    (inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool mat_solution = (inv_param->solution_type == QUDA_MAT_SOLUTION) ||
+    (inv_param->solution_type ==  QUDA_MATPC_SOLUTION);
+  bool direct_solve = (inv_param->solve_type == QUDA_DIRECT_SOLVE) ||
+    (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (inv_param->solve_type == QUDA_NORMERR_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+  inv_param->secs = 0;
+  inv_param->gflops = 0;
+  inv_param->iter = 0;
+
   //Define problem matrix
-  DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, pc_solve);
-  
-  //Construct operator.
-  Dirac *mat = Dirac::create(diracParam);
-  
+  //------------------------------------------------------
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
+
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
+  //------------------------------------------------------
+
   //For QUDA data type eigenvectors
-  ColorSpinorParam cpuParam(&host_evecs, *inv_param, cudaGauge->X(),
-			    inv_param->solution_type);
+  const int *X = cudaGauge->X();
+  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X,
+			    inv_param->solution_type, inv_param->input_location);
+
+  profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileEigensolve.TPSTART(QUDA_PROFILE_COMPUTE);
+  //Decide how to solve the problem
+  if(eig_param->use_norm_op) {
+    //Problem is symmetric, use a Lanczos solver
+    lanczosSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
+    //irlmSolve(host_evecs, host_evals, *mat, eig_param, &cpuParam);
+  } else {
+    //Problem is asymmetric, un an Arnoldi solver
+    errorQuda("Arnoldi solve types not yet implemented.");
+  }
+  profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
   
-  lanczosSolve(host_evecs, host_evals, *mat, eig_param, &cpuParam);
-  //irlmSolve(host_evecs, host_evals, *mat, eig_param, &cpuParam);
+  profileEigensolve.TPSTART(QUDA_PROFILE_FREE);  
+  delete d;
+  delete dSloppy;
+  delete dPre;
+  
+  profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
+
+  popVerbosity();
+
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
   
   profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
-
+  
 }
 
 

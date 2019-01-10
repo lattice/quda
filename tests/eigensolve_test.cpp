@@ -276,7 +276,7 @@ void setEigParam(QudaEigParam &eig_param) {
   eig_param.nKr     = eig_nKr;
   eig_param.nEv     = eig_nEv;
   eig_param.tol     = eig_tol;
-  eig_param.cuda_prec_ritz = prec;
+  eig_param.cuda_prec_ritz = cuda_prec;
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.use_dagger  = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
@@ -414,86 +414,32 @@ int main(int argc, char **argv)
   time += (double)clock();
   printfQuda("Time for QUDA solution = %f\n", time/CLOCKS_PER_SEC);
   
-  /*
-  //Access the eigenmode data
-  printfQuda("First 12 elements of the eigenvectors and the eigenvalues:\n");    
-  for(int i=0; i<arpack_param.nEv; i++) {
-    printfQuda("eigenvector %d:\n",i);
-    for(int j=0; j<12; j++) {
-      if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-	printfQuda("(%e,%e)\n",		   
-		   ((float*)hostEvecs)[i*vol*24 + 2*j],
-		   ((float*)hostEvecs)[i*vol*24 + 2*j+1]);
-      } else {
-	printfQuda("(%e,%e)\n",		   
-		   ((double*)hostEvecs)[i*vol*24 + 2*j],
-		   ((double*)hostEvecs)[i*vol*24 + 2*j+1]);
-      }
-    }      
-    printfQuda("eigenvalue %d = ", i);
-    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      printfQuda("(%e,%e)\n",		   
-		 ((float*)hostEvals)[2*i],
-		 ((float*)hostEvals)[2*i + 1]);
-    } else {
-      printfQuda("(%e,%e)\n",		   
-		 ((double*)hostEvals)[2*i],
-		 ((double*)hostEvals)[2*i + 1]);
-    }
-  }
-  */
-
-  
-  /*
-  //Access the eigenmode data
-  printfQuda("First 12 elements of the eigenvectors and the eigenvalues:\n");    
-  for(int i=0; i<arpack_param.nEv; i++) {
-    printfQuda("eigenvector %d:\n",i);
-    for(int j=0; j<12; j++) {
-      if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-	printfQuda("(%e,%e)\n",		   
-		   ((float*)hostEvecs)[i*vol*24 + 2*j],
-		   ((float*)hostEvecs)[i*vol*24 + 2*j+1]);
-      } else {
-	printfQuda("(%e,%e)\n",		   
-		   ((double*)hostEvecs)[i*vol*24 + 2*j],
-		   ((double*)hostEvecs)[i*vol*24 + 2*j+1]);
-      }
-    }      
-    printfQuda("eigenvalue %d = ", i);
-    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      printfQuda("(%e,%e)\n",		   
-		 ((float*)hostEvals)[2*i],
-		 ((float*)hostEvals)[2*i + 1]);
-    } else {
-      printfQuda("(%e,%e)\n",		   
-		 ((double*)hostEvals)[2*i],
-		 ((double*)hostEvals)[2*i + 1]);
-    }
-  }
-  */
-  
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-
+  
   //Clean-up.
   free(host_evecs);
-  free(host_evals);  
-  freeGaugeQuda();
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
-      dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    freeCloverQuda();
-    if (clover) free(clover);
-    if (clover_inv) free(clover_inv);
+  free(host_evals);
+  
+  freeGaugeQuda();  
+  if(dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
+     dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {    
+    freeCloverQuda();    
   }
-  for (int dir = 0; dir<4; dir++) free(gauge[dir]);
   
   // finalize the QUDA library
   endQuda();
   
   // finalize the communications layer
   finalizeComms();
-
+  
+  if(dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
+     dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if (clover) free(clover);
+    if (clover_inv) free(clover_inv);
+  }
+  for (int dir = 0; dir<4; dir++) free(gauge[dir]);
+  
   return 0;
 }

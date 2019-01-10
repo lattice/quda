@@ -26,7 +26,8 @@ namespace quda {
 
     //nEv is the number of Ritz vectors we use in the rotation
     //nKr is the number of Krylov space vectors to rotate.
-
+    //length is the number of complex elements of the vector
+    
     //loop over rows of kSpace
     for(int j=0; j<length; j++) {      
       
@@ -52,8 +53,8 @@ namespace quda {
   
   //Orthogonalise r against V_[j]
   template<typename Float>
-  void orthogonalise(std::vector<ColorSpinorField*> &v,
-		     ColorSpinorField &r, int j) {
+  void orthogonalise(std::vector<ColorSpinorField*> v,
+		     cudaColorSpinorField &r, int j) {
     
     std::complex<Float> s(0.0,0.0);
     for(int i=0; i<j; i++) {
@@ -64,58 +65,58 @@ namespace quda {
 
   template<typename Float>
   void lanczosStep(const Dirac &mat,
-		   std::vector<ColorSpinorField*> &v,
-		   ColorSpinorField &r,
+		   std::vector<ColorSpinorField*> v,
+		   cudaColorSpinorField &r,
 		   QudaEigParam *eig_param,
 		   Float *alpha, Float *beta, int j) {
 
-    //for(int l=0; l<10000000; l++) {
+    //printfQuda("flag 1\n");
+    
     //Compute r = A * v_j - b_{j-i} * v_{j-1}      
     //r = A * v_j
     //DMH: maybe enforce MdagM mat vec?
     if(eig_param->use_norm_op && eig_param->use_dagger) {
-      mat.MMdag(r, *v[j]);
+      mat.MMdag(r, *(v[j]) );
     }
     else if(eig_param->use_norm_op && !eig_param->use_dagger) {
-      mat.MdagM(r, *v[j]);
+      mat.MdagM(r, *(v[j]) );
     }
     else if (!eig_param->use_norm_op && eig_param->use_dagger) {
-      mat.Mdag(r, *v[j]);
+      mat.Mdag(r, *(v[j]) );
     }
-    else {  
-      mat.M(r, *v[j]);
+    else {
+      mat.M(r, *(v[j]) );
     }
-    //printfQuda("iteration l=%d\n", l);
-    //}
+    
     //r = r - b_{j-1} * v_{j-1}
     if(j>0) blas::axpy(-beta[j-1], *v[j-1], r);      
     
     //a_j = v_j^dag * r
     alpha[j] = blas::reDotProduct(*v[j], r);    
-    
+
     //r = r - a_j * v_j
     blas::axpy(-alpha[j], *v[j], r);
-    
+
     //b_j = ||r|| 
     beta[j] = sqrt(blas::norm2(r));
-    
+
     //Orthogonalise
     if(beta[j] < (1.0)*sqrt(alpha[j]*alpha[j] + beta[j-1]*beta[j-1])) {
-    
+
       //The residual vector r has been deemed insufficiently
       //orthogonal to the existing Krylov space. We must
       //orthogonalise it.
-      printfQuda("orthogonalising Beta %d = %e\n", j, beta[j]);
+      //printfQuda("orthogonalising Beta %d = %e\n", j, beta[j]);
       orthogonalise<Float>(v, r, j);
       //b_j = ||r|| 
       beta[j] = sqrt(blas::norm2(r));    
     }
-    
+
     //Prepare next step.
     //v_{j+1} = r / b_j
     blas::zero(*v[j+1]);
     blas::axpy(1.0/beta[j], r, *v[j+1]);
-    
+
   }
   
   
@@ -124,7 +125,10 @@ namespace quda {
 		     QudaEigParam *eig_param,
 		     ColorSpinorParam *cpuParam){
 
+    //profile.TPSTART(QUDA_PROFILE_INIT);
+    
     // Preliminaries: Memory allocation, local variables.
+    //---------------------------------------------------------------------------
     //---------------------------------------------------------------------------
     int nEv = eig_param->nEv;
     int nKr = eig_param->nKr;
@@ -152,7 +156,7 @@ namespace quda {
     h_evals_ = (std::complex<Float>*) (Float*)(h_evals);
     
     //Create the device side Krylov Space and residual vector
-    ColorSpinorField *r = nullptr;
+    cudaColorSpinorField *r = nullptr;
     ColorSpinorParam cudaParam(*cpuParam);
     cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -161,37 +165,38 @@ namespace quda {
       cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
       cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
     r = new cudaColorSpinorField(cudaParam);
-    
+
+    //Create kryloc space on the device
     std::vector<ColorSpinorField*> kSpace;
     for(int i=0; i<nKr+1; i++) {
-      kSpace.emplace_back(new cudaColorSpinorField(cudaParam));
-      blas::zero(*(kSpace[i]));
+      kSpace.push_back(cudaColorSpinorField::Create(cudaParam));
     }
 
+    //Auxiliiary device vector
     ColorSpinorField *eVec = nullptr;
     eVec = new cudaColorSpinorField(cudaParam);
   
     //At the moment, basis rotation is done on the host. We must transfer the
-    //krylov space each time we rotate.
+    //krylov space each time we rotate, se we create (for now) host side arrays.
+    //--------------------------------------------------------------------------
     int length = 12;
     for(int i=0; i<4; i++) {
       length *= cpuParam->x[i];
       printfQuda("dim[%d] = %d, length = %d\n", i, cpuParam->x[i], length);
     }
-    
-    cpuColorSpinorField** h_vecs =
-      (cpuColorSpinorField**)malloc((nKr+1)*sizeof(cpuColorSpinorField*));
+    std::vector<ColorSpinorField*> h_vecs;
     std::complex<Float> **vecs =
       (std::complex<Float>**)malloc((nKr+1)*sizeof(std::complex<Float*>));
     
     //Allocate space for the Ritz vectors.
     for(int i=0; i<nKr+1; i++) {
       vecs[i] = (std::complex<Float>*)malloc(length*sizeof(std::complex<Float>));
-      cpuParam->v = (std::complex<Float>*)vecs[i];
-      h_vecs[i] = new cpuColorSpinorField(*cpuParam);
-      blas::zero(*(h_vecs[i]));
+      cpuParam->v = &(vecs[i][0]);
+      h_vecs.push_back(cpuColorSpinorField::Create(*cpuParam));
     }
+    //--------------------------------------------------------------------------
 
+    //Host side dense matrix of Kspace eigenvectors
     Float **Emat = (Float**)malloc((nKr)*sizeof(Float*));
     for(int i=0; i<nKr; i++) {
       Emat[i] = (Float*)malloc((nKr)*sizeof(Float));
@@ -209,28 +214,36 @@ namespace quda {
     }
     //Normalise initial source
     blas::ax(1.0/norm, *kSpace[0]);
+    //profile.TPSTOP(QUDA_PROFILE_INIT);
     //---------------------------------------------------------------------------
+    //---------------------------------------------------------------------------
+
 
 
     
     // START LANCZOS
     // Lanczos Method for Symmetric Eigenvalue Problems
     //---------------------------------------------------------------------------
+    //---------------------------------------------------------------------------
 
+    //profile.TPSTART(QUDA_PROFILE_COMPUTE);
     Float t1 = clock();
     printfQuda("START LANCZOS SOLUTION\n");
     bool converged = false;
     int numConverged = 0;
     int k=0;
-    int check_interval = 1;
+    int check_interval = 100;
     while(k < nKr && !converged) {
-      
+
       lanczosStep<Float>(mat, kSpace, *r, eig_param, alpha, beta, k);
 
       if((k+1)%check_interval == 0) {
 
 	int check = k+1;
 	printfQuda("%04d converged eigenvalues at iter %04d\n", numConverged, check);
+	
+	//Copy Krylov space to host for manipulation
+	for(int i=0; i<check; i++) *h_vecs[i] = *kSpace[i];
 	
 	//Compute the Tridiagonal matrix T_{k,k} 
 	using Eigen::MatrixXd;
@@ -243,54 +256,55 @@ namespace quda {
 	    triDiag(i,i+1) = beta[i];
 	  }
 	}
-
+	
 	//Eigensolve the T_k matrix
-	Eigen::SelfAdjointEigenSolver<MatrixXd> eigenSolverTD(triDiag);
+	Eigen::Tridiagonalization<MatrixXd> TD(triDiag);
+	Eigen::SelfAdjointEigenSolver<MatrixXd> eigenSolverTD;
+	eigenSolverTD.computeFromTridiagonal(TD.diagonal(), TD.subDiagonal());
+	//Eigen::SelfAdjointEigenSolver<MatrixXd> eigenSolverTD(triDiag);
 	
 	//Ritz values are in ascending order if matrix is real.      
 	//std::cout << eigenSolverTD.eigenvalues() << std::endl;
 	
 	//Place data in accessible array
 	for(int i=0; i<check; i++) {
-	  for(int j=0; j<check; j++) 
+	  for(int j=0; j<check; j++) {
 	    Emat[i][j] = eigenSolverTD.eigenvectors().col(i)[j];
+	    //printfQuda("(%d,%d) %f\n", i, j, Emat[i][j]);
+	  }
 	}
-
-	//Copy Krylov space to host for manipulation
-	for(int i=0; i<check; i++) *h_vecs[i] = *kSpace[i];
 
 	computeEigVecs<Float>(vecs, Emat, check, check, length);
 	
 	//Check for convergence
 	int n_conv = 0;
 	//Error estimates given by ||M*q_tilde - lambda q_tilde||
-	for(int i=0; i<check; i++) {
+	for(int i=0; i<nEv; i++) {
 
-	  //printfQuda("Flag %d %d\n", k, i);
-	  
 	  *eVec = *h_vecs[i];
 
-	  //printfQuda("Flag %d %d\n", k, i);
-	  
 	  //r = A * v_i
 	  if(eig_param->use_norm_op && eig_param->use_dagger) {
-	    mat.MMdag(*r, *kSpace[0]);
+	    mat.MMdag(*r, *eVec);
 	  }
 	  else if(eig_param->use_norm_op && !eig_param->use_dagger) {
-	    mat.MdagM(*r, *kSpace[0]);
+	    mat.MdagM(*r, *eVec);
 	  }
 	  else if (!eig_param->use_norm_op && eig_param->use_dagger) {
-	    mat.Mdag(*r, *kSpace[0]);
+	    mat.Mdag(*r, *eVec);
 	  }
 	  else {  
-	    mat.M(*r, *kSpace[0]);
+	    mat.M(*r, *eVec);
 	  }
+	  
 	  
 	  //lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
 	  h_evals_[i] = blas::cDotProduct(*eVec, *r)/sqrt(blas::norm2(*eVec));
+
 	  //Convergence check ||A * v_i - lambda_i * v_i||
 	  blas::caxpby(h_evals_[i], *eVec, -1.0, *r);
 	  residual[i] = sqrt(blas::norm2(*r));
+	  //printfQuda("Residual %d = %.6e\n", i, residual[i]);
 	  if(i < nEv && residual[i] < tol) {
 	    n_conv++;
 	  }
@@ -302,7 +316,13 @@ namespace quda {
       }
       k++;
     }
+    //profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    //---------------------------------------------------------------------------
+    //---------------------------------------------------------------------------
     
+
+    //Post computation information
+    //----------------------------
     if(!converged) {
       printf("Lanczos failed to compute the requested %d vectors in %d steps. Please either increase nKr or decrease nEv\n", nEv, nKr);
     } else {
@@ -316,7 +336,20 @@ namespace quda {
     Float t2 = clock() - t1;
     printfQuda("END LANCZOS SOLUTION\n");
     printfQuda("Time to solve problem using Lanczos = %e\n", t2/CLOCKS_PER_SEC);
-    
+    //-----------------------------
+
+    //Local clean-up
+    //--------------
+    //profile.TPSTART(QUDA_PROFILE_FREE);
+    delete r;
+    delete eVec;
+    for(int i=0; i<nKr+1; i++) {
+      delete kSpace[i];
+      delete h_vecs[i];
+      free(vecs[i]);
+    }
+    //profile.TPSTOP(QUDA_PROFILE_FREE);
+    //--------------
   }
   
   void lanczosSolve(void *h_evecs, void *h_evals, const Dirac &mat,
