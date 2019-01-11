@@ -33,6 +33,7 @@ namespace quda {
   struct WilsonCloverLaunch {
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+      static_assert(nParity == 1, "preconditioned wilson-clover operator only defined for nParity=1");
       dslash.launch(wilsonCloverGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
     }
   };

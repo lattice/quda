@@ -506,13 +506,9 @@ namespace quda {
     double epsilon;
     void twistedApply(ColorSpinorField &out, const ColorSpinorField &in, 
 		      const QudaTwistGamma5Type twistType) const;
-    void TwistedDslash(ColorSpinorField &out, const ColorSpinorField &in,
-		       QudaParity parity, QudaTwistDslashType twistDslashType,
-		       double a, double b, double c, double d) const;
-    void TwistedDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			   const ColorSpinorField &x, QudaParity parity,
-			   QudaTwistDslashType twistDslashType,
-			   double a, double b, double c, double d) const;
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+                            QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
     void NdegTwistedDslash(ColorSpinorField &out, const ColorSpinorField &in,
 			   QudaParity parity, QudaTwistDslashType twistDslashType,

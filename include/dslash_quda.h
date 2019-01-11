@@ -44,7 +44,7 @@ namespace quda {
 
      where D is the gauged Wilson linear operator.
 
-     If kappa is non-zer, the operation is given by out = x + kappa * D in.
+     If kappa is non-zero, the operation is given by out = x + kappa * D in.
      This operator can be applied to both single parity
      (checker-boarded) fields, or to full fields.
 
@@ -98,8 +98,8 @@ namespace quda {
      where D is the gauged Wilson linear operator.
 
      If kappa is non-zero, the operation is given by out = x + kappa * A^{-1} D in.
-     This operator can be applied to both single parity
-     (checker-boarded) fields, or to full fields.
+     This operator can (at present) be applied to only single parity
+     (checker-boarded) fields.
 
      @param[out] out The output result field
      @param[in] in The input field
@@ -168,6 +168,32 @@ namespace quda {
 		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
 		    double a, bool dagger, Dslash5Type type);
 
+  /**
+     @brief Apply the 5-d domain-wall stencil operator
+
+     out = x + kappa * D_5 * in
+
+     where D_5 is the 5-d Wilson linear operator
+
+     This operator can be applied to both single parity
+     (5-d checker-boarded) fields, or to full fields.
+
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] U Gauge field
+     @param[in] x Auxilary input color-spinor field
+     @param[in] m_f Fermion mass parameter
+     @param[in] kappa Scale factor use in xpay operator
+     @param[in] Field parity (if color-spinor field is single parity)
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyDWF(ColorSpinorField &out, const ColorSpinorField &in,
+                const GaugeField &U, const ColorSpinorField &x,
+                double m_f, double kappa, int parity, bool dagger,
+                const int *comm_override, TimeProfile &profile);
+
   // domain wall Dslash  
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 			    const int parity, const int dagger, const cudaColorSpinorField *x,
@@ -196,6 +222,71 @@ namespace quda {
 				   const cudaColorSpinorField *in, const int parity, const int dagger,
 				   const cudaColorSpinorField *x, const double &k,
 				   const int *commDim, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the twisted-mass stencil
+
+     out = a * D * in + (1 + i*b*gamma_5) * x
+
+     where D is the gauged Wilson linear operator.
+
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] a Scale factor applied to Wilson term (typically -kappa)
+     @param[in] b Twist factor applied (typically 2*mu*kappa)
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                        double a, double b, const ColorSpinorField &x, int parity, bool dagger,
+                        const int *comm_override, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the preconditioned twisted-mass stencil
+
+     out = a*(1 + i*b*gamma_5) * D * in + x
+
+     where D is the gauged Wilson linear operator.  This operator can
+     be applied to both single parity (checker-boarded) fields, or to
+     full fields.  For the dagger operator, we generally apply the
+     conjugate transpose operator
+
+     out = x + D^\dagger A^{-\dagger}
+
+     with the additional asymmetric special case, where we apply do not
+     transpose the order of operations
+
+     out = A^{-\dagger} D^\dagger  (no xpay term)
+
+     This variant is required when have the asymmetric preconditioned
+     operator and require the preconditioned twist term to remain in
+     between the applications of D.  This would be combined with a
+     subsequent non-preconditioned dagger operator, A*x - kappa^2 D, to
+     form the full operator.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] a Scale factor applied to Wilson term (typically 1 / (1 + b*b))
+     @param[in] b Twist factor applied (typically -2*kappa*mu)
+     @param[in] xpay Whether to do xpay or not
+     @param[in] x Vector field we accumulate onto to when xpay is true
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] asymmetric Whether this is for the asymmetric preconditioned dagger operator (a*(1 - i*b*gamma_5) * D^dagger * in)
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                      double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
+                                      bool asymmetric, const int *comm_override, TimeProfile &profile);
 
   // twisted mass Dslash  
   void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in, 
@@ -277,11 +368,13 @@ namespace quda {
      @param[in] nFace Depth of halo
      @param[in] dagger Whether this is for the dagger operator
      @param[in] parity Field parity
+     @param[in] a Twisted mass scale factor (for preconditioned twisted-mass dagger operator)
+     @param[in] b Twisted mass twisted factor (for preconditioned twisted-mass dagger operator)
      @param[in] stream Which stream are we executing in
   */
   void PackGhost(void *ghost[2*QUDA_MAX_DIM], const ColorSpinorField &field,
-                 MemoryLocation location, int nFace,
-                 bool dagger, int parity, const cudaStream_t &stream);
+                 MemoryLocation location, int nFace, bool dagger, int parity,
+                 double a, double b, const cudaStream_t &stream);
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)

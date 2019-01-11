@@ -722,11 +722,11 @@ namespace quda {
       }
     }
 
-    // new packing kernel is only for Wilson/Clover at the moment
-    if (nSpin == 1 || nDim == 5 || a != 0.0 || b != 0.0) {
+    // new packing kernel is only for Wilson/Clover/twisted at the moment
+    if (nSpin == 1 || nDim == 5) {
       packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
     } else {
-      PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, *stream);
+      PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, a, b, *stream);
     }
 
 #else

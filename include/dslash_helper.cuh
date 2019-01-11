@@ -253,7 +253,8 @@ namespace quda {
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
-    // compatibility with dslash_policy for now
+    // these are set with symmetric preconditioned twisted-mass dagger
+    // operator for the packing (which needs to a do a twist)
     real twist_a;
     real twist_b;
 

@@ -3,6 +3,8 @@
 #include <iostream>
 #include <multigrid.h>
 
+#define NEW_DSLASH
+
 namespace quda {
 
   DiracTwistedMass::DiracTwistedMass(const DiracParam &param, const int nDim) 
@@ -37,23 +39,28 @@ namespace quda {
     twistedApply(out, in, QUDA_TWIST_GAMMA5_DIRECT);
   }
 
-  void DiracTwistedMass::TwistedDslash(ColorSpinorField &out, const ColorSpinorField &in,
-				       QudaParity parity, QudaTwistDslashType twistDslashType,
-				       double a, double b, double c, double d) const {
+  void DiracTwistedMass::Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const {
+
+#ifdef NEW_DSLASH
+    ApplyTwistedMass(out, in, *gauge, -kappa, 2*mu*kappa, in, parity, dagger, commDim, profile);
+#else
     twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger,
-			  0, twistDslashType, a, b, c, d, commDim, profile);
+			  0, QUDA_DEG_DSLASH_TWIST_XPAY, 2*kappa*mu, -kappa, 0.0, 0.0, commDim, profile);
+#endif
     flops += 1392ll*in.Volume();
   }
 
-  void DiracTwistedMass::TwistedDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-					   const ColorSpinorField &x, QudaParity parity,
-					   QudaTwistDslashType twistDslashType,
-					   double a, double b, double c, double d) const {
+  void DiracTwistedMass::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+                                    QudaParity parity, const ColorSpinorField &x, const double &k) const {
+#ifdef NEW_DSLASH
+    ApplyTwistedMass(out, in, *gauge, k, 2*mu*kappa, x, parity, dagger, commDim, profile);
+#else
     twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger,
 			  &static_cast<const cudaColorSpinorField&>(x),
-			  twistDslashType, a, b, c, d, commDim, profile);
+			  QUDA_DEG_DSLASH_TWIST_XPAY, 2*kappa*mu, k, 0.0, 0.0, commDim, profile);
+#endif
     flops += 1416ll*in.Volume();
   }
   
@@ -97,13 +104,13 @@ namespace quda {
     bool reset = newTmp(&tmp, in.Even());
 
     if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      double a = 2.0 * kappa * mu;//for direct twist (must be daggered separately)  
 
-      TwistedDslashXpay(out.Odd(), in.Even(), in.Odd(), QUDA_ODD_PARITY, 
-			QUDA_DEG_DSLASH_TWIST_XPAY, a, -kappa, 0.0, 0.0);
-
-      TwistedDslashXpay(out.Even(), in.Odd(), in.Even(), QUDA_EVEN_PARITY,
-			QUDA_DEG_DSLASH_TWIST_XPAY, a, -kappa, 0.0, 0.0);
+#ifdef NEW_DSLASH
+      ApplyTwistedMass(out, in, *gauge, -kappa, 2*mu*kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+#else
+      DiracTwistedMass::DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
+      DiracTwistedMass::DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
+#endif
     } else {
       double a = -2.0 * kappa * mu; //for twist 
       double b = -2.0 * kappa * epsilon;//for twist
@@ -188,17 +195,25 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      double a = -2.0 * kappa * mu;  //for invert twist (not daggered)
-      double b = 1.0 / (1.0 + a*a);                     //for invert twist
-      if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-	TwistedDslash(out, in, parity, QUDA_DEG_DSLASH_TWIST_INV, a, b, 0.0, 0.0);
-      } else { 
-	TwistedDslash(out, in, parity, QUDA_DEG_TWIST_INV_DSLASH, a, b, 0.0, 0.0);
-      }
+      double a = -2.0 * kappa * mu; //for inverse twist
+      double b = 1.0 / (1.0 + a*a);
+
+#ifdef NEW_DSLASH
+      bool asymmetric = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
+      ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, false, in, parity, dagger, asymmetric, commDim, profile);
+#else
+      auto type = (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? QUDA_DEG_DSLASH_TWIST_INV : QUDA_DEG_TWIST_INV_DSLASH;
+      twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+                            &static_cast<const cudaColorSpinorField&>(in), parity, dagger,
+                            0, type, a, b, 0.0, 0.0, commDim, profile);
+#endif
+
+      flops += 1392ll*in.Volume();
+
     } else {//TWIST doublet :
       double a = 2.0 * kappa * mu;  
       double b = 2.0 * kappa * epsilon;
-      double c = 1.0 / (1.0 + a*a - b*b);//!    
+      double c = 1.0 / (1.0 + a*a - b*b);
     
       if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         NdegTwistedDslash(out, in, parity, QUDA_NONDEG_DSLASH, a, b, c, 0.0);
@@ -229,13 +244,18 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
     if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      double a = -2.0 * kappa * mu;  //for invert twist
-      double b = k / (1.0 + a*a);                     //for invert twist 
-      if (!dagger) {
-        TwistedDslashXpay(out, in, x, parity, QUDA_DEG_DSLASH_TWIST_INV, a, b, 0.0, 0.0);
-      } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
-        TwistedDslashXpay(out, in, x, parity, QUDA_DEG_TWIST_INV_DSLASH, a, b, 0.0, 0.0);
-      }
+      double a = -2.0 * kappa * mu; //for inverse twist
+      double b = k / (1.0 + a*a);
+#ifdef NEW_DSLASH
+      ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, true, x, parity, dagger, false, commDim, profile);
+#else
+      auto type = !dagger ? QUDA_DEG_DSLASH_TWIST_INV : QUDA_DEG_TWIST_INV_DSLASH;
+      twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+                            &static_cast<const cudaColorSpinorField&>(in), parity, dagger,
+                            &static_cast<const cudaColorSpinorField&>(x),
+                            type, a, b, 0.0, 0.0, commDim, profile);
+#endif
+      flops += 1416ll*in.Volume();
     } else {//TWIST_DOUBLET:
       double a = 2.0 * kappa * mu;  
       double b = 2.0 * kappa * epsilon;
@@ -270,9 +290,8 @@ namespace quda {
 	Dslash(*tmp1, in, parity[0]);
 	DslashXpay(out, *tmp1, parity[1], in, kappa2);
       } else { //asymmetric preconditioning
-        double a = 2.0 * kappa * mu;
 	Dslash(*tmp1, in, parity[0]);
-	TwistedDslashXpay(out, *tmp1, in, parity[1], QUDA_DEG_DSLASH_TWIST_XPAY, a, kappa2, 0.0, 0.0);
+        DiracTwistedMass::DslashXpay(out, *tmp1, parity[1], in, kappa2);
       }
     } else {
       if (symmetric) {
