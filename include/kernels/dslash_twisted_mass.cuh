@@ -42,7 +42,7 @@ namespace quda {
 
     if (kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
-      x += complex<real>(0.0,arg.b)*x.gamma(4);
+      x += arg.b*x.igamma(4);
       out = x + arg.kappa * out;
     } else if (active) {
       Vector x = arg.out(x_cb, my_spinor_parity);

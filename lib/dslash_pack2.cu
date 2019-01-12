@@ -132,7 +132,7 @@ namespace quda {
       int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
       constexpr int proj_dir = dagger ? +1 : -1;
       Vector f = arg.field(idx, spinor_parity);
-      if (twist) f = arg.a * (f + complex<real>(0.0,arg.b)*f.gamma(4));
+      if (twist) f = arg.a * (f + arg.b*f.igamma(4));
       field.Ghost(dim, 0, ghost_idx, spinor_parity) = f.project(dim, proj_dir);
 
     } else { // forwards
@@ -140,7 +140,7 @@ namespace quda {
       int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,1>(ghost_idx, parity, arg);
       constexpr int proj_dir = dagger ? -1 : +1;
       Vector f = arg.field(idx, spinor_parity);
-      if (twist) f = arg.a * (f + complex<real>(0.0,arg.b)*f.gamma(4));
+      if (twist) f = arg.a * (f + arg.b*f.igamma(4));
       field.Ghost(dim, 1, ghost_idx, spinor_parity) = f.project(dim, proj_dir);
 
     }

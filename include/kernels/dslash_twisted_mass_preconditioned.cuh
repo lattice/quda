@@ -1,21 +1,23 @@
 #include <kernels/dslash_wilson.cuh>
-#include <linalg.cuh>
 
 namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType reconstruct_>
   struct TwistedMassArg : WilsonArg<Float,nColor,reconstruct_> {
     typedef typename mapper<Float>::type real;
-    real a; // this is the scaling factor - separate from kappa since here we reserve kappa for xpay boolean
+    real a; // this is the scaling factor
     real b; // this is the twist factor
+    real a_inv; // inverse scaling factor - used to allow early xpay inclusion
+    real b_inv; // inverse twist factor - used to allow early xpay inclusion
     bool asymmetric; // whether we are applying the asymetric operator or not
 
     TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    double a, double b, bool xpay, const ColorSpinorField &x,
                    int parity, bool dagger, bool asymmetric, const int *comm_override)
       : WilsonArg<Float,nColor,reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
-      a(a), b(dagger ? -b : b), asymmetric(asymmetric) // if dagger flip the twist
+      a(a), b(dagger ? -b : b), a_inv(1.0 / (a*(1 + b*b)) ), b_inv(dagger ? b : -b), asymmetric(asymmetric) // if dagger flip the twist
     {
+      // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {
         DslashArg<Float>::twist_a = this->a;
         DslashArg<Float>::twist_b = this->b;
@@ -66,7 +68,7 @@ namespace quda {
 
           Link U = arg.U(d, x_cb, parity);
           Vector in = arg.in(fwd_idx, their_spinor_parity);
-          in = arg.a * (in + complex<real>(0.0,arg.b)*in.gamma(4)); // apply A^{-1} to in
+          in = arg.a * (in + arg.b*in.igamma(4)); // apply A^{-1} to in
 
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -93,7 +95,7 @@ namespace quda {
 
           Link U = arg.U(d, gauge_idx, 1-parity);
           Vector in = arg.in(back_idx, their_spinor_parity);
-          in = arg.a * (in + complex<real>(0.0,arg.b)*in.gamma(4)); // apply A^{-1} to in
+          in = arg.a * (in + arg.b*in.igamma(4)); // apply A^{-1} to in
 
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -110,7 +112,6 @@ namespace quda {
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool asymmetric, bool xpay, KernelType kernel_type, typename Arg>
   __device__ __host__ inline void twistedMass(Arg &arg, int idx, int parity)
   {
-    using namespace linalg; // for Cholesky
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,4> Vector;
     typedef ColorSpinor<real,nColor,2> HalfVector;
@@ -124,23 +125,26 @@ namespace quda {
 
     Vector out;
 
-    if (dagger && !asymmetric)
-      applyWilsonTM<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
-    else // defined in dslash_wilson.cuh
+    if (!dagger || asymmetric) // defined in dslash_wilson.cuh
       applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+    else // special dslash for symmetric dagger
+      applyWilsonTM<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
 
-    if (kernel_type != INTERIOR_KERNEL && active) {
+    if (xpay && kernel_type == INTERIOR_KERNEL) {
+      Vector x = arg.x(x_cb, my_spinor_parity);
+      if (!dagger || asymmetric) {
+        out += arg.a_inv * (x + arg.b_inv*x.igamma(4)); // apply inverse twist which is undone below
+      } else {
+        out += x; // just directly add since twist already applied in the dslash
+      }
+    } else if (kernel_type != INTERIOR_KERNEL && active) {
       // if we're not the interior kernel, then we must sum the partial
       Vector x = arg.out(x_cb, my_spinor_parity);
       out += x;
     }
 
     if ( isComplete<kernel_type>(arg, coord) && active ) {
-      if (!dagger || asymmetric) out = arg.a * (out + complex<real>(0.0,arg.b)*out.gamma(4)); // apply A^{-1} to D*in
-      if (xpay) {
-	Vector x = arg.x(x_cb, my_spinor_parity);
-	out += x;
-      }
+      if (!dagger || asymmetric) out = arg.a * (out + arg.b*out.igamma(4)); // apply A^{-1} to D*in
     }
 
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
