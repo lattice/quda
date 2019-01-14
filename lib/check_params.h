@@ -613,10 +613,35 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_maxiter_refresh[i], INVALID_INT);
 #endif
 
+#ifdef INIT_PARAM
+    P(setup_ca_basis[i], QUDA_INVALID_BASIS);
+    P(setup_ca_basis_size[i], 4);
+    P(setup_ca_lambda_min[i], 0.0);
+    P(setup_ca_lambda_max[i], -1.0);
+#else
+    P(setup_ca_basis[i], QUDA_INVALID_BASIS);
+    P(setup_ca_basis_size[i], INVALID_INT);
+    P(setup_ca_lambda_min[i], INVALID_DOUBLE);
+    P(setup_ca_lambda_max[i], INVALID_DOUBLE);
+#endif
+
+
     P(coarse_solver[i], QUDA_INVALID_INVERTER);
     P(coarse_solver_maxiter[i], INVALID_INT);
     P(smoother[i], QUDA_INVALID_INVERTER);
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+
+#ifdef INIT_PARAM
+    P(coarse_solver_ca_basis[i], QUDA_INVALID_BASIS);
+    P(coarse_solver_ca_basis_size[i], 4);
+    P(coarse_solver_ca_lambda_min[i], 0.0);
+    P(coarse_solver_ca_lambda_max[i], -1.0);
+#else
+    P(coarse_solver_ca_basis[i], QUDA_INVALID_BASIS);
+    P(coarse_solver_ca_basis_size[i], INVALID_INT);
+    P(coarse_solver_ca_lambda_min[i], INVALID_DOUBLE);
+    P(coarse_solver_ca_lambda_max[i], INVALID_DOUBLE);
+#endif
 
 #ifndef CHECK_PARAM
     P(smoother_halo_precision[i], QUDA_INVALID_PRECISION);

@@ -1710,6 +1710,10 @@ int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
 double setup_tol[QUDA_MAX_MG_LEVEL] = { };
 int setup_maxiter[QUDA_MAX_MG_LEVEL] = { };
 int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL] = { };
+QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL] = { };
+int setup_ca_basis_size[QUDA_MAX_MG_LEVEL] = { };
+double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL] = { };
+double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL] = { };
 QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
 bool pre_orthonormalize = false;
 bool post_orthonormalize = true;
@@ -1720,6 +1724,10 @@ QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL] = { };
 QudaPrecision smoother_halo_prec = QUDA_INVALID_PRECISION;
 double smoother_tol[QUDA_MAX_MG_LEVEL] = { };
 int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL] = { };
+QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL] = { };
+int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL] = { };
+double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL] = { };
+double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL] = { };
 bool generate_nullspace = true;
 bool generate_all_levels = true;
 QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL] = { };
@@ -1798,9 +1806,9 @@ void usage(char** argv )
   printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)\n");
-  printf("    --basis-ca-cg <power/chebyshev>           # The basis to use for CA-CG (default power)\n");
-  printf("    --chebyshev-basis-eig-min                 # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)\n");
-  printf("    --chebyshev-basis-eig-max                 # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG (default is to guess with power iterations)\n");
+  printf("    --ca-basis-type <power/chebyshev>         # The basis to use for CA-CG (default power)\n");
+  printf("    --cheby-basis-eig-min                     # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)\n");
+  printf("    --cheby-basis-eig-max                     # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG (default is to guess with power iterations)\n");
   printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n");
   printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
@@ -1837,6 +1845,10 @@ void usage(char** argv )
   printf("    --mg-setup-maxiter-refresh <level iter>   # The maximum number of solver iterations to use when refreshing the pre-existing null space vectors (default 100)\n");
   printf("    --mg-setup-iters <level iter>             # The number of setup iterations to use for the multigrid (default 1)\n");
   printf("    --mg-setup-tol <level tol>                # The tolerance to use for the setup of multigrid (default 5e-6)\n");
+  printf("    --mg-setup-ca-basis-type <level power/chebyshev> # The basis to use for CA-CG setup of multigrid(default power)\n");
+  printf("    --mg-setup-ca-basis-size <level size>     # The basis size to use for CA-CG setup of multigrid (default 4)\n");
+  printf("    --mg-setup-cheby-basis-eig-min <level val> # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default 0)\n");
+  printf("    --mg-setup-cheby-basis-eig-max <level val> # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default is to guess with power iterations)\n");
   printf("    --mg-setup-type <null/test>               # The type of setup to use for the multigrid (default null)\n");
   printf("    --mg-pre-orth <true/false>                # If orthonormalize the vector before inverting in the setup of multigrid (default false)\n");
   printf("    --mg-post-orth <true/false>               # If orthonormalize the vector after inverting in the setup of multigrid (default true)\n");
@@ -1844,6 +1856,10 @@ void usage(char** argv )
   printf("    --mg-coarse-solver <level gcr/etc.>       # The solver to wrap the V cycle on each level (default gcr, only for levels 1+)\n");
   printf("    --mg-coarse-solver-tol <level gcr/etc.>   # The coarse solver tolerance for each level (default 0.25, only for levels 1+)\n");
   printf("    --mg-coarse-solver-maxiter <level n>      # The coarse solver maxiter for each level (default 100)\n");
+  printf("    --mg-coarse-solver-ca-basis-type <level power/chebyshev> # The basis to use for CA-CG setup of multigrid(default power)\n");
+  printf("    --mg-coarse-solver-ca-basis-size <level size>  # The basis size to use for CA-CG setup of multigrid (default 4)\n");
+  printf("    --mg-coarse-solver-cheby-basis-eig-min <level val> # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default 0)\n");
+  printf("    --mg-coarse-solver-cheby-basis-eig-max <level val> # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default is to guess with power iterations)\n");
   printf("    --mg-smoother <level mr/etc.>             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-smoother-tol <level resid_tol>       # The smoother tolerance to use for each multigrid (default 0.25)\n");
   printf("    --mg-smoother-halo-prec                   # The smoother halo precision (applies to all levels - defaults to null_precision)\n");
@@ -2851,6 +2867,91 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--mg-setup-ca-basis-type") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i+1], "power") == 0){
+      setup_ca_basis[level] = QUDA_POWER_BASIS;
+    }else if (strcmp(argv[i+1], "chebyshev") == 0 || strcmp(argv[i+1], "cheby") == 0){
+      setup_ca_basis[level] = QUDA_CHEBYSHEV_BASIS;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for basis ca cg type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-ca-basis-size") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_ca_basis_size[level] = atoi(argv[i+1]);
+    if (setup_ca_basis_size[level] < 1){
+      printf("ERROR: invalid basis size for CA-CG (%d < 1)\n", setup_ca_basis_size[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-cheby-basis-eig-min") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_ca_lambda_min[level] = atof(argv[i+1]);
+    if (setup_ca_lambda_min[level] < 0.0){
+      printf("ERROR: invalid minimum eigenvalue for CA-CG (%f < 0.0)\n", setup_ca_lambda_min[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-cheby-basis-eig-max") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_ca_lambda_max[level] = atof(argv[i+1]);
+    // negative value induces power iterations to guess
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mg-setup-type") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3022,6 +3123,92 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
+
+    if( strcmp(argv[i], "--mg-coarse-solver-ca-basis-type") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i+1], "power") == 0){
+      coarse_solver_ca_basis[level] = QUDA_POWER_BASIS;
+    }else if (strcmp(argv[i+1], "chebyshev") == 0 || strcmp(argv[i+1], "cheby") == 0){
+      coarse_solver_ca_basis[level] = QUDA_CHEBYSHEV_BASIS;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for basis ca cg type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarse-solver-ca-basis-size") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_ca_basis_size[level] = atoi(argv[i+1]);
+    if (coarse_solver_ca_basis_size[level] < 1){
+      printf("ERROR: invalid basis size for CA-CG (%d < 1)\n", coarse_solver_ca_basis_size[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarse-solver-cheby-basis-eig-min") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_ca_lambda_min[level] = atof(argv[i+1]);
+    if (coarse_solver_ca_lambda_min[level] < 0.0){
+      printf("ERROR: invalid minimum eigenvalue for CA-CG (%f < 0.0)\n", coarse_solver_ca_lambda_min[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarse-solver-cheby-basis-eig-max") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_ca_lambda_max[level] = atof(argv[i+1]);
+    // negative value induces power iterations to guess
+    i++;
+    ret = 0;
+    goto out;
+  }
+
 
 
   if( strcmp(argv[i], "--mg-smoother-halo-prec") == 0){
@@ -3342,7 +3529,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--ngcrkrylov") == 0){
+  if( strcmp(argv[i], "--ngcrkrylov") == 0 || strcmp(argv[i], "--ca-basis-size") == 0) {
     if (i+1 >= argc){
       usage(argv);
     }
@@ -3356,14 +3543,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--basis-ca-cg") == 0){
+  if( strcmp(argv[i], "--ca-basis-type") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
 
     if (strcmp(argv[i+1], "power") == 0){
       ca_basis = QUDA_POWER_BASIS;
-    }else if (strcmp(argv[i+1], "chebyshev") == 0){
+    }else if (strcmp(argv[i+1], "chebyshev") == 0 || strcmp(argv[i+1], "cheby") == 0){
       ca_basis = QUDA_CHEBYSHEV_BASIS;
     }else{
       fprintf(stderr, "ERROR: invalid value for basis ca cg type\n");
@@ -3375,7 +3562,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--chebyshev-basis-eig-min") == 0){
+  if( strcmp(argv[i], "--cheby-basis-eig-min") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
@@ -3389,7 +3576,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--chebyshev-basis-eig-max") == 0){
+  if( strcmp(argv[i], "--cheby-basis-eig-max") == 0){
     if (i+1 >= argc){
       usage(argv);
     }

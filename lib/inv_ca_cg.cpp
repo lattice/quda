@@ -519,7 +519,7 @@ namespace quda {
       blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
       matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy2);
       lambda_max = 1.1*(sqrt(blas::norm2(*AQ[0])));
-      printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
       lambda_init = true;
     }
 
