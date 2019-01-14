@@ -542,20 +542,20 @@ namespace quda {
         matSloppy(*AS[0], *S[0], tmpSloppy, tmpSloppy2);
 
         if (nKrylov > 1) {
-          Complex facs1[2] = { m_map, b_map };
-          std::vector<ColorSpinorField*> recur1{AS[0],S[0]};
+          Complex facs1[3] = { m_map, b_map, 0. };
+          std::vector<ColorSpinorField*> recur1{AS[0],S[0],S[1]};
           std::vector<ColorSpinorField*> S1{S[1]};
-          blas::zero(*S[1]);
+          //blas::zero(*S[1]);
           blas::caxpy(facs1,recur1,S1);
           matSloppy(*AS[1], *S[1], tmpSloppy, tmpSloppy2);
 
           // Enter recursion relation
           if (nKrylov > 2) {
-            Complex factors[3] = { 2.*m_map, 2.*b_map, -1. };
+            Complex factors[4] = { 2.*m_map, 2.*b_map, -1., 0. };
             for (int k = 2; k < nKrylov; k++) {
-              std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2]};
+              std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2],S[k]};
               std::vector<ColorSpinorField*> Sk{S[k]};
-              blas::zero(*S[k]);
+              //blas::zero(*S[k]);
               blas::caxpy(factors, recur2, Sk);
               matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
             }
