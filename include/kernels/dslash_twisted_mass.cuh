@@ -1,5 +1,4 @@
 #include <kernels/dslash_wilson.cuh>
-#include <linalg.cuh>
 
 namespace quda {
 
@@ -13,7 +12,7 @@ namespace quda {
                    double a, double b, const ColorSpinorField &x,
                    int parity, bool dagger, const int *comm_override)
       : WilsonArg<Float,nColor,reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
-      b(dagger ? -b : b) // if dagger flip the flip
+      b(dagger ? -b : b) // if dagger flip the twist
     { }
   };
 
@@ -38,7 +37,7 @@ namespace quda {
     Vector out;
 
     // defined in dslash_wilson.cuh
-    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
 
     if (kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);

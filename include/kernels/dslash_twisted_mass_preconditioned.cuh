@@ -34,12 +34,13 @@ namespace quda {
      @param[in,out] arg Parameter struct
      @param[in] coord Site coordinate
      @param[in] x_cb The checker-boarded site index
+     @param[in] s Fifth-dimension index
      @param[in] parity Site parity
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilsonTM(Vector &out, Arg &arg, int coord[nDim], int x_cb,
+  __device__ __host__ inline void applyWilsonTM(Vector &out, Arg &arg, int coord[nDim], int x_cb, int s,
                                                 int parity, int idx, int thread_dim, bool &active) {
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,2> HalfVector;
@@ -57,17 +58,17 @@ namespace quda {
         if ( doHalo<kernel_type>(d) && ghost ) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace) : idx;
+            ghostFaceIndex<1,nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U(d, x_cb, parity);
-          HalfVector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+          HalfVector in = arg.in.Ghost(d, 1, ghost_idx+s*arg.dc.ghostFaceCB[d], their_spinor_parity);
           if (d == 3) in *= arg.t_proj_scale; // put this in the Ghost accessor and merge with any rescaling?
 
           out += (U * in).reconstruct(d, proj_dir);
         } else if ( doBulk<kernel_type>() && !ghost ) {
 
           Link U = arg.U(d, x_cb, parity);
-          Vector in = arg.in(fwd_idx, their_spinor_parity);
+          Vector in = arg.in(fwd_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
           in = arg.a * (in + arg.b*in.igamma(4)); // apply A^{-1} to in
 
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
@@ -84,17 +85,17 @@ namespace quda {
         if ( doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace) : idx;
+            ghostFaceIndex<0,Dim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
-          HalfVector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+          HalfVector in = arg.in.Ghost(d, 0, ghost_idx+s*arg.dc.ghostFaceCB[d], their_spinor_parity);
           if (d == 3) in *= arg.t_proj_scale;
 
           out += (conj(U) * in).reconstruct(d, proj_dir);
         } else if ( doBulk<kernel_type>() && !ghost ) {
 
           Link U = arg.U(d, gauge_idx, 1-parity);
-          Vector in = arg.in(back_idx, their_spinor_parity);
+          Vector in = arg.in(back_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
           in = arg.a * (in + arg.b*in.igamma(4)); // apply A^{-1} to in
 
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
@@ -126,9 +127,9 @@ namespace quda {
     Vector out;
 
     if (!dagger || asymmetric) // defined in dslash_wilson.cuh
-      applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+      applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
     else // special dslash for symmetric dagger
-      applyWilsonTM<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+      applyWilsonTM<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
 
     if (xpay && kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
