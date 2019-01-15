@@ -74,6 +74,11 @@ extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
 extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
 extern double setup_tol[QUDA_MAX_MG_LEVEL];
 extern int setup_maxiter[QUDA_MAX_MG_LEVEL];
+extern QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
+extern int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
+extern double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+extern double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
+
 extern QudaSetupType setup_type;
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
@@ -81,6 +86,11 @@ extern double omega;
 extern QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
 extern QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];
 extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+extern QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+extern int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
+extern double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+extern double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL];
+
 extern double smoother_tol[QUDA_MAX_MG_LEVEL];
 extern int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
 
@@ -251,6 +261,18 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
+
+    // Basis to use for CA-CGN(E/R) setup
+    mg_param.setup_ca_basis[i] = setup_ca_basis[i];
+
+    // Basis size for CACG setup
+    mg_param.setup_ca_basis_size[i] = setup_ca_basis_size[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis setup
+    mg_param.setup_ca_lambda_min[i] = setup_ca_lambda_min[i];
+    mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
+
+
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
@@ -265,6 +287,16 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.coarse_solver[i] = coarse_solver[i];
     mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
     mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
+
+    // Basis to use for CA-CGN(E/R) coarse solver
+    mg_param.coarse_solver_ca_basis[i] = coarse_solver_ca_basis[i];
+
+    // Basis size for CACG coarse solver/
+    mg_param.coarse_solver_ca_basis_size[i] = coarse_solver_ca_basis_size[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis
+    mg_param.coarse_solver_ca_lambda_min[i] = coarse_solver_ca_lambda_min[i];
+    mg_param.coarse_solver_ca_lambda_max[i] = coarse_solver_ca_lambda_max[i];
 
     mg_param.smoother[i] = smoother_type[i];
 
@@ -507,6 +539,16 @@ int main(int argc, char **argv)
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
     nu_pre[i] = 2;
     nu_post[i] = 2;
+
+    setup_ca_basis[i] = QUDA_POWER_BASIS;
+    setup_ca_basis_size[i] = 4;
+    setup_ca_lambda_min[i] = 0.0;
+    setup_ca_lambda_max[i] = -1.0; // use power iterations
+
+    coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
+    coarse_solver_ca_basis_size[i] = 4;
+    coarse_solver_ca_lambda_min[i] = 0.0;
+    coarse_solver_ca_lambda_max[i] = -1.0;
   }
   reliable_delta = 1e-4;
 

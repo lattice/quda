@@ -302,18 +302,6 @@ namespace quda {
 	  resIncrease = 0;
 	}
 
-	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
-	  restart++; // restarting if residual is still too great
-
-	  PrintStats("CA-GCR (restart)", restart, r2, b2, heavy_quark_res);
-          blas::copy(*p[0], r);
-
-	  r2_old = r2;
-
-	  // prevent ending the Krylov space prematurely if other convergence criteria not met 
-	  if (r2 < stop) l2_converge = true; 
-	}
-
 	r2_old = r2;
       }
 
