@@ -76,6 +76,7 @@ extern bool kernel_pack_t;
 
 extern double mass; // mass of Dirac operator
 extern double mu;
+extern double epsilon;
 
 extern QudaVerbosity verbosity;
 
@@ -123,7 +124,7 @@ void init(int argc, char **argv) {
   inv_param.kappa = 0.1;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = 0.1;
+    inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
