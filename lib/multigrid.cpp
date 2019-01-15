@@ -1027,9 +1027,9 @@ namespace quda {
     if (halo_precision == QUDA_QUARTER_PRECISION) diracSmootherSloppy->setHaloPrecision(QUDA_HALF_PRECISION);
 
     Solver *solve;
-    DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
-    DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
-    if (solverParam.inv_type == QUDA_CG_INVERTER) {
+    DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CACG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
+    DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CACG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
+    if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CACG_INVERTER) {
       solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_MG_INVERTER) {
       // in case MG has not been created, we create the Smoother

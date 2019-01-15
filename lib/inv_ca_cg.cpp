@@ -27,9 +27,11 @@ namespace quda {
       if (Q_AS) delete []Q_AS;
       if (alpha) delete []alpha;
       if (beta) delete []beta;
-      bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
-                         param.precision == param.precision_sloppy &&
-                         param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
+
+      bool use_source = false; // needed for explicit residual recompute
+                         // (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
+                         // param.precision == param.precision_sloppy &&
+                         // param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
       if (basis == QUDA_POWER_BASIS) {
         for (int i=0; i<param.Nkrylov+1; i++) if (i>0 || !use_source) delete S[i];
       } else {
@@ -543,19 +545,21 @@ namespace quda {
 
         if (nKrylov > 1) {
           // S_1 = m AS_0 + b S_0
-          Complex facs1[3] = { m_map, b_map, -1. };
-          std::vector<ColorSpinorField*> recur1{AS[0],S[0],S[1]};
+          Complex facs1[] = { m_map, b_map };
+          std::vector<ColorSpinorField*> recur1{AS[0],S[0]};
           std::vector<ColorSpinorField*> S1{S[1]};
+          blas::zero(*S[1]);
           blas::caxpy(facs1,recur1,S1);
           matSloppy(*AS[1], *S[1], tmpSloppy, tmpSloppy2);
 
           // Enter recursion relation
           if (nKrylov > 2) {
             // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
-            Complex factors[4] = { 2.*m_map, 2.*b_map, -1., -1. }; // last -1 is to cancel itself out. really need a axy
+            Complex factors[] = { 2.*m_map, 2.*b_map, -1 }; 
             for (int k = 2; k < nKrylov; k++) {
-              std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2],S[k]};
+              std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2]};
               std::vector<ColorSpinorField*> Sk{S[k]};
+              blas::zero(*S[k]);
               blas::caxpy(factors, recur2, Sk);
               matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
             }
