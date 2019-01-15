@@ -578,6 +578,16 @@ int main(int argc, char **argv)
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
     nu_pre[i] = 2;
     nu_post[i] = 2;
+
+    setup_ca_basis[i] = QUDA_POWER_BASIS;
+    setup_ca_basis_size[i] = 4;
+    setup_ca_lambda_min[i] = 0.0;
+    setup_ca_lambda_max[i] = -1.0; // use power iterations
+
+    coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
+    coarse_solver_ca_basis_size[i] = 4;
+    coarse_solver_ca_lambda_min[i] = 0.0;
+    coarse_solver_ca_lambda_max[i] = -1.0;
   }
   reliable_delta = 1e-4;
 
