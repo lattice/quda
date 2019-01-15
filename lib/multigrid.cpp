@@ -1361,9 +1361,9 @@ namespace quda {
     if (halo_precision == QUDA_QUARTER_PRECISION) diracSmootherSloppy->setHaloPrecision(QUDA_HALF_PRECISION);
 
     Solver *solve;
-    DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CACG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
-    DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CACG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
-    if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CACG_INVERTER) {
+    DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
+    DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
+    if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) {
 #ifdef ESW_MRHS
       solverParam.num_src = num_simul;
 #endif
