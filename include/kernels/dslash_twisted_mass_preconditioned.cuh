@@ -85,7 +85,7 @@ namespace quda {
         if ( doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<0,Dim>(coord, arg.dim, d, arg.nFace) : idx;
+            ghostFaceIndex<0,nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx+s*arg.dc.ghostFaceCB[d], their_spinor_parity);
