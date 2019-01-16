@@ -106,6 +106,11 @@ extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
 extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
 extern double setup_tol[QUDA_MAX_MG_LEVEL];
 extern int setup_maxiter[QUDA_MAX_MG_LEVEL];
+extern QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
+extern int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
+extern double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+extern double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
+
 extern QudaSetupType setup_type;
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
@@ -113,6 +118,11 @@ extern double omega;
 extern QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
 extern QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];
 extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+extern QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+extern int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
+extern double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+extern double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL];
+
 extern double smoother_tol[QUDA_MAX_MG_LEVEL];
 extern int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
 
