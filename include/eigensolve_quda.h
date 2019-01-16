@@ -10,6 +10,11 @@ namespace quda {
 
   void lanczosSolve(void *h_evecs, void *h_evals, const Dirac &mat,
 		    QudaEigParam *eig_param, ColorSpinorParam *cpuParam);
+  
+  void irlmSolve(void *h_evecs, void *h_evals, const Dirac &mat,
+		 QudaEigParam *eig_param, ColorSpinorParam *cpuParam);
+  
 }
 
 #endif
+  

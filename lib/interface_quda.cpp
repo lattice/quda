@@ -2380,11 +2380,12 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   //Decide how to solve the problem
   if(eig_param->use_norm_op) {
     //Problem is symmetric, use a Lanczos solver
-    lanczosSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
-    //irlmSolve(host_evecs, host_evals, *mat, eig_param, &cpuParam);
+    if(eig_param->eig_type == QUDA_LANCZOS) lanczosSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
+    else if(eig_param->eig_type == QUDA_IMP_RST_LANCZOS) irlmSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
+    else errorQuda("Solve type not implemented");
   } else {
-    //Problem is asymmetric, un an Arnoldi solver
-    errorQuda("Arnoldi solve types not yet implemented.");
+    //Problem is asymmetric, use an Arnoldi solver
+    errorQuda("Solve type not yet implemented.");
   }
   profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
   

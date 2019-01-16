@@ -69,6 +69,8 @@ extern bool compute_clover;
 
 extern int eig_nEv;
 extern int eig_nKr;
+extern int eig_check_interval;
+extern int eig_max_restarts;
 extern double eig_tol;
 extern int eig_maxiter;
 extern bool eig_use_poly_acc;
@@ -268,14 +270,13 @@ void setInvertParam(QudaInvertParam &inv_param) {
 //Parameters defining the eigensolver
 void setEigParam(QudaEigParam &eig_param) {
 
-  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.poly_deg = eig_poly_deg;
-  eig_param.a_min    = eig_amin;
-  eig_param.a_max    = eig_amax;
-
+  eig_param.eig_type = eig_type;
+  
   eig_param.nKr     = eig_nKr;
   eig_param.nEv     = eig_nEv;
   eig_param.tol     = eig_tol;
+  eig_param.check_interval = eig_check_interval;
+  eig_param.max_restarts = eig_max_restarts;
   eig_param.cuda_prec_ritz = cuda_prec;
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
@@ -285,7 +286,13 @@ void setEigParam(QudaEigParam &eig_param) {
     warningQuda("Overriding any previous choices of operator type. SVD uses MdagM operator.\n");
     eig_param.use_dagger  = QUDA_BOOLEAN_NO;
     eig_param.use_norm_op = QUDA_BOOLEAN_YES;
-  }  
+  }
+
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.poly_deg = eig_poly_deg;
+  eig_param.a_min    = eig_amin;
+  eig_param.a_max    = eig_amax;
+
 }
 
 

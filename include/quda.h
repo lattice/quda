@@ -346,6 +346,8 @@ extern "C" {
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
 
+    //EIGENSOLVER PARAMS
+    //-------------------------------------------------
     /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
 
@@ -379,19 +381,21 @@ extern "C" {
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
 
-    //EIGENSOLVER PARAMS
-    //-------------------------------------------------
     /** Number of the eigenvectors requested **/
     int nEv;
     /** Total size of Krylov space **/
-    int nKr;         
+    int nKr;
+    /** For Lanczos, check every nth step **/
+    /** For IRLM, check every nth restart **/
+    int check_interval;
+    /** For IRLM, quit after n restarts **/
+    int max_restarts;    
     //-------------------------------------------------
     
     //EIG-CG PARAMS
     //-------------------------------------------------
     int nk;
     int np;         
-    //-------------------------------------------------
     
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
@@ -422,6 +426,7 @@ extern "C" {
 
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
+    //-------------------------------------------------
 
   } QudaEigParam;
 

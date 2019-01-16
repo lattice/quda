@@ -597,9 +597,9 @@ int main(int argc, char **argv)
       
 	}
       }
-
+      
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-
+      
       void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
@@ -663,11 +663,11 @@ int main(int argc, char **argv)
       } else {
         errorQuda("Unsupported dslash_type");
       }
-
+      
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	errorQuda("Mass normalization not implemented");
       }
-
+      
       free(spinorTmp);
     }
 

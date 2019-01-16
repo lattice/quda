@@ -1740,6 +1740,8 @@ QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
 int eig_nEv = 10;
 int eig_nKr = 20;
+int eig_check_interval = 5;
+int eig_max_restarts = 5;
 double eig_tol = 1e-4;
 int eig_maxiter = 10000;
 bool eig_use_poly_acc = false;
@@ -1884,6 +1886,8 @@ void usage(char** argv )
   
   printf("    --eig-nEv <n>                             # The number of eigenmodes requested from the eigensolver\n");
   printf("    --eig-nKr <n>                             # The size of the Krylov subspace to use in the eigensolver\n");
+  printf("    --eig-check-interval <n>                  # Perform a convergence check every nth step in the eigensolver\n");
+  printf("    --eig-max-restarts <n>                    # Perform n iterations of the restart in the IRAM/IRLM eigensolver\n");
   printf("    --eig-tol <tol>                           # The tolerance to use in the eigensolver\n");
   printf("    --eig-maxiter <n>                         # The maximum iterations to use in the eigensolver\n");
   printf("    --eig-use-poly-acc <true/false>           # Use Chebyshev polynomial acceleration in the eigensolver\n");
@@ -1894,7 +1898,7 @@ void usage(char** argv )
   printf("    --eig-use-dagger <true/false>             # Solve the Mdag  problem instead of M (MMdag if eig-useNormOp == true) (default false)\n");
   printf("    --eig-compute-svd <true/false>            # Solve the MdagM problem, use to compute SVD of M (default false)\n");
   printf("    --eig-spectrum <SR/LR/SM/LM/SI/LI>        # The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary\n");
-  printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (lanczos, iram, ...)\n");
+  printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (lanczos, irlm, arnoldi, iram, trlm,...)\n");
   
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
 
@@ -3368,6 +3372,26 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     eig_nKr = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-check-interval") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_check_interval = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-max-restarts") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_max_restarts = atoi(argv[i+1]);
     i++;
     ret = 0;
     goto out;

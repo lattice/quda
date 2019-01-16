@@ -146,12 +146,33 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
+  P(poly_deg, 0);
+  P(a_min, 0.0);
+  P(a_max, 0.0);
+  P(tol, 0.0);
   P(nk, 0);
   P(np, 0);
+  P(nEv, 0);
+  P(nKr, 0);
+  P(check_interval, 0);
+  P(max_restarts, 0);
+  P(extlib_type, QUDA_EIGEN_EXTLIB);
+  P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
+  P(poly_deg, INVALID_INT);
+  P(a_min, INVALID_DOUBLE);
+  P(a_max, INVALID_DOUBLE);
+  P(tol, INVALID_DOUBLE);
   P(nk, INVALID_INT);
   P(np, INVALID_INT);
+  P(nEv, INVALID_INT);
+  P(nKr, INVALID_INT);
+  P(check_interval, INVALID_INT);
+  P(max_restarts, INVALID_INT);
+  P(extlib_type, QUDA_EXTLIB_INVALID);
+  P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
+
 
 #if defined INIT_PARAM
   P(location, QUDA_CUDA_FIELD_LOCATION);
@@ -166,7 +187,7 @@ void printQudaEigParam(QudaEigParam *param) {
 // define the appropriate function for InvertParam
 
 #if defined INIT_PARAM
-QudaInvertParam newQudaInvertParam(void) {
+ QudaInvertParam newQudaInvertParam(void) {
   QudaInvertParam ret;
   QudaInvertParam *param=&ret;
 #elif defined CHECK_PARAM
