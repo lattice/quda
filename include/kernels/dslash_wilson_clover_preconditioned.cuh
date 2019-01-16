@@ -1,3 +1,5 @@
+#pragma once
+
 #include <kernels/dslash_wilson.cuh>
 #include <linalg.cuh>
 

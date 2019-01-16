@@ -1,3 +1,5 @@
+#pragma once
+
 namespace quda {
 
 #include <dslash_index.cuh> // FIXME - remove

@@ -254,8 +254,8 @@ namespace quda {
      out = a*(1 + i*b*gamma_5) * D * in + x
 
      where D is the gauged Wilson linear operator.  This operator can
-     be applied to both single parity (checker-boarded) fields, or to
-     full fields.  For the dagger operator, we generally apply the
+     (at present) be applied to only single parity (checker-boarded)
+     fields.  For the dagger operator, we generally apply the
      conjugate transpose operator
 
      out = x + D^\dagger A^{-\dagger}
@@ -292,6 +292,86 @@ namespace quda {
   void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in, 
 			     const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
 			     const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the non-degenerate twisted-mass
+     stencil
+
+     out = a * D * in + (1 + i*b*gamma_5*tau_3 + c*tau_1) * x
+
+     where D is the gauged Wilson linear operator.  The quark fields
+     out, in and x are five dimensional, with the fifth dimension
+     corresponding to the flavor dimension.  The convention is that
+     the first 4-d slice (s=0) corresponds to the positive twist and
+     the second slice (s=1) corresponds to the negative twist.
+
+     This operator can be applied to both single parity
+     (4d checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] a Scale factor applied to Wilson term (typically -kappa)
+     @param[in] b Chiral twist factor applied (typically 2*mu*kappa)
+     @param[in] c Flavor twist factor applied (typically 2*epsilon*kappa)
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyNdegTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                            double a, double b, double c, const ColorSpinorField &x, int parity, bool dagger,
+                            const int *comm_override, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the preconditioned non-degenerate
+     twisted-mass stencil
+
+     out = a * (1 + i*b*gamma_5*tau_3 + c*tau_1) * D * in + x
+
+     where D is the gauged Wilson linear operator.  The quark fields
+     out, in and x are five dimensional, with the fifth dimension
+     corresponding to the flavor dimension.  The convention is that
+     the first 4-d slice (s=0) corresponds to the positive twist and
+     the second slice (s=1) corresponds to the negative twist.
+
+     This operator can (at present) be applied to only single parity
+     (checker-boarded) fields.
+
+     For the dagger operator, we generally apply the
+     conjugate transpose operator
+
+     out = x + D^\dagger A^{-\dagger}
+
+     with the additional asymmetric special case, where we apply do not
+     transpose the order of operations
+
+     out = A^{-\dagger} D^\dagger  (no xpay term)
+
+     This variant is required when have the asymmetric preconditioned
+     operator and require the preconditioned twist term to remain in
+     between the applications of D.  This would be combined with a
+     subsequent non-preconditioned dagger operator, A*x - kappa^2 D, to
+     form the full operator.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] a Scale factor applied to Wilson term (typically -kappa)
+     @param[in] b Chiral twist factor applied (typically 2*mu*kappa)
+     @param[in] c Flavor twist factor applied (typically 2*epsilon*kappa)
+     @param[in] xpay Whether to do xpay or not
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] asymmetric Whether this is for the asymmetric preconditioned dagger operator (a*(1 - i*b*gamma_5) * D^dagger * in)
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyNdegTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                          double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
+                                          bool asymmetric, const int *comm_override, TimeProfile &profile);
 
   // twisted mass Dslash
   void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in,
@@ -369,12 +449,13 @@ namespace quda {
      @param[in] dagger Whether this is for the dagger operator
      @param[in] parity Field parity
      @param[in] a Twisted mass scale factor (for preconditioned twisted-mass dagger operator)
-     @param[in] b Twisted mass twisted factor (for preconditioned twisted-mass dagger operator)
+     @param[in] b Twisted mass chiral twist factor (for preconditioned twisted-mass dagger operator)
+     @param[in] c Twisted mass flavor twist factor (for preconditioned non degenerate twisted-mass dagger operator)
      @param[in] stream Which stream are we executing in
   */
   void PackGhost(void *ghost[2*QUDA_MAX_DIM], const ColorSpinorField &field,
                  MemoryLocation location, int nFace, bool dagger, int parity,
-                 double a, double b, const cudaStream_t &stream);
+                 double a, double b, double c, const cudaStream_t &stream);
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)

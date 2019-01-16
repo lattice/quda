@@ -117,6 +117,7 @@
 
     double twist_a;
     double twist_b;
+    double twist_c;
 
     int Vsh; // used by contraction kernels
 
@@ -188,5 +189,6 @@
       printfQuda("tProjScale = %e\n", tProjScale);
       printfQuda("twist_a = %e\n", twist_a);
       printfQuda("twist_b = %e\n", twist_b);
+      printfQuda("twist_c = %e\n", twist_c);
     }
   };

@@ -144,9 +144,9 @@ namespace quda {
     const int nParity;    // number of parities we're working on
     bool doublet;         // whether we applying the operator to a doublet
     const int volumeCB;   // checkerboarded volume
-    RegType a;
-    RegType b;
-    RegType c;
+    RegType a; // scale factor
+    RegType b; // chiral twist
+    RegType c; // flavor twist
 
     GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
 	     RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
@@ -161,19 +161,26 @@ namespace quda {
 
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
 	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-	  a = 2.0 * kappa * mu;
-	  b = 1.0;
+	  b = 2.0 * kappa * mu;
+	  a = 1.0;
 	} else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-	  a = -2.0 * kappa * mu;
-	  b = 1.0 / (1.0 + a*a);
+	  b = -2.0 * kappa * mu;
+	  a = 1.0 / (1.0 + a*a);
 	}
 	c = 0.0;
-	if (dagger) a *= -1.0;
+	if (dagger) b *= -1.0;
       } else if (doublet) {
-	a = (twist == QUDA_TWIST_GAMMA5_INVERSE) ? -2.0 * kappa * mu : 2.0 * kappa * mu;
-	b = 2.0 * kappa * epsilon;
-	c = 1.0 / (1.0 + a*a - b*b);
-	if (c<=0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
+	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+          b = 2.0 * kappa * mu;
+          c = -2.0 * kappa * epsilon;
+          a = 1.0;
+        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
+          b = -2.0 * kappa * mu;
+          c = 2.0 * kappa * epsilon;
+          a = 1.0 / (1.0 + b*b - c*c);
+          if (a<=0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
+        }
+	if (dagger) b *= -1.0;
       }
     }
   };
@@ -294,12 +301,12 @@ namespace quda {
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
 	if (!doublet) {
 	  ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-	  arg.out(x_cb, parity) = arg.b*(in + arg.a*in.igamma(arg.d));
+	  arg.out(x_cb, parity) = arg.a*(in + arg.b*in.igamma(arg.d));
 	} else {
 	  ColorSpinor<RegType,nColor,4> in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
 	  ColorSpinor<RegType,nColor,4> in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
-	  arg.out(x_cb+0*arg.volumeCB, parity) = arg.c*(in_1 - arg.a*in_1.igamma(arg.d) + arg.b*in_2);
-	  arg.out(x_cb+1*arg.volumeCB, parity) = arg.c*(in_2 + arg.a*in_2.igamma(arg.d) + arg.b*in_1);
+	  arg.out(x_cb+0*arg.volumeCB, parity) = arg.a*(in_1 + arg.b*in_1.igamma(arg.d) + arg.c*in_2);
+	  arg.out(x_cb+1*arg.volumeCB, parity) = arg.a*(in_2 - arg.b*in_2.igamma(arg.d) + arg.c*in_1);
 	}
       } // 4-d volumeCB
     } // parity
@@ -317,12 +324,12 @@ namespace quda {
 
     if (!doublet) {
       ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-      arg.out(x_cb, parity) = arg.b*(in + arg.a*in.igamma(d));
+      arg.out(x_cb, parity) = arg.a*(in + arg.b*in.igamma(d));
     } else {
       ColorSpinor<RegType,nColor,4> in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
       ColorSpinor<RegType,nColor,4> in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
-      arg.out(x_cb+0*arg.volumeCB, parity) = arg.c*(in_1 - arg.a*in_1.igamma(d) + arg.b*in_2);
-      arg.out(x_cb+1*arg.volumeCB, parity) = arg.c*(in_2 + arg.a*in_2.igamma(d) + arg.b*in_1);
+      arg.out(x_cb+0*arg.volumeCB, parity) = arg.a*(in_1 + arg.b*in_1.igamma(d) + arg.c*in_2);
+      arg.out(x_cb+1*arg.volumeCB, parity) = arg.a*(in_2 - arg.b*in_2.igamma(d) + arg.c*in_1);
     }
   }
 

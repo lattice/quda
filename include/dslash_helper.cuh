@@ -255,15 +255,16 @@ namespace quda {
 
     // these are set with symmetric preconditioned twisted-mass dagger
     // operator for the packing (which needs to a do a twist)
-    real twist_a;
-    real twist_b;
+    real twist_a; // scale factor
+    real twist_b; // chiral twist
+    real twist_c; // flavor twist
 
     DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
       : parity(parity), nParity(in.SiteSubset()), nFace(1), reconstruct(U.Reconstruct()),
         X0h(nParity == 2 ? in.X(0)/2 : in.X(0)), dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
         volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(kappa == 0.0 ? false : true),
         kernel_type(INTERIOR_KERNEL), threads(in.VolumeCB()), threadDimMapLower{ }, threadDimMapUpper{ },
-        twist_a(0.0), twist_b(0.0)
+        twist_a(0.0), twist_b(0.0), twist_c(0.0)
     {
       for (int d=0; d<4; d++) {
         ghostDim[d] = comm_dim_partitioned(d);
@@ -302,6 +303,9 @@ namespace quda {
     for (int i=0; i<4; i++) out << arg.threadDimMapLower[i] << (i<3 ? ", " : " }"); out << std::endl;
     out << "threadDimMapUpper = { ";
     for (int i=0; i<4; i++) out << arg.threadDimMapUpper[i] << (i<3 ? ", " : " }"); out << std::endl;
+    out << "twist_a = " << arg.twist_a;
+    out << "twist_b = " << arg.twist_b;
+    out << "twist_c = " << arg.twist_c;
     return out;
   }
 

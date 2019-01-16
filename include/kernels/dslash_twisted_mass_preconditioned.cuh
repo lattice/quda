@@ -1,3 +1,5 @@
+#pragma once
+
 #include <kernels/dslash_wilson.cuh>
 
 namespace quda {
@@ -7,15 +9,16 @@ namespace quda {
     typedef typename mapper<Float>::type real;
     real a; // this is the scaling factor
     real b; // this is the twist factor
+    real c; // dummy parameter to allow us to reuse applyWilsonTM for non-degenerate operator
     real a_inv; // inverse scaling factor - used to allow early xpay inclusion
     real b_inv; // inverse twist factor - used to allow early xpay inclusion
-    bool asymmetric; // whether we are applying the asymetric operator or not
+    bool asymmetric; // whether we are applying the asymetric operator or notb
 
     TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    double a, double b, bool xpay, const ColorSpinorField &x,
                    int parity, bool dagger, bool asymmetric, const int *comm_override)
       : WilsonArg<Float,nColor,reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
-      a(a), b(dagger ? -b : b), a_inv(1.0 / (a*(1 + b*b)) ), b_inv(dagger ? b : -b), asymmetric(asymmetric) // if dagger flip the twist
+      a(a), b(dagger ? -b : b), c(0.0), a_inv(1.0 / (a*(1 + b*b)) ), b_inv(dagger ? b : -b), asymmetric(asymmetric) // if dagger flip the twist
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {
@@ -39,9 +42,11 @@ namespace quda {
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, int twist,
+            KernelType kernel_type, typename Arg, typename Vector>
   __device__ __host__ inline void applyWilsonTM(Vector &out, Arg &arg, int coord[nDim], int x_cb, int s,
                                                 int parity, int idx, int thread_dim, bool &active) {
+    static_assert(twist==1||twist==2, "twist template must equal 1 or 2"); // ensure singlet or doublet
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,2> HalfVector;
     typedef Matrix<complex<real>,nColor> Link;
@@ -68,8 +73,16 @@ namespace quda {
         } else if ( doBulk<kernel_type>() && !ghost ) {
 
           Link U = arg.U(d, x_cb, parity);
-          Vector in = arg.in(fwd_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
-          in = arg.a * (in + arg.b*in.igamma(4)); // apply A^{-1} to in
+          Vector in;
+          if (twist == 1) {
+            in = arg.in(fwd_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
+            in = arg.a * (in + arg.b*in.igamma(4)); // apply A^{-1} to in
+          } else { // twisted doublet
+            Vector in0 = arg.in(fwd_idx+0*arg.dc.volume_4d_cb, their_spinor_parity);
+            Vector in1 = arg.in(fwd_idx+1*arg.dc.volume_4d_cb, their_spinor_parity);
+            if (s==0) in = arg.a * (in0 + arg.b*in0.igamma(4) + arg.c*in1);
+            else      in = arg.a * (in1 - arg.b*in1.igamma(4) + arg.c*in0);
+          }
 
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -95,8 +108,16 @@ namespace quda {
         } else if ( doBulk<kernel_type>() && !ghost ) {
 
           Link U = arg.U(d, gauge_idx, 1-parity);
-          Vector in = arg.in(back_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
-          in = arg.a * (in + arg.b*in.igamma(4)); // apply A^{-1} to in
+          Vector in;
+          if (twist == 1) {
+            in = arg.in(back_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
+            in = arg.a * (in + arg.b*in.igamma(4)); // apply A^{-1} to in
+          } else { // twisted doublet
+            Vector in0 = arg.in(back_idx+0*arg.dc.volume_4d_cb, their_spinor_parity);
+            Vector in1 = arg.in(back_idx+1*arg.dc.volume_4d_cb, their_spinor_parity);
+            if (s==0) in = arg.a * (in0 + arg.b*in0.igamma(4) + arg.c*in1);
+            else      in = arg.a * (in1 - arg.b*in1.igamma(4) + arg.c*in0);
+          }
 
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -129,7 +150,7 @@ namespace quda {
     if (!dagger || asymmetric) // defined in dslash_wilson.cuh
       applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
     else // special dslash for symmetric dagger
-      applyWilsonTM<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+      applyWilsonTM<Float,nDim,nColor,nParity,dagger,1,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
 
     if (xpay && kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
