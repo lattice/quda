@@ -349,6 +349,17 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
+
+    // Basis to use for CA-CGN(E/R) setup
+    mg_param.setup_ca_basis[i] = setup_ca_basis[i];
+
+    // Basis size for CACG setup
+    mg_param.setup_ca_basis_size[i] = setup_ca_basis_size[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis setup
+    mg_param.setup_ca_lambda_min[i] = setup_ca_lambda_min[i];
+    mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
+
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 96 : nvec[i]; // default to 96 vectors if not set
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
@@ -363,6 +374,16 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.coarse_solver[i] = coarse_solver[i];
     mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
     mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
+
+     // Basis to use for CA-CGN(E/R) coarse solver
+    mg_param.coarse_solver_ca_basis[i] = coarse_solver_ca_basis[i];
+
+    // Basis size for CACG coarse solver/
+    mg_param.coarse_solver_ca_basis_size[i] = coarse_solver_ca_basis_size[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis
+    mg_param.coarse_solver_ca_lambda_min[i] = coarse_solver_ca_lambda_min[i];
+    mg_param.coarse_solver_ca_lambda_max[i] = coarse_solver_ca_lambda_max[i];
 
     mg_param.smoother[i] = smoother_type[i];
 
