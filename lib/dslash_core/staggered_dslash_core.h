@@ -441,6 +441,7 @@ if (threadId.z & 1)
     if ( (kernel_type == EXTERIOR_KERNEL_X)){
       int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;	
       nbr_idx1 = param.ghostOffset[0][1] + src_idx*NFACE*param.dc.ghostFaceCB[0] + (y[0]-(X[0]-1))*param.dc.ghostFaceCB[0]+ space_con;
+       printf("Halo (%i %i %i %i), ga_idx %i nbr_idx1 %i sid %i full_idx %i\n",y[0],y[1],y[2],y[3], ga_idx,  nbr_idx1 - param.ghostOffset[0][1], sid, full_idx);
       stride1 = NFACE*param.dc.ghostFaceCB[0]*param.dc.Ls;
 #if (DD_PREC == 2) //half precision
       norm_idx1 = param.ghostNormOffset[0][1] + src_idx*NFACE*param.dc.ghostFaceCB[0] + (y[0]-(X[0]-1))*param.dc.ghostFaceCB[0]+ space_con;
@@ -454,6 +455,8 @@ if (threadId.z & 1)
       o01_im += A1_im;
       o02_re += A2_re;
       o02_im += A2_im;
+ // printf("Halo (%i %i %i %i), ga_idx %i nbr_idx1 %i sid %i full_idx %i\n",y[0],y[1],y[2],y[3], ga_idx,  nbr_idx1 - param.ghostOffset[0][1], sid, full_idx);
+ printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",y[0],y[1],y[2],y[3], ga_idx,  nbr_idx1 - param.ghostOffset[0][1], sid, full_idx, A0_re, A0_im, A0_re, A0_im,o00_re,o00_im);
     }else 
 #endif
     {

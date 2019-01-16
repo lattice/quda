@@ -1183,9 +1183,9 @@ namespace quda {
 	if (ghostExchange_==QUDA_GHOST_EXCHANGE_PAD ||
             (ghostExchange_==QUDA_GHOST_EXCHANGE_INVALID && ghostExchange!=QUDA_GHOST_EXCHANGE_EXTENDED) ) {
 	  if ( idx >= firstTimeSliceBound ) { // halo region on the first time slice
-	    return isFirstTimeSlice ? tBoundary*scale : scale;
+	    return isFirstTimeSlice ? tBoundary : scale;
 	  } else if ( idx >= lastTimeSliceBound ) { // last link on the last time slice
-	    return isLastTimeSlice ? tBoundary*scale : scale;
+	    return isLastTimeSlice ? tBoundary : scale;
 	  } else {
 	    return scale;
 	  }
@@ -1193,10 +1193,10 @@ namespace quda {
                    (ghostExchange_==QUDA_GHOST_EXCHANGE_INVALID && ghostExchange==QUDA_GHOST_EXCHANGE_EXTENDED) ) {
 	  if ( idx >= (R[3]-1)*X[0]*X[1]*X[2]/2 && idx < R[3]*X[0]*X[1]*X[2]/2 ) {
 	    // the boundary condition is on the R[3]-1 time slice
-	    return isFirstTimeSlice ? tBoundary*scale : scale;
+	    return isFirstTimeSlice ? tBoundary : scale;
 	  } else if ( idx >= (X[3]-R[3]-1)*X[0]*X[1]*X[2]/2 && idx < (X[3]-R[3])*X[0]*X[1]*X[2]/2 ) {
 	    // the boundary condition lies on the X[3]-R[3]-1 time slice
-	    return isLastTimeSlice ? tBoundary*scale : scale;
+	    return isLastTimeSlice ? tBoundary : scale;
 	  } else {
 	    return scale;
 	  }
@@ -1717,6 +1717,7 @@ namespace quda {
         // The phases come after the ghost matrices
         reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase, X, R);
 
+#if 0
 	// FIXME - this is a hack from hell - needs to be moved into the reconstruct type
 	if (stag_phase == QUDA_STAGGERED_PHASE_MILC && reconLenParam == 12) {
     Float sign=1;
@@ -1746,6 +1747,7 @@ namespace quda {
 #pragma unroll
 	  for (int i=12; i<18; i++) v[i] *= sign;
 	}
+  #endif
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {

@@ -259,6 +259,8 @@ void init()
   } else {
     gaugeParam.scale = 1.0;
   }
+
+  // gaugeParam.scale = 1.0;
   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
@@ -843,16 +845,16 @@ static int dslashTest()
 
 
 
-// int xx[4];
+int xx[4];
     // for verification
-// for(int i=0; i< 128; i++){
+ for(int i=0; i< 128; i++){
 
-//     mwgetCoords(xx, (i), X, 0);
-//     printfQuda("%i : %i %i %i %i CUDA: %f", i,xx[0], xx[1], xx[2], xx[3], ((double*)(spinorOut->V()))[6*i+4]);
-//     printfQuda("\tCPU:  %f\n", ((double*)(spinorRef->V()))[6*i+4]);
-//         printfQuda("%i : %i %i %i %i CUDA: %f", i,xx[0], xx[1], xx[2], xx[3], ((double*)(spinorOut->V()))[6*i+5]);
-//     printfQuda("\tCPU:  %f\n", ((double*)(spinorRef->V()))[6*i+5]);
-// }
+    mwgetCoords(xx, (i), X, 0);
+    printfQuda("%i : %i %i %i %i CUDA: %f", i,xx[0], xx[1], xx[2], xx[3], ((double*)(spinorOut->V()))[6*i+4]);
+    printfQuda("\tCPU:  %f\n", ((double*)(spinorRef->V()))[6*i+4]);
+        printfQuda("%i : %i %i %i %i CUDA: %f", i,xx[0], xx[1], xx[2], xx[3], ((double*)(spinorOut->V()))[6*i+5]);
+    printfQuda("\tCPU:  %f\n", ((double*)(spinorRef->V()))[6*i+5]);
+}
     // Catching nans is weird.
     if (std::isnan(spinor_ref_norm2)) { failed = true; }
     if (std::isnan(spinor_out_norm2)) { failed = true; }

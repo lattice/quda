@@ -92,11 +92,12 @@ namespace quda {
      @param[out] the dimension we are working on (fused kernel only)
      @return checkerboard space-time index
   */
-  template <int nDim, QudaDWFPCType pc_type, KernelType kernel_type, typename Arg>
+  template <int nDim, QudaDWFPCType pc_type, KernelType kernel_type, typename Arg, int nface_=1>
   __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity, int &dim) {
 
     
-    constexpr int nface_=1;
+    //MWTODO - needed for improved staggered
+    // constexpr int nface_=3;
     int x_cb, X;
     dim = kernel_type; // keep compiler happy
     if (kernel_type == INTERIOR_KERNEL) {
@@ -105,8 +106,8 @@ namespace quda {
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
-      const int face_num = idx >= arg.dc.ghostFaceCB[kernel_type];
-      idx -= face_num*arg.dc.ghostFaceCB[kernel_type];
+      const int face_num = idx >= nface_*arg.dc.ghostFaceCB[kernel_type];
+      idx -= face_num*nface_*arg.dc.ghostFaceCB[kernel_type]; //MW: maybe this be FaceVolumeCB
       coordsFromFaceIndex<nDim,pc_type,kernel_type,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
 
     } else { // fused kernel
@@ -114,26 +115,26 @@ namespace quda {
       // work out which dimension this thread corresponds to, then compute coords
       if (idx < arg.threadDimMapUpper[0]) { // x face
         dim = 0;
-        const int face_num = idx >= arg.dc.ghostFaceCB[0];
-        idx -= face_num*arg.dc.ghostFaceCB[0];
+        const int face_num = idx >= nface_*arg.dc.ghostFaceCB[0];
+        idx -= nface_*face_num*arg.dc.ghostFaceCB[0];
         coordsFromFaceIndex<nDim,pc_type,0,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[1]) { // y face
         dim = 1;
         idx -= arg.threadDimMapLower[1];
-        const int face_num = idx >= arg.dc.ghostFaceCB[1];
-        idx -= face_num*arg.dc.ghostFaceCB[1];
+        const int face_num = idx >= nface_*arg.dc.ghostFaceCB[1];
+        idx -= nface_*face_num*arg.dc.ghostFaceCB[1];
         coordsFromFaceIndex<nDim,pc_type,1,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[2]){ // z face
         dim = 2;
         idx -= arg.threadDimMapLower[2];
-        const int face_num = idx >= arg.dc.ghostFaceCB[2];
-        idx -= face_num*arg.dc.ghostFaceCB[2];
+        const int face_num = idx >= nface_*arg.dc.ghostFaceCB[2];
+        idx -= nface_*face_num*arg.dc.ghostFaceCB[2];
         coordsFromFaceIndex<nDim,pc_type,2,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       } else { // t face
         dim = 3;
         idx -= arg.threadDimMapLower[3];
-        const int face_num = idx >= arg.dc.ghostFaceCB[3];
-        idx -= face_num*arg.dc.ghostFaceCB[3];
+        const int face_num = idx >= nface_*arg.dc.ghostFaceCB[3];
+        idx -= nface_*face_num*arg.dc.ghostFaceCB[3];
         coordsFromFaceIndex<nDim,pc_type,3,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       }
 

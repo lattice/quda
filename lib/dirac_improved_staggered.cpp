@@ -1,7 +1,7 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 
-#define NEW_DSLASH
+//#define NEW_DSLASH
 
 namespace quda {
 
@@ -54,16 +54,31 @@ namespace quda {
   {
     checkParitySpinor(in, out);
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-#ifndef NEW_DSLASH
+
+  char *enable_newd_env = getenv("QUDA_NEWD");
+
+  // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
+  // and comm_dim(dim) == 2 (used for perf benchmarking)
+  int enable_newd = 0;
+
+  if (enable_newd_env) {
+    enable_newd = atoi(enable_newd_env);
+  }
+// #ifndef NEW_DSLASH
+   if (enable_newd==0){
+    printfQuda("OLD STAGGERED Dslash ...\n");
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 				  &static_cast<const cudaColorSpinorField&>(in), parity, 
 				  dagger, 0, 0, commDim, profile);
-#else
+   }
+//#else
+  else{
     constexpr bool improved = true;
-
+    printfQuda("NEW STAGGERED Dslash ...\n");
     ApplyDslashStaggered(out, in, fatGauge, longGauge , 0., in,
                          parity, dagger, improved, commDim, profile);
-#endif
+}
+//#endif
     } else {
       errorQuda("Not supported");
     }  
