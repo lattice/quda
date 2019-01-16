@@ -548,15 +548,20 @@ namespace quda {
 
   private:
     // TODO: add all the eofa parameters that don't already exist in the base classes. 
-
+    // TODO: For a test just set the values here.
+    // FIXME: Need to fix the interface later
+    double mq1, mq2, mq3, eofa_norm, eofa_shift;
+    int eofa_pm;
   public:
     DiracMobiusPCEofa(const DiracParam &param);
     DiracMobiusPCEofa(const DiracMobiusPC &dirac);
     virtual ~DiracMobiusPCEofa();
     DiracMobiusPCEofa& operator=(const DiracMobiusPC &dirac);
 
-    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void dslash5_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    // void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    // void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
   };
 
   // Full twisted mass

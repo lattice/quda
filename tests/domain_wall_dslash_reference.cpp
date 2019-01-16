@@ -401,6 +401,49 @@ void dslashReference_5th(sFloat *res, sFloat *spinorField,
 }
 
 //Currently we consider only spacetime decomposition (not in 5th dim), so this operator is local
+template<QudaDWFPCType type, bool zero_initialize=false, typename sFloat>
+void mdw_m5_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm) {
+  // res: the output spinor field
+  // spinorField: the input spinor field
+  // oddBit: even-odd bit
+  // daggerBit: dagger or not
+  // mferm: m_f
+  //
+  for (int i = 0; i < V5h; i++) {
+    if (zero_initialize) for(int one_site = 0 ; one_site < 24 ; one_site++)
+      res[i*(4*3*2)+one_site] = 0.0;
+    for (int dir = 8; dir < 10; dir++) {
+      // Calls for an extension of the original function.
+      // 8 is forward hop, which wants P_+, 9 is backward hop,
+      // which wants P_-.  Dagger reverses these.
+      sFloat *spinor = spinorNeighbor_5d<type>(i, dir, oddBit, spinorField);
+      sFloat projectedSpinor[4*3*2];
+      int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
+      multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
+      //J  Need a conditional here for s=0 and s=Ls-1.
+      int X = (type == QUDA_5D_PC) ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
+      int xs = X/(Z[3]*Z[2]*Z[1]*Z[0]);
+
+      if ( (xs == 0 && dir == 9) || (xs == Ls-1 && dir == 8) ) {
+        ax(projectedSpinor,(sFloat)(-mferm),projectedSpinor,4*3*2);
+      }
+      
+      sFloat kappa = 1.;
+
+      // kappa*D5
+      ax(projectedSpinor,(sFloat)(kappa),projectedSpinor,4*3*2);
+      // 1+kappa*D5
+      sum(&res[i*(4*3*2)], &spinorField[i*(4*3*2)], projectedSpinor, 4*3*2);
+    }
+    if(daggerBit == 0){
+      
+    }else{
+    
+    }
+  }
+}
+
+//Currently we consider only spacetime decomposition (not in 5th dim), so this operator is local
 template <typename sFloat>
 void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, 
                              int oddBit, int daggerBit, sFloat mferm, double *kappa) {

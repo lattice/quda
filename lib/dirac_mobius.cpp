@@ -717,5 +717,33 @@ namespace quda {
     long long Ls = in.X(4);
     flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
+ 
+  // DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracParam &param) : DiracMobiusPC(param) {  }
+
+  // DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracMobiusPCEofa &dirac) : DiracMobiusPC(dirac) {  }
+
+  DiracMobiusPCEofa::~DiracMobiusPCEofa() { }
+/*
+  DiracMobiusPCEofa& DiracMobiusPCEofa::operator=(const DiracMobiusPCEofa &dirac)
+  {
+    if (&dirac != this) {
+      DiracMobiusPC::operator=(dirac);
+    }
+
+    return *this;
+  }
+*/ 
+  void DiracMobiusPCEofa::dslash5_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, m5_eofa);
+   
+    long long Ls = in.X(4);
+    // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+  }
 
 } // namespace quda

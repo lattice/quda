@@ -185,7 +185,18 @@ namespace quda {
         ColorSpinorField& y, const ColorSpinorField& x, double m_f, double m_5,
         const Complex* b_5, const Complex* c_5, bool dagger, int parity, int shift[4], int halo_shift[4],
         const double scale, MdwfFusedDslashType type);
-
+  
+  // The EOFA stuff
+  namespace mobius_eofa{
+  
+  void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+    double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a,
+    const double mq1, const double mq2, const double mq3,
+    const int eofa_pm, const double eofa_norm, const double eofa_shift,
+    bool dagger, Dslash5Type type);
+  
+  }
+  
   // domain wall Dslash  
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 			    const int parity, const int dagger, const cudaColorSpinorField *x,
