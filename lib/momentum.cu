@@ -87,7 +87,7 @@ using namespace gauge;
     int parity = threadIdx.y;
     double action = 0.0;
     
-    if(x < arg.threads) {  
+    while (x < arg.threads) {
       // loop over direction
       for (int mu=0; mu<4; mu++) {
 	Float v[10];
@@ -99,6 +99,8 @@ using namespace gauge;
 	local_sum -= 4.0;
 	action += local_sum;
       }
+
+      x += blockDim.x*gridDim.x;
     }
     
     // perform final inter-block reduction and write out result
@@ -111,7 +113,7 @@ using namespace gauge;
     const GaugeField &meta;
 
   private:
-    unsigned int minThreads() const { return arg.threads; }
+    bool tuneGridDim() const { return true; }
 
   public:
     MomAction(MomActionArg<Mom> &arg, const GaugeField &meta) : arg(arg), meta(meta) {}
@@ -263,7 +265,7 @@ using namespace gauge;
     const GaugeField &meta;
 
   private:
-    unsigned int minThreads() const { return arg.threads; }
+    bool tuneGridDim() const { return true; }
 
   public:
     UpdateMom(Arg &arg, const GaugeField &meta) : arg(arg), meta(meta) {}

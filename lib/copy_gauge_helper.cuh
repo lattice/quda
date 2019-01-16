@@ -22,6 +22,11 @@ namespace quda {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return size; }
 
+    bool advanceTuneParam(TuneParam &param) const {
+      // only do autotuning if we are doing the copy on the GPU
+      return location == QUDA_CUDA_FIELD_LOCATION ? TunableVectorYZ::advanceTuneParam(param) : false;
+    }
+
 public:
     CopyGauge(Arg &arg, const GaugeField &out, const GaugeField &in, QudaFieldLocation location)
 #ifndef FINE_GRAINED_ACCESS
@@ -33,7 +38,7 @@ public:
 
       set_ghost(is_ghost); // initial state is not ghost
 
-      strcpy(aux, compile_type_str(in));
+      strcpy(aux, compile_type_str(in,location));
       strcat(aux, "out:");
       strcat(aux, out.AuxString());
       strcat(aux, ",in:");
@@ -82,7 +87,7 @@ public:
         } else {
           copyGhost<FloatOut, FloatIn, length>(arg);
         }
-      } else {
+      } else if (location == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel(!is_ghost ? "quda::copyGaugeKernel" : "quda::copyGhostKernel")
@@ -97,6 +102,8 @@ public:
             <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         }
 #endif
+      } else {
+        errorQuda("Invalid field location %d\n", location);
       }
     }
 
