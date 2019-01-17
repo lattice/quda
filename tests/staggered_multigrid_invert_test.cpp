@@ -240,6 +240,46 @@ void computeHISQLinksGPU(void** fatlink, void** longlink,
 
 }
 
+void computePlaquetteQDPOrder(void** qdp_link, double plaq[3]) {
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  gauge_param.X[0] = xdim;
+  gauge_param.X[1] = ydim;
+  gauge_param.X[2] = zdim;
+  gauge_param.X[3] = tdim;
+
+  gauge_param.type = QUDA_WILSON_LINKS;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+
+  gauge_param.cpu_prec = cpu_prec;
+
+  gauge_param.cuda_prec = prec;
+  gauge_param.reconstruct = link_recon;
+
+  gauge_param.cuda_prec_sloppy = prec;
+  gauge_param.reconstruct_sloppy = link_recon;
+
+  gauge_param.anisotropy = 1;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
+  gauge_param.ga_pad = 0;
+  // For multi-GPU, ga_pad must be large enough to store a time-slice
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
+  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  int pad_size =MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+  gauge_param.ga_pad = pad_size;
+#endif
+
+  loadGaugeQuda(qdp_link, &gauge_param);
+  plaqQuda(plaq);
+
+}
+
 QudaPrecision &cpu_prec = prec;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
@@ -700,7 +740,6 @@ int main(int argc, char **argv)
   void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* milc_inlink = nullptr;
   void* milc_fatlink = nullptr;
   void* milc_longlink = nullptr;
 
@@ -710,7 +749,6 @@ int main(int argc, char **argv)
     qdp_longlink[dir] = malloc(V*gaugeSiteSize*gSize);
   }
 
-  milc_inlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_longlink = malloc(4*V*gaugeSiteSize*gSize);
 
@@ -730,16 +768,13 @@ int main(int argc, char **argv)
   }
 
   // Compute plaquette
-  reorderQDPtoMILC(milc_inlink,qdp_inlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
   double plaq[3];
-  loadGaugeQuda(milc_inlink, &gauge_param);
-  plaqQuda(plaq);
+  computePlaquetteQDPOrder(qdp_inlink, plaq);
   if (dslash_type != QUDA_LAPLACE_DSLASH) {
     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
     plaq[1] = -plaq[1];
     plaq[2] = -plaq[2];
   }
-  free(milc_inlink);
 
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
@@ -837,24 +872,22 @@ int main(int argc, char **argv)
 
   }
 
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+
+    computePlaquetteQDPOrder(qdp_fatlink, plaq);
+    if (dslash_type != QUDA_LAPLACE_DSLASH) {
+      plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
+      plaq[1] = -plaq[1];
+      plaq[2] = -plaq[2];
+    }
+
+    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  }
+
   // Alright, we've created all the void** links.
   // Create the void* pointers
   reorderQDPtoMILC(milc_fatlink,qdp_fatlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink,qdp_longlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
-
-
-  // Just out of curiosity, look at the fat link plaquette
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    double plaq[3];
-    loadGaugeQuda(milc_fatlink, &gauge_param);
-    plaqQuda(plaq);
-
-    plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
-    plaq[1] = -plaq[1];
-    plaq[2] = -plaq[2];
-
-    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  }
 
 
   ColorSpinorParam csParam;
