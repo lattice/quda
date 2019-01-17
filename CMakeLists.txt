@@ -546,7 +546,7 @@ endif(QUDA_CONTRACT)
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
 
 # derive whether we need to build the fortran interface
-if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
+if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD OR QUDA_ARPACK)
   SET(BUILD_FORTRAN_INTERFACE ON)
   enable_language(Fortran)
 endif()

@@ -430,55 +430,6 @@ extern "C" {
 
   } QudaEigParam;
 
-#if 0
-  // Parameter set for using the ARPACK interface.    
-  typedef struct QudaArpackParam_s {
-
-    /** Specifies the problem type to be solved by Arpack **/
-    int arpackMode;
-    
-    /** Number of the eigenvectors requested **/
-    int nEv;
-
-    /** Total size of Krylov space **/
-    int nKv;         
-
-    /** Which part of the spectrum to solve **/
-    QudaArpackSpectrumType spectrum;
-    
-    /** Use Polynomial Acceleration **/
-    QudaBoolean usePolyAcc;
-
-    /** degree of the Chebysev polynomial **/
-    int polyDeg;
-
-    /** Range used in polynomial acceleration **/
-    double amin;    
-    double amax;
-    
-    /** Tolerance on the least well known eigenvalue **/
-    double arpackTol;
-
-    /** Maximum allowed iteration in the Arpack solver **/
-    int arpackMaxiter;
-
-    /** Name of the logfile to store Arpack's stdout **/    
-    char arpackLogfile[512];
-
-    /** Precision to be used in Arpack **/    
-    QudaPrecision arpackPrec;
-     
-    /** What type of Dirac operator we are using **/
-    /** If !(useNormOp && useDagger) use M. **/
-    /** If useDagger == true, use Mdag  instead of M. **/
-    /** If useNormOp == true, use MdagM instead of M. **/
-    /** If useNormOp && useDagger use MMdag. **/    
-    QudaBoolean useDagger;
-    QudaBoolean useNormOp;    
-
-  } QudaArpackParam;
-#endif
-
   typedef struct QudaMultigridParam_s {
 
     QudaInvertParam *invert_param;

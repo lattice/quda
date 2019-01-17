@@ -2,7 +2,7 @@
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu
-  eigensolve_quda.cpp  
+  eigensolve_quda.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
@@ -59,7 +59,7 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
-  quda_cuda_api.cpp quda_arpack_interface.cpp deflation.cpp checksum.cu version.cpp )
+  quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp )
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})
