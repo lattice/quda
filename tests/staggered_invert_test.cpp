@@ -186,7 +186,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   int pad_size =MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gaugeParam->ga_pad = 3*pad_size;    
+  gaugeParam->ga_pad = pad_size;    
 #endif
 
 
