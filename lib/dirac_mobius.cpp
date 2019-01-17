@@ -531,10 +531,11 @@ namespace quda {
       flops += 1320LL*(long long)sp_idx_length*Ls + 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL) + 72LL*(long long)sp_idx_length*Ls + 96LL*bulk + 120LL*wall;
     }
   }
+
 	// The "new" fused kernel 
   void DiracMobiusPC::fused_f0(ColorSpinorField &out, const ColorSpinorField &in,
     const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const
-  {
+  {  
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -543,8 +544,12 @@ namespace quda {
       dagger, parity, shift, halo_shift, scale, dslash4_dslash5pre_dslash5inv);
     
     long long Ls = in.X(4);
-		long long vol = (in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
-    flops += vol*24ll*8ll*6ll + vol*24ll*Ls*4ll;
+		long long vol = (2*in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
+ 	  long long halo_vol = (2*in.X(0)-2*halo_shift[0])*(in.X(1)-2*halo_shift[1])*
+      (in.X(2)-2*halo_shift[2])*(in.X(3)-2*halo_shift[3])*Ls/2ll;
+    const long long hop = 7ll*8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
+    const long long mat = 2ll*4ll*Ls-1ll;
+    flops += halo_vol*24ll*hop + vol*24ll*mat;
   }
   
   void DiracMobiusPC::fused_f2(ColorSpinorField &out, const ColorSpinorField &in,
@@ -558,8 +563,10 @@ namespace quda {
       dagger, parity, shift, halo_shift, scale, dslash4dag_dslash5predag_dslash5invdag);
     
     long long Ls = in.X(4);
-		long long vol = (in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
-    flops += vol*24ll*8ll*6ll + vol*24ll*Ls*4ll;
+		long long vol = (2*in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
+    const long long hop = 7ll*8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
+    const long long mat = 2ll*4ll*Ls-1ll;
+    flops += vol*24ll*(hop+mat);
   }
   
   void DiracMobiusPC::fused_f1(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -574,15 +581,19 @@ namespace quda {
       dagger, parity, shift, halo_shift, scale, dslash4_dslash5inv_dslash5invdag);
     
     long long Ls = in.X(4);
-		long long vol = (in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
-    flops += vol*24ll*8ll*6ll + vol*24ll*Ls*4ll;
+		long long vol = (2*in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
+		long long halo_vol = (2*in.X(0)-2*halo_shift[0])*(in.X(1)-2*halo_shift[1])*
+      (in.X(2)-2*halo_shift[2])*(in.X(3)-2*halo_shift[3])*Ls/2ll;
+    const long long hop = 7ll*8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
+    const long long mat = 2ll*4ll*Ls-1ll;
+    flops += halo_vol*24ll*hop + vol*24ll*2ll*mat;
   }
   
   void DiracMobiusPC::fused_f3(ColorSpinorField &out, const ColorSpinorField &in, 
     const ColorSpinorField& aux_in,
     const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+   if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
@@ -590,14 +601,16 @@ namespace quda {
       dagger, parity, shift, halo_shift, scale, dslash4dag_dslash5predag);
     
     long long Ls = in.X(4);
-		long long vol = (in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
-    flops += vol*24ll*8ll*6ll + vol*24ll*Ls*4ll + vol*24ll*Ls*4ll;
+		long long vol = (2*in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
+    const long long hop = 7ll*8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
+    const long long mat = 2ll*4ll*Ls-1ll;
+    flops += vol*24ll*(hop+mat);
   }
   
   void DiracMobiusPC::fused_f4(ColorSpinorField &out, const ColorSpinorField &in, 
     const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+   if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
@@ -605,8 +618,10 @@ namespace quda {
       dagger, parity, shift, halo_shift, scale, dslash5pre);
     
     long long Ls = in.X(4);
-		long long vol = (in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
-    flops += vol*24ll*Ls*4ll;
+		long long vol = (2*in.X(0)-2*shift[0])*(in.X(1)-2*shift[1])*(in.X(2)-2*shift[2])*(in.X(3)-2*shift[3])*Ls/2ll;
+    // const long long hop = 7ll*8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
+    const long long mat = 2ll*4ll*Ls-1ll;
+    flops += vol*24ll*mat;
   }
 	
   void DiracMobiusPC::dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
@@ -742,7 +757,7 @@ namespace quda {
 
     mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, m5_eofa);
    
-    long long Ls = in.X(4);
+    // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
 

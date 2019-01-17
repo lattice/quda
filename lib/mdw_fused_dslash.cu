@@ -213,12 +213,13 @@ namespace quda {
     @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha*M5inv operator
     The kernels type(type_) will be specified in some documentations. 
   */
-  template<class storage_type, int block_dim_x, int Ls_, bool reload, class Arg, int type_>
-  __global__ void fused_tensor_core(Arg arg)
+  template<class storage_type, int block_dim_x, int Ls_, int minBlocksPerMultiprocessor, bool reload, class Arg, int type_>
+  __global__ void __launch_bounds__(block_dim_x*Ls_, minBlocksPerMultiprocessor) fused_tensor_core(Arg arg)
+  // __global__ void fused_tensor_core(Arg arg)
   {
     const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
     
-    static_assert( type_ != 1 || reload == false); 
+    // static_assert( type_ != 1 || reload == false); 
     TensorCoreSharedMemory<half2> shared_memory_data;
   
     constexpr int M = 4*Ls_;
@@ -231,14 +232,11 @@ namespace quda {
     constexpr int M_sm = M + sm_m_pad_size;
     
     half2* sm_b = shared_memory_data;
-    half*  sm_c = (half*)sm_b;
+    half* sm_c = (half*)sm_b;
     
-    half*  sm_a;
-    if(reload){
-      sm_a = sm_c+M*N_sm;
-    }else{
-      sm_a = sm_c;
-    }
+    half* sm_a = reload ? sm_c+M*N_sm : sm_c;
+    // This is for type == 1 ONLY.
+    half* sm_a_black = sm_a+M*M_sm;
 
     if(      type_ == 0){
       construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm,false, Arg>(arg, sm_a); // dagger = false
@@ -288,9 +286,9 @@ namespace quda {
 
     if(type_ == 1){
       arg.alpha = 1.;
-      construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger = true
-      __syncthreads();
       if(!reload){ // in the preload case we preload ... 
+        construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger = true
+        __syncthreads();
         #pragma unroll
         for( int k = 0; k < tm_dim; k++ ){
           const int a_row = warp_m*WMMA_M;
@@ -298,6 +296,9 @@ namespace quda {
           // Load Matrix
           nvcuda::wmma::load_matrix_sync(a_frag_black[k], sm_c+a_row+a_col*M_sm, M_sm);
         } 
+      }else{
+        construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a_black); // dagger = true
+        __syncthreads();
       }
     } 
 
@@ -356,7 +357,7 @@ namespace quda {
           store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid, arg.scale*arg.m_scale);
         }
         __syncthreads();
-        wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_c, sm_c, sm_c);        
+        wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);        
         __syncthreads();
       
       }else if(type_ == 3){
@@ -396,22 +397,24 @@ namespace quda {
       static constexpr bool var_inverse = true;
 
       long long flops() const {
-        constexpr long long hop = (2ll*3ll-1ll)*8ll+7ll;
+        constexpr long long hop = 7ll*8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
         constexpr long long mat = 2ll*4ll*Ls_-1ll;
+        long long volume_4d_cb_halo_shift = (arg.dim[0]-2*arg.halo_shift[0]) * (arg.dim[1]-2*arg.halo_shift[1]) * 
+          (arg.dim[2]-2*arg.halo_shift[2]) * (arg.dim[3]-2*arg.halo_shift[3]) / 2;
 
         long long flops_ = 0;
         switch (arg.type) {
           // I am too lazy to fix the flops count. :(
           case 0: // FIXME: flops
+            flops_ = volume_4d_cb_halo_shift*6ll*4ll*Ls_*hop + arg.volume_4d_cb_shift*24ll*Ls_*mat; break;
+          case 1:
+            flops_ = volume_4d_cb_halo_shift*6ll*4ll*Ls_*hop + arg.volume_4d_cb_shift*24ll*Ls_*2ll*mat; break;
           case 2:
           case 3:
-            flops_ =   arg.volume_4d_cb_shift*6ll*4ll*Ls_*(hop+mat);
-            break;
-          case 1:
-            flops_ =   arg.volume_4d_cb_shift*6ll*4ll*Ls_*(hop+2*mat);
+            flops_ = arg.volume_4d_cb_shift*6ll*4ll*Ls_*(hop+mat); // for 2 and 3 we don't have the halo complication.
             break;
           case 4:
-            flops_ =   arg.volume_4d_cb_shift*6ll*4ll*Ls_*(mat);
+            flops_ = arg.volume_4d_cb_shift*6ll*4ll*Ls_*(mat);
             break;
           default:
             errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
@@ -444,10 +447,16 @@ namespace quda {
   
       unsigned int shared_bytes_per_block(const TuneParam& param) const { 
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
-        if(param.aux.x && arg.type != 1){ // aux.x == 1 --> reload == true
-          return ( (param.block.y*4)*(param.block.y*4+0)+(param.block.y*4)*(param.block.x*6+16) )*2;
+        if(param.aux.x == 1){ // aux.x == 1 --> reload == true
+          if(arg.type == 1){
+            return ( (param.block.y*4)*(param.block.y*4+0)*2+(param.block.y*4)*(param.block.x*6+16) )*sizeof(half);
+          }else{
+            return ( (param.block.y*4)*(param.block.y*4+0)+(param.block.y*4)*(param.block.x*6+16) )*sizeof(half);
+          }
         }else{
-          return ( (param.block.y*4)*(param.block.x*6+16) )*2;
+          int a_size = (param.block.y*4)*(param.block.y*4+0);
+          int b_size = (param.block.y*4)*(param.block.x*6+16);
+          return ( a_size>b_size ? a_size : b_size )*sizeof(half);
         }
       }
    
@@ -478,15 +487,24 @@ namespace quda {
       
       virtual bool advanceAux(TuneParam &param) const
       {
-        if (param.aux.x < 1) {
+        bool aux_advanced = false;
+        if (param.aux.x == 0) { // first see if aux.x(ONLY 0(false) or 1(true))
           param.aux.x++;
+          aux_advanced = true;
+        } else {
+          if(param.aux.y < 3){ // second see if aux.y
+            param.aux.y++;
+            aux_advanced = true;
+            param.aux.x = 0;
+          }
+        }
+        if(aux_advanced){
           // We have updated the "aux" so reset all other parameters. 
           param.grid.x = minGridSize();
           param.block.x = min_block_size();
           param.shared_bytes = shared_bytes_per_block(param); 
           return true;
-        } else {
-          param.aux.x = 0;
+        }else{
           return false;
         }
       }
@@ -557,135 +575,64 @@ namespace quda {
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }
 
-      void apply(const cudaStream_t &stream) {
-        // We ONLY have a GPU version
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-          switch(arg.type){
-            case 0:
-              switch(tp.block.x){
-                case  8:
-                  tp.aux.x? // tp.aux.x == 0 --> reload == false, preload; tp.aux.x == 1 --> reload == true
-                  launch(fused_tensor_core<storage_type,  8, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 0>, tp, arg, stream) ;
-                  break;
-                case 16:
-                  tp.aux.x? // tp.aux.x == 0 --> reload == false, preload; tp.aux.x == 1 --> reload == true
-                  launch(fused_tensor_core<storage_type, 16, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 0>, tp, arg, stream) ;
-                  break;
-                case 24:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 24, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 0>, tp, arg, stream) ;
-                  break;
-                case 32:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 32, Ls_, true, Arg, 0>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 0>, tp, arg, stream) ;
-                  break;
-                default:
-                  errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
-              }
-              break;
-            case 2:
-              switch(tp.block.x){
-                case  8:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type,  8, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 2>, tp, arg, stream) ;
-                  break;
-                case 16:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 16, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 2>, tp, arg, stream) ;
-                  break;
-                case 24:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 24, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 2>, tp, arg, stream) ;
-                  break;
-                case 32:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 32, Ls_, true, Arg, 2>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 2>, tp, arg, stream) ;
-                  break;
-                default:
-                  errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
-              }
-              break;
-            case 1:
-              switch(tp.block.x){
-                case  8:
-                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 1>, tp, arg, stream);
-                  break;
-                case 16:
-                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 1>, tp, arg, stream);
-                  break;
-                case 24:
-                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 1>, tp, arg, stream);
-                  break;
-                case 32:
-                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 1>, tp, arg, stream);
-                  break;
-                default:
-                  errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
-              }
-              break;
-            case 3:
-              switch(tp.block.x){
-                case  8:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type,  8, Ls_, true, Arg, 3>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 3>, tp, arg, stream) ;
-                  break;
-                case 16:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 16, Ls_, true, Arg, 3>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 3>, tp, arg, stream) ;
-                  break;
-                case 24:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 24, Ls_, true, Arg, 3>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 3>, tp, arg, stream) ;
-                  break;
-                case 32:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 32, Ls_, true, Arg, 3>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 3>, tp, arg, stream) ;
-                  break;
-                default:
-                  errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
-              }
-              break;
-            case 4:
-              switch(tp.block.x){
-                case  8:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type,  8, Ls_, true, Arg, 4>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type,  8, Ls_,false, Arg, 4>, tp, arg, stream) ;
-                  break;
-                case 16:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 16, Ls_, true, Arg, 4>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 16, Ls_,false, Arg, 4>, tp, arg, stream) ;
-                  break;
-                case 24:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 24, Ls_, true, Arg, 4>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 24, Ls_,false, Arg, 4>, tp, arg, stream) ;
-                  break;
-                case 32:
-                  tp.aux.x?
-                  launch(fused_tensor_core<storage_type, 32, Ls_, true, Arg, 4>, tp, arg, stream) :
-                  launch(fused_tensor_core<storage_type, 32, Ls_,false, Arg, 4>, tp, arg, stream) ;
-                  break;
-                default:
-                  errorQuda("NOT valid blockDim.x(=%d)\n", tp.block.x);
-              }
-              break;
-            default: 
-              errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
+      // The following apply<...> functions are used to turn the tune parameters into template arguments.
+      // Specifically tp.aux.y dictates the minBlocksPerMultiprocessor in __launch_bounds__(..).
+      // tp.aux.x dictates whether or not to reload.
+      template<int block_dim_x, bool reload, int type>
+      void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
+        switch(tp.aux.y){
+          case  1:
+            launch(fused_tensor_core<storage_type, block_dim_x, Ls_, 1, reload, Arg, type>, tp, arg, stream); break;
+          case  2:
+            launch(fused_tensor_core<storage_type, block_dim_x, Ls_, 2, reload, Arg, type>, tp, arg, stream); break;
+          case  3:
+            launch(fused_tensor_core<storage_type, block_dim_x, Ls_, 3, reload, Arg, type>, tp, arg, stream); break;
+          default:
+            errorQuda("NOT valid tp.aux.y(=%d)\n", tp.aux.y);
           }
+      }
+ 
+      template<bool reload, int type>
+      void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
+        switch(tp.block.x){
+          case  8:
+            apply< 8, reload, type>(tp, arg, stream); break;
+          case 16:
+            apply<16, reload, type>(tp, arg, stream); break;
+          case 24:
+            apply<24, reload, type>(tp, arg, stream); break;
+          case 32:
+            apply<32, reload, type>(tp, arg, stream); break;
+          default:
+            errorQuda("NOT valid tp.block.x(=%d)\n", tp.block.x);
+          }
+      }
+      
+      template<int type>
+      void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
+        if(tp.aux.x == 0){
+          apply<false, type>(tp, arg, stream); // reload = false
+        }else{
+          apply< true, type>(tp, arg, stream); // reload = true
+        }
+      }
+     
+      void apply(const cudaStream_t &stream) {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        switch(arg.type){
+          case 0:
+            apply<0>(tp, arg, stream); break;
+          case 1:
+            apply<1>(tp, arg, stream); break;
+          case 2:
+            apply<2>(tp, arg, stream); break;
+          case 3:
+            apply<3>(tp, arg, stream); break;
+          case 4:
+            apply<4>(tp, arg, stream); break;
+          default: 
+            errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
+        }
       }
 
       void initTuneParam(TuneParam &param) const {
@@ -694,6 +641,7 @@ namespace quda {
         param.grid = dim3(minGridSize(), 1, 1);
         param.shared_bytes = shared_bytes_per_block(param); 
         param.aux.x = 0;
+        param.aux.y = 1;
       }
 
       void defaultTuneParam(TuneParam &param) const {
@@ -703,10 +651,57 @@ namespace quda {
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
   };
 
-#endif // defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
   
   // Apply the 5th dimension dslash operator to a colorspinor field
   // out = Dslash5 * in
+  template<class storage_type>
+  void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
+                          ColorSpinorField& y, const ColorSpinorField& x, double m_f, double m_5, 
+                          const Complex* b_5, const Complex* c_5, bool dagger, int parity, int shift[4], int halo_shift[4], 
+                          const double scale, MdwfFusedDslashType type)
+  {
+    // switch for Ls
+    switch(in.X(4)){
+//      case  8:
+//        {
+//          FusedDslashArg<storage_type,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+//          FusedDslash<storage_type,  8, FusedDslashArg<storage_type,  8> > dslash(arg, in);
+//          dslash.apply(streams[Nstream-1]);
+//        }
+//      break;
+      case 12:
+        {
+          FusedDslashArg<storage_type, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+          FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12> > dslash(arg, in);
+          dslash.apply(streams[Nstream-1]);
+        }
+      break;
+//      case 16:
+//        {
+//          FusedDslashArg<storage_type, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+//          FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16> > dslash(arg, in);
+//          dslash.apply(streams[Nstream-1]);
+//        }
+//      break;
+//      case 20:
+//        {
+//          FusedDslashArg<storage_type, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+//          FusedDslash<storage_type, 20, FusedDslashArg<storage_type, 20> > dslash(arg, in);
+//          dslash.apply(streams[Nstream-1]);
+//        }
+//      break;
+//      case 24:
+//        {
+//          FusedDslashArg<storage_type, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+//          FusedDslash<storage_type, 24, FusedDslashArg<storage_type, 24> > dslash(arg, in);
+//          dslash.apply(streams[Nstream-1]);
+//        }
+//      break;
+      default: 
+        errorQuda("Ls = %d is NOT supported.\n", in.X(4));
+    }
+  }
+#endif // defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
   
   void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
                           ColorSpinorField& y, const ColorSpinorField& x, double m_f, double m_5, 
@@ -718,90 +713,13 @@ namespace quda {
     checkLocation(out, in);     // check all locations match
   
     if( checkPrecision(out, in) == QUDA_HALF_PRECISION && in.Ncolor() == 3){
-      // switch for Ls
-      switch(in.X(4)){
-        case  8:
-          {
-            FusedDslashArg<short,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<short,  8, FusedDslashArg<short,  8> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 12:
-          {
-            FusedDslashArg<short, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<short, 12, FusedDslashArg<short, 12> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 16:
-          {
-            FusedDslashArg<short, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<short, 16, FusedDslashArg<short, 16> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 20:
-          {
-            FusedDslashArg<short, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<short, 20, FusedDslashArg<short, 20> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 24:
-          {
-            FusedDslashArg<short, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<short, 24, FusedDslashArg<short, 24> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        default: 
-          errorQuda("Ls = %d is NOT supported.\n", in.X(4));
-      }
+      apply_fused_dslash<short>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
     }else if( checkPrecision(out, in) == QUDA_QUARTER_PRECISION && in.Ncolor() == 3){
-      // switch for Ls
-      switch(in.X(4)){
-        case  8:
-          {
-            FusedDslashArg<char,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<char,  8, FusedDslashArg<char,  8> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 12:
-          {
-            FusedDslashArg<char, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<char, 12, FusedDslashArg<char, 12> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 16:
-          {
-            FusedDslashArg<char, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<char, 16, FusedDslashArg<char, 16> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 20:
-          {
-            FusedDslashArg<char, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<char, 20, FusedDslashArg<char, 20> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 24:
-          {
-            FusedDslashArg<char, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-            FusedDslash<char, 24, FusedDslashArg<char, 24> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        default: 
-          errorQuda("Ls = %d is NOT supported.\n", in.X(4));
-      }
+      apply_fused_dslash<char >(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
     }else{
       errorQuda("Tensor core implemtation ONLY supports HALF precision and n_color = 3.\n");
     }
+
 #else
     errorQuda("Domain wall dslash WITH tensor cores has not been built");
 #endif
