@@ -20,8 +20,8 @@ namespace quda {
 
   template<typename Float>
   void matVec(const Dirac &mat,
-	      cudaColorSpinorField &out,
-	      const cudaColorSpinorField &in,
+	      ColorSpinorField &out,
+	      const ColorSpinorField &in,
 	      QudaEigParam *eig_param){
     
     if(eig_param->use_norm_op && eig_param->use_dagger) {
@@ -44,8 +44,8 @@ namespace quda {
   
   template<typename Float>
   void matVecOp(const Dirac &mat,
-		cudaColorSpinorField &out,
-		const cudaColorSpinorField &in,
+		ColorSpinorField &out,
+		const ColorSpinorField &in,
 		QudaEigParam *eig_param){
     
     //Just do a simple matVec if no poly acc is requested
@@ -77,7 +77,7 @@ namespace quda {
     //out = d2 * in + d1 * out
     //C_1(x) = x
     matVec<Float>(mat, out, in, eig_param);
-    blas::caxpby(d2, const_cast<cudaColorSpinorField&>(in), d1, out);
+    blas::caxpby(d2, const_cast<ColorSpinorField&>(in), d1, out);
     if(eig_param->poly_deg == 1) return;
 
     
@@ -85,8 +85,8 @@ namespace quda {
     // C_1 is the current 'out' vector.
        
     //Clone 'in' to two temporary vectors.
-    cudaColorSpinorField *tmp1 = new cudaColorSpinorField(in);
-    cudaColorSpinorField *tmp2 = new cudaColorSpinorField(in);
+    ColorSpinorField *tmp1 = ColorSpinorField::Create(in);
+    ColorSpinorField *tmp2 = ColorSpinorField::Create(in);
 
     blas::copy(*tmp1,in);
     blas::copy(*tmp2,out);
@@ -126,7 +126,7 @@ namespace quda {
   //Orthogonalise r against V_[j]
   template<typename Float>
   void orthogonalise(std::vector<ColorSpinorField*> v,
-		     cudaColorSpinorField &r, int j) {
+		     ColorSpinorField &r, int j) {
     
     std::complex<Float> s(0.0,0.0);
     for(int i=0; i<j; i++) {
@@ -141,13 +141,13 @@ namespace quda {
   //Orthogonalise r against V_[j]
   template<typename Float>
   void blockOrthogonalise(std::vector<ColorSpinorField*> v,
-			  cudaColorSpinorField &r, int j) {
+			  ColorSpinorField &r, int j) {
 
-    cudaColorSpinorField *r_p = nullptr;
-    r_p = new cudaColorSpinorField(r);    
+    ColorSpinorField *r_p = nullptr;
+    r_p = ColorSpinorField::Create(r);    
     
     std::vector<ColorSpinorField*> r_v;
-    r_v.push_back(cudaColorSpinorField::Create(*r_p));
+    r_v.push_back(ColorSpinorField::Create(*r_p));
 
     Complex *s = new Complex[j];    
     //Block dot products stored in s.
@@ -163,7 +163,7 @@ namespace quda {
   template<typename Float>
   void lanczosStep(const Dirac &mat,
 		   std::vector<ColorSpinorField*> v,
-		   cudaColorSpinorField &r,
+		   ColorSpinorField &r,
 		   QudaEigParam *eig_param,
 		   Float *alpha, Float *beta, int j) {
 
@@ -241,7 +241,7 @@ namespace quda {
     h_evals_ = (std::complex<Float>*) (Float*)(h_evals);
     
     //Create the device side Krylov Space and residual vector
-    cudaColorSpinorField *r = nullptr;
+    ColorSpinorField *r = nullptr;
     ColorSpinorParam cudaParam(*cpuParam);
     cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -250,12 +250,12 @@ namespace quda {
       cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
       cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
 
-    r = new cudaColorSpinorField(cudaParam);
+    r = ColorSpinorField::Create(cudaParam);
 
     //Create Krylov space on the device
     std::vector<ColorSpinorField*> kSpace;
     for(int i=0; i<nKr; i++) {
-      kSpace.push_back(cudaColorSpinorField::Create(cudaParam));
+      kSpace.push_back(ColorSpinorField::Create(cudaParam));
     }
 
     //Host side dense matrix of Q eigenvectors
@@ -317,11 +317,11 @@ namespace quda {
 	//Device side linalg for Lanczos
 	std::vector<ColorSpinorField*> d_vecs;
 	for(int i=0; i<check; i++) {
-	  d_vecs.push_back(cudaColorSpinorField::Create(cudaParam));
+	  d_vecs.push_back(ColorSpinorField::Create(cudaParam));
 	}
 	std::vector<ColorSpinorField*> d_vecs_out;
 	for(int i=0; i<check; i++) {
-	  d_vecs_out.push_back(cudaColorSpinorField::Create(cudaParam));
+	  d_vecs_out.push_back(ColorSpinorField::Create(cudaParam));
 	}
 		
 	//Copy Krylov space to device for manipulation
@@ -500,7 +500,7 @@ namespace quda {
     h_evals_ = (std::complex<Float>*) (Float*)(h_evals);
     
     //Create the device side Krylov Space and residual vector
-    cudaColorSpinorField *r = nullptr;
+    ColorSpinorField *r = nullptr;
     ColorSpinorParam cudaParam(*cpuParam);
     cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -508,12 +508,12 @@ namespace quda {
     sizeof(Float) == sizeof(double) ?
       cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
       cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-    r = new cudaColorSpinorField(cudaParam);
+    r = ColorSpinorField::Create(cudaParam);
 
     //Create Krylov space on the device
     std::vector<ColorSpinorField*> kSpace;
     for(int i=0; i<nKr; i++) {
-      kSpace.push_back(cudaColorSpinorField::Create(cudaParam));
+      kSpace.push_back(ColorSpinorField::Create(cudaParam));
     }
 
     //Populate source with randoms.
@@ -559,11 +559,11 @@ namespace quda {
     //Device side linalg for Lanczos
     std::vector<ColorSpinorField*> d_vecs_nev;
     for(int i=0; i<nEv; i++) {
-      d_vecs_nev.push_back(cudaColorSpinorField::Create(cudaParam));
+      d_vecs_nev.push_back(ColorSpinorField::Create(cudaParam));
     }
     std::vector<ColorSpinorField*> d_vecs_nev_out;
     for(int i=0; i<nEv; i++) {
-      d_vecs_nev_out.push_back(cudaColorSpinorField::Create(cudaParam));
+      d_vecs_nev_out.push_back(ColorSpinorField::Create(cudaParam));
     }
     
     //Initial k step factorisation
@@ -736,7 +736,7 @@ namespace quda {
 	  Complex n_unit(-1.0,0.0);
 	  blas::caxpby(h_evals_[i], *d_vecs_nev_out[i], n_unit, *r);
 	  residual[i] = sqrt(blas::norm2(*r));
-	  printfQuda("Residual %d = %.6e\n", i, residual[i]);
+	  //printfQuda("Residual %d = %.6e\n", i, residual[i]);
 	  //printfQuda("Eval %d = %.6e\n", i, h_evals_[i]);
 	  //printfQuda("Norm %d = %.6e\n", i, sqrt(blas::norm2(*d_vecs_nev_out[i])));
 
@@ -995,9 +995,10 @@ namespace quda {
 
     //ARPACK workspace
     //Initial guess?
-    std::complex<double> I(0.0,1.0);
-    std::complex<double> *resid_ =
-      (std::complex<double> *) malloc(ldv_*sizeof(std::complex<double>));
+    //Complex I(0.0,1.0);
+    Complex I(0.0,1.0);
+    Complex *resid_ =
+      (Complex *) malloc(ldv_*sizeof(Complex));
     
     if(info_ > 0) 
       for(int a = 0; a<ldv_; a++) {
@@ -1005,21 +1006,21 @@ namespace quda {
 	//printfQuda("(%e , %e)\n", real(resid_[a]), imag(resid_[a]));
       }
     
-    std::complex<double> sigma_ = 0.0;
-    std::complex<double> *w_workd_ =
-      (std::complex<double> *) malloc(3*ldv_*sizeof(std::complex<double>));
-    std::complex<double> *w_workl_ =
-      (std::complex<double> *) malloc(lworkl_*sizeof(std::complex<double>)); 
-    std::complex<double> *w_workev_=
-      (std::complex<double> *) malloc(2*nKr_*sizeof(std::complex<double>));    
+    Complex sigma_ = 0.0;
+    Complex *w_workd_ =
+      (Complex *) malloc(3*ldv_*sizeof(Complex));
+    Complex *w_workl_ =
+      (Complex *) malloc(lworkl_*sizeof(Complex)); 
+    Complex *w_workev_=
+      (Complex *) malloc(2*nKr_*sizeof(Complex));    
     double *w_rwork_  = (double *)malloc(nKr_*sizeof(double));    
     int *select_ = (int*)malloc(nKr_*sizeof(int));
 
     //Alias pointers
-    std::complex<double> *h_evecs_ = nullptr;
-    h_evecs_ = (std::complex<double>*) (double*)(h_evecs);    
-    std::complex<double> *h_evals_ = nullptr;
-    h_evals_ = (std::complex<double>*) (double*)(h_evals);
+    Complex *h_evecs_ = nullptr;
+    h_evecs_ = (Complex*) (double*)(h_evecs);    
+    Complex *h_evals_ = nullptr;
+    h_evals_ = (Complex*) (double*)(h_evals);
 
     //Memory checks
     if((iparam_ == nullptr) ||
@@ -1036,11 +1037,11 @@ namespace quda {
     int iter_count= 0;
 
     bool allocate = true;
-    cpuColorSpinorField *h_v = nullptr;
-    cudaColorSpinorField *d_v = nullptr;    
-    cpuColorSpinorField *h_v2 = nullptr;
-    cudaColorSpinorField *d_v2 = nullptr;
-    cudaColorSpinorField *resid = nullptr;    
+    ColorSpinorField *h_v = nullptr;
+    ColorSpinorField *d_v = nullptr;    
+    ColorSpinorField *h_v2 = nullptr;
+    ColorSpinorField *d_v2 = nullptr;
+    ColorSpinorField *resid = nullptr;    
 
     //ARPACK log routines
     // Code added to print the log of ARPACK  
@@ -1100,6 +1101,8 @@ namespace quda {
     do {
 
       t1 = -((double)clock());
+
+      //printfQuda("flag x1\n");
       
       //Interface to arpack routines
       //----------------------------
@@ -1112,9 +1115,11 @@ namespace quda {
 	errorQuda("\nError in pznaupd info = %d. Exiting.",info_);
       }
 #else
+      //printfQuda("flag x2\n");
       ARPACK(znaupd)(&ido_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_, &nKr_,
 		     h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_,
 		     w_rwork_, &info_, 1, 2);
+      //printfQuda("flag x3\n");
       if (info_ != 0) {
 	arpackErrorHelpNAUPD();
 	errorQuda("\nError in znaupd info = %d. Exiting.",info_);
@@ -1127,37 +1132,52 @@ namespace quda {
 	//Fortran arrays start at 1. The C++ pointer is therefore the Fortran pointer
 	//less one, hence ipntr[0] - 1 to specify the correct address.
 
+	cpuParam->location = QUDA_CPU_FIELD_LOCATION;
 	cpuParam->create = QUDA_REFERENCE_FIELD_CREATE;
 	cpuParam->gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 	
 	cpuParam->v = w_workd_ + (ipntr_[0] - 1);
-	h_v = new cpuColorSpinorField(*cpuParam);
+	h_v = ColorSpinorField::Create(*cpuParam);
 	//Adjust the position of the start of the array.
 	cpuParam->v = w_workd_ + (ipntr_[1] - 1);
-	h_v2 = new cpuColorSpinorField(*cpuParam);
+	h_v2 = ColorSpinorField::Create(*cpuParam);
 	
-	//cpuParam->print();
 	ColorSpinorParam cudaParam(*cpuParam);
 	cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
 	cudaParam.create = QUDA_ZERO_FIELD_CREATE;
 	cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 	cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
 	
-	d_v = new cudaColorSpinorField(cudaParam);
-	d_v2 = new cudaColorSpinorField(cudaParam);
-	resid = new cudaColorSpinorField(cudaParam);
+	d_v = ColorSpinorField::Create(cudaParam);
+	d_v2 = ColorSpinorField::Create(cudaParam);
+	resid = ColorSpinorField::Create(cudaParam);
 	allocate = false;
+
+	//Create the device side Krylov Space and residual vector
+	/*
+	cudaColorSpinorField *r = nullptr;
+	ColorSpinorParam cudaParam(*cpuParam);
+	cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+	cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+	cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+	sizeof(Float) == sizeof(double) ?
+	  cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
+	  cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+	r = new cudaColorSpinorField(cudaParam);
+	*/
       }
-      
+      //printfQuda("flag x5\n");
       if (ido_ == 99 || info_ == 1)
 	break;
       
       if (ido_ == -1 || ido_ == 1) {
-
+	//printfQuda("flag x6\n");
 	*d_v = *h_v;
-	
+
+	printfQuda("flag 1\n");
 	//apply matrix-vector operation here:
 	matVecOp<double>(mat, *d_v2, *d_v, eig_param);
+	printfQuda("flag 2\n");
 	
 	*h_v2 = *d_v2;
 	
@@ -1266,10 +1286,10 @@ namespace quda {
     }      
     
 
-    cpuColorSpinorField *h_v3 = NULL;
+    ColorSpinorField *h_v3 = NULL;
     for(int i =0 ; i < nconv ; i++){
-      cpuParam->v = (std::complex<double>*)h_evecs_ + h_evals_sorted_idx[i]*ldv_;
-      h_v3 = new cpuColorSpinorField(*cpuParam);
+      cpuParam->v = (Complex*)h_evecs_ + h_evals_sorted_idx[i]*ldv_;
+      h_v3 = ColorSpinorField::Create(*cpuParam);
       
       // d_v = v
       *d_v = *h_v3;
@@ -1280,8 +1300,8 @@ namespace quda {
       // lambda = v^dag * M*v
       h_evals_[i] = blas::cDotProduct(*d_v, *d_v2);
       
-      std::complex<double> unit(1.0,0.0);
-      std::complex<double> m_lambda(-real(h_evals_[i]),
+      Complex unit(1.0,0.0);
+      Complex m_lambda(-real(h_evals_[i]),
 				    -imag(h_evals_[i]));
 
       // d_v = ||M*v - lambda*v||
