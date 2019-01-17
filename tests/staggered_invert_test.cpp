@@ -404,7 +404,6 @@ invert_test(int argc, char** argv)
   void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* milc_inlink = nullptr;
   void* milc_fatlink = nullptr;
   void* milc_longlink = nullptr;
 
@@ -414,7 +413,6 @@ invert_test(int argc, char** argv)
     qdp_longlink[dir] = malloc(V*gaugeSiteSize*gSize);
   }
 
-  milc_inlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_longlink = malloc(4*V*gaugeSiteSize*gSize);
 

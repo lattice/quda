@@ -240,6 +240,12 @@ void computeHISQLinksGPU(void** fatlink, void** longlink,
 
 }
 
+
+QudaPrecision &cpu_prec = prec;
+QudaPrecision &cuda_prec = prec;
+QudaPrecision &cuda_prec_sloppy = prec_sloppy;
+QudaPrecision &cuda_prec_precondition = prec_precondition;
+
 void computePlaquetteQDPOrder(void** qdp_link, double plaq[3]) {
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   gauge_param.X[0] = xdim;
@@ -279,11 +285,6 @@ void computePlaquetteQDPOrder(void** qdp_link, double plaq[3]) {
   plaqQuda(plaq);
 
 }
-
-QudaPrecision &cpu_prec = prec;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-QudaPrecision &cuda_prec_precondition = prec_precondition;
 
 void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.X[0] = xdim;
