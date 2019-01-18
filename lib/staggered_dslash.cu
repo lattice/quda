@@ -21,23 +21,7 @@ namespace quda {
 namespace quda {
 
 
-//   template <int dir, typename I>
-//   __device__ __host__ inline int mwghostFaceIndex(const int x[], const I X[], int dim, int nFace) {
-//     int index = 0;
-//     switch(dim) {
-//     case 0:
-//       switch(dir) {
-//       case 0:
-//   index = ((x[0]+nFace-1)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
-//     // index = ((x[0])*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
-//   break;
-//       case 1:
-//   index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
-//   break;
-//  }  
-//   }
-//  return index;
-// }
+//MWTODO: This should be merged in the generic ghostFaceIndex function
 
  /**
      Compute the checkerboarded index into the ghost field
@@ -131,7 +115,6 @@ namespace quda {
   };
 
 
-  // #define XONLY 1
 /**
      Applies the off-diagonal part of the Laplace operator
 
@@ -143,18 +126,11 @@ namespace quda {
      @param[in] x_cb The checkerboarded site index
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
-  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, int coord[nDim], int x_cb,
-                                              int parity, int idx, int thread_dim, bool &active) {
-    typedef Matrix<complex<Float>,nColor> Link;
-    const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
-  // const int their_spinor_parity =  1-parity ;
+     __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, int coord[nDim], int x_cb,
+      int parity, int idx, int thread_dim, bool &active) {
+      typedef Matrix<complex<Float>,nColor> Link;
+      const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
-
-    // int coord[5];
-    // getCoords(coord, x_cb, arg.dim, parity);
-    // coord[4] = 0;
-
-//#define FULL 0
 
 #ifdef XONLY
 #pragma unroll
@@ -163,71 +139,42 @@ namespace quda {
 #pragma unroll
     for (int d = 0; d<4; d++) {// loop over dimension{
 #endif 
-      //         Float sign = (d == 0 && ((coords[3] ) & 1) != 0) ||
-      // ( d == 1 && ((coords[0] + coords[3] ) & 1) != 0) ||
-      // ( d == 2 && ((coords[0] + coords[1] + coords[3] ) & 1) != 0) ? -1.0 : 1.0;
+
       //Forward gather - compute fwd offset for vector fetch
 #ifndef XONLY2
+      
+      // standard - forward direction
       {
-        const bool ghost = (coord[d] + 1 >= arg.dim[d]) &&
-        isActive<kernel_type>(active, thread_dim, d, coord, arg);
-
-
+        const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if ( doHalo<kernel_type>(d) && ghost) {
-          // const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            // ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace) : idx;
           const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, 1);
-          int space_con = ((coord[3]*arg.dim[2]+coord[2])*arg.dim[1]+coord[1])/2; 
-          const int nbr_idx1 = (coord[0]-(arg.dim[0]-1))*arg.dc.ghostFaceCB[0]+ space_con;
-  const Link U = arg.U(d, x_cb, parity);
-  const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-          const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Vector in2 = arg.in(fwd_idx, their_spinor_parity);
+          const Link U = arg.U(d, x_cb, parity);
+          const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += U * in;
 
-          // printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx1,in.data[0].real(),in.data[0].imag(),in2.data[0].real(),in2.data[0].imag(),out.data[0].real(),out.data[0].imag());
-         // printf("HaloU (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx1,in.data[1].real(),in.data[1].imag(),in2.data[1].real(),in2.data[1].imag(),out.data[1].real(),out.data[1].imag());
-
-        
           // printf("in %f %f %f %f %f %f\n",in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),in.data[2].real(),in.data[2].imag());
-
-                 } else if ( doBulk<kernel_type>() && !ghost ) {
-           // printf("OOPS - NO Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, 0, 0);
-
+        }
+        else if ( doBulk<kernel_type>() && !ghost ) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-  const Link U = arg.U(d, x_cb, parity);
-  // U[6] *= sign;
-  // U[7] *= sign;
-  // U[8] *= sign;
-  const Vector in = arg.in(fwd_idx, their_spinor_parity);
+          const Link U = arg.U(d, x_cb, parity);
+          const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += U * in;
         }
       }
 
 
+      // improved - forward direction
       if(arg.improved){
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
         if ( doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
-          int space_con = ((coord[3]*arg.dim[2]+coord[2])*arg.dim[1]+coord[1])/2; 
-          const int nbr_idx3 = (coord[0]-(arg.dim[0]-3))*arg.dc.ghostFaceCB[0]+ space_con;
           const Link L = arg.L(d, x_cb, parity);
           const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-          const Vector in2 = arg.in(fwd3_idx, their_spinor_parity);
-
-
-          // printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx1,in.data[0].real(),in.data[0].imag(),in2.data[0].real(),in2.data[0].imag(),out.data[0].real(),out.data[0].imag());
-
-        
-          // printf("in %f %f %f %f %f %f\n",in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),in.data[2].real(),in.data[2].imag());
-
           out += L * in;
-          // printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx3,in.data[0].real(),in.data[0].imag(),in2.data[0].real(),in2.data[0].imag(),out.data[0].real(),out.data[0].imag());
         // printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx3,in.data[1].real(),in.data[1].imag(),in2.data[1].real(),in2.data[1].imag(),out.data[1].real(),out.data[1].imag());
-
-
-        } else if ( doBulk<kernel_type>() && !ghost ) {
+        } 
+        else if ( doBulk<kernel_type>() && !ghost ) {
           const Link L = arg.L(d, x_cb, parity);
           const Vector in = arg.in(fwd3_idx, their_spinor_parity);
           out += L * in;
@@ -238,25 +185,22 @@ namespace quda {
 #ifndef XONLY2
       {
       //Backward gather - compute back offset for spinor and gauge fetch
-      const int back_idx = linkIndexM1(coord, arg.dim, d);
-      const int gauge_idx = back_idx;
+
         const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if ( doHalo<kernel_type>(d) && ghost) {
         // MW - check indexing into GhostFace here
-  const int ghost_idx2 = mwghostFaceIndex<0>(coord, arg.dim, d, 1);
-  const int ghost_idx = arg.improved ? mwghostFaceIndex<0>(coord, arg.dim, d, 3) : ghost_idx2; 
-  const Link U = arg.U.Ghost(d, ghost_idx2, 1-parity);
-  const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-  // const   int space_con = ((y[3]*X[2] + y[2])*X[1] + y[1]) >>1;
-  // const int nbr_idx1 =  (y[0]+3-1)*arg.dc.ghostFaceCB[0]+ space_con;
-            const Vector in2 = arg.in(back_idx, their_spinor_parity);
-  // printf("Halo (%i %i %i %i), back_idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], back_idx, x_cb, ghost_idx, 0,in.data[0].real(),in.data[0].imag(),in2.data[0].real(),in2.data[0].imag(),out.data[0].real(),out.data[0].imag());
-
+          const int ghost_idx2 = mwghostFaceIndex<0>(coord, arg.dim, d, 1);
+          const int ghost_idx = arg.improved ? mwghostFaceIndex<0>(coord, arg.dim, d, 3) : ghost_idx2; 
+          const Link U = arg.U.Ghost(d, ghost_idx2, 1-parity);
+          const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
           out -= conj(U) * in;
-      } else  if ( doBulk<kernel_type>() && !ghost ) {
-  const Link U = arg.U(d, gauge_idx, 1-parity);
-  const Vector in = arg.in(back_idx, their_spinor_parity);
+        }
+        else  if ( doBulk<kernel_type>() && !ghost ) {
+          const int back_idx = linkIndexM1(coord, arg.dim, d);
+          const int gauge_idx = back_idx;
+          const Link U = arg.U(d, gauge_idx, 1-parity);
+          const Vector in = arg.in(back_idx, their_spinor_parity);
           out -= conj(U) * in;
         }
       }
@@ -264,17 +208,18 @@ namespace quda {
       // #ifndef XONLY
       if(arg.improved){
         //Backward gather - compute back offset for spinor and gauge fetch
-        const int back3_idx = linkIndexM3(coord, arg.dim, d);
-        const int gauge_idx = back3_idx;
-        const bool ghost = (coord[d] - 3 < 0) &&
-        isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        
+        const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if ( doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
           const Link L = arg.L.Ghost(d, ghost_idx, 1-parity);
           const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
           out -= conj(L) * in;
-        } else if ( doBulk<kernel_type>() && !ghost ) {
+        }
+        else if ( doBulk<kernel_type>() && !ghost ) {
+          const int back3_idx = linkIndexM3(coord, arg.dim, d);
+          const int gauge_idx = back3_idx;
           const Link L = arg.L(d, gauge_idx, 1-parity);
           const Vector in = arg.in(back3_idx, their_spinor_parity);
           out -= conj(L) * in;
@@ -295,18 +240,18 @@ namespace quda {
     bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
     int thread_dim; // which dimension is thread working on (fused kernel only)
     int coord[nDim];
-    //MWTDO - can this work for improved ???
     int x_cb = arg. improved ? getCoords<nDim,QUDA_4D_PC,kernel_type, Arg, 3>(coord, arg, idx, parity, thread_dim) : getCoords<nDim,QUDA_4D_PC,kernel_type, Arg, 1>(coord, arg, idx, parity, thread_dim);
     // coord[4] = 0;
-    //TODO
-    // int x_cb = idx; //getCoords<nDim,QUDA_4D_PC,kernel_type>(coord, arg, idx, parity, thread_dim);
-
+    //MWTODO -> coord[4]
+    
     const int my_spinor_parity = nParity == 2 ? parity : 0;
 
     Vector out;
 
     applyStaggered<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
 
+
+    //MWTODO: clean up here
     // if (xpay) {
     //   Vector x = arg.x(x_cb, parity);
     //   out = arg.a * x -out ;
@@ -321,13 +266,11 @@ namespace quda {
       out = arg.a * x -out ;
     } else if (kernel_type != INTERIOR_KERNEL ) {
       Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + out;
+      out = x +  ( xpay ? Float(-1)*out : out ); //MWTODO: verify
       //MWTODO - aadd xpay
     }
 
-    // printf("Out cb %i \t %f %f %f %f %f %f\n",x_cb,out.data[0].real(),out.data[0].imag(),out.data[1].real(),out.data[1].imag(),out.data[2].real(),out.data[2].imag());
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
-    // if(kernel_type != INTERIOR_KERNEL) arg.out(x_cb, my_spinor_parity) = out;
   }
 
 
