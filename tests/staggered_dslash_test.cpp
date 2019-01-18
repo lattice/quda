@@ -847,7 +847,7 @@ static int dslashTest()
 
 int xx[4];
     // for verification
- for(int i=0; i< 128; i++){
+ for(int i=0; i< 256; i++){
 
     mwgetCoords(xx, (i), X, 0);
     printfQuda("%i : %i %i %i %i CUDA: %f", i,xx[0], xx[1], xx[2], xx[3], ((double*)(spinorOut->V()))[6*i+4]);

@@ -21,53 +21,80 @@ namespace quda {
 namespace quda {
 
 
+//   template <int dir, typename I>
+//   __device__ __host__ inline int mwghostFaceIndex(const int x[], const I X[], int dim, int nFace) {
+//     int index = 0;
+//     switch(dim) {
+//     case 0:
+//       switch(dir) {
+//       case 0:
+//   index = ((x[0]+nFace-1)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
+//     // index = ((x[0])*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
+//   break;
+//       case 1:
+//   index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+//   break;
+//  }  
+//   }
+//  return index;
+// }
+
+ /**
+     Compute the checkerboarded index into the ghost field
+     corresponding to full (local) site index x[]
+     @param x local site
+     @param X local lattice dimensions
+     @param dim dimension
+     @param depth of ghost
+  */
   template <int dir, typename I>
   __device__ __host__ inline int mwghostFaceIndex(const int x[], const I X[], int dim, int nFace) {
     int index = 0;
     switch(dim) {
+    case 0:
+      switch(dir) {
       case 0:
-      switch(dir) {
-        case 0:
-        index = ((x[0]+nFace-1)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
-    // index = ((x[0])*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
-        break;
-        case 1:
-        index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
-        break;
-      }  
+ index = ((x[0]+nFace-1)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
+  break;
       case 1:
-      switch(dir) {
-        case 0:
-        index = ((x[1]+nFace-1)*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
-        break;
-        case 1:
-        index = ((x[1]-X[1]+nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
-        break;
+  index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+  break;
       }
       break;
-      case 2:
+    case 1:
       switch(dir) {
-        case 0:
-        index = ((x[2]+nFace-1)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-        break;
-        case 1:
-        index = ((x[2]-X[2]+nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
-        break;
+      case 0:
+  index = ((x[1]+nFace-1)*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
+  break;
+      case 1:
+  index = ((x[1]-X[1]+nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
+  break;
       }
       break;
-      case 3:
+    case 2:
       switch(dir) {
-        case 0:
-        index = ((x[3]+nFace-1)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-        break;
-        case 1:
-        index  = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
-        break;
+      case 0:
+  index = ((x[2]+nFace-1)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+  break;
+      case 1:
+  index = ((x[2]-X[2]+nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
+  break;
+      }
+      break;
+    case 3:
+      switch(dir) {
+      case 0:
+  index = ((x[3]+nFace-1)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+  break;
+      case 1:
+  index  = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
+  break;
       }
       break;
     }
     return index;
   }
+
   /**
      @brief Parameter structure for driving the Staggered Dslash operator
    */
@@ -159,7 +186,7 @@ namespace quda {
           out += U * in;
 
           // printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx1,in.data[0].real(),in.data[0].imag(),in2.data[0].real(),in2.data[0].imag(),out.data[0].real(),out.data[0].imag());
-         printf("HaloU (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx1,in.data[1].real(),in.data[1].imag(),in2.data[1].real(),in2.data[1].imag(),out.data[1].real(),out.data[1].imag());
+         // printf("HaloU (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx1,in.data[1].real(),in.data[1].imag(),in2.data[1].real(),in2.data[1].imag(),out.data[1].real(),out.data[1].imag());
 
         
           // printf("in %f %f %f %f %f %f\n",in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),in.data[2].real(),in.data[2].imag());
@@ -197,7 +224,7 @@ namespace quda {
 
           out += L * in;
           // printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx3,in.data[0].real(),in.data[0].imag(),in2.data[0].real(),in2.data[0].imag(),out.data[0].real(),out.data[0].imag());
-        printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx3,in.data[1].real(),in.data[1].imag(),in2.data[1].real(),in2.data[1].imag(),out.data[1].real(),out.data[1].imag());
+        // printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx3,in.data[1].real(),in.data[1].imag(),in2.data[1].real(),in2.data[1].imag(),out.data[1].real(),out.data[1].imag());
 
 
         } else if ( doBulk<kernel_type>() && !ghost ) {
@@ -217,14 +244,14 @@ namespace quda {
 
         if ( doHalo<kernel_type>(d) && ghost) {
         // MW - check indexing into GhostFace here
-  const int ghost_idx = mwghostFaceIndex<0>(coord, arg.dim, d, 3);
   const int ghost_idx2 = mwghostFaceIndex<0>(coord, arg.dim, d, 1);
+  const int ghost_idx = arg.improved ? mwghostFaceIndex<0>(coord, arg.dim, d, 3) : ghost_idx2; 
   const Link U = arg.U.Ghost(d, ghost_idx2, 1-parity);
   const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
   // const   int space_con = ((y[3]*X[2] + y[2])*X[1] + y[1]) >>1;
   // const int nbr_idx1 =  (y[0]+3-1)*arg.dc.ghostFaceCB[0]+ space_con;
             const Vector in2 = arg.in(back_idx, their_spinor_parity);
-  printf("Halo (%i %i %i %i), back_idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], back_idx, x_cb, ghost_idx, 0,in.data[0].real(),in.data[0].imag(),in2.data[0].real(),in2.data[0].imag(),out.data[0].real(),out.data[0].imag());
+  // printf("Halo (%i %i %i %i), back_idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], back_idx, x_cb, ghost_idx, 0,in.data[0].real(),in.data[0].imag(),in2.data[0].real(),in2.data[0].imag(),out.data[0].real(),out.data[0].imag());
 
           out -= conj(U) * in;
       } else  if ( doBulk<kernel_type>() && !ghost ) {
