@@ -59,7 +59,7 @@ namespace quda {
     NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
       : Dslash<Float>(arg, out, in), arg(arg), in(in), shared(arg.asymmetric||!arg.dagger) {
       TunableVectorYZ::resizeVector(2,arg.nParity);
-      if (arg.asymmetric) for (int i=0; i<8; i++) strcat(Dslash<Float>::aux[arg.kernel_type],",asym");
+      if (arg.asymmetric) for (int i=0; i<8; i++) if (i!=4) { strcat(Dslash<Float>::aux[i],",asym"); }
     }
 
     virtual ~NdegTwistedMassPreconditioned() { }
@@ -91,6 +91,23 @@ namespace quda {
         param.grid.y = 1;
         param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y*param.block.z;
       }
+    }
+
+    long long flops() const {
+      long long flops = Dslash<Float>::flops();
+      switch(arg.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+      case EXTERIOR_KERNEL_ALL:
+	break; // twisted-mass flops are in the interior kernel
+      case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
+	flops += 2 * nColor * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
+	break;
+      }
+      return flops;
     }
 
     TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }

@@ -68,7 +68,7 @@ namespace quda {
                                     QudaParity parity, const ColorSpinorField &x, const double &k) const {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      // D * in + k * (1 + i*2*mu*kappa*gamma_5) *x
+      // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
 #ifdef NEW_DSLASH
       ApplyTwistedMass(out, in, *gauge, k, 2*mu*kappa, x, parity, dagger, commDim, profile);
 #else
@@ -79,7 +79,7 @@ namespace quda {
 #endif
       flops += 1416ll*in.Volume();
     } else {
-      // D * in + k * (1 + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1) * x
+      // k * D * in + (1 + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1) * x
 #ifdef NEW_DSLASH
       ApplyNdegTwistedMass(out, in, *gauge, k, 2*mu*kappa, -2*kappa*epsilon, x, parity, dagger, commDim, profile);
 
@@ -94,7 +94,7 @@ namespace quda {
 
   }
 
-  // apply full operator  / (D + k * (1 + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1)) * in
+  // apply full operator  / (-kappa * D + (1 + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1)) * in
   void DiracTwistedMass::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
