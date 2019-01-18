@@ -377,19 +377,21 @@ extern "C" {
 
     /** Which part of the spectrum to solve **/
     QudaEigSpectrumType spectrum;
-    
-    /** Tolerance on the least well known eigenvalue's residual **/
-    double tol;
 
     /** Number of the eigenvectors requested **/
     int nEv;
     /** Total size of Krylov space **/
     int nKr;
+    /** Tolerance on the least well known eigenvalue's residual **/
+    double tol;
     /** For Lanczos, check every nth step **/
     /** For IRLM, check every nth restart **/
     int check_interval;
     /** For IRLM, quit after n restarts **/
-    int max_restarts;    
+    int max_restarts;
+    /** For Arpack cross check, name of the Arpack logfile **/
+    char arpack_logfile[512];
+    
     //-------------------------------------------------
     
     //EIG-CG PARAMS

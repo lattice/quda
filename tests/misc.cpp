@@ -1017,7 +1017,7 @@ const char* get_eig_spectrum_str(QudaEigSpectrumType type)
 
 QudaEigType get_eig_type(char* s) {
 
-  QudaEigType ret =  QUDA_INVALID_EIG_TYPE;
+  QudaEigType ret = QUDA_INVALID_EIG_TYPE;
   
   if (strcmp(s, "lanczos") == 0){
     ret = QUDA_LANCZOS;
@@ -1037,7 +1037,7 @@ QudaEigType get_eig_type(char* s) {
   return ret;
 }
 
-const char* get_eig_type_str(QudaEigSpectrumType type)
+const char* get_eig_type_str(QudaEigType type)
 {  
   const char* ret;
   

@@ -51,7 +51,7 @@ extern "C" {
   const char* get_eig_spectrum_str(QudaEigSpectrumType type);
 
   QudaEigType get_eig_type(char* s);
-  const char* get_eig_type_str(QudaEigSpectrumType type);
+  const char* get_eig_type_str(QudaEigType type);
   
   const char* get_quda_ver_str();
 

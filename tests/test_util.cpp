@@ -1750,9 +1750,9 @@ double eig_amin = 0.0;
 double eig_amax = 4;
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
-bool eig_compute_svd = false;
 QudaEigSpectrumType eig_spectrum = QUDA_LR_EIG_SPECTRUM;
 QudaEigType eig_type = QUDA_LANCZOS;
+char arpack_logfile[256] = "arpack_logfile.log";
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -1899,6 +1899,7 @@ void usage(char** argv )
   printf("    --eig-compute-svd <true/false>            # Solve the MdagM problem, use to compute SVD of M (default false)\n");
   printf("    --eig-spectrum <SR/LR/SM/LM/SI/LI>        # The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary\n");
   printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (lanczos, irlm, arnoldi, iram, trlm,...)\n");
+  printf("    --eig-arpack-logfile <file_name>          # The filename storing the stdout from Arpack\n");
   
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
 
@@ -3505,25 +3506,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-    if( strcmp(argv[i], "--eig-compute-svd") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
-      eig_compute_svd = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      eig_compute_svd = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
   if( strcmp(argv[i], "--eig-spectrum") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3539,6 +3521,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }     
     eig_type = get_eig_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-arpack-logfile") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    strcpy(arpack_logfile, argv[i+1]);
     i++;
     ret = 0;
     goto out;

@@ -13,6 +13,12 @@ namespace quda {
   
   void irlmSolve(void *h_evecs, void *h_evals, const Dirac &mat,
 		 QudaEigParam *eig_param, ColorSpinorParam *cpuParam);
+
+  void arnoldiSolve(void *h_evecs, void *h_evals, const Dirac &mat,
+		    QudaEigParam *eig_param, ColorSpinorParam *cpuParam);
+  
+  void iramSolve(void *h_evecs, void *h_evals, const Dirac &mat,
+		 QudaEigParam *eig_param, ColorSpinorParam *cpuParam);
   
 }
 

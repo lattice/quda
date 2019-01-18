@@ -79,9 +79,9 @@ extern double eig_amin;
 extern double eig_amax;
 extern bool eig_use_normop;
 extern bool eig_use_dagger;
-extern bool eig_compute_svd;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
+extern char eig_arpack_logfile[];
 
 extern bool verify_results;
 
@@ -101,18 +101,11 @@ display_test_info()
 	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
 
   printfQuda("   Eigensolver parameters\n");
-  //printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
-  //printfQuda(" - spectrum requested %s\n", get_spectrum_str(eig_spectrum));
+  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
+  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
   printfQuda(" - number of eigenvectors requested %d\n", eig_nEv);
   printfQuda(" - size of Krylov subspace %d\n", eig_nKr);
   printfQuda(" - solver tolerance %e\n", eig_tol);
-  if(eig_compute_svd) {
-    printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
-  } else {    
-    printfQuda(" - Operator: daggered (%s) , normal-op (%s)\n",
-	       eig_use_dagger ? "true" : "false",
-	       eig_use_normop ? "true" : "false");
-  }
   if(eig_use_poly_acc) {
     printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
     printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
@@ -271,6 +264,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 void setEigParam(QudaEigParam &eig_param) {
 
   eig_param.eig_type = eig_type;
+  eig_param.spectrum = eig_spectrum;
   
   eig_param.nKr     = eig_nKr;
   eig_param.nEv     = eig_nEv;
@@ -281,18 +275,13 @@ void setEigParam(QudaEigParam &eig_param) {
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.use_dagger  = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  if(eig_compute_svd) {
-    warningQuda("Overriding any previous choices of operator type. SVD uses MdagM operator.\n");
-    eig_param.use_dagger  = QUDA_BOOLEAN_NO;
-    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
-  }
-
   eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.poly_deg = eig_poly_deg;
   eig_param.a_min    = eig_amin;
   eig_param.a_max    = eig_amax;
 
+  //eig_param.arpack_logfile = eig_arpack_logfile;
+  
 }
 
 

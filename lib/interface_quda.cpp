@@ -2377,11 +2377,11 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     //Problem is symmetric, use a Lanczos solver
     if(eig_param->eig_type == QUDA_LANCZOS) {
       lanczosSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
-      arpackSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
+      //arpackSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
     }
     else if(eig_param->eig_type == QUDA_IMP_RST_LANCZOS) {
+      //arpackSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
       irlmSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
-      arpackSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
     }
     else errorQuda("Solve type not implemented");
   } else {
