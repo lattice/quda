@@ -763,7 +763,7 @@ int main(int argc, char **argv)
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       construct_gauge_field(qdp_fatlink, 1, gauge_param.cpu_prec, &gauge_param);
     } else {
-      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec,&gauge_param,dslash_type);
+      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec,&gauge_param,compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
     //createSiteLinkCPU(inlink, gauge_param.cpu_prec, 0); // 0 for no phases
   }

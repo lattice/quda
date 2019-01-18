@@ -318,6 +318,10 @@
     kernel<12,__VA_ARGS__>            \
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);    \
     break;                \
+  case 16:                \
+    kernel<16,__VA_ARGS__>            \
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);    \
+    break;                \
   case 24:                \
     kernel<24,__VA_ARGS__>            \
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);    \
