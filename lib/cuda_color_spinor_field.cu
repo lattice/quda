@@ -699,7 +699,7 @@ namespace quda {
                                        const int dim, const QudaDirection dir,
 				       const int dagger, cudaStream_t *stream, 
 				       MemoryLocation location [2*QUDA_MAX_DIM],
-                                       MemoryLocation location_label, double a, double b)
+                                       MemoryLocation location_label, double a, double b, double c)
   {
 #ifdef MULTI_GPU
     int face_num = (dir == QUDA_BACKWARDS) ? 0 : (dir == QUDA_FORWARDS) ? 1 : 2;
@@ -722,11 +722,11 @@ namespace quda {
       }
     }
 
-    // new packing kernel is only for Wilson/Clover at the moment
-    if (nSpin == 1 || nDim == 5 || a != 0.0 || b != 0.0) {
+    // new packing kernel is only for Wilson/Clover/twisted at the moment
+    if (nSpin == 1 || (nDim == 5 && (twistFlavor == QUDA_TWIST_NO || twistFlavor == QUDA_TWIST_INVALID) ) ) {
       packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
     } else {
-      PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, *stream);
+      PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, a, b, c, *stream);
     }
 
 #else
@@ -946,13 +946,14 @@ namespace quda {
   }
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx,
-				  MemoryLocation location[2*QUDA_MAX_DIM], MemoryLocation location_label, double a, double b)
+				  MemoryLocation location[2*QUDA_MAX_DIM], MemoryLocation location_label,
+                                  double a, double b, double c)
   {
     createComms(nFace); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
 
-    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label, a, b);
+    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label, a, b, c);
   }
 
   void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, 

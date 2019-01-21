@@ -25,6 +25,7 @@ namespace quda {
   struct PackArg {
 
     typedef Float_ Float;
+    typedef typename mapper<Float>::type real;
 
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
@@ -44,6 +45,11 @@ namespace quda {
 
     const DslashConstant dc; // pre-computed dslash constants for optimized indexing
 
+    real a; // preconditioned twisted-mass scaling parameter
+    real b; // preconditioned twisted-mass chiral twist factor
+    real c; // preconditioned twisted-mass flavor twist factor
+    int twist; // whether we are doing preconditioned twisted-mass or not (1 - singlet, 2 doublet)
+
     int_fastdiv threads;
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
@@ -51,10 +57,12 @@ namespace quda {
     int_fastdiv swizzle;
     int sites_per_block;
 
-    PackArg(void **ghost, const ColorSpinorField &field, int nFace, bool dagger, int parity)
+    PackArg(void **ghost, const ColorSpinorField &field, int nFace,
+            bool dagger, int parity, double a, double b, double c)
       : field(field, 1, nullptr, nullptr, reinterpret_cast<Float**>(ghost)),
         nFace(nFace), dagger(dagger), parity(parity), nParity(field.SiteSubset()),
-        dc(field.getDslashConstant())
+        dc(field.getDslashConstant()), a(a), b(b), c(c),
+        twist( (a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0 )
     {
       if (!field.isNative()) errorQuda("Unsupported field order colorspinor=%d\n", field.FieldOrder());
 
@@ -62,7 +70,7 @@ namespace quda {
       for (int i=0; i<4; i++) {
         if (!commDim[i]) continue;
         if ( i==3 && !getKernelPackT() ) continue;
-        sum += (2*nFace*field.GhostFace()[i]) / nParity; // 2 for forwards and backwards faces
+        sum += 2*nFace*dc.ghostFaceCB[i]; // 2 for forwards and backwards faces
       }
       threads = sum;
 
@@ -73,7 +81,7 @@ namespace quda {
         if (!commDim[i]) continue;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
         // divide by nParity since thread mapper is on checkerboard coords
-        threadDimMapUpper[i] = threadDimMapLower[i] + (2*nFace*field.GhostFace()[i]) / nParity;
+        threadDimMapUpper[i] = threadDimMapLower[i] + 2*nFace*dc.ghostFaceCB[i];
         prev=i;
       }
     }
@@ -87,6 +95,10 @@ namespace quda {
     out << "nParity = " << arg.nParity << std::endl;
     out << "nFace = " << arg.nFace << std::endl;
     out << "dagger = " << arg.dagger << std::endl;
+    out << "a = " << arg.a << std::endl;
+    out << "b = " << arg.b << std::endl;
+    out << "c = " << arg.c << std::endl;
+    out << "twist = " << arg.twist << std::endl;
     out << "threads = " << arg.threads << std::endl;
     out << "threadDimMapLower = { ";
     for (int i=0; i<4; i++) out << arg.threadDimMapLower[i] << (i<3 ? ", " : " }"); out << std::endl;
@@ -96,8 +108,8 @@ namespace quda {
     return out;
   }
 
-  template <bool dagger, int dim, typename Arg>
-  __device__ __host__ inline void pack(Arg &arg, int ghost_idx, int parity) {
+  template <bool dagger, int twist, int dim, typename Arg>
+  __device__ __host__ inline void pack(Arg &arg, int ghost_idx, int s, int parity) {
 
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real,Arg::nColor,Arg::nSpin> Vector;
@@ -122,15 +134,29 @@ namespace quda {
 
       int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
       constexpr int proj_dir = dagger ? +1 : -1;
-      Vector f = arg.field(idx, spinor_parity);
-      field.Ghost(dim, 0, ghost_idx, spinor_parity) = f.project(dim, proj_dir);
+      Vector f = arg.field(idx+s*arg.dc.volume_4d_cb, spinor_parity);
+      if (twist==1) {
+        f = arg.a * (f + arg.b*f.igamma(4));
+      } else if (twist==2) {
+        Vector f1 = arg.field(idx+(1-s)*arg.dc.volume_4d_cb, spinor_parity); // load other flavor
+        if (s==0) f = arg.a * (f + arg.b*f.igamma(4) + arg.c*f1);
+        else      f = arg.a * (f - arg.b*f.igamma(4) + arg.c*f1);
+      }
+      field.Ghost(dim, 0, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
 
     } else { // forwards
 
       int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,1>(ghost_idx, parity, arg);
       constexpr int proj_dir = dagger ? -1 : +1;
-      Vector f = arg.field(idx, spinor_parity);
-      field.Ghost(dim, 1, ghost_idx, spinor_parity) = f.project(dim, proj_dir);
+      Vector f = arg.field(idx+s*arg.dc.volume_4d_cb, spinor_parity);
+      if (twist==1) {
+        f = arg.a * (f + arg.b*f.igamma(4));
+      } else if (twist==2) {
+        Vector f1 = arg.field(idx+(1-s)*arg.dc.volume_4d_cb, spinor_parity); // load other flavor
+        if (s==0) f = arg.a * (f + arg.b*f.igamma(4) + arg.c*f1);
+        else      f = arg.a * (f - arg.b*f.igamma(4) + arg.c*f1);
+      }
+      field.Ghost(dim, 1, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
 
     }
 
@@ -138,7 +164,7 @@ namespace quda {
 
   // FIXME - add CPU variant
 
-  template <bool dagger, typename Arg>
+  template <bool dagger, int twist, typename Arg>
   __global__ void packKernel(Arg arg)
   {
 
@@ -151,8 +177,11 @@ namespace quda {
     constexpr int sites_per_block = 1;
     constexpr int local_tid = 0;
 #endif
+    int s = blockDim.y*blockIdx.y + threadIdx.y;
+    if (s >= arg.dc.Ls) return;
+
     // this is the parity used for load/store, but we use arg.parity for index mapping
-    int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+    int parity = (arg.nParity == 2) ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     while ( local_tid < sites_per_block && tid < arg.threads ) {
 
@@ -161,10 +190,10 @@ namespace quda {
       const int dim = dimFromFaceIndex(ghost_idx, tid, arg);
 
       switch (dim) {
-      case 0: pack<dagger,0>(arg, ghost_idx, parity); break;
-      case 1: pack<dagger,1>(arg, ghost_idx, parity); break;
-      case 2: pack<dagger,2>(arg, ghost_idx, parity); break;
-      case 3: pack<dagger,3>(arg, ghost_idx, parity); break;
+      case 0: pack<dagger,twist,0>(arg, ghost_idx, s, parity); break;
+      case 1: pack<dagger,twist,1>(arg, ghost_idx, s, parity); break;
+      case 2: pack<dagger,twist,2>(arg, ghost_idx, s, parity); break;
+      case 3: pack<dagger,twist,3>(arg, ghost_idx, s, parity); break;
       }
 
 #ifdef STRIPED
@@ -178,7 +207,7 @@ namespace quda {
   }
 
   template <typename Arg>
-  class Pack : TunableVectorY {
+  class Pack : TunableVectorYZ {
 
   protected:
     Arg &arg;
@@ -195,7 +224,7 @@ namespace quda {
         for (int d=0; d<meta.Ndim(); d++) nDimComms += commDim[d];
         return 3*nDimComms;
       } else {
-        return TunableVectorY::maxGridSize();
+        return TunableVectorYZ::maxGridSize();
       }
     } // use no more than a quarter of the GPU
     unsigned int minGridSize() const {
@@ -206,12 +235,12 @@ namespace quda {
         for (int d=0; d<meta.Ndim(); d++) nDimComms += commDim[d];
         return nDimComms;
       } else {
-        return TunableVectorY::minGridSize();
+        return TunableVectorYZ::minGridSize();
       }
     }
 #else
     bool tuneGridDim() const { return location & Host; } // only tune grid dimension if doing zero-copy writing
-    unsigned int maxGridSize() const { return tuneGridDim() ? deviceProp.multiProcessorCount/4 : TunableVectorY::maxGridSize(); } // use no more than a quarter of the GPU
+    unsigned int maxGridSize() const { return tuneGridDim() ? deviceProp.multiProcessorCount/4 : TunableVectorYZ::maxGridSize(); } // use no more than a quarter of the GPU
 #endif
 
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
@@ -245,12 +274,13 @@ namespace quda {
       case          Host: strcat(aux, comm_peer2peer_enabled_global() ? "host-device" : "host-host"); break;
       default: errorQuda("Unknown pack target location %d\n", location);
       }
+      if (arg.twist) strcat(aux, arg.twist==2 ? ",twist-doublet" : "twist-singlet");
     }
 
   public:
 
     Pack(Arg &arg, const ColorSpinorField &meta, MemoryLocation location)
-      : TunableVectorY(meta.SiteSubset()), arg(arg), meta(meta), location(location)
+      : TunableVectorYZ( (meta.Ndim() == 5 ? meta.X(4) : 1), meta.SiteSubset()), arg(arg), meta(meta), location(location)
     {
       fillAux();
     }
@@ -263,15 +293,21 @@ namespace quda {
       arg.swizzle = tp.aux.x;
       arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
 
-      //std::cout << arg;
-
-      if (arg.dagger)
-        packKernel<true> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-      else
-        packKernel<false> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+      if (arg.dagger) {
+        switch(arg.twist) {
+        case 0: packKernel<true, 0> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+        case 1: packKernel<true, 1> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+        case 2: packKernel<true, 2> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+        }
+      } else {
+        switch(arg.twist) {
+        case 0: packKernel<false, 0> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+        default: errorQuda("Twisted packing only for dagger");
+        }
+      }
     }
 
-    bool tuneSharedBytes() const { return location & Host ? false : TunableVectorY::tuneSharedBytes(); }
+    bool tuneSharedBytes() const { return location & Host ? false : TunableVectorYZ::tuneSharedBytes(); }
 
     bool advanceAux(TuneParam &param) const
     {
@@ -293,7 +329,7 @@ namespace quda {
     }
 
     void initTuneParam(TuneParam &param) const {
-      TunableVectorY::initTuneParam(param);
+      TunableVectorYZ::initTuneParam(param);
       param.aux.x = 1; // swizzle factor
       // if doing a zero-copy policy then ensure that each thread block
       // runs exclusively on a given SM - this is to ensure quality of
@@ -302,7 +338,7 @@ namespace quda {
     }
 
     void defaultTuneParam(TuneParam &param) const {
-      TunableVectorY::defaultTuneParam(param);
+      TunableVectorYZ::defaultTuneParam(param);
       param.aux.x = 1; // swizzle factor
     }
 
@@ -310,23 +346,25 @@ namespace quda {
 
     int tuningIter() const { return 3; }
 
-    long long flops() const { return 2 * ( Arg::spin_project ? Arg::nSpin/2 : Arg::nSpin ) * Arg::nColor * arg.nParity * arg.threads; }
+    long long flops() const {
+      return 2 * ( Arg::spin_project ? Arg::nSpin/2 : Arg::nSpin ) * Arg::nColor * arg.nParity * arg.dc.Ls * arg.threads;
+    }
 
     long long bytes() const {
       size_t precision = sizeof(typename Arg::Float);
       size_t faceBytes = 2 * ( (Arg::spin_project ? Arg::nSpin/2 : Arg::nSpin) + Arg::nSpin ) * Arg::nColor * precision;
       if (precision == QUDA_HALF_PRECISION) faceBytes += 2*sizeof(float); // 2 is from input and output
-      return faceBytes * arg.nParity * arg.threads;
+      return faceBytes * arg.nParity * arg.dc.Ls * arg.threads;
     }
 
   };
 
   template <typename Float, int nColor, int nSpin>
   void PackGhost(void *ghost[], const ColorSpinorField &field,
-                 MemoryLocation location, int nFace,
-                 bool dagger, int parity, const cudaStream_t &stream)
+                 MemoryLocation location, int nFace, bool dagger, int parity,
+                 double a, double b, double c, const cudaStream_t &stream)
   {
-    PackArg<Float,nColor,nSpin> arg(ghost, field, nFace, dagger, parity);
+    PackArg<Float,nColor,nSpin> arg(ghost, field, nFace, dagger, parity, a, b, c);
     Pack<PackArg<Float,nColor,nSpin>> pack(arg, field, location);
     pack.apply(stream);
   }
@@ -334,11 +372,11 @@ namespace quda {
   // template on the number of spins
   template <typename Float, int nColor>
   void PackGhost(void *ghost[], const ColorSpinorField &field,
-                 MemoryLocation location, int nFace,
-                 bool dagger, int parity, const cudaStream_t &stream)
+                 MemoryLocation location, int nFace, bool dagger, int parity,
+                 double a, double b, double c, const cudaStream_t &stream)
   {
     if (field.Nspin() == 4) {
-      PackGhost<Float,nColor,4>(ghost, field, location, nFace, dagger, parity, stream);
+      PackGhost<Float,nColor,4>(ghost, field, location, nFace, dagger, parity, a, b, c, stream);
     } else {
       errorQuda("Unsupported number of spins %d\n", field.Nspin());
     }
@@ -347,11 +385,11 @@ namespace quda {
   // template on the number of colors
   template <typename Float>
   void PackGhost(void *ghost[], const ColorSpinorField &field,
-                 MemoryLocation location, int nFace,
-                 bool dagger, int parity, const cudaStream_t &stream)
+                 MemoryLocation location, int nFace, bool dagger, int parity,
+                 double a, double b, double c, const cudaStream_t &stream)
   {
     if (field.Ncolor() == 3) {
-      PackGhost<Float,3>(ghost, field, location, nFace, dagger, parity, stream);
+      PackGhost<Float,3>(ghost, field, location, nFace, dagger, parity, a, b, c, stream);
     } else {
       errorQuda("Unsupported number of colors %d\n", field.Ncolor());
     }
@@ -359,8 +397,8 @@ namespace quda {
 
   // Pack the ghost for the Dslash operator
   void PackGhost(void *ghost[2*QUDA_MAX_DIM], const ColorSpinorField &field,
-                 MemoryLocation location, int nFace,
-                 bool dagger, int parity, const cudaStream_t &stream)
+                 MemoryLocation location, int nFace, bool dagger, int parity,
+                 double a, double b, double c, const cudaStream_t &stream)
   {
     int nDimPack = 0;
     for (int d=0; d<4; d++) {
@@ -371,13 +409,13 @@ namespace quda {
     if (!nDimPack) return; // if zero then we have nothing to pack
 
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-      PackGhost<double>(ghost, field, location, nFace, dagger, parity, stream);
+      PackGhost<double>(ghost, field, location, nFace, dagger, parity, a, b, c, stream);
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      PackGhost<float>(ghost, field, location, nFace, dagger, parity, stream);
+      PackGhost<float>(ghost, field, location, nFace, dagger, parity, a, b, c, stream);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      PackGhost<short>(ghost, field, location, nFace, dagger, parity, stream);
+      PackGhost<short>(ghost, field, location, nFace, dagger, parity, a, b, c, stream);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      PackGhost<char>(ghost, field, location, nFace, dagger, parity, stream);
+      PackGhost<char>(ghost, field, location, nFace, dagger, parity, a, b, c, stream);
     } else {
       errorQuda("Unsupported precision %d\n", field.Precision());
     }

@@ -76,6 +76,7 @@ extern bool kernel_pack_t;
 
 extern double mass; // mass of Dirac operator
 extern double mu;
+extern double epsilon;
 
 extern QudaVerbosity verbosity;
 
@@ -123,7 +124,7 @@ void init(int argc, char **argv) {
   inv_param.kappa = 0.1;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = 0.1;
+    inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
@@ -688,7 +689,8 @@ void dslashRef() {
     switch (test_type) {
     case 0:
       if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)
-	tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+	tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity,
+                  inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
         int tm_offset = 12*spinorRef->Volume();

@@ -129,8 +129,7 @@ namespace quda {
 	   int coarseSpin, int coarseColor, typename Wtype, typename Arg>
   __device__ __host__ inline void computeUV(Arg &arg, const Wtype &W, int parity, int x_cb, int ic_c) {
 
-    int coord[5];
-    coord[4] = 0;
+    int coord[4];
     getCoords(coord, x_cb, arg.x_size, parity);
 
     constexpr int uvSpin = fineSpin * (from_coarse ? 2 : 1);

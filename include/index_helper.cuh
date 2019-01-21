@@ -296,14 +296,18 @@ namespace quda {
   /**
      Compute the checkerboarded index into the ghost field
      corresponding to full (local) site index x[]
-     @param x local site
-     @param X local lattice dimensions
+     @param x_ local site
+     @param X_ local lattice dimensions
      @param dim dimension
      @param depth of ghost
   */
-  template <int dir, typename I>
-  __device__ __host__ inline int ghostFaceIndex(const int x[], const I X[], int dim, int nFace) {
+  template <int dir, int nDim=4, typename I>
+  __device__ __host__ inline int ghostFaceIndex(const int x_[], const I X_[], int dim, int nFace) {
+    static_assert( (nDim==4 || nDim==5), "Number of dimensions must be 4 or 5");
     int index = 0;
+    const int x[] = { x_[0], x_[1], x_[2], x_[3], nDim == 5 ? x_[4] : 0 };
+    const int X[] = { (int)X_[0], (int)X_[1], (int)X_[2], (int)X_[3], nDim == 5 ? (int)X_[4] : 1 };
+
     switch(dim) {
     case 0:
       switch(dir) {

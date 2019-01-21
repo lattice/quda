@@ -189,8 +189,8 @@ namespace {
       }
     }
     if (pack) {
-      PROFILE(if (dslash_pack_compute) in.pack(dslash.Nface()/2, parity, dslash.Dagger(), packIndex,
-					       pack_dest, location, dslash.dslashParam.twist_a, dslash.dslashParam.twist_b),
+      PROFILE(if (dslash_pack_compute) in.pack(dslash.Nface()/2, parity, dslash.Dagger(), packIndex, pack_dest, location,
+                                               dslash.dslashParam.twist_a, dslash.dslashParam.twist_b, dslash.dslashParam.twist_c),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
 
       // Record the end of the packing

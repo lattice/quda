@@ -1674,6 +1674,7 @@ bool verify_results = true;
 double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
+double epsilon = 0.01;
 double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
@@ -1802,7 +1803,8 @@ void usage(char** argv )
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
-  printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
+  printf("    --mu                                      # Twisted-Mass chiral twist of Dirac operator (default 0.1)\n");
+  printf("    --epsilon                                 # Twisted-Mass flavor twist of Dirac operator (default 0.01)\n");
   printf("    --tadpole-coeff                           # Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)\n");
   printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
@@ -2423,6 +2425,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mu = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--epsilon") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    epsilon = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;

@@ -53,6 +53,7 @@ extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
 extern double kappa; // kappa of Dirac operator
 extern double mu;
+extern double epsilon;
 extern double anisotropy; // temporal anisotropy
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
@@ -184,7 +185,7 @@ int main(int argc, char **argv)
   inv_param.mu = mu;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = 0.1385;
+    inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
