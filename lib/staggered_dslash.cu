@@ -253,7 +253,7 @@ namespace quda {
 
     //MWTODO: clean up here
     // if (xpay) {
-    //   Vector x = arg.x(x_cb, parity);
+    //   Vector x = arg.x(x_cb, my_spinor_parity);
     //   out = arg.a * x -out ;
     // }
     if (dagger){
@@ -262,14 +262,14 @@ namespace quda {
 
 
     if (xpay && kernel_type == INTERIOR_KERNEL) {
-      Vector x = arg.x(x_cb, parity);
+      Vector x = arg.x(x_cb, my_spinor_parity);
       out = arg.a * x -out ;
     } else if (kernel_type != INTERIOR_KERNEL ) {
       Vector x = arg.out(x_cb, my_spinor_parity);
       out = x +  ( xpay ? Float(-1)*out : out ); //MWTODO: verify
       //MWTODO - aadd xpay
     }
-
+   // printf("NEW Out cb %i %i \t %f %f %f %f %f %f\n",x_cb, my_spinor_parity, out.data[0].real(),out.data[0].imag(),out.data[1].real(),out.data[1].imag(),out.data[2].real(),out.data[2].imag());
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
   }
 

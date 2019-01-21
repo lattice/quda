@@ -74,7 +74,7 @@ namespace quda {
 //#else
   else{
     constexpr bool improved = true;
-    printfQuda("NEW STAGGERED Dslash ...\n");
+    printfQuda("NEW STAGGERED Dslash partiy %i %i...\n",parity, dagger);
     ApplyDslashStaggered(out, in, fatGauge, longGauge , 0., in,
                          parity, dagger, improved, commDim, profile);
 }
@@ -113,7 +113,7 @@ namespace quda {
 //#else
   else{
     constexpr bool improved = true;
-    printfQuda("NEW STAGGERED Dslash XPAY...\n");
+    printfQuda("NEW STAGGERED Dslash XPAY partiy %i %i...\n",parity, dagger);
 
     ApplyDslashStaggered(out, in, fatGauge, longGauge , k, x,
                          parity, dagger, improved, commDim, profile);
