@@ -128,7 +128,8 @@ namespace quda {
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
      __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, int coord[nDim], int x_cb,
       int parity, int idx, int thread_dim, bool &active) {
-      typedef Matrix<complex<Float>,nColor> Link;
+      typedef typename mapper<Float>::type real;
+      typedef Matrix<complex<real>,nColor> Link;
       const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
 
@@ -152,13 +153,15 @@ namespace quda {
           const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += U * in;
 
-          // printf("in %f %f %f %f %f %f\n",in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),in.data[2].real(),in.data[2].imag());
+          // printf("in %f %f %f %f %f %f\n",in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),out.data[2].real(),out.data[2].imag());
         }
         else if ( doBulk<kernel_type>() && !ghost ) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
           const Link U = arg.U(d, x_cb, parity);
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += U * in;
+           // printf("in %f %f %f %f %f %f\n",in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),out.data[2].real(),out.data[2].imag());
+
         }
       }
 
@@ -250,14 +253,15 @@ namespace quda {
 
     applyStaggered<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
 
-
+// printf("NEW1 Out cb %i %i \t %f %f %f %f %f %f\n",x_cb, my_spinor_parity, out.data[0].real(),out.data[0].imag(),out.data[1].real(),out.data[1].imag(),out.data[2].real(),out.data[2].imag());
+   
     //MWTODO: clean up here
     // if (xpay) {
     //   Vector x = arg.x(x_cb, my_spinor_parity);
     //   out = arg.a * x -out ;
     // }
     if (dagger){
-      out = Float(-1)*out;
+      out = real(-1)*out;
     }
 
 
@@ -266,10 +270,10 @@ namespace quda {
       out = arg.a * x -out ;
     } else if (kernel_type != INTERIOR_KERNEL ) {
       Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x +  ( xpay ? Float(-1)*out : out ); //MWTODO: verify
+      out = x +  ( xpay ? real(-1)*out : out ); //MWTODO: verify
       //MWTODO - aadd xpay
     }
-   // printf("NEW Out cb %i %i \t %f %f %f %f %f %f\n",x_cb, my_spinor_parity, out.data[0].real(),out.data[0].imag(),out.data[1].real(),out.data[1].imag(),out.data[2].real(),out.data[2].imag());
+   // printf("NEW2 Out cb %i %i \t %f %f %f %f %f %f\n",x_cb, my_spinor_parity, out.data[0].real(),out.data[0].imag(),out.data[1].real(),out.data[1].imag(),out.data[2].real(),out.data[2].imag());
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
   }
 
@@ -435,15 +439,16 @@ namespace quda {
     // const int nFace = 1;
     // in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy
 
-    // if (dslash::aux_worker) dslash::aux_worker->apply(0);
+    if (dslash::aux_worker) dslash::aux_worker->apply(0);
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
       ApplyDslashStaggered<double>(out, in, U, L, a, x, parity, dagger, improved, comm_override, profile);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
       ApplyDslashStaggered<float>(out, in, U, L, a, x, parity, dagger, improved, comm_override, profile);
     } 
-    //else if (U.Precision() == QUDA_HALF_PRECISION) {
-    //   ApplyDslashStaggered<short, true>(out, in, U, L,  a, x, parity);
-    // } 
+    else if (U.Precision() == QUDA_HALF_PRECISION) {
+      ApplyDslashStaggered<short>(out, in, U, L, a, x, parity, dagger, improved, comm_override, profile);
+
+    } 
     else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }  
