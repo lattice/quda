@@ -61,7 +61,7 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
       ApplyTwistedClover(out, in, *gauge, clover, k, 2*mu*kappa, x, parity, dagger, commDim, profile);
 #else
       FullClover *cs = new FullClover(clover, false);
@@ -93,7 +93,7 @@ namespace quda {
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
     }
 
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
     ApplyTwistedClover(out, in, *gauge, clover, -kappa, 2.0*kappa*mu, in,
                        QUDA_INVALID_PARITY, dagger, commDim, profile);
 #else
@@ -189,7 +189,7 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
 
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
     bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     if (dagger && symmetric && !reverse) {
       bool reset = newTmp(&tmp2, in);
@@ -242,7 +242,7 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
 
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
     bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     if (dagger && symmetric && !reverse) {
       bool reset = newTmp(&tmp2, in);
@@ -300,7 +300,7 @@ namespace quda {
         Dslash(*tmp1, in, parity[0]);
         DslashXpay(out, *tmp1, parity[1], in, kappa2);
       } else { // symmetric preconditioning, dagger
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
         TwistCloverInv(out, in, parity[1]);
         reverse = true; Dslash(*tmp1, out, parity[0]); reverse = false;
         DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
