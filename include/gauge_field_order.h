@@ -1717,7 +1717,7 @@ namespace quda {
         // The phases come after the ghost matrices
         reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase, X, R);
 
-#if 0
+#if 1
 	// FIXME - this is a hack from hell - needs to be moved into the reconstruct type
 	if (stag_phase == QUDA_STAGGERED_PHASE_MILC && reconLenParam == 12) {
     Float sign=1;
