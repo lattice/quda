@@ -247,7 +247,7 @@ include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 if(${CPU_ARCH} STREQUAL "x86_64")
   set(CXX_OPT "-march=native")
 elseif("$CMAKE_HOST_SYSTEM_PROCSSOR" STREQUAL "ppc64le")
-  check_cxx_compiler_flag("-Ofast -mcpu=native -mtune=native" MCPU_NATIVE)
+  set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
 endif()
 
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
