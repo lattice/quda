@@ -235,13 +235,28 @@ include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 ## Now we hopefully found some way to get eigen to work
 
 
+
+# Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64"
+# Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64"
+# Power: CMAKE_HOST_SYSTEM_PROCESSOR "ppc64le"
+
+## We need to use different optimization flags depending on whether we are on x86 or power
+## Note: This only applies to the RELASE build type
+## this is just a quick fix and we should probably use https://cmake.org/cmake/help/latest/module/CheckCXXCompilerFlag.html
+
+if(${CPU_ARCH} STREQUAL "x86_64")
+  set(CXX_OPT "-march=native")
+elseif("$CMAKE_HOST_SYSTEM_PROCSSOR" STREQUAL "ppc64le")
+  check_cxx_compiler_flag("-Ofast -mcpu=native -mtune=native" MCPU_NATIVE)
+endif()
+
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 #define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
 "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
 "Flags used by the C++ compiler during strict jenkins builds.")
-set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -march=native -w" CACHE STRING
+set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w ${CXX_OPT} " CACHE STRING
     "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds.")
@@ -250,6 +265,8 @@ set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas 
 set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds.")
 enable_language(CXX)
+
+
 
 
 #define C FLAGS
