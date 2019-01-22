@@ -84,6 +84,7 @@ namespace quda {
    */
   template <typename Float, int nColor, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_, bool improved_>
   struct StaggeredArg : DslashArg<Float> {
+        typedef typename mapper<Float>::type real;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
@@ -103,11 +104,12 @@ namespace quda {
     const GU U;            // the gauge field
     const GL L;            // the long gauge field
 
-    const Float a;
+    const real a;
+    const real fat_link_max; //MWTODO: FIXME: This a workaround should probably be in the accessor ...
     static constexpr bool improved = improved_;
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
-        Float a, const ColorSpinorField &x, int parity, bool dagger,  const int *comm_override)
-      : DslashArg<Float>(in, U, 0.0, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, comm_override), out(out), in(in, improved_ ? 3 :1 ), U(U), L(L), x(x), a(a) 
+        double a, const ColorSpinorField &x, int parity, bool dagger,  const int *comm_override)
+      : DslashArg<Float>(in, U, 0.0, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, comm_override), out(out), in(in, improved_ ? 3 : 1 ), U(U), L(L), fat_link_max(improved_ ? U.Precision() == QUDA_HALF_PRECISION ? U.LinkMax() : 1.0: 1.0), x(x), a(a) 
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -150,16 +152,18 @@ namespace quda {
         if ( doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, 1);
           const Link U = arg.U(d, x_cb, parity);
-          const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-          out += U * in;
+          Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+          in *=  arg.fat_link_max;
+          out += (U * in);
 
-          // printf("in %f %f %f %f %f %f\n",in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),out.data[2].real(),out.data[2].imag());
+           // printf("in %f %f %f %f %f %f\n",in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),out.data[9].real(),out.data[0].imag());
         }
         else if ( doBulk<kernel_type>() && !ghost ) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
           const Link U = arg.U(d, x_cb, parity);
-          const Vector in = arg.in(fwd_idx, their_spinor_parity);
-          out += U * in;
+          Vector in = arg.in(fwd_idx, their_spinor_parity);
+          in *=  arg.fat_link_max;
+          out += (U * in);
            // printf("in %f %f %f %f %f %f\n",in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),out.data[2].real(),out.data[2].imag());
 
         }
@@ -181,6 +185,7 @@ namespace quda {
           const Link L = arg.L(d, x_cb, parity);
           const Vector in = arg.in(fwd3_idx, their_spinor_parity);
           out += L * in;
+          // printf("Halo (%i %i %i %i),  x_cb %i  \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], x_cb, in.data[0].real(),in.data[0].imag(),in.data[1].real(),in.data[1].imag(),out.data[1].real(),out.data[1].imag());
         }  
       }
 #endif
@@ -196,15 +201,17 @@ namespace quda {
           const int ghost_idx2 = mwghostFaceIndex<0>(coord, arg.dim, d, 1);
           const int ghost_idx = arg.improved ? mwghostFaceIndex<0>(coord, arg.dim, d, 3) : ghost_idx2; 
           const Link U = arg.U.Ghost(d, ghost_idx2, 1-parity);
-          const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-          out -= conj(U) * in;
+          Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+          in *=  arg.fat_link_max;
+          out -= (conj(U) * in);
         }
         else  if ( doBulk<kernel_type>() && !ghost ) {
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
           const Link U = arg.U(d, gauge_idx, 1-parity);
-          const Vector in = arg.in(back_idx, their_spinor_parity);
-          out -= conj(U) * in;
+          Vector in = arg.in(back_idx, their_spinor_parity);
+          in *=  arg.fat_link_max;
+          out -= (conj(U) * in);
         }
       }
 #endif
