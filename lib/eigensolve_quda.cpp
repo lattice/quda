@@ -369,8 +369,8 @@ namespace quda {
     //Ensure we are not trying to compute on a zero-field source
     Float norm = sqrt(blas::norm2(*kSpace[0]));
     if(norm == 0){
-      errorQuda("Initial residual is zero.\n");
-      return;
+      printfQuda("Initial residual is zero. Populating with rands.\n");
+      kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
     }
 
     //Normalise initial source

@@ -1372,40 +1372,21 @@ namespace quda {
     //Just a dummy array for now, MG doesn't need the evals
     Complex *evals[B.size()];
 
-    //for(int i=0; i<B.size(); i++) B[i]->gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-
     std::vector<ColorSpinorField*> B_evecs;
     ColorSpinorParam csParam(*B[0]);
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-    for(int i=0; i<B.size(); i++) {
+    for(unsigned int i=0; i<B.size(); i++) {
       B_evecs.push_back(ColorSpinorField::Create(csParam));
-      //blas::copy(*B_evecs[i], *B[i]);
     }
-    //irlmSolve(B_evecs, evals, *(param.matSmooth->Expose()),
-    //param.mg_global.eig_param);
+    irlmSolve(B_evecs, evals, *(param.matSmooth->Expose()),
+	      param.mg_global.eig_param);
 
     if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
       saveVectors(B_evecs);
     }
 
-    for(int i=0; i<B_evecs.size(); i++) {
+    for(unsigned int i=0; i<B_evecs.size(); i++) {
       delete B_evecs[i];
-    }
-    
-    /*
-    for (int i=0; i<param.Nvec; i++) {
-      cpuParam.v = (Complex*)host_evecs + i*12*local_vol;
-      ColorSpinorField *cpuTemp = ColorSpinorField::Create(cpuParam);
-      
-      //Copy Evec_i from host to device.
-      *param.B[i] = *cpuTemp;
-      delete cpuTemp;
-    }
-    */
-    
-    //Clean up
-    //delete static_cast<Complex* >(host_evals);
-    //delete static_cast<Complex* >(host_evecs);
-    
+    }    
   }
 }
