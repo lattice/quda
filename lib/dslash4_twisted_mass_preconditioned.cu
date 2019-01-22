@@ -54,7 +54,7 @@ namespace quda {
 
     TwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
       : Dslash<Float>(arg, out, in), arg(arg), in(in) {
-      if (arg.asymmetric) for (int i=0; i<8; i++) strcat(Dslash<Float>::aux[arg.kernel_type],",asym");
+      if (arg.asymmetric) for (int i=0; i<8; i++) if (i!=4) { strcat(Dslash<Float>::aux[i],",asym"); }
     }
 
     virtual ~TwistedMassPreconditioned() { }
@@ -68,6 +68,23 @@ namespace quda {
       } else {
         errorQuda("Preconditioned twisted-mass operator not defined nParity=%d", arg.nParity);
       }
+    }
+
+    long long flops() const {
+      long long flops = Dslash<Float>::flops();
+      switch(arg.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+      case EXTERIOR_KERNEL_ALL:
+	break; // twisted-mass flops are in the interior kernel
+      case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
+	flops += 2 * nColor * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
+	break;
+      }
+      return flops;
     }
 
     TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }

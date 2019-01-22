@@ -422,6 +422,7 @@ namespace quda {
         switch(arg.kernel_type) {
         case INTERIOR_KERNEL:
           Launch<Float,nDim,nColor,nParity,dagger,xpay,INTERIOR_KERNEL,Arg>::launch(*this, tp, arg, stream); break;
+#ifdef MULTI_GPU
         case EXTERIOR_KERNEL_X:
           Launch<Float,nDim,nColor,nParity,dagger,xpay,EXTERIOR_KERNEL_X,Arg>::launch(*this, tp, arg, stream); break;
         case EXTERIOR_KERNEL_Y:
@@ -433,6 +434,9 @@ namespace quda {
         case EXTERIOR_KERNEL_ALL:
           Launch<Float,nDim,nColor,nParity,dagger,xpay,EXTERIOR_KERNEL_ALL,Arg>::launch(*this, tp, arg, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
+#else
+        default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
+#endif
         }
       }
     }

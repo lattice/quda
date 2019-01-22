@@ -12,7 +12,7 @@ namespace quda {
     real c; // dummy parameter to allow us to reuse applyWilsonTM for non-degenerate operator
     real a_inv; // inverse scaling factor - used to allow early xpay inclusion
     real b_inv; // inverse twist factor - used to allow early xpay inclusion
-    bool asymmetric; // whether we are applying the asymetric operator or notb
+    bool asymmetric; // whether we are applying the asymetric operator or not
 
     TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    double a, double b, bool xpay, const ColorSpinorField &x,

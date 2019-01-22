@@ -600,7 +600,12 @@ namespace quda {
     virtual ~DiracTwistedClover();
     DiracTwistedClover& operator=(const DiracTwistedClover &dirac);
 
-    void TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;	//IS PARITY REQUIRED???
+    void TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
+
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
+                        const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+                            const QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -631,6 +636,8 @@ namespace quda {
   // Even-odd preconditioned twisted mass with a clover term
   class DiracTwistedCloverPC : public DiracTwistedClover {
 
+    mutable bool reverse; /** swap the order of the derivative D and the diagonal inverse A^{-1} */
+
   public:
     DiracTwistedCloverPC(const DiracTwistedCloverPC &dirac);
     DiracTwistedCloverPC(const DiracParam &param, const int nDim);
@@ -641,9 +648,9 @@ namespace quda {
     void TwistCloverInv(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-      const QudaParity parity) const;
+                        const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-          const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+                            const QudaParity parity, const ColorSpinorField &x, const double &k) const;
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 

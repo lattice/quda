@@ -3,9 +3,6 @@
 #include <iostream>
 #include <multigrid.h>
 
-// enable new dslash
-#define NEW_DSLASH
-
 namespace quda {
 
   DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param) { }
@@ -31,7 +28,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
     ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
 #else
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
@@ -52,7 +49,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
     ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
 #else
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
@@ -91,7 +88,7 @@ namespace quda {
     }
 
     checkFullSpinor(*Out, *In);
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
     ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
 #else
     DslashXpay(Out->Odd(), In->Even(), QUDA_ODD_PARITY, In->Odd(), -kappa);

@@ -219,8 +219,6 @@ int main(int argc, char **argv)
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
   }
 
-  //inv_param.solution_type = QUDA_MAT_SOLUTION;
-
   inv_param.matpc_type = matpc_type;
 
   inv_param.dagger = QUDA_DAG_NO;
@@ -312,6 +310,7 @@ int main(int argc, char **argv)
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
   }
