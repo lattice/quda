@@ -353,6 +353,12 @@ namespace quda {
     void generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh=false);
 
     /**
+       @brief Generate low eigenvectors
+       @param B Generated eigenvectors
+    */
+    void generateEigenVectors(std::vector<ColorSpinorField*> &B);
+    
+    /**
        @brief Build free-field null-space vectors
        @param B Free-field null-space vectors
      */

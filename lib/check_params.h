@@ -154,6 +154,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, 0);
   P(nEv, 0);
   P(nKr, 0);
+  P(nConv, 0);
   P(check_interval, 0);
   P(max_restarts, 0);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
@@ -167,6 +168,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, INVALID_INT);
   P(nEv, INVALID_INT);
   P(nKr, INVALID_INT);
+  P(nConv, INVALID_INT);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
   P(extlib_type, QUDA_EXTLIB_INVALID);
@@ -672,7 +674,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
-
+  P(use_low_modes, QUDA_BOOLEAN_INVALID);
+  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
+  
 #ifdef INIT_PARAM
   P(gflops, 0.0);
   P(secs, 0.0);

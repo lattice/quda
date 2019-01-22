@@ -151,10 +151,10 @@ namespace quda{
    *                               QUDA color-spinor eigenvectors.
    **/
   
-  void arpackSolve(void *h_evecs, void *h_evals,
-		   const Dirac &mat,
-		   QudaEigParam *eig_param,
-		   ColorSpinorParam *cpuParam);
+  void arpack_solve(void *h_evecs, void *h_evals,
+		    const Dirac &mat,
+		    QudaEigParam *eig_param,
+		    ColorSpinorParam *cpuParam);
 
 }//end of namespace quda 
 

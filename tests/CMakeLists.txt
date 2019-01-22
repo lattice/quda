@@ -20,6 +20,13 @@ if(NOT QUDA_BUILD_ALL_TESTS)
   set(BUILD_TESTING OFF)
 endif()
 
+if(QUDA_ARPACK)
+  LIST(APPEND TEST_LIBS ${ARPACK})
+  if(QUDA_MPI OR QUDA_QMP) 
+    LIST(APPEND TEST_LIBS ${PARPACK})
+  endif()
+endif()
+
 #define tests
 
 # if we build with QDP JIT the tests cannot run anyway

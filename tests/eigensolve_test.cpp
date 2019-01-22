@@ -69,6 +69,7 @@ extern bool compute_clover;
 
 extern int eig_nEv;
 extern int eig_nKr;
+extern int eig_nConv;
 extern int eig_check_interval;
 extern int eig_max_restarts;
 extern double eig_tol;
@@ -79,9 +80,12 @@ extern double eig_amin;
 extern double eig_amax;
 extern bool eig_use_normop;
 extern bool eig_use_dagger;
+extern bool eig_compute_svd;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
+extern bool eig_arpack_check;
 extern char eig_arpack_logfile[];
+extern char eig_QUDA_logfile[];
 
 extern bool verify_results;
 
@@ -100,18 +104,29 @@ display_test_info()
 	     get_recon_str(link_recon), 
 	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
 
-  printfQuda("   Eigensolver parameters\n");
+  printfQuda("\n   Eigensolver parameters\n");
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
   printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
-  printfQuda(" - number of eigenvectors requested %d\n", eig_nEv);
-  printfQuda(" - size of Krylov subspace %d\n", eig_nKr);
+  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+  printfQuda(" - size of Krylov space %d\n", eig_nKr);
   printfQuda(" - solver tolerance %e\n", eig_tol);
+  if(eig_compute_svd) {
+    printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
+    printfQuda(" - ***********************************************************\n");
+    printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
+    printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
+    printfQuda(" - ***********************************************************\n");
+  } else {    
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n",
+	       eig_use_dagger ? "true" : "false",
+	       eig_use_normop ? "true" : "false");
+  }
   if(eig_use_poly_acc) {
     printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
     printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-    printfQuda(" - Chebyshev polynomial maximum %e\n", eig_amax);
+    printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
   }
-  
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
@@ -266,8 +281,9 @@ void setEigParam(QudaEigParam &eig_param) {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
   
-  eig_param.nKr     = eig_nKr;
+  eig_param.nConv   = eig_nConv;
   eig_param.nEv     = eig_nEv;
+  eig_param.nKr     = eig_nKr;
   eig_param.tol     = eig_tol;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
@@ -275,12 +291,20 @@ void setEigParam(QudaEigParam &eig_param) {
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.use_dagger  = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  if(eig_compute_svd) {
+    eig_param.use_dagger  = QUDA_BOOLEAN_NO;
+    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
+  }
+  
   eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.poly_deg = eig_poly_deg;
   eig_param.a_min    = eig_amin;
   eig_param.a_max    = eig_amax;
 
-  //eig_param.arpack_logfile = eig_arpack_logfile;
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
   
 }
 
@@ -365,9 +389,6 @@ int main(int argc, char **argv)
     eig_inv_param.return_clover_inverse = 1;
   }
 
-  // start the timer
-  double time0 = -((double)clock());
-
   // initialize the QUDA library
   initQuda(device);
 
@@ -380,10 +401,6 @@ int main(int argc, char **argv)
       dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     loadCloverQuda(clover, clover_inv, &eig_inv_param);
   }
-
-
-
-
   
   // QUDA eigensolver test 
   //----------------------------------------------------------------------------
@@ -401,18 +418,65 @@ int main(int argc, char **argv)
     host_evecs = (void*)malloc(vol*24*eig_param.nEv*sizeof(double));
     host_evals = (void*)malloc(     2*eig_param.nEv*sizeof(double));
   }
-
-  double time = -((double)clock());  
+  
+  //Demonstrate how to use inital guess. The vector will be
+  //normalised in the eigensolve function.
+  for(int i=0; i<vol*24; i++) {
+    if(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+      
+      ((double*)host_evecs)[i] = rand()/(double)RAND_MAX;
+      if(i<24) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
+    } else {
+      
+      ((float*)host_evecs)[i] = rand()/(float)RAND_MAX;      
+      if(i<24) printfQuda("Host elem %d = %f\n", i, ((float*)host_evecs)[i]);
+    }
+  }
+    
   //This function returns the host_evecs and host_evals pointers, populated with the
   //requested data, at the requested prec. All the information needed to perfom the
   //solve is in the eig_param container.
+  double timeQUDA = -((double)clock());
   eigensolveQuda(host_evecs, host_evals, &eig_param);
-  time += (double)clock();
-  printfQuda("Time for QUDA solution = %f\n", time/CLOCKS_PER_SEC);
-  
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
+  timeQUDA += (double)clock();
+  printfQuda("Time for QUDA solution = %f\n", timeQUDA/CLOCKS_PER_SEC);
+
+  if(eig_param.arpack_check) {
+#ifdef ARPACK_LIB
+    if(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+      //Perform a cross-check using the ARPACK interface
+      //Use same initial guess
+      for(int i=0; i<vol*24; i++) {
+	if(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+	  
+	  ((double*)host_evecs)[i] = rand()/(double)RAND_MAX;
+	  if(i<24) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
+	} else {
+	  
+	  ((float*)host_evecs)[i] = rand()/(double)RAND_MAX;
+	  if(i<24) printfQuda("Host elem %d = %f\n", i, ((float*)host_evecs)[i]);
+	}
+      }
+      
+      //Use same nConv and nKv to be fair
+      eig_param.nEv = eig_param.nConv;
+      eig_param.nKr = eig_param.nConv + eig_param.nConv/2;
+      
+      double timeARPACK = -((double)clock());
+      eigensolveARPACK(host_evecs, host_evals, &eig_param);
+      timeARPACK += (double)clock();
+      printfQuda("Time for ARPACK solution = %f\n\n", timeARPACK/CLOCKS_PER_SEC);
+      printfQuda("************************************************\n");
+      printfQuda("     Speed-up for QUDA Vs ARPACK is x%.1f       \n",
+		 (timeARPACK/CLOCKS_PER_SEC)/(timeQUDA/CLOCKS_PER_SEC));
+      printfQuda("************************************************\n\n");
+    } else {
+      errorQuda("Single prec ARPACK solves not supported. Rerun with double prec");
+    }
+#else
+    errorQuda("ARPACK interface not built.");
+#endif
+  }
   
   //Clean-up.
   free(host_evecs);

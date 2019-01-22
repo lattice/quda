@@ -1671,6 +1671,9 @@ QudaInverterType inv_type;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
+bool use_low_modes = false;
+bool low_mode_check = false;
+bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
@@ -1740,19 +1743,22 @@ QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
 int eig_nEv = 8;
 int eig_nKr = 12;
+int eig_nConv = 6;
 int eig_check_interval = 12;
-int eig_max_restarts = 64;
+int eig_max_restarts = 1000;
 double eig_tol = 1e-4;
-int eig_maxiter = 10000;
 bool eig_use_poly_acc = false;
 int eig_poly_deg = 15;
 double eig_amin = 0.0;
 double eig_amax = 4;
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
+bool eig_compute_svd = false;
 QudaEigSpectrumType eig_spectrum = QUDA_LR_EIG_SPECTRUM;
-QudaEigType eig_type = QUDA_LANCZOS;
-char arpack_logfile[256] = "arpack_logfile.log";
+QudaEigType eig_type = QUDA_IMP_RST_LANCZOS;
+bool eig_arpack_check = false;
+char eig_arpack_logfile[256] = "arpack_logfile.log";
+char eig_QUDA_logfile[256] = "QUDA_logfile.log";
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -1833,6 +1839,9 @@ void usage(char** argv )
   printf("    --reliable-delta <delta>                  # Set reliable update delta factor\n");
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
+  printf("    --mg-low-mode-check <true/false>          # Measure how well the null vector subspace overlaps with the low eigenmode subspace (default false)\n");
+  printf("    --mg-use-low-modes <true/false>           # Use the low eigenmodes as the null vector subspace (default false)\n");
+  printf("    --mg-oblique-proj-check <true/false>      # Measure how well the null vector subspace adjusts the low eigenmode subspace (default false)\n");
   printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
@@ -1882,24 +1891,24 @@ void usage(char** argv )
   printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory type for the ritz vectors  (default device memory type)\n");
 
 
-  //DMH new stuff
-  
-  printf("    --eig-nEv <n>                             # The number of eigenmodes requested from the eigensolver\n");
+  printf("    --eig-nEv <n>                             # The size of eigenvector search space in the eigensolver\n");
   printf("    --eig-nKr <n>                             # The size of the Krylov subspace to use in the eigensolver\n");
-  printf("    --eig-check-interval <n>                  # Perform a convergence check every nth step in the eigensolver\n");
+  printf("    --eig-nConv <n>                           # The number of converged eigenvalues requested\n");
+  printf("    --eig-check-interval <n>                  # Perform a convergence check every nth restart/iteration in the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
   printf("    --eig-max-restarts <n>                    # Perform n iterations of the restart in the IRAM/IRLM eigensolver\n");
   printf("    --eig-tol <tol>                           # The tolerance to use in the eigensolver\n");
-  printf("    --eig-maxiter <n>                         # The maximum iterations to use in the eigensolver\n");
   printf("    --eig-use-poly-acc <true/false>           # Use Chebyshev polynomial acceleration in the eigensolver\n");
   printf("    --eig-poly-deg <n>                        # Set the degree of the Chebyshev polynomial acceleration in the eigensolver\n");
   printf("    --eig-amin <Float>                        # The minimum in the polynomial acceleration\n");
   printf("    --eig-amax <Float>                        # The maximum in the polynomial acceleration\n");
-  printf("    --eig-use-normop <true/false>             # Solve the MdagM problem instead of M (MMdag if eig-useDagger == true) (default false)\n");
-  printf("    --eig-use-dagger <true/false>             # Solve the Mdag  problem instead of M (MMdag if eig-useNormOp == true) (default false)\n");
+  printf("    --eig-use-normop <true/false>             # Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)\n");
+  printf("    --eig-use-dagger <true/false>             # Solve the Mdag  problem instead of M (MMdag if eig-use-normop == true) (default false)\n");
   printf("    --eig-compute-svd <true/false>            # Solve the MdagM problem, use to compute SVD of M (default false)\n");
   printf("    --eig-spectrum <SR/LR/SM/LM/SI/LI>        # The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary\n");
   printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (lanczos, irlm, arnoldi, iram, trlm,...)\n");
-  printf("    --eig-arpack-logfile <file_name>          # The filename storing the stdout from Arpack\n");
+  printf("    --eig-ARPACK-logfile <file_name>          # The filename storing the stdout from ARPACK\n");
+  printf("    --eig-QUDA-logfile <file_name>            # The filename storing the stdout from the QUDA eigensolver\n");
+  printf("    --eig-arpack-check <true/false>           # Cross check the device data against ARPACK (requires ARPACK, default false)\n");
   
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
 
@@ -1950,6 +1959,63 @@ int process_command_line_option(int argc, char** argv, int* idx)
       verify_results = false;
     }else{
       fprintf(stderr, "ERROR: invalid verify type\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-low-mode-check") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      low_mode_check = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      low_mode_check = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid low_mode_check type (true/false)\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-use-low-modes") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      use_low_modes = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      use_low_modes = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid use_low_modes type (true/false)\n");	
+      exit(1);
+    }
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-oblique-proj-check") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      oblique_proj_check = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      oblique_proj_check = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid oblique_proj_check type (true/false)\n");	
       exit(1);
     }
 
@@ -3378,6 +3444,17 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+
+  if( strcmp(argv[i], "--eig-nConv") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eig_nConv = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--eig-check-interval") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3408,16 +3485,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--eig-maxiter") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_maxiter = atoi(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
   if( strcmp(argv[i], "--eig-use-poly-acc") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3506,6 +3573,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--eig-compute-svd") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      eig_compute_svd = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      eig_compute_svd = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--eig-spectrum") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3526,11 +3612,40 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--eig-arpack-logfile") == 0){
+  if( strcmp(argv[i], "--eig-ARPACK-logfile") == 0){
     if (i+1 >= argc){
       usage(argv);
     }     
-    strcpy(arpack_logfile, argv[i+1]);
+    strcpy(eig_arpack_logfile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-QUDA-logfile") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    strcpy(eig_QUDA_logfile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-arpack-check") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      eig_arpack_check = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      eig_arpack_check = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for arpack-check (true/false)\n");
+      exit(1);
+    }
+
     i++;
     ret = 0;
     goto out;

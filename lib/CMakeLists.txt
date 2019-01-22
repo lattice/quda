@@ -165,8 +165,17 @@ if(QUDA_MAGMA)
 endif()
 
 if(QUDA_ARPACK)
-  target_link_libraries(quda PRIVATE ${PARPACK_OR_ARPACK})
+  target_link_libraries(quda INTERFACE ${ARPACK})
+  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
+  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
+
+  if(QUDA_MPI OR QUDA_QMP)
+    target_link_libraries(quda INTERFACE ${PARPACK})
+    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
+    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)    
+  endif()
 endif()
+
 
 if(QUDA_NVML)
   target_link_libraries(quda PRIVATE ${NVML_LIBRARY})

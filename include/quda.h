@@ -365,9 +365,9 @@ extern "C" {
     double a_max;
 
     /** What type of Dirac operator we are using **/
-    /** If !(use_norm_op && use_dagger) use M. **/
-    /** If use_dagger == true, use Mdag  instead of M. **/
-    /** If use_norm_op == true, use MdagM instead of M. **/
+    /** If !(use_norm_op) && !(use_dagger) use M. **/
+    /** If use_dagger, use Mdag  instead of M. **/
+    /** If use_norm_op, use MdagM instead of M. **/
     /** If use_norm_op && use_dagger use MMdag. **/    
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
@@ -378,20 +378,27 @@ extern "C" {
     /** Which part of the spectrum to solve **/
     QudaEigSpectrumType spectrum;
 
-    /** Number of the eigenvectors requested **/
+    /** Size of the eigenvector search space **/
     int nEv;
     /** Total size of Krylov space **/
     int nKr;
+    /** Number of converged eigenvectors requested **/
+    int nConv;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
-    /** For Lanczos, check every nth step **/
-    /** For IRLM, check every nth restart **/
+    /** For Lanczos/Arnoldi, check every nth step **/
+    /** For IRLM/IRAM, check every nth restart **/
     int check_interval;
-    /** For IRLM, quit after n restarts **/
+    /** For IRLM/IRAM, quit after n restarts **/
     int max_restarts;
+    /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
+    char QUDA_logfile[512];
+
+    /** In the test function, cross check the device result against ARPACK **/
+    QudaBoolean arpack_check;
     /** For Arpack cross check, name of the Arpack logfile **/
     char arpack_logfile[512];
-    
+        
     //-------------------------------------------------
     
     //EIG-CG PARAMS
@@ -436,6 +443,8 @@ extern "C" {
 
     QudaInvertParam *invert_param;
 
+    QudaEigParam *eig_param;
+    
     /** Number of multigrid levels */
     int n_level;
 
@@ -544,6 +553,15 @@ extern "C" {
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
 
+    /** Whether to run null Vs eigen vector overlap checks once set up is complete */
+    QudaBoolean run_low_mode_check;
+
+    /** Whether to run null vector oblique checks once set up is complete */
+    QudaBoolean run_oblique_proj_check;
+
+    /** Whether to use eigenvectors for the nullspace */
+    QudaBoolean use_low_modes;
+    
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];
 
@@ -787,13 +805,22 @@ extern "C" {
   /**
    * Perform the eigensolve. The problem matrix is defined by the invert param, the 
    * mode of solution is specified by the eig param. It is assumed that the gauge
-   * field has already been loaded via
-   * loadGaugeQuda().
+   * field has already been loaded via  loadGaugeQuda().
    * @param h_els  Host side eigenvalues
    * @param h_evs  Host side eigenvectors
    * @param param  Contains all metadata regarding the type of solve.
    */
-  void eigensolveQuda(void *h_els, void *h_evs, QudaEigParam *param);
+  void eigensolveQuda(void *h_evals, void *h_evecs, QudaEigParam *param);
+
+  /**
+   * Perform the eigensolve using ARPACK. The problem matrix is defined by the 
+   * invert param, the mode of solution is specified by the eig param. 
+   * It is assumed that the gauge field has already been loaded via loadGaugeQuda().
+   * @param h_els  Host side eigenvalues
+   * @param h_evs  Host side eigenvectors
+   * @param param  Contains all metadata regarding the type of solve.
+   */
+  void eigensolveARPACK(void *h_evals, void *h_evecs, QudaEigParam *param);
   
   /**
    * Perform the solve, according to the parameters set in param.  It
