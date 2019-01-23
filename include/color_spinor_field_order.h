@@ -847,31 +847,39 @@ namespace quda {
   }
 
   __device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
-#pragma unroll
-    for (int i=0; i<M; i++) {
-      // first do vectorized copy from memory
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-      if (!huge_alloc) { // use textures unless we have a huge alloc
-        TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*i + x);
-        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
-      } else
-#endif
-      {
-        Vector vecTmp = vector_load<Vector>(field + parity*offset, x + stride*i);
-        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
-      }
-    }
 
+    RegType nrm;
     if ( isFixed<Float>::value ) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
       // use textures unless we have a large alloc
-      RegType nrm = !huge_alloc ? tex1Dfetch<float>(texNorm,x+parity*norm_offset) : norm[x+parity*norm_offset];
+      nrm = !huge_alloc ? tex1Dfetch<float>(texNorm,x+parity*norm_offset) : norm[x+parity*norm_offset];
 #else
-      RegType nrm = norm[x+parity*norm_offset];
+      nrm = norm[x+parity*norm_offset];
 #endif
-#pragma unroll
-      for (int i=0; i<length; i++) v[i] *= nrm;
     }
+
+#pragma unroll
+    for (int i=0; i<M; i++) {
+#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
+      if (!huge_alloc) { // use textures unless we have a huge alloc
+        // first do texture load from memory
+        TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*i + x);
+        // now insert into output array
+        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+        if ( isFixed<Float>::value ) {
+#pragma unroll
+          for (int j=0; j<N; j++) v[i*N+j] *= nrm;
+        }
+      } else
+#endif
+      {
+        // first load from memory
+        Vector vecTmp = vector_load<Vector>(field + parity*offset, x + stride*i);
+        // now copy into output and scale
+        copy_and_scale(reinterpret_cast<RegVector*>(v)[i], vecTmp, nrm);
+      }
+    }
+
   }
 
   __device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
@@ -887,7 +895,11 @@ namespace quda {
       for (int i=0; i<length/2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
 
+#ifdef __CUDA_ARCH__
+      RegType scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
+#else
       RegType scale_inv = fixedMaxValue<Float>::value / scale;
+#endif
 #pragma unroll
       for (int i=0; i<length; i++) tmp[i] = v[i] * scale_inv;
     } else {
@@ -936,6 +948,12 @@ namespace quda {
 
 
   __device__ __host__ inline void loadGhost(RegType v[length_ghost], int x, int dim, int dir, int parity=0) const {
+
+    RegType nrm;
+    if ( isFixed<Float>::value ) {
+      nrm = ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x];
+    }
+
 #pragma unroll
     for (int i=0; i<M_ghost; i++) { // to do - add texture support
       // first do vectorized copy from memory into registers
@@ -943,20 +961,17 @@ namespace quda {
       if (!huge_alloc) { // use textures unless we have a huge alloc
         TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity*tex_offset + stride*i + x);
         copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+        if (isFixed<Float>::value ) {
+#pragma unroll
+          for (int i=0; i<N; i++) v[i*N+j] *= nrm;
+        }
       } else
 #endif
       {
         Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N,
                                             i*faceVolumeCB[dim]+x);
-        // second do vectorized copy converting into register type
-        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+        copy_and_scale(reinterpret_cast<RegVector*>(v)[i], vecTmp, nrm);
       }
-    }
-
-    if ( isFixed<Float>::value ) {
-      RegType nrm = ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x];
-#pragma unroll
-      for (int i=0; i<length_ghost; i++) v[i] *= nrm;
     }
 
   }
@@ -974,7 +989,11 @@ namespace quda {
       for (int i=0; i<length_ghost/2; i++) scale = fmaxf(max_[i], scale);
       ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x] = scale;
 
+#ifdef __CUDA_ARCH__
+      RegType scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
+#else
       RegType scale_inv = fixedMaxValue<Float>::value / scale;
+#endif
 #pragma unroll
       for (int i=0; i<length_ghost; i++) tmp[i] = v[i] * scale_inv;
     } else {

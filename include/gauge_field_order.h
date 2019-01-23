@@ -1691,15 +1691,17 @@ namespace quda {
 
 #pragma unroll
         for (int i=0; i<M; i++){
-	  // first do vectorized copy from memory
+          // first do texture load from memory
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	  if (!huge_alloc) { // use textures unless we have a huge alloc
 	    TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + (dir*M + i)*stride + x);
+            // now insert into output array
 #pragma unroll
 	    for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
 	  } else
 #endif
 	  {
+            // first load from memory
 	    Vector vecTmp = vector_load<Vector>(gauge + parity*offset, (dir*M + i)*stride + x);
 	    // second do copy converting into register type
 #pragma unroll
