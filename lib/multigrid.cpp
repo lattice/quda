@@ -83,8 +83,8 @@ namespace quda {
 	      loadVectors(param.B);
 	    } else {
 	      generateEigenVectors(param.B); //Run the eigensolver
-	      //DMH: temporary check that the null vectors are populated
-	      for(int j=0; j<param.B.size(); j++) printfQuda("NV norm %f\n", sqrt(blas::norm2(*(param.B[j]))));
+	      //DMH: temporary check that the null vectors are populated and normalised
+	      for(unsigned int j=0; j<param.B.size(); j++) printfQuda("NV norm %f\n", sqrt(blas::norm2(*(param.B[j]))));
 	    }
 	  } else if (strcmp(param.mg_global.vec_infile,"") !=0 ) { // only load if infile is defined and not computing
 	    loadVectors(param.B);
@@ -97,8 +97,22 @@ namespace quda {
       } else { // generate free field vectors
         buildFreeVectors(param.B);
       }
-    }
-
+    } else {
+      /*
+      //We're on the coarsest grid. Create eigenvectors for deflation
+      if (param.mg_global.use_low_modes) {
+	if (strcmp(param.mg_global.vec_infile,"") !=0 ) { // only load if infile is defined and not computing
+	  loadVectors(param.B);
+	} else {
+	  generateEigenVectors(param.B); //Run the eigensolver
+	  //DMH: temporary check that the null vectors are populated and normalised
+	  for(unsigned int j=0; j<param.B.size(); j++) printfQuda("NV norm %f\n", sqrt(blas::norm2(*(param.B[j]))));
+	}
+      }
+      */
+    }      
+    
+    
     // in case of iterative setup with MG the coarse level may be already built
     if (!transfer) reset();
 
@@ -172,10 +186,10 @@ namespace quda {
         }
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer operator done\n");
       }
-
+      
       createCoarseDirac();
     }
-
+    
     // delay allocating smoother until after coarse-links have been created
     createSmoother();
 
@@ -1400,24 +1414,6 @@ namespace quda {
       //param.mg_global.arpack_param->arpackPrec = QUDA_SINGLE_PRECISION;
       cpuColorSpinorField *cpuTemp = nullptr;
       
-      /*
-      //Use null vector guess
-      generateNullVectors(param.B);
-      
-      //Transer to hostEvecs
-      for (int i=0; i<param.Nvec; i++) {
-      //cpuParam.v = (double*)hostEvecs + i*2*12*local_vol;
-      cpuTemp = new cpuColorSpinorField(cpuParam);      
-      //Copy Evec_i from device to host.
-      *cpuTemp = *param.B[i];
-      memcpy((double*)hostEvecs + i*2*12*local_vol, cpuTemp->V_h(), 2*12*local_vol*sizeof(double));
-      //for(int a=0; a<10; a++) printfQuda("(%e , %e)\n", (double*)cpuTemp->V_h() + 2*a, (double*)cpuTemp->V_h() + 2*a + 1);
-      //for(int a=0; a<10; a++) cpuTemp->PrintVector(a);
-      delete cpuTemp;
-      //exit(0);
-      }
-      */
-      
       arpack_solve(hostEvecs, hostEvals, *(param.matSmooth->Expose()),
 		   param.mg_global.eig_param, &cpuParam);
       
@@ -1467,18 +1463,27 @@ namespace quda {
       std::vector<ColorSpinorField*> B_evecs;
       ColorSpinorParam csParam(*B[0]);
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      
-      if(csParam.Precision() == QUDA_SINGLE_PRECISION)
-	csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+
       if(csParam.Precision() == QUDA_DOUBLE_PRECISION)
 	csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      if(csParam.Precision() == QUDA_SINGLE_PRECISION)
+	csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
       if(csParam.Precision() == QUDA_HALF_PRECISION)
-	errorQuda("Half prec Eigensolver not supported.");
+	errorQuda("Half precision eigensolver not supported");
+      
+      if(param.level > 0) {
+	csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      }
       
       for(int i=0; i<nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
       
+      const Dirac &mat = *param.matSmooth->Expose();
+      
       //Eigensolver function
-      irlmSolve(B_evecs, evals, *(param.matSmooth->Expose()),
+      //irlmSolve(B_evecs, evals, *(param.matSmooth->Expose()),
+      //param.mg_global.eig_param);
+
+      irlmSolve(B_evecs, evals, mat,
 		param.mg_global.eig_param);
       
       //Copy back to MG

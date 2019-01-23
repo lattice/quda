@@ -359,16 +359,17 @@ namespace quda {
     double time_svd= 0.0;  //time to compute SVD
 
     //Ensure we are not trying to compute on a zero-field source
+    //and test for an initial guess
     Float norm = sqrt(blas::norm2(*kSpace[0]));
     if(norm == 0){
       printfQuda("Initial residual is zero. Populating with rands.\n");
       kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
     }
 
-    //Normalise initial source
+    //Normalise initial guess
     norm = sqrt(blas::norm2(*kSpace[0]));
     blas::ax(1.0/norm, *kSpace[0]);
-
+    
     printfQuda("**** START IRLM SOLUTION ****\n");
     printfQuda("Output from IRLM directed to %s\n", QUDA_logfile); 
     
@@ -742,43 +743,22 @@ namespace quda {
   }
   
   template<typename Float>
-  void iram_solve(void *h_evecs, void *h_evals, const Dirac &mat,
-		  QudaEigParam *eig_param,
-		  ColorSpinorParam *cpuParam){
-    
+  void iram_solve(std::vector<ColorSpinorField*> kSpace,
+		  void *h_evals, const Dirac &mat,
+		  QudaEigParam *eig_param){    
   }
   
-  void iramSolve(void *h_evecs, void *h_evals, const Dirac &mat,
-		    QudaEigParam *eig_param,
-		    ColorSpinorParam *cpuParam){
+  void iramSolve(std::vector<ColorSpinorField*> kSpace,
+		 void *h_evals, const Dirac &mat,
+		 QudaEigParam *eig_param){
     
     if(eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION) {
-      iram_solve<double>(h_evecs, h_evals, mat, eig_param, cpuParam);
+      iram_solve<double>(kSpace, h_evals, mat, eig_param);
     } else {
-      iram_solve<float>(h_evecs, h_evals, mat, eig_param, cpuParam);
+      iram_solve<float>(kSpace, h_evals, mat, eig_param);
     }    
   }
 
-  template<typename Float>
-  void arnoldi_solve(void *h_evecs, void *h_evals, const Dirac &mat,
-		     QudaEigParam *eig_param,
-		     ColorSpinorParam *cpuParam){
-
-    
-  }
-  
-  void arnoldiSolve(void *h_evecs, void *h_evals, const Dirac &mat,
-		 QudaEigParam *eig_param,
-		 ColorSpinorParam *cpuParam){
-    
-    if(eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION) {
-      arnoldi_solve<double>(h_evecs, h_evals, mat, eig_param, cpuParam);
-    } else {
-      arnoldi_solve<float>(h_evecs, h_evals, mat, eig_param, cpuParam);
-    }    
-  }
- 
-   
   // ARPACK INTERAFCE ROUTINES
   //--------------------------------------------------------------------------
 

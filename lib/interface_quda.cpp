@@ -2365,13 +2365,9 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type,
 			    inv_param->input_location);
 
-  //Test for initial guess
+
   cpuParam.v = host_evecs;
   ColorSpinorField *h_tmp = ColorSpinorField::Create(cpuParam);
-  //h_tmp->PrintVector(0);
-  //if(h_tmp->Precision() == QUDA_DOUBLE_PRECISION) printfQuda("Your in DOUBLE\n");
-  //if(h_tmp->Precision() == QUDA_SINGLE_PRECISION) printfQuda("Your in SINGLE\n");
-  
   double norm = sqrt(blas::norm2(*h_tmp));
   printfQuda("Initial residual vector norm = %f\n", norm);
   
@@ -2387,6 +2383,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     kSpace.push_back(ColorSpinorField::Create(*cudaParam));
   }
 
+  //Test for initial guess
   if(norm == 0.0) {
     //Populate initial residual with randoms.
     printfQuda("Using random guess\n");
@@ -2411,36 +2408,20 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   
   //Decide how to solve the problem
   if(eig_param->use_norm_op) {
-
     //Problem is symmetric, use a Lanczos solver
-    if(eig_param->eig_type == QUDA_LANCZOS) {
-      //lanczosSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
-    }
-    else if(eig_param->eig_type == QUDA_IMP_RST_LANCZOS) {
-      //irlmSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
-      irlmSolve(kSpace, host_evals, dirac, eig_param);
-    }
-    else errorQuda("Solve type not implemented");
-    
+    irlmSolve(kSpace, host_evals, dirac, eig_param);    
   } else {
-
     //Problem is asymmetric, use an Arnoldi solver
-    if(eig_param->eig_type == QUDA_ARNOLDI) {
-      //arnoldiSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
-    }
-    else if(eig_param->eig_type == QUDA_IMP_RST_ARNOLDI) {
-      //iramSolve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
-    }
-    else errorQuda("Solve type not yet implemented.");
-    
+    iramSolve(kSpace, host_evals, dirac, eig_param);
   }
-
+  
   profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
   
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);  
   delete d;
   delete dSloppy;
-  delete dPre;  
+  delete dPre;
+  for(int i=0; i<eig_param->nKr; i++) delete kSpace[i]; 
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
