@@ -83,6 +83,8 @@ namespace quda {
 	      loadVectors(param.B);
 	    } else {
 	      generateEigenVectors(param.B); //Run the eigensolver
+	      //DMH: temporary check that the null vectors are populated
+	      for(int j=0; j<param.B.size(); j++) printfQuda("NV norm %f\n", sqrt(blas::norm2(*(param.B[j]))));
 	    }
 	  } else if (strcmp(param.mg_global.vec_infile,"") !=0 ) { // only load if infile is defined and not computing
 	    loadVectors(param.B);
@@ -1364,42 +1366,46 @@ namespace quda {
   }
   
   void MG::generateEigenVectors(std::vector<ColorSpinorField*> &B) {
-    
-    //Constraints.
-    if (param.smoother_solve_type != QUDA_DIRECT_SOLVE) {
-      errorQuda("Low mode generation only availible for direct solves. Please reconfigure.\n");
-    }
-    
-    //Clone the ColorSpinorParams from the coarse grid vectors. 
-    ColorSpinorParam cpuParam(*param.B[0]);
-    cpuParam.setPrecision(QUDA_DOUBLE_PRECISION); //force double prec for ARPACK
-    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-    cpuParam.location = QUDA_CPU_FIELD_LOCATION;
-    cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    
-    //A convenience.
-    int nKr = param.mg_global.eig_param->nKr;
-    
-    int local_vol = 1;
-    for(int i=0; i<4; i++) {
-      local_vol *= cpuParam.x[i];
-    }
-    
-    void *hostEvecs = static_cast<void*>(new std::complex<double>[nKr*12*local_vol]);
-    void *hostEvals = static_cast<void*>(new std::complex<double>[nKr]);
-    
-    //Set CPU adress to the start of Evecs buffer
-    cpuParam.v = ((double*)hostEvecs);
-    
-    //param.mg_global.arpack_param->arpackPrec = QUDA_SINGLE_PRECISION;
-    cpuColorSpinorField *cpuTemp = nullptr;
-    
-    /*
-    //Use null vector guess
-    generateNullVectors(param.B);
 
-    //Transer to hostEvecs
-    for (int i=0; i<param.Nvec; i++) {
+    if(param.mg_global.eig_param->arpack_check) {
+
+#ifdef ARPACK_LIB
+      
+      //Constraints.
+      if (param.smoother_solve_type != QUDA_DIRECT_SOLVE) {
+	errorQuda("Low mode generation only availible for direct solves. Please reconfigure.\n");
+      }
+      
+      //Clone the ColorSpinorParams from the coarse grid vectors. 
+      ColorSpinorParam cpuParam(*param.B[0]);
+      cpuParam.setPrecision(QUDA_DOUBLE_PRECISION); //force double prec for ARPACK
+      cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+      cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+      cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      
+      //A convenience.
+      int nKr = param.mg_global.eig_param->nKr;
+      
+      int local_vol = 1;
+      for(int i=0; i<4; i++) {
+	local_vol *= cpuParam.x[i];
+      }
+      
+      void *hostEvecs = static_cast<void*>(new std::complex<double>[nKr*12*local_vol]);
+      void *hostEvals = static_cast<void*>(new std::complex<double>[nKr]);
+      
+      //Set CPU adress to the start of Evecs buffer
+      cpuParam.v = ((double*)hostEvecs);
+      
+      //param.mg_global.arpack_param->arpackPrec = QUDA_SINGLE_PRECISION;
+      cpuColorSpinorField *cpuTemp = nullptr;
+      
+      /*
+      //Use null vector guess
+      generateNullVectors(param.B);
+      
+      //Transer to hostEvecs
+      for (int i=0; i<param.Nvec; i++) {
       //cpuParam.v = (double*)hostEvecs + i*2*12*local_vol;
       cpuTemp = new cpuColorSpinorField(cpuParam);      
       //Copy Evec_i from device to host.
@@ -1410,56 +1416,86 @@ namespace quda {
       delete cpuTemp;
       //exit(0);
       }
-    */
-    
-    arpack_solve(hostEvecs, hostEvals, *(param.matSmooth->Expose()),
-		 param.mg_global.eig_param, &cpuParam);
-    
-    for (int i=0; i<param.Nvec; i++) {
-      //HACKY: Position the cpu pointer to the next Evec. Possible to change
-      //address of the cpuColorSpinorField object?
-      cpuParam.v = (double*)hostEvecs + i*2*12*local_vol;
-      cpuTemp = new cpuColorSpinorField(cpuParam);
+      */
       
-      //Copy Evec_i from host to device.
-      *param.B[i] = *cpuTemp;
-      delete cpuTemp;
-    }
-    
-    //Clean up
-    delete static_cast<std::complex<double>* >(hostEvals);
-    delete static_cast<std::complex<double>* >(hostEvecs);
-    
-    if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
-      saveVectors(B);
-    }
- 
-#if 0
-  
-    if (param.smoother_solve_type != QUDA_DIRECT_SOLVE) {
-      errorQuda("Low mode generation only availible for direct solves. Please reconfigure.\n");
-    }
-    
-    //Just a dummy array for now, MG doesn't need the evals
-  Complex *evals[B.size()];
-
-    std::vector<ColorSpinorField*> B_evecs;
-    ColorSpinorParam csParam(*B[0]);
-    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-    for(unsigned int i=0; i<B.size(); i++) {
-      B_evecs.push_back(ColorSpinorField::Create(csParam));
-    }
-    irlmSolve(B_evecs, evals, *(param.matSmooth->Expose()),
-	      param.mg_global.eig_param);
-
-    if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
-      saveVectors(B_evecs);
-    }
-
-    for(unsigned int i=0; i<B_evecs.size(); i++) {
-      delete B_evecs[i];
-    }   
-  
+      arpack_solve(hostEvecs, hostEvals, *(param.matSmooth->Expose()),
+		   param.mg_global.eig_param, &cpuParam);
+      
+      for (int i=0; i<param.Nvec; i++) {
+	//HACKY: Position the cpu pointer to the next Evec. Possible to change
+	//address of the cpuColorSpinorField object?
+	cpuParam.v = (double*)hostEvecs + i*2*12*local_vol;
+	cpuTemp = new cpuColorSpinorField(cpuParam);
+	
+	//Copy Evec_i from host to device.
+	*param.B[i] = *cpuTemp;
+	delete cpuTemp;
+      }
+      
+      //Clean up
+      delete static_cast<std::complex<double>* >(hostEvals);
+      delete static_cast<std::complex<double>* >(hostEvecs);
+      
+      if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
+	saveVectors(B);
+      }
+#else
+      errorQuda("Arpack interface not built.");
 #endif
+    }
+    else {
+      //Use GPU eigensolver
+
+      sprintf(prefix,"MG level %d (%s) [Eigensolver]: ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+      setOutputPrefix(prefix);
+      
+      if (param.smoother_solve_type != QUDA_DIRECT_SOLVE) {
+	errorQuda("Low mode generation only availible for direct solves. Please reconfigure.\n");
+      }
+            
+      int nKr   = B.size() + B.size()/2;
+      int nEv   = B.size() + B.size()/4;;
+      int nConv = B.size();
+      
+      param.mg_global.eig_param->nKr   = nKr;
+      param.mg_global.eig_param->nEv   = nEv;
+      param.mg_global.eig_param->nConv = nConv;
+
+      //Just a dummy array for now, MG doesn't need the evals
+      Complex *evals[nEv];
+      
+      std::vector<ColorSpinorField*> B_evecs;
+      ColorSpinorParam csParam(*B[0]);
+      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      
+      if(csParam.Precision() == QUDA_SINGLE_PRECISION)
+	csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+      if(csParam.Precision() == QUDA_DOUBLE_PRECISION)
+	csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      if(csParam.Precision() == QUDA_HALF_PRECISION)
+	errorQuda("Half prec Eigensolver not supported.");
+      
+      for(int i=0; i<nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
+      
+      //Eigensolver function
+      irlmSolve(B_evecs, evals, *(param.matSmooth->Expose()),
+		param.mg_global.eig_param);
+      
+      //Copy back to MG
+      for(unsigned int i=0; i<B.size(); i++) {
+	*B[i] = *B_evecs[i];
+      }
+      // only save if outfile is defined
+      if (strcmp(param.mg_global.vec_outfile,"")!=0) {
+	saveVectors(B_evecs);
+      }
+      
+      //Local clean-up
+      for(unsigned int i=0; i<B_evecs.size(); i++) {
+	delete B_evecs[i];
+      }
+      sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+      setOutputPrefix(prefix);      
+    }
   }
 }

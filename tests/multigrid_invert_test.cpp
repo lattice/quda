@@ -164,8 +164,7 @@ display_test_info()
     if(eig_compute_svd) {
       printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
       warningQuda(" **** Overriding any previous choices of operator type. "
-		  "SVD demands normal operator, will use MdagM ****");
-      
+		  "SVD demands normal operator, will use MdagM ****");      
     } else {    
     printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n",
 	       eig_use_dagger ? "true" : "false",
