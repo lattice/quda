@@ -201,8 +201,8 @@ namespace quda {
         coarse->param.precision = param.mg_global.invert_param->cuda_prec_precondition;
         coarse->param.matResidual = matCoarseResidual;
         coarse->param.matSmooth = matCoarseSmoother;
-        coarse->param.matSmoothSloppy = matCoarseSmootherSloppy;
-        coarse->reset(refresh);
+        coarse->param.matSmoothSloppy = matCoarseSmootherSloppy;	
+        coarse->reset(refresh);	
       } else {
         // create the next multigrid level
         param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level+1);
@@ -1449,7 +1449,7 @@ namespace quda {
 	errorQuda("Low mode generation only availible for direct solves. Please reconfigure.\n");
       }
             
-      int nKr   = B.size() + B.size()/2;
+      int nKr   = B.size() + B.size()/2 + 4;
       int nEv   = B.size() + B.size()/4;;
       int nConv = B.size();
       
@@ -1463,6 +1463,7 @@ namespace quda {
       std::vector<ColorSpinorField*> B_evecs;
       ColorSpinorParam csParam(*B[0]);
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
       if(csParam.Precision() == QUDA_DOUBLE_PRECISION)
 	csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -1477,12 +1478,8 @@ namespace quda {
       
       for(int i=0; i<nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
       
-      const Dirac &mat = *param.matSmooth->Expose();
-      
       //Eigensolver function
-      //irlmSolve(B_evecs, evals, *(param.matSmooth->Expose()),
-      //param.mg_global.eig_param);
-
+      const Dirac &mat = *param.matResidual->Expose();
       irlmSolve(B_evecs, evals, mat,
 		param.mg_global.eig_param);
       
