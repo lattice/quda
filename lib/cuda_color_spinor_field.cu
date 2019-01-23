@@ -597,7 +597,6 @@ namespace quda {
         void *src_d;
         cudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.V()), 0);
         if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
-
         copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
       } else {
         void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
@@ -626,11 +625,11 @@ namespace quda {
 
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
     checkCudaError();
-    return;
   }
 
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
+
     if ( reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes+norm_bytes);
       qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
@@ -649,7 +648,7 @@ namespace quda {
         if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dest_d, v);
       } else {
-        void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr, *vNorm=nullptr;
+        void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr;
         if (!zeroCopy) {
           buffer = pool_device_malloc(dest.Bytes()+dest.NormBytes());
           dst = buffer;
@@ -660,8 +659,8 @@ namespace quda {
           if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField");
           dstNorm = static_cast<char*>(dst)+dest.Bytes();
         }
-        vNorm = static_cast<char*>(v)+this->Bytes();
-        copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, vNorm);
+
+        copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, 0, dstNorm, 0);
 
         if (!zeroCopy) {
           qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
@@ -678,7 +677,6 @@ namespace quda {
 
     qudaDeviceSynchronize(); // need to sync before data can be used on CPU
     checkCudaError();
-    return;
   }
 
   void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const {
