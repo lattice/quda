@@ -272,7 +272,7 @@ namespace quda {
       } else { //
         bool reset = newTmp(&tmp2, in);
         TwistCloverInv(*tmp2, in, 1-parity);
-        DiracWilson::DslashXpay(out, *tmp2, parity, k);
+        DiracWilson::DslashXpay(out, *tmp2, parity, x, k);
         deleteTmp(&tmp2, reset);
       }
     } else {//TWIST_DOUBLET:

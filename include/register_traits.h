@@ -227,6 +227,41 @@ namespace quda {
   }
 
   /**
+     @brief Specialized variants of the copy function that include an
+     additional scale factor.  Note the scale factor is ignored unless
+     the input type (b) is either a short or char vector.
+  */
+  template<typename T1, typename T2, typename T3>
+    __host__ __device__ inline void copy_and_scale(T1 &a, const T2 &b, const T3 &c) {
+    copy(a,b);
+  }
+
+  template<> __host__ __device__ inline void copy_and_scale(float4 &a, const short4 &b, const float &c) {
+    a.x = s2f(b.x,c); a.y = s2f(b.y,c); a.z = s2f(b.z,c); a.w = s2f(b.w,c);
+  }
+
+  template<> __host__ __device__ inline void copy_and_scale(float4 &a, const char4 &b, const float &c) {
+    a.x = c2f(b.x,c); a.y = c2f(b.y,c); a.z = c2f(b.z,c); a.w = c2f(b.w,c);
+  }
+
+  template<> __host__ __device__ inline void copy_and_scale(float2 &a, const short2 &b, const float &c) {
+    a.x = s2f(b.x,c); a.y = s2f(b.y,c);
+  }
+
+  template<> __host__ __device__ inline void copy_and_scale(float2 &a, const char2 &b, const float&c) {
+    a.x = c2f(b.x,c); a.y = c2f(b.y,c);
+  }
+
+  template<> __host__ __device__ inline void copy_and_scale(float &a, const short &b, const float &c) {
+    a = s2f(b,c);
+  }
+
+  template<> __host__ __device__ inline void copy_and_scale(float &a, const char &b, const float &c) {
+    a = c2f(b,c);
+  }
+
+
+  /**
      Generic wrapper for Trig functions
   */
   template <bool isFixed, typename T>
