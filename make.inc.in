@@ -42,7 +42,6 @@ DYNAMIC_CLOVER = @DYNAMIC_CLOVER@	# Dynamic inversion saves memory but decreases
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
 BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
-POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dslash
 
 #BLAS library
 BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
@@ -209,13 +208,7 @@ ifeq ($(strip $(BUILD_SSTEP)), yes)
   COPT += -DSSTEP
 endif
 
-ifeq ($(strip $(POSIX_THREADS)), yes)
-  NVCCOPT += -DPTHREADS
-  COPT += -DPTHREADS
-endif
-
 LIB += -lpthread
-
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
