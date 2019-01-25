@@ -95,9 +95,6 @@ namespace quda {
   template <int nDim, QudaDWFPCType pc_type, KernelType kernel_type, typename Arg, int nface_=1>
   __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity, int &dim) {
 
-    
-    //MWTODO - needed for improved staggered
-    // constexpr int nface_=3;
     int x_cb, X;
     dim = kernel_type; // keep compiler happy
     if (kernel_type == INTERIOR_KERNEL) {
@@ -284,11 +281,11 @@ namespace quda {
       dc = in.getDslashConstant();
     }
 
+// constructor for kernels that set xpay based on kappa
     DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
       : DslashArg(in, U, kappa, parity, dagger, kappa == 0.0 ? false : true, 1, comm_override)
       {
       };
-
   };
 
 

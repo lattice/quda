@@ -1,8 +1,6 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 
-//#define NEW_DSLASH
-
 namespace quda {
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param)

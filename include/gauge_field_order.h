@@ -1534,10 +1534,10 @@ namespace quda {
     __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir,
                                            const RegType phase, const I *X, const int *R,
                                            const Complex scale=Complex(static_cast<RegType>(1.0),
-                                                                       static_cast<RegType>(1.0))) const {
+                                          static_cast<RegType>(1.0))) const {
       Complex u = dir < 3 ? anisotropy :
-        timeBoundary<ghostExchange_>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
-                                     isFirstTimeSlice, isLastTimeSlice, ghostExchange);
+                                   timeBoundary<ghostExchange_>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
+                                   isFirstTimeSlice, isLastTimeSlice, ghostExchange);
       Unpack(out, in, idx, dir, phase, X, R, scale, u);
     }
 
@@ -1730,31 +1730,32 @@ namespace quda {
 
 #if 1
 	// FIXME - this is a hack from hell - needs to be moved into the reconstruct type
+  // MWTODO - fix atggered phases for reconstruction
 	if (stag_phase == QUDA_STAGGERED_PHASE_MILC && reconLenParam == 12) {
     Float sign=1;
 
 	  // Float sign = (dir == 0 && ((coords[3] - R[3]) & 1) != 0) ||
 	  //   ( dir == 1 && ((coords[0] - R[0] + coords[3] - R[3]) & 1) != 0) ||
 	  //   ( dir == 2 && ((coords[0] - R[0] + coords[1] - R[1] + coords[3] - R[3]) & 1) != 0) ? -10.0 : 1.0;
-    int mwcoords[4];
-    getCoords(mwcoords, x, X, parity);
-    // printf("coords %i %i %i %i %i\n",x,mwcoords[0],mwcoords[1],mwcoords[2],mwcoords[3]);
- 
+    int coords[4];
+    getCoords(coords, x, X, parity);
+    
+    // this uses MILC staggered phases
     switch(dir)
     {
       case 0:
-        sign = mwcoords[3]%2 == 0 ? 1 : -1;
+        sign = coords[3]%2 == 0 ? 1 : -1;
         break;
       case 1:
-        sign = (mwcoords[3]+mwcoords[0])%2 == 0 ? 1 : -1;
+        sign = (coords[3]+coords[0])%2 == 0 ? 1 : -1;
         break;
       case 2:
-        sign = (mwcoords[3]+mwcoords[1]+mwcoords[0])%2 == 0 ? 1 : -1;
+        sign = (coords[3]+coords[1]+coords[0])%2 == 0 ? 1 : -1;
         break;
       default:
         sign =1;
     }
- // printf("coords %i %i %i %i %i %f \n",x,mwcoords[0],mwcoords[1],mwcoords[2],mwcoords[3], sign);
+
 #pragma unroll
 	  for (int i=12; i<18; i++) v[i] *= sign;
 	}

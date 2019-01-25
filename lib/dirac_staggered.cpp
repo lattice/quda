@@ -1,9 +1,6 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 
-// enable new dslash
-#define NEW_DSLASH
-
 namespace quda {
 
   DiracStaggered::DiracStaggered(const DiracParam &param) : Dirac(param) { }
