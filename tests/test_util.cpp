@@ -1118,9 +1118,9 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
         else applyStaggeredScaling((float**)longlink, param, type);
       }
     }
-  }
+  
 
-  if (param->reconstruct == QUDA_RECONSTRUCT_9 || param->reconstruct == QUDA_RECONSTRUCT_13) {
+  // if (param->reconstruct == QUDA_RECONSTRUCT_9 || param->reconstruct == QUDA_RECONSTRUCT_13) {
     // incorporate non-trivial phase into long links
 
     const double phase = (M_PI * rand())/RAND_MAX;
@@ -1138,7 +1138,8 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
         } 
       }
     }
-  }
+  }  
+// }
 
   if (type==3) return;
 
