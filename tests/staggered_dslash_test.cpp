@@ -113,23 +113,6 @@ static double max_allowed_error = 1e-11;
 int argc_copy;
 char** argv_copy;
 
-template<typename I>
-void mwgetCoords(int x[], int cb_index, const I X[], int parity) {
-    //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-    //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-    //x[1] = (cb_index/(X[0]/2)) % X[1];
-    //x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-
-    int za = (cb_index / (X[0] >> 1));
-    int zb =  (za / X[1]);
-    x[1] = (za - zb * X[1]);
-    x[3] = (zb / X[2]);
-    x[2] = (zb - x[3] * X[2]);
-    int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
-    x[0] = (2 * cb_index + x1odd  - za * X[0]);
-    return;
-  }
-
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
         void** qdp_fatlink_eps, void** qdp_longlink_eps,
@@ -259,8 +242,6 @@ void init()
   } else {
     gaugeParam.scale = 1.0;
   }
-
-  // gaugeParam.scale = 1.0;
   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
@@ -845,16 +826,7 @@ static int dslashTest()
 
 
 
-int xx[4];
-    // for verification
- for(int i=0; i< 256; i++){
 
-    mwgetCoords(xx, (i), X, 0);
-    printfQuda("%i : %i %i %i %i CUDA: %f", i,xx[0], xx[1], xx[2], xx[3], ((double*)(spinorOut->V()))[6*i+4]);
-    printfQuda("\tCPU:  %f\n", ((double*)(spinorRef->V()))[6*i+4]);
-        printfQuda("%i : %i %i %i %i CUDA: %f", i,xx[0], xx[1], xx[2], xx[3], ((double*)(spinorOut->V()))[6*i+5]);
-    printfQuda("\tCPU:  %f\n", ((double*)(spinorRef->V()))[6*i+5]);
-}
     // Catching nans is weird.
     if (std::isnan(spinor_ref_norm2)) { failed = true; }
     if (std::isnan(spinor_out_norm2)) { failed = true; }

@@ -51,39 +51,22 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-
-  char *enable_newd_env = getenv("QUDA_NEWD");
-
-  // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
-  // and comm_dim(dim) == 2 (used for perf benchmarking)
-  int enable_newd = 0;
-
-  if (enable_newd_env) {
-    enable_newd = atoi(enable_newd_env);
-  }
-// #ifndef NEW_DSLASH
-   if (enable_newd==0){
-    printfQuda("OLD STAGGERED Dslash ...\n");
-
-
-// #ifndef NEW_DSLASH
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+   if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+ 
+#ifdef USE_LEGACY_DSLASH
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), 
 			  *gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
 			  dagger, 0, 0, commDim, profile);
+#else
+    constexpr bool improved = false;
+    ApplyDslashStaggered(out, in, *gauge, *gauge , 0., in,
+                         parity, dagger, improved, commDim, profile);
+#endif
+
     } else {
       errorQuda("Not supported");
     }
-  }
-// #else
-   
-  else{
-    constexpr bool improved = false;
-    printfQuda("NEW STAGGERED Dslash ...\n");
-    ApplyDslashStaggered(out, in, *gauge, *gauge , 0., in,
-                         parity, dagger, improved, commDim, profile);
-}
-// #endif
+  
     flops += 570ll*in.Volume();
   }
 
@@ -93,13 +76,12 @@ namespace quda {
   {    
     checkParitySpinor(in, out);
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-#ifndef NEW_DSLASH 
+#ifdef USE_LEGACY_DSLASH
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
 #else
     constexpr bool improved = false;
-
     ApplyDslashStaggered(out, in, *gauge, *gauge , k, x,
                          parity, dagger, improved, commDim, profile);
 #endif
