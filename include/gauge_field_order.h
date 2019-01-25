@@ -1460,25 +1460,21 @@ namespace quda {
       for (int i=2; i<8; i++) out[i] = in[i];
     }
 
-    template<typename I>
+       template<typename I>
     __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir,
                                            const RegType phase, const I *X, const int *R,
-                                           const Complex scale=Complex(static_cast<RegType>(1.0),
-                                                                       static_cast<RegType>(1.0))) const {
+                                           const Complex scale,
+                                           const Complex u) const {   
       const Complex *In = reinterpret_cast<const Complex*>(in);
       Complex *Out = reinterpret_cast<Complex*>(out);
+      RegType u0 = u.real();
+      RegType u0_inv =  u.imag();
 
 #pragma unroll
       for (int i=1; i<=3; i++) Out[i] = In[i]; // these elements are copied directly
 
       Trig<isFixed<Float>::value,RegType>::SinCos(in[0], &Out[0].y, &Out[0].x);
       Trig<isFixed<Float>::value,RegType>::SinCos(in[1], &Out[6].y, &Out[6].x);
-
-      Complex u = dir < 3 ? anisotropy :
-        timeBoundary<ghostExchange_>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
-                                     isFirstTimeSlice, isLastTimeSlice, ghostExchange);
-      RegType u0 = u.real();
-      RegType u0_inv = u.imag();
 
       // First, reconstruct first row
       RegType row_sum = Out[1].real() * Out[1].real();
@@ -1534,6 +1530,17 @@ namespace quda {
       }
     }
 
+    template<typename I>
+    __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir,
+                                           const RegType phase, const I *X, const int *R,
+                                           const Complex scale=Complex(static_cast<RegType>(1.0),
+                                                                       static_cast<RegType>(1.0))) const {
+      Complex u = dir < 3 ? anisotropy :
+        timeBoundary<ghostExchange_>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
+                                     isFirstTimeSlice, isLastTimeSlice, ghostExchange);
+      Unpack(out, in, idx, dir, phase, X, R, scale, u);
+    }
+
     __device__ __host__ inline RegType getPhase(const RegType in[18]){ return 0; }
   };
 
@@ -1553,7 +1560,7 @@ namespace quda {
       const Reconstruct<8,Float,ghostExchange_> reconstruct_8;
       const Complex scale; // imaginary value stores inverse
 
-  Reconstruct(const GaugeField &u) : reconstruct_8(u, u.Scale()), scale(u.Scale(), 1.0/u.Scale()) {}
+  Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale(), 1.0/u.Scale()) {}
 
     Reconstruct(const Reconstruct<9,Float,ghostExchange_> &recon) : reconstruct_8(recon.reconstruct_8),
       scale(recon.scale) { }
@@ -1581,19 +1588,21 @@ namespace quda {
 	RegType cos_sin[2];
 	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
+  z *= scale.imag();
 	Complex su3[9];
 #pragma unroll
 	for (int i=0; i<9; i++) su3[i] = z * reinterpret_cast<const Complex*>(in)[i];
-	reconstruct_8.Pack(out, reinterpret_cast<RegType*>(su3), idx);
+    reconstruct_8.Pack(out, reinterpret_cast<RegType*>(su3), idx);
       }
 
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir,
 					     const RegType phase, const I *X, const int *R) const {
-	reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, scale);
+  reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, Complex(static_cast<RegType>(1.0),static_cast<RegType>(1.0)), Complex(static_cast<RegType>(1.0),static_cast<RegType>(1.0)));
 	RegType cos_sin[2];
 	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
-	Complex z(cos_sin[0], cos_sin[1]);
+  Complex z(cos_sin[0], cos_sin[1]);
+  z *= scale.real();
 #pragma unroll
 	for (int i=0; i<9; i++) reinterpret_cast<Complex*>(out)[i] *= z;
       }
