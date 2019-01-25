@@ -83,16 +83,10 @@ void initComms(int argc, char **argv, const int *commDims)
     int map[] = { 0, 1, 2, 3 };
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   }
-
 #elif defined(MPI_COMMS)
-#ifdef PTHREADS
-  int provided;
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-#else
   MPI_Init(&argc, &argv);
 #endif
 
-#endif
   QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
 
   initCommsGridQuda(4, commDims, func, NULL);

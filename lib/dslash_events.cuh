@@ -1,9 +1,6 @@
 namespace dslash {
   extern int it;
 
-#ifdef PTHREADS
-  extern cudaEvent_t interiorDslashEnd;
-#endif
   extern cudaEvent_t packEnd[2]; // double buffered
   extern cudaEvent_t gatherStart[Nstream];
   extern cudaEvent_t gatherEnd[Nstream];

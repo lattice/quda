@@ -158,9 +158,6 @@ static int *num_failures_d = nullptr;
 
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
-#ifdef PTHREADS
-pthread_mutex_t pthread_mutex;
-#endif
 
 static bool initialized = false;
 
@@ -649,13 +646,6 @@ void initQuda(int dev)
 
   // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
   initQudaMemory();
-
-#ifdef PTHREADS
-  pthread_mutexattr_t mutex_attr;
-  pthread_mutexattr_init(&mutex_attr);
-  pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_RECURSIVE);
-  pthread_mutex_init(&pthread_mutex, &mutex_attr);
-#endif
 }
 
 // helper for creating extended gauge fields

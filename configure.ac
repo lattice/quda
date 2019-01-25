@@ -233,12 +233,6 @@ AS_CASE([$build_mpi],
 	[no], [AC_PROG_CC(gcc cc) AC_PROG_CXX(g++ CC cxx)])
 
 
-AC_ARG_ENABLE(pthreads,
-  AC_HELP_STRING([--enable-pthreads], [ Enable pthreads in the multi-GPU dslash build (default: disabled)]),
-  [ posix_threads=${enableval}],
-  [ posix_threads="no" ]
-)
-
 AC_ARG_WITH(qmp,
  AC_HELP_STRING([--with-qmp=QMPDIR], [ Specify QMP installation directory]),
  [ qmp_home=${withval} ; build_qmp="yes" ],
@@ -746,9 +740,6 @@ AC_SUBST( BUILD_QMP, [${build_qmp}])
 
 AC_MSG_NOTICE([Setting BUILD_MPI = ${build_mpi} ])
 AC_SUBST( BUILD_MPI, [${build_mpi}])
-
-AC_MSG_NOTICE([Setting POSIX_THREADS = ${posix_threads}])
-AC_SUBST( POSIX_THREADS, [${posix_threads}])
 
 AC_MSG_NOTICE([Setting MPI_NVTXS= ${mpi_nvtx}])
 AC_SUBST( MPI_NVTX, [${mpi_nvtx}])

@@ -96,7 +96,6 @@ set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
 # Multi-GPU options
 set(QUDA_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
 set(QUDA_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
-set(QUDA_POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dslash")
 
 #BLAS library
 set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
@@ -419,10 +418,6 @@ endif()
 
 if(QUDA_USE_EIGEN)
   add_definitions(-DEIGEN)
-endif()
-
-if(QUDA_POSIX_THREADS)
-  add_definitions(-DPTHREADS)
 endif()
 
 if(QUDA_DIRAC_WILSON)

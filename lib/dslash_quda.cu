@@ -51,9 +51,6 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
-#ifdef PTHREADS
-    cudaEvent_t interiorDslashEnd;
-#endif
     cudaEvent_t packEnd[2];
     cudaEvent_t gatherStart[Nstream];
     cudaEvent_t gatherEnd[Nstream];
@@ -85,9 +82,6 @@ namespace quda {
       cudaEventCreateWithFlags(&packEnd[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
     }
-#ifdef PTHREADS
-    cudaEventCreateWithFlags(&interiorDslashEnd, cudaEventDisableTiming);
-#endif
 
     aux_worker = NULL;
 
@@ -123,9 +117,6 @@ namespace quda {
       cudaEventDestroy(packEnd[i]);
       cudaEventDestroy(dslashStart[i]);
     }
-#ifdef PTHREADS
-    cudaEventDestroy(interiorDslashEnd);
-#endif
 
     checkCudaError();
   }

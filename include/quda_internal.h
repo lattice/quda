@@ -18,10 +18,6 @@
 #include <qmp.h>
 #endif
 
-#ifdef PTHREADS
-#include <pthread.h>
-#endif
-
 #define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
 #define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
 #include <enum_quda.h>
@@ -40,10 +36,6 @@ extern "C" {
 
   extern cudaDeviceProp deviceProp;  
   extern cudaStream_t *streams;
- 
-#ifdef PTHREADS
-  extern pthread_mutex_t pthread_mutex;
-#endif
  
 #ifdef __cplusplus
 }
@@ -74,11 +66,7 @@ namespace quda {
   template<> struct fixedInvMaxValue<char2>{ static constexpr float value = 7.874015748031e-3f; };
   template<> struct fixedInvMaxValue<char4>{ static constexpr float value = 7.874015748031e-3f; };
 
-#ifdef PTHREADS
-  const int Nstream = 10;
-#else
   const int Nstream = 9;
-#endif
 
   /**
    * Check that the resident gauge field is compatible with the requested inv_param

@@ -88,53 +88,6 @@ inline void setFusedParam(Arg & param, Dslash &dslash, const int* faceVolumeCB){
 #endif
 
 
-
-#ifdef PTHREADS
-#include <pthread.h>
-
-
-namespace {
-
-  struct ReceiveParam 
-  {
-    TimeProfile* profile;
-    int nFace;
-    int dagger;
-  };
-
-  void *issueMPIReceive(void* receiveParam)
-  {
-    ReceiveParam* param = static_cast<ReceiveParam*>(receiveParam);
-    for(int i=3; i>=0; i--){
-      if(!dslashParam.commDim[i]) continue;
-      for(int dir=1; dir>=0; dir--){
-        PROFILE(inSpinor->recvStart(param->nFace, 2*i+dir, param->dagger), (*(param->profile)), QUDA_PROFILE_COMMS_START);
-      }
-    }
-    return nullptr;
-  }
-
-  struct InteriorParam 
-  {
-    TimeProfile* profile;
-    DslashCuda* dslash;
-    int current_device;
-  };
-
-
- void* launchInteriorKernel(void* interiorParam)
-  {
-    InteriorParam* param = static_cast<InteriorParam*>(interiorParam);
-    cudaSetDevice(param->current_device); // set device in the new thread
-    PROFILE(param->dslash->apply(streams[Nstream-1]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
-    if (aux_worker) aux_worker->apply(streams[Nstream-1]);
-    return nullptr;
-  }
-
-} // anonymous namespace
-#endif
-
-
 namespace {
 
   /**
@@ -435,7 +388,6 @@ namespace {
 	      pattern.completeSum++;
 	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
 	    }
 	  }
 
@@ -478,169 +430,6 @@ namespace {
 
 };
 
-template <typename Dslash>
-struct DslashPthreads : DslashPolicyImp<Dslash> {
-
-  void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
-#ifdef PTHREADS
-    using namespace dslash;
-    profile.TPSTART(QUDA_PROFILE_TOTAL);
-  
-    auto &dslashParam = dslash.dslashParam;
-    dslashParam.kernel_type = INTERIOR_KERNEL;
-    dslashParam.threads = volume;
-
-#ifdef MULTI_GPU
-  // Record the start of the dslash if doing communication in T and not kernel packing
-    {
-      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream-1]),
-              profile, QUDA_PROFILE_EVENT_RECORD);
-    }
-		
-    // and launch the interior dslash kernel
-
-    const int packIndex = Nstream-2;
-    //const int packIndex = Nstream-1;
-    pthread_t receiveThread, interiorThread;
-    ReceiveParam receiveParam;
-    receiveParam.profile = &profile;
-    receiveParam.nFace   = (dslash.Nface() >> 1);
-    receiveParam.dagger  = dslash.Dagger();
-
-    if(pthread_create(&receiveThread, NULL, issueMPIReceive, &receiveParam)){
-      errorQuda("pthread_create failed");
-    }
-
-    InteriorParam interiorParam;
-    interiorParam.dslash   = &dslash;
-    interiorParam.profile  = &profile; 
-
-    cudaGetDevice(&(interiorParam.current_device)); // get the current device number
-    if(pthread_create(&interiorThread, NULL, launchInteriorKernel, &interiorParam)){
-      errorQuda("pthread_create failed");
-    }
-
-    bool pack = false;
-    for (int i=3; i>=0; i--) 
-      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
-        { pack = true; break; }
-
-    if (pack){
-      PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0),
-              profile, QUDA_PROFILE_STREAM_WAIT_EVENT); 
-    }
-
-    // Initialize pack from source spinor
-    MemoryLocation pack_dest[2*QUDA_MAX_DIM];
-    for (int i=0; i<2*QUDA_MAX_DIM; i++) pack_dest[i] = Device;
-    PROFILE(if (dslash_pack_compute) in->pack(dslash.Nface()/2, 1-dslashParam.parity, dslash.Dagger(), packIndex, pack_dest, twist_a, twist_b),
-	    profile, QUDA_PROFILE_PACK_KERNEL);
-
-    if (pack) {
-      // Record the end of the packing
-      PROFILE(qudaEventRecord(packEnd[in->bufferIndex], streams[packIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
-    }
-    for(int i = 3; i >=0; i--){
-      if (!dslashParam.commDim[i]) continue;
-
-      for (int dir=1; dir>=0; dir--) {
-        cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in->bufferIndex] : dslashStart[in->bufferIndex];
-
-        PROFILE(qudaStreamWaitEvent(streams[2*i+dir], event, 0),
-	        profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-
-        // Initialize host transfer from source spinor
-        PROFILE(if (dslash_copy) in->gather(dslash.Nface()/2, dslash.Dagger(), 2*i+dir), profile, QUDA_PROFILE_GATHER);
-
-        // Record the end of the gathering
-        PROFILE(qudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]),
-	        profile, QUDA_PROFILE_EVENT_RECORD);
-      }
-    }
-
-#endif // MULTI_GPU
-
-#if (!defined MULTI_GPU)
-    PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-    if (aux_worker) aux_worker->apply(streams[Nstream-1]);
-#endif
-
-#ifdef MULTI_GPU 
-    if(pthread_join(receiveThread, NULL)) errorQuda("pthread_join failed");
-    bool interiorLaunched = false;
-    DslashCommsPattern pattern(dslashParam.commDim);
-    while (pattern.completeSum < pattern.commDimTotal) {
-      for (int i=3; i>=0; i--) {
-        if (!dslashParam.commDim[i]) continue;
-
-        for (int dir=1; dir>=0; dir--) {
-
-	  // Query if gather has completed
-	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
-	    cudaError_t event_test = comm_peer2peer_enabled(dir,i) ? cudaSuccess : cudaErrorNotReady;
-	    if (event_test != cudaSuccess) PROFILE(event_test = qudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
-
-	    if (cudaSuccess == event_test) {
-	      pattern.gatherCompleted[2*i+dir] = 1;
-	      pattern.completeSum++;
-	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(),  dslashParam.remote_write ? streams+packIndex : nullptr,
-                                                      false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) ? in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
-	    }
-	  }
-
-	  // Query if comms has finished
-	  if(!pattern.commsCompleted[2*i+dir] && pattern.commsCompleted[pattern.previousDir[2*i+dir]] &&
-	     pattern.gatherCompleted[2*i+dir]) {
-	    PROFILE(int comms_test = dslash_comms ? in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()) : 1,
-		    profile, QUDA_PROFILE_COMMS_QUERY);
-	    if (comms_test) {
-	      pattern.commsCompleted[2*i+dir] = 1;
-	      pattern.completeSum++;
-
-	      // Scatter into the end zone
-	      PROFILE(if (dslash_copy) in->scatter(dslash.Nface()/2, dslash.Dagger(), 2*i+dir), profile, QUDA_PROFILE_SCATTER);
-	    }
-	  }
-
-        } // dir=0,1
-
-        // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-        if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
-	// Record the end of the scattering
-	  PROFILE(qudaEventRecord(scatterEnd[2*i], streams[2*i]),
-		  profile, QUDA_PROFILE_EVENT_RECORD);
-
-	  if(!interiorLaunched){
-	    if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
-	    interiorLaunched = true;
-          }
-
-	  // wait for scattering to finish and then launch dslash
-	  PROFILE(qudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0),
-		  profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-
-	  dslashParam.kernel_type = static_cast<KernelType>(i);
-	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
-	  // all faces use this stream
-	  PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-
-	  pattern.dslashCompleted[2*i] = 1;
-        }
-
-      }
-
-    }
-
-    completeDslash(*in,dslashParam);
-    in->bufferIndex = (1 - in->bufferIndex);
-#endif // MULTI_GPU
-    profile.TPSTOP(QUDA_PROFILE_TOTAL);
-#else // !PTHREADS
-    errorQuda("Pthreads has not been built\n"); 
-#endif
-  }
-};
 
 /**
    Standard dslash parallelization with host staging for send and receive, and fused halo update kernel
@@ -689,7 +478,6 @@ struct DslashPthreads : DslashPolicyImp<Dslash> {
 	      pattern.completeSum++;
 	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
 	    }
 	  }
 
@@ -923,7 +711,6 @@ struct DslashPthreads : DslashPolicyImp<Dslash> {
 	      pattern.completeSum++;
 	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, false, true);  // do a comms query to ensure MPI has begun
 	    }
 	  }
 
@@ -1002,7 +789,6 @@ struct DslashPthreads : DslashPolicyImp<Dslash> {
 	      pattern.completeSum++;
 	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, false, true);  // do a comms query to ensure MPI has begun
 	    }
 	  }
 
@@ -1814,7 +1600,6 @@ struct DslashPthreads : DslashPolicyImp<Dslash> {
     QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH,
     QUDA_DSLASH_ASYNC,
     QUDA_FUSED_DSLASH_ASYNC,
-    QUDA_PTHREADS_DSLASH,
     QUDA_DSLASH_NC,
     QUDA_DSLASH_POLICY_DISABLED // this MUST be the last element
   };
@@ -1843,9 +1628,6 @@ struct DslashPthreads : DslashPolicyImp<Dslash> {
       break;
     case QudaDslashPolicy::QUDA_DSLASH_ASYNC:
       result = new DslashAsync<Dslash>;
-      break;
-    case QudaDslashPolicy::QUDA_PTHREADS_DSLASH:
-      result = new DslashPthreads<Dslash>;
       break;
     case QudaDslashPolicy::QUDA_FUSED_DSLASH:
       result = new DslashFusedExterior<Dslash>;

@@ -15,9 +15,6 @@
 #include <deque>
 #include <queue>
 #include <functional>
-#ifdef PTHREADS
-#include <pthread.h>
-#endif
 
 //#define LAUNCH_TIMER
 extern char* gitversion;
@@ -621,18 +618,12 @@ namespace quda {
 
   static TimeProfile launchTimer("tuneLaunch");
 
-//  static int tally = 0;
-
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
-#ifdef PTHREADS // tuning should be performed serially
-//  pthread_mutex_lock(&pthread_mutex);
-//  tally++;
-#endif
 
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -673,11 +664,6 @@ namespace quda {
 
       tunable.checkLaunchParam(param);
 
-#ifdef PTHREADS
-      //pthread_mutex_unlock(&pthread_mutex);
-      //tally--;
-      //printfQuda("pthread_mutex_unlock a complete %d\n",tally);
-#endif
       // we could be tuning outside of the current scope
       if (!tuning && profile_count) param.n_calls++;
 
@@ -830,12 +816,6 @@ namespace quda {
     } else if (&tunable != active_tunable) {
       errorQuda("Unexpected call to tuneLaunch() in %s::apply()", typeid(tunable).name());
     }
-
-#ifdef PTHREADS
-//    pthread_mutex_unlock(&pthread_mutex);
-//    tally--;
-//    printfQuda("pthread_mutex_unlock b complete %d\n",tally);
-#endif
 
     param.n_calls = profile_count ? 1 : 0;
 
