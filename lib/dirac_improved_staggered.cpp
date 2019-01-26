@@ -58,7 +58,6 @@ namespace quda {
 				  dagger, 0, 0, commDim, profile);
 #else
     constexpr bool improved = true;
-    printfQuda("NEW STAGGERED Dslash partiy %i %i...\n",parity, dagger);
     ApplyDslashStaggered(out, in, fatGauge, longGauge , 0., in,
                          parity, dagger, improved, commDim, profile);
 

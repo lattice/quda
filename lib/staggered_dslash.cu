@@ -26,14 +26,18 @@ namespace quda {
  /**
      Compute the checkerboarded index into the ghost field
      corresponding to full (local) site index x[]
-     @param x local site
-     @param X local lattice dimensions
+     @param x_ local site
+     @param X_ local lattice dimensions
      @param dim dimension
      @param depth of ghost
   */
-  template <int dir, typename I>
-  __device__ __host__ inline int mwghostFaceIndex(const int x[], const I X[], int dim, int nFace) {
+  template <int dir, int nDim=4, typename I>
+  __device__ __host__ inline int mwghostFaceIndex(const int x_[], const I X_[], int dim, int nFace) {
+    static_assert( (nDim==4 || nDim==5), "Number of dimensions must be 4 or 5");
     int index = 0;
+    const int x[] = { x_[0], x_[1], x_[2], x_[3], nDim == 5 ? x_[4] : 0 };
+    const int X[] = { (int)X_[0], (int)X_[1], (int)X_[2], (int)X_[3], nDim == 5 ? (int)X_[4] : 1 };
+
     switch(dim) {
     case 0:
       switch(dir) {
@@ -150,7 +154,7 @@ namespace quda {
       {
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if ( doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, 1);
+          const int ghost_idx = mwghostFaceIndex<1>(coord, arg.dim, d, 1);
           const Link U = arg.U(d, x_cb, parity);
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           in *=  arg.fat_link_max;
@@ -175,7 +179,7 @@ namespace quda {
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
         if ( doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+          const int ghost_idx = mwghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
           const Link L = arg.L(d, x_cb, parity);
           const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += L * in;
@@ -222,7 +226,8 @@ namespace quda {
         const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if ( doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+          // when updating replace arg.nFace with 1 here
+          const int ghost_idx = mwghostFaceIndex<0>(coord, arg.dim, d, 1);
           const Link L = arg.L.Ghost(d, ghost_idx, 1-parity);
           const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
           out -= conj(L) * in;
