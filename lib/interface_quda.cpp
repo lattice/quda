@@ -2377,12 +2377,13 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ?
     cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
     cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-  
+
+  std::vector<Complex> evals(eig_param->nEv, 0.0);
   std::vector<ColorSpinorField*> kSpace;
   for(int i=0; i<eig_param->nKr; i++) {
     kSpace.push_back(ColorSpinorField::Create(*cudaParam));
   }
-
+  
   //Test for initial guess
   if(norm == 0.0) {
     //Populate initial residual with randoms.
@@ -2409,10 +2410,10 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   //Decide how to solve the problem
   if(eig_param->use_norm_op) {
     //Problem is symmetric, use a Lanczos solver
-    irlmSolve(kSpace, host_evals, dirac, eig_param);    
+    irlmSolve(kSpace, evals, dirac, eig_param);    
   } else {
     //Problem is asymmetric, use an Arnoldi solver
-    iramSolve(kSpace, host_evals, dirac, eig_param);
+    iramSolve(kSpace, evals, dirac, eig_param);
   }
   
   profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -2740,8 +2741,11 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   csParam.fieldOrder = mg_param.setup_location[0] == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_YES ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
-  for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = ColorSpinorField::Create(csParam);
-
+  for (int i=0; i<mg_param.n_vec[0]; i++) {
+    B[i] = ColorSpinorField::Create(csParam);
+    evals.push_back(0.0);
+  }
+  
   // fill out the MG parameters for the fine level
   mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
 

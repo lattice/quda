@@ -41,7 +41,6 @@ namespace quda {
     }
     else {  
       mat.M(out,in);
-      //printfQuda("here\n");
       return;
     }    
   }
@@ -113,8 +112,8 @@ namespace quda {
       matVec<Float>(mat, out, *tmp2, eig_param);
       
       blas::ax(d3,*tmp1);
-      std::complex<double> d1c(d1,0.0);
-      std::complex<double> d2c(d2,0.0);
+      Complex d1c(d1,0.0);
+      Complex d2c(d2,0.0);
       blas::cxpaypbz(*tmp1,d2c,*tmp2,d1c,out);
       
       blas::copy(*tmp1,*tmp2);
@@ -133,7 +132,7 @@ namespace quda {
 		     std::vector<ColorSpinorField*> r,
 		     int j) {
     
-    std::complex<Float> s(0.0,0.0);
+    Complex s(0.0,0.0);
     for(int i=0; i<j; i++) {
       s = blas::cDotProduct(*v[i], *r[0]);
       blas::caxpy(-s, *v[i], *r[0]);      
@@ -177,7 +176,7 @@ namespace quda {
     //DMH: This step ensures that the next mat vec
     //     does not reintroduce components of the
     //     existing eigenspace
-    std::complex<Float> s(0.0,0.0);
+    Complex s(0.0,0.0);
     for(unsigned int i=0; i<evecs.size() && locked[i]; i++) {
       s = blas::cDotProduct(*evecs[i], *v[j]);
       blas::caxpy(-s, *evecs[i], *v[j]);
@@ -249,7 +248,7 @@ namespace quda {
   
   template<typename Float>
   void irlm_solve(std::vector<ColorSpinorField*> kSpace,
-		  void *h_evals, const Dirac &mat,
+		  std::vector<Complex> &evals, const Dirac &mat,
 		  QudaEigParam *eig_param){
     
     // Preliminaries: Memory allocation, local variables.
@@ -280,10 +279,6 @@ namespace quda {
     bool *changed = (bool*)malloc((nKr)*sizeof(bool));
     for(int i=0; i<nKr; i++) changed[i] = true;
     
-    //Alias pointers
-    std::complex<Float> *h_evals_ = nullptr;
-    h_evals_ = (std::complex<Float>*) (Float*)(h_evals);
-
     if(flags) printfQuda("Flag 1\n");
     
     //Create the device side residual vector by cloning
@@ -427,9 +422,9 @@ namespace quda {
       //     Eigen returns Eigenvalues from Hermitian matrices in ascending order.
       //     We take advantage of this here, but be mindful that Arnoldi
       //     type solves will require some degree of sorting.
-      Float evals[nKr-nEv];
-      if(inverse) for(int j=0; j<(nKr-nEv); j++) evals[j] = eigenSolverTD.eigenvalues()[j];
-      else for(int j=0; j<(nKr-nEv); j++) evals[j] = eigenSolverTD.eigenvalues()[j+nEv];
+      Float evals_ritz[nKr-nEv];
+      if(inverse) for(int j=0; j<(nKr-nEv); j++) evals_ritz[j] = eigenSolverTD.eigenvalues()[j];
+      else for(int j=0; j<(nKr-nEv); j++) evals_ritz[j] = eigenSolverTD.eigenvalues()[j+nEv];
       
       //DMH: This can be batch parallelised on the GPU.
       //     Will be usefull when (nKr - nEv) is large.
@@ -448,7 +443,7 @@ namespace quda {
 	//Apply the shift \mu_j
 	TmMuI = triDiag;
 	MatrixXd Id = MatrixXd::Identity(nKr, nKr);;
-	TmMuI -= evals[j]*Id;
+	TmMuI -= evals_ritz[j]*Id;
 	
 	//QR decomposition of Tm - \mu_i I
 	Eigen::HouseholderQR<MatrixXd> QR(TmMuI);
@@ -547,7 +542,6 @@ namespace quda {
 	blas::caxpy(Qmat_d_nev, d_vecs_ptr, d_vecs_tmp);
 	time += clock();
 	time_mb += time;
-
 	
 	//Check for convergence
 	//Error estimates given by ||A*vec - lambda*vec||	
@@ -557,19 +551,19 @@ namespace quda {
 	  //r = A * v_i
 	  matVec<Float>(mat, *r[0], *d_vecs_tmp[i], eig_param);	    
 	  //lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-	  h_evals_[i] = blas::cDotProduct(*d_vecs_tmp[i], *r[0])/sqrt(blas::norm2(*d_vecs_tmp[i]));
-
+	  evals[i] = blas::cDotProduct(*d_vecs_tmp[i], *r[0])/sqrt(blas::norm2(*d_vecs_tmp[i]));
+	  
 	  //Convergence check ||lambda_i*v_i - A*v_i||
 	  //--------------------------------------------------------------------------
 	  Complex n_unit(-1.0,0.0);
-	  blas::caxpby(h_evals_[i], *d_vecs_tmp[i], n_unit, *r[0]);
+	  blas::caxpby(evals[i], *d_vecs_tmp[i], n_unit, *r[0]);
 	  residual[i] = sqrt(blas::norm2(*r[0]));
-
-	  //Place in QUDA_logfile, as well as alpha/beta info.
+	  
+	  //Update QUDA_logfile
 	  //printfQuda("Residual %d = %.6e\n", i, residual[i]);
 	  //printfQuda("Eval %d = %.6e\n", i, h_evals_[i].real() );
 	  //printfQuda("Norm %d = %.6e\n", i, sqrt(blas::norm2(*d_vecs_tmp[i])));
-
+	  
 	  //Copy over residual
 	  residual_old[i] = residual[i];
 	  //--------------------------------------------------------------------------
@@ -580,8 +574,8 @@ namespace quda {
 	    
 	    //This is a new eigenpair, lock it
 	    locked[i] = true;
-	    printfQuda("**** locking converged eigenvalue = %.16e resid %+.16e ****\n",
-		       fabs(h_evals_[i]), residual[i]);
+	    printfQuda("**** locking converged eigenvalue = (%+.16e,%+.16e) resid %+.16e ****\n",
+		       evals[i].real(), evals[i].imag(), residual[i]);
 	    
 	    num_converged++;
 	  }	  
@@ -589,7 +583,11 @@ namespace quda {
 
 	printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter+1);
 	
-	if(num_converged >= nConv) converged = true;
+	if(num_converged >= nConv) {	  
+	  //Eigensolver has converged. Transfer eigenvectors to kSpace array
+	  for(int i=0; i<nConv; i++) *kSpace[i] =  *d_vecs_tmp[i];	  
+	  converged = true;
+	}
 	
 	time += clock();
 	time_c += time;
@@ -630,19 +628,16 @@ namespace quda {
 		     i, alpha[i], 0.0, beta[i]);
 	}
       }
-      
-      
+
+      //Reverse for printing, then put back in original order
+      //if(inverse) std::reverse(evals.begin(), evals.end());      
       for(int i=0; i<nEv; i++) {
-	if(inverse) {
-	  printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
-		     i, h_evals_[nEv-1-i].real(), h_evals_[nEv-1-i].imag(), residual[nEv-1-i]);
-	}
-	else {
-	  printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
-		     i, h_evals_[i].real(), h_evals_[i].imag(), residual[i]);
-	}
+	printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
+		   i, evals[i].real(), evals[i].imag(), residual[i]);
+	//kSpace[i]->PrintVector(0);
       }
-      
+      //if(inverse) std::reverse(evals.begin(), evals.end());
+
       
       if(eig_param->compute_svd) {
 	
@@ -673,14 +668,14 @@ namespace quda {
       	  //As a cross check, we recompute the singular values from mat vecs rather
       	  //than make the direct relation (sigma_i)^2 = |lambda_i|
 	  //--------------------------------------------------------------------------
-      	  std::complex<Float> lambda = h_evals_[idx];
+      	  Complex lambda = evals[idx];
 
       	  //M*Rev_i = M*Rsv_i = sigma_i Lsv_i 
       	  matVec<Float>(mat, *r[0], *d_vecs_tmp[idx], eig_param);
 	  
       	  Complex sigma_sq = blas::cDotProduct(*r[0], *r[0]);  // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      	  sigma_tmp[2*i + 0] = std::complex<Float>(sqrt( sigma_sq.real() ) , sqrt( abs( sigma_sq.imag() ) ) );
-      	  sigma_tmp[2*i + 1] = std::complex<Float>(sqrt( sigma_sq.real() ) , sqrt( abs( sigma_sq.imag() ) ) );
+      	  sigma_tmp[2*i + 0] = Complex(sqrt( sigma_sq.real() ) , sqrt( abs( sigma_sq.imag() ) ) );
+      	  sigma_tmp[2*i + 1] = Complex(sqrt( sigma_sq.real() ) , sqrt( abs( sigma_sq.imag() ) ) );
 	  
       	  //Copy device Rsv[i] (EV[i]) to host SVD[2*i]
 	  *kSpace[2*i] = *d_vecs_tmp[idx];
@@ -698,7 +693,7 @@ namespace quda {
       	}
 
       	//Update the host evals array
-      	for(int i=0; i<nConv; i++) h_evals_[i] = sigma_tmp[i];
+      	for(int i=0; i<nConv; i++) evals[i] = sigma_tmp[i];
 	
       	//Revert to MdagM (or MMdag) mat vec
       	eig_param->use_norm_op = QUDA_BOOLEAN_YES;
@@ -710,6 +705,7 @@ namespace quda {
     
     Float t2 = clock() - t1;
     Float total;
+    
     if(eig_param->compute_svd) total = (time_e + time_c + time_ls + time_mb + time_svd)/CLOCKS_PER_SEC;    
     else total = (time_e + time_c + time_ls + time_mb)/CLOCKS_PER_SEC;
     printfQuda("Time to solve problem using IRLM = %e\n", t2/CLOCKS_PER_SEC);    
@@ -730,32 +726,32 @@ namespace quda {
   }
   
   void irlmSolve(std::vector<ColorSpinorField*> kSpace,
-		 void *h_evals, const Dirac &mat,
+		 std::vector<Complex> &evals, const Dirac &mat,
 		 QudaEigParam *eig_param){
     
     if(eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION) {
       if(flags) printfQuda("DOUBLE prec IRLM\n");
-      irlm_solve<double>(kSpace, h_evals, mat, eig_param);
+      irlm_solve<double>(kSpace, evals, mat, eig_param);
     } else {
       if(flags) printfQuda("SINGLE prec IRLM\n");
-      irlm_solve<float>(kSpace, h_evals, mat, eig_param);
+      irlm_solve<float>(kSpace, evals, mat, eig_param);
     }    
   }
   
   template<typename Float>
   void iram_solve(std::vector<ColorSpinorField*> kSpace,
-		  void *h_evals, const Dirac &mat,
+		  std::vector<Complex> &evals, const Dirac &mat,
 		  QudaEigParam *eig_param){    
   }
   
   void iramSolve(std::vector<ColorSpinorField*> kSpace,
-		 void *h_evals, const Dirac &mat,
+		 std::vector<Complex> &evals, const Dirac &mat,
 		 QudaEigParam *eig_param){
     
     if(eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION) {
-      iram_solve<double>(kSpace, h_evals, mat, eig_param);
+      iram_solve<double>(kSpace, evals, mat, eig_param);
     } else {
-      iram_solve<float>(kSpace, h_evals, mat, eig_param);
+      iram_solve<float>(kSpace, evals, mat, eig_param);
     }    
   }
 

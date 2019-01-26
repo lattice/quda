@@ -13,11 +13,11 @@
 namespace quda {
 
   void irlmSolve(std::vector<ColorSpinorField*> kSpace,
-		 void *h_evals, const Dirac &mat,
+		 std::vector<Complex> &evals, const Dirac &mat,
 		 QudaEigParam *eig_param);
   
   void iramSolve(std::vector<ColorSpinorField*> kSpace,
-		 void *h_evals, const Dirac &mat,
+		 std::vector<Complex> &evals, const Dirac &mat,
 		 QudaEigParam *eig_param);
   
 }

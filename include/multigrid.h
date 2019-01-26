@@ -53,6 +53,9 @@ namespace quda {
     /** The null space vectors */
     std::vector<ColorSpinorField*> &B;
 
+    /** The eigenvalue array */
+    std::vector<Complex> evals;
+    
     /** Number of pre-smoothing applications to perform */
     int nu_pre;
 
@@ -111,7 +114,7 @@ namespace quda {
       Nlevel(param.n_level),
       spinBlockSize(param.spin_block_size[level]),
       Nvec(param.n_vec[level]),
-      B(B), 
+      B(B),
       nu_pre(param.nu_pre[level]),
       nu_post(param.nu_post[level]),
       smoother_tol(param.smoother_tol[level]),
@@ -135,6 +138,7 @@ namespace quda {
 
     MGParam(const MGParam &param, 
 	    std::vector<ColorSpinorField*> &B,
+	    std::vector<Complex> evals,
 	    DiracMatrix *matResidual,
 	    DiracMatrix *matSmooth,
 	    DiracMatrix *matSmoothSloppy,
@@ -148,6 +152,7 @@ namespace quda {
       coarse(param.coarse),
       fine(param.fine),
       B(B),
+      evals(evals),
       nu_pre(param.mg_global.nu_pre[level]),
       nu_post(param.mg_global.nu_post[level]),
       smoother_tol(param.mg_global.smoother_tol[level]),
@@ -349,19 +354,26 @@ namespace quda {
        @brief Generate the null-space vectors
        @param B Generated null-space vectors
        @param refresh Whether we refreshing pre-exising vectors or starting afresh
-     */
+    */
     void generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh=false);
 
     /**
-       @brief Generate low eigenvectors
-       @param B Generated eigenvectors
+       @brief Generate lowest eigenvectors
     */
-    void generateEigenVectors(std::vector<ColorSpinorField*> &B);
+    void generateEigenVectors();
+
+    /**
+       @brief Deflate coarse grid initial guess
+    */
+    void deflateCoarseResidual(std::vector<ColorSpinorField*> vec_defl,
+			       std::vector<ColorSpinorField*> vec,
+			       std::vector<ColorSpinorField*> evecs,
+			       std::vector<Complex> evals);
     
     /**
        @brief Build free-field null-space vectors
        @param B Free-field null-space vectors
-     */
+    */
     void buildFreeVectors(std::vector<ColorSpinorField*> &B);
 
     /**
@@ -457,7 +469,8 @@ namespace quda {
     DiracM *mSmoothSloppy;
 
     std::vector<ColorSpinorField*> B;
-
+    std::vector<Complex> evals;
+    
     MGParam *mgParam;
 
     MG *mg;

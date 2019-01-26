@@ -126,6 +126,8 @@ extern bool eig_use_dagger;
 extern bool eig_compute_svd;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
+extern bool eig_arpack_check;
+extern char eig_arpack_logfile[];
 extern char eig_QUDA_logfile[];
 
 namespace quda {
@@ -559,6 +561,8 @@ void setEigParam(QudaEigParam &eig_param) {
   eig_param.a_min    = eig_amin;
   eig_param.a_max    = eig_amax;
 
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
   strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
   
 }
