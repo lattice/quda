@@ -12,9 +12,9 @@ set (QUDA_OBJS
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
   color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
-  cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
+  cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
-  cpu_gauge_field.cpp cuda_gauge_field.cu extract_gauge_ghost.cu
+  cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
   dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
