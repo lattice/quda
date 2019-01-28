@@ -224,6 +224,91 @@ namespace quda {
       blas::axpy(1.0/beta[j], *r[0], *v[j+1]);
     }
   }
+
+  template<typename Float>
+  void computeSVD(const Dirac &mat,
+		  std::vector<ColorSpinorField*> &kSpace,
+		  std::vector<ColorSpinorField*> &evecs,
+		  std::vector<Complex> &evals, 
+		  QudaEigParam *eig_param,
+		  bool inverse) {
+    
+    printfQuda("Computing SVD of M\n");
+    
+    //Switch to M (or Mdag) mat vec
+    eig_param->use_norm_op = QUDA_BOOLEAN_NO;
+    int nConv = eig_param->nConv;
+    int nEv = eig_param->nEv;
+    
+    Complex sigma_tmp[nConv/2];
+
+    //Create a device side temp vector by cloning
+    //the evecs passed to the function. We create a
+    //vector of one element. In future, we may wish to
+    //make a block eigensolver, so an std::vector structure
+    //will be needed.
+    
+    std::vector<ColorSpinorField*> tmp;
+    ColorSpinorParam csParam(*evecs[0]);
+    tmp.push_back(ColorSpinorField::Create(csParam));
+    
+    for(int i=0; i <nConv/2; i++){
+
+      int idx = i;
+      //If we used poly acc, the eigenpairs are in descending order.
+      if(inverse) idx = nEv-1 - i;
+      
+      //This function assumes that you have computed the eigenvectors
+      //of MdagM, ie, the right SVD of M. The ith eigen vector in the array corresponds
+      //to the ith right singular vector. We will sort the array as:
+      //
+      //     EV_array_MdagM = (Rev_0, Rev_1, ... , Rev_{n-1{)
+      // to  SVD_array_M    = (Rsv_0, Lsv_0, Rsv_1, Lsv_1, ... ,
+      //                       Rsv_{nEv/2-1}, Lsv_{nEv/2-1})
+      //
+      //We start at Rev_(n/2-1), compute Lsv_(n/2-1), then move the vectors
+      //to the n-2 and n-1 positions in the array respectively.
+      
+      
+      //As a cross check, we recompute the singular values from mat vecs rather
+      //than make the direct relation (sigma_i)^2 = |lambda_i|
+      //--------------------------------------------------------------------------
+      Complex lambda = evals[idx];
+      
+      //M*Rev_i = M*Rsv_i = sigma_i Lsv_i 
+      matVec<Float>(mat, *tmp[0], *evecs[idx], eig_param);
+
+      // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
+      Complex sigma_sq = blas::cDotProduct(*tmp[0], *tmp[0]);  
+      sigma_tmp[i] = Complex(sqrt(sigma_sq.real()) , sqrt(abs(sigma_sq.imag())));
+      
+      //Copy device Rsv[i] (EV[i]) to host SVD[2*i]
+      *kSpace[2*i] = *evecs[idx];
+      
+      //Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
+      double norm = sqrt(blas::norm2(*tmp[0]));      
+      blas::ax(1.0/norm, *tmp[0]);
+      //Copy Lsv[i] to SVD[2*i+1]
+      *kSpace[2*i+1] = *evecs[idx];
+      
+      printfQuda("Sval[%04d] = %+.16e  %+.16e   sigma - sqrt(|lambda|) = %+.16e\n",
+		 i, sigma_tmp[i].real(), sigma_tmp[i].imag(),
+		 sigma_tmp[i].real() - sqrt(abs(lambda.real())));
+      //--------------------------------------------------------------------------
+      
+    }
+    
+    //Update the host evals array
+    for(int i=0; i<nConv/2; i++) {
+      evals[2*i + 0] = sigma_tmp[i];
+      evals[2*i + 1] = sigma_tmp[i];
+    }
+    
+    //Revert to MdagM (or MMdag) mat vec
+    eig_param->use_norm_op = QUDA_BOOLEAN_YES;
+    
+    delete tmp[0];
+  }
   
   template<typename Float>
   void lanczos_solve(void *h_evecs, void *h_evals, const Dirac &mat,
@@ -280,7 +365,7 @@ namespace quda {
     for(int i=0; i<nKr; i++) changed[i] = true;
     
     if(flags) printfQuda("Flag 1\n");
-    
+   
     //Create the device side residual vector by cloning
     //the kSpace passed to the function. We create a
     //vector of one element. In future, we may wish to
@@ -574,8 +659,8 @@ namespace quda {
 	    
 	    //This is a new eigenpair, lock it
 	    locked[i] = true;
-	    printfQuda("**** locking converged eigenvalue = (%+.16e,%+.16e) resid %+.16e ****\n",
-		       evals[i].real(), evals[i].imag(), residual[i]);
+	    printfQuda("**** locking vector %d, converged eigenvalue = (%+.16e,%+.16e) resid %+.16e ****\n",
+		       i, evals[i].real(), evals[i].imag(), residual[i]);
 	    
 	    num_converged++;
 	  }	  
@@ -585,7 +670,7 @@ namespace quda {
 	
 	if(num_converged >= nConv) {	  
 	  //Eigensolver has converged. Transfer eigenvectors to kSpace array
-	  for(int i=0; i<nConv; i++) *kSpace[i] =  *d_vecs_tmp[i];	  
+	  for(int i=0; i<nConv; i++) *kSpace[i] =  *d_vecs_tmp[i];
 	  converged = true;
 	}
 	
@@ -617,90 +702,23 @@ namespace quda {
 		 "Please either increase nKr and nEv and/or extend the number of restarts\n", nConv, nEv, nKr, max_restarts);
     } else {
       printfQuda("IRLM computed the requested %d vectors in %d restart steps of size %d\n", nConv, restart_iter, (nKr-nEv));
-
+      
       for(int i=0; i<nEv; i++) {
-	if(inverse) {
-	  printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
-		     i, alpha[nEv-1-i], 0.0, beta[nEv-1-i]);
-	  
-	} else {
-	  printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
-		     i, alpha[i], 0.0, beta[i]);
-	}
+	printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
+		   i, alpha[i], 0.0, beta[i]);
       }
+      
 
-      //Reverse for printing, then put back in original order
-      //if(inverse) std::reverse(evals.begin(), evals.end());      
       for(int i=0; i<nEv; i++) {
 	printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
 		   i, evals[i].real(), evals[i].imag(), residual[i]);
-	//kSpace[i]->PrintVector(0);
       }
-      //if(inverse) std::reverse(evals.begin(), evals.end());
 
-      
-      if(eig_param->compute_svd) {
-	
-      	printfQuda("Computing SVD of M\n");
+      //Compute SVD
+      time_svd = -clock();
+      if(eig_param->compute_svd) computeSVD<Float>(mat, kSpace, d_vecs_tmp, evals, eig_param, inverse);
+      time_svd += clock();
 
-      	//Switch to M (or Mdag) mat vec
-      	eig_param->use_norm_op = QUDA_BOOLEAN_NO;
-
-      	Complex sigma_tmp[nConv/2];
-	
-      	time_svd = -(double)clock();
-      	for(int i=0; i <nConv/2; i++){
-
-      	  int idx = i;
-      	  if(inverse) idx = (nEv-1)-i;
-	  
-      	  //This function assumes that you have computed the eigenvectors
-      	  //of MdagM, ie, the right SVD of M. The ith eigen vector in the array corresponds
-      	  //to the ith right singular vector. We will sort the array as:
-      	  //
-      	  //     EV_array_MdagM = (Rev_0, Rev_1, ... , Rev_{n-1{)
-      	  // to  SVD_array_M    = (Rsv_0, Lsv_0, Rsv_1, Lsv_1, ... , Rsv_{nEv/2-1}, Lsv_{nEv/2-1})
-      	  //
-      	  //We start at Rev_(n/2-1), compute Lsv_(n/2-1), then move the vectors
-      	  //to the n-2 and n-1 positions in the array respectively.
-
-	  
-      	  //As a cross check, we recompute the singular values from mat vecs rather
-      	  //than make the direct relation (sigma_i)^2 = |lambda_i|
-	  //--------------------------------------------------------------------------
-      	  Complex lambda = evals[idx];
-
-      	  //M*Rev_i = M*Rsv_i = sigma_i Lsv_i 
-      	  matVec<Float>(mat, *r[0], *d_vecs_tmp[idx], eig_param);
-	  
-      	  Complex sigma_sq = blas::cDotProduct(*r[0], *r[0]);  // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      	  sigma_tmp[2*i + 0] = Complex(sqrt( sigma_sq.real() ) , sqrt( abs( sigma_sq.imag() ) ) );
-      	  sigma_tmp[2*i + 1] = Complex(sqrt( sigma_sq.real() ) , sqrt( abs( sigma_sq.imag() ) ) );
-	  
-      	  //Copy device Rsv[i] (EV[i]) to host SVD[2*i]
-	  *kSpace[2*i] = *d_vecs_tmp[idx];
-	  
-      	  //Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-      	  double norm = sqrt(blas::norm2(*r[0]));      
-      	  blas::ax(1.0/norm, *r[0]);
-      	  //Copy Lsv[i] to SVD[2*i+1]
-	  *kSpace[2*i+1] = *d_vecs_tmp[idx];
-	  
-      	  printfQuda("Sval[%04d] = %+.16e  %+.16e   sigma - sqrt(|lambda|) = %+.16e\n",
-      		     i, sigma_tmp[2*i].real(), sigma_tmp[2*i].imag(), sigma_tmp[2*i].real() - sqrt(abs(lambda.real())));
-	  //--------------------------------------------------------------------------
-	  
-      	}
-
-      	//Update the host evals array
-      	for(int i=0; i<nConv; i++) evals[i] = sigma_tmp[i];
-	
-      	//Revert to MdagM (or MMdag) mat vec
-      	eig_param->use_norm_op = QUDA_BOOLEAN_YES;
-	
-      	time_svd += clock();
-	
-      }
     }
     
     Float t2 = clock() - t1;
@@ -721,7 +739,8 @@ namespace quda {
     delete r[0];
     for(int i=0; i<nEv; i++) {
       delete d_vecs_tmp[i];
-    }        
+    }
+    
     printfQuda("END IRLM SOLUTION\n");
   }
   

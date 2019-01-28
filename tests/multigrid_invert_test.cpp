@@ -106,8 +106,9 @@ extern bool compute_clover;
 extern bool verify_results;
 
 //Eigensolver params for MG
-extern bool low_mode_check;
 extern bool use_low_modes;
+extern bool deflate_coarsest;
+extern bool low_mode_check;
 extern bool oblique_proj_check;
 
 extern int eig_nEv;
@@ -426,6 +427,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_param.use_low_modes = use_low_modes ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_param.deflate_coarsest = deflate_coarsest ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   
   // set file i/o parameters
@@ -562,7 +564,6 @@ void setEigParam(QudaEigParam &eig_param) {
   eig_param.a_max    = eig_amax;
 
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
   strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
   
 }

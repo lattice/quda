@@ -363,12 +363,20 @@ namespace quda {
     void generateEigenVectors();
 
     /**
-       @brief Deflate coarse grid initial guess
+       @brief Deflate coarse grid initial guess with Eigenvectors
     */
-    void deflateCoarseResidual(std::vector<ColorSpinorField*> vec_defl,
-			       std::vector<ColorSpinorField*> vec,
-			       std::vector<ColorSpinorField*> evecs,
-			       std::vector<Complex> evals);
+    void deflateEigenvectors(std::vector<ColorSpinorField*> vec_defl,
+			     std::vector<ColorSpinorField*> vec,
+			     std::vector<ColorSpinorField*> evecs,
+			     std::vector<Complex> evals);
+
+    /**
+       @brief Deflate coarse grid initial guess with SVD
+    */
+    void deflateSVD(std::vector<ColorSpinorField*> vec_defl,
+		    std::vector<ColorSpinorField*> vec,
+		    std::vector<ColorSpinorField*> svd_vecs,
+		    std::vector<Complex> svals);
     
     /**
        @brief Build free-field null-space vectors

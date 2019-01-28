@@ -561,6 +561,9 @@ extern "C" {
 
     /** Whether to use eigenvectors for the nullspace */
     QudaBoolean use_low_modes;
+
+    /** Deflate the coarsest grid  */
+    QudaBoolean deflate_coarsest;
     
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];
