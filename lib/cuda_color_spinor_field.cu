@@ -13,12 +13,10 @@ int zeroCopy = 0;
 
 namespace quda {
 
-  static bool ghost_precision_reset = false;
-  static QudaPrecision ghost_precision_old = QUDA_INVALID_PRECISION;
-
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -41,7 +39,8 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -51,7 +50,8 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -99,7 +99,8 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false),
-      ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+      ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
+      ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -441,6 +442,7 @@ namespace quda {
       } // buffer index
 
       ghostTexInit = true;
+      ghost_precision_tex = ghost_precision;
 
       checkCudaError();
     }
@@ -458,11 +460,10 @@ namespace quda {
   void cudaColorSpinorField::destroyGhostTexObject() const {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && ghostTexInit) {
       for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
-      if ( (ghost_precision_reset && (ghost_precision_old == QUDA_HALF_PRECISION || ghost_precision_old == QUDA_QUARTER_PRECISION) ||
-        (!ghost_precision_reset && (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ) ) ) {
+      if (ghost_precision_tex == QUDA_HALF_PRECISION || ghost_precision_tex == QUDA_QUARTER_PRECISION)
         for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
-      }
       ghostTexInit = false;
+      ghost_precision_tex = QUDA_INVALID_PRECISION;
     }
   }
 #endif
@@ -1298,16 +1299,15 @@ namespace quda {
 					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv,
 					   QudaPrecision ghost_precision_)  const {
 
+    // we are overriding the ghost precision, and it doesn't match what has already been allocated
     if (ghost_precision_ != QUDA_INVALID_PRECISION && ghost_precision != ghost_precision_) {
       ghost_precision_reset = true;
-      ghost_precision_old = ghost_precision;
       ghost_precision = ghost_precision_;
     }
 
     // not overriding the ghost precision, but we did previously so need to update
     if (ghost_precision == QUDA_INVALID_PRECISION && ghost_precision != precision) {
       ghost_precision_reset = true;
-      ghost_precision_old = ghost_precision;
       ghost_precision = precision;
     }
 

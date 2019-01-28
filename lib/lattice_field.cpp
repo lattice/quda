@@ -39,6 +39,7 @@ namespace quda {
   void* LatticeField::ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
   bool LatticeField::initGhostFaceBuffer = false;
+
   size_t LatticeField::ghostFaceBytes = 0;
 
   int LatticeField::bufferIndex = 0;
@@ -58,6 +59,7 @@ namespace quda {
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim),
       precision(param.Precision()), ghost_precision(param.GhostPrecision()),
+      ghost_precision_reset(false),
       scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
       ghost_bytes(0), ghost_bytes_old(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
@@ -102,6 +104,7 @@ namespace quda {
   LatticeField::LatticeField(const LatticeField &field)
     : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim),
       precision(field.precision), ghost_precision(field.ghost_precision),
+      ghost_precision_reset(false),
       scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange),
       ghost_bytes(0), ghost_bytes_old(0),
       ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),

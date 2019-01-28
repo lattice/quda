@@ -547,6 +547,8 @@ namespace quda {
 
     bool texInit; // whether a texture object has been created or not
     mutable bool ghostTexInit; // whether the ghost texture object has been created
+    mutable QudaPrecision ghost_precision_tex; /** the precision allocated for the ghost texture */
+
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
