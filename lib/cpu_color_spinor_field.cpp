@@ -254,7 +254,7 @@ namespace quda {
   }
 
   // print out the vector at volume point x
-  void cpuColorSpinorField::PrintVector(unsigned int x) { genericPrintVector(*this, x); }
+  void cpuColorSpinorField::PrintVector(unsigned int x) const { genericPrintVector(*this, x); }
 
   void cpuColorSpinorField::allocateGhostBuffer(int nFace) const
   {
