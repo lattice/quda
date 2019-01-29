@@ -62,16 +62,16 @@ namespace quda {
       for (int chirality=0; chirality<2; chirality++) {
 
 	HMatrix<real,nColor*Arg::nSpin/2> A = arg.A(x_cb, parity, chirality);
-	HalfVector out_chi = out.chiral_project(chirality);
+	HalfVector chi = out.chiral_project(chirality);
 
 	if (arg.dynamic_clover) {
 	  Cholesky<HMatrix,real,nColor*Arg::nSpin/2> cholesky(A);
-	  out_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out_chi));
+	  chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(chi));
 	} else {
-	  out_chi = A * out_chi;
+	  chi = A * chi;
 	}
 
-	tmp += out_chi.chiral_reconstruct(chirality);
+	tmp += chi.chiral_reconstruct(chirality);
       }
 
       tmp.toNonRel(); // switch back to non-chiral basis

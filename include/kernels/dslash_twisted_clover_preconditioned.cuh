@@ -67,20 +67,20 @@ namespace quda {
       for (int chirality=0; chirality<2; chirality++) {
 
         const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b) );
-	Mat A = arg.A(x_cb, parity, chirality);
-	HalfVector out_chi = out.chiral_project(chirality);
-        out_chi = A*out_chi + b*out_chi;
+        Mat A = arg.A(x_cb, parity, chirality);
+        HalfVector chi = out.chiral_project(chirality);
+        chi = A*chi + b*chi;
 
 	if (arg.dynamic_clover) {
           Mat A2 = A.square();
           A2 += b.imag()*b.imag();
 	  Cholesky<HMatrix,real,nColor*Arg::nSpin/2> cholesky(A2);
-	  out_chi = cholesky.backward(cholesky.forward(out_chi));
-          tmp += static_cast<real>(0.25) * out_chi.chiral_reconstruct(chirality);
+          chi = cholesky.backward(cholesky.forward(chi));
+          tmp += static_cast<real>(0.25) * chi.chiral_reconstruct(chirality);
 	} else {
           Mat A2inv = arg.A2inv(x_cb, parity, chirality);
-          out_chi = A2inv * out_chi;
-          tmp += static_cast<real>(2.0) * out_chi.chiral_reconstruct(chirality);
+          chi = A2inv * chi;
+          tmp += static_cast<real>(2.0) * chi.chiral_reconstruct(chirality);
 	}
 
       }
