@@ -49,6 +49,22 @@ extern float fat_link_max;
  */
 int gridsize_from_cmdline[4] = {1,1,1,1};
 
+void get_gridsize_from_env(int * const dims) {
+  char *grid_size_env = getenv("QUDA_TEST_GRID_SIZE");
+  if (grid_size_env) {
+    std::stringstream grid_list(grid_size_env);
+
+    int dim;
+    int i = 0;
+    while (grid_list >> dim) {
+      if (i>=4) errorQuda("Unexpected grid size array length");
+      dims[i] = dim;
+      if (grid_list.peek() == ',') grid_list.ignore();
+      i++;
+    }
+  }
+}
+
 static int lex_rank_from_coords_t(const int *coords, void *fdata)
 {
   int rank = coords[0];
@@ -69,8 +85,10 @@ static int lex_rank_from_coords_x(const int *coords, void *fdata)
 
 static int rank_order = 0;
 
-void initComms(int argc, char **argv, const int *commDims)
+void initComms(int argc, char **argv, int * const commDims)
 {
+  if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
+
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
