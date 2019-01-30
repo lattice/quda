@@ -170,6 +170,9 @@ namespace quda {
     /** Precision of the ghost */
     mutable QudaPrecision ghost_precision;
 
+    /** Bool which is triggered if the ghost precision is reset */
+    mutable bool ghost_precision_reset;
+
     /** For fixed-point fields that need a global scaling factor */
     double scale;
 

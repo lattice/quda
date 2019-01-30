@@ -485,7 +485,7 @@ namespace quda {
 
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
-    virtual void PrintVector(unsigned int x) = 0;
+    virtual void PrintVector(unsigned int x) const = 0;
 
     /**
      * Compute the n-dimensional site index given the 1-d offset index
@@ -547,6 +547,8 @@ namespace quda {
 
     bool texInit; // whether a texture object has been created or not
     mutable bool ghostTexInit; // whether the ghost texture object has been created
+    mutable QudaPrecision ghost_precision_tex; /** the precision allocated for the ghost texture */
+
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
@@ -812,7 +814,7 @@ namespace quda {
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
 
-    void PrintVector(unsigned int x);
+    void PrintVector(unsigned int x) const;
 
     /**
        @brief Backs up the cudaColorSpinorField
@@ -861,7 +863,7 @@ namespace quda {
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
     static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
-    void PrintVector(unsigned int x);
+    void PrintVector(unsigned int x) const;
 
     /**
        @brief Allocate the ghost buffers
@@ -911,7 +913,9 @@ namespace quda {
       void *dstNorm=0, void*srcNorm=0);
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
-  void genericPrintVector(cpuColorSpinorField &a, unsigned int x);
+
+  void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
+  void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
 
   void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double A, double B);
   void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double alpha);

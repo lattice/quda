@@ -473,17 +473,30 @@ namespace quda {
 
   template <typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ inline void cloverApply(Arg &arg, int x_cb, int parity) {
+    using namespace linalg; // for Cholesky
     typedef typename mapper<Float>::type RegType;
+    typedef ColorSpinor<RegType,nColor,nSpin> Spinor;
+    typedef ColorSpinor<RegType,nColor,nSpin/2> HalfSpinor;
     int spinor_parity = arg.nParity == 2 ? parity : 0;
-    ColorSpinor<RegType,nColor,nSpin> in = arg.in(x_cb, spinor_parity);
-    ColorSpinor<RegType,nColor,nSpin> out;
+    Spinor in = arg.in(x_cb, spinor_parity);
+    Spinor out;
 
     in.toRel(); // change to chiral basis here
 
 #pragma unroll
     for (int chirality=0; chirality<2; chirality++) {
+
       HMatrix<RegType,nColor*nSpin/2> A = arg.clover(x_cb, parity, chirality);
-      out += (A * in.chiral_project(chirality)).chiral_reconstruct(chirality);
+      HalfSpinor chi = in.chiral_project(chirality);
+
+      if (arg.dynamic_clover) {
+        Cholesky<HMatrix,RegType,nColor*nSpin/2> cholesky(A);
+        chi = static_cast<RegType>(0.25)*cholesky.backward(cholesky.forward(chi));
+      } else {
+        chi = A * chi;
+      }
+
+      out += chi.chiral_reconstruct(chirality);
     }
 
     out.toNonRel(); // change basis back
@@ -548,9 +561,21 @@ namespace quda {
   {
     if (in.Nspin() != 4) errorQuda("Unsupported nSpin=%d", in.Nspin());
     constexpr int nSpin = 4;
-    CloverArg<Float,nSpin,nColor> arg(out, in, clover, inverse, parity);
-    Clover<Float,nSpin,nColor,CloverArg<Float,nSpin,nColor> > worker(arg, in);
-    worker.apply(streams[Nstream-1]);
+
+    if (inverse) {
+#ifdef DYNAMIC_CLOVER
+      constexpr bool dynamic_clover = true;
+#else
+      constexpr bool dynamic_clover = false;
+#endif
+      CloverArg<Float,nSpin,nColor,dynamic_clover> arg(out, in, clover, inverse, parity);
+      Clover<Float,nSpin,nColor,CloverArg<Float,nSpin,nColor,dynamic_clover> > worker(arg, in);
+      worker.apply(streams[Nstream-1]);
+    } else {
+      CloverArg<Float,nSpin,nColor,false> arg(out, in, clover, inverse, parity);
+      Clover<Float,nSpin,nColor,CloverArg<Float,nSpin,nColor,false> > worker(arg, in);
+      worker.apply(streams[Nstream-1]);
+    }
 
     checkCudaError();
   }

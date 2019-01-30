@@ -5,7 +5,6 @@
 #include <iostream>
 
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h> // Evan hack
 #include <blas_quda.h>
 #include <dslash_quda.h>
 
@@ -13,12 +12,10 @@ int zeroCopy = 0;
 
 namespace quda {
 
-  static bool ghost_precision_reset = false;
-  static QudaPrecision ghost_precision_old = QUDA_INVALID_PRECISION;
-
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -41,7 +38,8 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -51,7 +49,8 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -99,7 +98,8 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false),
-      ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+      ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
+      ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -441,6 +441,7 @@ namespace quda {
       } // buffer index
 
       ghostTexInit = true;
+      ghost_precision_tex = ghost_precision;
 
       checkCudaError();
     }
@@ -458,11 +459,10 @@ namespace quda {
   void cudaColorSpinorField::destroyGhostTexObject() const {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && ghostTexInit) {
       for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
-      if ( (ghost_precision_reset && (ghost_precision_old == QUDA_HALF_PRECISION || ghost_precision_old == QUDA_QUARTER_PRECISION) ||
-        (!ghost_precision_reset && (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ) ) ) {
+      if (ghost_precision_tex == QUDA_HALF_PRECISION || ghost_precision_tex == QUDA_QUARTER_PRECISION)
         for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
-      }
       ghostTexInit = false;
+      ghost_precision_tex = QUDA_INVALID_PRECISION;
     }
   }
 #endif
@@ -1298,16 +1298,15 @@ namespace quda {
 					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv,
 					   QudaPrecision ghost_precision_)  const {
 
+    // we are overriding the ghost precision, and it doesn't match what has already been allocated
     if (ghost_precision_ != QUDA_INVALID_PRECISION && ghost_precision != ghost_precision_) {
       ghost_precision_reset = true;
-      ghost_precision_old = ghost_precision;
       ghost_precision = ghost_precision_;
     }
 
     // not overriding the ghost precision, but we did previously so need to update
     if (ghost_precision == QUDA_INVALID_PRECISION && ghost_precision != precision) {
       ghost_precision_reset = true;
-      ghost_precision_old = ghost_precision;
       ghost_precision = precision;
     }
 
@@ -1548,163 +1547,6 @@ namespace quda {
     *this = tmp;
   }
 
-
-  // This existed before but was never called. It kept giving me segfaults,
-  // but it would be ideal if I could've gotten it to work.
-  /*
-  template<typename Float,int Ns, int Nc>
-  void genericCudaPrintVector(const cudaColorSpinorField& field, unsigned int i)
-  {
-    typedef typename colorspinor_mapper<Float,Ns,Nc>::type ColorSpinor;
-    ColorSpinor csmap(field);
-    typedef typename mapper<Float>::type TrueFloat;
-    TrueFloat* data_gpu=0;
-    cudaMalloc((void**)&data_gpu, 2*Ns*Nc*sizeof(TrueFloat));
-    csmap.load(data_gpu,i);
-    TrueFloat* data_cpu = new TrueFloat[2*Ns*Nc];
-    cudaMemcpy(data_cpu, data_gpu, 2*Ns*Nc*sizeof(TrueFloat), cudaMemcpyDeviceToHost);
-    cudaFree(data_gpu);
-    for (int s = 0; s < Ns; s++) {
-      printfQuda("x = %u, s = %d, { ", i, s);
-      for (int c = 0; c < Nc; c++) {
-        printfQuda("(%f,%f)", data_cpu[(s*Nc+c)*2], data_cpu[(s*Nc+c)*2+1]);
-        printfQuda("%s", c == Nc-1 ? " " : " , ");
-      }
-      printfQuda("}\n");
-    }
-    delete[] data_cpu;
-  }*/
-
-  template <typename StoreType, int Ns, int Nc, QudaFieldOrder FieldOrder>
-  void genericCudaPrintVector(const cudaColorSpinorField& field, unsigned int i)
-  {
-
-    typedef colorspinor::AccessorCB<StoreType,Ns,Nc,1,FieldOrder> AccessorType;
-
-    AccessorType A(field);
-
-    // Register type
-    typedef typename scalar<typename mapper<StoreType>::type>::type Float;
-
-    // Allocate a real+imag component for the storage type.
-    StoreType indiv_num[2];
-
-    // Allocate space for the full site.
-    Float* data_cpu = new Float[2*Ns*Nc];
-
-    // Grab the pointer to the field.
-    complex<StoreType>* field_ptr = (complex<StoreType>*)field.V();
-
-    // Grab the pointer to the norm field. Might be ignored as appropriate.
-    float* norm_ptr = (float*)field.Norm();
-    float scale = 1.0;
-
-    if (isFixed<StoreType>::value)
-    {
-      cudaMemcpy(&scale, &norm_ptr[i], sizeof(float), cudaMemcpyDeviceToHost);
-      scale *= fixedInvMaxValue<StoreType>::value;
-    }
-
-    for (int s = 0; s < Ns; s++)
-    {
-      for (int c = 0; c < Nc; c++)
-      {
-        cudaMemcpy(indiv_num, &field_ptr[A.index(i%2,i/2,s,c,0)], 2*sizeof(StoreType), cudaMemcpyDeviceToHost);
-        data_cpu[2*(c+Nc*s)] = scale*static_cast<Float>(indiv_num[0]);
-        data_cpu[2*(c+Nc*s)+1] = scale*static_cast<Float>(indiv_num[1]);
-      }
-    }
-    // print
-    for (int s = 0; s < Ns; s++) {
-      printfQuda("x = %u, s = %d, { ", i, s);
-      for (int c = 0; c < Nc; c++) {
-        printfQuda("(%f,%f)", data_cpu[(s*Nc+c)*2], data_cpu[(s*Nc+c)*2+1]);
-        printfQuda("%s", c == Nc-1 ? " " : " , ");
-      }
-      printfQuda("}\n");
-    }
-    //for (int j = 0; j < 2*Ns*Nc; j++)
-    //  printfQuda("%f\n", data_cpu[j]);
-    
-    delete[] data_cpu;
-
-  }
-
-  template<typename Float,int Ns, int Nc>
-  void genericCudaPrintVector(const cudaColorSpinorField& field, unsigned int i)
-  {
-    switch (field.FieldOrder()) {
-    case QUDA_FLOAT_FIELD_ORDER:
-      genericCudaPrintVector<Float,Ns,Nc,QUDA_FLOAT_FIELD_ORDER>(field,i);
-      break;
-    case QUDA_FLOAT2_FIELD_ORDER:
-      genericCudaPrintVector<Float,Ns,Nc,QUDA_FLOAT2_FIELD_ORDER>(field,i);
-      break;
-    case QUDA_FLOAT4_FIELD_ORDER:
-      genericCudaPrintVector<Float,Ns,Nc,QUDA_FLOAT4_FIELD_ORDER>(field,i);
-      break;
-    case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER:
-      genericCudaPrintVector<Float,Ns,Nc,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(field,i);
-      break;
-    case QUDA_SPACE_COLOR_SPIN_FIELD_ORDER:
-      genericCudaPrintVector<Float,Ns,Nc,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER>(field,i);
-      break;
-    default:
-      errorQuda("Unsupported field order %d", field.FieldOrder());
-    }
-  }
-
-  template<typename Float>
-  void genericCudaPrintVector(const cudaColorSpinorField& field, unsigned int i) {
-    if (field.Ncolor() == 3 && field.Nspin() == 4)  {
-      genericCudaPrintVector<Float,4,3>(field,i);
-    }
-    else if (field.Ncolor() == 3 && field.Nspin() == 1)  {
-      genericCudaPrintVector<Float,1,3>(field,i);
-    }
-    else if (field.Ncolor() == 6 && field.Nspin() == 2) { // wilson free field MG
-      genericCudaPrintVector<Float,2,6>(field,i);
-    }
-    else if (field.Ncolor() == 24 && field.Nspin() == 2) { // common value for Wilson, also staggered free field
-      genericCudaPrintVector<Float,2,24>(field,i);
-    }
-    else if (field.Ncolor() == 32 && field.Nspin() == 2) {
-      genericCudaPrintVector<Float,2,32>(field,i);
-    } else {
-      errorQuda("Not supported Ncolor = %d, Nspin = %d", field.Ncolor(), field.Nspin());
-    }
-  }
-
-  void cudaColorSpinorField::PrintVector(unsigned int i) {
-    
-    switch (this->precision)
-    {
-      case QUDA_QUARTER_PRECISION:
-        genericCudaPrintVector<char>(*this,i);
-        break;
-      case QUDA_HALF_PRECISION:
-        genericCudaPrintVector<short>(*this,i);
-        break;
-      case QUDA_SINGLE_PRECISION:
-        genericCudaPrintVector<float>(*this,i);
-        break;
-      case QUDA_DOUBLE_PRECISION:
-        genericCudaPrintVector<double>(*this, i);
-        break;
-      default:
-        errorQuda("Unsupported precision = %d\n", this->precision);
-    }
-
-    /*
-    ColorSpinorParam param(*this);
-    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    param.location = QUDA_CPU_FIELD_LOCATION;
-    param.create = QUDA_NULL_FIELD_CREATE;
-
-    cpuColorSpinorField tmp(param);
-    tmp = *this;
-    tmp.PrintVector(i);*/
-  }
-
+  void cudaColorSpinorField::PrintVector(unsigned int i) const { genericCudaPrintVector(*this,i); }
 
 } // namespace quda

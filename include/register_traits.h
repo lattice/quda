@@ -226,6 +226,14 @@ namespace quda {
     a.x = f2i(b.x); a.y = f2i(b.y);
   }
 
+  template<> __host__ __device__ inline void copy_scaled(short &a, const float &b) {
+    a = f2i(b);
+  }
+
+  template<> __host__ __device__ inline void copy_scaled(char &a, const float &b) {
+    a = f2i(b);
+  }
+
   /**
      @brief Specialized variants of the copy function that include an
      additional scale factor.  Note the scale factor is ignored unless
