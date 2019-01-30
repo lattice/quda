@@ -8,7 +8,7 @@
 #include <clover_field.h>
 
 //these are access control for staggered action
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && !defined USE_LEGACY_DSLASH)
 #if (__COMPUTE_CAPABILITY__ >= 300) // Kepler works best with texture loads only
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
@@ -62,7 +62,7 @@ namespace quda {
 
   using namespace improvedstaggered;
 
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && !defined USE_LEGACY_DSLASH)
   template <typename sFloat, typename fatGFloat, typename longGFloat, typename phaseFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
@@ -282,7 +282,7 @@ namespace quda {
 				   const int parity, const int dagger, const cudaColorSpinorField *x,
 				   const double &k, const int *commOverride, TimeProfile &profile)
   {
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && !defined USE_LEGACY_DSLASH)
     const_cast<cudaColorSpinorField*>(in)->createComms(3);
 
     DslashCuda *dslash = nullptr;
