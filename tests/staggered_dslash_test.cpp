@@ -519,7 +519,7 @@ void init()
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
 
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
 
     // printfQuda("Long links sending..."); 
     loadGaugeQuda(milc_longlink_gpu, &gaugeParam);
