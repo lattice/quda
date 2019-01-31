@@ -121,7 +121,7 @@ namespace quda {
   /**
      @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
    */
-  cudaError_t qudaDeviceSynchronize();
+  cudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
 #if (CUDA_VERSION >= 9000)
   /**
@@ -139,5 +139,10 @@ namespace quda {
   void printAPIProfile();
 
 } // namespace quda
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDeviceSynchronize() \
+  ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #endif

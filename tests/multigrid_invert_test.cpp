@@ -410,6 +410,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   // set file i/o parameters
   strcpy(mg_param.vec_infile, vec_infile);
   strcpy(mg_param.vec_outfile, vec_outfile);
+  if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
+  if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
