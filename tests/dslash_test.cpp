@@ -1026,6 +1026,12 @@ int main(int argc, char **argv)
     }
 
     if (verify_results) {
+      ::testing::TestEventListeners& listeners =
+          ::testing::UnitTest::GetInstance()->listeners();
+      if (comm_rank() != 0) {
+        delete listeners.Release(listeners.default_result_printer());
+      }
+
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0) warningQuda("Tests failed");
     }

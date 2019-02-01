@@ -1081,6 +1081,11 @@ TEST_P(DslashTest, benchmark){
 
       initComms(argc, argv, gridsize_from_cmdline);
 
+      ::testing::TestEventListeners& listeners =
+          ::testing::UnitTest::GetInstance()->listeners();
+      if (comm_rank() != 0) {
+        delete listeners.Release(listeners.default_result_printer());
+      }
       test_rc = RUN_ALL_TESTS();
 
       finalizeComms();
