@@ -1,0 +1,14 @@
+﻿---
+BasedOnStyle: Webkit
+AllowShortBlocksOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine : true
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+BreakBeforeBraces: Attach
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+Cpp11BracedListStyle: true
+FixNamespaceComments: true
+NamespaceIndentation: All
+SortIncludes: false
+SpaceBeforeAssignmentOperators: true
+...
