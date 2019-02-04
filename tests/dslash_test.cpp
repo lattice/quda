@@ -93,9 +93,9 @@ void init(int argc, char **argv) {
 
   if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
     errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+  } else if( dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-             dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+             dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH ) {
     // for these we always use kernel packing
     dw_setDims(gauge_param.X, Lsdim);
     setKernelPackT(true);
@@ -129,7 +129,7 @@ void init(int argc, char **argv) {
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
     inv_param.m5 = -1.5;
     kappa5 = 0.5/(5 + inv_param.m5);
-  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH ) {
     inv_param.m5 = -1.5;
     kappa5 = 0.5/(5 + inv_param.m5);
     for(int k = 0; k < Lsdim; k++)
@@ -268,12 +268,12 @@ void init(int argc, char **argv) {
   for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH){
     csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
   if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH ) {
     csParam.PCtype = QUDA_4D_PC;
   } else {
     csParam.PCtype = QUDA_5D_PC;
@@ -397,6 +397,8 @@ void init(int argc, char **argv) {
       pc = (test_type != 4 && test_type !=6);
     else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH)
       pc = (test_type != 5 && test_type != 7);
+    else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH)
+      pc = true; // TODO: change this for the other test types
     else
       pc = (test_type != 2 && test_type != 4);
 
@@ -554,9 +556,20 @@ DslashTime dslashCUDA(int niter) {
           }
           break;
       }
+    } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+      switch (test_type) {
+        case 1: // The test for EOFA
+          if (transfer) {
+            errorQuda("(transfer == true) version NOT yet available!\n");
+          } else {
+            static_cast<DiracMobiusPCEofa*>(dirac)->dslash5_eofa(*cudaSpinorOut, *cudaSpinor, parity);
+          }
+          break;
+      }
     } else {
       switch (test_type) {
-        case 0:
+    
+    case 0:
           if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
             if (transfer) {
               dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
@@ -928,6 +941,34 @@ void dslashRef() {
       break;
     default:
       printf("Test type not supported for domain wall\n");
+      exit(-1);
+    }
+    free(kappa_b);
+    free(kappa_c);
+    free(kappa_5);
+    free(kappa_mdwf);
+  } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH){
+    double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+    double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+    double _Complex *kappa_5 = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+    double _Complex *kappa_mdwf = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+    for(int xs = 0 ; xs < Lsdim ; xs++)
+    {
+      kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
+      kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
+      kappa_5[xs] = 0.5*kappa_b[xs]/kappa_c[xs];
+      kappa_mdwf[xs] = -kappa_5[xs];
+    }
+    DiracMobiusPCEofa* dirac_eofa = static_cast<DiracMobiusPCEofa*>(dirac);
+    printfQuda("Testing EOFA! :) \n");
+    printfQuda("dirac_eofa->mq1 = %.4f\n", dirac_eofa->mq1);
+    switch (test_type) {
+      case 1:
+        mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), 
+          dirac_eofa->mq1, dirac_eofa->mq2, dirac_eofa->mq3, dirac_eofa->eofa_pm, dirac_eofa->eofa_norm, dirac_eofa->eofa_shift, gauge_param.cpu_prec);
+        break;
+      default:
+        printf("Test type not supported for domain wall\n");
       exit(-1);
     }
     free(kappa_b);

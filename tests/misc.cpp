@@ -903,6 +903,8 @@ get_dslash_type(char* s)
     ret =  QUDA_DOMAIN_WALL_4D_DSLASH;
   }else if (strcmp(s, "mobius") == 0){
     ret =  QUDA_MOBIUS_DWF_DSLASH;
+  }else if (strcmp(s, "mobius-eofa") == 0){
+    ret =  QUDA_MOBIUS_DWF_EOFA_DSLASH;
   }else if (strcmp(s, "laplace") == 0){
     ret =  QUDA_LAPLACE_DSLASH;
   }else{
@@ -945,6 +947,9 @@ get_dslash_str(QudaDslashType type)
     break;
   case QUDA_MOBIUS_DWF_DSLASH:
     ret = "mobius";
+    break;
+  case QUDA_MOBIUS_DWF_EOFA_DSLASH:
+    ret = "mobius-eofa";
     break;
   case QUDA_LAPLACE_DSLASH:
     ret = "laplace";

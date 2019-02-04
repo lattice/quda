@@ -373,6 +373,107 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
 }
 #endif
 
+template<bool plus, class sFloat> // plus = true -> gamma_+; plus = false -> gamma_-
+void axpby_ssp_project(sFloat* z, sFloat a, sFloat* x, sFloat b, sFloat* y, int idx_cb_4d, int s, int sp){
+  // z_s = a*x_s + b*\gamma_+/-*y_sp
+  // Will use the Weyl/chiral/reletivistic/DeGrand-Rossi basis, where gamma_5 is diagonal;
+  for(int spin = (plus?2:0); spin < (plus?4:2); spin++){
+    for(int color_comp = 0; color_comp < 6; color_comp++){
+      z[(s*Vh+idx_cb_4d)*24+spin*6+color_comp] = a*x[(s*Vh+idx_cb_4d)*24+spin*6+color_comp] + b*y[(sp*Vh+idx_cb_4d)*24+spin*6+color_comp];
+    }
+  }
+  for(int spin = (plus?0:2); spin < (plus?2:4); spin++){
+    for(int color_comp = 0; color_comp < 6; color_comp++){
+      z[(s*Vh+idx_cb_4d)*24+spin*6+color_comp] = a*x[(s*Vh+idx_cb_4d)*24+spin*6+color_comp];
+    }
+  }
+}
+
+template<typename sFloat>
+void mdw_m5_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, 
+  sFloat mferm, sFloat m5, sFloat b, sFloat c, 
+  sFloat mq1, sFloat mq2, sFloat mq3, int eofa_pm, sFloat eofa_norm, sFloat eofa_shift){
+  // res: the output spinor field
+  // spinorField: the input spinor field
+  // oddBit: even-odd bit
+  // daggerBit: dagger or not
+  // mferm: m_f
+  
+  sFloat alpha = b+c; // alpha = b+c
+  sFloat kappa = 0.5*(c*(4.+m5)-1.)/(b*(4.+m5)+1.) ; // alpha = b+c
+  
+  constexpr int spinor_size = 4*3*2;
+  for(int i = 0; i < V5h; i++){
+    for(int one_site = 0 ; one_site < 24 ; one_site++){
+      res[i*spinor_size + one_site] = 0.;
+    }
+    for (int dir = 8; dir < 10; dir++) {
+      // Calls for an extension of the original function.
+      // 8 is forward hop, which wants P_+, 9 is backward hop,
+      // which wants P_-.  Dagger reverses these.
+      sFloat *spinor = spinorNeighbor_5d<QUDA_4D_PC>(i, dir, oddBit, spinorField);
+      sFloat projectedSpinor[spinor_size];
+      int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
+      multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
+      //J  Need a conditional here for s=0 and s=Ls-1.
+      int X = fullLatticeIndex_5d_4dpc(i, oddBit);
+      int xs = X/(Z[3]*Z[2]*Z[1]*Z[0]);
+
+      if ( (xs == 0 && dir == 9) || (xs == Ls-1 && dir == 8) ) {
+        ax(projectedSpinor, -mferm, projectedSpinor, spinor_size);
+      } 
+      sum(&res[i*spinor_size], &res[i*spinor_size], projectedSpinor, spinor_size);
+    }
+    // 1 + kappa*D5
+    axpby((sFloat)1., &spinorField[i*spinor_size], kappa, &res[i*spinor_size], spinor_size);
+  }
+
+  // Initialize
+  std::vector<sFloat> shift_coeffs(Ls);
+
+  // Construct Mooee_shift
+  int idx(0);
+  sFloat N = ( (eofa_pm == 1) ? 1.0 : -1.0 ) * (2.0*eofa_shift*eofa_norm) *
+              ( std::pow(alpha+1.0,Ls) + mq1*std::pow(alpha-1.0,Ls) );
+  // For the kappa preconditioning
+  N *= 1./(b*(m5+4.)+1.);
+  for(int s = 0; s < Ls; s++){
+    idx = (eofa_pm == 1) ? (s) : (Ls-1-s);
+    shift_coeffs[idx] = N * std::pow(-1.0,s) * std::pow(alpha-1.0,s) / std::pow(alpha+1.0,Ls+s+1);
+    printfQuda("shift_coeffs[%02d] = %8.4e\n", idx, shift_coeffs[idx]);
+  }
+ 
+  // printfQuda("dagger = %d, eofa_pm = %d\n", daggerBit, eofa_pm);
+  // The eofa part.
+  for (int idx_cb_4d = 0; idx_cb_4d < Vh; idx_cb_4d++) {
+    for(int s = 0; s < Ls; s++){
+      if(daggerBit == 0){
+        if(eofa_pm == 1){
+          axpby_ssp_project<true >(res, (sFloat)1., res, shift_coeffs[s], spinorField, idx_cb_4d, s, Ls-1);
+        }else{
+          axpby_ssp_project<false>(res, (sFloat)1., res, shift_coeffs[s], spinorField, idx_cb_4d, s, 0   );
+        }
+      }else{
+        if(eofa_pm == 1){
+          axpby_ssp_project<true >(res, (sFloat)1., res, shift_coeffs[s], spinorField, idx_cb_4d, Ls-1, s);
+        }else{
+          axpby_ssp_project<false>(res, (sFloat)1., res, shift_coeffs[s], spinorField, idx_cb_4d, 0,    s);
+        }
+      }
+    }
+  }
+}
+
+void mdw_m5_eofa_ref(void* res, void* spinorField, int oddBit, int daggerBit, double mferm, double m5, double b, double c,
+    double mq1, double mq2, double mq3, int eofa_pm, double eofa_norm, double eofa_shift, QudaPrecision precision){
+    if(precision == QUDA_DOUBLE_PRECISION){
+      mdw_m5_eofa_ref<double>((double*)res, (double*)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift);
+    }else{
+      mdw_m5_eofa_ref<float >((float* )res, (float* )spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift);
+    }
+    return;  
+}
+
 //Currently we consider only spacetime decomposition (not in 5th dim), so this operator is local
 template <QudaDWFPCType type, bool zero_initialize=false, typename sFloat>
 void dslashReference_5th(sFloat *res, sFloat *spinorField, 
@@ -396,49 +497,6 @@ void dslashReference_5th(sFloat *res, sFloat *spinorField,
         ax(projectedSpinor,(sFloat)(-mferm),projectedSpinor,4*3*2);
       } 
       sum(&res[i*(4*3*2)], &res[i*(4*3*2)], projectedSpinor, 4*3*2);
-    }
-  }
-}
-
-//Currently we consider only spacetime decomposition (not in 5th dim), so this operator is local
-template<QudaDWFPCType type, bool zero_initialize=false, typename sFloat>
-void mdw_m5_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm) {
-  // res: the output spinor field
-  // spinorField: the input spinor field
-  // oddBit: even-odd bit
-  // daggerBit: dagger or not
-  // mferm: m_f
-  //
-  for (int i = 0; i < V5h; i++) {
-    if (zero_initialize) for(int one_site = 0 ; one_site < 24 ; one_site++)
-      res[i*(4*3*2)+one_site] = 0.0;
-    for (int dir = 8; dir < 10; dir++) {
-      // Calls for an extension of the original function.
-      // 8 is forward hop, which wants P_+, 9 is backward hop,
-      // which wants P_-.  Dagger reverses these.
-      sFloat *spinor = spinorNeighbor_5d<type>(i, dir, oddBit, spinorField);
-      sFloat projectedSpinor[4*3*2];
-      int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
-      multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
-      //J  Need a conditional here for s=0 and s=Ls-1.
-      int X = (type == QUDA_5D_PC) ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
-      int xs = X/(Z[3]*Z[2]*Z[1]*Z[0]);
-
-      if ( (xs == 0 && dir == 9) || (xs == Ls-1 && dir == 8) ) {
-        ax(projectedSpinor,(sFloat)(-mferm),projectedSpinor,4*3*2);
-      }
-      
-      sFloat kappa = 1.;
-
-      // kappa*D5
-      ax(projectedSpinor,(sFloat)(kappa),projectedSpinor,4*3*2);
-      // 1+kappa*D5
-      sum(&res[i*(4*3*2)], &spinorField[i*(4*3*2)], projectedSpinor, 4*3*2);
-    }
-    if(daggerBit == 0){
-      
-    }else{
-    
     }
   }
 }

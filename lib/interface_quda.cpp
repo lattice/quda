@@ -1523,6 +1523,21 @@ namespace quda {
       diracParam.type = pc ? QUDA_DOMAIN_WALL_4DPC_DIRAC : QUDA_DOMAIN_WALL_4D_DIRAC;
       diracParam.Ls = inv_param->Ls;
       break;
+    case QUDA_MOBIUS_DWF_EOFA_DSLASH:
+      if (inv_param->Ls > QUDA_MAX_DWF_LS){
+	      errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
+      }
+      if(!pc){
+	      errorQuda("EOFA ONLY support even-odd preconditioned dslash, for now. :( \n");
+      }
+      diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC;
+      diracParam.Ls = inv_param->Ls;
+      if (sizeof(Complex) != sizeof(double _Complex)) {
+        errorQuda("Irreconcilable difference between interface and internal complex number conventions");
+      }
+      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex)*inv_param->Ls);
+      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex)*inv_param->Ls);
+      break;
     case QUDA_MOBIUS_DWF_DSLASH:
       if (inv_param->Ls > QUDA_MAX_DWF_LS)
 	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);

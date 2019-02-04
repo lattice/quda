@@ -733,21 +733,20 @@ namespace quda {
     flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
  
-  // DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracParam &param) : DiracMobiusPC(param) {  }
+  DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracParam &param) : DiracMobiusPC(param){}
 
-  // DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracMobiusPCEofa &dirac) : DiracMobiusPC(dirac) {  }
+  DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracMobiusPC &dirac) : DiracMobiusPC(dirac){}
 
-  DiracMobiusPCEofa::~DiracMobiusPCEofa() { }
-/*
-  DiracMobiusPCEofa& DiracMobiusPCEofa::operator=(const DiracMobiusPCEofa &dirac)
+  DiracMobiusPCEofa::~DiracMobiusPCEofa(){}
+
+  DiracMobiusPCEofa& DiracMobiusPCEofa::operator=(const DiracMobiusPC &dirac)
   {
-    if (&dirac != this) {
+    if(&dirac != this){
       DiracMobiusPC::operator=(dirac);
     }
-
     return *this;
   }
-*/ 
+ 
   void DiracMobiusPCEofa::dslash5_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
@@ -760,5 +759,4 @@ namespace quda {
     // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
-
 } // namespace quda

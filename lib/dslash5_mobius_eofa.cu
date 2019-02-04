@@ -129,11 +129,20 @@ namespace quda {
                 c = c_5_[0].real();
                 kappa = 0.5 * (c*(m_5+4.0)-1.0) / (b*(m_5+4.0)+1.0);
                 alpha = b+c;
+                // Need to confirm with DJM: mq1 is actually the normal 
+                // this->eofa_norm = alpha * (this->mq3-this->mq2) * std::pow(alpha+1.0,2*Ls) /
+                //   ( std::pow(this->alpha+1.0,Ls) + this->mq2*std::pow(this->alpha-1.0,Ls) ) /
+                //   ( std::pow(this->alpha+1.0,Ls) + this->mq3*std::pow(this->alpha-1.0,Ls) );
+                
                 // Following the Grid implementation of MobiusEOFAFermion<Impl>::SetCoefficientsPrecondShiftOps()
-                N = ( (eofa_pm == 1) ? 1.0 : -1.0 ) * (2.0*eofa_shift*eofa_norm) * ( std::pow(alpha+1.0,Ls) + mq1*std::pow(alpha-1.0,Ls) );
+                N = ( (eofa_pm == 1) ? 1.0 : -1.0 ) * (2.0*this->eofa_shift*this->eofa_norm) * ( std::pow(alpha+1.0,Ls) + this->mq1*std::pow(alpha-1.0,Ls) );
+                // QUDA uses the kappa preconditioning: there is a (2.*kappa_b)^-1 difference here.
+                N *= 1./(b*(m_5+4.)+1.);
+                // The additional 2. QUDA's spin projection.
+                N /= 2.;
                 for(int s=0; s<Ls; ++s){
                   idx = (eofa_pm == 1) ? (s) : (Ls-1-s);
-                  m5_shift_h[idx] = N * std::pow(-1.0,s) * std::pow(alpha-1.0,s) / std::pow(alpha+1.0,Ls+s+1);
+                  reinterpret_cast<real*>(m5_shift_h)[idx] = N * std::pow(-1.0,s) * std::pow(alpha-1.0,s) / std::pow(alpha+1.0,Ls+s+1);
                 } 
                 cudaMemcpyToSymbolAsync(m5_shift_d, m5_shift_h, sizeof(real)*Ls, 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
                 break;
@@ -193,28 +202,35 @@ namespace quda {
           }
         }
 
+        // All the 1+/-gamma_5 projection has the opposite direction, due to the fact that the projector itself has the wrong sign.
+        // i.e. it should be +,-,+,- here if everything is consistent.
         if (type == m5_eofa) {
           Vector diagonal = cache.load(threadIdx.x, s, parity);
           out = arg.kappa*out + diagonal; // 1 + kappa*D5
 
-          if( dagger &&  pm){ // in Grid: axpby_ssp_pplus(chi, one, chi, shift_coeffs[s], psi, s, Ls-1);
+          if( dagger &&  pm){
+            // in Grid: axpby_ssp_pplus(chi, one, chi, shift_coeffs[s], psi, Ls-1, s);
             if(s == Ls-1)
-              for(int s_ = 0; s_ < Ls; s_++){
-                out += m5_shift_d[s_] * cache.load(threadIdx.x, s, parity).project(4,+1).reconstruct(4,+1);  
+              for(int sp = 0; sp < Ls; sp++){
+                out += reinterpret_cast<real*>(m5_shift_d)[sp] * cache.load(threadIdx.x, sp  , parity).project(4,-1).reconstruct(4,-1);  
               }
-          }else if( dagger && !pm){ // in Grid: axpby_ssp_pminus(chi, one, chi, shift_coeffs[s], psi, s, 0);
+          }else if( dagger && !pm){
+            // in Grid: axpby_ssp_pminus(chi, one, chi, shift_coeffs[s], psi, 0, s);
             if(s ==   0 )
-              for(int s_ = 0; s_ < Ls; s_++){
-                out += m5_shift_d[s_] * cache.load(threadIdx.x, s, parity).project(4,+1).reconstruct(4,+1);  
+              for(int sp = 0; sp < Ls; sp++){
+                out += reinterpret_cast<real*>(m5_shift_d)[sp] * cache.load(threadIdx.x, sp  , parity).project(4,+1).reconstruct(4,+1);  
               }
-          }else if(!dagger &&  pm){ // in Grid: axpby_ssp_pplus(chi, one, chi, shift_coeffs[s], psi, Ls-1, s);
+          }else if(!dagger &&  pm){
+            // in Grid: axpby_ssp_pplus(chi, one, chi, shift_coeffs[s], psi, s, Ls-1);
 
-            out += m5_shift_d[s] * cache.load(threadIdx.x, Ls-1, parity).project(4,-1).reconstruct(4,-1);  
+                
+                out += reinterpret_cast<real*>(m5_shift_d)[s ] * cache.load(threadIdx.x, Ls-1, parity).project(4,-1).reconstruct(4,-1);  
 
+          }else if(!dagger && !pm){
+            // in Grid: axpby_ssp_pminus(chi, one, chi, shift_coeffs[s], psi, s, 0);
 
-          }else if(!dagger && !pm){ // in Grid: axpby_ssp_pminus(chi, one, chi, shift_coeffs[s], psi, 0, s);
-
-            out += m5_shift_d[s] * cache.load(threadIdx.x,    0, parity).project(4,-1).reconstruct(4,-1);  
+                
+                out += reinterpret_cast<real*>(m5_shift_d)[s ] * cache.load(threadIdx.x,    0, parity).project(4,+1).reconstruct(4,+1);  
 
 
           }

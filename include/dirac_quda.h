@@ -541,18 +541,23 @@ namespace quda {
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
   
-// 4d Even-odd preconditioned Mobius domain wall with EOFA
+  // 4d Even-odd preconditioned Mobius domain wall with EOFA
   class DiracMobiusPCEofa : public DiracMobiusPC {
 
   protected:
 
   private:
+  public:
     // TODO: add all the eofa parameters that don't already exist in the base classes. 
     // TODO: For a test just set the values here.
     // FIXME: Need to fix the interface later
-    double mq1, mq2, mq3, eofa_norm, eofa_shift;
-    int eofa_pm;
-  public:
+    double mq1 = 0.1;
+    double mq2 = 0.1; 
+    double mq3 = 1.0;
+    double eofa_norm = 0.2;
+    double eofa_shift = 0.2;
+    int eofa_pm = 1;
+
     DiracMobiusPCEofa(const DiracParam &param);
     DiracMobiusPCEofa(const DiracMobiusPC &dirac);
     virtual ~DiracMobiusPCEofa();
