@@ -48,7 +48,7 @@ namespace quda {
     real a; // preconditioned twisted-mass scaling parameter
     real b; // preconditioned twisted-mass chiral twist factor
     real c; // preconditioned twisted-mass flavor twist factor
-    int twist; // whether we are doing preconditioned twisted-mass or not (1 - singlet, 2 doublet)
+    int twist; // whether we are doing preconditioned twisted-mass or not (1 - singlet, 2 - doublet)
 
     int_fastdiv threads;
     int threadDimMapLower[4];
@@ -80,7 +80,6 @@ namespace quda {
         threadDimMapUpper[i] = 0;
         if (!commDim[i]) continue;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
-        // divide by nParity since thread mapper is on checkerboard coords
         threadDimMapUpper[i] = threadDimMapLower[i] + 2*nFace*dc.ghostFaceCB[i];
         prev=i;
       }
@@ -250,10 +249,7 @@ namespace quda {
       strcpy(aux,"policy_kernel,");
       strcat(aux, meta.AuxString());
       char comm[5];
-      comm[0] = (commDim[0] ? '1' : '0');
-      comm[1] = (commDim[1] ? '1' : '0');
-      comm[2] = (commDim[2] ? '1' : '0');
-      comm[3] = (commDim[3] ? '1' : '0');
+      for (int i=0; i<4; i++) comm[i] = (commDim[i] ? '1' : '0');
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
       strcat(aux,comm_dim_topology_string());
@@ -334,6 +330,7 @@ namespace quda {
       // if doing a zero-copy policy then ensure that each thread block
       // runs exclusively on a given SM - this is to ensure quality of
       // service for the packing kernel when running concurrently.
+      // FIXME - we could set max shared memory on Volta
       if (location & Host) param.shared_bytes = deviceProp.sharedMemPerBlock / 2 + 1;
     }
 
@@ -353,7 +350,8 @@ namespace quda {
     long long bytes() const {
       size_t precision = sizeof(typename Arg::Float);
       size_t faceBytes = 2 * ( (Arg::spin_project ? Arg::nSpin/2 : Arg::nSpin) + Arg::nSpin ) * Arg::nColor * precision;
-      if (precision == QUDA_HALF_PRECISION) faceBytes += 2*sizeof(float); // 2 is from input and output
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+        faceBytes += 2*sizeof(float); // 2 is from input and output
       return faceBytes * arg.nParity * arg.dc.Ls * arg.threads;
     }
 
