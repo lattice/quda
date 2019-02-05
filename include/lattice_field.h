@@ -264,7 +264,7 @@ namespace quda {
     mutable int ghostNormOffset[QUDA_MAX_DIM][2];
 
     /**
-       Pinned memory buffer used for sending all messages
+       Pinned memory buffer used for sending messages
     */
     void *my_face_h[2];
 
@@ -272,6 +272,11 @@ namespace quda {
        Mapped version of my_face_h
     */
     void *my_face_hd[2];
+
+    /**
+       Device memory buffer for sending messages
+     */
+    void *my_face_d[2];
 
     /** Local pointers to the pinned my_face buffer */
     void *my_face_dim_dir_h[2][QUDA_MAX_DIM][2];
@@ -282,10 +287,20 @@ namespace quda {
     /** Local pointers to the device ghost_send buffer */
     void *my_face_dim_dir_d[2][QUDA_MAX_DIM][2];
 
-    /** Memory buffer used for receiving all messages */
+    /**
+       Memory buffer used for receiving all messages
+    */
     void *from_face_h[2];
-    /** Mapped version of from_face_h */
+
+    /**
+       Mapped version of from_face_h
+    */
     void *from_face_hd[2];
+
+    /**
+       Device memory buffer for receiving messages
+     */
+    void *from_face_d[2];
 
     /** Local pointers to the pinned from_face buffer */
     void *from_face_dim_dir_h[2][QUDA_MAX_DIM][2];

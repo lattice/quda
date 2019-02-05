@@ -579,9 +579,6 @@ namespace quda {
     void loadSpinorField(const ColorSpinorField &src);
     void saveSpinorField (ColorSpinorField &src) const;
 
-    /** Keep track of which pinned-memory buffer we used for creating message handlers */
-    size_t bufferMessageHandler;
-
   public:
 
     //cudaColorSpinorField();

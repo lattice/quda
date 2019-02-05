@@ -15,7 +15,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false),
     ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -39,7 +39,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
     ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -50,7 +50,7 @@ namespace quda {
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
     ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -99,7 +99,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false),
       ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-      ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+      ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -686,7 +686,11 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
     // ghost texture is per object
-    if (ghost_field_tex[0] != ghost_recv_buffer_d[0] || ghost_field_tex[1] != ghost_recv_buffer_d[1] || ghost_precision_reset)
+    if (ghost_field_tex[0] != ghost_recv_buffer_d[0] ||
+        ghost_field_tex[1] != ghost_recv_buffer_d[1] ||
+        ghost_field_tex[2] != ghost_pinned_recv_buffer_hd[0] ||
+        ghost_field_tex[3] != ghost_pinned_recv_buffer_hd[1] ||
+        ghost_precision_reset)
       destroyGhostTexObject();
     if (!ghostTexInit) createGhostTexObject();
 #endif
@@ -918,7 +922,8 @@ namespace quda {
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
       (my_face_h[0] != ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != ghost_pinned_send_buffer_h[1]) ||
       (from_face_h[0] != ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != ghost_pinned_recv_buffer_h[1]) ||
-      (ghost_field_tex[0] != ghost_recv_buffer_d[0]) || (ghost_field_tex[1] != ghost_recv_buffer_d[1]) || // receive buffers
+      (my_face_d[0] != ghost_send_buffer_d[0]) || (my_face_d[1] != ghost_send_buffer_d[1]) ||     // send buffers
+      (from_face_d[0] != ghost_recv_buffer_d[0]) || (from_face_d[1] != ghost_recv_buffer_d[1]) || // receive buffers
       ghost_precision_reset; // ghost_precision has changed
 
     if (!initComms || comms_reset) {

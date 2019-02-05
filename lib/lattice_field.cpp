@@ -62,7 +62,9 @@ namespace quda {
       ghost_precision_reset(false),
       scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
       ghost_bytes(0), ghost_bytes_old(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
-      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
+      my_face_h{ }, my_face_hd{ }, my_face_d{ },
+      from_face_h{ }, from_face_hd{ }, from_face_d{ },
+      initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     precisionCheck();
@@ -108,7 +110,9 @@ namespace quda {
       scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange),
       ghost_bytes(0), ghost_bytes_old(0),
       ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
-      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
+      my_face_h{ }, my_face_hd{ }, my_face_d{ },
+      from_face_h{ }, from_face_hd{ }, from_face_d{ },
+      initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     precisionCheck();
@@ -146,6 +150,10 @@ namespace quda {
 
       if (initGhostFaceBuffer) {
 	if (ghost_bytes) {
+          // remove potential for inter-process race conditions
+          // ensures that all outstanding communication is complete
+          // before we free any comms buffers
+          comm_barrier();
 	  for (int b=0; b<2; b++) {
 	    device_pinned_free(ghost_recv_buffer_d[b]);
 	    device_pinned_free(ghost_send_buffer_d[b]);
@@ -156,7 +164,8 @@ namespace quda {
       }
 
       if (ghost_bytes > 0) {
-	for (int b=0; b<2; ++b) {
+
+        for (int b=0; b<2; ++b) {
 	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
 	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
 
@@ -222,8 +231,10 @@ namespace quda {
     for (int b=0; b<2; b++) {
       my_face_h[b] = ghost_pinned_send_buffer_h[b];
       my_face_hd[b] = ghost_pinned_send_buffer_hd[b];
+      my_face_d[b] = ghost_send_buffer_d[b];
       from_face_h[b] = ghost_pinned_recv_buffer_h[b];
       from_face_hd[b] = ghost_pinned_recv_buffer_hd[b];
+      from_face_d[b] = ghost_recv_buffer_d[b];
     }
 
     // initialize ghost send pointers
@@ -238,8 +249,8 @@ namespace quda {
 	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
 	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
 
-	my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*ghost_precision;
+	my_face_dim_dir_d[b][i][0] = static_cast<char*>(my_face_d[b]) + offset;
+	from_face_dim_dir_d[b][i][0] = static_cast<char*>(from_face_d[b]) + ghostOffset[i][0]*ghost_precision;
       } // loop over b
 
       // if not bidir then forwards and backwards will alias
@@ -252,8 +263,8 @@ namespace quda {
 	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
 	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
 
-	my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*ghost_precision;
+	my_face_dim_dir_d[b][i][1] = static_cast<char*>(my_face_d[b]) + offset;
+	from_face_dim_dir_d[b][i][1] = static_cast<char*>(from_face_d[b]) + ghostOffset[i][1]*ghost_precision;
       } // loop over b
       offset += ghost_face_bytes[i];
 
