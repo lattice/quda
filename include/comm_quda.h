@@ -256,7 +256,7 @@ extern "C" {
   MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
 						    size_t blksize, int nblocks, size_t stride);
 
-  void comm_free(MsgHandle *mh);
+  void comm_free(MsgHandle *&mh);
   void comm_start(MsgHandle *mh);
   void comm_wait(MsgHandle *mh);
   int comm_query(MsgHandle *mh);

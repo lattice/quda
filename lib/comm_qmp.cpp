@@ -255,11 +255,12 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 }
 
 
-void comm_free(MsgHandle *mh)
+void comm_free(MsgHandle *&mh)
 {
   QMP_free_msghandle(mh->handle);
   QMP_free_msgmem(mh->mem);
   host_free(mh);
+  mh = nullptr;
 }
 
 
