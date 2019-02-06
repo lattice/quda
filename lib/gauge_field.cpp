@@ -51,8 +51,6 @@ namespace quda {
 
     if(link_type != QUDA_ASQTAD_LONG_LINKS && (reconstruct ==  QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9))
       errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
-       
-    if (link_type == QUDA_ASQTAD_MOM_LINKS) scale = 1.0;
 
     if(geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*nInternal;
@@ -265,7 +263,6 @@ namespace quda {
       if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
       if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, g.anisotropy);
       if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, g.tadpole);
-      //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale);
     }
     catch(std::bad_cast &e) {
       errorQuda("Failed to cast reference to GaugeField");
