@@ -550,7 +550,6 @@ namespace {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
 	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, true, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -629,7 +628,6 @@ namespace {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
 	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     true, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, true, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	}
       }
@@ -878,7 +876,6 @@ namespace {
 	      pattern.completeSum++;
 	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
 	      if (!comm_peer2peer_enabled(1-dir,i)) {
@@ -989,7 +986,6 @@ namespace {
 	      pattern.completeSum++;
 	      PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                       false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	      if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger());  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
 	      if (!comm_peer2peer_enabled(1-dir,i)) { // gather centric
@@ -1086,7 +1082,6 @@ namespace {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
 	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1181,7 +1176,6 @@ namespace {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
 	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packScatterIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1270,7 +1264,6 @@ namespace {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
 	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, false, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1356,7 +1349,6 @@ namespace {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
 	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), 0, false, true); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1437,7 +1429,6 @@ namespace {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
 	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1525,7 +1516,6 @@ namespace {
 	  if ( (comm_peer2peer_enabled(dir,i) + p2p) % 2 == 0 ) {
 	    PROFILE(if (dslash_comms) in->sendStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), dslashParam.remote_write ? streams+packIndex : nullptr,
                                                     false, dslashParam.remote_write), profile, QUDA_PROFILE_COMMS_START);
-	    if (dslash_comms) in->commsQuery(dslash.Nface()/2, 2*i+dir, dslash.Dagger()); // do a comms query to ensure MPI has begun
 	  } // is p2p?
 	} // dir
       } // i
@@ -1762,8 +1752,7 @@ namespace {
 	   if (policy_list.peek() == ',') policy_list.ignore();
 	 }
 	 if (first_active_policy == static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)) errorQuda("No valid policy found in QUDA_ENABLE_DSLASH_POLICY");
-       } 
-       else {
+       } else {
 	 enable_policy(QudaDslashPolicy::QUDA_DSLASH);
 	 first_active_policy = 0;
 	 enable_policy(QudaDslashPolicy::QUDA_FUSED_DSLASH);
