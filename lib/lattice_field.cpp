@@ -157,6 +157,7 @@ namespace quda {
           // remove potential for inter-process race conditions
           // ensures that all outstanding communication is complete
           // before we free any comms buffers
+          qudaDeviceSynchronize();
           comm_barrier();
 	  for (int b=0; b<2; b++) {
 	    device_pinned_free(ghost_recv_buffer_d[b]);
@@ -306,6 +307,7 @@ namespace quda {
 
       // ensure that all processes bring down their communicators
       // synchronously so that we don't end up in an undefined state
+      qudaDeviceSynchronize();
       comm_barrier();
 
       for (int b=0; b<2; ++b) {
@@ -479,6 +481,7 @@ namespace quda {
 
     // ensure that all processes bring down their communicators
     // synchronously so that we don't end up in an undefined state
+    qudaDeviceSynchronize();
     comm_barrier();
 
     for (int dim=0; dim<4; ++dim) {
