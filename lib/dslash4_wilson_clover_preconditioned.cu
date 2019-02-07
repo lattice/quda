@@ -32,7 +32,7 @@ namespace quda {
      correct templated kernel for the dslash.
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct WilsonCloverLaunch {
+  struct WilsonCloverPreconditionedLaunch {
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
       static_assert(nParity == 1, "preconditioned wilson-clover operator only defined for nParity=1");
@@ -60,8 +60,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
       if (arg.nParity == 1) {
-        if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverLaunch,nDim,nColor,1, true>(tp, arg, stream);
-        else          Dslash<Float>::template instantiate<WilsonCloverLaunch,nDim,nColor,1,false>(tp, arg, stream);
+        if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverPreconditionedLaunch,nDim,nColor,1, true>(tp, arg, stream);
+        else          Dslash<Float>::template instantiate<WilsonCloverPreconditionedLaunch,nDim,nColor,1,false>(tp, arg, stream);
       } else {
         errorQuda("Preconditioned Wilson-clover operator not defined nParity=%d", arg.nParity);
       }
