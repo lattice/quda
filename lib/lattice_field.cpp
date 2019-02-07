@@ -304,6 +304,10 @@ namespace quda {
   {
     if (initComms) {
 
+      // ensure that all processes bring down their communicators
+      // synchronously so that we don't end up in an undefined state
+      comm_barrier();
+
       for (int b=0; b<2; ++b) {
 	for (int i=0; i<nDimComms; i++) {
           if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
@@ -472,6 +476,10 @@ namespace quda {
 
     if (!initIPCComms) return;
     checkCudaError();
+
+    // ensure that all processes bring down their communicators
+    // synchronously so that we don't end up in an undefined state
+    comm_barrier();
 
     for (int dim=0; dim<4; ++dim) {
 
