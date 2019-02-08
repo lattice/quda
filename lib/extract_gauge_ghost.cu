@@ -33,9 +33,14 @@ namespace quda {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
 	extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
+                if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC){
+          typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
+  extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
+        } else {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type G;
 	extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
       }
+    }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       
 #ifdef BUILD_QDP_INTERFACE

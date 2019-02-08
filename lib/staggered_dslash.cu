@@ -20,6 +20,81 @@ namespace quda {
 
 namespace quda {
 
+// MWTODO: THis hould be place in the correct header
+template <typename Float, typename I>
+__device__ __host__ inline int mwStaggeredPhase(const int x, I X, int parity,
+                                                int d) {
+  Float sign;  // = static_cast<Float>(1.0);
+  int coords[4];
+  getCoords(coords, x, X, parity);
+  switch (d) {
+    case 0:
+      sign = (coords[3]) % 2 == 0 ? static_cast<Float>(1.0)
+                                  : static_cast<Float>(-1.0);
+      break;
+    case 1:
+      sign = (coords[3] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0)
+                                              : static_cast<Float>(-1.0);
+      break;
+    case 2:
+      sign = (coords[3] + coords[1] + coords[0]) % 2 == 0
+                 ? static_cast<Float>(1.0)
+                 : static_cast<Float>(-1.0);
+      break;
+    default:
+      sign = static_cast<Float>(1.0);
+  }
+  return sign;
+}
+
+//MWTODO: THis hould be place in the correct header
+template <typename Float, typename I>
+__device__ __host__ inline int mwStaggeredPhase(const I coords[], int d){
+    Float sign;// = static_cast<Float>(1.0);
+    // int coords[4];
+    // getCoords(coords, x, X, parity);
+    switch(d)
+    {
+      case 0:
+        sign = (coords[3])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
+        break;
+      case 1:
+        sign = (coords[3]+coords[0])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
+        break;
+      case 2:
+        sign = (coords[3]+coords[1]+coords[0])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
+        break;
+      default:
+        sign = static_cast<Float>(1.0);
+    }
+    return sign;
+}
+
+//MWTODO: THis hould be place in the correct header
+template <typename Float, typename I>
+__device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[], int d, int dir, Float tboundary){
+    Float sign;// = static_cast<Float>(1.0);
+    // int coords[4];
+    // getCoords(coords, x, X, parity);
+    switch(d)
+    {
+      case 0:
+        sign = (coords[3])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
+        break;
+      case 1:
+        sign = (coords[3]+coords[0])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
+        break;
+      case 2:
+        sign = (coords[3]+coords[1]+coords[0])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
+        break;
+      case 3:
+        sign = (coords[3] + dir >= X[3] || coords[3] + dir < 0) ? tboundary :  static_cast<Float>(1.0);
+        break; 
+      default:
+        sign = static_cast<Float>(1.0);
+    }
+    return sign;
+}
 
 //MWTODO: This should be merged in the generic ghostFaceIndex function
 
@@ -99,8 +174,9 @@ namespace quda {
     //TODO: recon 9/13 seems to break with gauge_direct_load = false
     static constexpr bool gauge_direct_load = true; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    using GU = typename gauge_mapper<Float,reconstruct_u,18,QUDA_STAGGERED_PHASE_MILC,gauge_direct_load,ghost>::type;
-    using GL = typename gauge_mapper<Float,reconstruct_l,18,QUDA_STAGGERED_PHASE_NO,gauge_direct_load,ghost>::type;
+    static constexpr bool use_inphase = improved_ ? false : true; 
+    using GU = typename gauge_mapper<Float,reconstruct_u,18,QUDA_STAGGERED_PHASE_MILC,gauge_direct_load,ghost, use_inphase>::type;
+    using GL = typename gauge_mapper<Float,reconstruct_l,18,QUDA_STAGGERED_PHASE_NO,gauge_direct_load,ghost, use_inphase>::type;
 
     F out;                // output vector field
     const F in;           // input vector field
@@ -110,10 +186,11 @@ namespace quda {
 
     const real a;
     const real fat_link_max; //MWTODO: FIXME: This a workaround should probably be in the accessor ...
+    const real tboundary;
     static constexpr bool improved = improved_;
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
         double a, const ColorSpinorField &x, int parity, bool dagger,  const int *comm_override)
-      : DslashArg<Float>(in, U, 0.0, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, comm_override), out(out), in(in, improved_ ? 3 : 1 ), U(U), L(L), fat_link_max(improved_ ? U.Precision() == QUDA_HALF_PRECISION ? U.LinkMax() : 1.0: 1.0), x(x), a(a) 
+      : DslashArg<Float>(in, U, 0.0, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, comm_override), out(out), in(in, improved_ ? 3 : 1 ), U(U), L(L), fat_link_max(improved_ ? U.Precision() == QUDA_HALF_PRECISION ? U.LinkMax() : 1.0: 1.0), tboundary(U.TBoundary()),x(x), a(a) 
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -155,7 +232,7 @@ namespace quda {
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if ( doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = mwghostFaceIndex<1>(coord, arg.dim, d, 1);
-          const Link U = arg.U(d, x_cb, parity);
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, mwStaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           in *=  arg.fat_link_max;
           out += (U * in);
@@ -164,7 +241,7 @@ namespace quda {
         }
         else if ( doBulk<kernel_type>() && !ghost ) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Link U = arg.U(d, x_cb, parity);
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, mwStaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           in *=  arg.fat_link_max;
           out += (U * in);
@@ -204,15 +281,21 @@ namespace quda {
         // MW - check indexing into GhostFace here
           const int ghost_idx2 = mwghostFaceIndex<0>(coord, arg.dim, d, 1);
           const int ghost_idx = arg.improved ? mwghostFaceIndex<0>(coord, arg.dim, d, 3) : ghost_idx2; 
-          const Link U = arg.U.Ghost(d, ghost_idx2, 1-parity);
-          Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+          // Float stagphase=mwStaggeredPhase<Float>(coord, d);
+          // printf("%i %i (%i %i %i %i): %f\n",ghost_idx2, d, coord[0], coord[1], coord[2], coord[3], stagphase);
+          const int back_idx = linkIndexM1(coord, arg.dim, d);
+          const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1-parity) : arg.U.Ghost(d, ghost_idx2, 1-parity, mwStaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
+          const Link UU = arg.improved ? arg.U      (d, back_idx , 1-parity)  : arg.U      (d, back_idx  , 1-parity, mwStaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
+          // printf("%i %i (%i %i %i %i): %f %f %f %f %f %f\n",ghost_idx2, d, coord[0], coord[1], coord[2], coord[3], U(0,0).real(), U(1,1).real(), U(2,2).real(),
+          //   UU(0,0).real(), UU(1,1).real(), UU(2,2).real());
+          Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity); 
           in *=  arg.fat_link_max;
           out -= (conj(U) * in);
         }
         else  if ( doBulk<kernel_type>() && !ghost ) {
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
-          const Link U = arg.U(d, gauge_idx, 1-parity);
+          const Link U = arg.improved ? arg.U(d, gauge_idx, 1-parity): arg.U(d, gauge_idx, 1-parity, mwStaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
           Vector in = arg.in(back_idx, their_spinor_parity);
           in *=  arg.fat_link_max;
           out -= (conj(U) * in);
@@ -406,11 +489,11 @@ namespace quda {
   else{
       if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
       ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_NO,false>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_NO,false>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      errorQuda("Recon 8 not implemented for standard staggered.\n");
-       // ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_NO, false>(out, in, U, L, a, x, parity);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_13) {
+      ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_NO,false>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_9) {
+      // errorQuda("Recon 8 not implemented for standard staggered.\n");
+       ApplyDslashStaggered<Float,nColor,QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_NO, false>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
     }  
@@ -454,12 +537,12 @@ namespace quda {
     if (dslash::aux_worker) dslash::aux_worker->apply(0);
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
       ApplyDslashStaggered<double>(out, in, U, L, a, x, parity, dagger, improved, comm_override, profile);
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+    }
+     else if (U.Precision() == QUDA_SINGLE_PRECISION) {
       ApplyDslashStaggered<float>(out, in, U, L, a, x, parity, dagger, improved, comm_override, profile);
     } 
     else if (U.Precision() == QUDA_HALF_PRECISION) {
       ApplyDslashStaggered<short>(out, in, U, L, a, x, parity, dagger, improved, comm_override, profile);
-
     } 
     else {
       errorQuda("Unsupported precision %d\n", U.Precision());
