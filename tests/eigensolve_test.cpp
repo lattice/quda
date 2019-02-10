@@ -445,30 +445,31 @@ int main(int argc, char **argv)
   timeQUDA += (double)clock();
   printfQuda("Time for QUDA solution = %f\n", timeQUDA/CLOCKS_PER_SEC);
 
+  //Deallocate host memory
+  free(host_evecs);
+  free(host_evals);
+  
   if(eig_param.arpack_check) {
 #ifdef ARPACK_LIB
     if(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
       //Perform a cross-check using the ARPACK interface
-      //Use same initial guess
-      for(int i=0; i<vol*24; i++) {
-	if(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-	  
-	  ((double*)host_evecs)[i] = rand()/(double)RAND_MAX;
-	  if(i<24) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
-	} else {
-	  
-	  ((float*)host_evecs)[i] = rand()/(double)RAND_MAX;
-	  if(i<24) printfQuda("Host elem %d = %f\n", i, ((float*)host_evecs)[i]);
-	}
-      }
+      //Use a different initial guess and reallocate memory
       
-      //Use same nConv and nKv to be fair
-      eig_param.nEv = eig_param.nConv;
-      eig_param.nKr = eig_param.nConv + eig_param.nConv/2;
+      host_evecs = (void*)malloc(vol*24*eig_param.nKr*sizeof(double));
+      host_evals = (void*)malloc(     2*eig_param.nKr*sizeof(double));
+      
+      for(int i=0; i<vol*24; i++) {
+	((double*)host_evecs)[i] = rand()/(double)RAND_MAX;
+	if(i<24) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
+      }
       
       double timeARPACK = -((double)clock());
       eigensolveARPACK(host_evecs, host_evals, &eig_param);
       timeARPACK += (double)clock();
+      //Deallocate host memory
+      free(host_evecs);
+      free(host_evals);
+      
       printfQuda("Time for ARPACK solution = %f\n\n", timeARPACK/CLOCKS_PER_SEC);
       printfQuda("************************************************\n");
       printfQuda("     Speed-up for QUDA Vs ARPACK is x%.1f       \n",
@@ -482,9 +483,6 @@ int main(int argc, char **argv)
 #endif
   }
   
-  //Clean-up.
-  free(host_evecs);
-  free(host_evals);
   
   freeGaugeQuda();  
   if(dslash_type == QUDA_CLOVER_WILSON_DSLASH ||

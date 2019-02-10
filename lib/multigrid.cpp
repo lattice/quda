@@ -826,7 +826,8 @@ namespace quda {
 	  
 	  //Deflate the residual injected into coarsest grid solve 
 	  printfQuda("Deflating coarsest grid\n");
-	  //Create temp deflated residual
+	  
+	  //Create temp guess vector
 	  ColorSpinorField *x_coarse_defl = nullptr;
 	  ColorSpinorParam csParam(*x_coarse);
 	  x_coarse_defl = ColorSpinorField::Create(csParam);
@@ -838,10 +839,10 @@ namespace quda {
 	  //Pointer wrapper for residual
 	  std::vector<ColorSpinorField*> r_coarse_ptr;
 	  r_coarse_ptr.push_back(r_coarse);
-
+	  
 	  //printfQuda("before deflation x_coarse_defl = %e r_coarse = %e\n", norm2(*x_coarse_defl_ptr[0]), norm2(*r_coarse));
-	  //deflateEigenvectors(x_coarse_defl_ptr, r_coarse_ptr, coarse->param.B, coarse->param.evals);
-	  deflateSVD(x_coarse_defl_ptr, r_coarse_ptr, coarse->param.B, coarse->param.evals);
+	  deflateEigenvectors(x_coarse_defl_ptr, r_coarse_ptr, coarse->param.B, coarse->param.evals);
+	  //deflateSVD(x_coarse_defl_ptr, r_coarse_ptr, coarse->param.B, coarse->param.evals);
 	  //printfQuda("between x_coarse_defl = %e r_coarse = %e\n", norm2(*x_coarse_defl_ptr[0]), norm2(*r_coarse));
 	  (*coarse_solver)(*x_coarse_defl_ptr[0], *r_coarse);
 	  setOutputPrefix(prefix); // restore prefix after return from coarse grid
