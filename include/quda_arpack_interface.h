@@ -1,6 +1,3 @@
-#ifndef QUDA_ARPACK_INTERFACE_H_
-#define QUDA_ARPACK_INTERFACE_H_
-
 #pragma once
 
 #include <string>
@@ -132,10 +129,10 @@ extern "C" {
 
 #endif //ARPACK_LIB
 
-namespace quda{
-  
+namespace quda {
+
   /**
-   *  arpackSolve()
+   *  arpack_solve()
    *
    *  The QUDA interface function. One passes two allocated arrays to hold the
    *  the eigenmode data, the problem matrix, the arpack parameters defining 
@@ -150,12 +147,9 @@ namespace quda{
    *  @param[in]     local_dim     Parameter container with meta data for the 
    *                               QUDA color-spinor eigenvectors.
    **/
-  
   void arpack_solve(void *h_evecs, void *h_evals,
 		    const Dirac &mat,
 		    QudaEigParam *eig_param,
 		    ColorSpinorParam *cpuParam);
 
-}//end of namespace quda 
-
-#endif
+} //end of namespace quda
