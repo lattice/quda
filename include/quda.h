@@ -103,6 +103,19 @@ extern "C" {
 
     double _Complex b_5[QUDA_MAX_DWF_LS];  /**< Mobius coefficients - only real part used if regular Mobius */
     double _Complex c_5[QUDA_MAX_DWF_LS];  /**< Mobius coefficients - only real part used if regular Mobius */
+    
+    /**<
+     * The following specifies the EOFA parameters. Notation follows arXiv:1706.05843
+     * eofa_shift: the "\beta" in the paper, or the "shift" in Grid implementation
+     * eofa_pm: plus or minus for the EOFA operator
+     * mq1, mq2, mq3 are the three masses corresponds to Hasenbusch mass spliting.
+     * As far as I know mq1 is always the same as "mass" but it's here just for consistence.
+     * */
+    double eofa_shift; 
+    int eofa_pm;
+    double mq1;
+    double mq2;
+    double mq3;
 
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */

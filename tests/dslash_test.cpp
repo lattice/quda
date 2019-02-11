@@ -79,6 +79,8 @@ extern double mu;
 
 extern QudaVerbosity verbosity;
 
+extern int eofa_pm;
+
 void init(int argc, char **argv) {
 
   cuda_prec = prec;
@@ -136,9 +138,14 @@ void init(int argc, char **argv) {
     {
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 1.50;// + 0.5*k;
-      inv_param.c_5[k] = 0.50;// - 0.5*k;
+      inv_param.b_5[k] = 2.5;// + 0.5*k;
+      inv_param.c_5[k] = 1.5;// - 0.5*k;
     }
+    inv_param.eofa_pm = eofa_pm;
+    inv_param.eofa_shift = +1.;
+    inv_param.mq1 = 0.085;
+    inv_param.mq2 = 0.085;
+    inv_param.mq3 = 1.;
   }
 
   inv_param.mu = mu;
@@ -220,6 +227,15 @@ void init(int argc, char **argv) {
         break;
       default:
         errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_DSLASH\n", test_type);
+    }
+  }else if(dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    switch(test_type) {
+      case 1:
+      case 2:
+        inv_param.solution_type = QUDA_MATPC_SOLUTION;
+        break;
+      default:
+        errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_EOFA_DSLASH\n", test_type);
     }
   }
   else
@@ -565,6 +581,17 @@ DslashTime dslashCUDA(int niter) {
             static_cast<DiracMobiusPCEofa*>(dirac)->dslash5_eofa(*cudaSpinorOut, *cudaSpinor, parity);
           }
           break;
+        case 2:
+          if (transfer) {
+            errorQuda("(transfer == true) version NOT yet available!\n");
+          } else {
+            static_cast<DiracMobiusPCEofa*>(dirac)->dslash5_eofa(*tmp1, *cudaSpinor, parity);
+            // static_cast<DiracMobiusPCEofa*>(dirac)->Dslash5(*tmp1, *cudaSpinor, parity);
+            static_cast<DiracMobiusPCEofa*>(dirac)->m5inv_eofa(*cudaSpinorOut, *tmp1, parity);
+          }
+          break;
+        default:
+          errorQuda("Undefined test type(=%d)\n", test_type);
       }
     } else {
       switch (test_type) {
@@ -959,13 +986,14 @@ void dslashRef() {
       kappa_5[xs] = 0.5*kappa_b[xs]/kappa_c[xs];
       kappa_mdwf[xs] = -kappa_5[xs];
     }
-    DiracMobiusPCEofa* dirac_eofa = static_cast<DiracMobiusPCEofa*>(dirac);
     printfQuda("Testing EOFA! :) \n");
-    printfQuda("dirac_eofa->mq1 = %.4f\n", dirac_eofa->mq1);
     switch (test_type) {
       case 1:
         mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), 
-          dirac_eofa->mq1, dirac_eofa->mq2, dirac_eofa->mq3, dirac_eofa->eofa_pm, dirac_eofa->eofa_norm, dirac_eofa->eofa_shift, gauge_param.cpu_prec);
+          inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+        break;
+      case 2:
+        spinorRef->copy(*spinor);
         break;
       default:
         printf("Test type not supported for domain wall\n");

@@ -1654,6 +1654,7 @@ int zdim = 24;
 int tdim = 24;
 int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
+int eofa_pm = 1;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 char gauge_outfile[256] = "";
@@ -2175,6 +2176,12 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }	
   
+  if( strcmp(argv[i], "--eofa-minus") == 0){
+    eofa_pm = 0;
+    ret = 0;
+    goto out;
+  }	
+ 
   if( strcmp(argv[i], "--partition") == 0){
     if (i+1 >= argc){
       usage(argv);

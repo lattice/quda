@@ -733,9 +733,15 @@ namespace quda {
     flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
  
-  DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracParam &param) : DiracMobiusPC(param){}
+  // Copy the EOFA specific parameters
+  DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracParam &param) : DiracMobiusPC(param),
+    eofa_shift(param.eofa_shift), eofa_pm(param.eofa_pm), mq1(param.mq1), mq2(param.mq2), mq3(param.mq3) { }
 
-  DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracMobiusPC &dirac) : DiracMobiusPC(dirac){}
+  // Specify the EOFA specific parameters
+  DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracMobiusPC &dirac) : DiracMobiusPC(dirac),
+    eofa_shift(0.), eofa_pm(1), mq1(0.), mq2(0.), mq3(0.) { 
+    printfQuda("Warning: uninitialized EOFA parameters! :( \n");
+  }
 
   DiracMobiusPCEofa::~DiracMobiusPCEofa(){}
 
@@ -744,6 +750,10 @@ namespace quda {
     if(&dirac != this){
       DiracMobiusPC::operator=(dirac);
     }
+    eofa_shift = 0.;
+    eofa_pm = 1;
+    mq1 = 0.; mq2 = 0.; mq3 = 0.; 
+    printfQuda("Warning: uninitialized EOFA parameters! :( \n");
     return *this;
   }
  
@@ -754,9 +764,33 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, m5_eofa);
+    double alpha = b_5[0].real()+c_5[0].real();
+    double eofa_norm = alpha * (mq3-mq2) * std::pow(alpha+1., 2.*Ls)
+                          / ( std::pow(alpha+1., Ls) + mq2*std::pow(alpha-1., Ls) )
+                          / ( std::pow(alpha+1., Ls) + mq3*std::pow(alpha-1., Ls) );
+
+    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, M5_EOFA);
    
     // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
+  
+  void DiracMobiusPCEofa::m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    double alpha = b_5[0].real()+c_5[0].real();
+    double eofa_norm = alpha * (mq3-mq2) * std::pow(alpha+1., 2.*Ls)
+                          / ( std::pow(alpha+1.,Ls) + mq2*std::pow(alpha-1.,Ls) )
+                          / ( std::pow(alpha+1.,Ls) + mq3*std::pow(alpha-1.,Ls) );
+
+    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, M5INV_EOFA);
+   
+    // long long Ls = in.X(4);
+    // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+  }
+
 } // namespace quda

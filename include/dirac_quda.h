@@ -26,6 +26,14 @@ namespace quda {
     int Ls;    // used by domain wall and twisted mass
     Complex b_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
     Complex c_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
+    
+    // The EOFA parameters. See the description in InvertParam
+    double eofa_shift;
+    int eofa_pm;
+    double mq1;
+    double mq2;
+    double mq3;
+    
     QudaMatPCType matpcType;
     QudaDagType dagger;
     cudaGaugeField *gauge;
@@ -547,23 +555,20 @@ namespace quda {
   protected:
 
   private:
+    // The EOFA parameters
+    double mq1;
+    double mq2; 
+    double mq3;
+    double eofa_shift;
+    int eofa_pm;
   public:
-    // TODO: add all the eofa parameters that don't already exist in the base classes. 
-    // TODO: For a test just set the values here.
-    // FIXME: Need to fix the interface later
-    double mq1 = 0.1;
-    double mq2 = 0.1; 
-    double mq3 = 1.0;
-    double eofa_norm = 0.2;
-    double eofa_shift = 0.2;
-    int eofa_pm = 1;
-
     DiracMobiusPCEofa(const DiracParam &param);
     DiracMobiusPCEofa(const DiracMobiusPC &dirac);
     virtual ~DiracMobiusPCEofa();
     DiracMobiusPCEofa& operator=(const DiracMobiusPC &dirac);
 
     void dslash5_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
 
     // void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     // void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;

@@ -1537,6 +1537,11 @@ namespace quda {
       }
       memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex)*inv_param->Ls);
       memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex)*inv_param->Ls);
+      diracParam.eofa_shift = inv_param->eofa_shift;
+      diracParam.eofa_pm = inv_param->eofa_pm;
+      diracParam.mq1 = inv_param->mq1;
+      diracParam.mq2 = inv_param->mq2;
+      diracParam.mq3 = inv_param->mq3;
       break;
     case QUDA_MOBIUS_DWF_DSLASH:
       if (inv_param->Ls > QUDA_MAX_DWF_LS)

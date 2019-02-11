@@ -376,13 +376,15 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
 template<bool plus, class sFloat> // plus = true -> gamma_+; plus = false -> gamma_-
 void axpby_ssp_project(sFloat* z, sFloat a, sFloat* x, sFloat b, sFloat* y, int idx_cb_4d, int s, int sp){
   // z_s = a*x_s + b*\gamma_+/-*y_sp
-  // Will use the Weyl/chiral/reletivistic/DeGrand-Rossi basis, where gamma_5 is diagonal;
-  for(int spin = (plus?2:0); spin < (plus?4:2); spin++){
+  // Will use the DeGrand-Rossi/CPS basis, where gamma5 is diagonal:
+  // +1   0
+  //  0  -1
+  for(int spin = (plus?0:2); spin < (plus?2:4); spin++){
     for(int color_comp = 0; color_comp < 6; color_comp++){
       z[(s*Vh+idx_cb_4d)*24+spin*6+color_comp] = a*x[(s*Vh+idx_cb_4d)*24+spin*6+color_comp] + b*y[(sp*Vh+idx_cb_4d)*24+spin*6+color_comp];
     }
   }
-  for(int spin = (plus?0:2); spin < (plus?2:4); spin++){
+  for(int spin = (plus?2:0); spin < (plus?4:2); spin++){
     for(int color_comp = 0; color_comp < 6; color_comp++){
       z[(s*Vh+idx_cb_4d)*24+spin*6+color_comp] = a*x[(s*Vh+idx_cb_4d)*24+spin*6+color_comp];
     }
@@ -465,7 +467,11 @@ void mdw_m5_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit
 }
 
 void mdw_m5_eofa_ref(void* res, void* spinorField, int oddBit, int daggerBit, double mferm, double m5, double b, double c,
-    double mq1, double mq2, double mq3, int eofa_pm, double eofa_norm, double eofa_shift, QudaPrecision precision){
+    double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision){
+    double alpha = b+c;
+    double eofa_norm = alpha * (mq3-mq2) * std::pow(alpha+1., 2*Ls)
+                        / ( std::pow(alpha+1., Ls) + mq2*std::pow(alpha-1., Ls) )
+                        / ( std::pow(alpha+1., Ls) + mq3*std::pow(alpha-1., Ls) );
     if(precision == QUDA_DOUBLE_PRECISION){
       mdw_m5_eofa_ref<double>((double*)res, (double*)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift);
     }else{
