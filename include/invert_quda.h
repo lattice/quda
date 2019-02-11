@@ -824,6 +824,11 @@ namespace quda {
     */
     void compute_beta();
 
+    /**
+       @ brief Check if it's time for a reliable update
+    */
+    int reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta);
+
   public:
     CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CACG();

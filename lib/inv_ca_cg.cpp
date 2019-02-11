@@ -412,12 +412,26 @@ namespace quda {
     }
   }
 
+  // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
+  int CACG::reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta) {
+    // reliable updates
+    rNorm = sqrt(r2);
+    if (rNorm > maxrr) maxrr = rNorm;
+    
+    int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+
+    rUpdate++;
+    
+    //printf("reliable %d %e %e %e %e\n", updateR, rNorm, maxrx, maxrr, r2);
+
+    return updateR;
+  }
+
   /*
     The main CA-CG algorithm, which consists of three main steps:
     1. Build basis vectors q_k = A p_k for k = 1..Nkrlylov
     2. Steepest descent minmization of the residual in this basis
     3. Update solution and residual vectors
-    4. (Optional) restart if convergence or maxiter not reached
   */
   void CACG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
@@ -497,9 +511,14 @@ namespace quda {
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
     int total_iter = 0;
-    int restart = 0;
     double r2_old = r2;
     bool l2_converge = false;
+
+    // Various variables related to reliable updates.
+    int rUpdate = 0; // count reliable updates. 
+    double delta = param.delta; // delta for reliable updates. 
+    double rNorm = sqrt(r2); // The current residual norm. 
+    double maxrr = rNorm; // The maximum residual norm since the last reliable update.
 
     // Use power iterations to approx lambda_max
     if (basis == QUDA_CHEBYSHEV_BASIS && lambda_max < lambda_min && !lambda_init) {
@@ -637,7 +656,7 @@ namespace quda {
       // update since nKrylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       // Note: this won't reliable update when the norm _increases_.
-      if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
+      if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, r2, delta)) {
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r_, x, tmp, tmp2);
         r2 = blas::xmyNorm(b, r_);
@@ -667,7 +686,8 @@ namespace quda {
     if (total_iter>param.maxiter && getVerbosity() >= QUDA_SUMMARIZE)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CA-CG: number of restarts = %d\n", restart);
+    // Print number of reliable updates.
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s: Reliable updates = %d\n", solver_name.c_str(), rUpdate);
 
     if (param.compute_true_res) {
       // Calculate the true residual

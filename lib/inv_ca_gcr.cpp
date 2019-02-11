@@ -202,13 +202,13 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-	warningQuda("inverting on zero-field source\n");
-	x = b;
-	param.true_res = 0.0;
-	param.true_res_hq = 0.0;
-	return;
-      } else {
-	b2 = r2;
+        warningQuda("inverting on zero-field source\n");
+        x = b;
+        param.true_res = 0.0;
+        param.true_res_hq = 0.0;
+        return;
+            } else {
+        b2 = r2;
       }
     }
 
