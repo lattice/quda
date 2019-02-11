@@ -1764,9 +1764,20 @@ namespace quda {
     printfQuda("        data was modified before entering ZNEUPD\n");
   }
   
+#else
+
+  void arpack_solve(void *h_evecs, void *h_evals,
+		    const Dirac &mat,
+		    QudaEigParam *eig_param,
+		    ColorSpinorParam *cpuParam) {
+
+    errorQuda("(P)ARPACK has not been enabled for this build");
+
+  }
+
 #endif
-  
-}
+
+} // namespace quda
 
 
 

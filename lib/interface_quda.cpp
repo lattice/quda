@@ -2447,12 +2447,12 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
-  
+
   profileEigensolveARPACK.TPSTART(QUDA_PROFILE_TOTAL);
   profileEigensolveARPACK.TPSTART(QUDA_PROFILE_INIT);
-  
+
   if (!initialized) errorQuda("QUDA not initialized");
-  
+
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
     printQudaInvertParam(inv_param);
@@ -2462,7 +2462,7 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
   checkInvertParam(inv_param);
   checkEigParam(eig_param);
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
-  
+
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
@@ -2489,34 +2489,31 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
 
   //The Arnoldi can solve any problem. However, if you use poly acc on a
   //non-symmetric matrix, this routine will fail.
-  if(eig_param->use_poly_acc && !eig_param->use_norm_op) {
+  if (eig_param->use_poly_acc && !eig_param->use_norm_op) {
     errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
   }
-  profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_INIT);
 
-  
+  profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_INIT);
   profileEigensolveARPACK.TPSTART(QUDA_PROFILE_COMPUTE);
-  
+
   arpack_solve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
 
   profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileEigensolveARPACK.TPSTART(QUDA_PROFILE_FREE);
 
-
-  
-  profileEigensolveARPACK.TPSTART(QUDA_PROFILE_FREE);  
   delete d;
   delete dSloppy;
-  delete dPre;  
+  delete dPre;
   profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
 
   // cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache();
-  
+
   profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
-  
+
 }
 
 
