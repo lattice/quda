@@ -100,8 +100,6 @@ namespace quda {
             double N = ( (eofa_pm == 1)?1.:-1. ) * (2.*this->eofa_shift*this->eofa_norm) * ( std::pow(alpha+1.,Ls) + this->mq1*std::pow(alpha-1.,Ls) );
             // QUDA uses the kappa preconditioning: there is a (2.*kappa_b)^-1 difference here.
             N *= 1./(b*(m_5+4.)+1.);
-            // The additional 2. QUDA's spin projection.
-            N /= 2.;
             
             // Here the signs are somewhat mixed:
             // There is one -1 from N for eofa_pm = 0/minus, thus the u_- here is actually -u_- in the document
@@ -158,10 +156,6 @@ namespace quda {
                     eofa_coeffs->y[s] = eofa_coeffs->y[s-1]*(-kappa); 
                   }
                 }
-                // Debug:
-                for(int s = 0; s < Ls; s++){
-                  printf("u[%02d] = %+.6f x[%02d] = %+.6f y[%02d] = %+.6f\n ", s, eofa_coeffs->u[s], s, eofa_coeffs->x[s], s, eofa_coeffs->y[s]);
-                }
                 inv = 0.5/(1.+factor); // 0.5 for the spin project factor
                 sherman_morrison = -0.5/(1.+sherman_morrison); // 0.5 for the spin project factor
                 cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>), 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
@@ -215,7 +209,7 @@ namespace quda {
         if (type == M5_EOFA) {
           const eofa_coeff<real>* eofa_coeffs = get_eofa_coeff<real>();
           Vector diagonal = cache.load(threadIdx.x, s, parity);
-          out = (static_cast<real>(0.5)*arg.kappa)*out + diagonal; // 1 + kappa*D5
+          out = (static_cast<real>(0.5)*arg.kappa)*out + diagonal; // 1 + kappa*D5; the 0.5 for spin projection
           
           constexpr int proj_dir = pm ? +1 : -1;
           
@@ -225,14 +219,14 @@ namespace quda {
             // axpby_ssp_pminus(chi, one, chi, shift_coeffs[s], psi, 0, s);
             if(s == (pm?Ls-1:0)){
               for(int sp = 0; sp < Ls; sp++){
-                out += eofa_coeffs->u[sp] * cache.load(threadIdx.x, sp, parity).project(4,proj_dir).reconstruct(4,proj_dir);  
+                out += (static_cast<real>(0.5)*eofa_coeffs->u[sp]) * cache.load(threadIdx.x, sp, parity).project(4,proj_dir).reconstruct(4,proj_dir);  
               }
             }
           }else{
             // in Grid: 
             // axpby_ssp_pplus(chi, one, chi, shift_coeffs[s], psi, s, Ls-1);
             // axpby_ssp_pminus(chi, one, chi, shift_coeffs[s], psi, s, 0);
-            out += eofa_coeffs->u[s] * cache.load(threadIdx.x, pm?Ls-1:0, parity).project(4,proj_dir).reconstruct(4,proj_dir);  
+            out += (static_cast<real>(0.5)*eofa_coeffs->u[s]) * cache.load(threadIdx.x, pm?Ls-1:0, parity).project(4,proj_dir).reconstruct(4,proj_dir);  
           }
 
           if (xpay) { // really axpy

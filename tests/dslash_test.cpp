@@ -129,10 +129,10 @@ void init(int argc, char **argv) {
     inv_param.twist_flavor = twist_flavor;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
-    inv_param.m5 = -1.5;
+    inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);
   } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH ) {
-    inv_param.m5 = -1.5;
+    inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);
     for(int k = 0; k < Lsdim; k++)
     {
@@ -142,8 +142,8 @@ void init(int argc, char **argv) {
       inv_param.c_5[k] = 1.5;// - 0.5*k;
     }
     inv_param.eofa_pm = eofa_pm;
-    inv_param.eofa_shift = +1.;
-    inv_param.mq1 = 0.085;
+    inv_param.eofa_shift = -1.;
+    inv_param.mq1 = 1.;
     inv_param.mq2 = 0.085;
     inv_param.mq3 = 1.;
   }

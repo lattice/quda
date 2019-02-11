@@ -439,6 +439,10 @@ void mdw_m5_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit
               ( std::pow(alpha+1.0,Ls) + mq1*std::pow(alpha-1.0,Ls) );
   // For the kappa preconditioning
   N *= 1./(b*(m5+4.)+1.);
+  printfQuda("eofa_norm(k) = %16.12e\n", eofa_norm);
+  printfQuda("N            = %16.12e\n", N);
+  printfQuda("b            = %16.12e\n", b);
+  printfQuda("m5           = %16.12e\n", m5);
   for(int s = 0; s < Ls; s++){
     idx = (eofa_pm == 1) ? (s) : (Ls-1-s);
     shift_coeffs[idx] = N * std::pow(-1.0,s) * std::pow(alpha-1.0,s) / std::pow(alpha+1.0,Ls+s+1);
