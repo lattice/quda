@@ -876,6 +876,10 @@ namespace quda {
     const DiracMatrix &matSloppy;
     bool init;
 
+    // Basis. Currently anything except POWER_BASIS causes a warning
+    // then swap to POWER_BASIS.
+    QudaCABasis basis;
+
     Complex *alpha; // Solution coefficient vectors
 
     ColorSpinorField *rp;

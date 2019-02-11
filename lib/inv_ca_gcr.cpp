@@ -4,16 +4,9 @@
 
 namespace quda {
 
-  enum Basis {
-    POWER_BASIS,
-    INVALID_BASIS
-  };
-
-  const static Basis basis = POWER_BASIS;
-
   CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
     : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
-      alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
+      basis(param.ca_basis), alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
 
   CAGCR::~CAGCR() {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
@@ -60,6 +53,11 @@ namespace quda {
 
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
+
+      if (basis != POWER_BASIS) {
+        warningQuda("CA-GCR does not support any basis besides POWER_BASIS. Switching to POWER_BASIS...\n");
+        basis = POWER_BASIS;
+      }
 
       if (basis == POWER_BASIS) {
         // in power basis q[k] = p[k+1], so we don't need a separate q array
@@ -283,26 +281,39 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
-	if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
-	mat(r, x, tmp);
-	r2 = blas::xmyNorm(b, r);  
-	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+        if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
+        mat(r, x, tmp);
+        r2 = blas::xmyNorm(b, r);  
+        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
         // break-out check if we have reached the limit of the precision
-	if (r2 > r2_old) {
-	  resIncrease++;
-	  resIncreaseTotal++;
-	  warningQuda("CA-GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-		      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
-	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
-	    warningQuda("CA-GCR: solver exiting due to too many true residual norm increases");
-	    break;
-	  }
-	} else {
-	  resIncrease = 0;
-	}
+        if (r2 > r2_old) {
+          resIncrease++;
+          resIncreaseTotal++;
+          warningQuda("CA-GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+          sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+            warningQuda("CA-GCR: solver exiting due to too many true residual norm increases");
+            break;
+          }
+        } else {
+          resIncrease = 0;
+        }
 
-	r2_old = r2;
+        r2_old = r2;
+      }
+
+      // No matter what, if we haven't converged, we do a restart.
+      if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
+        restart++; // restarting if residual is still too great
+
+        PrintStats("CA-GCR (restart)", restart, r2, b2, heavy_quark_res);
+        blas::copy(*p[0],r); // no-op if uni-precision
+
+        r2_old = r2;
+
+        // prevent ending the Krylov space prematurely if other convergence criteria not met 
+        if (r2 < stop) l2_converge = true; 
       }
 
     }
