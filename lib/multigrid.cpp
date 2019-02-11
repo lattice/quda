@@ -1471,7 +1471,7 @@ namespace quda {
       
       int nConv = param.B.size(); param.mg_global.eig_param->nConv = nConv;
       int nEv   = param.B.size(); param.mg_global.eig_param->nEv = nEv;
-      int nKr   = param.B.size()/2 + param.B.size(); param.mg_global.eig_param->nKr = nKr;
+      int nKr   = nEv+nEv/2; param.mg_global.eig_param->nKr = nKr;
       
       std::vector<Complex> evals(nEv, 0.0);
       
@@ -1482,8 +1482,6 @@ namespace quda {
 
       if(csParam.Precision() == QUDA_SINGLE_PRECISION)
 	csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-      if(csParam.Precision() == QUDA_HALF_PRECISION)
-	errorQuda("Half precision eigensolver not supported");
       
       if(param.level > 0) {
 	csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -1534,8 +1532,6 @@ namespace quda {
     }
   }
 
-  //(out, in, list of evecs, evals)
-  //DO ON MAT SMOOTH
   void MG::deflateEigenvectors(std::vector<ColorSpinorField*> vec_defl, std::vector<ColorSpinorField*> vec,
 			       std::vector<ColorSpinorField*> eig_vecs, std::vector<Complex> evals) {
     
@@ -1563,8 +1559,6 @@ namespace quda {
     
   }
 
-  //(out, in, list of evecs, evals)
-  //DO ON MAT SMOOTH
   void MG::deflateSVD(std::vector<ColorSpinorField*> vec_defl, std::vector<ColorSpinorField*> vec,
 		      std::vector<ColorSpinorField*> svd_vecs, std::vector<Complex> svals) {
     

@@ -85,8 +85,6 @@ namespace quda {
 
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
 
-      printfQuda("CGNE IG\n");
-      
       // compute initial residual
       mmdag.Expose()->M(*xp,x);
       double r2 = blas::xmyNorm(b,*xp);
@@ -312,7 +310,6 @@ namespace quda {
     // compute initial residual
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      printfQuda("CG IG\n");
       
       mat(r, x, y, tmp3);
       r2 = blas::xmyNorm(b, r);

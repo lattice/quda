@@ -470,6 +470,7 @@ namespace quda {
       else if (eig_param->spectrum == QUDA_LI_EIG_SPECTRUM) spectrum = strdup("LI");
     }
 
+    //Deduce, if using Chebyshev, whether to invert the sorting
     const char *L = "L";
     const char *S = "S";
     if(strncmp(L, spectrum, 1) == 0 && !eig_param->use_poly_acc) {
@@ -732,11 +733,24 @@ namespace quda {
 	}
 
 	printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter+1);
-	
-	if(num_converged >= nConv) {	  
-	  //Eigensolver has converged. Transfer eigenvectors to kSpace array
-	  for(int i=0; i<nConv; i++) *kSpace[i] =  *d_vecs_tmp[i];
-	  converged = true;
+
+
+	//Check that the lowest nConv Eigenpairs have converged. //FIXME
+	bool all_locked = true;
+	if(num_converged >= nConv) {
+	  for(int i=0; i<nConv; i++) {
+	    if(inverse) {
+	      if(!locked[nEv-1-i]) all_locked = false;
+	    } else {
+	      if(!locked[i]) all_locked = false;
+	    }	    
+	  }
+	  
+	  if(all_locked) {
+	    //Transfer eigenvectors to kSpace array
+	    for(int i=0; i<nConv; i++) *kSpace[i] =  *d_vecs_tmp[i];
+	    converged = true;
+	  }
 	}
 	
 	time += clock();
