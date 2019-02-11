@@ -16,7 +16,7 @@ namespace quda {
       bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
                          param.precision == param.precision_sloppy &&
                          param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
-      if (basis == POWER_BASIS) {
+      if (basis == QUDA_POWER_BASIS) {
         for (int i=0; i<param.Nkrylov+1; i++) if (i>0 || !use_source) delete p[i];
       } else {
         for (int i=0; i<param.Nkrylov; i++) if (i>0 || !use_source) delete p[i];
@@ -54,12 +54,12 @@ namespace quda {
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
 
-      if (basis != POWER_BASIS) {
-        warningQuda("CA-GCR does not support any basis besides POWER_BASIS. Switching to POWER_BASIS...\n");
-        basis = POWER_BASIS;
+      if (basis != QUDA_POWER_BASIS) {
+        warningQuda("CA-GCR does not support any basis besides QUDA_POWER_BASIS. Switching to QUDA_POWER_BASIS...\n");
+        basis = QUDA_POWER_BASIS;
       }
 
-      if (basis == POWER_BASIS) {
+      if (basis == QUDA_POWER_BASIS) {
         // in power basis q[k] = p[k+1], so we don't need a separate q array
         p.resize(param.Nkrylov+1);
         q.resize(param.Nkrylov);
@@ -246,7 +246,7 @@ namespace quda {
       // build up a space of size nKrylov
       for (int k=0; k<nKrylov; k++) {
         matSloppy(*q[k], *p[k], tmpSloppy);
-        if (k<nKrylov-1 && basis != POWER_BASIS) blas::copy(*p[k+1], *q[k]);
+        if (k<nKrylov-1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k+1], *q[k]);
       }
 
       solve(alpha, q, *p[0]);
@@ -264,7 +264,7 @@ namespace quda {
       if (!fixed_iteration || param.return_residual) {
         // update the residual vector
         std::vector<ColorSpinorField*> R;
-        R.push_back(p[0]);
+        R.push_back(&r);
         for (int i=0; i<nKrylov; i++) alpha[i] = -alpha[i];
         blas::caxpy(alpha, q, R);
       }
@@ -272,7 +272,7 @@ namespace quda {
       total_iter+=nKrylov;
       if ( !fixed_iteration || getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         // only compute the residual norm if we need to
-        r2 = blas::norm2(*p[0]);
+        r2 = blas::norm2(r);
       }
 
       PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
@@ -331,7 +331,7 @@ namespace quda {
       param.true_res_hq = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
       if (param.return_residual) blas::copy(b, r);
     } else {
-      if (param.return_residual) blas::copy(b, *p[0]);
+      if (param.return_residual) blas::copy(b, r);
     }
 
     if (!param.is_preconditioner) {

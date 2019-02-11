@@ -412,7 +412,7 @@ namespace quda {
     }
   }
 
-  // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
+  // Code to check for reliable updates
   int CACG::reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta) {
     // reliable updates
     rNorm = sqrt(r2);
@@ -420,9 +420,13 @@ namespace quda {
     
     int updateR = (rNorm < delta*maxrr) ? 1 : 0;
 
-    rUpdate++;
+    if (updateR) {
+      rUpdate++;
+      rNorm = sqrt(r2);
+      maxrr = rNorm;
+    }
     
-    //printf("reliable %d %e %e %e %e\n", updateR, rNorm, maxrx, maxrr, r2);
+    //printfQuda("Reliable triggered: %d  %e\n", updateR, rNorm);
 
     return updateR;
   }
@@ -647,16 +651,21 @@ namespace quda {
 
       }
 
-      total_iter+=nKrylov;
+      // NOTE: Because we always carry around the residual from an iteration before, we
+      // "lie" about which iteration we're on so the printed residual matches with the
+      // printed iteration number.
+      if (total_iter > 0) {
+        PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
+      }
 
-      // NOTE: Because of our cheat on the residual, this is behind an iteration
-      // through the loop
-      PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
+      total_iter+=nKrylov;
+      
+
 
       // update since nKrylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       // Note: this won't reliable update when the norm _increases_.
-      if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, r2, delta)) {
+      if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, rUpdate, r2, delta)) {
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r_, x, tmp, tmp2);
         r2 = blas::xmyNorm(b, r_);
@@ -687,7 +696,7 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // Print number of reliable updates.
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s: Reliable updates = %d\n", solver_name.c_str(), rUpdate);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s: Reliable updates = %d\n", "CA-CG", rUpdate);
 
     if (param.compute_true_res) {
       // Calculate the true residual
