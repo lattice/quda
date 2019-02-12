@@ -454,9 +454,18 @@ namespace quda {
     //Ensure we are not trying to compute on a zero-field source
     //and test for an initial guess
     Float norm = sqrt(blas::norm2(*kSpace[0]));
-    if(norm == 0){
+    if (norm == 0) {
       printfQuda("Initial residual is zero. Populating with rands.\n");
-      kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
+
+      if (kSpace[0] -> Location() == QUDA_CPU_FIELD_LOCATION) {
+        kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
+      } else {
+        RNG *rng = new RNG(kSpace[0]->Volume(), 1234, kSpace[0]->X());
+        rng->Init();
+        spinorNoise(*kSpace[0], *rng, QUDA_NOISE_UNIFORM);
+        rng->Release();
+        delete rng;
+      }
     }
 
     //Normalise initial guess
