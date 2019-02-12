@@ -269,11 +269,8 @@ namespace quda {
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      if (siteSubset != QUDA_FULL_SITE_SUBSET) {
+      if ( !(siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_composite) ) {
 	zeroPad();
-      } else if(!composite_descr.is_composite) {
-	(dynamic_cast<cudaColorSpinorField*>(even))->zeroPad();
-	(dynamic_cast<cudaColorSpinorField*>(odd))->zeroPad();
       } else { //temporary hack for the full spinor field sets, manual zeroPad for each component:
 	for(int cid = 0; cid < composite_descr.dim; cid++) {
 	  (dynamic_cast<cudaColorSpinorField&>(components[cid]->Even())).zeroPad();
@@ -548,26 +545,57 @@ namespace quda {
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
-    cudaMemsetAsync(v, 0, bytes, streams[Nstream-1]);
-    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, streams[Nstream-1]);
+    cudaMemsetAsync(v, 0, bytes);
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes);
   }
 
   void cudaColorSpinorField::zeroPad() {
-    size_t pad_bytes = (stride - volume) * precision * fieldOrder;
-    int Npad = nColor * nSpin * 2 / fieldOrder;
 
-    if (composite_descr.is_composite && !composite_descr.is_component){//we consider the whole eigenvector set:
-      Npad      *= composite_descr.dim;
-      pad_bytes /= composite_descr.dim;
+    { // zero initialize the field pads
+      size_t pad_bytes = (stride - volumeCB) * precision * fieldOrder;
+      int Npad = nColor * nSpin * 2 / fieldOrder;
+
+      if (composite_descr.is_composite && !composite_descr.is_component){//we consider the whole eigenvector set:
+        Npad      *= composite_descr.dim;
+        pad_bytes /= composite_descr.dim;
+      }
+
+      size_t pitch = ((!composite_descr.is_composite || composite_descr.is_component) ? stride : composite_descr.stride)*fieldOrder*precision;
+      char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volumeCB : composite_descr.volumeCB)*fieldOrder*precision;
+      if (pad_bytes)
+        for (int subset=0; subset<siteSubset; subset++) {
+          cudaMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad);
+        }
     }
 
-    size_t pitch = ((!composite_descr.is_composite || composite_descr.is_component) ? stride : composite_descr.stride)*fieldOrder*precision;
-    char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volume : composite_descr.volume)*fieldOrder*precision;
-    if (pad_bytes) cudaMemset2D(dst, pitch, 0, pad_bytes, Npad);
+    if (norm_bytes > 0) { // zero initialize the norm pad
+      size_t pad_bytes = (stride - volumeCB) * sizeof(float);
+      if (pad_bytes)
+        for (int subset=0; subset<siteSubset; subset++) {
+          cudaMemsetAsync((char*)norm + volumeCB*sizeof(float), 0, (stride-volumeCB)*sizeof(float));
+        }
+    }
 
-    //for (int i=0; i<Npad; i++) {
-    //  if (pad_bytes) cudaMemset((char*)v + (volume + i*stride)*fieldOrder*precision, 0, pad_bytes);
-    //}
+    // zero the region added for alignment reasons
+    if (bytes != (size_t)length*precision) {
+      size_t subset_bytes = bytes/siteSubset;
+      size_t subset_length = length/siteSubset;
+      for (int subset=0; subset < siteSubset; subset++) {
+        cudaMemsetAsync((char*)v + subset_length*precision + subset_bytes*subset, 0,
+                        subset_bytes-subset_length*precision);
+      }
+    }
+
+    // zero the region added for alignment reasons (norm)
+    if (norm_bytes && norm_bytes != siteSubset*stride*sizeof(float)) {
+      size_t subset_bytes = norm_bytes/siteSubset;
+      for (int subset=0; subset < siteSubset; subset++) {
+        cudaMemsetAsync((char*)norm + (size_t)stride*sizeof(float) + subset_bytes*subset, 0,
+                        subset_bytes-(size_t)stride*sizeof(float));
+      }
+    }
+
+    checkCudaError();
   }
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {

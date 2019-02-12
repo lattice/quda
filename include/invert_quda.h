@@ -345,6 +345,9 @@ namespace quda {
       }
       //for incremental eigCG:
       param.rhs_idx = rhs_idx;
+
+      param.ca_lambda_min = ca_lambda_min;
+      param.ca_lambda_max = ca_lambda_max;
     }
 
     void updateRhsIndex(QudaInvertParam &param) {
@@ -782,8 +785,6 @@ namespace quda {
 
     bool lambda_init;
     QudaCABasis basis;
-    double lambda_min; // for chebyshev basis
-    double lambda_max;
 
     Complex *Q_AQandg; // Fused inner product matrix
     Complex *Q_AS; // inner product matrix
@@ -823,6 +824,11 @@ namespace quda {
        @brief Compute the beta coefficients
     */
     void compute_beta();
+
+    /**
+       @ brief Check if it's time for a reliable update
+    */
+    int reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta);
 
   public:
     CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
@@ -875,6 +881,10 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     bool init;
+
+    // Basis. Currently anything except POWER_BASIS causes a warning
+    // then swap to POWER_BASIS.
+    QudaCABasis basis;
 
     Complex *alpha; // Solution coefficient vectors
 

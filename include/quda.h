@@ -473,8 +473,8 @@ extern "C" {
     /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
     double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
 
-    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
-    double coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+    /** Maximum number of iterations for the solver that wraps around the coarse grid correction and smoother */
+    int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
 
     /** Basis to use for CA-CGN(E/R) coarse solver */
     QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
@@ -545,8 +545,14 @@ extern "C" {
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
 
+    /** Whether to load the null-space vectors to disk (requires QIO) */
+    QudaBoolean vec_load;
+
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];
+
+    /** Whether to store the null-space vectors to disk (requires QIO) */
+    QudaBoolean vec_store;
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
@@ -598,7 +604,7 @@ extern "C" {
    *                   printed.  The default is stdout.
    */
   void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[],
-      FILE *outfile);
+                        FILE *outfile);
 
   /**
    * initCommsGridQuda() takes an optional "rank_from_coords" argument that
@@ -833,14 +839,27 @@ extern "C" {
   /**
    * @brief Free resources allocated by the multigrid solver
    * @param mg_instance Pointer to instance of multigrid_solver
+   * @param param Contains all metadata regarding host and device
+   * storage and solver parameters
    */
   void destroyMultigridQuda(void *mg_instance);
 
   /**
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
+   * @param param Contains all metadata regarding host and device
+   * storage and solver parameters
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
+
+  /**
+   * @brief Dump the null-space vectors to disk
+   * @param[in] mg_instance Pointer to the instance of multigrid_solver
+   * @param[in] param Contains all metadata regarding host and device
+   * storage and solver parameters (QudaMultigridParam::vec_outfile
+   * sets the output filename prefix).
+   */
+  void dumpMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).

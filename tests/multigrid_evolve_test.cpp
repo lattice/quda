@@ -424,6 +424,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   // set file i/o parameters
   strcpy(mg_param.vec_infile, vec_infile);
   strcpy(mg_param.vec_outfile, vec_outfile);
+  if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
+  if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -814,6 +816,15 @@ int main(int argc, char **argv)
 	inv_param.preconditioner = mg_preconditioner;
       }
       invertQuda(spinorOut, spinorIn, &inv_param);
+
+      if (inv_param.iter == inv_param.maxiter) {
+        sprintf(mg_param.vec_outfile, "dump_step_%d", step);
+        warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
+                    mg_param.vec_outfile);
+
+        dumpMultigridQuda(mg_preconditioner, &mg_param);
+        strcpy(mg_param.vec_outfile, vec_outfile); // restore output file name
+      }
 
       freeGaugeQuda();
     }

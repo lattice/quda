@@ -15,7 +15,6 @@ namespace quda {
   CACG::CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
     : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
       lambda_init(false), basis(param.ca_basis),
-      lambda_min(param.ca_lambda_min), lambda_max(param.ca_lambda_max),
       Q_AQandg(nullptr), Q_AS(nullptr), alpha(nullptr), beta(nullptr), rp(nullptr),
       tmpp(nullptr), tmpp2(nullptr), tmp_sloppy(nullptr), tmp_sloppy2(nullptr) { }
 
@@ -284,7 +283,7 @@ namespace quda {
     Map<vector> vecalpha(alpha,N);
 
     vecalpha = matQ_AQ.fullPivLu().solve(vecg);
-    
+
     //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
     //psi = svd.solve(phi);
   }
@@ -328,7 +327,7 @@ namespace quda {
         Map<vector> vecalpha(alpha,N);
 
         vecalpha = matQ_AQ.fullPivLu().solve(vecg);
-        
+
         //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
         //psi = svd.solve(phi);
         break;
@@ -412,12 +411,30 @@ namespace quda {
     }
   }
 
+  // Code to check for reliable updates
+  int CACG::reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta) {
+    // reliable updates
+    rNorm = sqrt(r2);
+    if (rNorm > maxrr) maxrr = rNorm;
+
+    int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+
+    if (updateR) {
+      rUpdate++;
+      rNorm = sqrt(r2);
+      maxrr = rNorm;
+    }
+
+    //printfQuda("Reliable triggered: %d  %e\n", updateR, rNorm);
+
+    return updateR;
+  }
+
   /*
     The main CA-CG algorithm, which consists of three main steps:
     1. Build basis vectors q_k = A p_k for k = 1..Nkrlylov
     2. Steepest descent minmization of the residual in this basis
     3. Update solution and residual vectors
-    4. (Optional) restart if convergence or maxiter not reached
   */
   void CACG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
@@ -438,6 +455,37 @@ namespace quda {
     ColorSpinorField &tmp2 = *tmpp2;
     ColorSpinorField &tmpSloppy = tmp_sloppy ? *tmp_sloppy : tmp;
     ColorSpinorField &tmpSloppy2 = tmp_sloppy2 ? *tmp_sloppy2 : tmp2;
+
+    // Use power iterations to approx lambda_max
+    auto &lambda_min = param.ca_lambda_min;
+    auto &lambda_max = param.ca_lambda_max;
+
+    if (basis == QUDA_CHEBYSHEV_BASIS && lambda_max < lambda_min && !lambda_init) {
+      if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+
+      *Q[0] = r_; // do power iterations on this
+      // Do 100 iterations, normalize every 10.
+      for (int i = 0; i < 10; i++) {
+        double tmpnrm = blas::norm2(*Q[0]);
+        blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
+        for (int j = 0; j < 10; j++) {
+          matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy2);
+          if (j == 0 && getVerbosity() >= QUDA_VERBOSE) {
+            printfQuda("Current Rayleigh Quotient step %d is %e\n", i*10+1, sqrt(blas::norm2(*AQ[0])));
+          }
+          std::swap(AQ[0], Q[0]);
+        }
+      }
+      // Get Rayleigh quotient
+      double tmpnrm = blas::norm2(*Q[0]);
+      blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
+      matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy2);
+      lambda_max = 1.1*(sqrt(blas::norm2(*AQ[0])));
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
+      lambda_init = true;
+
+      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
+    }
 
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
@@ -497,35 +545,16 @@ namespace quda {
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
     int total_iter = 0;
-    int restart = 0;
     double r2_old = r2;
     bool l2_converge = false;
 
-    // Use power iterations to approx lambda_max
-    if (basis == QUDA_CHEBYSHEV_BASIS && lambda_max < lambda_min && !lambda_init) {
-      *Q[0] = r_; // do power iterations on this
-      // Do 100 iterations, normalize every 10.
-      for (int i = 0; i < 10; i++) {
-        double tmpnrm = blas::norm2(*Q[0]);
-        blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
-        for (int j = 0; j < 10; j++) {
-          matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy2);
-          if (j == 0 && getVerbosity() >= QUDA_VERBOSE) {
-            printfQuda("Current Rayleigh Quotient step %d is %e\n", i*10+1, sqrt(blas::norm2(*AQ[0])));
-          }
-          std::swap(AQ[0], Q[0]);
-        }
-      }
-      // Get Rayleigh quotient
-      double tmpnrm = blas::norm2(*Q[0]);
-      blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
-      matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy2);
-      lambda_max = 1.1*(sqrt(blas::norm2(*AQ[0])));
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
-      lambda_init = true;
-    }
+    // Various variables related to reliable updates.
+    int rUpdate = 0; // count reliable updates.
+    double delta = param.delta; // delta for reliable updates.
+    double rNorm = sqrt(r2); // The current residual norm.
+    double maxrr = rNorm; // The maximum residual norm since the last reliable update.
 
-    // Factors which map linear operator onto [-1,1]    
+    // Factors which map linear operator onto [-1,1]
     double m_map = 2./(lambda_max-lambda_min);
     double b_map = -(lambda_max+lambda_min)/(lambda_max-lambda_min);
 
@@ -555,7 +584,7 @@ namespace quda {
           // Enter recursion relation
           if (nKrylov > 2) {
             // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
-            Complex factors[] = { 2.*m_map, 2.*b_map, -1 }; 
+            Complex factors[] = { 2.*m_map, 2.*b_map, -1 };
             for (int k = 2; k < nKrylov; k++) {
               std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2]};
               std::vector<ColorSpinorField*> Sk{S[k]};
@@ -628,16 +657,20 @@ namespace quda {
 
       }
 
+      // NOTE: Because we always carry around the residual from an iteration before, we
+      // "lie" about which iteration we're on so the printed residual matches with the
+      // printed iteration number.
+      if (total_iter > 0) {
+        PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
+      }
+
       total_iter+=nKrylov;
 
-      // NOTE: Because of our cheat on the residual, this is behind an iteration
-      // through the loop
-      PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
 
       // update since nKrylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       // Note: this won't reliable update when the norm _increases_.
-      if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
+      if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, rUpdate, r2, delta)) {
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r_, x, tmp, tmp2);
         r2 = blas::xmyNorm(b, r_);
@@ -667,7 +700,8 @@ namespace quda {
     if (total_iter>param.maxiter && getVerbosity() >= QUDA_SUMMARIZE)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CA-CG: number of restarts = %d\n", restart);
+    // Print number of reliable updates.
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s: Reliable updates = %d\n", "CA-CG", rUpdate);
 
     if (param.compute_true_res) {
       // Calculate the true residual

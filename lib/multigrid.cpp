@@ -1159,7 +1159,6 @@ namespace quda {
   //supports seperate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
 
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
 
     std::string vec_infile(param.mg_global.vec_infile);
@@ -1190,8 +1189,8 @@ namespace quda {
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
       for (int i=0; i<Nvec; i++) V[i] = B_[i]->V();
 
-      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+      read_spinor_field(vec_infile.c_str(), &V[0], B_[0]->Precision(), B_[0]->X(),
+			B_[0]->Ncolor(), B_[0]->Nspin(), Nvec, 0,  (char**)0);
 
       host_free(V);
 
@@ -1236,10 +1235,9 @@ namespace quda {
     profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
 
-  void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
+  void MG::saveVectors(std::vector<ColorSpinorField*> &B) const {
 #ifdef HAVE_QIO
 
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
 
     const int Nvec = B.size();
@@ -1270,8 +1268,8 @@ namespace quda {
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
       for (int i=0; i<Nvec; i++) V[i] = B_[i]->V();
 
-      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+      write_spinor_field(vec_outfile.c_str(), &V[0], B_[0]->Precision(), B_[0]->X(),
+			 B_[0]->Ncolor(), B_[0]->Nspin(), Nvec, 0,  (char**)0);
 
       host_free(V);
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done saving vectors\n");
@@ -1282,12 +1280,17 @@ namespace quda {
     }
 
     profile_global.TPSTOP(QUDA_PROFILE_IO);
-    profile_global.TPSTART(QUDA_PROFILE_INIT);
 #else
     if (strcmp(param.mg_global.vec_outfile,"")!=0) {
       errorQuda("\nQIO library was not built.\n");
     }
 #endif
+  }
+
+  void MG::dumpNullVectors() const
+  {
+    saveVectors(param.B);
+    if (param.level < param.Nlevel-2) coarse->dumpNullVectors();
   }
 
   void MG::generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh) {
@@ -1517,7 +1520,7 @@ namespace quda {
       diracSmootherSloppy->setCommDim(commDim);
     }
 
-    if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
+    if (param.mg_global.vec_store == QUDA_BOOLEAN_YES) { // conditional store of null vectors
       saveVectors(B);
     }
 

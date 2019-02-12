@@ -2646,6 +2646,23 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   profilerStop(__func__);
 }
 
+void dumpMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
+{
+  profilerStart(__func__);
+  pushVerbosity(mg_param->invert_param->verbosity);
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+
+  auto *mg = static_cast<multigrid_solver*>(mg_);
+  checkMultigridParam(mg_param);
+  checkGauge(mg_param->invert_param);
+
+  mg->mg->dumpNullVectors();
+
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+  popVerbosity();
+  profilerStop(__func__);
+}
+
 deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   : d(nullptr), m(nullptr), RV(nullptr), deflParam(nullptr), defl(nullptr),  profile(profile) {
 
@@ -4252,6 +4269,16 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
   // resident gauge field is required
   if (!gauge_param->use_resident_gauge || !gaugePrecise)
     errorQuda("Resident gauge field is required");
+
+  if (!gaugePrecise->StaggeredPhaseApplied()) {
+    errorQuda("Gauge field requires the staggered phase factors to be applied");
+  }
+
+  // check if staggered phase is the desired one
+  if (gauge_param->staggered_phase_type != gaugePrecise->StaggeredPhase()) {
+    errorQuda("Requested staggered phase %d, but found %d\n",
+              gauge_param->staggered_phase_type, gaugePrecise->StaggeredPhase());
+  }
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_H2D);
   profileStaggeredForce.TPSTART(QUDA_PROFILE_INIT);
