@@ -443,7 +443,7 @@ extern "C" {
 
     QudaInvertParam *invert_param;
 
-    QudaEigParam *eig_param;
+    QudaEigParam *eig_param[QUDA_MAX_MG_LEVEL];
     
     /** Number of multigrid levels */
     int n_level;

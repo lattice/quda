@@ -1405,73 +1405,75 @@ namespace quda {
   
   void MG::generateEigenVectors() {
 
-    if(param.mg_global.eig_param->arpack_check) {
+//     if(param.mg_global.eig_param->arpack_check) {
 
-#ifdef ARPACK_LIB
+// #ifdef ARPACK_LIB
 
-      sprintf(prefix,"MG level %d (%s): ARPACK: ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-      setOutputPrefix(prefix);
+//       sprintf(prefix,"MG level %d (%s): ARPACK: ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+//       setOutputPrefix(prefix);
       
-      //A convenience.
-      int nKr = param.mg_global.eig_param->nKr;
+//       //A convenience.
+//       int nKr = param.mg_global.eig_param->nKr;
 
-      //Clone the ColorSpinorParams from the coarse grid vectors. 
-      ColorSpinorParam cpuParam(*param.B[0]);
-      cpuParam.setPrecision(QUDA_DOUBLE_PRECISION); //force double prec for ARPACK
-      cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-      cpuParam.location = QUDA_CPU_FIELD_LOCATION;
-      cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+//       //Clone the ColorSpinorParams from the coarse grid vectors. 
+//       ColorSpinorParam cpuParam(*param.B[0]);
+//       cpuParam.setPrecision(QUDA_DOUBLE_PRECISION); //force double prec for ARPACK
+//       cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+//       cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+//       cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       
-      int local_vol = 1;
-      for(int i=0; i<4; i++) {
-	local_vol *= cpuParam.x[i];
-      }
+//       int local_vol = 1;
+//       for(int i=0; i<4; i++) {
+// 	local_vol *= cpuParam.x[i];
+//       }
       
-      void *hostEvecs = static_cast<void*>(new std::complex<double>[nKr*12*local_vol]);
-      void *hostEvals = static_cast<void*>(new std::complex<double>[nKr]);
+//       void *hostEvecs = static_cast<void*>(new std::complex<double>[nKr*12*local_vol]);
+//       void *hostEvals = static_cast<void*>(new std::complex<double>[nKr]);
             
-      arpack_solve(hostEvecs, hostEvals, *(param.matSmooth->Expose()),
-		   param.mg_global.eig_param, &cpuParam);
+//       arpack_solve(hostEvecs, hostEvals, *(param.matSmooth->Expose()),
+// 		   param.mg_global.eig_param, &cpuParam);
 
-      //Set CPU adress to the start of Evecs buffer
-      cpuParam.v = ((double*)hostEvecs);      
-      ColorSpinorField *cpuTemp = nullptr;
+//       //Set CPU adress to the start of Evecs buffer
+//       cpuParam.v = ((double*)hostEvecs);      
+//       ColorSpinorField *cpuTemp = nullptr;
       
-      for (int i=0; i<param.Nvec; i++) {
-	//Position the cpu pointer to the next Evec. Possible to change
-	//address of the cpuColorSpinorField object?
-	cpuParam.v = (double*)hostEvecs + i*2*12*local_vol;
-	cpuTemp = ColorSpinorField::Create(cpuParam);
+//       for (int i=0; i<param.Nvec; i++) {
+// 	//Position the cpu pointer to the next Evec. Possible to change
+// 	//address of the cpuColorSpinorField object?
+// 	cpuParam.v = (double*)hostEvecs + i*2*12*local_vol;
+// 	cpuTemp = ColorSpinorField::Create(cpuParam);
 	
-	//Copy Evec_i from host to device.
-	*param.B[i] = *cpuTemp;
-	delete cpuTemp;
-      }
+// 	//Copy Evec_i from host to device.
+// 	*param.B[i] = *cpuTemp;
+// 	delete cpuTemp;
+//       }
       
-      //Clean up
-      delete static_cast<std::complex<double>* >(hostEvals);
-      delete static_cast<std::complex<double>* >(hostEvecs);
+//       //Clean up
+//       delete static_cast<std::complex<double>* >(hostEvals);
+//       delete static_cast<std::complex<double>* >(hostEvecs);
       
-      if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
-	saveVectors(param.B);
-      }
-#else
-      errorQuda("Arpack interface not built.");
-#endif
+//       if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
+// 	saveVectors(param.B);
+//       }
+// #else
+//       errorQuda("Arpack interface not built.");
+// #endif
 
-      sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-      setOutputPrefix(prefix);      
+//       sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+//       setOutputPrefix(prefix);      
       
-    }
-    else {
-      //Use GPU eigensolver
-
+//     }
+//     else {
+//       //Use GPU eigensolver
+// #endif
+      
       sprintf(prefix,"MG level %d (%s): Eigensolver: ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
       setOutputPrefix(prefix);
-      
-      int nConv = param.B.size(); param.mg_global.eig_param->nConv = nConv;
-      int nEv   = param.B.size(); param.mg_global.eig_param->nEv = nEv;
-      int nKr   = nEv+nEv/2; param.mg_global.eig_param->nKr = nKr;
+
+      //Extract eigensolver params from the size of the null space.
+      int nConv = param.B.size(); param.mg_global.eig_param[param.level]->nConv = nConv;
+      int nEv   = param.B.size(); param.mg_global.eig_param[param.level]->nEv = nEv;
+      int nKr   = nEv+nEv/2; param.mg_global.eig_param[param.level]->nKr = nKr;
       
       std::vector<Complex> evals(nEv, 0.0);
       
@@ -1491,9 +1493,8 @@ namespace quda {
       
       //Eigensolver function
       const Dirac &mat = *param.matResidual->Expose();
-      irlmSolve(B_evecs, evals, mat,
-		param.mg_global.eig_param);
-
+      irlmSolve(B_evecs, evals, mat, param.mg_global.eig_param[param.level]);
+      
       if(param.level == param.Nlevel-1) {
 	//This is the coarsest grid. We save the eigenvalues
 	for(unsigned int i=0; i<param.B.size(); i++) {
@@ -1529,7 +1530,6 @@ namespace quda {
 
       sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
       setOutputPrefix(prefix);      
-    }
   }
 
   void MG::deflateEigenvectors(std::vector<ColorSpinorField*> vec_defl, std::vector<ColorSpinorField*> vec,

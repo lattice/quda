@@ -111,24 +111,20 @@ extern bool deflate_coarsest;
 extern bool low_mode_check;
 extern bool oblique_proj_check;
 
-extern int eig_nEv;
-extern int eig_nKr;
-extern int eig_nConv;
-extern int eig_check_interval;
-extern int eig_max_restarts;
-extern double eig_tol;
-extern int eig_maxiter;
-extern bool eig_use_poly_acc;
-extern int eig_poly_deg;
-extern double eig_amin;
-extern double eig_amax;
-extern bool eig_use_normop;
-extern bool eig_use_dagger;
-extern bool eig_compute_svd;
-extern QudaEigSpectrumType eig_spectrum;
-extern QudaEigType eig_type;
-extern bool eig_arpack_check;
-extern char eig_arpack_logfile[];
+//The coarsest grid params are for deflation,
+//all others are for PR vectors.
+extern int mg_eig_check_interval[QUDA_MAX_MG_LEVEL];
+extern int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL];
+extern double mg_eig_tol[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_use_poly_acc[QUDA_MAX_MG_LEVEL];
+extern int mg_eig_poly_deg[QUDA_MAX_MG_LEVEL];
+extern double mg_eig_amin[QUDA_MAX_MG_LEVEL];
+extern double mg_eig_amax[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL];
+extern QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL];
+extern QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL];
+
 extern char eig_QUDA_logfile[];
 
 namespace quda {
@@ -156,31 +152,31 @@ display_test_info()
 
   printfQuda("Outer solver paramers\n");
   printfQuda(" - pipeline = %d\n", pipeline);
-
+  
   if(low_mode_check || use_low_modes) {
     printfQuda("Eigensolver parameters\n");
-    printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
-    printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
-    printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-    printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-    printfQuda(" - size of Krylov space %d\n", eig_nKr);
-    printfQuda(" - solver tolerance %e\n", eig_tol);
-    if(eig_compute_svd) {
-      printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
-      warningQuda(" **** Overriding any previous choices of operator type. "
-		  "SVD demands normal operator, will use MdagM ****");      
-    } else {    
-    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n",
-	       eig_use_dagger ? "true" : "false",
-	       eig_use_normop ? "true" : "false");
+    for (int i=0; i<mg_levels; i++) {
+      if ((i < mg_levels-1 && use_low_modes) || (i == mg_levels-1 && deflate_coarsest)) {
+	printfQuda(" - Level %d\n", i+1);
+	printfQuda(" - solver mode %s\n", get_eig_type_str(mg_eig_type[i]));
+	printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(mg_eig_spectrum[i]));
+	printfQuda(" - number of eigenvectors requested %d\n", nvec[i]);
+	printfQuda(" - size of eigenvector search space %d\n", nvec[i]);
+	printfQuda(" - size of Krylov space %d\n", nvec[i] +nvec[i]/2);
+	printfQuda(" - solver tolerance %e\n", mg_eig_tol[i]);
+	printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n",
+		   mg_eig_use_dagger[i] ? "true" : "false",
+		   mg_eig_use_normop[i] ? "true" : "false");
+	
+	if(mg_eig_use_poly_acc[i]) {
+	  printfQuda(" - Chebyshev polynomial degree %d\n", mg_eig_poly_deg[i]);
+	  printfQuda(" - Chebyshev polynomial minumum %e\n", mg_eig_amin[i]);
+	  printfQuda(" - Chebyshev polynomial maximum %e\n", mg_eig_amax[i]);
+	}
+      }
     }
-    if(eig_use_poly_acc) {
-      printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
-      printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
-    }
+    printfQuda("\n");
   }
-  
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
@@ -231,6 +227,30 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   pad_size = MAX(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;    
 #endif
+}
+
+//Parameters defining the eigensolver
+void setEigParam(QudaEigParam &mg_eig_param, int level) {
+
+  mg_eig_param.eig_type = mg_eig_type[level];
+  mg_eig_param.spectrum = mg_eig_spectrum[level];
+  
+  mg_eig_param.tol     = mg_eig_tol[level];
+  mg_eig_param.check_interval = mg_eig_check_interval[level];
+  mg_eig_param.max_restarts = mg_eig_max_restarts[level];
+  mg_eig_param.cuda_prec_ritz = cuda_prec;
+
+  mg_eig_param.compute_svd = QUDA_BOOLEAN_NO;
+  mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.use_dagger  = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  
+  mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.poly_deg = mg_eig_poly_deg[level];
+  mg_eig_param.a_min    = mg_eig_amin[level];
+  mg_eig_param.a_max    = mg_eig_amax[level];
+  
+  strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
+  
 }
 
 void setMultigridParam(QudaMultigridParam &mg_param) {
@@ -293,6 +313,11 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
+
+    QudaEigParam mg_eig_param = newQudaEigParam();
+    setEigParam(mg_eig_param, i);
+    mg_param.eig_param[i] = &mg_eig_param;  
+    
     for (int j=0; j<QUDA_MAX_DIM; j++) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
@@ -309,7 +334,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.nu_pre[i] = nu_pre[i];
     mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];
-
+    
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
     // set the coarse solver wrappers including bottom solver
@@ -536,39 +561,6 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.omega = 1.0;
 }
 
-//Parameters defining the eigensolver
-void setEigParam(QudaEigParam &eig_param) {
-
-  eig_param.eig_type = eig_type;
-  eig_param.spectrum = eig_spectrum;
-  
-  eig_param.nConv   = eig_nConv;
-  eig_param.nEv     = eig_nEv;
-  eig_param.nKr     = eig_nKr;
-  eig_param.tol     = eig_tol;
-  eig_param.check_interval = eig_check_interval;
-  eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = cuda_prec;
-
-  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.use_dagger  = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  if(eig_compute_svd) {
-    eig_param.use_dagger  = QUDA_BOOLEAN_NO;
-    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
-  }
-  
-  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.poly_deg = eig_poly_deg;
-  eig_param.a_min    = eig_amin;
-  eig_param.a_max    = eig_amax;
-
-  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
-  
-}
-
-
 int main(int argc, char **argv)
 {
   // We give here the default values to some of the array
@@ -592,6 +584,18 @@ int main(int argc, char **argv)
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
     nu_pre[i] = 2;
     nu_post[i] = 2;
+    //Default eigensolver params
+    mg_eig_tol[i] = 1e-3;
+    mg_eig_type[i] = QUDA_IMP_RST_LANCZOS;
+    mg_eig_spectrum[i] = QUDA_SR_EIG_SPECTRUM;
+    mg_eig_check_interval[i] = 5;
+    mg_eig_max_restarts[i] = 100;
+    mg_eig_use_normop[i] = QUDA_BOOLEAN_YES;
+    mg_eig_use_dagger[i] = QUDA_BOOLEAN_NO;
+    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_YES;
+    mg_eig_poly_deg[i] = 100;
+    mg_eig_amin[i] = 1.0;
+    mg_eig_amax[i] = 5.0;
   }
   reliable_delta = 1e-4;
 
@@ -620,8 +624,6 @@ int main(int argc, char **argv)
   // call srand() with a rank-dependent seed
   initRand();
 
-  display_test_info();
-
   // *** QUDA parameters begin here.
 
   if (dslash_type != QUDA_WILSON_DSLASH &&
@@ -637,21 +639,17 @@ int main(int argc, char **argv)
 
   QudaMultigridParam mg_param = newQudaMultigridParam();
 
-  //Set sub structures
+  //Set sub structure
   QudaInvertParam mg_inv_param = newQudaInvertParam();
-  //Sen in MG
+  //Set in MG
   mg_param.invert_param = &mg_inv_param;
-  
-  QudaEigParam mg_eig_param = newQudaEigParam();
-  //Set in function
-  setEigParam(mg_eig_param);
-  mg_param.eig_param = &mg_eig_param;  
-
   setMultigridParam(mg_param);
 
   QudaInvertParam inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
 
+  display_test_info();
+  
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
 

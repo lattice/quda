@@ -1743,6 +1743,7 @@ QudaExtLibType deflation_ext_lib  = QUDA_EIGEN_EXTLIB;
 QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
+//Parameters for the stand alone eigensolver
 int eig_nEv = 8;
 int eig_nKr = 12;
 int eig_nConv = 6;
@@ -1761,6 +1762,21 @@ QudaEigType eig_type = QUDA_IMP_RST_LANCZOS;
 bool eig_arpack_check = false;
 char eig_arpack_logfile[256] = "arpack_logfile.log";
 char eig_QUDA_logfile[256] = "QUDA_logfile.log";
+
+//Parameters for the MG eigensolver.
+//The coarsest grid params are for deflation,
+//all others are for PR vectors.
+int mg_eig_check_interval[QUDA_MAX_MG_LEVEL] = { };
+int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL] = { };
+double mg_eig_tol[QUDA_MAX_MG_LEVEL] = { };
+bool mg_eig_use_poly_acc[QUDA_MAX_MG_LEVEL] = { };
+int mg_eig_poly_deg[QUDA_MAX_MG_LEVEL] = { };
+double mg_eig_amin[QUDA_MAX_MG_LEVEL] = { };
+double mg_eig_amax[QUDA_MAX_MG_LEVEL] = { };
+bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL] = { };
+bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL] = { };
+QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL] = { };
+QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL] = { };
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -1894,7 +1910,7 @@ void usage(char** argv )
   printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory location)\n");
   printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory type for the ritz vectors  (default device memory type)\n");
 
-
+  //Stand alone Eigensolver
   printf("    --eig-nEv <n>                             # The size of eigenvector search space in the eigensolver\n");
   printf("    --eig-nKr <n>                             # The size of the Krylov subspace to use in the eigensolver\n");
   printf("    --eig-nConv <n>                           # The number of converged eigenvalues requested\n");
@@ -1912,6 +1928,19 @@ void usage(char** argv )
   printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (lanczos, irlm, arnoldi, iram, trlm,...)\n");
   printf("    --eig-QUDA-logfile <file_name>            # The filename storing the stdout from the QUDA eigensolver\n");
   printf("    --eig-arpack-check <true/false>           # Cross check the device data against ARPACK (requires ARPACK, default false)\n");
+  
+  //Multigrid Eigensolver
+  printf("    --mg-eig-check-interval <level> <n>               # Perform a convergence check every nth restart/iteration in the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
+  printf("    --mg-eig-max-restarts <level> <n>                 # Perform n iterations of the restart in the IRAM/IRLM eigensolver\n");
+  printf("    --mg-eig-tol <level> <tol>                        # The tolerance to use in the eigensolver\n");
+  printf("    --mg-eig-use-poly-acc <level> <true/false>        # Use Chebyshev polynomial acceleration in the eigensolver\n");
+  printf("    --mg-eig-poly-deg <level> <n>                     # Set the degree of the Chebyshev polynomial acceleration in the eigensolver\n");
+  printf("    --mg-eig-amin <level> <Float>                     # The minimum in the polynomial acceleration\n");
+  printf("    --mg-eig-amax <level> <Float>                     # The maximum in the polynomial acceleration\n");
+  printf("    --mg-eig-use-normop <level> <true/false>          # Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)\n");
+  printf("    --mg-eig-use-dagger <level> <true/false>          # Solve the MMdag problem instead of M (MMdag if eig-use-normop == true) (default false)\n");
+  printf("    --mg-eig-spectrum <level> <SR/LR/SM/LM/SI/LI>     # The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary (default SR)\n");
+  printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (lanczos, irlm, arnoldi, iram, trlm,...) (default irlm)\n");
   
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
 
@@ -3691,6 +3720,228 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
+
+  //DMH
+  if( strcmp(argv[i], "--mg-eig-check-interval") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_check_interval[level] = atoi(argv[i+1]);
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-eig-max-restarts") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_max_restarts[level] = atoi(argv[i+1]);
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--mg-eig-tol") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_tol[level] = atof(argv[i+1]);
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-eig-use-poly-acc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i+1], "true") == 0){
+      mg_eig_use_poly_acc[level] = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      mg_eig_use_poly_acc[level] = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
+      exit(1);
+    }
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-eig-poly-deg") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_poly_deg[level] = atoi(argv[i+1]);
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-eig-amin") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_amin[level] = atof(argv[i+1]);
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-eig-amax") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_amax[level] = atof(argv[i+1]);
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-eig-use-normop") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i+1], "true") == 0){
+      mg_eig_use_normop[level] = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      mg_eig_use_normop[level] = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
+      exit(1);
+    }
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-eig-use-dagger") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i+1], "true") == 0){
+      mg_eig_use_dagger[level] = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      mg_eig_use_dagger[level] = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
+      exit(1);
+    }
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-eig-spectrum") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+    
+    mg_eig_spectrum[level] = get_eig_spectrum_type(argv[i+1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-eig-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+    
+    mg_eig_type[level] = get_eig_type(argv[i+1]);
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  
   
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
