@@ -345,6 +345,9 @@ namespace quda {
       }
       //for incremental eigCG:
       param.rhs_idx = rhs_idx;
+
+      param.ca_lambda_min = ca_lambda_min;
+      param.ca_lambda_max = ca_lambda_max;
     }
 
     void updateRhsIndex(QudaInvertParam &param) {
@@ -782,8 +785,6 @@ namespace quda {
 
     bool lambda_init;
     QudaCABasis basis;
-    double lambda_min; // for chebyshev basis
-    double lambda_max;
 
     Complex *Q_AQandg; // Fused inner product matrix
     Complex *Q_AS; // inner product matrix
