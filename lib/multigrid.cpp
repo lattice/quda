@@ -41,12 +41,9 @@ namespace quda {
       ColorSpinorParam csParam(*(param.B[0]));
       csParam.create = QUDA_NULL_FIELD_CREATE;
       csParam.location = param.location;
-      csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy);
+      csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION,
+                           csParam.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
       if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
-        // all coarse GPU vectors use FLOAT2 ordering
-        csParam.fieldOrder = (csParam.Precision() == QUDA_DOUBLE_PRECISION || param.level > 0 || param.B[0]->Nspin() == 1) ?
-          QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-        csParam.setPrecision(csParam.Precision());
         csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS: QUDA_UKQCD_GAMMA_BASIS;
       }
       if (param.B[0]->Nspin() == 1) csParam.gammaBasis = param.B[0]->GammaBasis(); // hack for staggered to avoid unnecessary basis checks
@@ -903,7 +900,7 @@ namespace quda {
     setOutputPrefix(param.level == 0 ? "" : prefix_bkup);
   }
 
-  //supports seperate reading or single file read
+  //supports separate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
 
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
@@ -1405,7 +1402,7 @@ namespace quda {
   
   void MG::generateEigenVectors() {
 
-    if(param.mg_global.eig_param->arpack_check) {
+    if (param.mg_global.eig_param->arpack_check) {
 
 #ifdef ARPACK_LIB
 
@@ -1462,8 +1459,7 @@ namespace quda {
       sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
       setOutputPrefix(prefix);      
       
-    }
-    else {
+    } else {
       //Use GPU eigensolver
 
       sprintf(prefix,"MG level %d (%s): Eigensolver: ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
@@ -1479,15 +1475,10 @@ namespace quda {
       ColorSpinorParam csParam(*param.B[0]);
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       csParam.create = QUDA_ZERO_FIELD_CREATE;
+      // this is the vector precision used by matResidual
+      csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
-      if(csParam.Precision() == QUDA_SINGLE_PRECISION)
-	csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-      
-      if(param.level > 0) {
-	csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      }
-      
-      for(int i=0; i<nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
+      for (int i=0; i<nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
       
       //Eigensolver function
       const Dirac &mat = *param.matResidual->Expose();
@@ -1513,7 +1504,7 @@ namespace quda {
 #endif
       
       //Copy evecs back to MG
-      for(unsigned int i=0; i<param.B.size(); i++) {
+      for (unsigned int i=0; i<param.B.size(); i++) {
 	*param.B[i] = *B_evecs[i];
       }
 
@@ -1523,7 +1514,7 @@ namespace quda {
       }
 
       //Local clean-up
-      for(unsigned int i=0; i<B_evecs.size(); i++) {
+      for (unsigned int i=0; i<B_evecs.size(); i++) {
 	delete B_evecs[i];
       }
 
