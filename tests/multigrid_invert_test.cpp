@@ -135,13 +135,13 @@ void
 display_test_info()
 {
   printfQuda("running the following test:\n");
-    
+
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
   printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
 	     get_prec_str(prec),get_prec_str(prec_sloppy),
-	     get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
-  
+	     get_recon_str(link_recon),
+	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);
+
   printfQuda("MG parameters\n");
   printfQuda(" - number of levels %d\n", mg_levels);
   for (int i=0; i<mg_levels-1; i++) {
@@ -152,11 +152,11 @@ display_test_info()
 
   printfQuda("Outer solver paramers\n");
   printfQuda(" - pipeline = %d\n", pipeline);
-  
-  if(low_mode_check || use_low_modes) {
+
+  if(low_mode_check || use_low_modes || deflate_coarsest) {
     printfQuda("Eigensolver parameters\n");
     for (int i=0; i<mg_levels; i++) {
-      if ((i < mg_levels-1 && use_low_modes) || (i == mg_levels-1 && deflate_coarsest)) {
+      if ((i < mg_levels-1 && (low_mode_check || use_low_modes)) || (i == mg_levels-1 && deflate_coarsest)) {
 	printfQuda(" - Level %d\n", i+1);
 	printfQuda(" - solver mode %s\n", get_eig_type_str(mg_eig_type[i]));
 	printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(mg_eig_spectrum[i]));
@@ -167,7 +167,7 @@ display_test_info()
 	printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n",
 		   mg_eig_use_dagger[i] ? "true" : "false",
 		   mg_eig_use_normop[i] ? "true" : "false");
-	
+
 	if(mg_eig_use_poly_acc[i]) {
 	  printfQuda(" - Chebyshev polynomial degree %d\n", mg_eig_poly_deg[i]);
 	  printfQuda(" - Chebyshev polynomial minumum %e\n", mg_eig_amin[i]);
@@ -177,12 +177,12 @@ display_test_info()
     }
     printfQuda("\n");
   }
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n",
 	     dimPartitioned(0),
 	     dimPartitioned(1),
 	     dimPartitioned(2),
-	     dimPartitioned(3)); 
+	     dimPartitioned(3));
   return ;
 }
 
@@ -201,7 +201,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
+
   gauge_param.cpu_prec = cpu_prec;
 
   gauge_param.cuda_prec = cuda_prec;
@@ -225,7 +225,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   int pad_size =MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
+  gauge_param.ga_pad = pad_size;
 #endif
 }
 
@@ -234,8 +234,8 @@ void setEigParam(QudaEigParam &mg_eig_param, int level) {
 
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
-  
-  mg_eig_param.tol     = mg_eig_tol[level];
+
+  mg_eig_param.tol = mg_eig_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];
   mg_eig_param.cuda_prec_ritz = cuda_prec;
@@ -243,19 +243,19 @@ void setEigParam(QudaEigParam &mg_eig_param, int level) {
   mg_eig_param.compute_svd = QUDA_BOOLEAN_NO;
   mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_eig_param.use_dagger  = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  
+
   mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_eig_param.poly_deg = mg_eig_poly_deg[level];
   mg_eig_param.a_min    = mg_eig_amin[level];
   mg_eig_param.a_max    = mg_eig_amax[level];
-  
+
   strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
-  
+
 }
 
 void setMultigridParam(QudaMultigridParam &mg_param) {
   QudaInvertParam &inv_param = *mg_param.invert_param;
-  
+
   inv_param.Ls = 1;
 
   inv_param.sp_pad = 0;
@@ -313,11 +313,6 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
-
-    QudaEigParam mg_eig_param = newQudaEigParam();
-    setEigParam(mg_eig_param, i);
-    mg_param.eig_param[i] = &mg_eig_param;  
-    
     for (int j=0; j<QUDA_MAX_DIM; j++) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
@@ -334,7 +329,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.nu_pre[i] = nu_pre[i];
     mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];
-    
+
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
     // set the coarse solver wrappers including bottom solver
@@ -454,7 +449,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.use_low_modes = use_low_modes ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_param.deflate_coarsest = deflate_coarsest ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  
+
   // set file i/o parameters
   strcpy(mg_param.vec_infile, vec_infile);
   strcpy(mg_param.vec_outfile, vec_outfile);
@@ -639,9 +634,15 @@ int main(int argc, char **argv)
 
   QudaMultigridParam mg_param = newQudaMultigridParam();
 
-  //Set sub structure
+  //Set sub structures
   QudaInvertParam mg_inv_param = newQudaInvertParam();
-  //Set in MG
+  QudaEigParam mg_eig_param[mg_levels];
+  for(int i=0; i<mg_levels; i++) {
+    mg_eig_param[i] = newQudaEigParam();
+    setEigParam(mg_eig_param[i], i);
+    mg_param.eig_param[i] = &mg_eig_param[i];
+  }
+  //Set MG
   mg_param.invert_param = &mg_inv_param;
   setMultigridParam(mg_param);
 
@@ -649,7 +650,7 @@ int main(int argc, char **argv)
   setInvertParam(inv_param);
 
   display_test_info();
-  
+
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
 
@@ -746,14 +747,14 @@ int main(int argc, char **argv)
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-    
-  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+
+  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
   //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, 0.0);
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
-    
+
     if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
       wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
     } else {
@@ -769,11 +770,11 @@ int main(int argc, char **argv)
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
       ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     }
-    
+
   } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
-    
+
     if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-      wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
+      wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0,
 		inv_param.cpu_prec, gauge_param);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -786,7 +787,7 @@ int main(int argc, char **argv)
         }
       }
     }
-    
+
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
       ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
     }

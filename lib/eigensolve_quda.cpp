@@ -171,7 +171,7 @@ namespace quda {
 
   }
 
-  
+
   template<typename Float>
   void lanczosStep(const Dirac &mat,
 		   std::vector<ColorSpinorField*> v,
@@ -474,6 +474,12 @@ namespace quda {
 
     printfQuda("**** START IRLM SOLUTION ****\n");
     printfQuda("Output from IRLM directed to %s\n", QUDA_logfile);
+    printfQuda("nConv %d\n", nConv);
+    printfQuda("nEv %d\n", nEv);
+    printfQuda("nKr %d\n", nKr);
+    printfQuda("polyDeg %d\n", eig_param->poly_deg);
+    printfQuda("a-min %f\n", eig_param->a_min);
+    printfQuda("a-max %f\n", eig_param->a_max);
 
     //Initial k step factorisation
     time = -clock();
@@ -797,20 +803,20 @@ namespace quda {
 		  std::vector<Complex> &evals, const Dirac &mat,
 		  QudaEigParam *eig_param){
 
-    
+
   }
 
   void iramSolve(std::vector<ColorSpinorField*> kSpace,
 		 std::vector<Complex> &evals, const Dirac &mat,
 		 QudaEigParam *eig_param){
-    
+
     if(eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION) {
       iram_solve<double>(kSpace, evals, mat, eig_param);
     } else {
       iram_solve<float>(kSpace, evals, mat, eig_param);
     }
   }
-  
+
   // ARPACK INTERAFCE ROUTINES
   //--------------------------------------------------------------------------
 
