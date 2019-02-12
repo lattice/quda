@@ -878,7 +878,6 @@ extern "C" {
 			void** quark_field,
 			void* oprod[3]);
 
-
 #ifdef __cplusplus
 }
 #endif

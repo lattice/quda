@@ -582,6 +582,12 @@ extern "C" {
   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
   /**
+   * @param mycomm User provided MPI communicator in place of MPI_COMM_WORLD
+   */
+
+  void qudaSetCommHandle(void *mycomm);
+
+  /**
    * Declare the grid mapping ("logical topology" in QMP parlance)
    * used for communications in a multi-GPU grid.  This function
    * should be called prior to initQuda().  The only case in which
@@ -607,6 +613,7 @@ extern "C" {
    *
    * @see QudaCommsMap
    */
+
   void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata);
 
   /**
@@ -1195,6 +1202,8 @@ extern "C" {
    * Free resources allocated by the deflated solver
    */
   void destroyDeflationQuda(void *df_instance);
+
+  void qudaSetMPICommHandle(void *mycomm);
 
 #ifdef __cplusplus
 }
