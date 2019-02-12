@@ -161,6 +161,18 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
 
+  // set gdr enablement
+  if (comm_gdr_enabled()) {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
+    comm_gdr_blacklist(); // set GDR blacklist
+    // by default, if GDR is enabled we disable non-p2p policies to
+    // prevent possible conflict between MPI and QUDA opening the same
+    // IPC memory handles when using CUDA-aware MPI
+    enable_peer_to_peer += 4;
+  } else {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
+  }
+
   char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
 
   // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
@@ -258,14 +270,6 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   comm_barrier();
 
   peer2peer_present = comm_peer2peer_enabled_global();
-
-  // set gdr enablement
-  if (comm_gdr_enabled()) {
-    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
-    comm_gdr_blacklist(); // set GDR blacklist
-  } else {
-    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
-  }
 
   checkCudaErrorNoSync();
   return;
