@@ -734,8 +734,78 @@ namespace quda {
   }
  
   // Copy the EOFA specific parameters
-  DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracParam &param) : DiracMobiusPC(param),
-    eofa_shift(param.eofa_shift), eofa_pm(param.eofa_pm), mq1(param.mq1), mq2(param.mq2), mq3(param.mq3) { }
+  DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracParam &param): 
+    DiracMobiusPC(param),
+    eofa_shift(param.eofa_shift), 
+    eofa_pm(param.eofa_pm), 
+    mq1(param.mq1), 
+    mq2(param.mq2), 
+    mq3(param.mq3)
+  {
+    // Initiaize the EOFA parameters here: u, x, y 
+
+    double b = b_5[0].real();
+    double c = c_5[0].real();
+    
+    kappa = (c*(m5+4.)-1.) / (b*(m5+4.)+1.);
+    double alpha = b+c;
+    
+    double eofa_norm = alpha * (mq3-mq2) * std::pow(alpha+1., 2.*Ls)
+                          / ( std::pow(alpha+1.,Ls) + mq2*std::pow(alpha-1.,Ls) )
+                          / ( std::pow(alpha+1.,Ls) + mq3*std::pow(alpha-1.,Ls) );
+    
+    // Following the Grid implementation of MobiusEOFAFermion<Impl>::SetCoefficientsPrecondShiftOps()
+    // QUDA uses the kappa preconditioning: there is a (2.*kappa_b)^-1 difference here.
+    double N = (eofa_pm?+1.:-1.) * (2.*this->eofa_shift*eofa_norm) * ( std::pow(alpha+1.,Ls) + this->mq1*std::pow(alpha-1.,Ls) ) / (b*(m5+4.)+1.);
+    
+    // Here the signs are somewhat mixed:
+    // There is one -1 from N for eofa_pm = minus, thus the u_- here is actually -u_- in the document
+    // It turns out this actually simplies things.
+    for(int s = 0; s < Ls; s++){
+      eofa_u[eofa_pm?s:Ls-1-s] = N * std::pow(-1.,s) * std::pow(alpha-1.,s) / std::pow(alpha+1.,Ls+s+1);
+    }
+
+    double factor = -kappa*mass;
+    if(eofa_pm){
+      // eofa_pm = plus
+      // Computing x
+      eofa_x[0] = eofa_u[0]; 
+      for(int s = Ls-1; s > 0; s--){
+        eofa_x[0] -= factor*eofa_u[s];
+        factor *= -kappa;
+      }
+      eofa_x[0] /= 1.+factor;
+      for(int s = 1; s < Ls; s++){
+        eofa_x[s] = eofa_x[s-1]*(-kappa) + eofa_u[s];
+      }
+      // Computing y
+      eofa_y[Ls-1] = 1./(1.+factor);
+      sherman_morrison_fac = eofa_x[Ls-1];
+      for(int s = Ls-1; s > 0; s--){
+        eofa_y[s-1] = eofa_y[s]*(-kappa);
+      }
+    }else{
+      // eofa_pm = minus
+      // Computing x
+      eofa_x[Ls-1] = eofa_u[Ls-1]; 
+      for(int s = 0; s < Ls; s++){
+        eofa_x[Ls-1] -= factor*eofa_u[s];
+        factor *= -kappa;
+      }
+      eofa_x[Ls-1] /= 1.+factor;
+      for(int s = Ls-1; s > 0; s--){
+        eofa_x[s-1] = eofa_x[s]*(-kappa) + eofa_u[s-1];
+      }
+      // Computing y
+      eofa_y[0] = 1./(1.+factor);
+      sherman_morrison_fac = eofa_x[0];
+      for(int s = 1; s < Ls; s++){
+        eofa_y[s] = eofa_y[s-1]*(-kappa); 
+      }
+    }
+    m5inv_fac = 0.5/(1.+factor); // 0.5 for the spin project factor
+    sherman_morrison_fac = -0.5/(1.+sherman_morrison_fac); // 0.5 for the spin project factor
+  }
 
   // Specify the EOFA specific parameters
   DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracMobiusPC &dirac) : DiracMobiusPC(dirac),
@@ -764,12 +834,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    double alpha = b_5[0].real()+c_5[0].real();
-    double eofa_norm = alpha * (mq3-mq2) * std::pow(alpha+1., 2.*Ls)
-                          / ( std::pow(alpha+1., Ls) + mq2*std::pow(alpha-1., Ls) )
-                          / ( std::pow(alpha+1., Ls) + mq3*std::pow(alpha-1., Ls) );
-
-    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, M5_EOFA);
+    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
    
     // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
@@ -782,12 +847,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    double alpha = b_5[0].real()+c_5[0].real();
-    double eofa_norm = alpha * (mq3-mq2) * std::pow(alpha+1., 2.*Ls)
-                          / ( std::pow(alpha+1.,Ls) + mq2*std::pow(alpha-1.,Ls) )
-                          / ( std::pow(alpha+1.,Ls) + mq3*std::pow(alpha-1.,Ls) );
-
-    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, M5INV_EOFA);
+    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
    
     // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);

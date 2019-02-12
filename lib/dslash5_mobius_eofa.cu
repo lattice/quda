@@ -62,102 +62,44 @@ namespace quda {
         real c = 0.;                 // real constant Mobius coefficient
         real a;                      // real xpay coefficient
 
-        real kappa = 0.;
-        real inv = 0.;
+        real kappa;
+        real inv;
 
         int  eofa_pm;
         real eofa_norm; // k in Grid implementation. (A12)
-        real eofa_shift; // \beta in (B16), or the "shift" in Grid implementation
-
         real sherman_morrison;
-
-        real mq1, mq2, mq3; // mq1, mq2 and mq3 in Grid implementation
 
         Dslash5Type type;
 
         Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-            const double m_f_, const double m_5_, const Complex *b_5_, const Complex *c_5_, double a_, 
-            const double mq1_, const double mq2_, const double mq3_, 
-            const int eofa_pm_, const double eofa_norm_, const double eofa_shift_,
-            bool dagger, Dslash5Type type_)
+            const double m_f_, const double m_5_, const Complex *b_5_, const Complex *c_5_, double a_,
+            int eofa_pm_,
+            double inv_, double kappa_, const double* eofa_u, const double* eofa_x, const double* eofa_y, double sherman_morrison_,
+            bool dagger_, Dslash5Type type_)
           : out(out), in(in), x(x), nParity(in.SiteSubset()),
           volume_cb(in.VolumeCB()), volume_4d_cb(volume_cb/in.X(4)), Ls(in.X(4)),
-          m_f(m_f_), m_5(m_5_), a(a_), dagger(dagger), xpay(a_ == 0.0 ? false : true), type(type_),
-          mq1(mq1_), mq2(mq2_), mq3(mq3_), eofa_pm(eofa_pm_), eofa_norm(eofa_norm_), eofa_shift(eofa_shift_), sherman_morrison(0.)
-          {
+          m_f(m_f_), m_5(m_5_), a(a_), dagger(dagger_), xpay(a_==0.?false:true), type(type_),
+          eofa_pm(eofa_pm_), inv(inv_), kappa(kappa_), sherman_morrison(sherman_morrison_)
+        {
             if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
             if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
             if (sizeof(eofa_coeff<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(eofa_coeff<real>));
             
             eofa_coeff<real>* eofa_coeffs = reinterpret_cast<eofa_coeff<real>*>(mobius_eofa_h);
-            // For Mobius the b's and c's are constants and real
-            b = b_5_[0].real();
-            c = c_5_[0].real();
-            kappa = (c*(m_5+4.)-1.) / (b*(m_5+4.)+1.);
-            double alpha = b+c;
-            
-            // Following the Grid implementation of MobiusEOFAFermion<Impl>::SetCoefficientsPrecondShiftOps()
-            double N = ( (eofa_pm == 1)?1.:-1. ) * (2.*this->eofa_shift*this->eofa_norm) * ( std::pow(alpha+1.,Ls) + this->mq1*std::pow(alpha-1.,Ls) );
-            // QUDA uses the kappa preconditioning: there is a (2.*kappa_b)^-1 difference here.
-            N *= 1./(b*(m_5+4.)+1.);
-            
-            // Here the signs are somewhat mixed:
-            // There is one -1 from N for eofa_pm = 0/minus, thus the u_- here is actually -u_- in the document
-            // It turns out this actually simplies things.
-            for(int s = 0; s < Ls; s++){
-              int idx = (eofa_pm == 1) ? (s) : (Ls-1-s);
-              eofa_coeffs->u[idx] = N * std::pow(-1.,s) * std::pow(alpha-1.,s) / std::pow(alpha+1.,Ls+s+1);
-            } 
-
-            real factor = -kappa*m_f;
+           
             switch(type) {
               case M5_EOFA:
+                for(int s = 0; s < Ls; s++){
+                  eofa_coeffs->u[s] = eofa_u[s]; 
+                }
                 cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>)/3, 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
                 break;
               case M5INV_EOFA:
-                /** Here we want to solve 
-                 * M_pm^-1      * u_pm = x_pm
-                 * M_pm^-dagger * v_pm = y_pm
-                 */
-                if(eofa_pm){
-                  // eofa_pm = plus
-                  // Computing x
-                  eofa_coeffs->x[0] = eofa_coeffs->u[0]; 
-                  for(int s = Ls-1; s > 0; s--){
-                    eofa_coeffs->x[0] -= factor*eofa_coeffs->u[s];
-                    factor *= -kappa;
-                  }
-                  eofa_coeffs->x[0] /= 1.+factor;
-                  for(int s = 1; s < Ls; s++){
-                    eofa_coeffs->x[s] = eofa_coeffs->x[s-1]*(-kappa) + eofa_coeffs->u[s];
-                  }
-                  // Computing y
-                  eofa_coeffs->y[Ls-1] = 1./(1.+factor);
-                  sherman_morrison = eofa_coeffs->x[Ls-1];
-                  for(int s = Ls-1; s > 0; s--){
-                    eofa_coeffs->y[s-1] = eofa_coeffs->y[s]*(-kappa);
-                  }
-                }else{
-                  // eofa_pm = minus
-                  // Computing x
-                  eofa_coeffs->x[Ls-1] = eofa_coeffs->u[Ls-1]; 
-                  for(int s = 0; s < Ls; s++){
-                    eofa_coeffs->x[Ls-1] -= factor*eofa_coeffs->u[s];
-                    factor *= -kappa;
-                  }
-                  eofa_coeffs->x[Ls-1] /= 1.+factor;
-                  for(int s = Ls-1; s > 0; s--){
-                    eofa_coeffs->x[s-1] = eofa_coeffs->x[s]*(-kappa) + eofa_coeffs->u[s-1];
-                  }
-                  // Computing y
-                  eofa_coeffs->y[0] = 1./(1.+factor);
-                  sherman_morrison = eofa_coeffs->x[0];
-                  for(int s = 1; s < Ls; s++){
-                    eofa_coeffs->y[s] = eofa_coeffs->y[s-1]*(-kappa); 
-                  }
+                for(int s = 0; s < Ls; s++){
+                  eofa_coeffs->u[s] = eofa_u[s]; 
+                  eofa_coeffs->x[s] = eofa_x[s]; 
+                  eofa_coeffs->y[s] = eofa_y[s]; 
                 }
-                inv = 0.5/(1.+factor); // 0.5 for the spin project factor
-                sherman_morrison = -0.5/(1.+sherman_morrison); // 0.5 for the spin project factor
                 cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>), 0, cudaMemcpyHostToDevice, streams[Nstream-1]);
                 break;
               default:
@@ -258,9 +200,9 @@ namespace quda {
         typedef typename mapper<storage_type>::type real;
         typedef ColorSpinor<real,nColor,4> Vector;
 
-        const real k = -arg.kappa; // k is -kappa
-        const real inv = arg.inv;
-        const real sherman_morrison = arg.sherman_morrison;
+        const auto k = -arg.kappa; // k is -kappa
+        const auto inv = arg.inv;
+        const auto sherman_morrison = arg.sherman_morrison;
         VectorCache<real,Vector> cache;
         cache.save(arg.in(s*arg.volume_4d_cb + x_cb, parity));
         cache.sync();
@@ -272,13 +214,15 @@ namespace quda {
           Vector in = cache.load(threadIdx.x, sp, parity);
           {
             int exp = s < sp ? arg.Ls-sp+s : s-sp;
-            real factorR = inv * __fast_pow(k,exp) * ( s < sp ? -arg.m_f : static_cast<real>(1.0) );
+            real factorR = 0.5 * eofa_coeffs->y[pm?arg.Ls-exp-1:exp] * ( s < sp ? -arg.m_f : static_cast<real>(1.0) );
+            // real factorR = inv * __fast_pow(k,exp) * ( s < sp ? -arg.m_f : static_cast<real>(1.0) );
             constexpr int proj_dir = dagger ? -1 : +1;
             out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
           }
           {
             int exp = s > sp ? arg.Ls-s+sp : sp-s;
-            real factorL = inv * __fast_pow(k,exp) * ( s > sp ? -arg.m_f : static_cast<real>(1.0) );
+            real factorL = 0.5 * eofa_coeffs->y[pm?arg.Ls-exp-1:exp] * ( s > sp ? -arg.m_f : static_cast<real>(1.0) );
+            // real factorL = inv * __fast_pow(k,exp) * ( s > sp ? -arg.m_f : static_cast<real>(1.0) );
             constexpr int proj_dir = dagger ? +1 : -1;
             out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
           }
@@ -371,7 +315,7 @@ namespace quda {
 
           // overloaded to return max dynamic shared memory if doing shared-memory inverse
           unsigned int maxSharedBytesPerBlock() const {
-            if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS) ) {
+            if (shared && (arg.type == M5_EOFA || arg.type == M5INV_EOFA) ) {
               return maxDynamicSharedBytesPerBlock();
             } else {
               return TunableVectorYZ::maxSharedBytesPerBlock();
@@ -383,8 +327,13 @@ namespace quda {
             : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
           {
             strcpy(aux, meta.AuxString());
-            if (arg.dagger) strcat(aux, ",Dagger");
-            if (arg.xpay) strcat(aux,",xpay");
+            if (arg.dagger)  strcat(aux, ",Dagger");
+            if (arg.xpay)    strcat(aux, ",xpay");
+            if (arg.eofa_pm){
+              strcat(aux, ",eofa_plus");
+            }else{
+              strcat(aux, ",eofa_minus");
+            }
             switch (arg.type) {
               case M5_EOFA:        strcat(aux, ",mobius_M5_EOFA");        break;
               case M5INV_EOFA:     strcat(aux, ",mobius_M5INV_EOFA");     break;
@@ -395,7 +344,7 @@ namespace quda {
 
           template <typename T>
             inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-              if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS) ) {
+              if (shared && (arg.type == M5_EOFA || arg.type == M5INV_EOFA) ) {
                 // if inverse kernel uses shared memory then maximize total shared memory pool
                 setMaxDynamicSharedBytesPerBlock(f);
               }
@@ -404,9 +353,10 @@ namespace quda {
             }
 
           void apply(const cudaStream_t &stream) {
-              TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+              // TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+              TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
               if (arg.type == M5_EOFA) {
-                if(arg.eofa_pm == 1){
+                if(arg.eofa_pm){
                   if (arg.xpay) {
                     arg.dagger ?
                     launch(dslash5GPU<storage_type, nColor, true,true , true,M5_EOFA, Arg>, tp, arg, stream) :
@@ -428,7 +378,7 @@ namespace quda {
                   }
                 }
               }else if(arg.type == M5INV_EOFA){
-                if(arg.eofa_pm == 1){
+                if(arg.eofa_pm){
                   if (arg.xpay) {
                     arg.dagger ?
                     launch(dslash5GPU<storage_type, nColor, true,true , true,M5INV_EOFA, Arg>, tp, arg, stream) :
@@ -475,11 +425,11 @@ namespace quda {
     template <typename storage_type, int nColor>
     void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
         double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a,
-        const double mq1, const double mq2, const double mq3, 
-        const int eofa_pm, const double eofa_norm, const double eofa_shift,
+        int eofa_pm,
+        double inv, double kappa, const double* eofa_u, const double* eofa_x, const double* eofa_y, double sherman_morrison,
         bool dagger, Dslash5Type type)
     {
-      Dslash5Arg<storage_type,nColor> arg(out, in, x, m_f, m_5, b_5, c_5, a, mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, type);
+      Dslash5Arg<storage_type,nColor> arg(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type);
       Dslash5<storage_type,nColor,Dslash5Arg<storage_type,nColor> > dslash(arg, in);
       dslash.apply(streams[Nstream-1]);
     }
@@ -488,12 +438,12 @@ namespace quda {
     template <typename storage_type>
     void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
         double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a,
-        const double mq1, const double mq2, const double mq3, 
-        const int eofa_pm, const double eofa_norm, const double eofa_shift,
+        int eofa_pm,
+        double inv, double kappa, const double* eofa_u, const double* eofa_x, const double* eofa_y, double sherman_morrison,
         bool dagger, Dslash5Type type)
    {
      switch(in.Ncolor()) {
-       case 3: ApplyDslash5<storage_type,3>(out, in, x, m_f, m_5, b_5, c_5, a, mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, type); break;
+       case 3: ApplyDslash5<storage_type,3>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type); break;
        default: errorQuda("Unsupported number of colors %d\n", in.Ncolor());
      }
    }
@@ -503,8 +453,8 @@ namespace quda {
     //out = Dslash5*in
     void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
         double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a,
-        const double mq1, const double mq2, const double mq3, 
-        const int eofa_pm, const double eofa_norm, const double eofa_shift,
+        int eofa_pm,
+        double inv, double kappa, const double* eofa_u, const double* eofa_x, const double* eofa_y, double sherman_morrison,
         bool dagger, Dslash5Type type)
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC
@@ -512,9 +462,9 @@ namespace quda {
       checkLocation(out, in);     // check all locations match
 
       switch(checkPrecision(out,in)) {
-        case QUDA_DOUBLE_PRECISION: ApplyDslash5<double>(out, in, x, m_f, m_5, b_5, c_5, a, mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, type); break;
-        case QUDA_SINGLE_PRECISION: ApplyDslash5<float >(out, in, x, m_f, m_5, b_5, c_5, a, mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, type); break;
-        case QUDA_HALF_PRECISION:   ApplyDslash5<short >(out, in, x, m_f, m_5, b_5, c_5, a, mq1, mq2, mq3, eofa_pm, eofa_norm, eofa_shift, dagger, type); break;
+        case QUDA_DOUBLE_PRECISION: ApplyDslash5<double>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type); break;
+        case QUDA_SINGLE_PRECISION: ApplyDslash5<float >(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type); break;
+        case QUDA_HALF_PRECISION:   ApplyDslash5<short >(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type); break;
         default: errorQuda("Unsupported precision %d\n", in.Precision());
       }
 #else

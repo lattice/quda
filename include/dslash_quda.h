@@ -188,13 +188,11 @@ namespace quda {
   
   // The EOFA stuff
   namespace mobius_eofa{
-  
-  void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-    double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a,
-    const double mq1, const double mq2, const double mq3,
-    const int eofa_pm, const double eofa_norm, const double eofa_shift,
-    bool dagger, Dslash5Type type);
-  
+    void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+      double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a,
+      int eofa_pm,
+      double inv, double kappa, const double* eofa_u, const double* eofa_x, const double* eofa_y, double sherman_morrison,
+      bool dagger, Dslash5Type type);  
   }
   
   // domain wall Dslash  

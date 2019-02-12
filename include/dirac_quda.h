@@ -555,12 +555,17 @@ namespace quda {
   protected:
 
   private:
+    double m5inv_fac;
+    double sherman_morrison_fac;
     // The EOFA parameters
     double mq1;
     double mq2; 
     double mq3;
     double eofa_shift;
     int eofa_pm;
+    double eofa_u[QUDA_MAX_DWF_LS];
+    double eofa_x[QUDA_MAX_DWF_LS];
+    double eofa_y[QUDA_MAX_DWF_LS];
   public:
     DiracMobiusPCEofa(const DiracParam &param);
     DiracMobiusPCEofa(const DiracMobiusPC &dirac);
