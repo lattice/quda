@@ -1,14 +1,17 @@
 ﻿---
 BasedOnStyle: Webkit
+IndentWidth: 2
 AllowShortBlocksOnASingleLine: true
 AllowShortCaseLabelsOnASingleLine : true
 AllowShortIfStatementsOnASingleLine: true
 AllowShortLoopsOnASingleLine: true
-BreakBeforeBraces: Attach
+BreakBeforeBraces: Linux
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 Cpp11BracedListStyle: true
 FixNamespaceComments: true
 NamespaceIndentation: All
 SortIncludes: false
 SpaceBeforeAssignmentOperators: true
+CommentPragmas:  '^\\.+'
+UseTab: Never
 ...
