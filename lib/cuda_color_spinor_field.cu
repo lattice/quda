@@ -1636,6 +1636,10 @@ namespace quda {
     param.location = QUDA_CPU_FIELD_LOCATION;
     param.setPrecision((param.Precision() == QUDA_HALF_PRECISION || param.Precision() == QUDA_QUARTER_PRECISION) ? QUDA_SINGLE_PRECISION : param.Precision());
     param.create = (sourceType == QUDA_POINT_SOURCE ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE);
+    
+    // since CPU fields cannot be low precision, use single precision instead
+    if (precision < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION, QUDA_INVALID_PRECISION, false);
+
     cpuColorSpinorField tmp(param);
     tmp.Source(sourceType, st, s, c);
     *this = tmp;

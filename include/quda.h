@@ -352,30 +352,69 @@ extern "C" {
   } QudaInvertParam;
 
 
-  // Parameter set for solving the eigenvalue problems.
-  // Eigen problems are tightly related with Ritz algorithm.
-  // And the Lanczos algorithm use the Ritz operator.
-  // For Ritz matrix operation,
-  // we need to know about the solution type of dirac operator.
-  // For acceleration, we are also using chevisov polynomial method.
-  // And nk, np values are needed Implicit Restart Lanczos method
-  // which is optimized form of Lanczos algorithm
+  // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
 
+    //EIGENSOLVER PARAMS
+    //-------------------------------------------------
+    /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
-//specific for Lanczos method:
-    QudaSolutionType  RitzMat_lanczos;
-    QudaSolutionType  RitzMat_Convcheck;
+
+    /** Type of eigensolver algorithm to employ **/
     QudaEigType eig_type;
 
-    double *MatPoly_param;
-    int NPoly;
-    double Stp_residual;
+    /** Use Polynomial Acceleration **/
+    QudaBoolean use_poly_acc;
+
+    /** Degree of the Chebysev polynomial **/
+    int poly_deg;
+
+    /** Range used in polynomial acceleration **/
+    double a_min;    
+    double a_max;
+
+    /** What type of Dirac operator we are using **/
+    /** If !(use_norm_op) && !(use_dagger) use M. **/
+    /** If use_dagger, use Mdag  instead of M. **/
+    /** If use_norm_op, use MdagM instead of M. **/
+    /** If use_norm_op && use_dagger use MMdag. **/    
+    QudaBoolean use_dagger;
+    QudaBoolean use_norm_op;
+
+    /** Performs an MdagM solve, then constructs the left and right SVD. **/
+    QudaBoolean compute_svd;
+
+    /** Which part of the spectrum to solve **/
+    QudaEigSpectrumType spectrum;
+
+    /** Size of the eigenvector search space **/
+    int nEv;
+    /** Total size of Krylov space **/
+    int nKr;
+    /** Number of converged eigenvectors requested **/
+    int nConv;
+    /** Tolerance on the least well known eigenvalue's residual **/
+    double tol;
+    /** For Lanczos/Arnoldi, check every nth step **/
+    /** For IRLM/IRAM, check every nth restart **/
+    int check_interval;
+    /** For IRLM/IRAM, quit after n restarts **/
+    int max_restarts;
+    /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
+    char QUDA_logfile[512];
+
+    /** In the test function, cross check the device result against ARPACK **/
+    QudaBoolean arpack_check;
+    /** For Arpack cross check, name of the Arpack logfile **/
+    char arpack_logfile[512];
+        
+    //-------------------------------------------------
+    
+    //EIG-CG PARAMS
+    //-------------------------------------------------
     int nk;
-    int np;
-    int f_size;
-    double eigen_shift;
-//more general stuff:
+    int np;         
+    
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
 
@@ -397,22 +436,24 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 
-    /** The Gflops rate of the multigrid solver setup */
+    /** The Gflops rate of the eigensolver setup */
     double gflops;
 
-    /**< The time taken by the multigrid solver setup */
+    /**< The time taken by the eigensolver setup */
     double secs;
 
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
+    //-------------------------------------------------
 
   } QudaEigParam;
-
 
   typedef struct QudaMultigridParam_s {
 
     QudaInvertParam *invert_param;
 
+    QudaEigParam *eig_param[QUDA_MAX_MG_LEVEL];
+    
     /** Number of multigrid levels */
     int n_level;
 
@@ -545,6 +586,18 @@ extern "C" {
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
 
+    /** Whether to run null Vs eigen vector overlap checks once set up is complete */
+    QudaBoolean run_low_mode_check;
+
+    /** Whether to run null vector oblique checks once set up is complete */
+    QudaBoolean run_oblique_proj_check;
+
+    /** Whether to use eigenvectors for the nullspace */
+    QudaBoolean use_low_modes;
+
+    /** Deflate the coarsest grid  */
+    QudaBoolean deflate_coarsest;
+    
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];
 
@@ -790,6 +843,26 @@ extern "C" {
                    void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
 
   /**
+   * Perform the eigensolve. The problem matrix is defined by the invert param, the 
+   * mode of solution is specified by the eig param. It is assumed that the gauge
+   * field has already been loaded via  loadGaugeQuda().
+   * @param h_els  Host side eigenvalues
+   * @param h_evs  Host side eigenvectors
+   * @param param  Contains all metadata regarding the type of solve.
+   */
+  void eigensolveQuda(void *h_evals, void *h_evecs, QudaEigParam *param);
+
+  /**
+   * Perform the eigensolve using ARPACK. The problem matrix is defined by the 
+   * invert param, the mode of solution is specified by the eig param. 
+   * It is assumed that the gauge field has already been loaded via loadGaugeQuda().
+   * @param h_els  Host side eigenvalues
+   * @param h_evs  Host side eigenvectors
+   * @param param  Contains all metadata regarding the type of solve.
+   */
+  void eigensolveARPACK(void *h_evals, void *h_evecs, QudaEigParam *param);
+  
+  /**
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
    * loadGaugeQuda().
@@ -797,9 +870,9 @@ extern "C" {
    * @param h_b    Source spinor field
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
-   */
+   */  
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
-
+  
   /**
    * Perform the solve like @invertQuda but for multiples right hand sides.
    *
@@ -810,7 +883,6 @@ extern "C" {
    *               storage and solver parameters
    */
   void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
-
 
   /**
    * Solve for multiple shifts (e.g., masses).
