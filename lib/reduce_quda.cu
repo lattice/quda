@@ -179,15 +179,15 @@ A.S. edit: extended to 16 for CA solvers
        Return the L1 norm of x
     */
     template<typename ReduceType> __device__ __host__ ReduceType norm1_(const double2 &a) {
-      return (ReduceType)fabs(a.x) + (ReduceType)fabs(a.y);
+      return (ReduceType)sqrt(a.x*a.x + a.y*a.y);
     }
 
     template<typename ReduceType> __device__ __host__ ReduceType norm1_(const float2 &a) {
-      return (ReduceType)fabs(a.x) + (ReduceType)fabs(a.y);
+      return (ReduceType)sqrt(a.x*a.x + a.y*a.y);
     }
 
     template<typename ReduceType> __device__ __host__ ReduceType norm1_(const float4 &a) {
-      return (ReduceType)fabs(a.x) + (ReduceType)fabs(a.y) + (ReduceType)fabs(a.z) + (ReduceType)fabs(a.w);
+      return (ReduceType)sqrt(a.x*a.x + a.y*a.y) + (ReduceType)sqrt(a.z*a.z + a.w*a.w);
     }
 
     template <typename ReduceType, typename Float2, typename FloatN>

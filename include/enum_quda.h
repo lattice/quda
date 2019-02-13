@@ -126,6 +126,8 @@ extern "C" {
     QUDA_SRE_PCG_INVERTER,
     QUDA_LRE_PCG_INVERTER,
     QUDA_CA_CG_INVERTER,
+    QUDA_CA_CGNE_INVERTER,
+    QUDA_CA_CGNR_INVERTER,
     QUDA_CA_GCR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
@@ -178,6 +180,13 @@ extern "C" {
     QUDA_HEAVY_QUARK_RESIDUAL = 4, // Fermilab heavy quark residual
     QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
   } QudaResidualType;
+
+  // Which basis to use for CA algorithms
+  typedef enum QudaCABasis_s {
+    QUDA_POWER_BASIS,
+    QUDA_CHEBYSHEV_BASIS,
+    QUDA_INVALID_BASIS = QUDA_INVALID_ENUM
+  } QudaCABasis; 
 
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
   //

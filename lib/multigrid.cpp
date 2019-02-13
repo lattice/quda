@@ -78,7 +78,7 @@ namespace quda {
 
         }
         if ( param.mg_global.num_setup_iter[param.level] > 0 ) generateNullVectors(param.B);
-      } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
+      } else if (param.mg_global.vec_load == QUDA_BOOLEAN_YES) { // only conditional load of null vectors
         loadVectors(param.B);
       } else { // generate free field vectors
         buildFreeVectors(param.B);
@@ -403,6 +403,15 @@ namespace quda {
 
       param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level+1];
       param_coarse_solver->Nkrylov = param_coarse_solver->maxiter < 20 ? param_coarse_solver->maxiter : 20;
+      if (param_coarse_solver->inv_type == QUDA_CA_CG_INVERTER ||
+          param_coarse_solver->inv_type == QUDA_CA_CGNE_INVERTER ||
+          param_coarse_solver->inv_type == QUDA_CA_CGNR_INVERTER ||
+          param_coarse_solver->inv_type == QUDA_CA_GCR_INVERTER) {
+        param_coarse_solver->ca_basis = param.mg_global.coarse_solver_ca_basis[param.level+1];
+        param_coarse_solver->ca_lambda_min = param.mg_global.coarse_solver_ca_lambda_min[param.level+1];
+        param_coarse_solver->ca_lambda_max = param.mg_global.coarse_solver_ca_lambda_max[param.level+1];
+        param_coarse_solver->Nkrylov = param.mg_global.coarse_solver_ca_basis_size[param.level+1];
+      }
       param_coarse_solver->inv_type_precondition = (param.level<param.Nlevel-2 || coarse->presmoother) ? QUDA_MG_INVERTER : QUDA_INVALID_INVERTER;
       param_coarse_solver->preconditioner = (param.level<param.Nlevel-2 || coarse->presmoother) ? coarse : nullptr;
       param_coarse_solver->mg_instance = true;
@@ -830,7 +839,6 @@ namespace quda {
   //supports seperate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
 
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
 
     std::string vec_infile(param.mg_global.vec_infile);
@@ -861,8 +869,8 @@ namespace quda {
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
       for (int i=0; i<Nvec; i++) V[i] = B_[i]->V();
 
-      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+      read_spinor_field(vec_infile.c_str(), &V[0], B_[0]->Precision(), B_[0]->X(),
+			B_[0]->Ncolor(), B_[0]->Nspin(), Nvec, 0,  (char**)0);
 
       host_free(V);
 
@@ -907,10 +915,9 @@ namespace quda {
     profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
 
-  void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
+  void MG::saveVectors(std::vector<ColorSpinorField*> &B) const {
 #ifdef HAVE_QIO
 
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
 
     const int Nvec = B.size();
@@ -941,8 +948,8 @@ namespace quda {
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
       for (int i=0; i<Nvec; i++) V[i] = B_[i]->V();
 
-      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+      write_spinor_field(vec_outfile.c_str(), &V[0], B_[0]->Precision(), B_[0]->X(),
+			 B_[0]->Ncolor(), B_[0]->Nspin(), Nvec, 0,  (char**)0);
 
       host_free(V);
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done saving vectors\n");
@@ -953,12 +960,17 @@ namespace quda {
     }
 
     profile_global.TPSTOP(QUDA_PROFILE_IO);
-    profile_global.TPSTART(QUDA_PROFILE_INIT);
 #else
     if (strcmp(param.mg_global.vec_outfile,"")!=0) {
       errorQuda("\nQIO library was not built.\n");
     }
 #endif
+  }
+
+  void MG::dumpNullVectors() const
+  {
+    saveVectors(param.B);
+    if (param.level < param.Nlevel-2) coarse->dumpNullVectors();
   }
 
   void MG::generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh) {
@@ -971,7 +983,18 @@ namespace quda {
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-1;
     solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
-    solverParam.Nkrylov = 4;
+    // Hard coded for now...
+    if (solverParam.inv_type == QUDA_CA_CG_INVERTER ||
+        solverParam.inv_type == QUDA_CA_CGNE_INVERTER ||
+        solverParam.inv_type == QUDA_CA_CGNR_INVERTER ||
+        solverParam.inv_type == QUDA_CA_GCR_INVERTER) {
+      solverParam.ca_basis = param.mg_global.setup_ca_basis[param.level];
+      solverParam.ca_lambda_min = param.mg_global.setup_ca_lambda_min[param.level];
+      solverParam.ca_lambda_max = param.mg_global.setup_ca_lambda_max[param.level];
+      solverParam.Nkrylov = param.mg_global.setup_ca_basis_size[param.level];
+    } else {
+      solverParam.Nkrylov = 4;
+    }
     solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
     solverParam.precision = r->Precision();
 
@@ -1007,9 +1030,9 @@ namespace quda {
     if (halo_precision == QUDA_QUARTER_PRECISION) diracSmootherSloppy->setHaloPrecision(QUDA_HALF_PRECISION);
 
     Solver *solve;
-    DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
-    DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
-    if (solverParam.inv_type == QUDA_CG_INVERTER) {
+    DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
+    DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
+    if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) {
       solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_MG_INVERTER) {
       // in case MG has not been created, we create the Smoother
@@ -1127,7 +1150,7 @@ namespace quda {
       diracSmootherSloppy->setCommDim(commDim);
     }
 
-    if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
+    if (param.mg_global.vec_store == QUDA_BOOLEAN_YES) { // conditional store of null vectors
       saveVectors(B);
     }
 
