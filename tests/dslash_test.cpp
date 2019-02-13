@@ -578,17 +578,15 @@ DslashTime dslashCUDA(int niter) {
           if (transfer) {
             errorQuda("(transfer == true) version NOT yet available!\n");
           } else {
-            static_cast<DiracMobiusPCEofa*>(dirac)->dslash5_eofa(*cudaSpinorOut, *cudaSpinor, parity);
+            static_cast<DiracMobiusPCEofa*>(dirac)->m5_eofa(*cudaSpinorOut, *cudaSpinor);
           }
           break;
         case 2:
           if (transfer) {
             errorQuda("(transfer == true) version NOT yet available!\n");
           } else {
-            // static_cast<DiracMobiusPCEofa*>(dirac)->dslash5_eofa(*tmp1, *cudaSpinor, parity);
-            // static_cast<DiracMobiusPCEofa*>(dirac)->m5inv_eofa(*cudaSpinorOut, *tmp1, parity);
-            static_cast<DiracMobiusPCEofa*>(dirac)->Dslash5(*tmp1, *cudaSpinor, parity);
-            static_cast<DiracMobiusPCEofa*>(dirac)->Dslash5inv(*cudaSpinorOut, *tmp1, parity);
+            static_cast<DiracMobiusPCEofa*>(dirac)->m5_eofa(*tmp1, *cudaSpinor);
+            static_cast<DiracMobiusPCEofa*>(dirac)->m5inv_eofa(*cudaSpinorOut, *tmp1);
           }
           break;
         default:

@@ -556,8 +556,9 @@ namespace quda {
 
   private:
     double m5inv_fac;
-    double sherman_morrison_fac;
+    double kappa_b;
     // The EOFA parameters
+    double sherman_morrison_fac;
     double mq1;
     double mq2; 
     double mq3;
@@ -572,11 +573,13 @@ namespace quda {
     virtual ~DiracMobiusPCEofa();
     DiracMobiusPCEofa& operator=(const DiracMobiusPC &dirac);
 
-    void dslash5_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-
-    // void M(ColorSpinorField &out, const ColorSpinorField &in) const;
-    // void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x) const;
+    void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x) const;
+    
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
   };
 
   // Full twisted mass

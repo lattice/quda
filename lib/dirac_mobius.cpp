@@ -749,7 +749,9 @@ namespace quda {
     
     kappa = (c*(m5+4.)-1.) / (b*(m5+4.)+1.);
     double alpha = b+c;
-    
+   
+    kappa_b = 0.5 / (b*(m5+4.)+1.);
+
     double eofa_norm = alpha * (mq3-mq2) * std::pow(alpha+1., 2.*Ls)
                           / ( std::pow(alpha+1.,Ls) + mq2*std::pow(alpha-1.,Ls) )
                           / ( std::pow(alpha+1.,Ls) + mq3*std::pow(alpha-1.,Ls) );
@@ -827,7 +829,7 @@ namespace quda {
     return *this;
   }
  
-  void DiracMobiusPCEofa::dslash5_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracMobiusPCEofa::m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
@@ -840,7 +842,22 @@ namespace quda {
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
   
-  void DiracMobiusPCEofa::m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracMobiusPCEofa::m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    double a = -kappa_b*kappa_b; // a = -kappa_b^2 
+    // The kernel will actually do (m5 * in - kappa_b^2 * x)
+    mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+   
+    // long long Ls = in.X(4);
+    // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+  }
+ 
+  void DiracMobiusPCEofa::m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
@@ -851,6 +868,73 @@ namespace quda {
    
     // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+  }
+  
+  void DiracMobiusPCEofa::m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    double a = -kappa_b*kappa_b; // a = -kappa_b^2 
+    // The kernel will actually do (x - kappa_b^2 * m5inv * in)
+    mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
+   
+    // long long Ls = in.X(4);
+    // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
+  }
+ 
+  // Apply the even-odd preconditioned mobius DWF EOFA operator
+  void DiracMobiusPCEofa::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    bool reset1 = newTmp(&tmp1, in);
+
+    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+    bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
+    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+
+    //QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
+    //QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
+    if (symmetric && !dagger) {
+      Dslash4pre(*tmp1, in, parity[1]);
+      Dslash4(out, *tmp1, parity[0]);
+      m5inv_eofa(*tmp1, out);
+      Dslash4pre(out, *tmp1, parity[0]);
+      Dslash4(*tmp1, out, parity[1]);
+      m5inv_eofa_xpay(out, *tmp1, in);
+    } else if (symmetric && dagger) {
+      m5inv_eofa(*tmp1, in);
+      Dslash4(out, *tmp1, parity[0]);
+      Dslash4pre(*tmp1, out, parity[0]);
+      m5inv_eofa(out, *tmp1);
+      Dslash4(*tmp1, out, parity[1]);
+      Dslash4preXpay(out, *tmp1, parity[1], in, -1.0);
+    } else if (!symmetric && !dagger) {
+      Dslash4pre(*tmp1, in, parity[1]);
+      Dslash4(out, *tmp1, parity[0]);
+      m5inv_eofa(*tmp1, out);
+      Dslash4pre(out, *tmp1, parity[0]);
+      Dslash4(*tmp1, out, parity[1]);
+      m5_eofa_xpay(out, in, *tmp1);
+    } else if (!symmetric && dagger) {
+      Dslash4(*tmp1, in, parity[0]);
+      Dslash4pre(out, *tmp1, parity[0]);
+      m5inv_eofa(*tmp1, out);
+      Dslash4(out, *tmp1, parity[1]);
+      Dslash4pre(*tmp1, out, parity[1]);
+      m5_eofa_xpay(out, in, *tmp1);
+    }
+
+    deleteTmp(&tmp1, reset1);
+  }
+  
+  void DiracMobiusPCEofa::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    bool reset = newTmp(&tmp2, in);
+    M(*tmp2, in);
+    Mdag(out, *tmp2);
+    deleteTmp(&tmp2, reset);
   }
 
 } // namespace quda

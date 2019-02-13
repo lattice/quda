@@ -91,6 +91,8 @@ namespace quda {
           errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
         if (sizeof(eofa_coeff<real>) > size)
           errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(eofa_coeff<real>));
+        
+        a *= 4.*(b*(4.+m_5));
 
         eofa_coeff<real>* eofa_coeffs = reinterpret_cast<eofa_coeff<real>*>(mobius_eofa_h);
 
@@ -205,8 +207,8 @@ namespace quda {
       typedef typename mapper<storage_type>::type real;
       typedef ColorSpinor<real, nColor, 4> Vector;
 
-      const auto k = -arg.kappa; // k is -kappa
-      const auto inv = arg.inv;
+      // const auto k = -arg.kappa; // k is -kappa
+      // const auto inv = arg.inv;
       const auto sherman_morrison = arg.sherman_morrison;
       VectorCache<real, Vector> cache;
       cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
@@ -244,7 +246,7 @@ namespace quda {
       }
       if (xpay) { // really axpy
         Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-        out = arg.a * x + out;
+        out = x + arg.a * out;
       }
       arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
     }
