@@ -3715,7 +3715,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-<<<<<<< HEAD
   if( strcmp(argv[i], "--ca-basis-type") == 0){
     if (i+1 >= argc){
       usage(argv);
