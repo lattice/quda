@@ -991,6 +991,11 @@ int main(int argc, char** argv)
 
   // lastly check for correctness
   if (verify_results) {    
+    ::testing::TestEventListeners& listeners =
+      ::testing::UnitTest::GetInstance()->listeners();
+    if (comm_rank() != 0) {
+      delete listeners.Release(listeners.default_result_printer());
+    }
     result = RUN_ALL_TESTS();
   }
 

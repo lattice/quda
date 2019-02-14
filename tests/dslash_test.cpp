@@ -117,8 +117,6 @@ void init(int argc, char **argv) {
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
   gauge_param.reconstruct = link_recon;
-  gauge_param.reconstruct_sloppy = link_recon;
-  gauge_param.cuda_prec_sloppy = cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.kappa = 0.1;
@@ -249,9 +247,6 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
-    inv_param.clover_cuda_prec_precondition = inv_param.clover_cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_refinement_sloppy = inv_param.clover_cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
     hostClover = malloc((size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
@@ -1026,6 +1021,12 @@ int main(int argc, char **argv)
     }
 
     if (verify_results) {
+      ::testing::TestEventListeners& listeners =
+          ::testing::UnitTest::GetInstance()->listeners();
+      if (comm_rank() != 0) {
+        delete listeners.Release(listeners.default_result_printer());
+      }
+
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0) warningQuda("Tests failed");
     }

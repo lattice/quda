@@ -18,7 +18,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	cuda_color_spinor_field.o dirac.o clover_field.o		\
 	lattice_field.o gauge_field.o cpu_gauge_field.o			\
 	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\
-	gauge_update_quda.o dirac_clover.o dirac_wilson.o		\
+	max_clover.o gauge_update_quda.o dirac_clover.o dirac_wilson.o  \
 	dirac_staggered.o dirac_improved_staggered.o gauge_covdev.o	\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\

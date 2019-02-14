@@ -15,7 +15,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false),
     ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -39,7 +39,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
     ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -50,7 +50,7 @@ namespace quda {
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
     ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -99,7 +99,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false),
       ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-      ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
+      ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -262,11 +262,8 @@ namespace quda {
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      if (siteSubset != QUDA_FULL_SITE_SUBSET) {
+      if ( !(siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_composite) ) {
 	zeroPad();
-      } else if(!composite_descr.is_composite) {
-	(dynamic_cast<cudaColorSpinorField*>(even))->zeroPad();
-	(dynamic_cast<cudaColorSpinorField*>(odd))->zeroPad();
       } else { //temporary hack for the full spinor field sets, manual zeroPad for each component:
 	for(int cid = 0; cid < composite_descr.dim; cid++) {
 	  (dynamic_cast<cudaColorSpinorField&>(components[cid]->Even())).zeroPad();
@@ -532,26 +529,57 @@ namespace quda {
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
-    cudaMemsetAsync(v, 0, bytes, streams[Nstream-1]);
-    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, streams[Nstream-1]);
+    cudaMemsetAsync(v, 0, bytes);
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes);
   }
 
   void cudaColorSpinorField::zeroPad() {
-    size_t pad_bytes = (stride - volume) * precision * fieldOrder;
-    int Npad = nColor * nSpin * 2 / fieldOrder;
 
-    if (composite_descr.is_composite && !composite_descr.is_component){//we consider the whole eigenvector set:
-      Npad      *= composite_descr.dim;
-      pad_bytes /= composite_descr.dim;
+    { // zero initialize the field pads
+      size_t pad_bytes = (stride - volumeCB) * precision * fieldOrder;
+      int Npad = nColor * nSpin * 2 / fieldOrder;
+
+      if (composite_descr.is_composite && !composite_descr.is_component){//we consider the whole eigenvector set:
+        Npad      *= composite_descr.dim;
+        pad_bytes /= composite_descr.dim;
+      }
+
+      size_t pitch = ((!composite_descr.is_composite || composite_descr.is_component) ? stride : composite_descr.stride)*fieldOrder*precision;
+      char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volumeCB : composite_descr.volumeCB)*fieldOrder*precision;
+      if (pad_bytes)
+        for (int subset=0; subset<siteSubset; subset++) {
+          cudaMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad);
+        }
     }
 
-    size_t pitch = ((!composite_descr.is_composite || composite_descr.is_component) ? stride : composite_descr.stride)*fieldOrder*precision;
-    char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volume : composite_descr.volume)*fieldOrder*precision;
-    if (pad_bytes) cudaMemset2D(dst, pitch, 0, pad_bytes, Npad);
+    if (norm_bytes > 0) { // zero initialize the norm pad
+      size_t pad_bytes = (stride - volumeCB) * sizeof(float);
+      if (pad_bytes)
+        for (int subset=0; subset<siteSubset; subset++) {
+          cudaMemsetAsync((char*)norm + volumeCB*sizeof(float), 0, (stride-volumeCB)*sizeof(float));
+        }
+    }
 
-    //for (int i=0; i<Npad; i++) {
-    //  if (pad_bytes) cudaMemset((char*)v + (volume + i*stride)*fieldOrder*precision, 0, pad_bytes);
-    //}
+    // zero the region added for alignment reasons
+    if (bytes != (size_t)length*precision) {
+      size_t subset_bytes = bytes/siteSubset;
+      size_t subset_length = length/siteSubset;
+      for (int subset=0; subset < siteSubset; subset++) {
+        cudaMemsetAsync((char*)v + subset_length*precision + subset_bytes*subset, 0,
+                        subset_bytes-subset_length*precision);
+      }
+    }
+
+    // zero the region added for alignment reasons (norm)
+    if (norm_bytes && norm_bytes != siteSubset*stride*sizeof(float)) {
+      size_t subset_bytes = norm_bytes/siteSubset;
+      for (int subset=0; subset < siteSubset; subset++) {
+        cudaMemsetAsync((char*)norm + (size_t)stride*sizeof(float) + subset_bytes*subset, 0,
+                        subset_bytes-(size_t)stride*sizeof(float));
+      }
+    }
+
+    checkCudaError();
   }
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
@@ -686,7 +714,11 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
     // ghost texture is per object
-    if (ghost_field_tex[0] != ghost_recv_buffer_d[0] || ghost_field_tex[1] != ghost_recv_buffer_d[1] || ghost_precision_reset)
+    if (ghost_field_tex[0] != ghost_recv_buffer_d[0] ||
+        ghost_field_tex[1] != ghost_recv_buffer_d[1] ||
+        ghost_field_tex[2] != ghost_pinned_recv_buffer_hd[0] ||
+        ghost_field_tex[3] != ghost_pinned_recv_buffer_hd[1] ||
+        ghost_precision_reset)
       destroyGhostTexObject();
     if (!ghostTexInit) createGhostTexObject();
 #endif
@@ -720,12 +752,16 @@ namespace quda {
       }
     }
 
-    // new packing kernel is only for Wilson/Clover/twisted at the moment
-    if (nSpin == 1 || (nDim == 5 && (twistFlavor == QUDA_TWIST_NO || twistFlavor == QUDA_TWIST_INVALID) ) ) {
+#ifdef USE_LEGACY_DSLASH
+    packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
+#else
+    // new packing kernel is only for Wilson/Clover/twisted/dwf-4d at the moment
+    if (nSpin == 1 || (nDim == 5 && PCtype == QUDA_5D_PC) ) {
       packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
     } else {
       PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, a, b, c, *stream);
     }
+#endif
 
 #else
     errorQuda("packGhost not built on single-GPU build");
@@ -914,7 +950,8 @@ namespace quda {
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
       (my_face_h[0] != ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != ghost_pinned_send_buffer_h[1]) ||
       (from_face_h[0] != ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != ghost_pinned_recv_buffer_h[1]) ||
-      (ghost_field_tex[0] != ghost_recv_buffer_d[0]) || (ghost_field_tex[1] != ghost_recv_buffer_d[1]) || // receive buffers
+      (my_face_d[0] != ghost_send_buffer_d[0]) || (my_face_d[1] != ghost_send_buffer_d[1]) ||     // send buffers
+      (from_face_d[0] != ghost_recv_buffer_d[0]) || (from_face_d[1] != ghost_recv_buffer_d[1]) || // receive buffers
       ghost_precision_reset; // ghost_precision has changed
 
     if (!initComms || comms_reset) {

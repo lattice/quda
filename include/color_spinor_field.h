@@ -568,6 +568,11 @@ namespace quda {
     void destroy();
     void copy(const cudaColorSpinorField &);
 
+    /**
+       @brief Zero the padded regions added on to the field.  Ensures
+       correct reductions and silences false positive warnings
+       regarding uninitialized memory.
+     */
     void zeroPad();
 
     /**
@@ -578,9 +583,6 @@ namespace quda {
 
     void loadSpinorField(const ColorSpinorField &src);
     void saveSpinorField (ColorSpinorField &src) const;
-
-    /** Keep track of which pinned-memory buffer we used for creating message handlers */
-    size_t bufferMessageHandler;
 
   public:
 

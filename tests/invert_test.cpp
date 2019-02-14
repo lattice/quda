@@ -69,6 +69,9 @@ extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL]; // use this for preconditi
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter; // max solver iterations
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
+extern QudaCABasis ca_basis; // basis for CA-CG solves
+extern double ca_lambda_min; // minimum eigenvalue for scaling Chebyshev CA-CG solves
+extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG solves
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 extern char latfile[];
@@ -242,6 +245,9 @@ int main(int argc, char **argv)
 
   inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = gcrNkrylov;
+  inv_param.ca_basis = ca_basis;
+  inv_param.ca_lambda_min = ca_lambda_min;
+  inv_param.ca_lambda_max = ca_lambda_max;
   inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
   if(tol_hq == 0 && tol == 0){

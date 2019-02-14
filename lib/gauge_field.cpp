@@ -265,7 +265,6 @@ namespace quda {
       if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
       if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, g.anisotropy);
       if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, g.tadpole);
-      //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale);
     }
     catch(std::bad_cast &e) {
       errorQuda("Failed to cast reference to GaugeField");

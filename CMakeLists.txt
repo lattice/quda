@@ -135,8 +135,13 @@ set(QUDA_TEX ON CACHE BOOL "enable texture reads?")
 set(QUDA_NVML OFF CACHE BOOL "use NVML to report CUDA graphics driver version" )
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
-set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template for multi-blas /-reduce")
+set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
+
+# Set CTest options
 set(QUDA_CTEST_SEP_DSLASH_POLICIES OFF CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
+set(QUDA_CTEST_LAUNCH "" CACHE STRING "Launch command for automated unit tests, (e.g., mpirun)")
+set(QUDA_CTEST_LAUNCH_ARGS "" CACHE STRING "Launch parameters for automated unit tests (e.g., number of processes)")
+
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 11 CACHE STRING "set the CXX Standard (11 or 14)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
@@ -168,7 +173,8 @@ mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
-
+mark_as_advanced(QUDA_CTEST_LAUNCH)
+mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_MPI_NVTX)
@@ -234,13 +240,28 @@ include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 ## Now we hopefully found some way to get eigen to work
 
 
+
+# Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64"
+# Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64"
+# Power: CMAKE_HOST_SYSTEM_PROCESSOR "ppc64le"
+
+## We need to use different optimization flags depending on whether we are on x86 or power
+## Note: This only applies to the RELASE build type
+## this is just a quick fix and we should probably use https://cmake.org/cmake/help/latest/module/CheckCXXCompilerFlag.html
+
+if(${CPU_ARCH} STREQUAL "x86_64")
+  set(CXX_OPT "-march=native")
+elseif(${CPU_ARCH} STREQUAL "ppc64le")
+  set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
+endif()
+
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 #define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
 "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
 "Flags used by the C++ compiler during strict jenkins builds.")
-set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -march=native -w" CACHE STRING
+set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w ${CXX_OPT} " CACHE STRING
     "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds.")
@@ -249,6 +270,8 @@ set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas 
 set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds.")
 enable_language(CXX)
+
+
 
 
 #define C FLAGS
@@ -554,7 +577,7 @@ set(CMAKE_CUDA_STANDARD_REQUIRED True)
 mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
 
-# NVCC FLAGS independet off build type
+# NVCC FLAGS independent off build type
 
 set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
 set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
@@ -591,7 +614,6 @@ include_directories(include)
 include_directories(lib)
 
 
-
 # QUDA_HASH for tunecache
 if(NOT GITVERSION)
   set(GITVERSION ${PROJECT_VERSION})
@@ -600,7 +622,6 @@ file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CU
 STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
-
 
 # this allows simplified running of clang-tidy 
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")

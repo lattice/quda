@@ -240,6 +240,10 @@
     kernel<64,__VA_ARGS__>						\
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);		\
     break;								\
+  case 72:                                                              \
+     kernel<72,__VA_ARGS__>                                             \
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);          \
+    break;                                                              \
   case 81:								\
     kernel<81,__VA_ARGS__>						\
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);		\

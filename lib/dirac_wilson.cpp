@@ -71,7 +71,7 @@ namespace quda {
     ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     flops += 1368ll*in.Volume();
 #else
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, out.Odd(), -kappa);
+    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
     DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
 #endif
   }

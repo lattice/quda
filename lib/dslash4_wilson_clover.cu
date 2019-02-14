@@ -1,3 +1,5 @@
+#ifndef USE_LEGACY_DSLASH
+
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <color_spinor_field.h>
@@ -108,9 +110,8 @@ namespace quda {
                          const int *comm_override, TimeProfile &profile)
   {
     constexpr int nDim = 4;
-    constexpr bool dynamic_clover = false;
-    WilsonCloverArg<Float,nColor,recon,dynamic_clover> arg(out, in, U, A, kappa, 0.0, x, parity, dagger, comm_override);
-    WilsonClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,dynamic_clover> > wilson(arg, out, in);
+    WilsonCloverArg<Float,nColor,recon> arg(out, in, U, A, kappa, 0.0, x, parity, dagger, comm_override);
+    WilsonClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon> > wilson(arg, out, in);
 
     DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                               in.VolumeCB(), in.GhostFaceCB(), profile);
@@ -187,3 +188,5 @@ namespace quda {
 
 
 } // namespace quda
+
+#endif

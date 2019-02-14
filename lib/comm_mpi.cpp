@@ -279,11 +279,12 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 }
 
 
-void comm_free(MsgHandle *mh)
+void comm_free(MsgHandle *&mh)
 {
   MPI_CHECK(MPI_Request_free(&(mh->request)));
   if (mh->custom) MPI_CHECK(MPI_Type_free(&(mh->datatype)));
   host_free(mh);
+  mh = nullptr;
 }
 
 
