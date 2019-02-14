@@ -727,8 +727,8 @@ namespace quda {
 #ifdef USE_LEGACY_DSLASH
     packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
 #else
-    // new packing kernel is only for Wilson/Clover/twisted at the moment
-    if (nSpin == 1 || (nDim == 5 && (twistFlavor == QUDA_TWIST_NO || twistFlavor == QUDA_TWIST_INVALID) ) ) {
+    // new packing kernel is only for Wilson/Clover/twisted/dwf-4d at the moment
+    if (nSpin == 1 || (nDim == 5 && PCtype == QUDA_5D_PC) ) {
       packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
     } else {
       PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, a, b, c, *stream);
