@@ -796,19 +796,21 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
-
-
-  setGaugeParam(gauge_param);
-  setInvertParam(inv_param);
   for(int i=0; i<mg_levels; i++) {
     mg_eig_param[i] = newQudaEigParam();
     setEigParam(mg_eig_param[i], i);
-    mg_param.eig_param[i] = &mg_eig_param[i];
   }
+
+  setGaugeParam(gauge_param);
+  setInvertParam(inv_param);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
+
   mg_param.invert_param = &mg_inv_param;
+  for(int i=0; i<mg_levels; i++) {
+    mg_param.eig_param[i] = &mg_eig_param[i];
+  }
 
   setMultigridParam(mg_param);
 
