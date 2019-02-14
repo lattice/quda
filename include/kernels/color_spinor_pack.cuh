@@ -45,7 +45,7 @@ namespace quda {
      Compute the max element over the spin-color components of a given site.
    */
   template <typename Float, int Ns, int Ms, int Nc, int Mc, typename Arg>
-  __device__ __host__ inline Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block, bool active) {
+  __device__ __host__ __forceinline__ Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block, bool active) {
 
     Float thread_max = 0.0;
     Float site_max = active ? 0.0 : 1.0;
@@ -92,7 +92,7 @@ namespace quda {
 
 
   template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim, int dir, typename Arg>
-  __device__ __host__ inline void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block) {
+  __device__ __host__ __forceinline__ void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block) {
 
     int x[5] = { };
     if (nDim == 5) getCoords5(x, x_cb, arg.X, parity, arg.pc_type);

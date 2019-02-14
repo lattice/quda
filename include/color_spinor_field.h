@@ -568,6 +568,11 @@ namespace quda {
     void destroy();
     void copy(const cudaColorSpinorField &);
 
+    /**
+       @brief Zero the padded regions added on to the field.  Ensures
+       correct reductions and silences false positive warnings
+       regarding uninitialized memory.
+     */
     void zeroPad();
 
     /**

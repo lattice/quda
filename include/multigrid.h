@@ -273,6 +273,18 @@ namespace quda {
     /** Parallel hyper-cubic random number generator for generating null-space vectors */
     RNG *rng;
 
+    /**
+       @brief Load the null space vectors in from file
+       @param B Loaded null-space vectors (pre-allocated)
+    */
+    void loadVectors(std::vector<ColorSpinorField*> &B);
+
+    /**
+       @brief Save the null space vectors in from file
+       @param B Save null-space vectors from here
+    */
+    void saveVectors(std::vector<ColorSpinorField*> &B) const;
+
   public:
     /** 
       Constructor for MG class
@@ -292,6 +304,11 @@ namespace quda {
        @param Whether we are refreshing the null-space components or just updating the operators
      */
     void reset(bool refresh=false);
+
+    /**
+       @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
+    */
+    void dumpNullVectors() const;
 
     /**
        @brief Create the smoothers
@@ -332,18 +349,6 @@ namespace quda {
        @param in The residual vector (or equivalently the right hand side vector)
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    /**
-       @brief Load the null space vectors in from file
-       @param B Loaded null-space vectors (pre-allocated)
-    */
-    void loadVectors(std::vector<ColorSpinorField*> &B);
-
-    /**
-       @brief Save the null space vectors in from file
-       @param B Save null-space vectors from here
-    */
-    void saveVectors(std::vector<ColorSpinorField*> &B);
 
     /**
        @brief Generate the null-space vectors
