@@ -146,27 +146,35 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
-  P(RitzMat_lanczos, QUDA_INVALID_SOLUTION);
-  P(RitzMat_Convcheck, QUDA_INVALID_SOLUTION);
-  P(eig_type, QUDA_INVALID_TYPE);
-  P(NPoly, 0);
-  P(Stp_residual, 0.0);
+  P(poly_deg, 0);
+  P(a_min, 0.0);
+  P(a_max, 0.0);
+  P(tol, 0.0);
   P(nk, 0);
   P(np, 0);
-  P(f_size, 0);
-  P(eigen_shift, 0.0);
+  P(nEv, 0);
+  P(nKr, 0);
+  P(nConv, 0);
+  P(check_interval, 0);
+  P(max_restarts, 0);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
-  P(NPoly, INVALID_INT);
-  P(Stp_residual, INVALID_DOUBLE);
+  P(poly_deg, INVALID_INT);
+  P(a_min, INVALID_DOUBLE);
+  P(a_max, INVALID_DOUBLE);
+  P(tol, INVALID_DOUBLE);
   P(nk, INVALID_INT);
   P(np, INVALID_INT);
-  P(f_size, INVALID_INT);
-  P(eigen_shift, INVALID_DOUBLE);
+  P(nEv, INVALID_INT);
+  P(nKr, INVALID_INT);
+  P(nConv, INVALID_INT);
+  P(check_interval, INVALID_INT);
+  P(max_restarts, INVALID_INT);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
+
 
 #if defined INIT_PARAM
   P(location, QUDA_CUDA_FIELD_LOCATION);
@@ -181,7 +189,7 @@ void printQudaEigParam(QudaEigParam *param) {
 // define the appropriate function for InvertParam
 
 #if defined INIT_PARAM
-QudaInvertParam newQudaInvertParam(void) {
+ QudaInvertParam newQudaInvertParam(void) {
   QudaInvertParam ret;
   QudaInvertParam *param=&ret;
 #elif defined CHECK_PARAM
@@ -711,7 +719,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
-
+  P(use_low_modes, QUDA_BOOLEAN_INVALID);
+  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
+  
 #ifdef INIT_PARAM
   P(vec_load, QUDA_BOOLEAN_INVALID);
   P(vec_store, QUDA_BOOLEAN_INVALID);

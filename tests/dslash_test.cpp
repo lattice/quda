@@ -73,6 +73,7 @@ extern double clover_coeff;
 extern bool verify_results;
 extern int niter;
 extern char latfile[];
+extern bool unit_gauge;
 
 extern bool kernel_pack_t;
 
@@ -308,10 +309,16 @@ void init(int argc, char **argv) {
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, hostGauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(hostGauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate a random SU(3) field
-    construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
+  } else { // else generate an SU(3) field
+    if(unit_gauge){
+      //unit SU(3) field
+      construct_gauge_field(hostGauge, 0, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      //random SU(3) field
+      construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
+    }
   }
-
+  
   spinor->Source(QUDA_RANDOM_SOURCE, 0);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {

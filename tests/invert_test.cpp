@@ -74,6 +74,7 @@ extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG s
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 extern char latfile[];
+extern bool unit_gauge;
 
 extern void usage(char** );
 
@@ -349,8 +350,14 @@ int main(int argc, char **argv)
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate a random SU(3) field
-    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+  } else { // else generate an SU(3) field
+    if(unit_gauge){
+      //unit SU(3) field
+      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      //random SU(3) field
+      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    }
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -608,9 +615,9 @@ int main(int argc, char **argv)
       
 	}
       }
-
+      
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-
+      
       void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
@@ -674,11 +681,11 @@ int main(int argc, char **argv)
       } else {
         errorQuda("Unsupported dslash_type");
       }
-
+      
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	errorQuda("Mass normalization not implemented");
       }
-
+      
       free(spinorTmp);
     }
 

@@ -143,6 +143,29 @@ extern bool compute_clover;
 
 extern bool verify_results;
 
+
+//Eigensolver params for MG
+extern bool use_low_modes;
+extern bool deflate_coarsest;
+extern bool low_mode_check;
+extern bool oblique_proj_check;
+
+//The coarsest grid params are for deflation,
+//all others are for PR vectors.
+extern int mg_eig_check_interval[QUDA_MAX_MG_LEVEL];
+extern int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL];
+extern double mg_eig_tol[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_use_poly_acc[QUDA_MAX_MG_LEVEL];
+extern int mg_eig_poly_deg[QUDA_MAX_MG_LEVEL];
+extern double mg_eig_amin[QUDA_MAX_MG_LEVEL];
+extern double mg_eig_amax[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL];
+extern QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL];
+extern QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL];
+
+extern char eig_QUDA_logfile[];
+
 // Unitarization coefficients
 static double unitarize_eps  = 1e-6;
 static bool reunit_allow_svd = true;
@@ -191,6 +214,31 @@ display_test_info()
 
   printfQuda("Outer solver paramers\n");
   printfQuda(" - pipeline = %d\n", pipeline);
+
+  if(low_mode_check || use_low_modes || deflate_coarsest) {
+    printfQuda("Eigensolver parameters\n");
+    for (int i=0; i<mg_levels; i++) {
+      if ((i < mg_levels-1 && (low_mode_check || use_low_modes)) || (i == mg_levels-1 && deflate_coarsest)) {
+        printfQuda(" - Level %d\n", i+1);
+        printfQuda(" - solver mode %s\n", get_eig_type_str(mg_eig_type[i]));
+        printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(mg_eig_spectrum[i]));
+        printfQuda(" - number of eigenvectors requested %d\n", nvec[i]);
+        printfQuda(" - size of eigenvector search space %d\n", nvec[i]);
+        printfQuda(" - size of Krylov space %d\n", nvec[i] +nvec[i]/2);
+        printfQuda(" - solver tolerance %e\n", mg_eig_tol[i]);
+        printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n",
+        mg_eig_use_dagger[i] ? "true" : "false",
+        mg_eig_use_normop[i] ? "true" : "false");
+
+        if(mg_eig_use_poly_acc[i]) {
+          printfQuda(" - Chebyshev polynomial degree %d\n", mg_eig_poly_deg[i]);
+          printfQuda(" - Chebyshev polynomial minumum %e\n", mg_eig_amin[i]);
+          printfQuda(" - Chebyshev polynomial maximum %e\n", mg_eig_amax[i]);
+        }
+      }
+    }
+    printfQuda("\n");
+  }
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -339,6 +387,30 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   pad_size = MAX(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;    
 #endif
+
+}
+
+//Parameters defining the eigensolver
+void setEigParam(QudaEigParam &mg_eig_param, int level) {
+
+  mg_eig_param.eig_type = mg_eig_type[level];
+  mg_eig_param.spectrum = mg_eig_spectrum[level];
+
+  mg_eig_param.tol = mg_eig_tol[level];
+  mg_eig_param.check_interval = mg_eig_check_interval[level];
+  mg_eig_param.max_restarts = mg_eig_max_restarts[level];
+  mg_eig_param.cuda_prec_ritz = cuda_prec;
+
+  mg_eig_param.compute_svd = QUDA_BOOLEAN_NO;
+  mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.use_dagger  = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+
+  mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.poly_deg = mg_eig_poly_deg[level];
+  mg_eig_param.a_min    = mg_eig_amin[level];
+  mg_eig_param.a_max    = mg_eig_amax[level];
+
+  strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 
 }
 
@@ -660,6 +732,19 @@ int main(int argc, char **argv)
     coarse_solver_ca_basis_size[i] = 4;
     coarse_solver_ca_lambda_min[i] = 0.0;
     coarse_solver_ca_lambda_max[i] = -1.0;
+
+    //Default eigensolver params
+    mg_eig_tol[i] = 1e-3;
+    mg_eig_type[i] = QUDA_IMP_RST_LANCZOS;
+    mg_eig_spectrum[i] = QUDA_SR_EIG_SPECTRUM;
+    mg_eig_check_interval[i] = 5;
+    mg_eig_max_restarts[i] = 100;
+    mg_eig_use_normop[i] = QUDA_BOOLEAN_YES;
+    mg_eig_use_dagger[i] = QUDA_BOOLEAN_NO;
+    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_YES;
+    mg_eig_poly_deg[i] = 100;
+    mg_eig_amin[i] = 1.0;
+    mg_eig_amax[i] = 5.0;
   }
   reliable_delta = 1e-4;
 
@@ -710,9 +795,16 @@ int main(int argc, char **argv)
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
+  QudaEigParam mg_eig_param[mg_levels];
+
 
   setGaugeParam(gauge_param);
   setInvertParam(inv_param);
+  for(int i=0; i<mg_levels; i++) {
+    mg_eig_param[i] = newQudaEigParam();
+    setEigParam(mg_eig_param[i], i);
+    mg_param.eig_param[i] = &mg_eig_param[i];
+  }
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();

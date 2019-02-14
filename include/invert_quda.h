@@ -357,6 +357,7 @@ namespace quda {
 
   };
 
+  //DMH KATE
   class Solver {
 
   protected:
@@ -450,6 +451,7 @@ namespace quda {
   /**
      @brief  Conjugate-Gradient Solver.
    */
+  //DMH KATE
   class CG : public Solver {
 
   private:
@@ -556,7 +558,23 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  class CGDF : public CG {
+    
+  private:
+    DiracMdagM mdagm;
+    DiracMdagM mdagmSloppy;
+    ColorSpinorField *bp;
+    bool init;
 
+  public:
+    CGDF(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CGDF();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  //DMH CGDF
+  
 
   class MPCG : public Solver {
     private:

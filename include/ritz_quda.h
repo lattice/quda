@@ -10,6 +10,8 @@
 #include <dirac_quda.h>
 #include <typeinfo>
 
+#if 0
+
 namespace quda {
 
   /**
@@ -52,4 +54,5 @@ namespace quda {
 
 } // namespace quda
 
+#endif
 #endif // _RITZ_QUDA_H
