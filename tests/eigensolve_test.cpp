@@ -429,11 +429,11 @@ int main(int argc, char **argv)
     if(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
       
       ((double*)host_evecs)[i] = rand()/(double)RAND_MAX;
-      if(i<24) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
+      //if(i<24) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
     } else {
       
       ((float*)host_evecs)[i] = rand()/(float)RAND_MAX;      
-      if(i<24) printfQuda("Host elem %d = %f\n", i, ((float*)host_evecs)[i]);
+      //if(i<24) printfQuda("Host elem %d = %f\n", i, ((float*)host_evecs)[i]);
     }
   }
     

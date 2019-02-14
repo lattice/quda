@@ -92,12 +92,12 @@ namespace quda {
 	buildFreeVectors(param.B);
       }
     } else {
-      //DMH 1
       //We're on the coarsest grid. Create eigenvectors for deflation
       if (param.mg_global.deflate_coarsest) {
 	if (strcmp(param.mg_global.vec_infile,"") !=0 ) { // only load if infile is defined and not computing
 	  loadVectors(param.B);
 	} else {
+	  printfQuda("Running Eigensolver on level %d\n", param.level+1);
 	  generateEigenVectors(); //Run the eigensolver
 	  //temporary check that the null vectors are populated and normalised
 	  //for(unsigned int j=0; j<param.B.size(); j++) printfQuda("NV norm %f\n", sqrt(blas::norm2(*(param.B[j]))));
@@ -107,7 +107,7 @@ namespace quda {
     
     // in case of iterative setup with MG the coarse level may be already built
     if (!transfer) reset();
-
+    
     setOutputPrefix("");
     postTrace();
   }
@@ -160,9 +160,9 @@ namespace quda {
         x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
 
         B_coarse = new std::vector<ColorSpinorField*>();
-        int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level+1]);
+        int nVec_coarse = (param.level == param.Nlevel-2 ?  param.mg_global.n_vec[param.level+1] : std::max(param.Nvec, param.mg_global.n_vec[param.level+1]));
         B_coarse->resize(nVec_coarse);
-
+	
         // only have single precision B vectors on the coarse grid
         QudaPrecision B_coarse_precision = std::max(param.mg_global.precision_null[param.level+1], QUDA_SINGLE_PRECISION);
         for (int i=0; i<nVec_coarse; i++)
@@ -406,9 +406,9 @@ namespace quda {
       coarse_solver = coarse;
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to coarse MG operator\n");
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
+      
       param_coarse_solver = new SolverParam(param);
-
-      param_coarse_solver->inv_type = param.mg_global.coarse_solver[param.level+1];
+      param_coarse_solver->inv_type = param.mg_global.coarse_solver[param.level+1];      
       param_coarse_solver->is_preconditioner = false;
       param_coarse_solver->sloppy_converge = true; // this means we don't check the true residual before declaring convergence
 
@@ -416,7 +416,9 @@ namespace quda {
       param_coarse_solver->return_residual = false; // coarse solver does need to return residual vector
 
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;  
-
+      if(param.mg_global.deflate_coarsest) {
+	param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      }
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
       param_coarse_solver->global_reduction = true;
       param_coarse_solver->compute_true_res = false;
@@ -434,12 +436,14 @@ namespace quda {
       param_coarse_solver->precision = r_coarse->Precision();
       param_coarse_solver->precision_sloppy = param_coarse_solver->precision;
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
-      
+
       if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
+	printfQuda("QUDA_MATPC_SOLUTION on level %d\n", param.mg_global.coarse_grid_solution_type[param.level+1]); 
 	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
 	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
 	coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
       } else {
+	printfQuda("NOT QUDA_MATPC_SOLUTION on level %d\n", param.mg_global.coarse_grid_solution_type[param.level+1]); 
 	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
 	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
 	coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
@@ -452,19 +456,19 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse solver wrapper done\n");
     postTrace();
   }
-
+  
   MG::~MG() {
     if (param.level < param.Nlevel-1) {
       if (rng) rng->Release();
       delete rng;
-
+      
       if (param.level == param.Nlevel-1 || param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
 	if (coarse_solver) delete coarse_solver;
 	if (param_coarse_solver) delete param_coarse_solver;
       }
 
       if (B_coarse) {
-	int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level+1]);
+	int nVec_coarse = (param.level == param.Nlevel-2 ?  param.mg_global.n_vec[param.level+1] : std::max(param.Nvec, param.mg_global.n_vec[param.level+1]));
 	for (int i=0; i<nVec_coarse; i++) if ((*B_coarse)[i]) delete (*B_coarse)[i];
 	delete B_coarse;
       }
@@ -819,11 +823,9 @@ namespace quda {
         // recurse to the next lower level
 	if(param.level == param.Nlevel-2 && param.mg_global.deflate_coarsest) {
 	  
-	  param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 	  
-	  //Deflate the residual injected into coarsest grid solve 
-	  printfQuda("Deflating coarsest grid\n");
-	  
+	  //Deflate the residual injected into coarsest grid solve
+	  //==============================================================
 	  //Create temp guess vector
 	  ColorSpinorField *x_coarse_defl = nullptr;
 	  ColorSpinorParam csParam(*x_coarse);
@@ -839,17 +841,20 @@ namespace quda {
 	  
 	  //printfQuda("before deflation x_coarse_defl = %e r_coarse = %e\n", norm2(*x_coarse_defl_ptr[0]), norm2(*r_coarse));
 	  deflateEigenvectors(x_coarse_defl_ptr, r_coarse_ptr, coarse->param.B, coarse->param.evals);
-	  //deflateSVD(x_coarse_defl_ptr, r_coarse_ptr, coarse->param.B, coarse->param.evals);
 	  //printfQuda("between x_coarse_defl = %e r_coarse = %e\n", norm2(*x_coarse_defl_ptr[0]), norm2(*r_coarse));
+	  //==============================================================
+	  
+	  //Call deflated solver
 	  (*coarse_solver)(*x_coarse_defl_ptr[0], *r_coarse);
+	  
+          //printfQuda("between x_coarse_defl = %e r_coarse = %e\n", norm2(*x_);
 	  setOutputPrefix(prefix); // restore prefix after return from coarse grid
 	  //printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse_defl_ptr[0]), norm2(*r_coarse));
 	  //copy back to x_coarse
 	  *x_coarse = *x_coarse_defl;
 	  delete x_coarse_defl;
-	  
 	} else {
-	    
+	  printfQuda("before inv x_coarse = %e r_coarse_tmp = %e\n", norm2(*x_coarse), norm2(*r_coarse));	  
 	  (*coarse_solver)(*x_coarse, *r_coarse); 
 	  setOutputPrefix(prefix); // restore prefix after return from coarse grid
 	  if ( debug ) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
@@ -883,7 +888,7 @@ namespace quda {
       diracSmoother->reconstruct(x, b, outer_solution_type);
 
     } else { // do the coarse grid solve
-
+      
       ColorSpinorField *out=nullptr, *in=nullptr;
       //Deflate EVEN ODD here
       diracSmoother->prepare(in, out, x, b, outer_solution_type);
@@ -1416,14 +1421,17 @@ namespace quda {
       ColorSpinorParam csParam(*param.B[0]);
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      // this is the vector precision used by matResidual
+      //This is the vector precision used by matResidual
       csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
       for (int i=0; i<nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
       
       //Eigensolver function
-      const Dirac &mat = *param.matResidual->Expose();
-      irlmSolve(B_evecs, evals, mat, param.mg_global.eig_param[param.level]);
+      //const Dirac &mat = *param.matResidual->Expose();
+      //irlmSolve(B_evecs, evals, mat, param.mg_global.eig_param[param.level]);
+
+      EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *param.matResidual->Expose(), profile);
+      (*eig_solve)(B_evecs, evals);
       
       if(param.level == param.Nlevel-1) {
 	//This is the coarsest grid. We save the eigenvalues
@@ -1462,11 +1470,15 @@ namespace quda {
       setOutputPrefix(prefix);      
   }
 
-  void MG::deflateEigenvectors(std::vector<ColorSpinorField*> vec_defl, std::vector<ColorSpinorField*> vec,
-			       std::vector<ColorSpinorField*> eig_vecs, std::vector<Complex> evals) {
+  void MG::deflateEigenvectors(std::vector<ColorSpinorField*> vec_defl,
+			       std::vector<ColorSpinorField*> vec,
+			       std::vector<ColorSpinorField*> eig_vecs,
+			       std::vector<Complex> evals) {
     
     //number of evecs
     int Nvecs = eig_vecs.size();
+
+    printfQuda("Deflating %d vectors from coarsest grid\n", Nvecs);
 
     //Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * x_coarse = r_coarse_DEFL
     //for all i computed eigenvectors and values.
@@ -1482,15 +1494,14 @@ namespace quda {
     blas::zero(*vec_defl[0]);
     blas::caxpy(s, eig_vecs, vec_defl);
     
-    //Normalise the guess relative to the source
-    double norma = sqrt(blas::norm2(*vec_defl[0]));
-    double normb = sqrt(blas::norm2(*vec[0]));
-    blas::ax(normb/norma, *vec_defl[0]);
+    printfQuda("Deflation complete\n");
     
   }
 
-  void MG::deflateSVD(std::vector<ColorSpinorField*> vec_defl, std::vector<ColorSpinorField*> vec,
-		      std::vector<ColorSpinorField*> svd_vecs, std::vector<Complex> svals) {
+  void MG::deflateSVD(std::vector<ColorSpinorField*> vec_defl,
+		      std::vector<ColorSpinorField*> vec,
+		      std::vector<ColorSpinorField*> svd_vecs,
+		      std::vector<Complex> svals) {
     
     //number of svecs
     int Svecs = svd_vecs.size()/2;

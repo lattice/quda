@@ -18,7 +18,6 @@
 #include <invert_quda.h>
 #include <eigensolve_quda.h>
 #include <color_spinor_field.h>
-//#include <eig_variables.h>
 #include <clover_field.h>
 #include <llfat_quda.h>
 #include <unitarization_links.h>
@@ -2386,35 +2385,36 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   
   //Test for initial guess
   if(norm == 0.0) {
-    //Populate initial residual with randoms.
-    printfQuda("Using random guess\n");
-    kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
+    printfQuda("Initial residual is zero. Populating with rands.\n");
+    if (kSpace[0] -> Location() == QUDA_CPU_FIELD_LOCATION) {
+      kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
+    } else {
+      RNG *rng = new RNG(kSpace[0]->Volume(), 1234, kSpace[0]->X());
+      rng->Init();
+      spinorNoise(*kSpace[0], *rng, QUDA_NOISE_UNIFORM);
+      rng->Release();
+      delete rng;
+    }
     printfQuda("Random guess set\n");
   } else {
     //Transfer host guess to device
     printfQuda("Using initial guess\n");
     *kSpace[0] = *h_tmp;
-  }      
+  }     
   delete h_tmp;
   
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
 
   profileEigensolve.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  //The Arnoldi can solve any problem. However, if you use poly acc on a
-  //non-symmetric matrix, this routine will fail.
+  //If you use polynomial acceleration on a non-symmetric matrix,
+  //the solver will fail.
   if(eig_param->use_poly_acc && !eig_param->use_norm_op) {
     errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
   }
   
-  //Decide how to solve the problem
-  if(eig_param->use_norm_op) {
-    //Problem is symmetric, use a Lanczos solver
-    irlmSolve(kSpace, evals, dirac, eig_param);    
-  } else {
-    //Problem is asymmetric, use an Arnoldi solver
-    iramSolve(kSpace, evals, dirac, eig_param);
-  }
+  EigenSolver *eig_solve = EigenSolver::create(eig_param, dirac, profileEigensolve);
+  (*eig_solve)(kSpace, evals);
   
   profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
   
@@ -2434,7 +2434,6 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   profilerStop(__func__);
   
 }
-
 
 void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_param) {
 
@@ -2740,7 +2739,6 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   B.resize(mg_param.n_vec[0]);
   for (int i=0; i<mg_param.n_vec[0]; i++) {
     B[i] = ColorSpinorField::Create(csParam);
-    evals.push_back(0.0);
   }
   
   // fill out the MG parameters for the fine level

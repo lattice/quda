@@ -19,7 +19,7 @@ namespace quda {
   Solver* Solver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			 DiracMatrix &matPrecon, TimeProfile &profile)
   {
-    Solver *solver=0;
+    Solver *solver = nullptr;
 
     if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER)
       errorQuda("Explicit preconditoner not supported for %d solver", param.inv_type);
