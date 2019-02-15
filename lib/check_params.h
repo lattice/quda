@@ -470,7 +470,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 
 #ifdef INIT_PARAM
-  P(ca_basis, QUDA_INVALID_BASIS);
+  P(ca_basis, QUDA_POWER_BASIS);
   P(ca_lambda_min, 0.0);
   P(ca_lambda_max, -1.0);
 #else
@@ -636,7 +636,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-    P(setup_ca_basis[i], QUDA_INVALID_BASIS);
+    P(setup_ca_basis[i], QUDA_POWER_BASIS);
     P(setup_ca_basis_size[i], 4);
     P(setup_ca_lambda_min[i], 0.0);
     P(setup_ca_lambda_max[i], -1.0);
@@ -654,7 +654,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
 
 #ifdef INIT_PARAM
-    P(coarse_solver_ca_basis[i], QUDA_INVALID_BASIS);
+    P(coarse_solver_ca_basis[i], QUDA_POWER_BASIS);
     P(coarse_solver_ca_basis_size[i], 4);
     P(coarse_solver_ca_lambda_min[i], 0.0);
     P(coarse_solver_ca_lambda_max[i], -1.0);
