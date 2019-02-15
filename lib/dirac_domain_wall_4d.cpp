@@ -29,9 +29,13 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
+#ifndef USE_LEGACY_DSLASH
+    ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, parity, dagger, commDim, profile);
+#else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, 0, mass, 0, 0, commDim, 0, profile);
+#endif
 
     flops += 1320LL*(long long)in.Volume();
   }
@@ -43,7 +47,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-#if 1
+#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, in, mass, 0.0, nullptr, nullptr, 0.0, dagger, DSLASH5_DWF);
 #else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
@@ -66,10 +70,14 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#ifndef USE_LEGACY_DSLASH
+    ApplyDomainWall4D(out, in, *gauge, k, 0.0, nullptr, nullptr, x, parity, dagger, commDim, profile);
+#else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
 			 mass, k, 0, commDim, 0, profile);
+#endif
 
     flops += (1320LL+48LL)*(long long)in.Volume();
   }
@@ -82,7 +90,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#if 1
+#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, x, mass, 0.0, nullptr, nullptr, k, dagger, DSLASH5_DWF);
 #else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
@@ -101,11 +109,21 @@ namespace quda {
   {
     checkFullSpinor(out, in);
 
+#ifndef USE_LEGACY_DSLASH
+    ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    flops += 1320LL*(long long)in.Volume();
+    ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, DSLASH5_DWF);
+    long long Ls = in.X(4);
+    long long bulk = (Ls-2)*(in.Volume()/Ls);
+    long long wall = 2*in.Volume()/Ls;
+    flops += (48LL)*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
+#else
     Dslash4(out.Odd(), in.Even(), QUDA_ODD_PARITY);
     Dslash5Xpay(out.Odd(), in.Odd(), QUDA_ODD_PARITY, out.Odd(), 1.0);
 
     Dslash4(out.Even(), in.Odd(), QUDA_EVEN_PARITY);
     Dslash5Xpay(out.Even(), in.Even(), QUDA_EVEN_PARITY, out.Even(), 1.0);
+#endif
 
     blas::xpay(const_cast<ColorSpinorField&>(in), -kappa5, out);
   }
@@ -164,7 +182,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#if 1
+#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, in, mass, m5, nullptr, nullptr, 0.0, dagger, M5_INV_DWF);
 #else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
@@ -184,7 +202,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#if 1
+#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, x, mass, m5, nullptr, nullptr, b, dagger, M5_INV_DWF);
 #else
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,

@@ -86,7 +86,7 @@ namespace quda {
 
   }
 
-  // GPU Kernel for applying the non-dengenerate twisted-mass operator to a vector
+  // GPU Kernel for applying the non-degenerate twisted-mass operator to a vector
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg>
   __global__ void ndegTwistedMassGPU(Arg arg)
   {

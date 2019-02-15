@@ -35,6 +35,10 @@ namespace quda {
     checkDWF(out, in);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
+
+#ifndef USE_LEGACY_DSLASH
+    errorQuda("Not implemented");
+#else
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 			   &static_cast<const cudaColorSpinorField&>(in), 
@@ -42,6 +46,7 @@ namespace quda {
     } else {
       errorQuda("Not implemented");
     }
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -57,6 +62,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#ifndef USE_LEGACY_DSLASH
+    errorQuda("Not implemented");
+#else
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 			   &static_cast<const cudaColorSpinorField&>(in), 
@@ -66,6 +74,7 @@ namespace quda {
     } else {
       errorQuda("Not implemented");
     }
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);

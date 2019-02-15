@@ -342,6 +342,35 @@ namespace quda {
                                         double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
                                         const int *comm_override, TimeProfile &profile);
 
+  /**
+     @brief Driver for applying the batched Wilson 4-d stencil to a
+     5-d vector with 4-d preconditioned data order
+
+     out = D * in
+
+     where D is the gauged Wilson linear operator.
+
+     If kappa is non-zero, the operation is given by out = x + kappa * D in.
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] a Scale factor applied
+     @param[in] m_5 Wilson mass shift
+     @param[in] b_5 Mobius coefficient array (length Ls)
+     @param[in] c_5 Mobius coefficient array (length Ls)
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                         double a, double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                         int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+
 #else
 
   // plain Wilson Dslash
@@ -378,6 +407,23 @@ namespace quda {
 			       const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistCloverDslashType type,
 			       const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim,
 			       TimeProfile &profile);
+
+  // domain wall Dslash
+  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+			    const int parity, const int dagger, const cudaColorSpinorField *x,
+			    const double &m_f, const double &k, const int *commDim, TimeProfile &profile);
+
+  // Added for 4d EO preconditioning in DWF
+  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+			    const int parity, const int dagger, const cudaColorSpinorField *x,
+			    const double &m_f, const double &a, const double &b,
+			    const int *commDim, const int DS_type, TimeProfile &profile);
+
+  // Added for 4d EO preconditioning in Mobius DWF
+  void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+		      const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k,
+		      const double *b5, const double *c_5, const double &m5,
+                      const int *commDim, const int DS_type, TimeProfile &profile);
 
 #endif
 
@@ -445,23 +491,6 @@ namespace quda {
                 const GaugeField &U, const ColorSpinorField &x,
                 double m_f, double kappa, int parity, bool dagger,
                 const int *comm_override, TimeProfile &profile);
-
-  // domain wall Dslash
-  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-			    const int parity, const int dagger, const cudaColorSpinorField *x,
-			    const double &m_f, const double &k, const int *commDim, TimeProfile &profile);
-
-  // Added for 4d EO preconditioning in DWF
-  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-			    const int parity, const int dagger, const cudaColorSpinorField *x,
-			    const double &m_f, const double &a, const double &b,
-			    const int *commDim, const int DS_type, TimeProfile &profile);
-
-  // Added for 4d EO preconditioning in Mobius DWF
-  void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-		      const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k,
-		      const double *b5, const double *c_5, const double &m5,
-                      const int *commDim, const int DS_type, TimeProfile &profile);
 
   // staggered Dslash
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
