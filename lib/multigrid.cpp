@@ -80,7 +80,7 @@ namespace quda {
             // Initializing to random vectors
             for(int i=0; i<(int)param.B.size(); i++) {
               if (param.B[i]->Location() == QUDA_CPU_FIELD_LOCATION) param.B[i]->Source(QUDA_RANDOM_SOURCE);
-              else spinorNoise(*param.B[i], *rng, QUDA_NOISE_UNIFORM);
+              else spinorNoise(*r, *rng, QUDA_NOISE_UNIFORM);
               *param.B[i] = *r;
               param.evals.push_back(0.0);
             }
