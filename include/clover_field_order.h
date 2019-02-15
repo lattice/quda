@@ -237,7 +237,7 @@ namespace quda {
           complex<Float> *ptr = reinterpret_cast<complex<Float>*>(a);
           result = thrust::transform_reduce(thrust::seq, ptr, ptr+offset_cb, h, result, r);
         }
-        return result;
+        return 2.0*result; // factor of two is normalization
       }
 
     };
