@@ -736,9 +736,10 @@ namespace quda {
     checkLocation(out, in);     // check all locations match
 
     switch(checkPrecision(out,in)) {
-    case QUDA_DOUBLE_PRECISION: ApplyDslash5<double>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
-    case QUDA_SINGLE_PRECISION: ApplyDslash5<float> (out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
-    case QUDA_HALF_PRECISION:   ApplyDslash5<short> (out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
+    case QUDA_DOUBLE_PRECISION:  ApplyDslash5<double>(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
+    case QUDA_SINGLE_PRECISION:  ApplyDslash5<float> (out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
+    case QUDA_HALF_PRECISION:    ApplyDslash5<short> (out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
+    case QUDA_QUARTER_PRECISION: ApplyDslash5<char>  (out, in, x, m_f, m_5, b_5, c_5, a, dagger, type); break;
     default: errorQuda("Unsupported precision %d\n", in.Precision());
     }
 #else
