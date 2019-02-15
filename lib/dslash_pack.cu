@@ -1990,7 +1990,7 @@ namespace quda {
 		  const int parity, const cudaStream_t &stream) {
 
 
-    if(in.DWFPCtype() == QUDA_4D_PC)
+    if(in.PCType() == QUDA_4D_PC)
       {
 	switch(in.Precision()) {
 	case QUDA_DOUBLE_PRECISION:

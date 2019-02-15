@@ -344,7 +344,7 @@
 #define QUDA_GALERKIN_PROJECTION 1
 #define QUDA_INVALID_PROJECTION QUDA_INVALID_ENUM
   
-#define QudaDWFPCType integer(4)
+#define QudaPCType integer(4)
 #define QUDA_5D_PC 0
 #define QUDA_4D_PC 1
 #define QUDA_PC_INVALID QUDA_INVALID_ENUM

@@ -271,9 +271,9 @@ void init(int precision, QudaReconstructType link_recon) {
   }
   if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
     dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-    csParam.PCtype = QUDA_4D_PC;
+    csParam.pc_type = QUDA_4D_PC;
   } else {
-    csParam.PCtype = QUDA_5D_PC;
+    csParam.pc_type = QUDA_5D_PC;
   }
 
   //ndeg_tm

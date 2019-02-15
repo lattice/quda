@@ -92,7 +92,7 @@ namespace quda {
      @param[out] the dimension we are working on (fused kernel only)
      @return checkerboard space-time index
   */
-  template <int nDim, QudaDWFPCType pc_type, KernelType kernel_type, typename Arg>
+  template <int nDim, QudaPCType pc_type, KernelType kernel_type, typename Arg>
   __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity, int &dim) {
 
     int x_cb, X;

@@ -348,7 +348,7 @@ enum IndexType {
    @param idx[in] Input checkerboarded face index
    @param[in] param Parameter struct with required meta data
  */
-template <int nDim, QudaDWFPCType pc_type, IndexType idxType, typename T, typename Param>
+template <int nDim, QudaPCType pc_type, IndexType idxType, typename T, typename Param>
 static __device__ __forceinline__ void coordsFromIndex(int &idx, T *x, int &cb_idx, const Param &param)
 {
 

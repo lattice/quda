@@ -268,7 +268,7 @@ void multiplySpinorByDiracProjector5(Float *res, int projIdx, Float *spinorIn) {
 //
 //An "ok" will only be granted once check2.tex is deemed complete,
 //since the logic in this function is important and nontrivial.
-template <QudaDWFPCType type, typename sFloat, typename gFloat>
+template <QudaPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, 
 			     int oddBit, int daggerBit) {
   
@@ -326,7 +326,7 @@ void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorFiel
 }
 
 #ifdef MULTI_GPU
-template <QudaDWFPCType type, typename sFloat, typename gFloat>
+template <QudaPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField,
 			     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
 {
@@ -374,7 +374,7 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
 #endif
 
 //Currently we consider only spacetime decomposition (not in 5th dim), so this operator is local
-template <QudaDWFPCType type, bool zero_initialize=false, typename sFloat>
+template <QudaPCType type, bool zero_initialize=false, typename sFloat>
 void dslashReference_5th(sFloat *res, sFloat *spinorField, 
                          int oddBit, int daggerBit, sFloat mferm) {
   for (int i = 0; i < V5h; i++) {
@@ -608,7 +608,7 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    csParam.PCtype = QUDA_5D_PC;
+    csParam.pc_type = QUDA_5D_PC;
   
     cpuColorSpinorField inField(csParam);
 
@@ -670,7 +670,7 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    csParam.PCtype = QUDA_4D_PC;
+    csParam.pc_type = QUDA_4D_PC;
   
     cpuColorSpinorField inField(csParam);
 

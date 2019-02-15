@@ -94,7 +94,7 @@ namespace quda {
     QudaGammaBasis gammaBasis;
     QudaFieldCreate create; //
 
-    QudaDWFPCType PCtype; // used to select preconditioning method in DWF
+    QudaPCType pc_type; // used to select preconditioning method in DWF
 
     void *v; // pointer to field
     void *norm;
@@ -111,7 +111,7 @@ namespace quda {
     : LatticeFieldParam(), location(QUDA_INVALID_FIELD_LOCATION), nColor(0),
       nSpin(0), nVec(1), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS),
-      create(QUDA_INVALID_FIELD_CREATE), PCtype(QUDA_PC_INVALID),
+      create(QUDA_INVALID_FIELD_CREATE), pc_type(QUDA_PC_INVALID),
       is_composite(false), composite_dim(0), is_component(false), component_id(0) { ; }
 
       // used to create cpu params
@@ -124,7 +124,7 @@ namespace quda {
       twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
-      PCtype(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||
+      pc_type(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||
 	      (inv_param.dslash_type==QUDA_MOBIUS_DWF_DSLASH))?QUDA_4D_PC:QUDA_5D_PC ),
       v(V), is_composite(false), composite_dim(0), is_component(false), component_id(0) {
 
@@ -182,7 +182,7 @@ namespace quda {
       location(location), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), nVec(cpuParam.nVec),
       twistFlavor(cpuParam.twistFlavor), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER),
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
-      create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0), is_composite(cpuParam.is_composite), composite_dim(cpuParam.composite_dim), is_component(false), component_id(0)
+      create(QUDA_COPY_FIELD_CREATE), pc_type(cpuParam.pc_type), v(0), is_composite(cpuParam.is_composite), composite_dim(cpuParam.composite_dim), is_component(false), component_id(0)
       {
 	siteSubset = cpuParam.siteSubset;
 	fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ?
@@ -278,7 +278,7 @@ namespace quda {
     void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
 		QudaPrecision precision, int pad, QudaSiteSubset subset,
 		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
-		QudaDWFPCType PCtype);
+		QudaPCType pc_type);
     void destroy();
 
   protected:
@@ -301,7 +301,7 @@ namespace quda {
 
     QudaTwistFlavorType twistFlavor;
 
-    QudaDWFPCType PCtype; // used to select preconditioning method in DWF
+    QudaPCType pc_type; // used to select preconditioning method in DWF
 
     size_t real_length; // physical length only
     size_t length; // length including pads, but not ghost zone - used for BLAS
@@ -441,7 +441,7 @@ namespace quda {
     size_t ComponentBytes() const { return composite_descr.bytes; }
     size_t ComponentNormBytes() const { return composite_descr.norm_bytes; }
 
-    QudaDWFPCType DWFPCtype() const { return PCtype; }
+    QudaPCType PCType() const { return pc_type; }
 
     QudaSiteSubset SiteSubset() const { return siteSubset; }
     QudaSiteOrder SiteOrder() const { return siteOrder; }
@@ -962,14 +962,14 @@ namespace quda {
      type of the fields is the same.
      @param[in] a Input field
      @param[in] b Input field
-     @return If PCtype is unique return this
+     @return If PCType is unique return this
    */
-  inline QudaDWFPCType PCType_(const char *func, const char *file, int line,
+  inline QudaPCType PCType_(const char *func, const char *file, int line,
 			       const ColorSpinorField &a, const ColorSpinorField &b) {
-    QudaDWFPCType type = QUDA_PC_INVALID;
-    if (a.DWFPCtype() == b.DWFPCtype()) type = a.DWFPCtype();
+    QudaPCType type = QUDA_PC_INVALID;
+    if (a.PCType() == b.PCType()) type = a.PCType();
     else errorQuda("PCTypes %d %d do not match (%s:%d in %s())\n",
-		   a.DWFPCtype(), b.DWFPCtype(), file, line, func);
+		   a.PCType(), b.PCType(), file, line, func);
     return type;
   }
 
@@ -981,10 +981,10 @@ namespace quda {
      @return If precision is unique return the precision
    */
   template <typename... Args>
-  inline QudaDWFPCType PCType_(const char *func, const char *file, int line,
+  inline QudaPCType PCType_(const char *func, const char *file, int line,
 			       const ColorSpinorField &a, const ColorSpinorField &b,
 			       const Args &... args) {
-    return static_cast<QudaDWFPCType>(PCType_(func,file,line,a,b) & PCType_(func,file,line,a,args...));
+    return static_cast<QudaPCType>(PCType_(func,file,line,a,b) & PCType_(func,file,line,a,args...));
   }
 
 #define checkPCType(...) PCType_(__func__, __FILE__, __LINE__, __VA_ARGS__)

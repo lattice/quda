@@ -277,7 +277,7 @@ namespace quda {
 		    double a, bool dagger, Dslash5Type type)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    if (in.DWFPCtype() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");
+    if (in.PCType() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");
     checkLocation(out, in);     // check all locations match
 
     switch(checkPrecision(out,in)) {
