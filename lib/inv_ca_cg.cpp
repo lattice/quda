@@ -456,12 +456,35 @@ namespace quda {
     ColorSpinorField &tmpSloppy = tmp_sloppy ? *tmp_sloppy : tmp;
     ColorSpinorField &tmpSloppy2 = tmp_sloppy2 ? *tmp_sloppy2 : tmp2;
 
+    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+
+    // compute b2, but only if we need to
+    bool fixed_iteration = param.sloppy_converge && nKrylov==param.maxiter && !param.compute_true_res;
+    double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
+    double r2 = 0.0; // if zero source then we will exit immediately doing no work
+
+    // compute intitial residual depending on whether we have an initial guess or not
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      mat(r_, x, tmp, tmp2);
+      //r = b - Ax0
+      if (!fixed_iteration) {
+        r2 = blas::xmyNorm(b, r_);
+      } else {
+        blas::xpay(b, -1.0, r_);
+        r2 = b2; // dummy setting
+      }
+    } else {
+      r2 = b2;
+      blas::copy(r_, b);
+      blas::zero(x);
+    }
+
     // Use power iterations to approx lambda_max
     auto &lambda_min = param.ca_lambda_min;
     auto &lambda_max = param.ca_lambda_max;
 
     if (basis == QUDA_CHEBYSHEV_BASIS && lambda_max < lambda_min && !lambda_init) {
-      if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_PREAMBLE); profile.TPSTART(QUDA_PROFILE_INIT); }
 
       *Q[0] = r_; // do power iterations on this
       // Do 100 iterations, normalize every 10.
@@ -484,30 +507,7 @@ namespace quda {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
       lambda_init = true;
 
-      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
-    }
-
-    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-
-    // compute b2, but only if we need to
-    bool fixed_iteration = param.sloppy_converge && nKrylov==param.maxiter && !param.compute_true_res;
-    double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
-    double r2 = 0.0; // if zero source then we will exit immediately doing no work
-
-    // compute intitial residual depending on whether we have an initial guess or not
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r_, x, tmp, tmp2);
-      //r = b - Ax0
-      if (!fixed_iteration) {
-        r2 = blas::xmyNorm(b, r_);
-      } else {
-        blas::xpay(b, -1.0, r_);
-        r2 = b2; // dummy setting
-      }
-    } else {
-      r2 = b2;
-      blas::copy(r_, b);
-      blas::zero(x);
+      if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_INIT); profile.TPSTART(QUDA_PROFILE_PREAMBLE); }
     }
 
     // Check to see that we're not trying to invert on a zero-field source
