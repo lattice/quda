@@ -260,6 +260,7 @@ namespace quda {
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XYZT[4];
 
+    int ghostFace[QUDA_MAX_DIM+1];
     int ghostFaceCB[QUDA_MAX_DIM+1];
 
     int X2X1;

@@ -132,10 +132,11 @@ namespace quda {
       }
 
       dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
-      dslash_constant.ghostFaceCB[0] = (X[1]*X[2]*X[3])/2;
-      dslash_constant.ghostFaceCB[1] = (X[0]*X[2]*X[3])/2;
-      dslash_constant.ghostFaceCB[2] = (X[0]*X[1]*X[3])/2;
-      dslash_constant.ghostFaceCB[3] = (X[0]*X[1]*X[2])/2;
+      dslash_constant.ghostFace[0] = X[1]*X[2]*X[3];
+      dslash_constant.ghostFace[1] = X[0]*X[2]*X[3];
+      dslash_constant.ghostFace[2] = X[0]*X[1]*X[3];
+      dslash_constant.ghostFace[3] = X[0]*X[1]*X[2];
+      for (int d=0; d<4; d++) dslash_constant.ghostFaceCB[d] = dslash_constant.ghostFace[d]/2;
 
       dslash_constant.X2X1 = X[1]*X[0];
       dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
