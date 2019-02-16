@@ -18,10 +18,10 @@
 
 /***
 * Experimental PipePCG algorithm
-* Sources: 
+* Sources:
 * P. Ghysels and W. Vanroose "Hiding global synchronization latency in the preconditioned Conjugate Gradient algorithm"
 * S. Cools et al, "Analyzing the effect of local rounding error propagation on the maximal attainable accuracy of the
-*                   pipelined Conjugate Gredient method ",  arXiv:1601.07068  
+*                   pipelined Conjugate Gredient method ",  arXiv:1601.07068
 ***/
 
 //#define FULL_PIPELINE
@@ -82,7 +82,7 @@ namespace quda {
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
   }
-  
+
   PipePCG::~PipePCG(){
     profile.TPSTART(QUDA_PROFILE_FREE);
 
@@ -125,16 +125,16 @@ namespace quda {
      ColorSpinorField *zp;
 
      double *buffer;
-     int     n_update; 
+     int     n_update;
 
-  
+
    public:
      GlobalMPIallreduce(ColorSpinorField *xp, ColorSpinorField *up, ColorSpinorField *wp, ColorSpinorField *mp, ColorSpinorField *pp, ColorSpinorField *sp, ColorSpinorField *qp, ColorSpinorField *zp, double *buffer) : xp(xp), up(up), wp(wp), mp(mp), pp(pp), sp(sp), qp(qp), zp(zp),  buffer(buffer), n_update( xp->Nspin()==4 ? 4 : 2 ) { }
 
      virtual ~GlobalMPIallreduce() { }
 
      void apply(const cudaStream_t &stream) {
- 
+
        static int count = 0;
 
        if (count == 0 ) {
@@ -157,7 +157,7 @@ namespace quda {
          //(s, s)
          buffer[2] = norm2 ( *qp );
          buffer[3] = norm2 ( *zp );
-       } 
+       }
 
        if (++count == n_update ) count = 0;
 
@@ -165,7 +165,7 @@ namespace quda {
      }
   };
 
-  // this is the Worker pointer 
+  // this is the Worker pointer
   namespace dslash {
     extern Worker* aux_worker;
   }
@@ -248,7 +248,7 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
     const double bnorm = sqrt(b2);
-    y = x;//copy initial guess 
+    y = x;//copy initial guess
 
     if(b2 == 0){
       profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -261,7 +261,7 @@ namespace quda {
 //TEST:
     csParam.setPrecision(param.precision);
     ColorSpinorField *Ax_cuda = ColorSpinorField::Create(csParam);
-   
+
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     csParam.location   = QUDA_CPU_FIELD_LOCATION;
     ColorSpinorField *Ax = ColorSpinorField::Create(csParam);
@@ -280,11 +280,11 @@ namespace quda {
 /*
 32*64 : 1000
 32*32 : 100 => better
-*/ 
-    const double mu    = K ? 100.0 : 1000.0; 
+*/
+    const double mu    = K ? 100.0 : 1000.0;
     const double blen  = b.RealLength();
     const double Anorm = sqrt(blas::norm2(r));
-    const double msqrn = mu*sqrt(blen); 
+    const double msqrn = mu*sqrt(blen);
     const double msqrnA= msqrn*Anorm;
     printfQuda("(Debug info) A-norm estimate: %1.15le\n", Anorm);
 
@@ -363,7 +363,7 @@ tau = 5.0e+6*sqrt(uro);
     dslash::aux_worker = nullptr;
 #endif
 
-    double *recvbuff   = new double[12];   
+    double *recvbuff   = new double[12];
     MPI_Request request_handle;
 
     commGlobalReductionSet(false);
@@ -376,7 +376,7 @@ tau = 5.0e+6*sqrt(uro);
       m = w;
     }
     //
-    gamma = blas::reDotProduct(r_sloppy,u); 
+    gamma = blas::reDotProduct(r_sloppy,u);
     mNorm = blas::norm2(r_sloppy);
     delta = blas::reDotProduct(w,u);
     local_reduce[0].w = 0.0;
@@ -427,11 +427,11 @@ tau = 5.0e+6*sqrt(uro);
       beta  = (gamma - gamma_aux) / gammajm1;
       double scal = (delta / gamma - beta / alpha);
       alpha_old = alpha;
-      alpha = 1.0 / scal; 
+      alpha = 1.0 / scal;
       gammajm1 = gamma;
 
 //start a cascade of updates:
-      mNorm_old2 = mNorm_old;//sic! 
+      mNorm_old2 = mNorm_old;//sic!
       mNorm_old  = mNorm;
 
 #ifdef FULL_PIPELINE
@@ -449,7 +449,7 @@ tau = 5.0e+6*sqrt(uro);
       pi_old2    = pi_old;
       sigma_old2 = sigma_old;
       phi_old2   = phi_old;
-      psi_old2   = psi_old; 
+      psi_old2   = psi_old;
 
       pi_old    = sqrt(pi);
       sigma_old = sqrt(sigma);
@@ -512,8 +512,8 @@ tau = 5.0e+6*sqrt(uro);
 
           //updateR = 0;
 
-        } else { 
-          f = f + ajm1*bjm1*g + ajm1*h + sqrt(ef)*uro + ajm1*sqrt(eg)*uro; 
+        } else {
+          f = f + ajm1*bjm1*g + ajm1*h + sqrt(ef)*uro + ajm1*sqrt(eg)*uro;
           g = bjm1*g + h + sqrt(eg)*uro;
           h = h + ajm1*bjm1*k + sqrt(eh)*uro + ajm1*sqrt(ek)*uro;
           k = bjm1*k + sqrt(ek)*uro;
@@ -566,7 +566,7 @@ tau = 5.0e+6*sqrt(uro);
 #ifdef FULL_PIPELINE
         commGlobalReductionSet(false);
         //
-        local_reduce[2].x = 0.0; 
+        local_reduce[2].x = 0.0;
         local_reduce[2].y = norm2 ( u );
         local_reduce[2].z = norm2 ( w );
         local_reduce[2].w = norm2 ( m );//set m to zero
@@ -591,7 +591,7 @@ tau = 5.0e+6*sqrt(uro);
 
 
         commGlobalReductionSet(false);
-        gamma = blas::reDotProduct(r_sloppy,u); 
+        gamma = blas::reDotProduct(r_sloppy,u);
         delta = blas::reDotProduct(w,u);
         mNorm = blas::norm2(r_sloppy);
         commGlobalReductionSet(true);
@@ -637,7 +637,7 @@ tau = 5.0e+6*sqrt(uro);
           n = r_sloppy;
           xpay(w, -Kscale_factor, n);
           rPre = n;
-         
+
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
@@ -678,7 +678,7 @@ tau = 5.0e+6*sqrt(uro);
     if (j==param.maxiter)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    // compute the true residual 
+    // compute the true residual
     x_sloppy = y;
     xpy(x_sloppy, x);
     mat(r, x, tmp);
@@ -701,17 +701,17 @@ tau = 5.0e+6*sqrt(uro);
       delete rp_sloppy;
       delete xp_sloppy;
       delete tmpp_sloppy;
-    } 
+    }
 
     return;
   }
 
-#ifdef USE_WORKER
-#undef USE_WORKER
+#ifdef FULL_PIPELINE
+#undef FULL_PIPELINE
 #endif
 
 #ifdef NONBLOCK_REDUCE
 #undef MPI_CHECK_
-#endif 
+#endif
 
 } // namespace quda

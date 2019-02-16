@@ -1,6 +1,6 @@
 //EXPERIMENTAL:
 template <typename ReduceType, typename SpinorX, typename SpinorP,
-typename SpinorU, typename SpinorR, typename SpinorS, typename SpinorM, 
+typename SpinorU, typename SpinorR, typename SpinorS, typename SpinorM,
 typename SpinorQ, typename SpinorW, typename SpinorN, typename SpinorZ, typename Reducer>
 struct ReductionArgExp : public ReduceArg<ReduceType> {//defined in cub
   SpinorX X;
@@ -82,7 +82,7 @@ __global__ void reduceKernelExp(ReductionArgExp<ReduceType,SpinorX,SpinorP,Spino
    Generic reduction kernel launcher
 */
 template <int Nreduce, typename doubleN, typename ReduceType, typename FloatN, int M_, typename SpinorX,
-	  typename SpinorP, typename SpinorU, typename SpinorR, typename SpinorS, typename SpinorM, 
+	  typename SpinorP, typename SpinorU, typename SpinorR, typename SpinorS, typename SpinorM,
           typename SpinorQ, typename SpinorW, typename SpinorN, typename SpinorZ, typename Reducer>
 void reduceLaunchExp(doubleN cpu_sum[Nreduce], ReductionArgExp<ReduceType,SpinorX,SpinorP,SpinorU,SpinorR,SpinorS,SpinorM,SpinorQ,SpinorW,SpinorN,SpinorZ, Reducer> &arg,
 		     const TuneParam &tp, const cudaStream_t &stream) {
@@ -90,22 +90,46 @@ void reduceLaunchExp(doubleN cpu_sum[Nreduce], ReductionArgExp<ReduceType,Spinor
   if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
      errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
+	if (getFastReduce() && !commAsyncReduction()) {
+	// initialize the reduction values in 32-bit increments to INT_MIN
+	  constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
+	  for (unsigned int i=0; i<tp.grid.y*words; i++) {
+	     reinterpret_cast<int32_t*>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
+	  }
+	}
+
   LAUNCH_KERNEL(reduceKernelExp,tp,stream,arg,ReduceType,FloatN,Nreduce,M_);
 
-  if (!commAsyncReduction()) {
+
+	if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
-    if(deviceProp.canMapHostMemory) {
-      cudaEventRecord(reduceEnd, stream);
-      while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
+    if (deviceProp.canMapHostMemory) {
+      if (getFastReduce()) {
+	       constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
+	       volatile int32_t *check = reinterpret_cast<int32_t*>(h_reduce);
+	       int count = 0;
+	       for (unsigned int i=0; i<tp.grid.y*words*Nreduce; i++) {
+	          // spin-wait until all values have been updated
+	          while (check[i] == std::numeric_limits<int32_t>::min()) {
+	           if (count++ % 10000 == 0) { // check error every 10000 iterations
+	             // if there is an error in the kernel then we need to exit the spin-wait
+	             if (cudaSuccess != cudaPeekAtLastError()) break;
+	           }
+	         }
+	      }
+      } else {
+	       qudaEventRecord(reduceEnd, stream);
+	       while (cudaSuccess != qudaEventQuery(reduceEnd)) { ; }
+      }
     } else
 #endif
-    { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType)*Nreduce, cudaMemcpyDeviceToHost); }
+      { qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType)*Nreduce, cudaMemcpyDeviceToHost); }
   }
 
 #pragma unroll
   for (int j=0; j<Nreduce;j++) cpu_sum[j] = set(((ReduceType*)h_reduce)[0+j*tp.grid.y]);
   if (tp.grid.y==2) {
-#pragma unroll 
+#pragma unroll
     for (int j=0; j<Nreduce;j++) sum(cpu_sum[j], ((ReduceType*)h_reduce)[1+j*tp.grid.y]); // add other parity if needed
   }
   return;
@@ -146,7 +170,7 @@ public:
 	     SpinorR &R, SpinorS &S, SpinorM &M, SpinorQ &Q, SpinorW &W, SpinorN &N, SpinorZ &Z, Reducer &r, int length, int nParity,
 	     const size_t *bytes, const size_t *norm_bytes) :
     arg(X, P, U, R, S, M, Q, W, N, Z, r, length/nParity),
-    result(result), nParity(nParity), X_h(0), P_h(0), U_h(0), R_h(0), S_h(0), M_h(0), Q_h(0), W_h(0), N_h(0), Z_h(0), 
+    result(result), nParity(nParity), X_h(0), P_h(0), U_h(0), R_h(0), S_h(0), M_h(0), Q_h(0), W_h(0), N_h(0), Z_h(0),
     Xnorm_h(0), Pnorm_h(0), Unorm_h(0), Rnorm_h(0), Snorm_h(0), Mnorm_h(0), Qnorm_h(0), Wnorm_h(0), Nnorm_h(0), Znorm_h(0),
     bytes_(bytes), norm_bytes_(norm_bytes) { }
   virtual ~ReduceCudaExp() { }
@@ -220,9 +244,9 @@ public:
 template <int Nreduce, typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename zType,
 	  int M_, template <int Nreduce_, typename ReducerType, typename Float, typename FloatN> class Reducer,
 	  int writeX,int writeP,int writeU,int writeR, int writeS, int writeM,int writeQ,int writeW,int writeN, int writeZ>
-void reduceCudaExp(doubleN reduce_buffer[Nreduce], const double2 &a, const double2 &b, ColorSpinorField &x, 
+void reduceCudaExp(doubleN reduce_buffer[Nreduce], const double2 &a, const double2 &b, ColorSpinorField &x,
 		   ColorSpinorField &p, ColorSpinorField &u, ColorSpinorField &r,
-                   ColorSpinorField &s, ColorSpinorField &m, ColorSpinorField &q, 
+                   ColorSpinorField &s, ColorSpinorField &m, ColorSpinorField &q,
                    ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z,
 		   int length) {
 
@@ -292,7 +316,7 @@ void reduceCudaExp(doubleN reduce_buffer[Nreduce], const double2 &a, const doubl
 //////COMPOSITE
 
 template <typename ReduceType, typename SpinorX1, typename SpinorR1, typename SpinorW1, typename SpinorQ1, typename SpinorD1,
-typename SpinorH1, typename SpinorZ1, typename SpinorP1, typename SpinorU1, typename SpinorG1, 
+typename SpinorH1, typename SpinorZ1, typename SpinorP1, typename SpinorU1, typename SpinorG1,
 typename SpinorX2, typename SpinorR2, typename SpinorW2, typename SpinorQ2, typename SpinorD2, typename SpinorH2, typename SpinorZ2, typename SpinorP2, typename SpinorU2, typename SpinorG2, typename Reducer>
 struct ReductionComponentwiseArgExp : public ReduceArg<ReduceType> {//defined in cub
   SpinorX1 X1;
@@ -411,7 +435,7 @@ SpinorX2,SpinorR2,SpinorW2,SpinorQ2,SpinorD2,SpinorH2,SpinorZ2,SpinorP2,SpinorU2
    Generic reduction kernel launcher
 */
 template <int Nreduce, typename doubleN, typename ReduceType, typename FloatN, int M_, typename SpinorX1, typename SpinorR1, typename SpinorW1, typename SpinorQ1, typename SpinorD1,
-	  typename SpinorH1, typename SpinorZ1, typename SpinorP1, typename SpinorU1, typename SpinorG1, 
+	  typename SpinorH1, typename SpinorZ1, typename SpinorP1, typename SpinorU1, typename SpinorG1,
           typename SpinorX2, typename SpinorR2, typename SpinorW2, typename SpinorQ2, typename SpinorD2, typename SpinorH2, typename SpinorZ2, typename SpinorP2, typename SpinorU2, typename SpinorG2, typename Reducer>
 void reduceLaunchExp(doubleN cpu_sum[Nreduce], ReductionComponentwiseArgExp<ReduceType,SpinorX1,SpinorR1,SpinorW1,SpinorQ1,SpinorD1,SpinorH1,SpinorZ1,SpinorP1,SpinorU1,SpinorG1, SpinorX2,SpinorR2,SpinorW2,SpinorQ2,SpinorD2,SpinorH2,SpinorZ2,SpinorP2,SpinorU2,SpinorG2, Reducer> &arg, const TuneParam &tp, const cudaStream_t &stream) {
   if (Nreduce < 0 or Nreduce > 8) errorQuda("Incorrect size of the reduce array: %d.\n", Nreduce);
@@ -433,15 +457,15 @@ void reduceLaunchExp(doubleN cpu_sum[Nreduce], ReductionComponentwiseArgExp<Redu
 #pragma unroll
   for (int j=0; j<Nreduce;j++) cpu_sum[j] = set(((ReduceType*)h_reduce)[0+j*tp.grid.y]);
   if (tp.grid.y==2) {
-#pragma unroll 
+#pragma unroll
     for (int j=0; j<Nreduce;j++) sum(cpu_sum[j], ((ReduceType*)h_reduce)[1+j*tp.grid.y]); // add other parity if needed
   }
   return;
 }
 
 
-template <int Nreduce, typename doubleN, typename ReduceType, typename FloatN, int M_, typename SpinorX1, typename SpinorR1, typename SpinorW1, typename SpinorQ1, typename SpinorD1, 
-          typename SpinorH1, typename SpinorZ1, typename SpinorP1, typename SpinorU1, typename SpinorG1,  
+template <int Nreduce, typename doubleN, typename ReduceType, typename FloatN, int M_, typename SpinorX1, typename SpinorR1, typename SpinorW1, typename SpinorQ1, typename SpinorD1,
+          typename SpinorH1, typename SpinorZ1, typename SpinorP1, typename SpinorU1, typename SpinorG1,
 	  typename SpinorX2, typename SpinorR2, typename SpinorW2, typename SpinorQ2, typename SpinorD2, typename SpinorH2, typename SpinorZ2, typename SpinorP2, typename SpinorU2, typename SpinorG2, typename Reducer>
 class ReduceComponentwiseCudaExp : public Tunable {
 
@@ -477,8 +501,8 @@ public:
 	     SpinorQ1 &Q1, SpinorD1 &D1, SpinorH1 &H1, SpinorZ1 &Z1, SpinorP1 &P1, SpinorU1 &U1, SpinorG1 &G1, SpinorX2 &X2, SpinorR2 &R2, SpinorW2 &W2, SpinorQ2 &Q2, SpinorD2 &D2, SpinorH2 &H2, SpinorZ2 &Z2, SpinorP2 &P2, SpinorU2 &U2, SpinorG2 &G2, Reducer &r, int length, int nParity,
 	     const size_t *bytes, const size_t *norm_bytes) :
     arg(X1,R1,W1,Q1,D1,H1,Z1,P1,U1,G1,X2,R2,W2,Q2,D2,H2,Z2,P2,U2,G2, r, length/nParity),
-    result(result), nParity(nParity), 
-    X1_h(0), R1_h(0), W1_h(0), Q1_h(0), D1_h(0), H1_h(0), Z1_h(0), P1_h(0), U1_h(0), G1_h(0), 
+    result(result), nParity(nParity),
+    X1_h(0), R1_h(0), W1_h(0), Q1_h(0), D1_h(0), H1_h(0), Z1_h(0), P1_h(0), U1_h(0), G1_h(0),
     X2_h(0), R2_h(0), W2_h(0), Q2_h(0), D2_h(0), H2_h(0), Z2_h(0), P2_h(0), U2_h(0), G2_h(0),
     X1norm_h(0), R1norm_h(0), W1norm_h(0), Q1norm_h(0), D1norm_h(0), H1norm_h(0), Z1norm_h(0), P1norm_h(0), U1norm_h(0), G1norm_h(0),
     X2norm_h(0), R2norm_h(0), W2norm_h(0), Q2norm_h(0), D2norm_h(0), H2norm_h(0), Z2norm_h(0), P2norm_h(0), U2norm_h(0), G2norm_h(0),
@@ -576,14 +600,14 @@ public:
 template <int Nreduce, typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename zType,
 	  int M_, template <int Nreduce_, typename ReducerType, typename Float, typename FloatN> class Reducer,
 	  int writeX,int writeR,int writeW,int writeQ, int writeD, int writeH,int writeZ,int writeP,int writeU, int writeG>
-void reduceComponentwiseCudaExp(doubleN reduce_buffer[Nreduce], const double2 &a, const double2 &b, const double2 &c, const double2 &a2, const double2 &b2, const double2& c2, 
+void reduceComponentwiseCudaExp(doubleN reduce_buffer[Nreduce], const double2 &a, const double2 &b, const double2 &c, const double2 &a2, const double2 &b2, const double2& c2,
                    ColorSpinorField &x1, ColorSpinorField &r1,
 		   ColorSpinorField &w1, ColorSpinorField &q1, ColorSpinorField &d1,
-		   ColorSpinorField &h1, ColorSpinorField &z1, ColorSpinorField &p1, 
+		   ColorSpinorField &h1, ColorSpinorField &z1, ColorSpinorField &p1,
                    ColorSpinorField &u1, ColorSpinorField &g1,
                    ColorSpinorField &x2, ColorSpinorField &r2,
 		   ColorSpinorField &w2, ColorSpinorField &q2, ColorSpinorField &d2,
-		   ColorSpinorField &h2, ColorSpinorField &z2, ColorSpinorField &p2, 
+		   ColorSpinorField &h2, ColorSpinorField &z2, ColorSpinorField &p2,
                    ColorSpinorField &u2, ColorSpinorField &g2, int length) {
 
   checkLength(x1, r1); checkLength(x1, w1); checkLength(x1, q1); checkLength(x1, d1);
@@ -676,5 +700,3 @@ x2.NormBytes(), r2.NormBytes(), w2.NormBytes(), q2.NormBytes(), d2.NormBytes(), 
 
   return;
 }
-
-

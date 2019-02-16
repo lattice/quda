@@ -132,8 +132,8 @@ namespace quda {
   __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx); }
 
 
-  template <int nreduce, int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum>
-  __device__ inline void array_reduce2d(ReduceArg<T> arg, const T in[nreduce], const int idx=0) {
+	template <int nreduce,, int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum>
+	__device__ inline void array_reduce2d(ReduceArg<T> arg, const T in[nreduce], const int idx=0) {
 
 		typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
 		__shared__ typename BlockReduce::TempStorage cub_tmp;
@@ -168,7 +168,7 @@ namespace quda {
 			for(int j=0; j<nreduce; j++) zero(sum[j]);
 			while (i<gridDim.x) {
 #pragma unroll //??
-				for(int j=0; j<nreduce; j++) sum[j] = r(sum[j], arg.partial[j*gridDim.x*gridDim.y + idx*gridDim.x + i]);
+				for(int j=0; j<nreduce; j++) sum = r(sum, arg.partial[j*gridDim.x*gridDim.y + idx*gridDim.x + i]);
 		    //for(int j=0; j<nreduce; j++) sum[j] += arg.partial[j*gridDim.x*gridDim.y + idx*gridDim.x + i];
 	      i += block_size_x*block_size_y;
 			}

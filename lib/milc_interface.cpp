@@ -101,7 +101,7 @@ void qudaFinalize()
   endQuda();
   qudamilc_called<false>(__func__);
 }
-#ifdef MULTI_GPU
+#if defined(MULTI_GPU) && !defined(QMP_COMMS)
 /**
  *  Implements a lexicographical mapping of node coordinates to ranks,
  *  with t varying fastest.
@@ -136,7 +136,11 @@ void qudaSetLayout(QudaLayout_t input)
 
 #ifdef MULTI_GPU
   for(int dir=0; dir<4; ++dir)  gridDim[dir] = input.machsize[dir];
+#ifdef QMP_COMMS
+  initCommsGridQuda(4, gridDim, nullptr, nullptr);
+#else
   initCommsGridQuda(4, gridDim, rankFromCoords, (void *)(gridDim));
+#endif
   static int device = -1;
 #else
   for(int dir=0; dir<4; ++dir)  gridDim[dir] = 1;

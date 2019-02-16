@@ -791,7 +791,6 @@ extern "C" {
   void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
                    void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
 
-
   /**
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via

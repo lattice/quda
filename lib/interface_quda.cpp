@@ -149,7 +149,7 @@ std::vector<cudaColorSpinorField*> solutionResident;
 
 // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 12
-// each entry is one p 
+// each entry is one p
 std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 
 // Mapped memory buffer used to hold unitarization failures
@@ -547,7 +547,7 @@ void initQudaDevice(int dev) {
   if (deviceProp.major == my_major and deviceProp.minor > my_minor) {
     warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- This might result in a lower performance. Please consider adjusting QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
   }
-   
+
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
@@ -706,20 +706,21 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   profileGauge.TPSTART(QUDA_PROFILE_INIT);
   // Set the specific input parameters and create the cpu gauge field
-#ifdef JULIA_INTERFACE //current hack for julia bindings
-  void *hh_gauge[4];
+  #ifdef JULIA_INTERFACE //current hack for julia bindings
+    void *hh_gauge[4];
 
-  const int Vol = param->X[0]*param->X[1]*param->X[2]*param->X[3];
-  const int gaugeSiteSize = 18;
+    const int Vol = param->X[0]*param->X[1]*param->X[2]*param->X[3];
+    const int gaugeSiteSize = 18;
 
-  for (int dir = 0; dir < 4; dir++) {
-    hh_gauge[dir] = param->cpu_prec == QUDA_DOUBLE_PRECISION ? static_cast<void*>(&((static_cast<double*>(h_gauge))[dir*Vol*gaugeSiteSize])) : static_cast<void*>(&((static_cast<float*>(h_gauge))[dir*Vol*gaugeSiteSize]));
-  }
+    for (int dir = 0; dir < 4; dir++) {
+      hh_gauge[dir] = param->cpu_prec == QUDA_DOUBLE_PRECISION ? static_cast<void*>(&((static_cast<double*>(h_gauge))[dir*Vol*gaugeSiteSize])) : static_cast<void*>(&((static_cast<float*>(h_gauge))[dir*Vol*gaugeSiteSize]));
+    }
 
-  GaugeFieldParam gauge_param(hh_gauge, *param);
-#else
-  GaugeFieldParam gauge_param(h_gauge, *param);
-#endif
+    GaugeFieldParam gauge_param(hh_gauge, *param);
+  #else
+    GaugeFieldParam gauge_param(h_gauge, *param);
+  #endif
+
   // if we are using half precision then we need to compute the fat
   // link maximum while still on the cpu
   // FIXME get a kernel for this
@@ -957,7 +958,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   if(param->type == QUDA_SMEARED_LINKS) {
     delete cudaGauge;
-  } 
+  }
 
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -1193,7 +1194,7 @@ void loadSloppyCloverQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondi
     } else {
       cloverPrecondition = cloverSloppy;
     }
-  
+
     // switch the parameters for creating the mirror preconditioner clover field
     clover_param.setPrecision(prec_refinement_sloppy);
 
@@ -1384,7 +1385,7 @@ void freeSloppyCloverQuda()
   if (cloverRefinement != cloverSloppy && cloverRefinement) delete cloverRefinement;
   if (cloverPrecondition != cloverSloppy && cloverPrecondition) delete cloverPrecondition;
   if (cloverSloppy != cloverPrecise && cloverSloppy) delete cloverSloppy;
-  
+
   cloverRefinement = nullptr;
   cloverPrecondition = nullptr;
   cloverSloppy = nullptr;
@@ -2057,10 +2058,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   cudaColorSpinorField out(in, cudaParam);
 
   DiracParam diracParam;
-  if(inv_param->dslash_type_precondition == QUDA_INVALID_DSLASH)
-    setDiracParam(diracParam, inv_param, pc);
-  else 
-    setDiracPreParam(diracParam, inv_param, pc, false);
+  setDiracParam(diracParam, inv_param, pc);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->M(out, in); // apply the operator
@@ -2134,10 +2132,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   //  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= gaugePrecise->anisotropy;
 
   DiracParam diracParam;
-  if(inv_param->dslash_type_precondition == QUDA_INVALID_DSLASH)
-    setDiracParam(diracParam, inv_param, pc);
-  else 
-    setDiracPreParam(diracParam, inv_param, pc, false);
+  setDiracParam(diracParam, inv_param, pc);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->MdagM(out, in); // apply the operator
@@ -2677,7 +2672,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   : d(nullptr), m(nullptr), RV(nullptr), deflParam(nullptr), defl(nullptr),  profile(profile) {
 
   QudaInvertParam *param = eig_param.invert_param;
-  
+
   if(param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER)  return;
 
   profile.TPSTART(QUDA_PROFILE_INIT);
@@ -2721,12 +2716,12 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   int ritzVolume = 1;
   for(int d = 0; d < ritzParam.nDim; d++) ritzVolume *= ritzParam.x[d];
 
-  if( getVerbosity() == QUDA_DEBUG_VERBOSE ) { 
+  if( getVerbosity() == QUDA_DEBUG_VERBOSE ) {
 
     size_t byte_estimate = (size_t)ritzParam.composite_dim*(size_t)ritzVolume*(ritzParam.nColor*ritzParam.nSpin*ritzParam.Precision());
     printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)" , byte_estimate, ritzVolume, ritzParam.Precision());
     if(ritzParam.mem_type == QUDA_MEMORY_DEVICE) printfQuda("Using device memory type.\n");
-    else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED) printfQuda("Using mapped memory type.\n"); 
+    else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED) printfQuda("Using mapped memory type.\n");
   }
 
   RV = ColorSpinorField::Create(ritzParam);
@@ -2758,7 +2753,6 @@ void destroyDeflationQuda(void *df) {
 #endif
   delete static_cast<deflated_solver*>(df);
 }
-
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
@@ -2990,7 +2984,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
       blas::copy(*tmp, *in);
       mre(*out, *tmp, basis, Ap);
-      
+
       for (auto ap: Ap) {
         if (ap) delete(ap);
       }
@@ -3514,7 +3508,7 @@ for(int i=0; i < param->num_src; i++) {
  * For Wilson-type fermions, the solution_type must be MATDAG_MAT or MATPCDAG_MATPC,
  * and solve_type must be NORMOP or NORMOP_PC. The solution and solve
  * preconditioning have to match.
- * 
+ *
  * For Staggered-type fermions, the solution_type must be MATPC, and the
  * solve type must be DIRECT_PC. This difference in convention is because
  * preconditioned staggered operator is normal, unlike with Wilson-type fermions.
@@ -4532,7 +4526,7 @@ void computeHISQForceQuda(void* const milc_momentum,
         profileHISQForce.TPSTOP(QUDA_PROFILE_H2D);
 
         profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-        computeStaggeredOprod(oprod, cudaQuark, coeff[i], 3);
+        computeStaggeredOprod(oprod, cudaQuark, coeff[i + num_terms], 3);
         profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }
@@ -5363,7 +5357,7 @@ void gaussGaugeQuda(long seed)
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
-  
+
   if (extendedGaugeResident) {
     extendedGaugeResident = gaugePrecise;
     extendedGaugeResident -> exchangeExtendedGhost(R,profileGauss,redundant_comms);
@@ -5422,7 +5416,7 @@ void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
   return;
 }
 
-void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
+void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
                            unsigned int nSteps, double alpha)
 {
   profileWuppertal.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5433,7 +5427,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   cudaGaugeField *precise = nullptr;
-  
+
   if (gaugeSmeared != nullptr) {
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("Wuppertal smearing done with gaugeSmeared\n");
