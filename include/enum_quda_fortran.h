@@ -345,8 +345,8 @@
 #define QUDA_INVALID_PROJECTION QUDA_INVALID_ENUM
   
 #define QudaPCType integer(4)
-#define QUDA_5D_PC 0
-#define QUDA_4D_PC 1
+#define QUDA_4D_PC 4
+#define QUDA_5D_PC 5
 #define QUDA_PC_INVALID QUDA_INVALID_ENUM
 
 #define QudaTwistFlavorType integer(4)

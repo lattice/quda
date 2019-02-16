@@ -381,8 +381,8 @@ extern "C" {
 
   // used to select checkerboard preconditioning method
   typedef enum QudaPCType_s {
-    QUDA_5D_PC,
-    QUDA_4D_PC,
+    QUDA_4D_PC = 4,
+    QUDA_5D_PC = 5,
     QUDA_PC_INVALID = QUDA_INVALID_ENUM
   } QudaPCType;
 
