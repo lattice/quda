@@ -1203,7 +1203,7 @@ extern "C" {
    */
   void destroyDeflationQuda(void *df_instance);
 
-  void qudaSetMPICommHandle(void *mycomm);
+  void setMPICommHandleQuda(void *mycomm);
 
 #ifdef __cplusplus
 }
