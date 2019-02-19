@@ -139,8 +139,6 @@ set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to initialize templat
 
 # Set CTest options
 set(QUDA_CTEST_SEP_DSLASH_POLICIES OFF CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
-set(QUDA_CTEST_LAUNCH "" CACHE STRING "Launch command for automated unit tests, (e.g., mpirun)")
-set(QUDA_CTEST_LAUNCH_ARGS "" CACHE STRING "Launch parameters for automated unit tests (e.g., number of processes)")
 
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 11 CACHE STRING "set the CXX Standard (11 or 14)")
