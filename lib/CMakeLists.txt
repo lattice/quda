@@ -25,16 +25,14 @@ set (QUDA_OBJS
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
   dslash_twisted_clover.cu dslash_domain_wall.cu
-  dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu staggered_dslash.cu
+  dslash_domain_wall_4d.cu dslash_mobius.cu staggered_dslash.cu
   dslash4_wilson.cu dslash4_wilson_clover.cu dslash5_domain_wall.cu
-  dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu
-  dslash4_wilson.cu dslash4_wilson_clover.cu
-  dslash4_wilson_clover_preconditioned.cu dslash5_domain_wall.cu
+  dslash4_wilson_clover_preconditioned.cu 
   dslash4_twisted_mass.cu dslash4_twisted_mass_preconditioned.cu
   dslash4_ndeg_twisted_mass.cu dslash4_ndeg_twisted_mass_preconditioned.cu
   dslash4_twisted_clover.cu dslash4_twisted_clover_preconditioned.cu
-  dslash4_domain_wall_4d.cu
-  dslash_improved_staggered.cu dslash_pack.cu dslash_pack2.cu
+  dslash4_domain_wall_4d.cu dslash_pack.cu dslash_pack2.cu
+  #dslash_improved_staggered.cu dslash_staggered.cu 
   blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
@@ -68,6 +66,10 @@ set (QUDA_OBJS
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
   quda_cuda_api.cpp quda_arpack_interface.cpp deflation.cpp checksum.cu version.cpp )
+
+if(QUDA_LEGACY_DSLASH)
+LIST(APPEND QUDA_OBJS dslash_improved_staggered.cu dslash_staggered.cu)
+endif()
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})

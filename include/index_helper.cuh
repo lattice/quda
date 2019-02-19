@@ -299,7 +299,7 @@ namespace quda {
      @param x_ local site
      @param X_ local lattice dimensions
      @param dim dimension
-     @param depth of ghost
+     @param nFace depth of ghost
   */
   template <int dir, int nDim=4, typename I>
   __device__ __host__ inline int ghostFaceIndex(const int x_[], const I X_[], int dim, int nFace) {
@@ -347,6 +347,67 @@ namespace quda {
       case 1:
 	index  = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
 	break;
+      }
+      break;
+    }
+    return index;
+  }
+
+
+   /**
+     Compute the checkerboarded index into the ghost field
+     corresponding to full (local) site index x[] for staggered
+     @param x_ local site
+     @param X_ local lattice dimensions
+     @param dim dimension
+     @param nFace depth of ghost
+  */
+  template <int dir, int nDim=4, typename I>
+  __device__ __host__ inline int ghostFaceIndexStaggered(const int x_[], const I X_[], int dim, int nFace) {
+    static_assert( (nDim==4 || nDim==5), "Number of dimensions must be 4 or 5");
+    int index = 0;
+    const int x[] = { x_[0], x_[1], x_[2], x_[3], nDim == 5 ? x_[4] : 0 };
+    const int X[] = { (int)X_[0], (int)X_[1], (int)X_[2], (int)X_[3], nDim == 5 ? (int)X_[4] : 1 };
+
+    switch(dim) {
+    case 0:
+      switch(dir) {
+      case 0:
+ index = ((x[0]+nFace-1)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
+  break;
+      case 1:
+  index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+  break;
+      }
+      break;
+    case 1:
+      switch(dir) {
+      case 0:
+  index = ((x[1]+nFace-1)*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
+  break;
+      case 1:
+  index = ((x[1]-X[1]+nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
+  break;
+      }
+      break;
+    case 2:
+      switch(dir) {
+      case 0:
+  index = ((x[2]+nFace-1)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+  break;
+      case 1:
+  index = ((x[2]-X[2]+nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
+  break;
+      }
+      break;
+    case 3:
+      switch(dir) {
+      case 0:
+  index = ((x[3]+nFace-1)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+  break;
+      case 1:
+  index  = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
+  break;
       }
       break;
     }

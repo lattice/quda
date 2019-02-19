@@ -8,7 +8,7 @@
 #include <clover_field.h>
 
 //these are access control for staggered action
-#if (defined GPU_STAGGERED_DIRAC && !defined USE_LEGACY_DSLASH)
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
 #if (__COMPUTE_CAPABILITY__ >= 300) // Kepler works best with texture loads only
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
@@ -36,7 +36,7 @@
 #include <inline_ptx.h>
 
 namespace quda {
-
+#ifdef USE_LEGACY_DSLASH
   namespace staggered {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
@@ -67,12 +67,14 @@ namespace quda {
 #include <dslash_quda.cuh>
   } // end namespace staggered
 
+#endif
+
   // declare the dslash events
 #include <dslash_events.cuh>
 
   using namespace staggered;
 
-#if (defined GPU_STAGGERED_DIRAC && !defined USE_LEGACY_DSLASH)
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
   template <typename sFloat, typename gFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
@@ -194,7 +196,7 @@ namespace quda {
 			   const int dagger, const cudaColorSpinorField *x,
 			   const double &k, const int *commOverride, TimeProfile &profile)
   {
-#if (defined GPU_STAGGERED_DIRAC && !defined USE_LEGACY_DSLASH)
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     DslashCuda *dslash = nullptr;

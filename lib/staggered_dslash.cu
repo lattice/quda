@@ -21,58 +21,58 @@ namespace quda {
 namespace quda {
 
 // MWTODO: THis hould be place in the correct header
-template <typename Float, typename I>
-__device__ __host__ inline int mwStaggeredPhase(const int x, I X, int parity,
-                                                int d) {
-  Float sign;  // = static_cast<Float>(1.0);
-  int coords[4];
-  getCoords(coords, x, X, parity);
-  switch (d) {
-    case 0:
-      sign = (coords[3]) % 2 == 0 ? static_cast<Float>(1.0)
-                                  : static_cast<Float>(-1.0);
-      break;
-    case 1:
-      sign = (coords[3] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0)
-                                              : static_cast<Float>(-1.0);
-      break;
-    case 2:
-      sign = (coords[3] + coords[1] + coords[0]) % 2 == 0
-                 ? static_cast<Float>(1.0)
-                 : static_cast<Float>(-1.0);
-      break;
-    default:
-      sign = static_cast<Float>(1.0);
-  }
-  return sign;
-}
+// template <typename Float, typename I>
+// __device__ __host__ inline int StaggeredPhase(const int x, I X, int parity,
+//                                                 int d) {
+//   Float sign;  // = static_cast<Float>(1.0);
+//   int coords[4];
+//   getCoords(coords, x, X, parity);
+//   switch (d) {
+//     case 0:
+//       sign = (coords[3]) % 2 == 0 ? static_cast<Float>(1.0)
+//                                   : static_cast<Float>(-1.0);
+//       break;
+//     case 1:
+//       sign = (coords[3] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0)
+//                                               : static_cast<Float>(-1.0);
+//       break;
+//     case 2:
+//       sign = (coords[3] + coords[1] + coords[0]) % 2 == 0
+//                  ? static_cast<Float>(1.0)
+//                  : static_cast<Float>(-1.0);
+//       break;
+//     default:
+//       sign = static_cast<Float>(1.0);
+//   }
+//   return sign;
+// }
 
-//MWTODO: THis hould be place in the correct header
-template <typename Float, typename I>
-__device__ __host__ inline int mwStaggeredPhase(const I coords[], int d){
-    Float sign;// = static_cast<Float>(1.0);
-    // int coords[4];
-    // getCoords(coords, x, X, parity);
-    switch(d)
-    {
-      case 0:
-        sign = (coords[3])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
-        break;
-      case 1:
-        sign = (coords[3]+coords[0])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
-        break;
-      case 2:
-        sign = (coords[3]+coords[1]+coords[0])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
-        break;
-      default:
-        sign = static_cast<Float>(1.0);
-    }
-    return sign;
-}
+// //MWTODO: THis hould be place in the correct header
+// template <typename Float, typename I>
+// __device__ __host__ inline int StaggeredPhase(const I coords[], int d){
+//     Float sign;// = static_cast<Float>(1.0);
+//     // int coords[4];
+//     // getCoords(coords, x, X, parity);
+//     switch(d)
+//     {
+//       case 0:
+//         sign = (coords[3])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
+//         break;
+//       case 1:
+//         sign = (coords[3]+coords[0])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
+//         break;
+//       case 2:
+//         sign = (coords[3]+coords[1]+coords[0])%2 == 0 ? static_cast<Float>(1.0) :  static_cast<Float>(-1.0);
+//         break;
+//       default:
+//         sign = static_cast<Float>(1.0);
+//     }
+//     return sign;
+// }
 
-//MWTODO: THis hould be place in the correct header
+//MWTODO: THis should probably be placed in the correct header
 template <typename Float, typename I>
-__device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[], int d, int dir, Float tboundary){
+__device__ __host__ inline int StaggeredPhase(const int coords[], const I X[], int d, int dir, Float tboundary){
     Float sign;// = static_cast<Float>(1.0);
     // int coords[4];
     // getCoords(coords, x, X, parity);
@@ -96,67 +96,8 @@ __device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[],
     return sign;
 }
 
-//MWTODO: This should be merged in the generic ghostFaceIndex function
 
- /**
-     Compute the checkerboarded index into the ghost field
-     corresponding to full (local) site index x[]
-     @param x_ local site
-     @param X_ local lattice dimensions
-     @param dim dimension
-     @param depth of ghost
-  */
-  template <int dir, int nDim=4, typename I>
-  __device__ __host__ inline int mwghostFaceIndex(const int x_[], const I X_[], int dim, int nFace) {
-    static_assert( (nDim==4 || nDim==5), "Number of dimensions must be 4 or 5");
-    int index = 0;
-    const int x[] = { x_[0], x_[1], x_[2], x_[3], nDim == 5 ? x_[4] : 0 };
-    const int X[] = { (int)X_[0], (int)X_[1], (int)X_[2], (int)X_[3], nDim == 5 ? (int)X_[4] : 1 };
 
-    switch(dim) {
-    case 0:
-      switch(dir) {
-      case 0:
- index = ((x[0]+nFace-1)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
-  break;
-      case 1:
-  index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
-  break;
-      }
-      break;
-    case 1:
-      switch(dir) {
-      case 0:
-  index = ((x[1]+nFace-1)*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
-  break;
-      case 1:
-  index = ((x[1]-X[1]+nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
-  break;
-      }
-      break;
-    case 2:
-      switch(dir) {
-      case 0:
-  index = ((x[2]+nFace-1)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-  break;
-      case 1:
-  index = ((x[2]-X[2]+nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
-  break;
-      }
-      break;
-    case 3:
-      switch(dir) {
-      case 0:
-  index = ((x[3]+nFace-1)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-  break;
-      case 1:
-  index  = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
-  break;
-      }
-      break;
-    }
-    return index;
-  }
 
   /**
      @brief Parameter structure for driving the Staggered Dslash operator
@@ -231,8 +172,8 @@ __device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[],
       {
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if ( doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx = mwghostFaceIndex<1>(coord, arg.dim, d, 1);
-          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, mwStaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
+          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           in *=  arg.fat_link_max;
           out += (U * in);
@@ -241,7 +182,7 @@ __device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[],
         }
         else if ( doBulk<kernel_type>() && !ghost ) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, mwStaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           in *=  arg.fat_link_max;
           out += (U * in);
@@ -255,7 +196,7 @@ __device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[],
       if(arg.improved){
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if ( doHalo<kernel_type>(d) && ghost) {
-          const int ghost_idx = mwghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
           const Link L = arg.L(d, x_cb, parity);
           const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += L * in;
@@ -279,13 +220,13 @@ __device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[],
 
         if ( doHalo<kernel_type>(d) && ghost) {
         // MW - check indexing into GhostFace here
-          const int ghost_idx2 = mwghostFaceIndex<0>(coord, arg.dim, d, 1);
-          const int ghost_idx = arg.improved ? mwghostFaceIndex<0>(coord, arg.dim, d, 3) : ghost_idx2; 
-          // Float stagphase=mwStaggeredPhase<Float>(coord, d);
+          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+          const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2; 
+          // Float stagphase=StaggeredPhase<Float>(coord, d);
           // printf("%i %i (%i %i %i %i): %f\n",ghost_idx2, d, coord[0], coord[1], coord[2], coord[3], stagphase);
           const int back_idx = linkIndexM1(coord, arg.dim, d);
-          const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1-parity) : arg.U.Ghost(d, ghost_idx2, 1-parity, mwStaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
-          const Link UU = arg.improved ? arg.U      (d, back_idx , 1-parity)  : arg.U      (d, back_idx  , 1-parity, mwStaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
+          const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1-parity) : arg.U.Ghost(d, ghost_idx2, 1-parity, StaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
+          const Link UU = arg.improved ? arg.U      (d, back_idx , 1-parity)  : arg.U      (d, back_idx  , 1-parity, StaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
           // printf("%i %i (%i %i %i %i): %f %f %f %f %f %f\n",ghost_idx2, d, coord[0], coord[1], coord[2], coord[3], U(0,0).real(), U(1,1).real(), U(2,2).real(),
           //   UU(0,0).real(), UU(1,1).real(), UU(2,2).real());
           Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity); 
@@ -295,7 +236,7 @@ __device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[],
         else  if ( doBulk<kernel_type>() && !ghost ) {
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
-          const Link U = arg.improved ? arg.U(d, gauge_idx, 1-parity): arg.U(d, gauge_idx, 1-parity, mwStaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, gauge_idx, 1-parity): arg.U(d, gauge_idx, 1-parity, StaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
           Vector in = arg.in(back_idx, their_spinor_parity);
           in *=  arg.fat_link_max;
           out -= (conj(U) * in);
@@ -310,7 +251,7 @@ __device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[],
 
         if ( doHalo<kernel_type>(d) && ghost) {
           // when updating replace arg.nFace with 1 here
-          const int ghost_idx = mwghostFaceIndex<0>(coord, arg.dim, d, 1);
+          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
           const Link L = arg.L.Ghost(d, ghost_idx, 1-parity);
           const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
           out -= conj(L) * in;
