@@ -399,6 +399,8 @@ static bool comms_initialized = false;
 
 void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata)
 {
+  if (comms_initialized) return;
+
 
 #if QMP_COMMS
   initQMPComms();
