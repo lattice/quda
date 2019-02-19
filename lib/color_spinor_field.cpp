@@ -22,7 +22,7 @@ namespace quda {
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor,
 	   param.Precision(), param.pad, param.siteSubset, param.siteOrder,
-	   param.fieldOrder, param.gammaBasis, param.PCtype);
+	   param.fieldOrder, param.gammaBasis, param.pc_type);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
@@ -33,7 +33,7 @@ namespace quda {
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor,
 	   field.Precision(), field.pad, field.siteSubset, field.siteOrder,
-	   field.fieldOrder, field.gammaBasis, field.PCtype);
+	   field.fieldOrder, field.gammaBasis, field.pc_type);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -132,10 +132,11 @@ namespace quda {
       }
 
       dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
-      dslash_constant.ghostFaceCB[0] = (X[1]*X[2]*X[3])/2;
-      dslash_constant.ghostFaceCB[1] = (X[0]*X[2]*X[3])/2;
-      dslash_constant.ghostFaceCB[2] = (X[0]*X[1]*X[3])/2;
-      dslash_constant.ghostFaceCB[3] = (X[0]*X[1]*X[2])/2;
+      dslash_constant.ghostFace[0] = X[1]*X[2]*X[3];
+      dslash_constant.ghostFace[1] = X[0]*X[2]*X[3];
+      dslash_constant.ghostFace[2] = X[0]*X[1]*X[3];
+      dslash_constant.ghostFace[3] = X[0]*X[1]*X[2];
+      for (int d=0; d<4; d++) dslash_constant.ghostFaceCB[d] = dslash_constant.ghostFace[d]/2;
 
       dslash_constant.X2X1 = X[1]*X[0];
       dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
@@ -168,7 +169,7 @@ namespace quda {
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset,
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
-				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
+				QudaGammaBasis gammaBasis, QudaPCType pc_type) {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
@@ -183,7 +184,7 @@ namespace quda {
     nVec = Nvec;
     twistFlavor = Twistflavor;
 
-    PCtype = DWFPC;
+    this->pc_type = pc_type;
 
     precision = Prec;
     volume = 1;
@@ -302,7 +303,7 @@ namespace quda {
 
       create(src.nDim, src.x, src.nColor, src.nSpin, src.nVec, src.twistFlavor,
 	     src.precision, src.pad, src.siteSubset,
-	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);
+	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type);
     }
     return *this;
   }
@@ -315,7 +316,7 @@ namespace quda {
     if (param.nVec != 0) nVec = param.nVec;
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
 
-    if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
+    if (param.pc_type != QUDA_PC_INVALID) pc_type = param.pc_type;
 
     if (param.Precision() != QUDA_INVALID_PRECISION) precision = param.Precision();
     if (param.GhostPrecision() != QUDA_INVALID_PRECISION) ghost_precision = param.GhostPrecision();
@@ -417,7 +418,7 @@ namespace quda {
     param.siteSubset = siteSubset;
     param.siteOrder = siteOrder;
     param.gammaBasis = gammaBasis;
-    param.PCtype = PCtype;
+    param.pc_type = pc_type;
     param.create = QUDA_INVALID_FIELD_CREATE;
   }
 
@@ -884,7 +885,7 @@ namespace quda {
     }
     out << "Is component = " << a.composite_descr.is_component << std::endl;
     if(a.composite_descr.is_composite) out << "Component ID = " << a.composite_descr.id << std::endl;
-    out << "PC type = " << a.PCtype << std::endl;
+    out << "pc_type = " << a.pc_type << std::endl;
     return out;
   }
 

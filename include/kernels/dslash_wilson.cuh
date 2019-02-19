@@ -111,7 +111,7 @@ namespace quda {
 
   //out(x) = M*in = (-D + m) * in(x-mu)
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void wilson(Arg &arg, int idx, int parity)
+  __device__ __host__ inline void wilson(Arg &arg, int idx, int s, int parity)
   {
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,4> Vector;
@@ -123,17 +123,18 @@ namespace quda {
 
     const int my_spinor_parity = nParity == 2 ? parity : 0;
     Vector out;
-    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, s, parity, idx, thread_dim, active);
 
+    int xs = x_cb + s*arg.dc.volume_4d_cb;
     if (xpay && kernel_type == INTERIOR_KERNEL) {
-      Vector x = arg.x(x_cb, my_spinor_parity);
+      Vector x = arg.x(xs, my_spinor_parity);
       out = x + arg.kappa * out;
     } else if (kernel_type != INTERIOR_KERNEL && active) {
-      Vector x = arg.out(x_cb, my_spinor_parity);
+      Vector x = arg.out(xs, my_spinor_parity);
       out = x + (xpay ? arg.kappa * out : out);
     }
 
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
   }
 
   // CPU kernel for applying the Wilson operator to a vector
@@ -146,7 +147,7 @@ namespace quda {
       parity = nParity == 2 ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-        wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, parity);
+        wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0, parity);
       } // 4-d volumeCB
     } // parity
 
@@ -163,8 +164,8 @@ namespace quda {
     int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     switch(parity) {
-    case 0: wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0); break;
-    case 1: wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 1); break;
+    case 0: wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0, 0); break;
+    case 1: wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0, 1); break;
     }
 
   }

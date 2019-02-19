@@ -254,7 +254,7 @@ namespace quda {
    */
   template <typename I>
   static __device__ __host__ inline void getCoords5(int x[5], int cb_index, const I X[5],
-						    int parity, QudaDWFPCType pc_type) {
+						    int parity, QudaPCType pc_type) {
     //x[4] = cb_index/(X[3]*X[2]*X[1]*X[0]/2);
     //x[3] = (cb_index/(X[2]*X[1]*X[0]/2) % X[3];
     //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
@@ -376,7 +376,7 @@ namespace quda {
      @param[in] parity Parity index
      @param[in] arg Argument struct with required meta data
   */
-  template <int nDim, QudaDWFPCType type, int dim_, int nLayers, typename Int, typename Arg>
+  template <int nDim, QudaPCType type, int dim_, int nLayers, typename Int, typename Arg>
   inline __device__ __host__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int * const x, int face_idx,
                                                       const int &face_num, int parity, const Arg &arg)
   {
@@ -468,7 +468,7 @@ namespace quda {
      @brief Overloaded variant of indexFromFaceIndex where we use the
      parity declared in arg.
    */
-  template <int nDim, QudaDWFPCType type, int dim_, int nLayers, typename Int, typename Arg>
+  template <int nDim, QudaPCType type, int dim_, int nLayers, typename Int, typename Arg>
   inline __device__ __host__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int * const x, int face_idx,
                                                       const int &face_num, const Arg &arg)
   { coordsFromFaceIndex<nDim,type,dim_,nLayers>(idx, cb_idx, x, face_idx, face_num, arg.parity, arg); }
@@ -482,7 +482,7 @@ namespace quda {
      @param[in] arg Argument struct with required meta data
      @return Checkerboard lattice index
   */
-  template <int nDim, QudaDWFPCType type, int dim, int nLayers, int face_num, typename Arg>
+  template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
   inline __device__ __host__ int indexFromFaceIndex(int face_idx, int parity, const Arg &arg)
   {
     // intrinsic parity of the face depends on offset of first element
@@ -567,7 +567,7 @@ namespace quda {
      @brief Overloaded variant of indexFromFaceIndex where we use the
      parity declared in arg.
    */
-  template <int nDim, QudaDWFPCType type, int dim, int nLayers, int face_num, typename Arg>
+  template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
   inline __device__ __host__ int indexFromFaceIndex(int face_idx, const Arg &arg)
   {
     return indexFromFaceIndex<nDim,type,dim,nLayers,face_num>(face_idx, arg.parity, arg);
@@ -592,7 +592,7 @@ namespace quda {
       // int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
 
 
-template <int nDim, QudaDWFPCType type, int dim, int nLayers, int face_num, typename Arg>
+template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
 static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
 {
   const auto *X = arg.dc.X;              // grid dimension

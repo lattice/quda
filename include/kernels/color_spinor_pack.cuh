@@ -15,7 +15,7 @@ namespace quda {
     const int parity;
     const int nParity;
     const int dagger;
-    const QudaDWFPCType pc_type;
+    const QudaPCType pc_type;
     int commDim[4]; // whether a given dimension is partitioned or not
     int_fastdiv nParity2dim_threads;
 
@@ -27,7 +27,7 @@ namespace quda {
 	parity(parity),
 	nParity(a.SiteSubset()),
 	dagger(dagger),
-	pc_type(a.DWFPCtype())
+	pc_type(a.PCType())
     {
       X[0] = ((nParity == 1) ? 2 : 1) * a.X(0); // set to full lattice dimensions
       for (int d=1; d<nDim; d++) X[d] = a.X(d);

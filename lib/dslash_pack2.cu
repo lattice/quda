@@ -42,6 +42,7 @@ namespace quda {
 
     const int parity;  // only use this for single parity fields
     const int nParity;  // number of parities we are working on
+    const QudaPCType pc_type; // preconditioning type (4-d or 5-d)
 
     const DslashConstant dc; // pre-computed dslash constants for optimized indexing
 
@@ -61,7 +62,7 @@ namespace quda {
             bool dagger, int parity, double a, double b, double c)
       : field(field, nFace, nullptr, nullptr, reinterpret_cast<Float**>(ghost)),
         nFace(nFace), dagger(dagger), parity(parity), nParity(field.SiteSubset()),
-        dc(field.getDslashConstant()), a(a), b(b), c(c),
+        pc_type(field.PCType()), dc(field.getDslashConstant()), a(a), b(b), c(c),
         twist( (a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0 )
     {
       if (!field.isNative()) errorQuda("Unsupported field order colorspinor=%d\n", field.FieldOrder());
@@ -92,6 +93,7 @@ namespace quda {
   {
     out << "parity = " << arg.parity << std::endl;
     out << "nParity = " << arg.nParity << std::endl;
+    out << "pc_type = " << arg.pc_type << std::endl;
     out << "nFace = " << arg.nFace << std::endl;
     out << "dagger = " << arg.dagger << std::endl;
     out << "a = " << arg.a << std::endl;
@@ -107,12 +109,20 @@ namespace quda {
     return out;
   }
 
-  template <bool dagger, int twist, int dim, typename Arg, int nFace=1>
+  template <bool dagger, int twist, int dim, QudaPCType pc, typename Arg>
   __device__ __host__ inline void pack(Arg &arg, int ghost_idx, int s, int parity) {
 
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real,Arg::nColor,Arg::nSpin> Vector;
-    typedef ColorSpinor<real,Arg::nColor,Arg::nSpin/2> HalfVector;
+    constexpr int nFace = 1;
+
+    // this means we treat 4-d preconditioned fields as 4-d fields,
+    // and don't fold in any fifth dimension until after we have
+    // computed the 4-d indices (saves division)
+    constexpr int nDim = pc;
+
+    // for 5-d preconditioning the face_size includes the Ls dimension
+    const int face_size = nFace*arg.dc.ghostFaceCB[dim] * (pc == QUDA_5D_PC ? arg.dc.Ls : 1);
 
     int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
@@ -121,8 +131,8 @@ namespace quda {
     // read spinor, spin-project, and write half spinor to face
 
     // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-    const int face_num = (ghost_idx >= nFace*arg.dc.ghostFaceCB[dim]) ? 1 : 0;
-    ghost_idx -= face_num*nFace*arg.dc.ghostFaceCB[dim];
+    const int face_num = (ghost_idx >= face_size) ? 1 : 0;
+    ghost_idx -= face_num*face_size;
 
     // remove const to ensure we have non-const Ghost member
     typedef typename std::remove_const<decltype(arg.field)>::type T;
@@ -130,7 +140,7 @@ namespace quda {
 
     if (face_num == 0) { // backwards
 
-      int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
+      int idx = indexFromFaceIndex<nDim,pc,dim,nFace,0>(ghost_idx, parity, arg);
       constexpr int proj_dir = dagger ? +1 : -1;
       Vector f = arg.field(idx+s*arg.dc.volume_4d_cb, spinor_parity);
       if (twist==1) {
@@ -144,7 +154,7 @@ namespace quda {
 
     } else { // forwards
 
-      int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,1>(ghost_idx, parity, arg);
+      int idx = indexFromFaceIndex<nDim,pc,dim,nFace,1>(ghost_idx, parity, arg);
       constexpr int proj_dir = dagger ? -1 : +1;
       Vector f = arg.field(idx+s*arg.dc.volume_4d_cb, spinor_parity);
       if (twist==1) {
@@ -191,7 +201,7 @@ namespace quda {
 
   // FIXME - add CPU variant
 
-  template <bool dagger, int twist, typename Arg>
+  template <bool dagger, int twist, QudaPCType pc, typename Arg>
   __global__ void packKernel(Arg arg)
   {
 
@@ -216,12 +226,19 @@ namespace quda {
       int ghost_idx;
       const int dim = dimFromFaceIndex(ghost_idx, tid, arg);
 
-      if(arg.nSpin==4){
+      if (pc == QUDA_5D_PC) { // 5-d checkerboarded, include s (not ghostFaceCB since both faces)
         switch (dim) {
-          case 0: pack<dagger,twist,0,Arg>(arg, ghost_idx, s, parity); break;
-          case 1: pack<dagger,twist,1,Arg>(arg, ghost_idx, s, parity); break;
-          case 2: pack<dagger,twist,2,Arg>(arg, ghost_idx, s, parity); break;
-          case 3: pack<dagger,twist,3,Arg>(arg, ghost_idx, s, parity); break;
+        case 0: pack<dagger,twist,0,pc>(arg, ghost_idx+s*arg.dc.ghostFace[0], 0, parity); break;
+        case 1: pack<dagger,twist,1,pc>(arg, ghost_idx+s*arg.dc.ghostFace[1], 0, parity); break;
+        case 2: pack<dagger,twist,2,pc>(arg, ghost_idx+s*arg.dc.ghostFace[2], 0, parity); break;
+        case 3: pack<dagger,twist,3,pc>(arg, ghost_idx+s*arg.dc.ghostFace[3], 0, parity); break;
+        }
+      } else { // 4-d checkerboarding, keeping s separate (if it exists)
+        switch (dim) {
+        case 0: pack<dagger,twist,0,pc>(arg, ghost_idx, s, parity); break;
+        case 1: pack<dagger,twist,1,pc>(arg, ghost_idx, s, parity); break;
+        case 2: pack<dagger,twist,2,pc>(arg, ghost_idx, s, parity); break;
+        case 3: pack<dagger,twist,3,pc>(arg, ghost_idx, s, parity); break;
         }
       }
    
@@ -337,6 +354,7 @@ namespace quda {
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
       strcat(aux,comm_dim_topology_string());
+      if (arg.pc_type == QUDA_5D_PC) { strcat(aux,",5D_pc"); }
       if (arg.dagger) { strcat(aux, ",dagger"); }
       if (getKernelPackT()) { strcat(aux,",kernelPackT"); }
       switch (arg.nFace) {
@@ -373,21 +391,30 @@ namespace quda {
       arg.swizzle = tp.aux.x;
       arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
 
-      if (arg.dagger) {
-        switch(arg.twist) {
-        case 0: packKernel<true, 0> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-        case 1: packKernel<true, 1> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-        case 2: packKernel<true, 2> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+      if (arg.pc_type == QUDA_4D_PC) {
+        if (arg.dagger) {
+          switch(arg.twist) {
+          case 0: packKernel<true, 0, QUDA_4D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+          case 1: packKernel<true, 1, QUDA_4D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+          case 2: packKernel<true, 2, QUDA_4D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+          }
+        } else {
+          switch(arg.twist) {
+          case 0: packKernel<false, 0, QUDA_4D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+          default: errorQuda("Twisted packing only for dagger");
+          }
         }
-      } else {
-        switch(arg.twist) {
-        case 0: packKernel<false, 0> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-        default: errorQuda("Twisted packing only for dagger");
+      } else if (arg.pc_type == QUDA_5D_PC) {
+        if (arg.twist) errorQuda("Twist packing not defined");
+        if (arg.dagger) {
+          packKernel<true, 0, QUDA_5D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+        } else {
+          packKernel<false, 0, QUDA_5D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
         }
       }
     }
 
-    bool tuneSharedBytes() const { return location & Host ? false : TunableVectorYZ::tuneSharedBytes(); }
+    bool tuneSharedBytes() const { return false; }
 
     bool advanceAux(TuneParam &param) const
     {

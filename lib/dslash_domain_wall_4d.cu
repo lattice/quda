@@ -1,3 +1,5 @@
+#ifdef USE_LEGACY_DSLASH
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -293,3 +295,5 @@ namespace quda {
   }
 
 }
+
+#endif

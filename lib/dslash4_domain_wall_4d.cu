@@ -1,0 +1,153 @@
+#ifndef USE_LEGACY_DSLASH
+
+#include <gauge_field.h>
+#include <gauge_field_order.h>
+#include <color_spinor_field.h>
+#include <color_spinor_field_order.h>
+#include <dslash_helper.cuh>
+#include <index_helper.cuh>
+#include <dslash_quda.h>
+#include <color_spinor.h>
+#include <worker.h>
+
+namespace quda {
+#include <dslash_events.cuh>
+#include <dslash_policy.cuh>
+}
+
+#include <kernels/dslash_domain_wall_4d.cuh>
+
+/**
+   This is the gauged domain-wall 4-d preconditioned operator.
+
+   Note, for now, this just applies a batched 4-d dslash across the fifth
+   dimension.
+*/
+
+namespace quda {
+
+#ifdef GPU_DOMAIN_WALL_DIRAC
+
+  /**
+     @brief This is a helper class that is used to instantiate the
+     correct templated kernel for the dslash.
+   */
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  struct DomainWall4DLaunch {
+    template <typename Dslash>
+    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+      dslash.launch(domainWall4DGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+    }
+  };
+
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class DomainWall4D : public Dslash<Float> {
+
+  protected:
+    Arg &arg;
+    const ColorSpinorField &in;
+
+  public:
+
+    DomainWall4D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
+      : Dslash<Float>(arg, out, in), arg(arg), in(in) {
+      TunableVectorYZ::resizeVector(in.X(4),arg.nParity);
+    }
+
+    virtual ~DomainWall4D() { }
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Dslash<Float>::setParam(arg);
+      if (arg.xpay) Dslash<Float>::template instantiate<DomainWall4DLaunch,nDim,nColor, true>(tp, arg, stream);
+      else          Dslash<Float>::template instantiate<DomainWall4DLaunch,nDim,nColor,false>(tp, arg, stream);
+    }
+
+    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
+  };
+
+  template <typename Float, int nColor, QudaReconstructType recon>
+  void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                         double a, double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                         int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  {
+    constexpr int nDim = 4;
+    DomainWall4DArg<Float,nColor,recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger, comm_override);
+    DomainWall4D<Float,nDim,nColor,DomainWall4DArg<Float,nColor,recon> > twisted(arg, out, in);
+
+    DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+                                               in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+    policy.apply(0);
+
+    checkCudaError();
+  }
+
+  // template on the gauge reconstruction
+  template <typename Float, int nColor>
+  void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                         double a, double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                         int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  {
+    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
+      ApplyDomainWall4D<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
+      ApplyDomainWall4D<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
+      ApplyDomainWall4D<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+    }
+  }
+
+  // template on the number of colors
+  template <typename Float>
+  void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                         double a, double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                         int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  {
+    if (in.Ncolor() == 3) {
+      ApplyDomainWall4D<Float,3>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+    }
+  }
+
+#endif // GPU_DOMAIN_WALL_DIRAC
+
+  //Apply the 4-d preconditioned domain-wall Dslash operator
+  //out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
+  void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                         double a, double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                         int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  {
+#ifdef GPU_DOMAIN_WALL_DIRAC
+    if (in.V() == out.V()) errorQuda("Aliasing pointers");
+    if (in.FieldOrder() != out.FieldOrder())
+      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
+
+    // check all precisions match
+    checkPrecision(out, in, x, U);
+
+    // check all locations match
+    checkLocation(out, in, x, U);
+
+    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
+      ApplyDomainWall4D<double>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
+    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+      ApplyDomainWall4D<float>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
+    } else if (U.Precision() == QUDA_HALF_PRECISION) {
+      ApplyDomainWall4D<short>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
+    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyDomainWall4D<char>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+#else
+    errorQuda("Domain-wall dslash has not been built");
+#endif // GPU_DOMAIN_WALL_DIRAC
+  }
+
+
+} // namespace quda
+
+#endif
