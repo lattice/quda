@@ -573,6 +573,79 @@ namespace quda {
     return indexFromFaceIndex<nDim,type,dim,nLayers,face_num>(face_idx, arg.parity, arg);
   }
 
+
+/**
+  @brief Compute global checkerboard index from face index.
+  The following indexing routines work for arbitrary lattice
+  dimensions (though perhaps not odd like thw Wilson variant?)
+  Specifically, we compute an index into the local volume from an
+  index into the face.  This is used by the staggered-like face
+  packing routines, and is different from the Wilson variant since
+  here the halo depth is tranversed in a different order - here the
+  halo depth is the faster running dimension.
+
+  @param[in] face_idx_in Checkerboarded face index
+  @param[in] param Parameter struct with required meta data
+  @return Global checkerboard coordinate
+*/
+
+      // int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
+
+
+template <int nDim, QudaDWFPCType type, int dim, int nLayers, int face_num, typename Arg>
+static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
+{
+  const auto *X = arg.dc.X;              // grid dimension
+  const auto *dims = arg.dc.dims[dim];   // dimensions of the face
+  const auto &V4 = arg.dc.volume_4d;     // 4-d volume
+
+  // intrinsic parity of the face depends on offset of first element
+  int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
+
+  // reconstruct full face index from index into the checkerboard
+  face_idx_in *= 2;
+
+  // first compute src index, then find 4-d index from remainder
+  int s = face_idx_in / arg.dc.face_XYZT[dim];
+  int face_idx = face_idx_in - s*arg.dc.face_XYZT[dim];
+
+  /*y,z,t here are face indexes in new order*/
+  int aux1 = face_idx / dims[0];
+  int aux2 = aux1 / dims[1];
+  int y = aux1 - aux2 * dims[1];
+  int t = aux2 / dims[2];
+  int z = aux2 - t * dims[2];
+  face_idx += (face_parity + t + z + y) & 1;
+
+  // compute index into the full local volume
+  int gap = X[dim] - nLayers;
+  int idx = face_idx;
+  int aux;
+  switch (dim) {
+    case 0:
+      aux = face_idx;
+      idx += face_num*gap + aux*(X[0]-1);
+      idx += (idx/V4)*(1-V4);
+      break;
+    case 1:
+      aux = face_idx / arg.dc.face_X[dim];
+      idx += face_num * gap * arg.dc.face_X[dim] + aux*(X[1]-1)*arg.dc.face_X[dim];
+      idx += (idx/V4)*(X[0]-V4);
+      break;
+    case 2:
+      aux = face_idx / arg.dc.face_XY[dim];
+      idx += face_num * gap * arg.dc.face_XY[dim] +aux*(X[2]-1)*arg.dc.face_XY[dim];
+      idx += (idx/V4)*((X[1]*X[0])-V4);
+      break;
+    case 3:
+      idx += face_num * gap * arg.dc.face_XYZ[dim];
+      break;
+  }
+
+  // return index into the checkerboard
+  return (idx + s*V4) >> 1;
+}
+
   /**
      @brief Determines which face a given thread is computing.  Also
      rescale face_idx so that is relative to a given dimension.  If 5-d

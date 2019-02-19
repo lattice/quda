@@ -254,7 +254,6 @@ __device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[],
       // improved - forward direction
       if(arg.improved){
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
-        const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
         if ( doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = mwghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
           const Link L = arg.L(d, x_cb, parity);
@@ -263,6 +262,7 @@ __device__ __host__ inline int mwStaggeredPhase(const int coords[], const I X[],
         // printf("Halo (%i %i %i %i), idx %i x_cb %i ghost %i nbr_idx1 %i \t in %f %f %f %f %f %f\n",coord[0],coord[1],coord[2],coord[3], idx, x_cb, ghost_idx, nbr_idx3,in.data[1].real(),in.data[1].imag(),in2.data[1].real(),in2.data[1].imag(),out.data[1].real(),out.data[1].imag());
         } 
         else if ( doBulk<kernel_type>() && !ghost ) {
+          const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
           const Link L = arg.L(d, x_cb, parity);
           const Vector in = arg.in(fwd3_idx, their_spinor_parity);
           out += L * in;
