@@ -31,7 +31,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dslash_staggered.o dslash_improved_staggered.o			\
 	dslash_pack.o dslash_pack2.o					\
 	dslash4_wilson.o dslash4_wilson_clover_preconditioned.o		\
-	dslash4_wilson_clover.o dslash5_domain_wall.o			\
+	dslash4_wilson_clover.o dslash4_wilson_clover_hasenbusch_twist.o \
+	dslash5_domain_wall.o			                        \
 	dslash4_twisted_mass.o dslash4_twisted_mass_preconditioned.o	\
 	dslash4_ndeg_twisted_mass.o 					\
 	dslash4_ndeg_twisted_mass_preconditioned.o			\

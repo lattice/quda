@@ -7,6 +7,10 @@
 
 namespace quda {
 
+
+  /******
+   * DiracClover Implementation starts here.
+   ******/
   DiracClover::DiracClover(const DiracParam &param)
     : DiracWilson(param), clover(*(param.clover))
   { }
@@ -116,6 +120,9 @@ namespace quda {
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
+  /*******
+   * DiracCloverPC Starts here 
+   *******/
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
     DiracClover(param)
   {
@@ -202,17 +209,37 @@ namespace quda {
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
+
+   
     if (!symmetric) {
+
+      // No need to change order of calls for dagger
+      // because the asymmetric operator is actually symmetric
+      // A_oo -D_oe A^{-1}_ee D_eo -> A_oo -D^\dag_oe A^{-1}_ee D^\dag_eo
+      // the pieces in Dslash and DslashXPay respect the dagger
+
+
       // DiracCloverPC::Dslash applies A^{-1}Dslash
       Dslash(*tmp1, in, parity[0]);
       // DiracClover::DslashXpay applies (A - kappa^2 D)
       DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2);
     } else if (!dagger) { // symmetric preconditioning
+      // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
+      // where A is actually a clover inverse.
+
+      // This is the non-dag case: AD
       Dslash(*tmp1, in, parity[0]);
+      
+      // Then x + AD (AD)
       DslashXpay(out, *tmp1, parity[1], in, kappa2);
     } else { // symmetric preconditioning, dagger
+
+      // This is the dagger: 1 - DADA
+      //  i) Apply A
       CloverInv(out, in, parity[1]);
+      // ii) Apply A D => ADA
       Dslash(*tmp1, out, parity[0]);
+      // iii) Apply  x + D(ADA)
       DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
     }
 
@@ -315,6 +342,165 @@ namespace quda {
 				     double kappa, double mass, double mu, double mu_factor) const {
     double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
+  }
+
+
+  /********
+   * DiracCloverHasenbuschTwist start here
+   ********/
+
+  DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracParam &param)
+    : DiracWilson(param), clover(*(param.clover))
+  { }
+
+  DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracCloverHasenbuschTwist &dirac) 
+    : DiracWilson(dirac), clover(dirac.clover)
+  { }
+
+  DiracCloverHasenbuschTwist::~DiracCloverHasenbuschTwist() { }
+
+  DiracCloverHasenbuschTwist& DiracCloverHasenbuschTwist::operator=(const DiracCloverHasenbuschTwist &dirac)
+  {
+    if (&dirac != this) {
+      DiracWilson::operator=(dirac);
+      clover = dirac.clover;
+    }
+    return *this;
+  }
+
+
+  /* Inherited */
+  /*
+  void DiracCloverHasenbuschTwist::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    Dirac::checkParitySpinor(out, in);
+
+    if (out.Volume() != clover.VolumeCB()) {
+      errorQuda("Parity spinor volume %d doesn't match clover checkboard volume %d",
+		out.Volume(), clover.VolumeCB());
+    }
+  }
+  */
+
+  /** Applies the operator (A+i mu Gamma_5 + k D) */
+  /* Inheritd but I want to inhibit adding the twist...*/
+
+  void DiracCloverHasenbuschTwist::DslashXpTwistY(ColorSpinorField &out, const ColorSpinorField &in, 
+			       const QudaParity parity, const ColorSpinorField &x,
+			       const double &k) const
+  {
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+      
+#ifndef USE_LEGACY_DSLASH
+    ApplyWilsonCloverHasenbuschTwist(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
+#else
+    errorQuda("Not implemented: DiracCloverHasenbuschTwist is not implemented for USE_LEGACY_DSLASH");
+#endif
+
+    // FIXME: This FLOPS needs correcting.
+    flops += 1872ll*in.Volume();
+  }
+
+  /** Applies the operator (A + k D) */
+  /* Inheritd but I want to inhibit adding the twist...*/
+  /*
+  void DiracCloverHasenbuschTwist::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+			       const QudaParity parity, const ColorSpinorField &x,
+			       const double &k) const
+  {
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+      
+#ifndef USE_LEGACY_DSLASH
+    ApplyWilsonClover(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
+#else
+    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+      FullClover cs(clover);
+      asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
+			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
+			   &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+    } else {
+      errorQuda("Not implemented");
+    }
+#endif
+
+    flops += 1872ll*in.Volume();
+  }
+  */
+
+  // Inherited
+  /*
+  void DiracCloverHasenbuschTwist::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    checkParitySpinor(in, out);
+    ApplyClover(out, in, clover, false, parity);
+    flops += 504ll*in.Volume();
+  }
+  */
+
+  void DiracCloverHasenbuschTwist::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+#ifndef USE_LEGACY_DSLASH
+    if ( arg.matpcType == QUDA_MATPC_EVEN_EVEN ) {
+      
+      ApplyWilsonCloverHasenbuschTwist(out,in,*gauge,clover, -kappa, in, QUDA_PARITY_EVEN, dagger, commDim,profile);
+      ApplyWilsonClover(out, in, *gauge, clover, -kappa, in, QUDA_PARITY_ODD, dagger, commDim, profile);
+    }
+    else {
+      ApplyWilsonCloverHasenbuschTwist(out,in,*gauge,clover, -kappa, in, QUDA_PARITY_ODD, dagger, commDim, profile);
+      ApplyWilsonClover(out,in,*gauge,clover,-kappa,in,QUDA_PARITY_EVEN,dagger,commDim,profile);
+    }
+
+    // FIXME: This is wrong
+    flops += 1872ll*in.Volume();
+#else
+    errorQuda("DiracCloverHasenbuschTwist is not implemented for USE_LEGACY_DSLASH");
+#endif
+  }
+
+  void DiracCloverHasenbuschTwist::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    checkFullSpinor(out, in);
+
+    bool reset = newTmp(&tmp1, in);
+    checkFullSpinor(*tmp1, in);
+
+    M(*tmp1, in);
+    Mdag(out, *tmp1);
+
+    deleteTmp(&tmp1, reset);
+  }
+
+  // Inherit
+  /*
+  void DiracCloverHasenbuschTwist::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			    ColorSpinorField &x, ColorSpinorField &b, 
+			    const QudaSolutionType solType) const
+  {
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      errorQuda("Preconditioned solution requires a preconditioned solve_type");
+    }
+
+    src = &b;
+    sol = &x;
+  }
+  */
+
+  // Inherit
+  /*
+  void DiracCloverHasenbuschTwist::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+				const QudaSolutionType solType) const
+  {
+    // do nothing
+  }
+  */
+
+  void DiracCloverHasenbuschTwist::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+				   double kappa, double mass, double mu, double mu_factor) const {
+    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    // errorQuda("Not Yet Implemented");
   }
 
 } // namespace quda
