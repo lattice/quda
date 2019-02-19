@@ -114,6 +114,13 @@ extern "C" {
   } QudaFatLinkArgs_t;
 
   /**
+   * Optional: Set the MPI Comm Handle if it is not MPI_COMM_WORLD
+   *
+   * @param input Pointer to an MPI_Comm handle, static cast as a void *
+   */
+  void qudaSetMPICommHandle(void *mycomm);
+
+  /**
    * Initialize the QUDA context.
    *
    * @param input Meta data for the QUDA context
