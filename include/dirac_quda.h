@@ -431,6 +431,9 @@ namespace quda {
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
     */
+  protected:
+	double m5;
+
 
   public:
     DiracCloverHasenbuschTwist(const DiracParam &param);
@@ -455,7 +458,7 @@ namespace quda {
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     // Inherit
-    //virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     // These are Nops for the unprec op so we can inhert them too.
     //

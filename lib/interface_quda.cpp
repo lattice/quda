@@ -1505,6 +1505,9 @@ namespace quda {
     case QUDA_CLOVER_WILSON_DSLASH:
       diracParam.type = pc ? QUDA_CLOVERPC_DIRAC : QUDA_CLOVER_DIRAC;
       break;
+    case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH:
+	  diracParam.type = pc ?   QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC   : QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC;
+      break;
     case QUDA_DOMAIN_WALL_DSLASH:
       diracParam.type = pc ? QUDA_DOMAIN_WALLPC_DIRAC : QUDA_DOMAIN_WALL_DIRAC;
       diracParam.Ls = inv_param->Ls;

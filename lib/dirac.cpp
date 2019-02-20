@@ -154,8 +154,8 @@ namespace quda {
     } else if (param.type == QUDA_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracClover operator\n");
       return new DiracClover(param);
-    } else if (param.type == QUDA_CLOVER_DIRAC_HASENBUSCH_TWIST) {
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracClover operator\n");
+    } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwist operator\n");
       return new DiracCloverHasenbuschTwist(param);
     } else if (param.type == QUDA_CLOVERPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
@@ -247,6 +247,7 @@ namespace quda {
 	break;
       case QUDA_WILSON_DIRAC:
       case QUDA_CLOVER_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
       case QUDA_DOMAIN_WALL_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
       case QUDA_STAGGERED_DIRAC:

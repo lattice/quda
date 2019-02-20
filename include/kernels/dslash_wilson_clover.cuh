@@ -17,12 +17,12 @@ namespace quda {
     real b; // chiral twist factor (twisted-clover only)
 
     WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		    const CloverField &A, double kappa, double b, const ColorSpinorField &x,
+		    const CloverField &A, double kappa, double b_, const ColorSpinorField &x,
 		    int parity, bool dagger, const int *comm_override)
       : WilsonArg<Float,nColor,reconstruct_>(out, in, U, kappa, x, parity, dagger, comm_override),
-      A(A, false), b(dagger ? -0.5*b : 0.5*b) // factor of 1/2 comes from clover normalization we need to correct for
+      A(A, false), b(dagger ? -0.5*b_ : 0.5*b_) // factor of 1/2 comes from clover normalization we need to correct for
 
-    { }
+    { printfQuda("WilsonCloverArg setting b = %lf\n", b); }
   };
 
   /**
@@ -137,29 +137,29 @@ namespace quda {
     applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
 
     if (kernel_type == INTERIOR_KERNEL) {
-      Vector x = arg.x(x_cb, my_spinor_parity);
-      x.toRel(); // switch to chiral basis
+    	Vector x = arg.x(x_cb, my_spinor_parity);
+    	x.toRel(); // switch to chiral basis
 
-      Vector tmp;
+    	Vector tmp;
 
 #pragma unroll
-      for (int chirality=0; chirality<2; chirality++) {
-        constexpr int n = nColor*Arg::nSpin/2;
-        HMatrix<real,n> A = arg.A(x_cb, parity, chirality);
-        HalfVector x_chi = x.chiral_project(chirality);
-        HalfVector Ax_chi = A * x_chi;   // A x_chi
-	HalfVector A2x_chi= A * Ax_chi;  // A2x_chi 
-	const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b) );
-	Ax_chi += b*A2x_chi;
-	tmp += Ax_chi.chiral_reconstruct(chirality);
-      }
+    	for (int chirality=0; chirality<2; chirality++) {
+    		constexpr int n = nColor*Arg::nSpin/2;
+    		HMatrix<real,n> A = arg.A(x_cb, parity, chirality);
+    		HalfVector x_chi = x.chiral_project(chirality);
+    		HalfVector Ax_chi = A * x_chi;   // A x_chi
+    		HalfVector A2x_chi= A * Ax_chi;  // A2x_chi
+    		const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b) );
+    		Ax_chi += b*A2x_chi;
+    		tmp += Ax_chi.chiral_reconstruct(chirality);
+    	}
 
-      tmp.toNonRel(); // switch back to non-chiral basis
+    	tmp.toNonRel(); // switch back to non-chiral basis
 
-      out = tmp + arg.kappa * out;
+    	out = tmp + arg.kappa * out;
     } else if (active) {
-      Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + arg.kappa * out;
+    	Vector x = arg.out(x_cb, my_spinor_parity);
+    	out = x + arg.kappa * out;
     }
 
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;

@@ -350,11 +350,13 @@ namespace quda {
    ********/
 
   DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracParam &param)
-    : DiracWilson(param), clover(*(param.clover))
-  { }
+    : DiracClover(param), m5(param.m5)
+  {
+	  printfQuda("Creating DiracCloverHasenbuschTwist m5=%lf\n",m5);
+  }
 
   DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracCloverHasenbuschTwist &dirac) 
-    : DiracWilson(dirac), clover(dirac.clover)
+    : DiracClover(dirac), m5(dirac.m5)
   { }
 
   DiracCloverHasenbuschTwist::~DiracCloverHasenbuschTwist() { }
@@ -364,6 +366,7 @@ namespace quda {
     if (&dirac != this) {
       DiracWilson::operator=(dirac);
       clover = dirac.clover;
+      m5 = dirac.m5;
     }
     return *this;
   }
@@ -393,7 +396,7 @@ namespace quda {
     checkSpinorAlias(in, out);
       
 #ifndef USE_LEGACY_DSLASH
-    ApplyWilsonCloverHasenbuschTwist(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
+    ApplyWilsonCloverHasenbuschTwist(out, in, *gauge, clover, k, m5,x, parity, dagger, commDim, profile);
 #else
     errorQuda("Not implemented: DiracCloverHasenbuschTwist is not implemented for USE_LEGACY_DSLASH");
 #endif
@@ -441,15 +444,18 @@ namespace quda {
 
   void DiracCloverHasenbuschTwist::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
+
 #ifndef USE_LEGACY_DSLASH
-    if ( arg.matpcType == QUDA_MATPC_EVEN_EVEN ) {
-      
-      ApplyWilsonCloverHasenbuschTwist(out,in,*gauge,clover, -kappa, in, QUDA_PARITY_EVEN, dagger, commDim,profile);
-      ApplyWilsonClover(out, in, *gauge, clover, -kappa, in, QUDA_PARITY_ODD, dagger, commDim, profile);
+    if ( matpcType == QUDA_MATPC_EVEN_EVEN ) {
+      printfQuda("Applying EVEN EVEN\n");
+      ApplyWilsonCloverHasenbuschTwist(out.Even(),in.Odd(),*gauge,clover, -kappa, m5, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,profile);
+      ApplyWilsonClover(out.Odd(), in.Even(), *gauge, clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
     }
     else {
-      ApplyWilsonCloverHasenbuschTwist(out,in,*gauge,clover, -kappa, in, QUDA_PARITY_ODD, dagger, commDim, profile);
-      ApplyWilsonClover(out,in,*gauge,clover,-kappa,in,QUDA_PARITY_EVEN,dagger,commDim,profile);
+      printfQuda("Applying Odd Odd\n");
+      ApplyWilsonClover(out.Even(),in.Odd(),*gauge,clover,-kappa,in.Even(),QUDA_EVEN_PARITY,dagger,commDim,profile);
+      ApplyWilsonCloverHasenbuschTwist(out.Odd(),in.Even(),*gauge,clover, -kappa, m5, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
+
     }
 
     // FIXME: This is wrong

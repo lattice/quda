@@ -306,7 +306,7 @@ void comm_allreduce_array(double* data, size_t size)
 
 void comm_allreduce_max_array(double* data, size_t size)
 {
-  for (int i=0; i<size; i++) {
+  for (size_t i=0; i<size; i++) {
     QMP_CHECK( QMP_max_double(data+i) );
   }
 }

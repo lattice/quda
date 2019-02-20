@@ -18,7 +18,7 @@ namespace quda {
 }
 
 #include <kernels/dslash_wilson_clover.cuh>
-#include <kernels/dslash_wilson_clover_hasenbusch_twist.cuh>
+//#include <kernels/dslash_wilson_clover_hasenbusch_twist.cuh>
 
 /**
    This is the Wilson-clover linear operator
@@ -52,7 +52,7 @@ namespace quda {
 
     WilsonCloverHasenbuschTwist(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
       : Dslash<Float>(arg, out, in), arg(arg), in(in)
-    {  }
+    { printfQuda("Instantiating WilsonCloverHasenbuschTwist mu = %lf", arg.b); }
 
     virtual ~WilsonCloverHasenbuschTwist() { }
 
@@ -111,8 +111,9 @@ namespace quda {
 					const int *comm_override, TimeProfile &profile)
   {
     constexpr int nDim = 4;
-    constexpr bool twist = true;
-    using ArgType = WilsonCloverArg<Float,nColor,recon,twist>;
+
+    using ArgType = WilsonCloverArg<Float,nColor,recon,true>;
+    printfQuda("Instantiating Arg: mu=%lf\n", mu);
     ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
     WilsonCloverHasenbuschTwist<Float,nDim,nColor,ArgType > wilson(arg, out, in);
 
@@ -158,7 +159,7 @@ namespace quda {
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
-  void ApplyWilsonCloverHasembuschTwist(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+  void ApplyWilsonCloverHasenbuschTwist(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
 					const CloverField &A, double kappa, double mu, const ColorSpinorField &x, int parity, bool dagger,
 			 const int *comm_override, TimeProfile &profile)
   {
