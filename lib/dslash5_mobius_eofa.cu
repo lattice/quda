@@ -92,8 +92,6 @@ namespace quda {
         if (sizeof(eofa_coeff<real>) > size)
           errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(eofa_coeff<real>));
         
-        a *= 4.*(b*(4.+m_5));
-
         eofa_coeff<real>* eofa_coeffs = reinterpret_cast<eofa_coeff<real>*>(mobius_eofa_h);
 
         switch (type) {
@@ -250,6 +248,103 @@ namespace quda {
       }
       arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
     }
+
+#if 0    
+    template <typename storage_type, int nColor, bool dagger, bool pm, bool xpay, Dslash5Type type, typename Arg>
+    __device__ __host__ inline void dslash5inv_OLs(Arg& arg, int parity) {
+      typedef typename mapper<storage_type>::type real;
+      typedef ColorSpinor<real, nColor, 4> Vector;
+      int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
+
+      extern __shared__ Vector* sm_in;
+      extern __shared__ Vector* sm_out;
+
+      for(int s = 0; s < arg.Ls; s++){
+        sm_in[s*blockDim.x+threadIdx.x] = arg.in(s*arg.volume_4d_cb+x_cb, 0);
+      }
+      __syncthreads();
+      // const auto k = -arg.kappa; // k is -kappa
+      // const auto inv = arg.inv;
+      const auto sherman_morrison = arg.sherman_morrison;
+
+      Vector out;
+      const eofa_coeff<real>* eofa_coeffs = get_eofa_coeff<real>();
+
+    real factor = -kappa*arg.m_f;
+    if(eofa_pm){
+      constexpr int proj_dir = dagger ? +1 : -1;
+      // eofa_pm = plus
+      // Computing x
+      sm_out[0*blockDim.x+threadIdx.x] = sm_in[0*blockDim.x+threadIdx.x].project(4,proj_dir).reconstruct(4,proj_dir);
+      for(int s = arg.Ls-1; s > 0; s--){
+        sm_in[s*blockDim.x+threadIdx.x] = sm_in[s*blockDim.x+threadIdx.x].project(4,proj_dir).reconstruct(4,proj_dir);
+        sm_out[0*blockDim.x+threadIdx.x] -= factor*sm_in[s*blockDim.x+threadIdx.x];
+        factor *= -kappa;
+      }
+      sm_out[0*blockDim.x+threadIdx.x][0] /= 1.+factor;
+      for(int s = 1; s < arg.s; s++){
+        sm_out[s*blockDim.x+threadIdx.x] = eofa_x[s-1]*(-kappa) + eofa_u[s];
+      }
+      // Computing y
+      eofa_y[Ls-1] = 1./(1.+factor);
+      sherman_morrison_fac = eofa_x[Ls-1];
+      for(int s = Ls-1; s > 0; s--){
+        eofa_y[s-1] = eofa_y[s]*(-kappa);
+      }
+    }else{
+      // eofa_pm = minus
+      // Computing x
+      eofa_x[Ls-1] = eofa_u[Ls-1];
+      for(int s = 0; s < Ls; s++){
+        eofa_x[Ls-1] -= factor*eofa_u[s];
+        factor *= -kappa;
+      }
+      eofa_x[Ls-1] /= 1.+factor;
+      for(int s = Ls-1; s > 0; s--){
+        eofa_x[s-1] = eofa_x[s]*(-kappa) + eofa_u[s-1];
+      }
+      // Computing y
+      eofa_y[0] = 1./(1.+factor);
+      sherman_morrison_fac = eofa_x[0];
+      for(int s = 1; s < Ls; s++){
+        eofa_y[s] = eofa_y[s-1]*(-kappa);
+      }
+    }
+
+      for (int sp = 0; sp < arg.Ls; sp++) {
+        Vector in = cache.load(threadIdx.x, sp, parity);
+        {
+          int exp = s < sp ? arg.Ls - sp + s : s - sp;
+          real factorR
+              = 0.5 * eofa_coeffs->y[pm ? arg.Ls - exp - 1 : exp] * (s < sp ? -arg.m_f : static_cast<real>(1.0));
+          // real factorR = inv * __fast_pow(k,exp) * ( s < sp ? -arg.m_f :
+          // static_cast<real>(1.0) );
+          constexpr int proj_dir = dagger ? -1 : +1;
+          out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        }
+        {
+          int exp = s > sp ? arg.Ls - s + sp : sp - s;
+          real factorL
+              = 0.5 * eofa_coeffs->y[pm ? arg.Ls - exp - 1 : exp] * (s > sp ? -arg.m_f : static_cast<real>(1.0));
+          // real factorL = inv * __fast_pow(k,exp) * ( s > sp ? -arg.m_f :
+          // static_cast<real>(1.0) );
+          constexpr int proj_dir = dagger ? +1 : -1;
+          out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        }
+        // The EOFA stuff
+        {
+          constexpr int proj_dir = pm ? +1 : -1;
+          real t = dagger ? eofa_coeffs->y[s] * eofa_coeffs->x[sp] : eofa_coeffs->x[s] * eofa_coeffs->y[sp];
+          out += (t * sherman_morrison) * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        }
+      }
+      if (xpay) { // really axpy
+        Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+        out = x + arg.a * out;
+      }
+      arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
+    }
+#endif
 
     /**
       @brief GPU kernel for applying the D5 operator

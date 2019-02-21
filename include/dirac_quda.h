@@ -555,15 +555,15 @@ namespace quda {
   protected:
 
   private:
-    double m5inv_fac;
-    double kappa_b;
+    double m5inv_fac = 0.;
+    double kappa_b = 0.;
     // The EOFA parameters
-    double sherman_morrison_fac;
+    double sherman_morrison_fac = 0.;
+    double eofa_shift;
+    int    eofa_pm;
     double mq1;
     double mq2; 
     double mq3;
-    double eofa_shift;
-    int eofa_pm;
     double eofa_u[QUDA_MAX_DWF_LS];
     double eofa_x[QUDA_MAX_DWF_LS];
     double eofa_y[QUDA_MAX_DWF_LS];
@@ -574,12 +574,16 @@ namespace quda {
     DiracMobiusPCEofa& operator=(const DiracMobiusPC &dirac);
 
     void m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x) const;
+    void m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a = -1.) const;
     void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x) const;
+    void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a = -1.) const;
     
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+  
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
+		  ColorSpinorField &b, const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
 
   // Full twisted mass

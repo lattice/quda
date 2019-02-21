@@ -1720,7 +1720,8 @@ namespace quda {
     double kappa5 = (0.5/(5.0 + param.m5));
     double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
 		    param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-		    param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) ? kappa5 : param.kappa;
+		    param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || 
+        param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ? kappa5 : param.kappa;
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
@@ -2035,6 +2036,75 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   popVerbosity();
 }
 
+void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
+{
+  if(inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH){
+    setKernelPackT(true);
+  }else{
+    errorQuda("This type of dslashQuda operator is defined for QUDA_MOBIUS_DWF_EOFA_DSLASH ONLY");
+  }
+
+  if (gaugePrecise == nullptr) errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true, inv_param->input_location);
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU: %16.12e CUDA: %16.12e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (parity == QUDA_EVEN_PARITY) {
+      parity = QUDA_ODD_PARITY;
+    } else {
+      parity = QUDA_EVEN_PARITY;
+    }
+    blas::ax(gaugePrecise->Anisotropy(), in);
+  }
+  bool pc = true;
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc);
+
+  DiracMobiusPCEofa dirac(diracParam); // create the Dirac operator
+  switch (test_type) {
+    case 0:
+      dirac.m5_eofa(out, in);
+      break;
+    case 1:
+      dirac.m5inv_eofa(out, in);
+      break;
+    default:
+      errorQuda("test_type(=%d) NOT defined for M\"obius EOFA! :( \n", test_type);
+  }
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  *out_h = out;
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU: %e CUDA: %e\n", cpu, gpu);
+  }
+
+  delete out_h;
+  delete in_h;
+
+  popVerbosity();
+}
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
@@ -2753,7 +2823,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
+      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
+      param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) setKernelPackT(true);
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
 

@@ -852,6 +852,8 @@ extern "C" {
   void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param,
       QudaParity parity, int test_type);
 
+  void dslashQuda_mobius_eofa(void *h_out, void *h_in, 
+      QudaInvertParam *inv_param, QudaParity parity, int test_type);
   /**
    * Apply the clover operator or its inverse.
    * @param h_out  Result spinor field

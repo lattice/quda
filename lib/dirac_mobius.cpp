@@ -842,14 +842,14 @@ namespace quda {
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
   
-  void DiracMobiusPCEofa::m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x) const
+  void DiracMobiusPCEofa::m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    double a = -kappa_b*kappa_b; // a = -kappa_b^2 
+    a *= kappa_b*kappa_b; // a = a * kappa_b^2 
     // The kernel will actually do (m5 * in - kappa_b^2 * x)
     mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
    
@@ -870,14 +870,14 @@ namespace quda {
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
   }
   
-  void DiracMobiusPCEofa::m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x) const
+  void DiracMobiusPCEofa::m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    double a = -kappa_b*kappa_b; // a = -kappa_b^2 
+    a *= kappa_b*kappa_b; // a = a * kappa_b^2 
     // The kernel will actually do (x - kappa_b^2 * m5inv * in)
     mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
    
@@ -893,7 +893,7 @@ namespace quda {
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
     bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-
+    
     //QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
     //QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
     if (symmetric && !dagger) {
@@ -902,7 +902,7 @@ namespace quda {
       m5inv_eofa(*tmp1, out);
       Dslash4pre(out, *tmp1, parity[0]);
       Dslash4(*tmp1, out, parity[1]);
-      m5inv_eofa_xpay(out, *tmp1, in);
+      m5inv_eofa_xpay(out, *tmp1, in, -1.);
     } else if (symmetric && dagger) {
       m5inv_eofa(*tmp1, in);
       Dslash4(out, *tmp1, parity[0]);
@@ -916,19 +916,96 @@ namespace quda {
       m5inv_eofa(*tmp1, out);
       Dslash4pre(out, *tmp1, parity[0]);
       Dslash4(*tmp1, out, parity[1]);
-      m5_eofa_xpay(out, in, *tmp1);
+      m5_eofa_xpay(out, in, *tmp1, -1.);
     } else if (!symmetric && dagger) {
       Dslash4(*tmp1, in, parity[0]);
       Dslash4pre(out, *tmp1, parity[0]);
       m5inv_eofa(*tmp1, out);
       Dslash4(out, *tmp1, parity[1]);
       Dslash4pre(*tmp1, out, parity[1]);
-      m5_eofa_xpay(out, in, *tmp1);
+      m5_eofa_xpay(out, in, *tmp1, -1.);
     }
 
     deleteTmp(&tmp1, reset1);
   }
-  
+
+  void DiracMobiusPCEofa::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+      ColorSpinorField &x, ColorSpinorField &b, const QudaSolutionType solType) const
+  {
+    // we desire solution to preconditioned system
+    if(solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION){
+      src = &b;
+      sol = &x;
+    }else{ 
+      // we desire solution to full system
+      bool reset = newTmp(&tmp1, b.Even());
+      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+        // src = D5^-1 (b_e + k D4_eo * D4pre * D5^-1 b_o)
+        src = &(x.Odd());
+        m5inv_eofa(*tmp1, b.Odd());
+        Dslash4pre(*src, *tmp1, QUDA_ODD_PARITY);
+        Dslash4Xpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), 1.0);
+        m5inv_eofa(*src, *tmp1);
+        sol = &(x.Even());
+      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+        // src = b_o + k D4_oe * D4pre * D5inv b_e
+        src = &(x.Even());
+        m5inv_eofa(*tmp1, b.Even());
+        Dslash4pre(*src, *tmp1, QUDA_EVEN_PARITY);
+        Dslash4Xpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), 1.0);
+        m5inv_eofa(*src, *tmp1);
+        sol = &(x.Odd());
+      } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+        // src = b_e + k D4_eo * D4pre * D5inv b_o
+        src = &(x.Odd());
+        m5inv_eofa(*src, b.Odd());
+        Dslash4pre(*tmp1, *src, QUDA_ODD_PARITY);
+        Dslash4Xpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), 1.0);
+        sol = &(x.Even());
+      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+        // src = b_o + k D4_oe * D4pre * D5inv b_e
+        src = &(x.Even());
+        m5inv_eofa(*src, b.Even());
+        Dslash4pre(*tmp1, *src, QUDA_EVEN_PARITY);
+        Dslash4Xpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), 1.0);
+        sol = &(x.Odd());
+      } else {
+        errorQuda("MatPCType %d not valid for DiracMobiusPCEofa", matpcType);
+      }
+      // here we use final solution to store parity solution and parity source
+      // b is now up for grabs if we want
+      deleteTmp(&tmp1, reset);
+    }
+  }
+
+  void DiracMobiusPCEofa::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+      const QudaSolutionType solType) const
+  {
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      return;
+    }				
+
+    bool reset1 = newTmp(&tmp1, x.Even());
+
+    // create full solution
+    checkFullSpinor(x, b);
+    if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      // psi_o = M5^-1 (b_o + k_b D4_oe D4pre x_e)
+      Dslash4pre(x.Odd(), x.Even(), QUDA_EVEN_PARITY);
+      Dslash4Xpay(*tmp1, x.Odd(), QUDA_ODD_PARITY, b.Odd(), 1.0);
+      m5inv_eofa(x.Odd(), *tmp1);
+    } else if (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      // psi_e = M5^-1 (b_e + k_b D4_eo D4pre x_o)
+      Dslash4pre(x.Even(), x.Odd(), QUDA_ODD_PARITY);
+      Dslash4Xpay(*tmp1, x.Even(), QUDA_EVEN_PARITY, b.Even(), 1.0);
+      m5inv_eofa(x.Even(), *tmp1);
+    } else {
+      errorQuda("MatPCType %d not valid for DiracMobiusPC", matpcType);
+    }
+
+    deleteTmp(&tmp1, reset1);
+  }
+
   void DiracMobiusPCEofa::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp2, in);
