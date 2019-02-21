@@ -509,4 +509,95 @@ namespace quda {
     // errorQuda("Not Yet Implemented");
   }
 
+
+  /* **********************************************
+   * DiracCloverHasenbuschTwistPC Starts Here
+   * ********************************************* */
+
+  DiracCloverHasenbuschTwistPC::DiracCloverHasenbuschTwistPC(const DiracParam &param) :
+      DiracCloverPC(param), m5(param.m5) {}
+
+    DiracCloverHasenbuschTwistPC::DiracCloverHasenbuschTwistPC(const DiracCloverHasenbuschTwistPC &dirac)
+    	: DiracCloverPC(dirac), m5(dirac.m5) { }
+
+    DiracCloverHasenbuschTwistPC::~DiracCloverHasenbuschTwistPC() { }
+
+    DiracCloverHasenbuschTwistPC& DiracCloverHasenbuschTwistPC::operator=(const DiracCloverHasenbuschTwistPC &dirac)
+    {
+      if (&dirac != this) {
+        DiracCloverPC::operator=(dirac);
+        m5 = dirac.m5;
+      }
+      return *this;
+    }
+
+
+
+    // Apply the even-odd preconditioned clover-improved Dirac operator
+    void DiracCloverHasenbuschTwistPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      double kappa2 = -kappa*kappa;
+      bool reset1 = newTmp(&tmp1, in);
+
+      bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
+      int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+      QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+
+
+
+      if (!symmetric) {
+
+        // No need to change order of calls for dagger
+        // because the asymmetric operator is actually symmetric
+        // A_oo -D_oe A^{-1}_ee D_eo -> A_oo -D^\dag_oe A^{-1}_ee D^\dag_eo
+        // the pieces in Dslash and DslashXPay respect the dagger
+
+
+        // DiracCloverHasenbuschTwistPC::Dslash applies A^{-1}Dslash
+        Dslash(*tmp1, in, parity[0]);
+        // DiracClover::DslashXpay applies (A - kappa^2 D)
+        DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2);
+      } else if (!dagger) { // symmetric preconditioning
+        // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
+        // where A is actually a clover inverse.
+
+        // This is the non-dag case: AD
+        Dslash(*tmp1, in, parity[0]);
+
+        // Then x + AD (AD)
+        DslashXpay(out, *tmp1, parity[1], in, kappa2);
+      } else { // symmetric preconditioning, dagger
+
+        // This is the dagger: 1 - DADA
+        //  i) Apply A
+        CloverInv(out, in, parity[1]);
+        // ii) Apply A D => ADA
+        Dslash(*tmp1, out, parity[0]);
+        // iii) Apply  x + D(ADA)
+        DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
+      }
+
+      deleteTmp(&tmp1, reset1);
+    }
+
+    void DiracCloverHasenbuschTwistPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      // need extra temporary because of symmetric preconditioning dagger
+      // and for multi-gpu the input and output fields cannot alias
+      bool reset = newTmp(&tmp2, in);
+      M(*tmp2, in);
+      Mdag(out, *tmp2);
+      deleteTmp(&tmp2, reset);
+    }
+
+
+    void DiracCloverHasenbuschTwistPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+  				     double kappa, double mass, double mu, double mu_factor) const {
+      //double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+      //CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor,QUDA_CLOVERPC_DIRAC, matpcType);
+
+      errorQuda("Not yet implemented\n");
+    }
+
+
 } // namespace quda

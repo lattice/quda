@@ -481,8 +481,70 @@ namespace quda {
 			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
    };
 
-  // This is where we can create our op.
-  // We should follow up how create coarse op is done
+  // Even-odd preconditioned clover
+   class DiracCloverHasenbuschTwistPC : public DiracCloverPC {
+   protected:
+	  double m5;
+
+   public:
+     DiracCloverHasenbuschTwistPC(const DiracParam &param);
+     DiracCloverHasenbuschTwistPC(const DiracCloverHasenbuschTwistPC &dirac);
+     virtual ~DiracCloverHasenbuschTwistPC();
+     DiracCloverHasenbuschTwistPC& operator=(const DiracCloverHasenbuschTwistPC &dirac);
+
+     // Clover is inherited from parent
+
+     // Clover Inv is inherited from parent
+
+     // Dslash is defined as A_pp^{-1} D_p\bar{p} and is inherited
+
+     // DslashXPay is inherited (for reconstructs and such)
+
+     // I need a new Op
+     // out = x +/- i g5 mu A x - D in
+     void CloverTwistWilsonDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+ 		const QudaParity parity, const ColorSpinorField &x, const double &k, const double &mu) const;
+
+
+     // out = x +- ig5 mu Ax  + k A_pp^{-1} D_p\bar{p} in
+     void CloverTwistDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+ 		    const QudaParity parity, const ColorSpinorField &x, const double &k, const double &mu) const;
+
+
+     // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
+     //                            ii) out_o = in_o + A_oo^{-1} D_oe tmp_e (AXPY)
+     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+     // squared op
+     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+     // Inherit prepare
+#if 0
+     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+ 		 ColorSpinorField &x, ColorSpinorField &b,
+ 		 const QudaSolutionType) const;
+#endif
+
+     // inherit reconstruct
+#if 0
+     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+ 		     const QudaSolutionType) const;
+#endif
+     /**
+      * @brief Create the coarse even-odd preconditioned clover
+      * operator.  Unlike the Wilson operator, the coarsening of the
+      * preconditioned clover operator differs from that of the
+      * unpreconditioned clover operator, so we need to specialize it.
+      *
+      * @param T[in] Transfer operator defining the coarse grid
+      * @param Y[out] Coarse link field
+      * @param X[out] Coarse clover field
+      * @param kappa Kappa parameter for the coarse operator
+      * @param mass Mass parameter for the coarse operator (set to zero)
+      */
+     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+ 			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+   };
 
   // Full domain wall
   class DiracDomainWall : public DiracWilson {

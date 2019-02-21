@@ -30,61 +30,61 @@ namespace quda {
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   __device__ __host__ inline void wilsonClover(Arg &arg, int idx, int parity)
   {
-    using namespace linalg; // for Cholesky
-    typedef typename mapper<Float>::type real;
-    typedef ColorSpinor<real,nColor,4> Vector;
-    typedef ColorSpinor<real,nColor,2> HalfVector;
+	  using namespace linalg; // for Cholesky
+	  typedef typename mapper<Float>::type real;
+	  typedef ColorSpinor<real,nColor,4> Vector;
+	  typedef ColorSpinor<real,nColor,2> HalfVector;
 
-    bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-    int thread_dim; // which dimension is thread working on (fused kernel only)
-    int coord[nDim];
-    int x_cb = getCoords<nDim,QUDA_4D_PC,kernel_type>(coord, arg, idx, parity, thread_dim);
+	  bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+	  int thread_dim; // which dimension is thread working on (fused kernel only)
+	  int coord[nDim];
+	  int x_cb = getCoords<nDim,QUDA_4D_PC,kernel_type>(coord, arg, idx, parity, thread_dim);
 
-    const int my_spinor_parity = nParity == 2 ? parity : 0;
+	  const int my_spinor_parity = nParity == 2 ? parity : 0;
 
-    Vector out;
+	  Vector out;
 
-    // defined in dslash_wilson.cuh
-    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+	  // defined in dslash_wilson.cuh
+	  applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
 
-    if (kernel_type != INTERIOR_KERNEL && active) {
-      // if we're not the interior kernel, then we must sum the partial
-      Vector x = arg.out(x_cb, my_spinor_parity);
-      out += x;
-    }
+	  if (kernel_type != INTERIOR_KERNEL && active) {
+		  // if we're not the interior kernel, then we must sum the partial
+		  Vector x = arg.out(x_cb, my_spinor_parity);
+		  out += x;
+	  }
 
-    if ( isComplete<kernel_type>(arg, coord) && active ) {
-      out.toRel(); // switch to chiral basis
+	  if ( isComplete<kernel_type>(arg, coord) && active ) {
+		  out.toRel(); // switch to chiral basis
 
-      Vector tmp;
+		  Vector tmp;
 
 #pragma unroll
-      for (int chirality=0; chirality<2; chirality++) {
+		  for (int chirality=0; chirality<2; chirality++) {
 
-	HMatrix<real,nColor*Arg::nSpin/2> A = arg.A(x_cb, parity, chirality);
-	HalfVector chi = out.chiral_project(chirality);
+			  HMatrix<real,nColor*Arg::nSpin/2> A = arg.A(x_cb, parity, chirality);
+			  HalfVector chi = out.chiral_project(chirality);
 
-	if (arg.dynamic_clover) {
-	  Cholesky<HMatrix,real,nColor*Arg::nSpin/2> cholesky(A);
-	  chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(chi));
-	} else {
-	  chi = A * chi;
-	}
+			  if (arg.dynamic_clover) {
+				  Cholesky<HMatrix,real,nColor*Arg::nSpin/2> cholesky(A);
+				  chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(chi));
+			  } else {
+				  chi = A * chi;
+			  }
 
-	tmp += chi.chiral_reconstruct(chirality);
-      }
+			  tmp += chi.chiral_reconstruct(chirality);
+		  }
 
-      tmp.toNonRel(); // switch back to non-chiral basis
+		  tmp.toNonRel(); // switch back to non-chiral basis
 
-      if (xpay) {
-	Vector x = arg.x(x_cb, my_spinor_parity);
-	out = x + arg.kappa * tmp;
-      } else {
-	out = tmp;
-      }
-    }
+		  if (xpay) {
+			  Vector x = arg.x(x_cb, my_spinor_parity);
+			  out = x + arg.kappa * tmp;
+		  } else {
+			  out = tmp;
+		  }
+	  }
 
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+	  if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
   }
 
   // CPU kernel for applying the Wilson operator to a vector

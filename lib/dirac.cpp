@@ -157,6 +157,9 @@ namespace quda {
     } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwist operator\n");
       return new DiracCloverHasenbuschTwist(param);
+    } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwistPC operator\n");
+      return new DiracCloverHasenbuschTwistPC(param);
     } else if (param.type == QUDA_CLOVERPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
       return new DiracCloverPC(param);
