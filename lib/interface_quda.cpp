@@ -365,6 +365,7 @@ static int qmp_rank_from_coords(const int *coords, void *fdata)
 // Provision for user control over MPI comm handle
 // Assumes an MPI implementation of QMP
 
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
 MPI_Comm MPI_COMM_HANDLE;
 static int user_set_comm_handle = 0;
 
@@ -372,6 +373,7 @@ void setMPICommHandleQuda(void *mycomm){
   MPI_COMM_HANDLE = *((MPI_Comm *)mycomm);
   user_set_comm_handle = 1;
 }
+#endif
 
 #ifdef QMP_COMMS
 static void initQMPComms(void){
@@ -383,8 +385,7 @@ static void initQMPComms(void){
     setMPICommHandleQuda(mycomm);
   }
 }
-#endif
-
+#else
 static void initMPIComms(void){
   // Default comm handle is MPI_COMM_WORLD
   if(!user_set_comm_handle){
@@ -393,6 +394,7 @@ static void initMPIComms(void){
     setMPICommHandleQuda((void *)&mycomm);
   }
 }
+#endif
 
 
 static bool comms_initialized = false;

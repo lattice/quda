@@ -5,7 +5,7 @@
 #include <csignal>
 #include <quda_internal.h>
 #include <comm_quda.h>
-#include <comm_handle.h>
+#include <mpi_comm_handle.h>
 
 #define MPI_CHECK(mpi_call) do {                    \
   int status = mpi_call;                            \
