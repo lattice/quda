@@ -1050,7 +1050,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
     if (!device_calc) {
       profileClover.TPSTART(QUDA_PROFILE_H2D);
-      cloverPrecise->copy(*in, h_clovinv && !inv_param->compute_clover_inverse ? true : false);
+      bool inverse = (h_clovinv && !inv_param->compute_clover_inverse && !dynamic_clover);
+      cloverPrecise->copy(*in, inverse);
       profileClover.TPSTOP(QUDA_PROFILE_H2D);
     } else {
       profileClover.TPSTOP(QUDA_PROFILE_TOTAL);

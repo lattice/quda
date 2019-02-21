@@ -31,8 +31,8 @@ set (QUDA_OBJS
   dslash4_twisted_mass.cu dslash4_twisted_mass_preconditioned.cu
   dslash4_ndeg_twisted_mass.cu dslash4_ndeg_twisted_mass_preconditioned.cu
   dslash4_twisted_clover.cu dslash4_twisted_clover_preconditioned.cu
-  dslash4_domain_wall_4d.cu dslash_pack.cu dslash_pack2.cu
-  #dslash_improved_staggered.cu dslash_staggered.cu 
+  dslash4_domain_wall_4d.cu  dslash4_domain_wall_5d.cu
+  dslash_pack.cu dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
