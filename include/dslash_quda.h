@@ -343,6 +343,34 @@ namespace quda {
                                         const int *comm_override, TimeProfile &profile);
 
   /**
+     @brief Driver for applying the Domain-wall 5-d stencil to a
+     5-d vector with 5-d preconditioned data order
+
+     out = D_5 * in
+
+     where D_5 is the 5-d wilson linear operator with fifth dimension
+     boundary condition set by the fermion mass.
+
+     If a is non-zero, the operation is given by out = x + a * D_5 in.
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] a Scale factor applied (typically -kappa_5)
+     @param[in] m_f Fermion mass parameter
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                         double a, double m_f, const ColorSpinorField &x,
+                         int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+
+  /**
      @brief Driver for applying the batched Wilson 4-d stencil to a
      5-d vector with 4-d preconditioned data order
 
@@ -350,7 +378,7 @@ namespace quda {
 
      where D is the gauged Wilson linear operator.
 
-     If kappa is non-zero, the operation is given by out = x + kappa * D in.
+     If a is non-zero, the operation is given by out = x + a * D in.
      This operator can be applied to both single parity
      (checker-boarded) fields, or to full fields.
 
@@ -370,6 +398,34 @@ namespace quda {
   void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                          double a, double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
                          int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+
+  enum Dslash5Type {
+    DSLASH5_DWF,
+    DSLASH5_MOBIUS_PRE,
+    DSLASH5_MOBIUS,
+    M5_INV_DWF,
+    M5_INV_MOBIUS,
+    M5_INV_ZMOBIUS
+  };
+
+  /**
+     @brief Apply either the domain-wall / mobius Dslash5 operator or
+     the M5 inverse operator.  In the current implementation, it is
+     expected that the color-spinor fields are 4-d preconditioned.
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] x Auxilary input color-spinor field
+     @param[in] m_f Fermion mass parameter
+     @param[in] m_5 Wilson mass shift
+     @param[in] b_5 Mobius coefficient array (length Ls)
+     @param[in] c_5 Mobius coefficient array (length Ls)
+     @param[in] a Scale factor use in xpay operator
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] type Type of dslash we are applying
+  */
+  void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+		    double a, bool dagger, Dslash5Type type);
 
 #else
 
@@ -437,60 +493,6 @@ namespace quda {
   */
   void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in,
 		   const CloverField &clover, bool inverse, int parity);
-
-  enum Dslash5Type {
-    DSLASH5_DWF,
-    DSLASH5_MOBIUS_PRE,
-    DSLASH5_MOBIUS,
-    M5_INV_DWF,
-    M5_INV_MOBIUS,
-    M5_INV_ZMOBIUS
-  };
-
-  /**
-     @brief Apply either the domain-wall / mobius Dslash5 operator or
-     the M5 inverse operator.  In the current implementation, it is
-     expected that the color-spinor fields are 4-d preconditioned.
-     @param[out] out Result color-spinor field
-     @param[in] in Input color-spinor field
-     @param[in] x Auxilary input color-spinor field
-     @param[in] m_f Fermion mass parameter
-     @param[in] m_5 Wilson mass shift
-     @param[in] b_5 Mobius coefficient array (length Ls)
-     @param[in] c_5 Mobius coefficient array (length Ls)
-     @param[in] a Scale factor use in xpay operator
-     @param[in] dagger Whether this is for the dagger operator
-     @param[in] type Type of dslash we are applying
-  */
-  void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-		    double a, bool dagger, Dslash5Type type);
-
-  /**
-     @brief Apply the 5-d domain-wall stencil operator
-
-     out = x + kappa * D_5 * in
-
-     where D_5 is the 5-d Wilson linear operator
-
-     This operator can be applied to both single parity
-     (5-d checker-boarded) fields, or to full fields.
-
-     @param[out] out Result color-spinor field
-     @param[in] in Input color-spinor field
-     @param[in] U Gauge field
-     @param[in] x Auxilary input color-spinor field
-     @param[in] m_f Fermion mass parameter
-     @param[in] kappa Scale factor use in xpay operator
-     @param[in] Field parity (if color-spinor field is single parity)
-     @param[in] dagger Whether this is for the dagger operator
-     @param[in] comm_override Override for which dimensions are partitioned
-     @param[in] profile The TimeProfile used for profiling the dslash
-  */
-  void ApplyDWF(ColorSpinorField &out, const ColorSpinorField &in,
-                const GaugeField &U, const ColorSpinorField &x,
-                double m_f, double kappa, int parity, bool dagger,
-                const int *comm_override, TimeProfile &profile);
 
   // staggered Dslash
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,

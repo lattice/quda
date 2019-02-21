@@ -97,41 +97,51 @@ namespace quda {
 
     int x_cb, X;
     dim = kernel_type; // keep compiler happy
+
+    // only for 5-d checkerboarding where we need to include the fifth dimension
+    const int Ls = (nDim == 5 && pc_type == QUDA_5D_PC ? (int)arg.dim[4] : 1);
+
     if (kernel_type == INTERIOR_KERNEL) {
       x_cb = idx;
-      getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+      if (nDim == 5) getCoords5CB(coord, idx, arg.dim, arg.X0h, parity, pc_type);
+      else getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
-      const int face_num = idx >= arg.dc.ghostFaceCB[kernel_type];
-      idx -= face_num*arg.dc.ghostFaceCB[kernel_type];
+      const int face_size = arg.dc.ghostFaceCB[kernel_type] * Ls;
+      const int face_num = idx >= face_size;
+      idx -= face_num*face_size;
       coordsFromFaceIndex<nDim,pc_type,kernel_type,1>(X, x_cb, coord, idx, face_num, parity, arg);
 
     } else { // fused kernel
 
       // work out which dimension this thread corresponds to, then compute coords
-      if (idx < arg.threadDimMapUpper[0]) { // x face
+      if (idx < arg.threadDimMapUpper[0]*Ls) { // x face
         dim = 0;
-        const int face_num = idx >= arg.dc.ghostFaceCB[0];
-        idx -= face_num*arg.dc.ghostFaceCB[0];
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_num = idx >= face_size;
+        idx -= face_num*face_size;
         coordsFromFaceIndex<nDim,pc_type,0,1>(X, x_cb, coord, idx, face_num, parity, arg);
-      } else if (idx < arg.threadDimMapUpper[1]) { // y face
+      } else if (idx < arg.threadDimMapUpper[1]*Ls) { // y face
         dim = 1;
-        idx -= arg.threadDimMapLower[1];
-        const int face_num = idx >= arg.dc.ghostFaceCB[1];
-        idx -= face_num*arg.dc.ghostFaceCB[1];
+        idx -= arg.threadDimMapLower[1] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_num = idx >= face_size;
+        idx -= face_num*face_size;
         coordsFromFaceIndex<nDim,pc_type,1,1>(X, x_cb, coord, idx, face_num, parity, arg);
-      } else if (idx < arg.threadDimMapUpper[2]){ // z face
+      } else if (idx < arg.threadDimMapUpper[2]*Ls){ // z face
         dim = 2;
-        idx -= arg.threadDimMapLower[2];
-        const int face_num = idx >= arg.dc.ghostFaceCB[2];
-        idx -= face_num*arg.dc.ghostFaceCB[2];
+        idx -= arg.threadDimMapLower[2] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_num = idx >= face_size;
+        idx -= face_num*face_size;
         coordsFromFaceIndex<nDim,pc_type,2,1>(X, x_cb, coord, idx, face_num, parity, arg);
       } else { // t face
         dim = 3;
-        idx -= arg.threadDimMapLower[3];
-        const int face_num = idx >= arg.dc.ghostFaceCB[3];
-        idx -= face_num*arg.dc.ghostFaceCB[3];
+        idx -= arg.threadDimMapLower[3] * Ls;
+        const int face_size = arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_num = idx >= face_size;
+        idx -= face_num*face_size;
         coordsFromFaceIndex<nDim,pc_type,3,1>(X, x_cb, coord, idx, face_num, parity, arg);
       }
 
@@ -249,7 +259,7 @@ namespace quda {
     KernelType kernel_type;  // interior, exterior_t, etc.
     bool remote_write;       // used by the autotuner to switch on/off remote writing vs using copy engines
 
-    int threads;              // number of threads in x-thread dimension
+    int_fastdiv threads;      // number of threads in x-thread dimension
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
@@ -261,7 +271,8 @@ namespace quda {
 
     DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
       : parity(parity), nParity(in.SiteSubset()), nFace(1), reconstruct(U.Reconstruct()),
-        X0h(nParity == 2 ? in.X(0)/2 : in.X(0)), dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
+        X0h(nParity == 2 ? in.X(0)/2 : in.X(0)),
+        dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1 },
         volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(kappa == 0.0 ? false : true),
         kernel_type(INTERIOR_KERNEL), threads(in.VolumeCB()), threadDimMapLower{ }, threadDimMapUpper{ },
         twist_a(0.0), twist_b(0.0), twist_c(0.0)

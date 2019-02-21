@@ -53,11 +53,16 @@ namespace quda {
     typedef Matrix<complex<real>,nColor> Link;
     const int their_spinor_parity = nParity == 2 ? 1-parity : 0;
 
+    // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
+    const int gauge_parity = (nDim == 5 ? (x_cb/arg.dc.volume_4d_cb + parity) % 2 : parity);
+
 #pragma unroll
-    for (int d = 0; d<nDim; d++) { // loop over dimension
+    for (int d = 0; d<4; d++) { // loop over dimension
       { // Forward gather - compute fwd offset for vector fetch
-        const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
+        const int fwd_idx = getNeighborIndexCB<nDim>(coord, d, +1, arg.dc);
+        const int gauge_idx = (nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
+
         const bool ghost = (coord[d] + arg.nFace >= arg.dim[d]) &&
           isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
@@ -66,14 +71,14 @@ namespace quda {
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
             ghostFaceIndex<1,nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
-          Link U = arg.U(d, x_cb, parity);
+          Link U = arg.U(d, gauge_idx, gauge_parity);
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx+s*arg.dc.ghostFaceCB[d], their_spinor_parity);
           if (d == 3) in *= arg.t_proj_scale; // put this in the Ghost accessor and merge with any rescaling?
 
           out += (U * in).reconstruct(d, proj_dir);
         } else if ( doBulk<kernel_type>() && !ghost ) {
 
-          Link U = arg.U(d, x_cb, parity);
+          Link U = arg.U(d, gauge_idx, gauge_parity);
           Vector in = arg.in(fwd_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
@@ -81,9 +86,10 @@ namespace quda {
       }
 
       { // Backward gather - compute back offset for spinor and gauge fetch
-        const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
-        const int gauge_idx = back_idx;
+        const int back_idx = getNeighborIndexCB<nDim>(coord, d, -1, arg.dc);
+        const int gauge_idx = (nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
         constexpr int proj_dir = dagger ? -1 : +1;
+
         const bool ghost = (coord[d] - arg.nFace < 0) &&
           isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
@@ -92,14 +98,15 @@ namespace quda {
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
             ghostFaceIndex<0,nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
-          Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
+          const int gauge_ghost_idx = (nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
+          Link U = arg.U.Ghost(d, gauge_ghost_idx, 1-gauge_parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx+s*arg.dc.ghostFaceCB[d], their_spinor_parity);
           if (d == 3) in *= arg.t_proj_scale;
 
           out += (conj(U) * in).reconstruct(d, proj_dir);
         } else if ( doBulk<kernel_type>() && !ghost ) {
 
-          Link U = arg.U(d, gauge_idx, 1-parity);
+          Link U = arg.U(d, gauge_idx, 1-gauge_parity);
           Vector in = arg.in(back_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);

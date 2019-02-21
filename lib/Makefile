@@ -36,7 +36,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dslash4_ndeg_twisted_mass.o 					\
 	dslash4_ndeg_twisted_mass_preconditioned.o			\
 	dslash4_twisted_clover.o dslash4_twisted_clover_preconditioned.o\
-	dslash4_dwf_4d.cu						\
+	dslash4_domain_wall_4d.o dslash4_domain_wall_5d.o		\
 	blas_quda.o multi_blas_quda.o copy_quda.o 			\
 	reduce_quda.o multi_reduce_quda.o contract.o			\
 	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
