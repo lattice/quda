@@ -58,7 +58,7 @@ namespace quda {
 	 @param[in] x_cb Checkerboarded space-time index we are accessing
 	 @param[in] parity Parity we are accessing
        */
-      __device__ __host__ inline gauge_wrapper<Float,T>(T &gauge, int dim, int x_cb, int parity, Float phase=10.0)
+      __device__ __host__ inline gauge_wrapper<Float,T>(T &gauge, int dim, int x_cb, int parity, Float phase=1.0)
 	: gauge(gauge), dim(dim), x_cb(x_cb), parity(parity), phase(phase) { }
 
       /**
@@ -117,7 +117,7 @@ namespace quda {
 	 @param[in] ghost_idx Ghost index we are accessing
 	 @param[in] parity Parity we are accessing
        */
-      __device__ __host__ inline gauge_ghost_wrapper<Float,T>(T &gauge, int dim, int ghost_idx, int parity, Float phase=10.0)
+      __device__ __host__ inline gauge_ghost_wrapper<Float,T>(T &gauge, int dim, int ghost_idx, int parity, Float phase=1.0)
 	: gauge(gauge), dim(dim), ghost_idx(ghost_idx), parity(parity), phase(phase) { }
 
       /**
@@ -2009,7 +2009,7 @@ namespace quda {
 	 this field at the above coordinates.
        */
       __device__ __host__ inline gauge_ghost_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >
-	   Ghost(int dim, int ghost_idx, int parity, Float phase=10.0) {
+	   Ghost(int dim, int ghost_idx, int parity, Float phase=1.0) {
 	return gauge_ghost_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >(*this, dim, ghost_idx, parity, phase);
       }
 
