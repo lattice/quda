@@ -1135,7 +1135,7 @@ namespace quda {
         {
 #pragma unroll
 	for (int i=0; i<N; i++) out[i] = in[i];
-      }
+        }
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir,
 					       const RegType phase, const I *X, const int *R) const {
@@ -1194,18 +1194,17 @@ namespace quda {
 
         // MWTODO: should this return tBoundary : scale or tBoundary*scale : scale
 
-        if (ghostExchange_==QUDA_GHOST_EXCHANGE_PAD ||
-            (ghostExchange_==QUDA_GHOST_EXCHANGE_INVALID && ghostExchange!=QUDA_GHOST_EXCHANGE_EXTENDED) ) {
-	  if ( idx >= firstTimeSliceBound ) { // halo region on the first time slice
+        if (ghostExchange_ == QUDA_GHOST_EXCHANGE_PAD || (ghostExchange_ == QUDA_GHOST_EXCHANGE_INVALID && ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED)) {
+          if ( idx >= firstTimeSliceBound ) { // halo region on the first time slice
 	    return isFirstTimeSlice ? tBoundary : scale;
 	  } else if ( idx >= lastTimeSliceBound ) { // last link on the last time slice
 	    return isLastTimeSlice ? tBoundary : scale;
 	  } else {
 	    return scale;
 	  }
-	} else if (ghostExchange_==QUDA_GHOST_EXCHANGE_EXTENDED ||
-                   (ghostExchange_==QUDA_GHOST_EXCHANGE_INVALID && ghostExchange==QUDA_GHOST_EXCHANGE_EXTENDED) ) {
-	  if ( idx >= (R[3]-1)*X[0]*X[1]*X[2]/2 && idx < R[3]*X[0]*X[1]*X[2]/2 ) {
+        } else if (ghostExchange_ == QUDA_GHOST_EXCHANGE_EXTENDED
+            || (ghostExchange_ == QUDA_GHOST_EXCHANGE_INVALID && ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED)) {
+          if ( idx >= (R[3]-1)*X[0]*X[1]*X[2]/2 && idx < R[3]*X[0]*X[1]*X[2]/2 ) {
 	    // the boundary condition is on the R[3]-1 time slice
 	    return isFirstTimeSlice ? tBoundary : scale;
 	  } else if ( idx >= (X[3]-R[3]-1)*X[0]*X[1]*X[2]/2 && idx < (X[3]-R[3])*X[0]*X[1]*X[2]/2 ) {
@@ -1214,7 +1213,7 @@ namespace quda {
 	  } else {
 	    return scale;
 	  }
-	}
+        }
         return scale;
       }
 
@@ -1437,7 +1436,7 @@ namespace quda {
       */
       template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<13, Float, ghostExchange_, QUDA_STAGGERED_PHASE_MILC> {
         typedef typename mapper<Float>::type RegType;
-	typedef complex<RegType> Complex;
+        typedef complex<RegType> Complex;
 	const Reconstruct<12,Float,ghostExchange_> reconstruct_12;
 	const RegType scale;
 
@@ -1478,7 +1477,7 @@ namespace quda {
 #if 1 // phase from cross product
         const Complex *In = reinterpret_cast<const Complex *>(in);
         // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-        Complex denom = conj(In[0]*In[4] - In[1]*In[3]) / scale;
+        Complex denom = conj(In[0] * In[4] - In[1] * In[3]) / scale;
         Complex expI3Phase = In[8] / denom;             // numerator = U[2][2]
         RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
 #else // phase from determinant
@@ -1817,12 +1816,12 @@ namespace quda {
 
         // static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
         // 	       "staggered phase only presently supported for 18 and 12 reconstruct");
-        for (int i=0; i<4; i++) {
-	  X[i] = u.X()[i];
+        for (int i = 0; i < 4; i++) {
+          X[i] = u.X()[i];
 	  R[i] = u.R()[i];
 	  ghost[i] = ghost_ ? ghost_[i] : 0;
 	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
-	}
+        }
 #ifdef USE_TEXTURE_OBJECTS
 	if (u.Location() == QUDA_CUDA_FIELD_LOCATION) tex = static_cast<const cudaGaugeField&>(u).Tex();
 	if (!huge_alloc && this->gauge != u.Gauge_p() && !override) {
@@ -2301,11 +2300,11 @@ namespace quda {
 
       __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const
       {
-        for (int i=0; i<length; i++) {
-	  int z = i%2;
+        for (int i = 0; i < length; i++) {
+          int z = i%2;
 	  int rolcol = i/2;
 	  v[i] = (RegType)gauge[dir][((z*(length/2) + rolcol)*2 + parity)*volumeCB + x];
-	}
+        }
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {

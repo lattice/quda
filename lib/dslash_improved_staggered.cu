@@ -57,7 +57,7 @@ namespace quda {
 #include <dslash_quda.cuh>
   } // end namespace improvedstaggered
 #endif
-  
+
   // declare the dslash events
 #include <dslash_events.cuh>
 
