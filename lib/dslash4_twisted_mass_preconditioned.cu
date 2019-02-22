@@ -1,13 +1,8 @@
 #ifndef USE_LEGACY_DSLASH
 
 #include <gauge_field.h>
-#include <gauge_field_order.h>
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
-#include <dslash_helper.cuh>
-#include <index_helper.cuh>
-#include <dslash_quda.h>
-#include <color_spinor.h>
+#include <dslash.h>
 #include <worker.h>
 
 namespace quda {
@@ -31,17 +26,11 @@ namespace quda {
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct TwistedMassPreconditionedLaunch {
+    static constexpr const char *kernel = "quda::twistedMassPreconditionedGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
       static_assert(nParity == 1, "preconditioned twisted-mass operator only defined for nParity=1");
-      if (arg.asymmetric) {
-        // constrain template instantiation for compilation
-        if (!dagger) errorQuda("asymmetric operator only defined for dagger");
-        if (xpay) errorQuda("asymmetric operator not defined for xpay");
-        dslash.launch(twistedMassGPU<Float,nDim,nColor,nParity,true,true,false,kernel_type,Arg>, tp, arg, stream);
-      } else {
-        dslash.launch(twistedMassGPU<Float,nDim,nColor,nParity,dagger,false,xpay,kernel_type,Arg>, tp, arg, stream);
-      }
+      dslash.launch(twistedMassPreconditionedGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
     }
   };
 
@@ -55,7 +44,7 @@ namespace quda {
   public:
 
     TwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), in(in) {
+      : Dslash<Float>(arg, out, in, "kernels/dslash_twisted_mass_preconditioned.cuh"), arg(arg), in(in) {
       if (arg.asymmetric) for (int i=0; i<8; i++) if (i!=4) { strcat(Dslash<Float>::aux[i],",asym"); }
     }
 
@@ -64,6 +53,9 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
+      if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
+      if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
+
       if (arg.nParity == 1) {
         if (arg.xpay) Dslash<Float>::template instantiate<TwistedMassPreconditionedLaunch,nDim,nColor,1, true>(tp, arg, stream);
         else          Dslash<Float>::template instantiate<TwistedMassPreconditionedLaunch,nDim,nColor,1,false>(tp, arg, stream);

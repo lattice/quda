@@ -12,7 +12,7 @@ namespace quda {
     real c; // dummy parameter to allow us to reuse applyWilsonTM for non-degenerate operator
     real a_inv; // inverse scaling factor - used to allow early xpay inclusion
     real b_inv; // inverse twist factor - used to allow early xpay inclusion
-    bool asymmetric; // whether we are applying the asymetric operator or not
+    bool asymmetric; // whether we are applying the asymmetric operator or not
 
     TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    double a, double b, bool xpay, const ColorSpinorField &x,
@@ -173,24 +173,34 @@ namespace quda {
   }
 
   // CPU kernel for applying the preconditioned twisted-mass operator to a vector
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool asymmetric, bool xpay, KernelType kernel_type, typename Arg>
-  void twistedMassCPU(Arg arg)
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  void twistedMassPreconditionedCPU(Arg arg)
   {
 
-    for (int parity= 0; parity < nParity; parity++) {
-      // for full fields then set parity from loop else use arg setting
-      parity = nParity == 2 ? parity : arg.parity;
+    if (arg.asymmetric) {
+      for (int parity= 0; parity < nParity; parity++) {
+        // for full fields then set parity from loop else use arg setting
+        parity = nParity == 2 ? parity : arg.parity;
 
-      for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-        twistedMass<Float,nDim,nColor,nParity,dagger,asymmetric,xpay,kernel_type>(arg, x_cb, parity);
-      } // 4-d volumeCB
-    } // parity
+        for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
+          twistedMass<Float,nDim,nColor,nParity,dagger,true,xpay,kernel_type>(arg, x_cb, parity);
+        } // 4-d volumeCB
+      } // parity
+    } else {
+      for (int parity= 0; parity < nParity; parity++) {
+        // for full fields then set parity from loop else use arg setting
+        parity = nParity == 2 ? parity : arg.parity;
 
+        for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
+          twistedMass<Float,nDim,nColor,nParity,dagger,false,xpay,kernel_type>(arg, x_cb, parity);
+        } // 4-d volumeCB
+      } // parity
+    }
   }
 
   // GPU Kernel for applying the preconditioned twisted-mass operator to a vector
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool asymmetric, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void twistedMassGPU(Arg arg)
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  __global__ void twistedMassPreconditionedGPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.threads) return;
@@ -198,9 +208,17 @@ namespace quda {
     // for full fields set parity from y thread index else use arg setting
     int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
-    switch(parity) {
-    case 0: twistedMass<Float,nDim,nColor,nParity,dagger,asymmetric,xpay,kernel_type>(arg, x_cb, 0); break;
-    case 1: twistedMass<Float,nDim,nColor,nParity,dagger,asymmetric,xpay,kernel_type>(arg, x_cb, 1); break;
+    if (arg.asymmetric) {
+      // constrain template instantiation for compilation (asymmetric implies dagger and !xpay)
+      switch(parity) {
+      case 0: twistedMass<Float,nDim,nColor,nParity,true,true,false,kernel_type>(arg, x_cb, 0); break;
+      case 1: twistedMass<Float,nDim,nColor,nParity,true,true,false,kernel_type>(arg, x_cb, 1); break;
+      }
+    } else {
+      switch(parity) {
+      case 0: twistedMass<Float,nDim,nColor,nParity,dagger,false,xpay,kernel_type>(arg, x_cb, 0); break;
+      case 1: twistedMass<Float,nDim,nColor,nParity,dagger,false,xpay,kernel_type>(arg, x_cb, 1); break;
+      }
     }
 
   }

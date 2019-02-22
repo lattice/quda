@@ -152,11 +152,14 @@ endif()
 
 
 
+#  use FindMPI variables for QUDA_CTEST_LAUNCH
+# set MPIEXEC_MAX_NUMPROCS to the number of ranks you want to launch
+set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS})
 
 ## BLAS test
 
-add_test(NAME blas_test_parity COMMAND ${QUDA_CTEST_LAUNCH} ${QUDA_CTEST_LAUNCH_ARGS} ./blas_test --dim 2 4 6 8 --solve-type direct-pc --gtest_output=xml:blas_test_parity.xml)
-add_test(NAME blas_test_full COMMAND ${QUDA_CTEST_LAUNCH} ${QUDA_CTEST_LAUNCH_ARGS} ./blas_test --dim 2 4 6 8 --solve-type direct --gtest_output=xml:blas_test_full.xml)
+add_test(NAME blas_test_parity COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS} --dim 2 4 6 8 --solve-type direct-pc --gtest_output=xml:blas_test_parity.xml)
+add_test(NAME blas_test_full COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS} --dim 2 4 6 8 --solve-type direct --gtest_output=xml:blas_test_full.xml)
 
 
 # loop over Dslash policies
@@ -176,10 +179,6 @@ else()
   set(DSLASH_POLICIES -1)
 endif()
 
-
-#  use FindMPI variables for QUDA_CTEST_LAUNCH 
-# set MPIEXEC_MAX_NUMPROCS to the number of ranks you want to launch
-set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS})
 
 foreach(pol IN LISTS DSLASH_POLICIES)
 

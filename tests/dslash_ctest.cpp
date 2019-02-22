@@ -269,11 +269,10 @@ void init(int precision, QudaReconstructType link_recon) {
       csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
-  if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-    dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-    csParam.pc_type = QUDA_4D_PC;
-  } else {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     csParam.pc_type = QUDA_5D_PC;
+  } else {
+    csParam.pc_type = QUDA_4D_PC;
   }
 
   //ndeg_tm

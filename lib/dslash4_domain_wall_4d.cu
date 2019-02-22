@@ -1,13 +1,8 @@
 #ifndef USE_LEGACY_DSLASH
 
 #include <gauge_field.h>
-#include <gauge_field_order.h>
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
-#include <dslash_helper.cuh>
-#include <index_helper.cuh>
-#include <dslash_quda.h>
-#include <color_spinor.h>
+#include <dslash.h>
 #include <worker.h>
 
 namespace quda {
@@ -34,6 +29,7 @@ namespace quda {
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct DomainWall4DLaunch {
+    static constexpr const char *kernel = "quda::domainWall4DGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
       dslash.launch(domainWall4DGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
@@ -50,7 +46,7 @@ namespace quda {
   public:
 
     DomainWall4D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), in(in) {
+      : Dslash<Float>(arg, out, in, "kernels/dslash_domain_wall_4d.cuh"), arg(arg), in(in) {
       TunableVectorYZ::resizeVector(in.X(4),arg.nParity);
     }
 
@@ -59,8 +55,7 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
-      if (arg.xpay) Dslash<Float>::template instantiate<DomainWall4DLaunch,nDim,nColor, true>(tp, arg, stream);
-      else          Dslash<Float>::template instantiate<DomainWall4DLaunch,nDim,nColor,false>(tp, arg, stream);
+      Dslash<Float>::template instantiate<DomainWall4DLaunch,nDim,nColor>(tp, arg, stream);
     }
 
     TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }

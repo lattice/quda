@@ -1,13 +1,8 @@
 #ifndef USE_LEGACY_DSLASH
 
 #include <gauge_field.h>
-#include <gauge_field_order.h>
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
-#include <dslash_helper.cuh>
-#include <index_helper.cuh>
-#include <dslash_quda.h>
-#include <color_spinor.h>
+#include <dslash.h>
 #include <worker.h>
 
 namespace quda {
@@ -32,10 +27,11 @@ namespace quda {
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct NdegTwistedMassLaunch {
+    static constexpr const char *kernel = "quda::ndegTwistedMassGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
       static_assert(xpay == true, "Non-generate twisted-mass operator only defined for xpay");
-      dslash.launch(ndegTwistedMassGPU<Float,nDim,nColor,nParity,dagger,kernel_type,Arg>, tp, arg, stream);
+      dslash.launch(ndegTwistedMassGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
     }
   };
 
@@ -49,7 +45,7 @@ namespace quda {
   public:
 
     NdegTwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), in(in) {
+      : Dslash<Float>(arg, out, in, "kernels/dslash_ndeg_twisted_mass.cuh"), arg(arg), in(in) {
       TunableVectorYZ::resizeVector(2,arg.nParity);
     }
 
@@ -58,7 +54,7 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
-      if (arg.xpay) Dslash<Float>::template instantiate<NdegTwistedMassLaunch,nDim,nColor, true>(tp, arg, stream);
+      if (arg.xpay) Dslash<Float>::template instantiate<NdegTwistedMassLaunch,nDim,nColor,true>(tp, arg, stream);
       else errorQuda("Non-degenerate twisted-mass operator only defined for xpay=true");
     }
 

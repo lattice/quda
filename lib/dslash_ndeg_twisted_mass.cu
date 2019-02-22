@@ -22,7 +22,7 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
-#include <dslash_helper.cuh>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
