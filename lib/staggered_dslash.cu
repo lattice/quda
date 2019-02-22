@@ -1,13 +1,13 @@
-#include <gauge_field.h>
-#include <gauge_field_order.h>
-#include <color_spinor_field.h>
+
+#include <dslash.h>
+#include <worker.h>
+#include <dslash_helper.cuh>
 #include <color_spinor_field_order.h>
+#include <gauge_field_order.h>
+#include <color_spinor.h>
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
-#include <stencil.h>
-#include <color_spinor.h>
-#include <worker.h>
-#include <tune_quda.h>
+#include <gauge_field.h>
 
 namespace quda
 {
@@ -357,7 +357,7 @@ protected:
         unsigned int minThreads() const { return arg.volumeCB; }
     */
 public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash<Float>(arg, out, in), arg(arg), in(in) {}
+    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash<Float>(arg, out, in, ""), arg(arg), in(in) {}
 
     virtual ~Staggered() {}
 
