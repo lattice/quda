@@ -64,6 +64,30 @@ namespace quda {
     flops += 1872ll*in.Volume();
   }
 
+  /** Applies the operator (A + k D) */
+  void DiracClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+  			       const QudaParity parity, const ColorSpinorField &x,
+  			       const double &k, const double &b) const
+    {
+      checkParitySpinor(in, out);
+      checkSpinorAlias(in, out);
+
+  #ifndef USE_LEGACY_DSLASH
+      ApplyWilsonClover(out, in, *gauge, clover, k, b ,x, parity, dagger, commDim, profile);
+  #else
+      if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+        FullClover cs(clover);
+        asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs,
+  			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger,
+  			   &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+      } else {
+        errorQuda("Not implemented");
+      }
+  #endif
+
+      flops += 1872ll*in.Volume();
+    }
+
   // Public method to apply the clover term only
   void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
@@ -555,8 +579,8 @@ namespace quda {
 
         // DiracCloverHasenbuschTwistPC::Dslash applies A^{-1}Dslash
         Dslash(*tmp1, in, parity[0]);
-        // DiracClover::DslashXpay applies (A - kappa^2 D)
-        DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2);
+        // DiracClover::DslashXpay applies (A - kappa^2 D)-
+        DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2, m5);
       } else if (!dagger) { // symmetric preconditioning
         // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
         // where A is actually a clover inverse.
