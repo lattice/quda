@@ -48,22 +48,21 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-   if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
- 
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+
 #ifdef USE_LEGACY_DSLASH
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), 
 			  *gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
 			  dagger, 0, 0, commDim, profile);
 #else
-    constexpr bool improved = false;
-    ApplyDslashStaggered(out, in, *gauge, *gauge , 0., in,
-                         parity, dagger, improved, commDim, profile);
+      constexpr bool improved = false;
+      ApplyDslashStaggered(out, in, *gauge, *gauge, 0., in, parity, dagger, improved, commDim, profile);
 #endif
 
     } else {
       errorQuda("Not supported");
     }
-  
+
     flops += 570ll*in.Volume();
   }
 
@@ -78,9 +77,8 @@ namespace quda {
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
 #else
-    constexpr bool improved = false;
-    ApplyDslashStaggered(out, in, *gauge, *gauge , k, x,
-                         parity, dagger, improved, commDim, profile);
+      constexpr bool improved = false;
+      ApplyDslashStaggered(out, in, *gauge, *gauge, k, x, parity, dagger, improved, commDim, profile);
 #endif
     } else {
       errorQuda("Not supported");

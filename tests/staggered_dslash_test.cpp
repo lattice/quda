@@ -500,11 +500,12 @@ void init()
 
   gaugeParam.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
-  #ifdef USE_LEGACY_DSLASH
+#ifdef USE_LEGACY_DSLASH
     gaugeParam.reconstruct = link_recon;
-  #else
-gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
- #endif
+#else
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy
+        = (link_recon == QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
+#endif
   } else {
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   }
@@ -523,7 +524,8 @@ gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECON
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy
+        = (link_recon == QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
 
     // printfQuda("Long links sending..."); 
     loadGaugeQuda(milc_longlink_gpu, &gaugeParam);
@@ -827,9 +829,6 @@ static int dslashTest()
 
     double spinor_ref_norm2 = blas::norm2(*spinorRef);
     double spinor_out_norm2 = blas::norm2(*spinorOut);
-
-
-
 
     // Catching nans is weird.
     if (std::isnan(spinor_ref_norm2)) { failed = true; }
