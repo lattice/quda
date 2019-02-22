@@ -434,7 +434,6 @@ if(QUDA_JITIFY)
   LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
   LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
   configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
-  include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 endif()
 
 if(QUDA_USE_EIGEN)
@@ -610,7 +609,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
 include_directories(include)
 include_directories(lib)
-
+if(QUDA_JITIFY)
+  include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
+endif()
 
 # QUDA_HASH for tunecache
 if(NOT GITVERSION)

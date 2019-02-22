@@ -53,6 +53,10 @@ namespace quda {
 #endif
       options.push_back( std::string("-D__COMPUTE_CAPABILITY__=") + std::to_string(__COMPUTE_CAPABILITY__) );
 
+#ifdef USE_TEXTURE_OBJECTS
+      options.push_back( std::string("-DUSE_TEXTURE_OBJECTS") );
+#endif
+
       // add an extra compilation options specific to this instance
       for (auto option : extra_options) options.push_back(option);
 
