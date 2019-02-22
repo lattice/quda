@@ -1,15 +1,9 @@
 #ifndef USE_LEGACY_DSLASH
 
 #include <gauge_field.h>
-#include <gauge_field_order.h>
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
 #include <clover_field.h>
-#include <clover_field_order.h>
-#include <dslash_helper.cuh>
-#include <index_helper.cuh>
-#include <dslash_quda.h>
-#include <color_spinor.h>
+#include <dslash.h>
 #include <worker.h>
 
 namespace quda {
@@ -33,10 +27,11 @@ namespace quda {
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct TwistedCloverLaunch {
+    static constexpr const char *kernel = "quda::wilsonCloverGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
       static_assert(xpay == true, "Twisted-clover operator only defined for xpay");
-      dslash.launch(wilsonCloverGPU<Float,nDim,nColor,nParity,dagger,kernel_type,Arg>, tp, arg, stream);
+      dslash.launch(wilsonCloverGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
     }
   };
 
@@ -50,7 +45,7 @@ namespace quda {
   public:
 
     TwistedClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), in(in) {  }
+      : Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover.cuh"), arg(arg), in(in) {  }
 
     virtual ~TwistedClover() { }
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <kernels/dslash_wilson_clover_preconditioned.cuh>
+#include <clover_field_order.h>
+#include <linalg.cuh>
 
 namespace quda {
 
@@ -101,7 +103,7 @@ namespace quda {
 
   // CPU kernel for applying the Wilson operator to a vector
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  void twistedCloverCPU(Arg arg)
+  void twistedCloverPreconditionedCPU(Arg arg)
   {
 
     for (int parity= 0; parity < nParity; parity++) {
@@ -117,7 +119,7 @@ namespace quda {
 
   // GPU Kernel for applying the Wilson operator to a vector
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void twistedCloverGPU(Arg arg)
+  __global__ void twistedCloverPreconditionedGPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.threads) return;

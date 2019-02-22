@@ -9,7 +9,7 @@
 #define SWIZZLE // needs to be before index_helper is included
 #endif
 
-#include <dslash_helper.cuh>
+#include <dslash.h>
 #include <index_helper.cuh>
 #include <dslash_quda.h>
 
