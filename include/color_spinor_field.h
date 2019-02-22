@@ -124,8 +124,7 @@ namespace quda {
       twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
-      pc_type(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||
-	      (inv_param.dslash_type==QUDA_MOBIUS_DWF_DSLASH))?QUDA_4D_PC:QUDA_5D_PC ),
+      pc_type(inv_param.dslash_type==QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC),
       v(V), is_composite(false), composite_dim(0), is_component(false), component_id(0) {
 
         if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");

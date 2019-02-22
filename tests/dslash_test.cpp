@@ -268,11 +268,10 @@ void init(int argc, char **argv) {
     csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
-  if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-    csParam.pc_type = QUDA_4D_PC;
-  } else {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     csParam.pc_type = QUDA_5D_PC;
+  } else {
+    csParam.pc_type = QUDA_4D_PC;
   }
 
 //ndeg_tm    
@@ -1004,6 +1003,8 @@ int main(int argc, char **argv)
     //FIXME No flops count for twisted-clover yet
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
+    printfQuda("%llu flops per kernel call, %llu flops per site\n",
+               flops / niter, (flops / niter) / cudaSpinor->Volume());
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
 
     printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
