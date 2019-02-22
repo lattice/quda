@@ -73,7 +73,7 @@ namespace quda {
   }
 
   /**
-       Applies the off-diagonal part of the Laplace operator
+       Applies the off-diagonal part of the Staggered / Asqtad operator
 
        @param[out] out The out result field
        @param[in] U The gauge field
