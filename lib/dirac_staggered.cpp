@@ -93,14 +93,21 @@ namespace quda {
     // Due to the staggered convention, this is applying
     // (  2m     -D_eo ) (x_e) = (b_e)
     // ( -D_oe   2m    ) (x_o) = (b_o)
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
+
+#ifdef USE_LEGACY_DSLASH
+    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 0*mass);  
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
+#else
+    checkFullSpinor(out, in);
+    constexpr bool improved = false;
+    ApplyDslashStaggered(out, in, *gauge, *gauge, 2.*mass, in, QUDA_INVALID_PARITY, dagger, improved, commDim, profile);
+#endif
   }
 
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp1, in);
-  
+    printfQuda("Calling DiracStaggered::MdagM \n");
     //even
     Dslash(tmp1->Even(), in.Even(), QUDA_ODD_PARITY);  
     DslashXpay(out.Even(), tmp1->Even(), QUDA_EVEN_PARITY, in.Even(), 4*mass*mass);

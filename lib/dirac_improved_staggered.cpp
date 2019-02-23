@@ -93,8 +93,14 @@ namespace quda {
   // Full staggered operator
   void DiracImprovedStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
+  #ifdef USE_LEGACY_DSLASH
     DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
+  #else
+    checkFullSpinor(out, in);
+    constexpr bool improved = true;
+    ApplyDslashStaggered(out, in, fatGauge, longGauge, 2.*mass, in, QUDA_INVALID_PARITY, dagger, improved, commDim, profile);
+#endif
   }
 
   void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
