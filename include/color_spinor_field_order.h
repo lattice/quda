@@ -865,7 +865,8 @@ namespace quda {
         // first do texture load from memory
         TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*i + x);
         // now insert into output array
-        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+#pragma unroll
+        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
         if ( isFixed<Float>::value ) {
 #pragma unroll
           for (int j=0; j<N; j++) v[i*N+j] *= nrm;
@@ -876,7 +877,8 @@ namespace quda {
         // first load from memory
         Vector vecTmp = vector_load<Vector>(field + parity*offset, x + stride*i);
         // now copy into output and scale
-        copy_and_scale(reinterpret_cast<RegVector*>(v)[i], vecTmp, nrm);
+#pragma unroll
+        for (int j=0; j<N; j++) copy_and_scale(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j], nrm);
       }
     }
 
@@ -910,8 +912,9 @@ namespace quda {
 #pragma unroll
     for (int i=0; i<M; i++) {
       Vector vecTmp;
-      // first do vectorized copy converting into storage type
-      copy_scaled(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
+      // first do scalar copy converting into storage type
+#pragma unroll
+      for (int j=0; j<N; j++) copy_scaled(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
       // second do vectorized copy into memory
       vector_store(field + parity*offset, x + stride*i, vecTmp);
     }
@@ -960,7 +963,8 @@ namespace quda {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__) && 0 // buggy - need to account for dim/dir offset
       if (!huge_alloc) { // use textures unless we have a huge alloc
         TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity*tex_offset + stride*i + x);
-        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+#pragma unroll
+        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
         if (isFixed<Float>::value ) {
 #pragma unroll
           for (int i=0; i<N; i++) v[i*N+j] *= nrm;
@@ -970,7 +974,8 @@ namespace quda {
       {
         Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N,
                                             i*faceVolumeCB[dim]+x);
-        copy_and_scale(reinterpret_cast<RegVector*>(v)[i], vecTmp, nrm);
+#pragma unroll
+        for (int j=0; j<N; j++) copy_and_scale(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j], nrm);
       }
     }
 
@@ -1004,8 +1009,9 @@ namespace quda {
 #pragma unroll
     for (int i=0; i<M_ghost; i++) {
       Vector vecTmp;
-      // first do vectorized copy converting into storage type
-      copy_scaled(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
+      // first do scalar copy converting into storage type
+#pragma unroll
+      for (int j=0; j<N; j++) copy_scaled(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
       // second do vectorized copy into memory
       vector_store(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N, i*faceVolumeCB[dim]+x, vecTmp);
     }
