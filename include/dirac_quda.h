@@ -505,16 +505,15 @@ namespace quda {
 
      // DslashXPay is inherited (for reconstructs and such)
 
-     // I need a new Op
-     // out = x +/- i g5 mu A x - D in
-     void CloverTwistWilsonDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
- 		const QudaParity parity, const ColorSpinorField &x, const double &k, const double &mu) const;
+     // out = (1 +/- ig5 mu A)x  + k A^{-1} D in
+     void DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in,
+         				 const QudaParity parity, const ColorSpinorField &x,
+         				 const double &k, const double& b) const;
 
-
-     // out = x +- ig5 mu Ax  + k A_pp^{-1} D_p\bar{p} in
-     void CloverTwistDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
- 		    const QudaParity parity, const ColorSpinorField &x, const double &k, const double &mu) const;
-
+     // out = ( 1+/- i g5 mu A) x - D in
+     void DslashXpayTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in,
+         				 const QudaParity parity, const ColorSpinorField &x,
+         				 const double &k, const double& b) const;
 
      // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
      //                            ii) out_o = in_o + A_oo^{-1} D_oe tmp_e (AXPY)

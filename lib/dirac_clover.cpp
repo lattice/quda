@@ -223,6 +223,8 @@ namespace quda {
     flops += 1872ll*in.Volume();
   }
 
+
+
   // Apply the even-odd preconditioned clover-improved Dirac operator
   void DiracCloverPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
@@ -555,6 +557,31 @@ namespace quda {
       return *this;
     }
 
+    // xpay version of the above
+    void DiracCloverHasenbuschTwistPC::DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in,
+    				 const QudaParity parity, const ColorSpinorField &x,
+    				 const double &k, const double& b) const
+      {
+        checkParitySpinor(in, out);
+        checkSpinorAlias(in, out);
+
+        ApplyWilsonCloverHasenbuschTwistClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
+        // FIXME:
+        flops += 1872ll*in.Volume();
+      }
+
+    // xpay version of the above
+     void DiracCloverHasenbuschTwistPC::DslashXpayTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in,
+     				 const QudaParity parity, const ColorSpinorField &x,
+     				 const double &k, const double &b) const
+       {
+         checkParitySpinor(in, out);
+         checkSpinorAlias(in, out);
+
+         ApplyWilsonCloverHasenbuschTwistNoClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
+         // fixme,
+         flops += 1872ll*in.Volume();
+       }
 
 
     // Apply the even-odd preconditioned clover-improved Dirac operator
@@ -589,7 +616,7 @@ namespace quda {
         Dslash(*tmp1, in, parity[0]);
 
         // Then x + AD (AD)
-        DslashXpay(out, *tmp1, parity[1], in, kappa2);
+        DslashXpayTwistClovInv(out, *tmp1, parity[1], in, kappa2, m5);
       } else { // symmetric preconditioning, dagger
 
         // This is the dagger: 1 - DADA
@@ -598,7 +625,7 @@ namespace quda {
         // ii) Apply A D => ADA
         Dslash(*tmp1, out, parity[0]);
         // iii) Apply  x + D(ADA)
-        DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
+        DslashXpayTwistNoClovInv(out, *tmp1, parity[1], in, kappa2, m5);
       }
 
       deleteTmp(&tmp1, reset1);
