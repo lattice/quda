@@ -64,7 +64,7 @@ namespace quda {
 
       WilsonCloverHasenbuschTwistNoClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
         : Dslash<Float>(arg, out, in), arg(arg), in(in)
-      { printfQuda("Instantiating WilsonCloverHasenbuschTwistNoClovInv mu = %lf", arg.b); }
+      {  }
 
       virtual ~WilsonCloverHasenbuschTwistNoClovInv() { }
 
@@ -132,7 +132,7 @@ namespace quda {
   #endif
 
       using ArgType = WilsonCloverHasenbuschTwistArg<Float,nColor,recon,dynamic_clover>;
-      printfQuda("Instantiating Arg: mu=%lf\n", mu);
+
       ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistNoClovInv<Float,nDim,nColor,ArgType > wilson(arg, out, in);
 
@@ -224,7 +224,7 @@ namespace quda {
 
         WilsonCloverHasenbuschTwistClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
           : Dslash<Float>(arg, out, in), arg(arg), in(in)
-        { printfQuda("Instantiating WilsonCloverHasenbuschTwistClovInv mu = %lf", arg.b); }
+        {}
 
         virtual ~WilsonCloverHasenbuschTwistClovInv() { }
 
@@ -292,7 +292,7 @@ namespace quda {
     #endif
 
         using ArgType = WilsonCloverHasenbuschTwistArg<Float,nColor,recon,dynamic_clover>;
-        printfQuda("Instantiating Arg: mu=%lf\n", mu);
+
         ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
         WilsonCloverHasenbuschTwistClovInv<Float,nDim,nColor,ArgType > wilson(arg, out, in);
 

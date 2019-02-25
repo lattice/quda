@@ -51,8 +51,7 @@ namespace quda {
   public:
 
     WilsonCloverHasenbuschTwist(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), in(in)
-    { printfQuda("Instantiating WilsonCloverHasenbuschTwist mu = %lf", arg.b); }
+      : Dslash<Float>(arg, out, in), arg(arg), in(in) { }
 
     virtual ~WilsonCloverHasenbuschTwist() { }
 
@@ -113,7 +112,7 @@ namespace quda {
     constexpr int nDim = 4;
 
     using ArgType = WilsonCloverArg<Float,nColor,recon,true>;
-    printfQuda("Instantiating Arg: mu=%lf\n", mu);
+
     ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
     WilsonCloverHasenbuschTwist<Float,nDim,nColor,ArgType > wilson(arg, out, in);
 

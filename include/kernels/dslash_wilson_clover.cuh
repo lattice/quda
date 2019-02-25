@@ -22,7 +22,7 @@ namespace quda {
       : WilsonArg<Float,nColor,reconstruct_>(out, in, U, kappa, x, parity, dagger, comm_override),
       A(A, false), b(dagger ? -0.5*b_ : 0.5*b_) // factor of 1/2 comes from clover normalization we need to correct for
 
-    { printfQuda("WilsonCloverArg setting b = %lf\n", b); }
+    { }
   };
 
   /**
