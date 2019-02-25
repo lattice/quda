@@ -856,37 +856,23 @@ namespace quda {
 
 	       typedef typename ScalarType<ReduceType>::type scalar;
 
-         norm2_<scalar> (sum[1].x, p);
-         norm2_<scalar> (sum[1].y, s);
-         norm2_<scalar> (sum[1].z, q);
-         norm2_<scalar> (sum[1].w, z);
-
-         z = n + b.x*z;
+				 z = n + b.x*z;
          q = m + b.x*q;
          s = w + b.x*s;
          p = u + b.x*p;
 
-         norm2_<scalar> (sum[1].x, p);
-         norm2_<scalar> (sum[1].y, s);
-         norm2_<scalar> (sum[1].z, q);
-         norm2_<scalar> (sum[1].w, z);
-
-         norm2_<scalar> (sum[2].x, x);
-         norm2_<scalar> (sum[2].y, u);
-         norm2_<scalar> (sum[2].z, w);
-         norm2_<scalar> (sum[2].w, m);
-
          x = x + a.x*p;
          u = u - a.x*q;
-
-         sum[0].w = 0.0;
-
-         r = r - a.x*s;
          w = w - a.x*z;
+         r = r - a.x*s;
+				 n = w - r;
 
          dot_<scalar>   (sum[0].x, r, u);
          dot_<scalar>   (sum[0].y, w, u);
-         norm2_<scalar> (sum[0].z, r);
+				 norm2_<scalar> (sum[0].z, r);
+         dot_<scalar>   (sum[0].w, s, u);
+				 norm2_<scalar> (sum[1].x, s);
+         norm2_<scalar> (sum[1].y, z);
     }
 
       __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
@@ -904,80 +890,12 @@ namespace quda {
 			if (x.Precision() != p.Precision()) {
 				 errorQuda("\nMixed blas is not implemented.\n");
 			}
-			if(buffer_size != 3) errorQuda("Incorrect buffer size. \n");
+			if(buffer_size != 2) errorQuda("Incorrect buffer size. \n");
 
-			reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+			reduce::reduceCudaExp<2, double4, QudaSumFloat4,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,1,1,false>
 					(buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
 			return;
 		}
-
-		template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
-    struct pipePCGRRFletcherReevesMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
-      Float2 a;
-      Float2 b;
-      pipePCGRRFletcherReevesMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) {
-
-	       typedef typename ScalarType<ReduceType>::type scalar;
-
-         if(Nreduce == 3) {
-           norm2_<scalar> (sum[2].x, x);
-           norm2_<scalar> (sum[2].y, u);
-           norm2_<scalar> (sum[2].z, w);
-           norm2_<scalar> (sum[2].w, m);
-         }
-
-         z = n + b.x*z;
-         q = m + b.x*q;
-         s = w + b.x*s;
-         p = u + b.x*p;
-
-         x = x + a.x*p;
-         u = u - a.x*q;
-
-         dot_<scalar>   (sum[0].w, r, u);
-
-         r = r - a.x*s;
-         w = w - a.x*z;
-
-         dot_<scalar>   (sum[0].x, r, u);
-         dot_<scalar>   (sum[0].y, w, u);
-         dot_<scalar>   (sum[0].z, r, r);
-
-         if(Nreduce == 3) {
-           norm2_<scalar> (sum[1].x, p);
-           norm2_<scalar> (sum[1].y, s);
-           norm2_<scalar> (sum[1].z, q);
-           norm2_<scalar> (sum[1].w, z);
-         }
-      }
-
-      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
-						  FloatN &d1, FloatN &h1, FloatN &z1, FloatN &p1, FloatN &u1, FloatN &g1,
-                                                  FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2,
-                                                  FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) {}
-
-      static int streams() { return 18; } //! total number of input and output streams
-      static int flops() { return (16+6); } //! flops per real element
-    };
-
-		void pipePCGRRFletcherReevesMergedOp(double4 *buffer, const int buffer_size,  ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u,
-                                ColorSpinorField &r, ColorSpinorField &s, ColorSpinorField &m, const double &b, ColorSpinorField &q,
-			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
-      if (x.Precision() != p.Precision()) {
-         errorQuda("\nMixed blas is not implemented.\n");
-      }
-      if( buffer_size == 3 ) {
-         reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRFletcherReevesMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
-	           (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
-      } else if ( buffer_size == 1 ) {
-         reduce::reduceCudaExp<1, double4, QudaSumFloat4,pipePCGRRFletcherReevesMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
-             (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
-      } else {
-         errorQuda("Reduction operation for buffer size %d is not implemented. \n", buffer_size);
-      }
-      return;
-    }
 
 		template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
     struct pipe2PCGMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
