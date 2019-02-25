@@ -123,7 +123,7 @@ namespace quda {
 
     printfQuda("MSPCG constructor starts.\n");
 
-    R[0]=1;
+    R[0]=2;
     R[1]=2;
     R[2]=2;
     R[3]=2;
@@ -154,7 +154,7 @@ namespace quda {
       printfQuda("WOW you are RICH enough to have tensor cores! :_) \n(will use tensor core implementations)\n");
     }
 
-    int gR[4] = {2*R[0], R[1], R[2], R[3]}; 
+    int gR[4] = {R[0], R[1], R[2], R[3]}; 
     padded_gauge_field = createExtendedGauge(*gaugePrecise, gR, profile, true);
     padded_gauge_field_precondition = createExtendedGauge(*gaugePrecondition, gR, profile, true);
 
@@ -267,8 +267,10 @@ namespace quda {
     cudaColorSpinorField* fb = NULL;
     cudaColorSpinorField* ft = NULL;
 
-    for(int i=0; i<4; ++i){
-      csParam.x[i] += 2*R[i];
+    constexpr int test_shift = 2;
+    csParam.x[0] += 2*test_shift/2;
+    for(int i=1; i<4; ++i){
+      csParam.x[i] += 2*test_shift;
     }
 
     // csParam.print();
@@ -537,7 +539,8 @@ namespace quda {
     immp=  new cudaColorSpinorField(csParam);
     ip  =  new cudaColorSpinorField(csParam);
     
-    for(int i=0; i<4; ++i){
+    csParam.x[0] += 2*R[0]/2; // x direction is checkerboarded
+    for(int i=1; i<4; ++i){
       csParam.x[i] += 2*R[i];
     }
     csParam.setPrecision(dirac_param_precondition.gauge->Precision());

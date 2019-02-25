@@ -222,11 +222,9 @@ namespace quda {
     template <class storage_type, int block_dim_x, int Ls_, int minBlocksPerMultiprocessor, bool reload, class Arg,
         int type_>
     __global__ void __launch_bounds__(block_dim_x* Ls_, minBlocksPerMultiprocessor) fused_tensor_core(Arg arg)
-    // __global__ void fused_tensor_core(Arg arg)
     {
       const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
-      // static_assert( type_ != 1 || reload == false);
       TensorCoreSharedMemory<half2> shared_memory_data;
 
       constexpr int M = 4 * Ls_;
@@ -348,8 +346,9 @@ namespace quda {
         if (type_ == 1) {
 
           if (!idle) {
-            int back_x[4] = {x[0] - 2, x[1] - 2, x[2] - 2, x[3] - 2};
-            int back_dim[4] = {arg.dim[0] - 4, arg.dim[1] - 4, arg.dim[2] - 4, arg.dim[3] - 4};
+            constexpr int in_x_shift = 2;
+            int back_x[4] = {x[0] - in_x_shift, x[1] - in_x_shift, x[2] - in_x_shift, x[3] - in_x_shift};
+            int back_dim[4] = {arg.dim[0] - in_x_shift*2, arg.dim[1] - in_x_shift*2, arg.dim[2] - in_x_shift*2, arg.dim[3] - in_x_shift*2};
             if (back_x[0] >= 0 && back_x[0] < back_dim[0] && back_x[1] >= 0 && back_x[1] < back_dim[1] && back_x[2] >= 0
                 && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
               int volume_4d_cb_back = back_dim[0] * back_dim[1] * back_dim[2] * back_dim[3] >> 1;
