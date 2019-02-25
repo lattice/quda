@@ -493,7 +493,7 @@ namespace quda {
   */
   void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in,
 		   const CloverField &clover, bool inverse, int parity);
-
+#ifdef USE_LEGACY_DSLASH
   // staggered Dslash
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
 			   const cudaColorSpinorField *in, const int parity, const int dagger,
@@ -506,6 +506,23 @@ namespace quda {
 				   const cudaColorSpinorField *x, const double &k,
 				   const int *commDim, TimeProfile &profile);
 
+#else
+  /**
+     @brief Apply the twisted-mass gamma operator to a color-spinor field.
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] U Gauge-Link (1-link or fat-link)
+     @param[in] L Long-Links for asqtad
+     @param[in] a xpay parameter (set to 0.0 for non-xpay version)
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity parity parameter
+     @param[in] dagger Whether we are applying the dagger or not
+     @param[in] improved whether to apply the standard-staggered (false) or asqtad (true) operator
+  */
+  void ApplyDslashStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a, const ColorSpinorField &x,
+      int parity, bool dagger, bool improved, const int *comm_override, TimeProfile &profile);
+
+#endif
   /**
      @brief Apply the twisted-mass gamma operator to a color-spinor field.
      @param[out] out Result color-spinor field

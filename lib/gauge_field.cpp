@@ -49,9 +49,6 @@ namespace quda {
     if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
       errorQuda("Temporal gauge fixing only supported for Wilson links");
 
-    if(link_type != QUDA_ASQTAD_LONG_LINKS && (reconstruct ==  QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9))
-      errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
-
     if(geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*nInternal;
       length = 2*stride*nInternal; // two comes from being full lattice

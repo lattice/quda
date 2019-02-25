@@ -63,6 +63,25 @@ namespace quda {
     return idx;
   }
 
+/**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] +n in the mu direction
+
+     @return 1-d checkerboard index
+     @tparam n number of hops (=/-) in the mu direction
+     @param x 4-d lattice index
+     @param X Full lattice dimensions
+     @param mu direction in which to add n hops
+   */
+  template <typename I, int n>
+  static __device__ __host__ inline int linkIndexDn(const int x[], const I X[4], const int mu) {
+    int y[4];
+#pragma unroll
+    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
+    y[mu] = (y[mu] +n + X[mu]) % X[mu];
+    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
+    return idx;
+  }
+
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] -1 in the mu direction
 
@@ -73,12 +92,20 @@ namespace quda {
    */
   template <typename I>
   static __device__ __host__ inline int linkIndexM1(const int x[], const I X[4], const int mu) {
-    int y[4];
-#pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
-    y[mu] = (y[mu] - 1 + X[mu]) % X[mu];
-    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
-    return idx;
+    return linkIndexDn<I,-1>(x, X, mu);
+  }
+
+  /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] -3 in the mu direction
+
+     @return 1-d checkerboard index
+     @param x 4-d lattice index
+     @param X Full lattice dimensions
+     @param mu direction in which to subtract 3
+   */
+  template <typename I>
+  static __device__ __host__ inline int linkIndexM3(const int x[], const I X[4], const int mu) {
+    return linkIndexDn<I,-3>(x, X, mu);
   }
 
   /**
@@ -109,12 +136,20 @@ namespace quda {
    */
   template <typename I>
   static __device__ __host__ inline int linkIndexP1(const int x[], const I X[4], const int mu) {
-    int y[4];
-#pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
-    y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
-    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
-    return idx;
+    return linkIndexDn<I,1>(x, X, mu);
+  }
+
+  /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] +3 in the mu direction
+
+     @return 1-d checkerboard index
+     @param x 4-d lattice index
+     @param X Full lattice dimensions
+     @param mu direction in which to add 3
+   */
+  template <typename I>
+  static __device__ __host__ inline int linkIndexP3(const int x[], const I X[4], const int mu) {
+    return linkIndexDn<I,3>(x, X, mu);
   }
 
   /**
@@ -290,7 +325,7 @@ namespace quda {
      @param x_ local site
      @param X_ local lattice dimensions
      @param dim dimension
-     @param depth of ghost
+     @param nFace depth of ghost
   */
   template <int dir, int nDim=4, typename I>
   __device__ __host__ inline int ghostFaceIndex(const int x_[], const I X_[], int dim, int nFace) {
@@ -338,6 +373,67 @@ namespace quda {
       case 1:
 	index  = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
 	break;
+      }
+      break;
+    }
+    return index;
+  }
+
+
+   /**
+     Compute the checkerboarded index into the ghost field
+     corresponding to full (local) site index x[] for staggered
+     @param x_ local site
+     @param X_ local lattice dimensions
+     @param dim dimension
+     @param nFace depth of ghost
+  */
+  template <int dir, int nDim=4, typename I>
+  __device__ __host__ inline int ghostFaceIndexStaggered(const int x_[], const I X_[], int dim, int nFace) {
+    static_assert( (nDim==4 || nDim==5), "Number of dimensions must be 4 or 5");
+    int index = 0;
+    const int x[] = { x_[0], x_[1], x_[2], x_[3], nDim == 5 ? x_[4] : 0 };
+    const int X[] = { (int)X_[0], (int)X_[1], (int)X_[2], (int)X_[3], nDim == 5 ? (int)X_[4] : 1 };
+
+    switch(dim) {
+    case 0:
+      switch(dir) {
+      case 0:
+ index = ((x[0]+nFace-1)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
+  break;
+      case 1:
+  index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+  break;
+      }
+      break;
+    case 1:
+      switch(dir) {
+      case 0:
+  index = ((x[1]+nFace-1)*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
+  break;
+      case 1:
+  index = ((x[1]-X[1]+nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
+  break;
+      }
+      break;
+    case 2:
+      switch(dir) {
+      case 0:
+  index = ((x[2]+nFace-1)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+  break;
+      case 1:
+  index = ((x[2]-X[2]+nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
+  break;
+      }
+      break;
+    case 3:
+      switch(dir) {
+      case 0:
+  index = ((x[3]+nFace-1)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+  break;
+      case 1:
+  index  = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
+  break;
       }
       break;
     }
@@ -563,6 +659,79 @@ namespace quda {
   {
     return indexFromFaceIndex<nDim,type,dim,nLayers,face_num>(face_idx, arg.parity, arg);
   }
+
+
+/**
+  @brief Compute global checkerboard index from face index.
+  The following indexing routines work for arbitrary lattice
+  dimensions (though perhaps not odd like thw Wilson variant?)
+  Specifically, we compute an index into the local volume from an
+  index into the face.  This is used by the staggered-like face
+  packing routines, and is different from the Wilson variant since
+  here the halo depth is tranversed in a different order - here the
+  halo depth is the faster running dimension.
+
+  @param[in] face_idx_in Checkerboarded face index
+  @param[in] param Parameter struct with required meta data
+  @return Global checkerboard coordinate
+*/
+
+      // int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
+
+
+template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
+static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
+{
+  const auto *X = arg.dc.X;              // grid dimension
+  const auto *dims = arg.dc.dims[dim];   // dimensions of the face
+  const auto &V4 = arg.dc.volume_4d;     // 4-d volume
+
+  // intrinsic parity of the face depends on offset of first element
+  int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
+
+  // reconstruct full face index from index into the checkerboard
+  face_idx_in *= 2;
+
+  // first compute src index, then find 4-d index from remainder
+  int s = face_idx_in / arg.dc.face_XYZT[dim];
+  int face_idx = face_idx_in - s*arg.dc.face_XYZT[dim];
+
+  /*y,z,t here are face indexes in new order*/
+  int aux1 = face_idx / dims[0];
+  int aux2 = aux1 / dims[1];
+  int y = aux1 - aux2 * dims[1];
+  int t = aux2 / dims[2];
+  int z = aux2 - t * dims[2];
+  face_idx += (face_parity + t + z + y) & 1;
+
+  // compute index into the full local volume
+  int gap = X[dim] - nLayers;
+  int idx = face_idx;
+  int aux;
+  switch (dim) {
+    case 0:
+      aux = face_idx;
+      idx += face_num*gap + aux*(X[0]-1);
+      idx += (idx/V4)*(1-V4);
+      break;
+    case 1:
+      aux = face_idx / arg.dc.face_X[dim];
+      idx += face_num * gap * arg.dc.face_X[dim] + aux*(X[1]-1)*arg.dc.face_X[dim];
+      idx += (idx/V4)*(X[0]-V4);
+      break;
+    case 2:
+      aux = face_idx / arg.dc.face_XY[dim];
+      idx += face_num * gap * arg.dc.face_XY[dim] +aux*(X[2]-1)*arg.dc.face_XY[dim];
+      idx += (idx/V4)*((X[1]*X[0])-V4);
+      break;
+    case 3:
+      idx += face_num * gap * arg.dc.face_XYZ[dim];
+      break;
+  }
+
+  // return index into the checkerboard
+  return (idx + s*V4) >> 1;
+}
 
   /**
      @brief Determines which face a given thread is computing.  Also

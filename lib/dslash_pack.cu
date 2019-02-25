@@ -1198,7 +1198,7 @@ namespace quda {
     }
   }
 
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
 
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEXDOUBLE param.inTex
@@ -1612,7 +1612,7 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && USE_LEGACY_DSLASH)
 
       static PackParam<FloatN> param;
       this->prepareParam(param,tp,this->dim,this->face_num);

@@ -1093,10 +1093,7 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
 
 }
 
-void
-construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
-			       QudaPrecision precision, QudaGaugeParam* param,
-			       QudaDslashType dslash_type)
+void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, QudaPrecision precision, QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1130,49 +1127,46 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
         else applyStaggeredScaling((float**)longlink, param, type);
       }
     }
-  }
 
-  if (param->reconstruct == QUDA_RECONSTRUCT_9 || param->reconstruct == QUDA_RECONSTRUCT_13) {
-    // incorporate non-trivial phase into long links
-
-    const double phase = (M_PI * rand())/RAND_MAX;
-    const complex<double> z = polar(1.0, phase);
-    for (int dir=0; dir<4; ++dir) {
-      for (int i=0; i<V; ++i) {
-        for (int j=0; j<gaugeSiteSize; j+=2) {
-          if (precision == QUDA_DOUBLE_PRECISION) {
-            complex<double> *l = (complex<double>*)( &(((double*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
-          } else {
-            complex<float> *l = (complex<float>*)( &(((float*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      // incorporate non-trivial phase into long links
+      const double phase = (M_PI * rand()) / RAND_MAX;
+      const complex<double> z = polar(1.0, phase);
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              complex<double> *l = (complex<double> *)(&(((double *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            } else {
+              complex<float> *l = (complex<float> *)(&(((float *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            }
           }
-        } 
+        }
+      }
+    }
+
+    if (type == 3) return;
+
+    // set all links to zero to emulate the 1-link operator (needed for host comparison)
+    if (dslash_type == QUDA_STAGGERED_DSLASH) {
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              ((double *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((double *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            } else {
+              ((float *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((float *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            }
+          }
+        }
       }
     }
   }
-
-  if (type==3) return;
-
-  // set all links to zero to emulate the 1-link operator (needed for host comparison)
-  if (dslash_type == QUDA_STAGGERED_DSLASH) { 
-    for(int dir=0; dir<4; ++dir){
-      for(int i=0; i<V; ++i){
-	for(int j=0; j<gaugeSiteSize; j+=2){
-	  if(precision == QUDA_DOUBLE_PRECISION){
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }else{
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }
-	} 
-      }
-    }
-  }
-
 }
-
 
 template <typename Float>
 static void constructCloverField(Float *res, double norm, double diag) {

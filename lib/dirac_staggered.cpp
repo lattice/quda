@@ -49,9 +49,16 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+
+#ifdef USE_LEGACY_DSLASH
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), 
 			  *gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
 			  dagger, 0, 0, commDim, profile);
+#else
+      constexpr bool improved = false;
+      ApplyDslashStaggered(out, in, *gauge, *gauge, 0., in, parity, dagger, improved, commDim, profile);
+#endif
+
     } else {
       errorQuda("Not supported");
     }
@@ -64,11 +71,15 @@ namespace quda {
 				  const double &k) const
   {    
     checkParitySpinor(in, out);
-
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+#ifdef USE_LEGACY_DSLASH
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+#else
+      constexpr bool improved = false;
+      ApplyDslashStaggered(out, in, *gauge, *gauge, k, x, parity, dagger, improved, commDim, profile);
+#endif
     } else {
       errorQuda("Not supported");
     }  
@@ -82,14 +93,21 @@ namespace quda {
     // Due to the staggered convention, this is applying
     // (  2m     -D_eo ) (x_e) = (b_e)
     // ( -D_oe   2m    ) (x_o) = (b_o)
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
+
+#ifdef USE_LEGACY_DSLASH
+    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 0*mass);  
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
+#else
+    checkFullSpinor(out, in);
+    constexpr bool improved = false;
+    ApplyDslashStaggered(out, in, *gauge, *gauge, 2.*mass, in, QUDA_INVALID_PARITY, dagger, improved, commDim, profile);
+#endif
   }
 
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp1, in);
-  
+    printfQuda("Calling DiracStaggered::MdagM \n");
     //even
     Dslash(tmp1->Even(), in.Even(), QUDA_ODD_PARITY);  
     DslashXpay(out.Even(), tmp1->Even(), QUDA_EVEN_PARITY, in.Even(), 4*mass*mass);
