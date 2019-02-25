@@ -1273,16 +1273,14 @@ namespace quda {
 	template<typename I>
 	__device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir,
 					       const RegType phase, const I *X, const int *R) const {
-	  const Complex *In = reinterpret_cast<const Complex*>(in);
-	  Complex *Out = reinterpret_cast<Complex*>(out);
+	  Complex Out[9];
+#pragma unroll
+	  for (int i=0; i<6; i++) Out[i] = Complex(in[2*i+0], in[2*i+1]);
 
 	  const RegType u0 = dir < 3 ? anisotropy :
 	    timeBoundary<ghostExchange_>(idx, X, R, tBoundary, static_cast<RegType>(1.0),
                                          firstTimeSliceBound, lastTimeSliceBound,
                                          isFirstTimeSlice, isLastTimeSlice, ghostExchange);
-
-#pragma unroll
-	  for(int i=0; i<6; ++i) Out[i] = In[i];
 
 	  //Out[6] = u0*conj(Out[1]*Out[5] - Out[2]*Out[4]);
           Out[6] = cmul(Out[2], Out[4]);
@@ -1298,7 +1296,13 @@ namespace quda {
           Out[8] = cmul(Out[1], Out[3]);
           Out[8] = cmac(Out[0], Out[4], -Out[8]);
           Out[8] = u0*conj(Out[8]);
-	}
+
+#pragma unroll
+          for (int i=0; i<9; i++) {
+            out[2*i+0] = Out[i].real();
+            out[2*i+1] = Out[i].imag();
+          }
+        }
 
 	__device__ __host__ inline RegType getPhase(const RegType in[18]) { return 0; }
       };
@@ -1410,7 +1414,9 @@ namespace quda {
         __device__ __host__ inline RegType getPhase(const RegType in[18]) const
         {
 #if 1 // phase from cross product
-          const Complex *In = reinterpret_cast<const Complex *>(in);
+        Complex In[9];
+  #pragma unroll
+          for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
           // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
           Complex denom = conj(In[0] * In[4] - In[1] * In[3]) / scale;
           Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
@@ -1448,12 +1454,11 @@ namespace quda {
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir,
 					     const RegType phase, const I *X, const int *R) const {
-	const Complex *In = reinterpret_cast<const Complex*>(in);
-	Complex *Out = reinterpret_cast<Complex*>(out);
 	const RegType coeff = static_cast<RegType>(1.0)/scale;
-        // printf("Reconstruct13-staggeredphasemilc ...\n");
+
+        Complex Out[9];
 #pragma unroll
-	for(int i=0; i<6; ++i) Out[i] = In[i];
+        for (int i=0; i<6; i++) Out[i] = Complex(in[2*i+0], in[2*i+1]);
 
         Out[6] = cmul(Out[2], Out[4]);
         Out[6] = cmac(Out[1], Out[5], -Out[6]);
@@ -1470,22 +1475,31 @@ namespace quda {
         Out[6] *= phase;
         Out[7] *= phase;
         Out[8] *= phase;
+
+#pragma unroll
+        for (int i=0; i<9; i++) {
+          out[2*i+0] = Out[i].real();
+          out[2*i+1] = Out[i].imag();
+        }
       }
 
       __device__ __host__ inline RegType getPhase(const RegType in[18]) const
       {
 #if 1 // phase from cross product
-        const Complex *In = reinterpret_cast<const Complex *>(in);
-        // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-        Complex denom = conj(In[0] * In[4] - In[1] * In[3]) / scale;
-        Complex expI3Phase = In[8] / denom;             // numerator = U[2][2]
-        RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
+        Complex In[9];
+#pragma unroll
+        for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
+	// denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
+	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) / scale;
+	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
+  RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
+
 #else // phase from determinant
         Matrix<Complex, 3> a;
 #pragma unroll
-	for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
-        const Complex det = getDeterminant(a);
-        RegType phase = arg(det) / 3;
+        for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
+        const Complex det = getDeterminant( a );
+        RegType phase = arg(det)/3;
 #endif
         return phase;
       }
@@ -1534,17 +1548,17 @@ namespace quda {
       for (int i=2; i<8; i++) out[i] = in[i];
     }
 
-    template <typename I>
+    template<typename I>
     __device__ __host__ inline void Unpack(
         RegType out[18], const RegType in[8], int idx, int dir, const RegType phase, const I *X, const int *R, const Complex scale, const Complex u) const
     {
-      const Complex *In = reinterpret_cast<const Complex*>(in);
-      Complex *Out = reinterpret_cast<Complex*>(out);
+
       RegType u0 = u.real();
       RegType u0_inv = u.imag();
 
+      Complex Out[9];
 #pragma unroll
-      for (int i=1; i<=3; i++) Out[i] = In[i]; // these elements are copied directly
+      for (int i=1; i<=3; i++) Out[i] = Complex(in[2*i+0], in[2*i+1]); // these elements are copied directly
 
       Trig<isFixed<Float>::value,RegType>::SinCos(in[0], &Out[0].y, &Out[0].x);
       Trig<isFixed<Float>::value,RegType>::SinCos(in[1], &Out[6].y, &Out[6].x);
@@ -1601,6 +1615,12 @@ namespace quda {
         Out[8] = cmac(u0*A, Out[2], Out[8]);
         Out[8] = -r_inv2*Out[8];
       }
+
+#pragma unroll
+      for (int i=0; i<9; i++) {
+        out[2*i+0] = Out[i].real();
+        out[2*i+1] = Out[i].imag();
+      }
     }
 
     template <typename I>
@@ -1637,7 +1657,9 @@ namespace quda {
     __device__ __host__ inline RegType getPhase(const RegType in[18]) const
     {
 #if 1 // phase from cross product
-      const Complex *In = reinterpret_cast<const Complex *>(in);
+      Complex In[9];
+      #pragma unroll
+      for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
       // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
       Complex denom = conj(In[0] * In[4] - In[1] * In[3]) * scale.imag();
       Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
@@ -1663,7 +1685,7 @@ namespace quda {
       // printf("Pack Reconstruct9-staggered phase NO ...\n");
       Complex su3[9];
 #pragma unroll
-      for (int i = 0; i < 9; i++) su3[i] = z * reinterpret_cast<const Complex *>(in)[i];
+      for (int i = 0; i < 9; i++) su3[i] = z * Complex(in[2*i+0], in[2*i+1]);
       reconstruct_8.Pack(out, reinterpret_cast<RegType *>(su3), idx);
     }
 
@@ -1679,7 +1701,11 @@ namespace quda {
       Complex z(cos_sin[0], cos_sin[1]);
       z *= scale.real();
 #pragma unroll
-      for (int i = 0; i < 9; i++) reinterpret_cast<Complex *>(out)[i] *= z;
+      for (int i = 0; i < 9; i++) {
+        Complex Out = Complex(out[2*i+0],out[2*i+1]) * z;
+        out[2*i+0] = Out.real();
+        out[2*i+1] = Out.imag();
+      };
     }
   };
 
@@ -1704,8 +1730,10 @@ namespace quda {
 
       __device__ __host__ inline RegType getPhase(const RegType in[18]) const {
 #if 1 // phase from cross product
-	const Complex *In = reinterpret_cast<const Complex*>(in);
-	// denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
+        Complex In[9];
+#pragma unroll
+        for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
+        // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
 	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) * scale.imag();
 	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
         RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
@@ -1721,8 +1749,9 @@ namespace quda {
 
       __device__ __host__ inline RegType getPhase2(const RegType in[18]) const
       {
+        Complex In[9];
 #if 1 // phase from cross product
-        const Complex *In = reinterpret_cast<const Complex *>(in);
+        for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
         // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
         Complex denom = conj(In[0] * In[4] - In[1] * In[3]) * scale.imag();
         Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
@@ -1740,11 +1769,13 @@ namespace quda {
       // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
       __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
 	RegType phase = getPhase(in);
-        // printf("Pack Reconstruct9-staggered phase milc ...\n");
-        Complex su3[9];
+
+	RegType su3[18];
 #pragma unroll
-        for (int i = 0; i < 9; i++) su3[i] = phase * reinterpret_cast<const Complex *>(in)[i];
-        reconstruct_8.Pack(out, reinterpret_cast<RegType *>(su3), idx);
+	for (int i=0; i<18; i++) {
+          su3[i] = phase * in[i];
+        }
+	reconstruct_8.Pack(out, su3, idx);
       }
 
       template<typename I>
@@ -1754,8 +1785,10 @@ namespace quda {
         reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)),
             Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)));
 #pragma unroll
-        for (int i = 0; i < 9; i++) reinterpret_cast<Complex *>(out)[i] *= phase;
+	for (int i=0; i<18; i++) {
+          out[i] = phase*in[1];        
       }
+    }
   };
 
   __host__ __device__ inline constexpr int ct_sqrt(int n, int i = 1){
