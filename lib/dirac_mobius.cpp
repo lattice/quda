@@ -540,7 +540,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
-    apply_fused_dslash(out, in, *gauge, out, in, mass, m5, b_5, c_5, 
+    mobius_tensor_core::apply_fused_dslash(out, in, *gauge, out, in, mass, m5, b_5, c_5, 
       dagger, parity, shift, halo_shift, scale, dslash4_dslash5pre_dslash5inv);
     
     long long Ls = in.X(4);
@@ -559,7 +559,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
-    apply_fused_dslash(out, in, *gauge, out, in, mass, m5, b_5, c_5, 
+    mobius_tensor_core::apply_fused_dslash(out, in, *gauge, out, in, mass, m5, b_5, c_5, 
       dagger, parity, shift, halo_shift, scale, dslash4dag_dslash5predag_dslash5invdag);
     
     long long Ls = in.X(4);
@@ -577,7 +577,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
-    apply_fused_dslash(out, in, *gauge, aux_out, aux_in, mass, m5, b_5, c_5, 
+    mobius_tensor_core::apply_fused_dslash(out, in, *gauge, aux_out, aux_in, mass, m5, b_5, c_5, 
       dagger, parity, shift, halo_shift, scale, dslash4_dslash5inv_dslash5invdag);
     
     long long Ls = in.X(4);
@@ -597,7 +597,7 @@ namespace quda {
     // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
-    apply_fused_dslash(out, in, *gauge, out, aux_in, mass, m5, b_5, c_5, 
+    mobius_tensor_core::apply_fused_dslash(out, in, *gauge, out, aux_in, mass, m5, b_5, c_5, 
       dagger, parity, shift, halo_shift, scale, dslash4dag_dslash5predag);
     
     long long Ls = in.X(4);
@@ -614,7 +614,7 @@ namespace quda {
     // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     
-    apply_fused_dslash(out, in, *gauge, out, in, mass, m5, b_5, c_5, 
+    mobius_tensor_core::apply_fused_dslash(out, in, *gauge, out, in, mass, m5, b_5, c_5, 
       dagger, parity, shift, halo_shift, scale, dslash5pre);
     
     long long Ls = in.X(4);
