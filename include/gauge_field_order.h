@@ -1736,7 +1736,7 @@ namespace quda {
         // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
 	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) * scale.imag();
 	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-        RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
+  RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
 #else // phase from determinant
 	Matrix<Complex,3> a;
 #pragma unroll
@@ -1786,7 +1786,7 @@ namespace quda {
             Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)));
 #pragma unroll
 	for (int i=0; i<18; i++) {
-          out[i] = phase*in[1];        
+          out[i] *= phase;        
       }
     }
   };
