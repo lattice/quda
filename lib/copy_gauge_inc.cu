@@ -38,9 +38,8 @@ namespace quda {
           typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9>::type G;
           copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
         }
-      }
 #endif
-      else {
+      } else {
         errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
       }
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
