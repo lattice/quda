@@ -7,26 +7,9 @@
 #include <quda_internal.h>
 #include <float_vector.h>
 #include <blas_quda.h>
+#include <blas_helper.cuh>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-
-#define checkSpinor(a, b)						\
-  {									\
-    if (a.Precision() != b.Precision())					\
-      errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision()); \
-    if (a.Length() != b.Length())					\
-      errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length()); \
-    if (a.Stride() != b.Stride())					\
-      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
-  }
-
-#define checkLength(a, b)						\
-  {									\
-    if (a.Length() != b.Length())					\
-      errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length()); \
-    if (a.Stride() != b.Stride())					\
-      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
-  }
 
 namespace quda {
 

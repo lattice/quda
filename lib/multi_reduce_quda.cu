@@ -1,4 +1,5 @@
 #include <blas_quda.h>
+#include <blas_helper.cuh>
 #include <tune_quda.h>
 #include <float_vector.h>
 #include <color_spinor_field_order.h>
@@ -38,13 +39,6 @@ template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 #undef MAX_MULTI_BLAS_N
 #define MAX_MULTI_BLAS_N 2
 #endif
-
-static void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
-  if (a.Length() != b.Length())
-    errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());
-  if (a.Stride() != b.Stride())
-    errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());
-}
 
 static struct {
   const char *vol_str;
