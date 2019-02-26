@@ -1,6 +1,7 @@
 #pragma once
 
 #include <color_spinor_field_order.h>
+#include <blas_helper.cuh>
 
 namespace quda {
 

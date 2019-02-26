@@ -133,9 +133,10 @@ namespace quda {
       Arg arg;
       doubleN *result;
 
+      std::vector<ColorSpinorField*> &x, &y, &z, &w;
+
       // don't curry into the Spinors to minimize parameter size
       char *Y_h[MAX_MULTI_BLAS_N], *W_h[MAX_MULTI_BLAS_N], *Ynorm_h[MAX_MULTI_BLAS_N], *Wnorm_h[MAX_MULTI_BLAS_N];
-      std::vector<ColorSpinorField*> &x, &y, &z, &w;
 
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
