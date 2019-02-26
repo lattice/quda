@@ -6,7 +6,6 @@
 #include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
 #include <kernels/reduce_core.cuh>
-#include <blas_helper.cuh>
 
 // These are used for reduction kernels
 static QudaSumFloat *d_reduce=0;

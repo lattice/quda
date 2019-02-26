@@ -53,6 +53,8 @@ namespace quda {
 #endif
       options.push_back( std::string("-D__COMPUTE_CAPABILITY__=") + std::to_string(__COMPUTE_CAPABILITY__) );
 
+      options.push_back( std::string("-DMAX_MULTI_BLAS_N=") + std::to_string(MAX_MULTI_BLAS_N) );
+
 #ifdef USE_TEXTURE_OBJECTS
       options.push_back( std::string("-DUSE_TEXTURE_OBJECTS") );
 #endif
