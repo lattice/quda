@@ -280,6 +280,10 @@
     kernel<256,__VA_ARGS__>						\
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);		\
     break;								\
+  case 288:								\
+    kernel<288,__VA_ARGS__>						\
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);		\
+    break;								\
   case 432:								\
     kernel<432,__VA_ARGS__>						\
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);		\
