@@ -364,7 +364,7 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
 	clover_mat(out, gauge, clover, in, kappa, dagger, precision, gauge_param);
 
 
-	bool asymmeric = ( matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC );
+	bool asymmetric = ( matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC );
 
 	void *inEven = in;
 	void *inOdd  = (char*)in + Vh*spinorSiteSize*precision;
@@ -376,7 +376,7 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
 		// apply a simple twist
 
 		// out_parity = out_parity -/+ i mu gamma_5
-		if ( matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ) {
+		if ( matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ) {
 			// out_e = out_e  -/+ i mu gamma5 in_e
 			applyTwist(outEven, inEven, outEven, (dagger ? -mu : mu), precision);
 
@@ -391,14 +391,14 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
 		// Symmetric case:  - i mu gamma_5 A^2 psi_in
 		void *tmp = malloc(Vh*spinorSiteSize*precision);
 
-		if ( matpcType == QUDA_MATPC_EVEN_EVEN ) {
+		if ( matpc_type == QUDA_MATPC_EVEN_EVEN ) {
 
 			// tmp = A_ee in_e
 			apply_clover(tmp, clover, inEven,0,precision);
 
 			// two factors of 2 for two clover applications => (1/4) mu
 			// out_e = out_e -/+ i gamma_5 mu A_ee (A_ee) in_ee
-			twistClover(outEven, tmp, outEven, clover, 0.25*mu, dagger, 0, precision);
+			twistClover(outEven, tmp, outEven, clover,  0.25*mu, dagger, 0, precision);
 
 		}
 		else {
@@ -417,11 +417,11 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
 void cloverHasenbuschTwist_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
               QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param) {
 
-	clover_matpc(out, gauge, clover, clover_inv, in, kappa, matpc_type, dagger, precision, gauge_param);
+	clover_matpc(out, gauge, clover, cInv, in, kappa, matpc_type, dagger, precision, gauge_param);
 
-	if( matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC ) {
+	if( matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD ) {
 		twistClover(out, in, out, clover, 0.5*mu, dagger,
-					(matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ? 0 : 1),precision);
+					(matpc_type == QUDA_MATPC_EVEN_EVEN ? 0 : 1),precision);
 	}
 	else {
 		applyTwist(out, in, out, (dagger ? -mu : mu), precision);

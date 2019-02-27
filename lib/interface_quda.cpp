@@ -967,7 +967,9 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   if (inv_param->clover_cpu_prec == QUDA_HALF_PRECISION)  errorQuda("Half precision not supported on CPU");
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded before clover");
-  if ((inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) && (inv_param->dslash_type != QUDA_TWISTED_CLOVER_DSLASH)) {
+  if ((inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH)
+		  && (inv_param->dslash_type != QUDA_TWISTED_CLOVER_DSLASH)
+		  && (inv_param->dslash_type != QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH)) {
     errorQuda("Wrong dslash_type %d in loadCloverQuda()", inv_param->dslash_type);
   }
 

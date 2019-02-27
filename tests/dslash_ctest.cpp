@@ -89,8 +89,7 @@ const char *recon_str[] = {"r18", "r12", "r8"};
 
 
 void init(int precision, QudaReconstructType link_recon) {
-
-  cuda_prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
+	cuda_prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
@@ -168,6 +167,7 @@ void init(int precision, QudaReconstructType link_recon) {
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
+
 #ifndef MULTI_GPU // free parameter for single GPU
   gauge_param.ga_pad = 0;
 #else // must be this one c/b face for multi gpu
@@ -188,6 +188,7 @@ void init(int precision, QudaReconstructType link_recon) {
 
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // test code only supports DeGrand-Rossi Basis
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
 
   if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
     switch(test_type) {
@@ -242,7 +243,7 @@ void init(int precision, QudaReconstructType link_recon) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
@@ -324,7 +325,7 @@ void init(int precision, QudaReconstructType link_recon) {
 
  spinor->Source(QUDA_RANDOM_SOURCE, 0);
 
- if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+ if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
     construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
@@ -342,7 +343,8 @@ void init(int precision, QudaReconstructType link_recon) {
   // printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(hostGauge, &gauge_param);
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     if (compute_clover) printfQuda("Computing clover field on GPU\n");
     else printfQuda("Sending clover field to GPU\n");
     inv_param.compute_clover = compute_clover;
@@ -450,7 +452,7 @@ void end() {
   freeGaugeQuda();
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
       free(hostClover);
       free(hostCloverInv);
     }
@@ -706,6 +708,8 @@ void dslashRef() {
       exit(-1);
     }
   } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+	  printfQuda("HASENBUCH_TWIST Test: kappa=%lf mu=%lf\n",
+			  inv_param.kappa, inv_param.mu); fflush(stdout);
 	  switch (test_type) {
 	  case 0:
 		  // My dslash should be the same as the clover dslash
@@ -740,7 +744,7 @@ void dslashRef() {
 		  cloverHasenbuchTwist_mat(spinorTmp->V(),hostGauge, hostClover, spinor->V(),
 				  inv_param.kappa, inv_param.mu, dagger, inv_param.cpu_prec, gauge_param,inv_param.matpc_type);
 		  cloverHasenbuchTwist_mat(spinorRef->V(),hostGauge, hostClover, spinorTmp->V(),
-				  inv_param.kappa, inv_param.mu, dagger, inv_param.cpu_prec, gauge_param,inv_param.matpc_type);
+				  inv_param.kappa, inv_param.mu, not_dagger, inv_param.cpu_prec, gauge_param,inv_param.matpc_type);
 
 		  break;
 	  default:
