@@ -866,7 +866,7 @@ namespace quda {
         TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*i + x);
         // now insert into output array
 #pragma unroll
-        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
+        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
         if ( isFixed<Float>::value ) {
 #pragma unroll
           for (int j=0; j<N; j++) v[i*N+j] *= nrm;
@@ -964,7 +964,7 @@ namespace quda {
       if (!huge_alloc) { // use textures unless we have a huge alloc
         TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity*tex_offset + stride*i + x);
 #pragma unroll
-        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
+        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
         if (isFixed<Float>::value ) {
 #pragma unroll
           for (int i=0; i<N; i++) v[i*N+j] *= nrm;
