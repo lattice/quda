@@ -449,12 +449,13 @@ namespace quda {
       typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false, bool block_float=false, bool use_tex=false>
       class FieldOrderCB {
 
+      typedef float norm_type;
     protected:
       complex<storeFloat> *v;
     const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
       // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
       union {
-        float *norm;
+        norm_type *norm;
         Float scale;
       };
       union {
@@ -463,7 +464,7 @@ namespace quda {
       };
 #ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
-      mutable float *ghost_norm[8];
+      mutable norm_type *ghost_norm[8];
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
@@ -507,8 +508,8 @@ namespace quda {
 
         if (block_float) {
           // only if we have block_float format do we set these (only block_orthogonalize.cu at present)
-          norm = static_cast<float*>(const_cast<void*>(field.Norm()));
-          norm_offset = field.NormBytes()/(2*sizeof(float));
+          norm = static_cast<norm_type*>(const_cast<void*>(field.Norm()));
+          norm_offset = field.NormBytes()/(2*sizeof(norm_type));
         }
       }
 
@@ -523,9 +524,9 @@ namespace quda {
         for (int dim=0; dim<4; dim++) {
           for (int dir=0; dir<2; dir++) {
           ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
-          ghost_norm[2*dim+dir] =
-              reinterpret_cast<float*>(static_cast<char*>(ghost_[2*dim+dir]) +
-                a.GhostNormOffset(dim,dir)*QUDA_SINGLE_PRECISION - a.GhostOffset(dim,dir)*sizeof(ghostFloat));
+          ghost_norm[2*dim+dir] = reinterpret_cast<norm_type*>
+            (static_cast<char*>(ghost_[2*dim+dir]) + a.GhostNormOffset(dim,dir)*sizeof(norm_type)
+             - a.GhostOffset(dim,dir)*sizeof(ghostFloat));
           }
         }
       }
@@ -786,12 +787,13 @@ namespace quda {
         typedef typename VectorType<Float,N>::type Vector;
         typedef typename VectorType<RegType,N>::type RegVector;
         typedef typename AllocType<huge_alloc>::type AllocInt;
+        typedef float norm_type;
         static constexpr int length = 2 * Ns * Nc;
         static constexpr int length_ghost = spin_project ? length/2 : length;
         static constexpr int M = length / N;
         static constexpr int M_ghost = spin_project ? M/2 : M;
         Float *field;
-        float *norm;
+        norm_type *norm;
         const AllocInt offset; // offset can be 32-bit or 64-bit
         const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
@@ -806,14 +808,14 @@ namespace quda {
         int faceVolumeCB[4];
         int stride;
         mutable Float *ghost[8];
-        mutable float *ghost_norm[8];
+        mutable norm_type *ghost_norm[8];
         int nParity;
         void *backup_h; //! host memory for backing up the field when tuning
         size_t bytes;
 
-      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0, bool override=false)
+      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, norm_type *norm_=0, Float **ghost_=0, bool override=false)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
-    norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
+    norm(norm_ ? norm_ : (norm_type*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(norm_type))),
 #ifdef USE_TEXTURE_OBJECTS
     tex(0), texNorm(0), tex_offset(offset/N),
 #endif
@@ -841,14 +843,14 @@ namespace quda {
       for (int dir=0; dir<2; dir++) {
         ghost[2*dim+dir] = static_cast<Float*>(ghost_[2*dim+dir]);
         ghost_norm[2*dim+dir] =
-        reinterpret_cast<float*>(static_cast<char*>(ghost_[2*dim+dir]) + nParity*length_ghost*faceVolumeCB[dim]*sizeof(Float));
+        reinterpret_cast<norm_type*>(static_cast<char*>(ghost_[2*dim+dir]) + nParity*length_ghost*faceVolumeCB[dim]*sizeof(Float));
       }
     }
   }
 
   __device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
 
-    RegType nrm;
+    norm_type nrm;
     if ( isFixed<Float>::value ) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
       // use textures unless we have a large alloc
@@ -888,11 +890,11 @@ namespace quda {
     RegType tmp[length];
 
     if ( isFixed<Float>::value ) {
-      RegType max_[length/2];
+      norm_type max_[length/2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-      for (int i=0; i<length/2; i++) max_[i] = fmaxf(fabsf(v[i]),fabsf(v[i+length/2]));
-      RegType scale = 0.0;
+      for (int i=0; i<length/2; i++) max_[i] = fmaxf(fabsf((norm_type)v[i]),fabsf((norm_type)v[i+length/2]));
+      norm_type scale = 0.0;
 #pragma unroll
       for (int i=0; i<length/2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
@@ -952,7 +954,7 @@ namespace quda {
 
   __device__ __host__ inline void loadGhost(RegType v[length_ghost], int x, int dim, int dir, int parity=0) const {
 
-    RegType nrm;
+    norm_type nrm;
     if ( isFixed<Float>::value ) {
       nrm = ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x];
     }
@@ -985,11 +987,11 @@ namespace quda {
     RegType tmp[length_ghost];
 
     if ( isFixed<Float>::value ) {
-      RegType max_[length_ghost/2];
+      norm_type max_[length_ghost/2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-      for (int i=0; i<length_ghost/2; i++) max_[i] = fmaxf(fabsf(v[i]),fabsf(v[i+length_ghost/2]));
-      RegType scale = 0.0;
+      for (int i=0; i<length_ghost/2; i++) max_[i] = fmaxf((norm_type)fabsf(v[i]),(norm_type)fabsf(v[i+length_ghost/2]));
+      norm_type scale = 0.0;
 #pragma unroll
       for (int i=0; i<length_ghost/2; i++) scale = fmaxf(max_[i], scale);
       ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x] = scale;
@@ -1069,7 +1071,9 @@ namespace quda {
     checkCudaError();
   }
 
-  size_t Bytes() const { return nParity * volumeCB * (Nc * Ns * 2 * sizeof(Float) + (typeid(Float) == typeid(short) ? sizeof(float) : 0)); }
+  size_t Bytes() const {
+    return nParity * volumeCB * (Nc* Ns * 2 * sizeof(Float) + (isFixed<Float>::value ? sizeof(norm_type) : 0));
+  }
   };
 
     /**

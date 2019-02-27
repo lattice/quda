@@ -202,10 +202,8 @@ namespace quda {
         .configure(tp.grid,tp.block,tp.shared_bytes,stream)
         .launch(arg);
 #else
-      switch (arg.xpay) {
-      case  true: instantiate<Launch,nDim,nColor, true>(tp, arg, stream); break;
-      case false: instantiate<Launch,nDim,nColor,false>(tp, arg, stream); break;
-      }
+      if (arg.xpay) instantiate<Launch,nDim,nColor, true>(tp, arg, stream);
+      else          instantiate<Launch,nDim,nColor,false>(tp, arg, stream);
 #endif
     }
 

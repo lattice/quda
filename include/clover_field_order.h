@@ -513,10 +513,11 @@ namespace quda {
 	typedef typename mapper<Float>::type RegType;
 	typedef typename VectorType<Float,N>::type Vector;
 	typedef typename AllocType<huge_alloc>::type AllocInt;
+        typedef float norm_type;
 	static const int M=length/(N*2); // number of short vectors per chiral block
 	static const int block=length/2; // chiral block size
 	Float *clover;
-	float *norm;
+	norm_type *norm;
 	const AllocInt offset; // offset can be 32-bit or 64-bit
 	const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
@@ -536,8 +537,8 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 	void *backup_norm_h; //! host memory for backing up norm when tuning
 
-      FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_=0, float *norm_=0, bool override=false)
-	: offset(clover.Bytes()/(2*sizeof(Float))), norm_offset(clover.NormBytes()/(2*sizeof(float))),
+      FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_=0, norm_type *norm_=0, bool override=false)
+	: offset(clover.Bytes()/(2*sizeof(Float))), norm_offset(clover.NormBytes()/(2*sizeof(norm_type))),
 #ifdef USE_TEXTURE_OBJECTS
 	  tex(0), normTex(0), tex_offset(offset/N),
 #endif
@@ -546,7 +547,7 @@ namespace quda {
 	  norm_bytes(clover.NormBytes()), backup_h(nullptr), backup_norm_h(nullptr)
 	{
 	  this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
-	  this->norm = norm_ ? norm_ : (float*)(clover.Norm(is_inverse));
+	  this->norm = norm_ ? norm_ : (norm_type*)(clover.Norm(is_inverse));
 #ifdef USE_TEXTURE_OBJECTS
 	  if (clover.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	    if (is_inverse) {
@@ -607,7 +608,7 @@ namespace quda {
 	 */
 	__device__ __host__ inline void load(RegType v[block], int x, int parity, int chirality) const {
 
-          RegType nrm;
+          norm_type nrm;
 	  if ( isFixed<Float>::value ) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	    nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity*norm_offset + chirality*stride + x) :
@@ -657,9 +658,9 @@ namespace quda {
 
 	  // find the norm of each chiral block
 	  if ( isFixed<Float>::value ) {
-            RegType scale = 0.0;
+            norm_type scale = 0.0;
 #pragma unroll
-	    for (int i=0; i<block; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
+	    for (int i=0; i<block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
 	    norm[parity*norm_offset + chirality*stride + x] = scale;
 
 #ifdef __CUDA_ARCH__
@@ -739,7 +740,7 @@ namespace quda {
 
 	size_t Bytes() const {
 	  size_t bytes = length*sizeof(Float);
-	  if ( isFixed<Float>::value ) bytes += 2*sizeof(float);
+	  if ( isFixed<Float>::value ) bytes += 2*sizeof(norm_type);
 	  return bytes;
 	}
       };

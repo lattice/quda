@@ -16,7 +16,7 @@
 
 namespace quda {
 
-  static void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b)
+  inline void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b)
   {
     if (a.Length() != b.Length())
       errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());
@@ -24,7 +24,7 @@ namespace quda {
       errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());
   }
 
-  static void checkLength(const ColorSpinorField &a, const ColorSpinorField &b)
+  inline void checkLength(const ColorSpinorField &a, const ColorSpinorField &b)
   {
     if (a.Length() != b.Length())
       errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());

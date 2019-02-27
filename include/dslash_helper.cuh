@@ -70,7 +70,7 @@ namespace quda {
     case EXTERIOR_KERNEL_Y:
       incomplete = incomplete || (arg.ghostDim[0] && (coord[0]==0 || coord[0]==(arg.dc.X[0]-1)));
     case EXTERIOR_KERNEL_X:
-      incomplete = incomplete;
+      break;
     }
 
     return !incomplete;
