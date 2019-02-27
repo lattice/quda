@@ -1,10 +1,11 @@
+#include <color_spinor_field_order.h>
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <color_spinor.h>
 
 namespace quda {
 
-#include <texture.h>
+#include <texture.h> // we need to convert this kernel to using colorspinor accessors
 
   // This is the maximum number of color spinors we can process in a single kernel
 #if (CUDA_VERSION < 8000)

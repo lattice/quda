@@ -1,10 +1,12 @@
 #ifndef _LATTICE_FIELD_H
 #define _LATTICE_FIELD_H
 
+#include <map>
 #include <quda.h>
 #include <iostream>
 #include <comm_quda.h>
-#include <map>
+#include <util_quda.h>
+#include <object.h>
 
 /**
  * @file lattice_field.h
@@ -706,6 +708,21 @@ namespace quda {
      @param reorder_location_ The location to set where data will be reordered
   */
   void reorder_location_set(QudaFieldLocation reorder_location_);
+
+  /**
+     @brief Helper function for setting auxilary string
+     @param[in] meta LatticeField used for querying field location
+     @return String containing location and compilation type
+   */
+  inline const char* compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION)
+  {
+    QudaFieldLocation location = (location_ == QUDA_INVALID_FIELD_LOCATION ? meta.Location() : location_);
+#ifdef JITIFY
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+#else
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+#endif
+  }
 
 } // namespace quda
 
