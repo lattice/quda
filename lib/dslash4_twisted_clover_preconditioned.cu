@@ -69,7 +69,7 @@ namespace quda {
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-	flops += clover_flops * in.GhostFace()[arg.kernel_type];
+	flops += clover_flops * 2 * in.GhostFace()[arg.kernel_type];
 	break;
       case EXTERIOR_KERNEL_ALL:
 	flops += clover_flops * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
