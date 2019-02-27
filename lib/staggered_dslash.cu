@@ -11,12 +11,14 @@
 #include <index_helper.cuh>
 #include <gauge_field.h>
 
-#include <kernels/dslash_staggered.cuh>
 namespace quda
 {
 #include <dslash_events.cuh>
 #include <dslash_policy.cuh>
 } // namespace quda
+
+#include <kernels/dslash_staggered.cuh>
+
 
 /**
    This is a staggered Dirac operator

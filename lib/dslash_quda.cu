@@ -58,6 +58,20 @@ namespace quda {
     cudaEvent_t scatterEnd[Nstream];
     cudaEvent_t dslashStart[2];
 
+    // these variables are used for benchmarking the dslash components in isolation
+    bool dslash_pack_compute;
+    bool dslash_interior_compute;
+    bool dslash_exterior_compute;
+    bool dslash_comms;
+    bool dslash_copy;
+
+    // whether the dslash policy tuner has been enabled
+    bool dslash_policy_init;
+
+    // used to keep track of which policy to start the autotuning
+    int first_active_policy;
+    int first_active_p2p_policy;
+
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
     Worker *aux_worker;
@@ -94,6 +108,16 @@ namespace quda {
 #endif
 
     checkCudaError();
+
+    dslash_pack_compute = true;
+    dslash_interior_compute = true;
+    dslash_exterior_compute = true;
+    dslash_comms = true;
+    dslash_copy = true;
+
+    dslash_policy_init = false;
+    first_active_policy = 0;
+    first_active_p2p_policy = 0;
   }
 
 

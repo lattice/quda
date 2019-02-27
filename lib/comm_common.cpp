@@ -680,6 +680,22 @@ bool comm_gdr_blacklist() {
   return blacklist;
 }
 
+const char* comm_config_string() {
+  static char config_string[16];
+  static bool config_init = false;
+
+  if (!config_init) {
+    strcpy(config_string, ",p2p=");
+    strcat(config_string, std::to_string(comm_peer2peer_enabled_global()).c_str());
+    strcat(config_string, ",gdr=");
+    strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
+    config_init = true;
+  }
+
+  return config_string;
+}
+
+
 static bool globalReduce = true;
 static bool asyncReduce = false;
 

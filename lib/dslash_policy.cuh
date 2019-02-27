@@ -9,13 +9,6 @@ void enableProfileCount();
 
 void setPolicyTuning(bool);
 
-// these variables are used for benchmarking the dslash components in isolation
-static bool dslash_pack_compute = true;
-static bool dslash_interior_compute = true;
-static bool dslash_exterior_compute = true;
-static bool dslash_comms = true;
-static bool dslash_copy = true;
-
 /**
  * Arrays used for the dynamic scheduling.
  */
@@ -99,6 +92,7 @@ namespace {
   */
   template <typename Dslash>
   inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, cudaStream_t *stream, bool gdr) {
+    using namespace dslash;
     for(int i=3; i>=0; i--){
       if (!dslash.dslashParam.commDim[i]) continue;
       for(int dir=1; dir>=0; dir--) {
@@ -1562,6 +1556,7 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
+    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
     
     auto &dslashParam = dslash.dslashParam;
@@ -1672,14 +1667,6 @@ namespace {
   }
 };
 
-  static bool dslash_init = false;
-
-  static int config = 0; // 3-bit number used to record the machine config (first bit for gdr / two bits for p2p) and if this changes we will force a retune
-
-  static int first_active_policy=static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
-
-  static int first_active_p2p_policy=static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
-
   void enable_policy(QudaDslashPolicy p){
     policies[static_cast<std::size_t>(p)] = p;
   }
@@ -1691,29 +1678,32 @@ namespace {
   template <typename Dslash>
   class DslashPolicyTune : public Tunable {
 
-   Dslash &dslash;
-   decltype(dslash.dslashParam) &dslashParam;
-   cudaColorSpinorField *in;
-   const int volume;
-   const int *ghostFace;
-   TimeProfile &profile;
+    Dslash &dslash;
+    decltype(dslash.dslashParam) &dslashParam;
+    cudaColorSpinorField *in;
+    const int volume;
+    const int *ghostFace;
+    int config;
+    TimeProfile &profile;
 
-   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-   bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
-   unsigned int sharedBytesPerThread() const { return 0; }
-   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
  public:
    DslashPolicyTune(Dslash &dslash, cudaColorSpinorField *in,
 		    const int volume, const int *ghostFace, TimeProfile &profile)
-     : dslash(dslash), dslashParam(dslash.dslashParam), in(in), volume(volume), ghostFace(ghostFace), profile(profile)
+     : dslash(dslash), dslashParam(dslash.dslashParam), in(in),
+       volume(volume), ghostFace(ghostFace), config(0), profile(profile)
    {
+     using namespace dslash;
      in->streamInit(streams);
 
-     if (!dslash_init) {
+     if (!dslash_policy_init) {
 
-       config += comm_gdr_enabled();
-       config += 2*comm_peer2peer_enabled_global();
+       first_active_policy=static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+       first_active_p2p_policy=static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
        if (comm_peer2peer_enabled_global() & 2) { // enable/disable p2p copy engine policy tuning
          p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)] = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
@@ -1773,11 +1763,9 @@ namespace {
 	   enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH);
 	 }
 
-#ifdef USE_TEXTURE_OBJECTS
          // pure zero-copy policies require texture objects
 	 enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH);
 	 enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH);
-#endif
 
 	 // Async variants are only supported on CUDA 8.0 and up
 #if (CUDA_VERSION >= 8000) && 0
@@ -1913,19 +1901,13 @@ namespace {
        enableProfileCount();
        setPolicyTuning(true);
      }
-     dslash_init = true;
+     dslash_policy_init = true;
    }
 
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
    void apply(const cudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-     if (config != tp.aux.w && comm_size() > 1) {
-       errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "
-		 "this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.",
-		 config, tp.aux.w);
-     }
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
      if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
@@ -1966,6 +1948,7 @@ namespace {
    // Find the best dslash policy
    bool advanceAux(TuneParam &param) const
    {
+     using namespace dslash;
      while ((unsigned)param.aux.x < policies.size()-1) {
        param.aux.x++;
        if (policies[param.aux.x] != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) return true;
@@ -1984,13 +1967,15 @@ namespace {
    bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
 
    void initTuneParam(TuneParam &param) const  {
+     using namespace dslash;
      Tunable::initTuneParam(param);
-     param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0; param.aux.w = config;
+     param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0;
    }
 
    void defaultTuneParam(TuneParam &param) const  {
+     using namespace dslash;
      Tunable::defaultTuneParam(param);
-     param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0; param.aux.w = config;
+     param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0;
    }
 
    TuneKey tuneKey() const {
@@ -1998,6 +1983,7 @@ namespace {
      dslashParam.kernel_type = KERNEL_POLICY;
      TuneKey key = dslash.tuneKey();
      strcat(key.aux,comm_dim_topology_string());
+     strcat(key.aux,comm_config_string()); // any change in P2P/GDR will be stored as a separate tunecache entry
      dslashParam.kernel_type = kernel_type;
      return key;
    }
