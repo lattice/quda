@@ -437,7 +437,7 @@ namespace quda {
     void initConstants();
     */
   protected:
-	double m5;
+	double mu;
 
 
   public:
@@ -446,32 +446,9 @@ namespace quda {
     virtual ~DiracCloverHasenbuschTwist();
     DiracCloverHasenbuschTwist& operator=(const DiracCloverHasenbuschTwist &dirac);
 
-    // Evauate 
-    //   A_pp( 1 + i mu gamma_5 A_pp ) + k D_p\bar{p} if undaggered
-    //   A_pp( 1 - i mu gamma_5 A_pp ) + k D^\dagger_p\bar{p} if daggered
-    virtual void DslashXpTwistY(ColorSpinorField &out, const ColorSpinorField &in, 
-			const QudaParity parity, const ColorSpinorField &x,
-			const double &k) const;
-
-    // Inherit -- but want to make sure that we don't add in any twists now.
-    /*
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-    			    const ColorSpinorField &x, const double &k) const;
-    */
-
-    // if MATPC_EVEN_EVEN: 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
-
-    // Inherit
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    // These are Nops for the unprec op so we can inhert them too.
-    //
-    // virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-    //			 ColorSpinorField &x, ColorSpinorField &b,
-    //			 const QudaSolutionType) const;
-    //virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-    //			     const QudaSolutionType) const;
 
     /**
      * @brief Create the coarse clover operator
@@ -489,7 +466,7 @@ namespace quda {
   // Even-odd preconditioned clover
    class DiracCloverHasenbuschTwistPC : public DiracCloverPC {
    protected:
-	  double m5;
+	  double mu;
 
    public:
      DiracCloverHasenbuschTwistPC(const DiracParam &param);
@@ -522,18 +499,6 @@ namespace quda {
      // squared op
      void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-     // Inherit prepare
-#if 0
-     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
- 		 ColorSpinorField &x, ColorSpinorField &b,
- 		 const QudaSolutionType) const;
-#endif
-
-     // inherit reconstruct
-#if 0
-     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
- 		     const QudaSolutionType) const;
-#endif
      /**
       * @brief Create the coarse even-odd preconditioned clover
       * operator.  Unlike the Wilson operator, the coarsening of the

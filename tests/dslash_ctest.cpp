@@ -705,6 +705,48 @@ void dslashRef() {
       printfQuda("Test type not defined\n");
       exit(-1);
     }
+  } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+	  switch (test_type) {
+	  case 0:
+		  // My dslash should be the same as the clover dslash
+		  clover_dslash(spinorRef->V(), hostGauge, hostCloverInv, spinor->V(), parity, dagger, inv_param.cpu_prec, gauge_param);
+		  break;
+	  case 1:
+		  // my matpc op
+		  cloverHasenbuschTwist_matpc(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv,
+				  	  inv_param.kappa, inv_param.mu, inv_param.matpc_type, dagger,
+					  inv_param.cpu_prec, gauge_param);
+
+		  break;
+	  case 2:
+		  // my mat
+		  cloverHasenbuchTwist_mat(spinorRef->V(),hostGauge, hostClover, spinor->V(),
+				  inv_param.kappa, inv_param.mu, dagger, inv_param.cpu_prec, gauge_param,inv_param.matpc_type);
+		  break;
+	  case 3:
+		  // matpc^\dagger matpc
+		  // my matpc op
+		  cloverHasenbuschTwist_matpc(spinorTmp->V(), hostGauge, spinor->V(), hostClover, hostCloverInv,
+				  	  inv_param.kappa, inv_param.mu, inv_param.matpc_type, dagger,
+					  inv_param.cpu_prec, gauge_param);
+
+		  cloverHasenbuschTwist_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), hostClover, hostCloverInv,
+				  	  inv_param.kappa, inv_param.mu, inv_param.matpc_type, not_dagger,
+					  inv_param.cpu_prec, gauge_param);
+
+		  break;
+	  case 4:
+		  // my mat
+		  cloverHasenbuchTwist_mat(spinorTmp->V(),hostGauge, hostClover, spinor->V(),
+				  inv_param.kappa, inv_param.mu, dagger, inv_param.cpu_prec, gauge_param,inv_param.matpc_type);
+		  cloverHasenbuchTwist_mat(spinorRef->V(),hostGauge, hostClover, spinorTmp->V(),
+				  inv_param.kappa, inv_param.mu, dagger, inv_param.cpu_prec, gauge_param,inv_param.matpc_type);
+
+		  break;
+	  default:
+		  printfQuda("Test type not defined\n");
+		  exit(-1);
+	  }
   } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     switch (test_type) {
       case 0:

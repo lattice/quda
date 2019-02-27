@@ -376,13 +376,11 @@ namespace quda {
    ********/
 
   DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracParam &param)
-    : DiracClover(param), m5(param.m5)
-  {
-	  printfQuda("Creating DiracCloverHasenbuschTwist m5=%lf\n",m5);
-  }
+    : DiracClover(param), mu(param.mu)
+  { }
 
   DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracCloverHasenbuschTwist &dirac) 
-    : DiracClover(dirac), m5(dirac.m5)
+    : DiracClover(dirac), mu(dirac.mu)
   { }
 
   DiracCloverHasenbuschTwist::~DiracCloverHasenbuschTwist() { }
@@ -392,98 +390,43 @@ namespace quda {
     if (&dirac != this) {
       DiracWilson::operator=(dirac);
       clover = dirac.clover;
-      m5 = dirac.m5;
+      mu = dirac.mu;
     }
     return *this;
   }
 
 
-  /* Inherited */
-  /*
-  void DiracCloverHasenbuschTwist::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
-  {
-    Dirac::checkParitySpinor(out, in);
-
-    if (out.Volume() != clover.VolumeCB()) {
-      errorQuda("Parity spinor volume %d doesn't match clover checkboard volume %d",
-		out.Volume(), clover.VolumeCB());
-    }
-  }
-  */
-
-  /** Applies the operator (A+i mu Gamma_5 + k D) */
-  /* Inheritd but I want to inhibit adding the twist...*/
-
-  void DiracCloverHasenbuschTwist::DslashXpTwistY(ColorSpinorField &out, const ColorSpinorField &in, 
-			       const QudaParity parity, const ColorSpinorField &x,
-			       const double &k) const
-  {
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-      
-#ifndef USE_LEGACY_DSLASH
-    ApplyWilsonCloverHasenbuschTwist(out, in, *gauge, clover, k, m5,x, parity, dagger, commDim, profile);
-#else
-    errorQuda("Not implemented: DiracCloverHasenbuschTwist is not implemented for USE_LEGACY_DSLASH");
-#endif
-
-    // FIXME: This FLOPS needs correcting.
-    flops += 1872ll*in.Volume();
-  }
-
-  /** Applies the operator (A + k D) */
-  /* Inheritd but I want to inhibit adding the twist...*/
-  /*
-  void DiracCloverHasenbuschTwist::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-			       const QudaParity parity, const ColorSpinorField &x,
-			       const double &k) const
-  {
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-      
-#ifndef USE_LEGACY_DSLASH
-    ApplyWilsonClover(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover);
-      asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-			   &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
-    } else {
-      errorQuda("Not implemented");
-    }
-#endif
-
-    flops += 1872ll*in.Volume();
-  }
-  */
-
-  // Inherited
-  /*
-  void DiracCloverHasenbuschTwist::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
-  {
-    checkParitySpinor(in, out);
-    ApplyClover(out, in, clover, false, parity);
-    flops += 504ll*in.Volume();
-  }
-  */
-
   void DiracCloverHasenbuschTwist::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
+	  bool asymmetric = ( matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC ) || (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC );
 
+	  if( ! asymmetric ) {
 #ifndef USE_LEGACY_DSLASH
-    if ( matpcType == QUDA_MATPC_EVEN_EVEN ) {
-      printfQuda("Applying EVEN EVEN\n");
-      ApplyWilsonCloverHasenbuschTwist(out.Even(),in.Odd(),*gauge,clover, -kappa, m5, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,profile);
-      ApplyWilsonClover(out.Odd(), in.Even(), *gauge, clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
-    }
-    else {
-      printfQuda("Applying Odd Odd\n");
-      ApplyWilsonClover(out.Even(),in.Odd(),*gauge,clover,-kappa,in.Even(),QUDA_EVEN_PARITY,dagger,commDim,profile);
-      ApplyWilsonCloverHasenbuschTwist(out.Odd(),in.Even(),*gauge,clover, -kappa, m5, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
+		  if ( matpcType == QUDA_MATPC_EVEN_EVEN ) {
+			  // printfQuda("Applying EVEN EVEN\n");
+			  ApplyWilsonCloverHasenbuschTwist(out.Even(),in.Odd(),*gauge,clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,profile);
+			  ApplyWilsonClover(out.Odd(), in.Even(), *gauge, clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
+		  }
+		  else {
+			  // printfQuda("Applying Odd Odd\n");
+			  ApplyWilsonClover(out.Even(),in.Odd(),*gauge,clover,-kappa,in.Even(),QUDA_EVEN_PARITY,dagger,commDim,profile);
+			  ApplyWilsonCloverHasenbuschTwist(out.Odd(),in.Even(),*gauge,clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
 
-    }
+		  }
+	  }
+	  else {
+		  if ( matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC ) {
 
+			  // printfQuda("Applying Odd Odd\n");
+			  ApplyWilsonClover(out.Even(),in.Odd(),*gauge,clover,-kappa,in.Even(),QUDA_EVEN_PARITY,dagger,commDim,profile);
+			  ApplyWilsonClover(out.Odd(),in.Even(),*gauge,clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
+		  }
+	     else {
+		        // printfQuda("Applying EVEN EVEN\n");
+	    	 ApplyWilsonClover(out.Even(),in.Odd(),*gauge,clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,profile);
+	    	 ApplyWilsonClover(out.Odd(), in.Even(), *gauge, clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
+	     }
+	  }
     // FIXME: This is wrong
     flops += 1872ll*in.Volume();
 #else
@@ -504,29 +447,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  // Inherit
-  /*
-  void DiracCloverHasenbuschTwist::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b, 
-			    const QudaSolutionType solType) const
-  {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      errorQuda("Preconditioned solution requires a preconditioned solve_type");
-    }
 
-    src = &b;
-    sol = &x;
-  }
-  */
-
-  // Inherit
-  /*
-  void DiracCloverHasenbuschTwist::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
-  {
-    // do nothing
-  }
-  */
 
   void DiracCloverHasenbuschTwist::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 				   double kappa, double mass, double mu, double mu_factor) const {
@@ -541,10 +462,10 @@ namespace quda {
    * ********************************************* */
 
   DiracCloverHasenbuschTwistPC::DiracCloverHasenbuschTwistPC(const DiracParam &param) :
-      DiracCloverPC(param), m5(param.m5) {}
+      DiracCloverPC(param), mu(param.mu) {}
 
     DiracCloverHasenbuschTwistPC::DiracCloverHasenbuschTwistPC(const DiracCloverHasenbuschTwistPC &dirac)
-    	: DiracCloverPC(dirac), m5(dirac.m5) { }
+    	: DiracCloverPC(dirac), mu(dirac.mu) { }
 
     DiracCloverHasenbuschTwistPC::~DiracCloverHasenbuschTwistPC() { }
 
@@ -552,7 +473,7 @@ namespace quda {
     {
       if (&dirac != this) {
         DiracCloverPC::operator=(dirac);
-        m5 = dirac.m5;
+        mu = dirac.mu;
       }
       return *this;
     }
@@ -607,7 +528,7 @@ namespace quda {
         // DiracCloverHasenbuschTwistPC::Dslash applies A^{-1}Dslash
         Dslash(*tmp1, in, parity[0]);
         // DiracClover::DslashXpay applies (A - kappa^2 D)-
-        DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2, m5);
+        DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2, mu);
       } else if (!dagger) { // symmetric preconditioning
         // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
         // where A is actually a clover inverse.
@@ -616,7 +537,7 @@ namespace quda {
         Dslash(*tmp1, in, parity[0]);
 
         // Then x + AD (AD)
-        DslashXpayTwistClovInv(out, *tmp1, parity[1], in, kappa2, m5);
+        DslashXpayTwistClovInv(out, *tmp1, parity[1], in, kappa2, mu);
       } else { // symmetric preconditioning, dagger
 
         // This is the dagger: 1 - DADA
@@ -625,7 +546,7 @@ namespace quda {
         // ii) Apply A D => ADA
         Dslash(*tmp1, out, parity[0]);
         // iii) Apply  x + D(ADA)
-        DslashXpayTwistNoClovInv(out, *tmp1, parity[1], in, kappa2, m5);
+        DslashXpayTwistNoClovInv(out, *tmp1, parity[1], in, kappa2, mu);
       }
 
       deleteTmp(&tmp1, reset1);
