@@ -366,8 +366,8 @@ extern "C" {
 
     /** What type of Dirac operator we are using **/
     /** If !(use_norm_op) && !(use_dagger) use M. **/
-    /** If use_dagger, use Mdag  instead of M. **/
-    /** If use_norm_op, use MdagM instead of M. **/
+    /** If use_dagger, use Mdag **/
+    /** If use_norm_op, use MdagM **/
     /** If use_norm_op && use_dagger use MMdag. **/    
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
@@ -378,6 +378,9 @@ extern "C" {
     /** Which part of the spectrum to solve **/
     QudaEigSpectrumType spectrum;
 
+    /** Whether or not this instance will be used to deflate an inverter */    
+    QudaBoolean deflate;
+    
     /** Size of the eigenvector search space **/
     int nEv;
     /** Total size of Krylov space **/

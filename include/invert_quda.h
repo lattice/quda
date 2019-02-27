@@ -1,10 +1,10 @@
-#ifndef _INVERT_QUDA_H
-#define _INVERT_QUDA_H
+#pragma once
 
 #include <quda.h>
 #include <quda_internal.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
+#include <eigensolve_quda.h>
 #include <vector>
 #include <memory>
 
@@ -44,15 +44,24 @@ namespace quda {
      *
      * p.residual_type = (QudaResidualType) (QUDA_L2_RELATIVE_RESIDUAL
      *                                     | QUDA_HEAVY_QUARK_RESIDUAL);
-     */
+     */    
     QudaResidualType residual_type;
 
+    /**< Used to define deflation */
+    QudaEigParam eig_param;
+    
+    /**< Deflation eigenvectors */
+    std::vector<ColorSpinorField*> evecs;
+    
+    /**< Deflation eigenvalues */
+    std::vector<Complex> evals;
+    
     /**< Whether to use an initial guess in the solver or not */
     QudaUseInitGuess use_init_guess;
-
+    
     /**< Whether to solve linear system with zero RHS */
     QudaComputeNullVector compute_null_vector;
-
+    
     /**< Reliable update tolerance */
     double delta;
 
@@ -222,9 +231,11 @@ namespace quda {
 
     /**
        Default constructor
-     */
-    SolverParam() : compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
+     */    
+  SolverParam() : compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
       compute_true_res(true), sloppy_converge(false), verbosity_precondition(QUDA_SILENT), mg_instance(false) { ; }
+    
+    //evals(evals), evecs(nullptr),  
 
     /**
        Constructor that matches the initial values to that of the
@@ -271,7 +282,7 @@ namespace quda {
 
     SolverParam(const SolverParam &param) : inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
-      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      residual_type(param.residual_type), eig_param(param.eig_param), use_init_guess(param.use_init_guess),
       compute_null_vector(param.compute_null_vector), delta(param.delta),
       use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
@@ -345,15 +356,20 @@ namespace quda {
 
   };
 
-  //DMH KATE
+  
   class Solver {
 
+    friend class EigenSolver;
+    
   protected:
     SolverParam &param;
     TimeProfile &profile;
     int node_parity;
-
+    bool deflated;
+    EigenSolver *eig_solver;
+    
   public:
+    
     Solver(SolverParam &param, TimeProfile &profile);
     virtual ~Solver() { ; }
 
@@ -361,6 +377,8 @@ namespace quda {
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
+
+    
     /**
        Solver factory
     */
@@ -435,11 +453,11 @@ namespace quda {
     virtual double flops() const { return 0; }
   };
 
-
+  
   /**
      @brief  Conjugate-Gradient Solver.
    */
-  //DMH KATE
+  
   class CG : public Solver {
 
   private:
@@ -448,8 +466,9 @@ namespace quda {
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
     std::vector<ColorSpinorField*> p;
-    bool init;
-
+    bool init;    
+    bool deflate_init;
+    
   public:
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
@@ -1158,4 +1177,3 @@ namespace quda {
 
 } // namespace quda
 
-#endif // _INVERT_QUDA_H

@@ -632,25 +632,29 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
 
+  QudaInvertParam inv_param = newQudaInvertParam();
+  setInvertParam(inv_param);
+  
   QudaMultigridParam mg_param = newQudaMultigridParam();
-
   //Set sub structures
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
   for(int i=0; i<mg_levels; i++) {
     mg_eig_param[i] = newQudaEigParam();
     setEigParam(mg_eig_param[i], i);
+    //If on the coarse level, give the invert param too
+    //for the deflated solver
+    if (i == mg_levels-1 && deflate_coarsest) {
+      mg_eig_param[i].invert_param = &inv_param;
+    }
     mg_param.eig_param[i] = &mg_eig_param[i];
   }
   //Set MG
   mg_param.invert_param = &mg_inv_param;
   setMultigridParam(mg_param);
-
-  QudaInvertParam inv_param = newQudaInvertParam();
-  setInvertParam(inv_param);
-
+  
   display_test_info();
-
+  
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
 

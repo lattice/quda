@@ -15,13 +15,14 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
+#include <eigensolve_quda.h>
 
 namespace quda {
 
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), yp(nullptr), rp(nullptr),
     rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
-    rSloppyp(nullptr), xSloppyp(nullptr), init(false)
+    rSloppyp(nullptr), xSloppyp(nullptr), init(false), deflate_init(false)
   {
 
   }
@@ -135,6 +136,7 @@ namespace quda {
   CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(mat.Expose()),
     bp(nullptr), init(false) {
+    
   }
 
   CGNR::~CGNR() {
@@ -157,7 +159,6 @@ namespace quda {
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       bp = ColorSpinorField::Create(csParam);
-
       init = true;
     }
 
@@ -262,6 +263,41 @@ namespace quda {
       init = true;
     }
 
+    std::vector<ColorSpinorField*> tempy;
+    
+    //Once the CG operator is called, we are able to construct an appropriate
+    //Krylov space for deflation
+    if (param.eig_param.deflate && !deflate_init) {
+      //Deflation requested + first instance of solver
+      printfQuda("Flag 1\n");
+      EigenSolver *eig_solver_lc = EigenSolver::create(&param.eig_param,
+						       *mat.Expose(),
+						       profile);
+
+      std::vector<ColorSpinorField*> B_evecs;
+      ColorSpinorParam csParam(*tmpp);
+      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      //This is the vector precision used by matResidual
+      csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+      
+      for (int i=0; i<param.eig_param.nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
+      
+      printfQuda("Flag 2\n");
+      //param.evecs.resize(param.eig_param.nKr);
+      printfQuda("Flag 4\n");
+      param.evals.resize(param.eig_param.nEv);
+      printfQuda("Flag 5\n");
+      for (int i=0; i<param.eig_param.nKr; i++) {
+	B_evecs.push_back(ColorSpinorField::Create(csParam));
+	if(i<param.eig_param.nEv) param.evals[i] = 0.0;
+      }
+      printfQuda("Flag 6\n");
+      (*eig_solver_lc)(B_evecs, param.evals);
+      deflate_init = true;
+    }
+    
+    
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
@@ -768,7 +804,7 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   if(!rnewp) {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    //ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
   }
 
   ColorSpinorField &r = *rp;
@@ -1161,7 +1197,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if(!rnewp) {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    //ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
   }
 
   ColorSpinorField &r = *rp;

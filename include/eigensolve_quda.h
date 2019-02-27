@@ -146,6 +146,35 @@ namespace quda {
     
   };
 
+  class DeflationEigenSolver : public EigenSolver {
+    
+  private:
+    EigenSolver *eig_solver;
+    const Dirac &dirac;
+    const char *prefix;
+
+  public:
+  DeflationEigenSolver(EigenSolver &eig_solver, const Dirac &dirac, QudaEigParam &eig_param, TimeProfile &profile, const char *prefix)
+    : EigenSolver(&eig_param, profile), eig_solver(&eig_solver), dirac(dirac), prefix(prefix) { }
+    virtual ~DeflationEigenSolver() { delete eig_solver; }
+
+    void operator()(std::vector<ColorSpinorField*> &evecs,
+		    std::vector<Complex> evals) {
+
+      setOutputPrefix(prefix);
+
+      //ColorSpinorField *out=nullptr;
+      //ColorSpinorField *in=nullptr;
+
+      (*eig_solver)(evecs, evals);
+
+      setOutputPrefix("");
+      
+    }
+  };
+
+
+  
   void irlmSolve(std::vector<ColorSpinorField*> kSpace,
 		 std::vector<Complex> &evals, const Dirac &mat,
 		 QudaEigParam *eig_param);

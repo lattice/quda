@@ -155,6 +155,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(nEv, 0);
   P(nKr, 0);
   P(nConv, 0);
+  P(deflate, QUDA_BOOLEAN_NO);
   P(check_interval, 0);
   P(max_restarts, 0);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
@@ -169,6 +170,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(nEv, INVALID_INT);
   P(nKr, INVALID_INT);
   P(nConv, INVALID_INT);
+  P(deflate, QUDA_BOOLEAN_INVALID);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
   P(extlib_type, QUDA_EXTLIB_INVALID);

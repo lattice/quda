@@ -13,6 +13,7 @@ namespace quda {
     // compute parity of the node
     for (int i=0; i<4; i++) node_parity += commCoords(i);
     node_parity = node_parity % 2;
+    
   }
 
   // solver factory
@@ -21,6 +22,7 @@ namespace quda {
   {
     Solver *solver = nullptr;
 
+       
     if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER)
       errorQuda("Explicit preconditoner not supported for %d solver", param.inv_type);
 

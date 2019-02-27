@@ -17,7 +17,7 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
-bool flags = false;
+bool flags = true;
 
 namespace quda {
   
@@ -240,17 +240,19 @@ namespace quda {
     bool *locked = (bool*)malloc((nKr)*sizeof(bool));
     for(int i=0; i<nKr; i++) locked[i] = false;
 
-    if(flags) printfQuda("Flag 1\n");
+    if(flags) printfQuda("EV Flag 1\n");
 
     //Create the device side residual vector by cloning
     //the kSpace passed to the function. We create a
     //vector of one element. In future, we may wish to
     //make a block eigensolver, so a vector structure will be needed.
     std::vector<ColorSpinorField*> r;
+    if(flags) printfQuda("EV Flag 1.1\n");
     ColorSpinorParam csParam(*kSpace[0]);
+    if(flags) printfQuda("EV Flag 1.2\n");
     r.push_back(ColorSpinorField::Create(csParam));
 
-    if(flags) printfQuda("Flag 2\n");
+    if(flags) printfQuda("EV Flag 2\n");
 
     //Device side space for Lanczos Ritz vector basis rotation.
     std::vector<ColorSpinorField*> d_vecs_tmp;
@@ -258,7 +260,7 @@ namespace quda {
       d_vecs_tmp.push_back(ColorSpinorField::Create(csParam));
     }
 
-    if(flags) printfQuda("Flag 3\n");
+    if(flags) printfQuda("EV Flag 3\n");
 
     //Part of the spectrum to be computed.
     char *spectrum;
@@ -293,7 +295,7 @@ namespace quda {
     }
     //---------------------------------------------------------------------------
 
-    if(flags) printfQuda("Flag 4\n");
+    if(flags) printfQuda("EV Flag 4\n");
 
     // Implictly Restarted Lanczos Method for Symmetric Eigenvalue Problems
     //---------------------------------------------------------------------------
@@ -349,7 +351,7 @@ namespace quda {
     time = -clock();
     for(k=0; k<nEv; k++) {
       lanczosStep(mat, kSpace, r, d_vecs_tmp, locked, eig_param, alpha, beta, k);
-      if(flags) printfQuda("Flag k=%d\n", k);
+      if(flags) printfQuda("EV Flag k=%d\n", k);
     }
     printfQuda("Initial %d step factorisation complete\n", k);
     time += clock();
@@ -362,7 +364,7 @@ namespace quda {
       time = -clock();
       for(k=nEv; k<nKr; k++) {
 	lanczosStep(mat, kSpace, r, d_vecs_tmp, locked, eig_param, alpha, beta, k);
-	if(flags) printfQuda("Flag k=%d\n", k);
+	if(flags) printfQuda("EV Flag k=%d\n", k);
       }
       if(flags) printfQuda("Restart %d complete\n", restart_iter+1);
       time += clock();
@@ -559,7 +561,6 @@ namespace quda {
 
 	printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter+1);
 
-	/*
 	//Check that the lowest nConv Eigenpairs have converged.
 	bool all_locked = true;
 	if(num_converged >= nConv) {
@@ -577,7 +578,6 @@ namespace quda {
 	    converged = true;
 	  }
 	}
-	*/
 	time += clock();
 	time_c += time;
 
@@ -1151,7 +1151,7 @@ namespace quda {
     bool *locked = (bool*)malloc((nKr)*sizeof(bool));
     for(int i=0; i<nKr; i++) locked[i] = false;
 
-    if(flags) printfQuda("Flag 1\n");
+    if(flags) printfQuda("EV Flag 1\n");
 
     //Create the device side residual vector by cloning
     //the kSpace passed to the function. We create a
@@ -1161,7 +1161,7 @@ namespace quda {
     ColorSpinorParam csParam(*kSpace[0]);
     r.push_back(ColorSpinorField::Create(csParam));
 
-    if(flags) printfQuda("Flag 2\n");
+    if(flags) printfQuda("EV Flag 2\n");
 
     //Device side space for Lanczos Ritz vector basis rotation.
     std::vector<ColorSpinorField*> d_vecs_tmp;
@@ -1169,7 +1169,7 @@ namespace quda {
       d_vecs_tmp.push_back(ColorSpinorField::Create(csParam));
     }
 
-    if(flags) printfQuda("Flag 3\n");
+    if(flags) printfQuda("EV Flag 3\n");
 
     //Part of the spectrum to be computed.
     char *spectrum;
@@ -1204,7 +1204,7 @@ namespace quda {
     }
     //---------------------------------------------------------------------------
 
-    if(flags) printfQuda("Flag 4\n");
+    if(flags) printfQuda("EV Flag 4\n");
 
     // Implictly Restarted Lanczos Method for Symmetric Eigenvalue Problems
     //---------------------------------------------------------------------------
@@ -1260,7 +1260,7 @@ namespace quda {
     time = -clock();
     for(k=0; k<nEv; k++) {
       lanczosStep<Float>(mat, kSpace, r, d_vecs_tmp, locked, eig_param, alpha, beta, k);
-      if(flags) printfQuda("Flag k=%d\n", k);
+      if(flags) printfQuda("EV Flag k=%d\n", k);
     }
     printfQuda("Initial %d step factorisation complete\n", k);
     time += clock();
@@ -1273,7 +1273,7 @@ namespace quda {
       time = -clock();
       for(k=nEv; k<nKr; k++) {
 	lanczosStep<Float>(mat, kSpace, r, d_vecs_tmp, locked, eig_param, alpha, beta, k);
-	if(flags) printfQuda("Flag k=%d\n", k);
+	if(flags) printfQuda("EV Flag k=%d\n", k);
       }
       if(flags) printfQuda("Restart %d complete\n", restart_iter+1);
       time += clock();

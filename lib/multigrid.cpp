@@ -94,14 +94,14 @@ namespace quda {
     } else {
       //We're on the coarsest grid. Create eigenvectors for deflation
       if (param.mg_global.deflate_coarsest) {
-	if (strcmp(param.mg_global.vec_infile,"") !=0 ) { // only load if infile is defined and not computing
-	  loadVectors(param.B);
-	} else {
-	  printfQuda("Running Eigensolver on level %d\n", param.level+1);
-	  generateEigenVectors(); //Run the eigensolver
-	  //temporary check that the null vectors are populated and normalised
-	  //for(unsigned int j=0; j<param.B.size(); j++) printfQuda("NV norm %f\n", sqrt(blas::norm2(*(param.B[j]))));
-	}
+	//if (strcmp(param.mg_global.vec_infile,"") !=0 ) { // only load if infile is defined and not computing
+	//loadVectors(param.B);
+	//} else {
+	//printfQuda("Running Eigensolver on level %d\n", param.level+1);
+	//generateEigenVectors(); //Run the eigensolver
+	//temporary check that the null vectors are populated and normalised
+	//for(unsigned int j=0; j<param.B.size(); j++) printfQuda("NV norm %f\n", sqrt(blas::norm2(*(param.B[j]))));
+	//}
       }      
     }      
     
@@ -417,6 +417,8 @@ namespace quda {
 
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;  
       if(param.mg_global.deflate_coarsest) {
+	param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel-1];
+	param_coarse_solver->eig_param.deflate = QUDA_BOOLEAN_YES;
 	param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       }
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
@@ -822,7 +824,7 @@ namespace quda {
 
         // recurse to the next lower level
 	if(param.level == param.Nlevel-2 && param.mg_global.deflate_coarsest) {
-	  
+	  /*
 	  
 	  //Deflate the residual injected into coarsest grid solve
 	  //==============================================================
@@ -853,8 +855,14 @@ namespace quda {
 	  //copy back to x_coarse
 	  *x_coarse = *x_coarse_defl;
 	  delete x_coarse_defl;
+	  */
+	  //printfQuda("before inv x_coarse = %e r_coarse_tmp = %e\n", norm2(*x_coarse), norm2(*r_coarse));	  
+	  (*coarse_solver)(*x_coarse, *r_coarse); 
+	  setOutputPrefix(prefix); // restore prefix after return from coarse grid
+	  if ( debug ) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
+	  
 	} else {
-	  printfQuda("before inv x_coarse = %e r_coarse_tmp = %e\n", norm2(*x_coarse), norm2(*r_coarse));	  
+	  //printfQuda("before inv x_coarse = %e r_coarse_tmp = %e\n", norm2(*x_coarse), norm2(*r_coarse));	  
 	  (*coarse_solver)(*x_coarse, *r_coarse); 
 	  setOutputPrefix(prefix); // restore prefix after return from coarse grid
 	  if ( debug ) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));

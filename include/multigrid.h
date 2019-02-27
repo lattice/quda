@@ -1,5 +1,4 @@
-#ifndef _MG_QUDA_H
-#define _MG_QUDA_H
+#pragma once
 
 #include <invert_quda.h>
 #include <transfer.h>
@@ -454,7 +453,7 @@ namespace quda {
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field
-     @param Yhat[out] Preconditioned coarse link field
+     @param Yhat[out] Preconidtioned coarse link field
      @param Xinv[out] Coarse clover inverse field
      @param Y[in] Coarse link field
      @param X[in] Coarse clover field
@@ -508,4 +507,4 @@ namespace quda {
 
 } // namespace quda
 
-#endif // _MG_QUDA_H
+
