@@ -283,9 +283,12 @@ namespace quda {
       int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
       int ghost_flops = (num_mv_multiply * mv_flops + 2*in.Ncolor()*in.Nspin());
       int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
-      int num_dir = 2*in.Ndim();
+      int num_dir = 2 * 4; // set to 4-d since we take care of 5-d fermions in derived classes where necessary
 
       long long flops_ = 0;
+
+      // FIXME - should we count the xpay flops in the derived kernels
+      // since some kernels require the xpay in the exterior (preconditiond clover)
 
       switch(arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
@@ -322,16 +325,16 @@ namespace quda {
       return flops_;
     }
 
-    long long bytes() const
+    virtual long long bytes() const
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
-      int proj_spinor_bytes = in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;
       int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + 2*spinor_bytes; // 2 since we have to load the partial
-      int num_dir = 2 * in.Ndim(); // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
+      int num_dir = 2 * 4; // set to 4-d since we take care of 5-d fermions in derived classes where necessary
 
-      long long bytes_=0;
+      long long bytes_ = 0;
 
       switch(arg.kernel_type) {
       case EXTERIOR_KERNEL_X:

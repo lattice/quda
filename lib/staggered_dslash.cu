@@ -29,7 +29,7 @@ namespace quda
 
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct StaggeredLaunch {
-    static constexpr const char *kernel = "quda::staggeredGPU"; // kernel name for jit compilation 
+    static constexpr const char *kernel = "quda::staggeredGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
@@ -44,22 +44,6 @@ protected:
     Arg &arg;
     const ColorSpinorField &in;
 
-    // TODO: fix flop / byte count?
-
-    /*
-        long long flops() const
-        {
-          return (2*nDim*(8*nColor*nColor)-2*nColor + (arg.xpay ? 2*2*nColor : 0) )*arg.nParity*(long long)in.VolumeCB();
-        }
-        long long bytes() const
-        {
-          return arg.out.Bytes() + 2*nDim*arg.in.Bytes() + arg.nParity*2*nDim*arg.U.Bytes()*in.VolumeCB() +
-      (arg.xpay ? arg.x.Bytes() : 0);
-        }
-
-        bool tuneGridDim() const { return false; }
-        unsigned int minThreads() const { return arg.volumeCB; }
-    */
 public:
     Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"), arg(arg), in(in) {}
 
@@ -76,6 +60,113 @@ public:
           Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor, true>(tp, arg, stream);
         else
           Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor, false>(tp, arg, stream);
+      }
+    }
+
+    /*
+      per direction / dimension flops
+      SU(3) matrix-vector flops = (8 Nc - 2) * Nc
+      xpay = 2 * 2 * Nc * Ns
+
+      So for the full dslash we have
+      flops = (2 * 2 * Nd * (8*Nc-2) * Nc)  +  ((2 * 2 * Nd - 1) * 2 * Nc * Ns)
+      flops_xpay = flops + 2 * 2 * Nc * Ns
+
+      For Asqtad this should give 1146 for Nc=3,Ns=2 and 1158 for the axpy equivalent
+    */
+    long long flops() const
+    {
+      if (!arg.improved) {
+        return Dslash<Float>::flops();
+      } else {
+        int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
+        int ghost_flops = (3 + 1) * (mv_flops + 2*in.Ncolor()*in.Nspin());
+        int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
+        int num_dir = 2 * 4; // hard code factor of 4 in direction since fields may be 5-d
+
+        long long flops_ = 0;
+
+        switch(arg.kernel_type) {
+        case EXTERIOR_KERNEL_X:
+        case EXTERIOR_KERNEL_Y:
+        case EXTERIOR_KERNEL_Z:
+        case EXTERIOR_KERNEL_T:
+          flops_ = ghost_flops * 2 * in.GhostFace()[arg.kernel_type];
+          break;
+        case EXTERIOR_KERNEL_ALL:
+          {
+            long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
+            flops_ = ghost_flops * ghost_sites;
+            break;
+          }
+        case INTERIOR_KERNEL:
+        case KERNEL_POLICY:
+          {
+            long long sites = in.Volume();
+            flops_ = (2*num_dir*mv_flops +                              // SU(3) matrix-vector multiplies
+                      (2*num_dir-1)*2*in.Ncolor()*in.Nspin()) * sites;  // accumulation
+            if (arg.xpay) flops_ += xpay_flops * sites;                 // axpy is always on interior
+
+            if (arg.kernel_type == KERNEL_POLICY) break;
+            // now correct for flops done by exterior kernel
+            long long ghost_sites = 0;
+            for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+            flops_ -= ghost_flops * ghost_sites;
+
+            break;
+          }
+        }
+        return flops_;
+      }
+    }
+
+    long long bytes() const
+    {
+      if (!arg.improved) {
+        return Dslash<Float>::bytes();
+      } else {
+        int gauge_bytes_fat = QUDA_RECONSTRUCT_NO * in.Precision();
+        int gauge_bytes_long = arg.reconstruct * in.Precision();
+        bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
+        int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+        int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat) +
+          3 * 2 * spinor_bytes; // last term is the accumulator load/store through the face
+        int num_dir = 2 * 4; // set to 4-d since we take care of 5-d fermions in derived classes where necessary
+
+        long long bytes_ = 0;
+
+        switch(arg.kernel_type) {
+        case EXTERIOR_KERNEL_X:
+        case EXTERIOR_KERNEL_Y:
+        case EXTERIOR_KERNEL_Z:
+        case EXTERIOR_KERNEL_T:
+          bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type];
+          break;
+        case EXTERIOR_KERNEL_ALL:
+          {
+            long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
+            bytes_ = ghost_bytes * ghost_sites;
+            break;
+          }
+        case INTERIOR_KERNEL:
+        case KERNEL_POLICY:
+          {
+            long long sites = in.Volume();
+            bytes_ = (num_dir*(gauge_bytes_fat + gauge_bytes_long) + // gauge reads
+                      num_dir*2*spinor_bytes +                       // spinor reads
+                      spinor_bytes)*sites;                           // spinor write
+            if (arg.xpay) bytes_ += spinor_bytes;
+
+            if (arg.kernel_type == KERNEL_POLICY) break;
+            // now correct for bytes done by exterior kernel
+            long long ghost_sites = 0;
+            for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
+            bytes_ -= ghost_bytes * ghost_sites;
+
+            break;
+          }
+        }
+        return bytes_;
       }
     }
 
