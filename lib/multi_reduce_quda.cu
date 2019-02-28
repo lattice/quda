@@ -129,8 +129,7 @@ namespace quda {
     private:
       const int NYW;
       int nParity;
-      typedef MultiReduceArg<NXZ,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Reducer> Arg;
-      Arg arg;
+      MultiReduceArg<NXZ,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Reducer> arg;
       doubleN *result;
 
       std::vector<ColorSpinorField*> &x, &y, &z, &w;

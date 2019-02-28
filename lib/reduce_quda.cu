@@ -162,8 +162,7 @@ namespace quda {
 
     private:
       const int nParity; // for composite fields this includes the number of composites
-      typedef ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> Arg;
-      mutable Arg arg;
+      mutable ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg;
       doubleN &result;
 
       const ColorSpinorField &x, &y, &z, &w, &v;

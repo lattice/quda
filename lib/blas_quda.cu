@@ -30,8 +30,7 @@ class BlasCuda : public Tunable {
 
 private:
   const int nParity; // for composite fields this includes the number of composites
-  typedef BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Functor> Arg;
-  mutable Arg arg;
+  mutable BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Functor> arg;
 
   const ColorSpinorField &x, &y, &z, &w, &v;
 
@@ -84,7 +83,7 @@ public:
 #ifdef JITIFY
     using namespace jitify::reflection;
     jitify_error = program->kernel("quda::blas::blasKernel")
-      .instantiate(Type<FloatN>(),M,Type<Arg>())
+      .instantiate(Type<FloatN>(),M,Type<decltype(arg)>())
       .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
     blasKernel<FloatN,M> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);

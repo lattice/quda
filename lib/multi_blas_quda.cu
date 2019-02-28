@@ -49,8 +49,7 @@ namespace quda {
     private:
       const int NYW;
       const int nParity;
-      typedef MultiBlasArg<NXZ,SpinorX,SpinorY,SpinorZ,SpinorW,Functor> Arg;
-      mutable Arg arg;
+      mutable MultiBlasArg<NXZ,SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg;
       const coeff_array<T> &a, &b, &c;
 
       std::vector<ColorSpinorField*> &x, &y, &z, &w;
@@ -104,7 +103,7 @@ namespace quda {
 #ifdef JITIFY
         using namespace jitify::reflection;
         auto instance = program->kernel("quda::blas::multiBlasKernel")
-          .instantiate(Type<FloatN>(),M,NXZ,Type<Arg>());
+          .instantiate(Type<FloatN>(),M,NXZ,Type<decltype(arg)>());
 
         // FIXME - if NXZ=1 no need to copy entire array
         // FIXME - do we really need strided access here?
