@@ -207,7 +207,7 @@ namespace quda {
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     printfQuda("Stopping condition: %le\n", stop);
 
-    double4 *local_reduce = new double3[2];//to keep double3 or double4 registers
+    double3 *local_reduce = new double3[2];//to keep double3 or double4 registers
 
     double alpha = 0.0, beta = 0.0, alpha_old = 0.0, gamma_old = 0.0, eta = 0.0;
 

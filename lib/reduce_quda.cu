@@ -872,7 +872,7 @@ namespace quda {
 				 norm2_<scalar> (sum[0].z, r);
 				 norm2_<scalar> (sum[1].x, s);
          norm2_<scalar> (sum[1].y, z);
-         dot_<scalar>   (sum[1].z, s, u);				 
+         dot_<scalar>   (sum[1].z, s, u);
     }
 
       __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
@@ -884,7 +884,7 @@ namespace quda {
       static int flops() { return (16+6); } //! flops per real element
     };
 
-		void pipePCGRRMergedOp(double4 *buffer, const int buffer_size, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, ColorSpinorField &r, ColorSpinorField &s,
+		void pipePCGRRMergedOp(double3 *buffer, const int buffer_size, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, ColorSpinorField &r, ColorSpinorField &s,
 																ColorSpinorField &m, const double &b, ColorSpinorField &q,
 							ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
 			if (x.Precision() != p.Precision()) {
@@ -892,7 +892,7 @@ namespace quda {
 			}
 			if(buffer_size != 2) errorQuda("Incorrect buffer size. \n");
 
-			reduce::reduceCudaExp<2, double3, QudaSumFloat4,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,1,1,false>
+			reduce::reduceCudaExp<2, double3, QudaSumFloat3,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,1,1,false>
 					(buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
 			return;
 		}
