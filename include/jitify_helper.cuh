@@ -55,6 +55,10 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
       options.push_back( std::string("-DUSE_TEXTURE_OBJECTS") );
 #endif
+#ifdef DYNAMIC_CLOVER
+      options.push_back( std::string("-DDYNAMIC_CLOVER") );
+#endif
+
 #ifdef DEVICE_DEBUG
       options.push_back( std::string("-G") );
 #endif
