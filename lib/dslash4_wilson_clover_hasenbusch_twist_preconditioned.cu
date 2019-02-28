@@ -51,7 +51,7 @@ namespace quda {
     };
 
     /* ***************************
-  	  * No Clov Inv
+  	  * No Clov Inv:  1 - k^2 D - i mu gamma_5 A
   	  * **************************/
   template <typename Float, int nDim, int nColor, typename Arg>
     class WilsonCloverHasenbuschTwistNoClovInv : public Dslash<Float> {
@@ -75,46 +75,72 @@ namespace quda {
         else errorQuda("Wilson-clover hasenbusch twist no clover operator only defined for xpay=true");
       }
 
-      // Fixme get this right
       long long flops() const {
-        int clover_flops = 504;
-        long long flops = Dslash<Float>::flops();
-        switch(arg.kernel_type) {
-        case EXTERIOR_KERNEL_X:
-        case EXTERIOR_KERNEL_Y:
-        case EXTERIOR_KERNEL_Z:
-        case EXTERIOR_KERNEL_T:
-        case EXTERIOR_KERNEL_ALL:
-  	break; // all clover flops are in the interior kernel
-        case INTERIOR_KERNEL:
-        case KERNEL_POLICY:
-  	flops += clover_flops * in.Volume();
-  	break;
-        }
-        return flops;
-      }
+        	int clover_flops = 504;
+        	long long flops = Dslash<Float>::flops();
+        	switch(arg.kernel_type) {
+        	case EXTERIOR_KERNEL_X:
+        	case EXTERIOR_KERNEL_Y:
+        	case EXTERIOR_KERNEL_Z:
+        	case EXTERIOR_KERNEL_T:
+        		// 2 from fwd / back face * 1 clover terms:
+        		// there is no A^{-1}D only D
+        		// there is one clover_term and 48 is the - mu (igamma_5) A
+        		flops += 2*(clover_flops + 48) * in.GhostFace()[arg.kernel_type];
+        		break;
+        	case EXTERIOR_KERNEL_ALL:
+        		flops += 2*(clover_flops + 48) * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
+        		break;
+        	case INTERIOR_KERNEL:
+        	case KERNEL_POLICY:
+        		flops += (clover_flops + 48) * in.Volume();
 
-      // Fixme: Get this right
-      long long bytes() const {
-        bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-        int clover_bytes = 72 * in.Precision() + (isFixed ? 2*sizeof(float) : 0);
 
-        long long bytes = Dslash<Float>::bytes();
-        switch(arg.kernel_type) {
-        case EXTERIOR_KERNEL_X:
-        case EXTERIOR_KERNEL_Y:
-        case EXTERIOR_KERNEL_Z:
-        case EXTERIOR_KERNEL_T:
-        case EXTERIOR_KERNEL_ALL:
-  	break;
-        case INTERIOR_KERNEL:
-        case KERNEL_POLICY:
-  	bytes += clover_bytes*in.Volume();
-  	break;
+        		if (arg.kernel_type == KERNEL_POLICY) break;
+        		// now correct for flops done by exterior kernel
+        		long long ghost_sites = 0;
+        		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+        		flops -= (clover_flops + 48) * ghost_sites;
+
+        		break;
+        	}
+        	return flops;
         }
 
-        return bytes;
-      }
+        long long bytes() const {
+        	bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
+        	int clover_bytes = 72 * in.Precision() + (isFixed ? 2*sizeof(float) : 0);
+
+        	long long bytes = Dslash<Float>::bytes();
+        	switch(arg.kernel_type) {
+        	case EXTERIOR_KERNEL_X:
+        	case EXTERIOR_KERNEL_Y:
+        	case EXTERIOR_KERNEL_Z:
+        	case EXTERIOR_KERNEL_T:
+        		// Factor of 2 is from the fwd/back faces.
+        		bytes += clover_bytes * 2 * in.GhostFace()[arg.kernel_type];
+        		break;
+        	case EXTERIOR_KERNEL_ALL:
+        		// Factor of 2 is from the fwd/back faces
+        		bytes += clover_bytes * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
+        		break;
+        	case INTERIOR_KERNEL:
+        	case KERNEL_POLICY:
+
+        		bytes += clover_bytes*in.Volume();
+
+        		if (arg.kernel_type == KERNEL_POLICY) break;
+        		// now correct for bytes done by exterior kernel
+        		long long ghost_sites = 0;
+        		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
+        		bytes -= clover_bytes * ghost_sites;
+
+        		break;
+        	}
+
+        	return bytes;
+        }
+
 
       TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
     };
@@ -212,6 +238,8 @@ namespace quda {
 #ifdef GPU_CLOVER_DIRAC
     /* ***************************
      * Clov Inv
+     *
+     * M = psi_p - k^2 A^{-1} D_p\not{p} - i mu gamma_5 A_{pp} psi_{p}
      * **************************/
     template <typename Float, int nDim, int nColor, typename Arg>
       class WilsonCloverHasenbuschTwistClovInv : public Dslash<Float> {
@@ -235,45 +263,74 @@ namespace quda {
           else errorQuda("Wilson-clover hasenbusch twist no clover operator only defined for xpay=true");
         }
 
-        // Fixme get this right
         long long flops() const {
-          int clover_flops = 504;
-          long long flops = Dslash<Float>::flops();
-          switch(arg.kernel_type) {
-          case EXTERIOR_KERNEL_X:
-          case EXTERIOR_KERNEL_Y:
-          case EXTERIOR_KERNEL_Z:
-          case EXTERIOR_KERNEL_T:
-          case EXTERIOR_KERNEL_ALL:
-    	break; // all clover flops are in the interior kernel
-          case INTERIOR_KERNEL:
-          case KERNEL_POLICY:
-    	flops += clover_flops * in.Volume();
-    	break;
-          }
-          return flops;
+        	int clover_flops = 504;
+        	long long flops = Dslash<Float>::flops();
+        	switch(arg.kernel_type) {
+        	case EXTERIOR_KERNEL_X:
+        	case EXTERIOR_KERNEL_Y:
+        	case EXTERIOR_KERNEL_Z:
+        	case EXTERIOR_KERNEL_T:
+        		// 2 from fwd / back face * 2 clover terms:
+        		// one clover_term from the A^{-1}D
+        		// second clover_term and 48 is the - mu (igamma_5) A
+        		flops += 2*(2*clover_flops + 48) * in.GhostFace()[arg.kernel_type];
+        		break;
+        	case EXTERIOR_KERNEL_ALL:
+        		flops += 2*(2*clover_flops + 48) * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
+        		break;
+        	case INTERIOR_KERNEL:
+        	case KERNEL_POLICY:
+        		flops += (2*clover_flops + 48) * in.Volume();
+
+
+        		if (arg.kernel_type == KERNEL_POLICY) break;
+        		// now correct for flops done by exterior kernel
+        		long long ghost_sites = 0;
+        		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+        		flops -= (2*clover_flops + 48) * ghost_sites;
+
+        		break;
+        	}
+        	return flops;
         }
 
-        // Fixme: Get this right
         long long bytes() const {
-          bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-          int clover_bytes = 72 * in.Precision() + (isFixed ? 2*sizeof(float) : 0);
+        	bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
+        	int clover_bytes = 72 * in.Precision() + (isFixed ? 2*sizeof(float) : 0);
 
-          long long bytes = Dslash<Float>::bytes();
-          switch(arg.kernel_type) {
-          case EXTERIOR_KERNEL_X:
-          case EXTERIOR_KERNEL_Y:
-          case EXTERIOR_KERNEL_Z:
-          case EXTERIOR_KERNEL_T:
-          case EXTERIOR_KERNEL_ALL:
-    	break;
-          case INTERIOR_KERNEL:
-          case KERNEL_POLICY:
-    	bytes += clover_bytes*in.Volume();
-    	break;
-          }
+        	// if we use dynamic clover we read only A (even for A^{-1}
+        	// otherwise we read both A and A^{-1}
+        	int dyn_factor = arg.dynamic_clover ? 1 : 2;
 
-          return bytes;
+        	long long bytes = Dslash<Float>::bytes();
+        	switch(arg.kernel_type) {
+        	case EXTERIOR_KERNEL_X:
+        	case EXTERIOR_KERNEL_Y:
+        	case EXTERIOR_KERNEL_Z:
+        	case EXTERIOR_KERNEL_T:
+        		// Factor of 2 is from the fwd/back faces.
+        		bytes += dyn_factor * clover_bytes * 2 * in.GhostFace()[arg.kernel_type];
+        		break;
+        	case EXTERIOR_KERNEL_ALL:
+        		// Factor of 2 is from the fwd/back faces
+        		bytes += dyn_factor * clover_bytes * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
+        		break;
+        	case INTERIOR_KERNEL:
+        	case KERNEL_POLICY:
+
+        		bytes += dyn_factor *  clover_bytes*in.Volume();
+
+        		if (arg.kernel_type == KERNEL_POLICY) break;
+        		// now correct for bytes done by exterior kernel
+        		long long ghost_sites = 0;
+        		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
+        		bytes -= dyn_factor * clover_bytes * ghost_sites;
+
+        		break;
+        	}
+
+        	return bytes;
         }
 
         TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }

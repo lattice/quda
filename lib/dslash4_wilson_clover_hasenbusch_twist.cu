@@ -74,7 +74,11 @@ namespace quda {
 	break; // all clover flops are in the interior kernel
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
-	flops += clover_flops * in.Volume();	  
+    	  flops += clover_flops * in.Volume();
+    	  if( arg.twist ) {
+    		  // -mu * (i gamma_5 A) (A x)
+    		  flops += ((clover_flops+48)*in.Volume());
+    	  }
 	break;
       }
       return flops;
@@ -94,7 +98,8 @@ namespace quda {
 	break;
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
-	bytes += clover_bytes*in.Volume();
+    	  // No extra bytes from twist
+    	  bytes += clover_bytes*in.Volume();
 	break;
       }
 

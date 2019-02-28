@@ -68,62 +68,62 @@ namespace quda {
     }
 
     long long flops() const {
-      int clover_flops = 504;
-      long long flops = Dslash<Float>::flops();
-      switch(arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-	flops += clover_flops * in.GhostFace()[arg.kernel_type];
-	break;
-      case EXTERIOR_KERNEL_ALL:
-	flops += clover_flops * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-	break;
-      case INTERIOR_KERNEL:
-      case KERNEL_POLICY:
-	flops += clover_flops * in.Volume();	  
+    	int clover_flops = 504;
+    	long long flops = Dslash<Float>::flops();
+    	switch(arg.kernel_type) {
+    	case EXTERIOR_KERNEL_X:
+    	case EXTERIOR_KERNEL_Y:
+    	case EXTERIOR_KERNEL_Z:
+    	case EXTERIOR_KERNEL_T:
+    		flops += 2* clover_flops * in.GhostFace()[arg.kernel_type];
+    		break;
+    	case EXTERIOR_KERNEL_ALL:
+    		flops += 2* clover_flops * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
+    		break;
+    	case INTERIOR_KERNEL:
+    	case KERNEL_POLICY:
+    		flops += clover_flops * in.Volume();
 
-	if (arg.kernel_type == KERNEL_POLICY) break;
-	// now correct for flops done by exterior kernel
-	long long ghost_sites = 0;
-	for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
-	flops -= clover_flops * ghost_sites;
-	
-	break;
-      }
-      return flops;
+    		if (arg.kernel_type == KERNEL_POLICY) break;
+    		// now correct for flops done by exterior kernel
+    		long long ghost_sites = 0;
+    		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+    		flops -= clover_flops * ghost_sites;
+
+    		break;
+    	}
+    	return flops;
     }
 
     long long bytes() const {
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int clover_bytes = 72 * in.Precision() + (isFixed ? 2*sizeof(float) : 0);
+    	bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
+    	int clover_bytes = 72 * in.Precision() + (isFixed ? 2*sizeof(float) : 0);
 
-      long long bytes = Dslash<Float>::bytes();
-      switch(arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-	bytes += clover_bytes * 2 * in.GhostFace()[arg.kernel_type];
-	break;
-      case EXTERIOR_KERNEL_ALL:
-	bytes += clover_bytes * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-	break;
-      case INTERIOR_KERNEL:
-      case KERNEL_POLICY:
-	bytes += clover_bytes*in.Volume();
+    	long long bytes = Dslash<Float>::bytes();
+    	switch(arg.kernel_type) {
+    	case EXTERIOR_KERNEL_X:
+    	case EXTERIOR_KERNEL_Y:
+    	case EXTERIOR_KERNEL_Z:
+    	case EXTERIOR_KERNEL_T:
+    		bytes += clover_bytes * 2 * in.GhostFace()[arg.kernel_type];
+    		break;
+    	case EXTERIOR_KERNEL_ALL:
+    		bytes += clover_bytes * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
+    		break;
+    	case INTERIOR_KERNEL:
+    	case KERNEL_POLICY:
+    		bytes += clover_bytes*in.Volume();
 
-	if (arg.kernel_type == KERNEL_POLICY) break;
-	// now correct for bytes done by exterior kernel
-	long long ghost_sites = 0;
-	for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
-	bytes -= clover_bytes * ghost_sites;
-	
-	break;
-      }
+    		if (arg.kernel_type == KERNEL_POLICY) break;
+    		// now correct for bytes done by exterior kernel
+    		long long ghost_sites = 0;
+    		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
+    		bytes -= clover_bytes * ghost_sites;
 
-      return bytes;
+    		break;
+    	}
+
+    	return bytes;
     }
 
     TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
