@@ -236,6 +236,7 @@ namespace quda {
       composite_descr.norm_bytes  = norm_bytes;
 
       volume *= composite_descr.dim;
+      volumeCB *= composite_descr.dim;
       stride *= composite_descr.dim;
       length *= composite_descr.dim;
       real_length *= composite_descr.dim;
