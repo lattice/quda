@@ -870,9 +870,9 @@ namespace quda {
          dot_<scalar>   (sum[0].x, r, u);
          dot_<scalar>   (sum[0].y, w, u);
 				 norm2_<scalar> (sum[0].z, r);
-         dot_<scalar>   (sum[0].w, s, u);
 				 norm2_<scalar> (sum[1].x, s);
          norm2_<scalar> (sum[1].y, z);
+         dot_<scalar>   (sum[1].z, s, u);				 
     }
 
       __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
@@ -892,7 +892,7 @@ namespace quda {
 			}
 			if(buffer_size != 2) errorQuda("Incorrect buffer size. \n");
 
-			reduce::reduceCudaExp<2, double4, QudaSumFloat4,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,1,1,false>
+			reduce::reduceCudaExp<2, double3, QudaSumFloat4,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,1,1,false>
 					(buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
 			return;
 		}

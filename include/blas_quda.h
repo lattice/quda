@@ -110,7 +110,7 @@ namespace quda {
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
 
-		void pipePCGRRMergedOp(double4 *buffer, const int buffer_size, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u,
+		void pipePCGRRMergedOp(double3 *buffer, const int buffer_size, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u,
 														ColorSpinorField &r, ColorSpinorField &s, ColorSpinorField &m, const double &b, ColorSpinorField &q, ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z);
 
 

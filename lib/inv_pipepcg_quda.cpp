@@ -207,12 +207,12 @@ namespace quda {
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     printfQuda("Stopping condition: %le\n", stop);
 
-    double4 *local_reduce = new double4[2];//to keep double3 or double4 registers
+    double4 *local_reduce = new double3[2];//to keep double3 or double4 registers
 
     double alpha = 0.0, beta = 0.0, alpha_old = 0.0, gamma_old = 0.0, eta = 0.0;
 
-    double &gamma = local_reduce[0].x, &delta = local_reduce[0].y, &mNorm = local_reduce[0].z, &tau = local_reduce[0].w;
-    double &sigma = local_reduce[1].x, &zeta  = local_reduce[1].y;
+    double &gamma = local_reduce[0].x, &delta = local_reduce[0].y, &mNorm = local_reduce[0].z;
+    double &sigma = local_reduce[1].x, &zeta  = local_reduce[1].y, &tau   = local_reduce[1].z;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -232,7 +232,7 @@ namespace quda {
 
     blas::flops = 0;
 
-    double *recvbuff   = new double[12];
+    double *recvbuff   = new double[6];
     MPI_Request request_handle;
     //
     commGlobalReductionSet(false);
@@ -252,10 +252,10 @@ namespace quda {
     commGlobalReductionSet(true);
 
     //Start async communications:
-    MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 4, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
+    MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
     matSloppy(n, m, tmp_sloppy);
     MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
-    memcpy(local_reduce, recvbuff, 4*sizeof(double));
+    memcpy(local_reduce, recvbuff, 3*sizeof(double));
 
     // START zero iteration:
     eta   = delta;
@@ -274,12 +274,13 @@ namespace quda {
 
     commGlobalReductionSet(false);
 
+    gamma_old = gamma;
     gamma = blas::reDotProduct(r_sloppy,u);
     delta = blas::reDotProduct(w,u);
-    tau   = blas::reDotProduct(s,u);
     mNorm = blas::norm2(u);
     sigma = blas::norm2(s);
     zeta  = blas::norm2(z);
+    tau   = blas::reDotProduct(s,u);
 
     if(K) {
       rPre = n;
