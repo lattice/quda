@@ -413,6 +413,9 @@ namespace quda {
 			  ApplyWilsonCloverHasenbuschTwist(out.Odd(),in.Even(),*gauge,clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
 
 		  }
+
+		  // 2 Applies of DiracClover + (1-imu gamma_5 A)psi_{!p}
+		  flops += 2*1872ll*in.Volume()+(48ll + 504ll)*in.VolumeCB();
 	  }
 	  else {
 		  if ( matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC ) {
@@ -426,9 +429,9 @@ namespace quda {
 	    	 ApplyWilsonClover(out.Even(),in.Odd(),*gauge,clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,profile);
 	    	 ApplyWilsonClover(out.Odd(), in.Even(), *gauge, clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
 	     }
+		  // 2 Applies of DiracClover + (1-imu gamma_5)psi_{!p}
+		  flops += 2*1872ll*in.Volume()+48ll*in.VolumeCB();
 	  }
-    // FIXME: This is wrong
-    flops += 1872ll*in.Volume();
 #else
     errorQuda("DiracCloverHasenbuschTwist is not implemented for USE_LEGACY_DSLASH");
 #endif
@@ -452,8 +455,8 @@ namespace quda {
   void DiracCloverHasenbuschTwist::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 				   double kappa, double mass, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
-    // errorQuda("Not Yet Implemented");
+    //CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    errorQuda("Not Yet Implemented");
   }
 
 
@@ -487,8 +490,9 @@ namespace quda {
         checkSpinorAlias(in, out);
 
         ApplyWilsonCloverHasenbuschTwistClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
-        // FIXME:
-        flops += 1872ll*in.Volume();
+
+        //    DiracCloverPC.DslashXPay -/+ mu ( i gamma_5 ) A
+        flops += (1872ll + 48ll + 504ll)*in.Volume();
       }
 
     // xpay version of the above
@@ -500,8 +504,9 @@ namespace quda {
          checkSpinorAlias(in, out);
 
          ApplyWilsonCloverHasenbuschTwistNoClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
-         // fixme,
-         flops += 1872ll*in.Volume();
+
+         //    DiracCloverPC.DslashXPay -/+ mu ( i gamma_5 )
+         flops += (1872ll+48)*in.Volume();
        }
 
 
