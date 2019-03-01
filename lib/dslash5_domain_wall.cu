@@ -18,8 +18,6 @@ namespace quda {
     - use kappa notation and not b/c for consistency with other codes and sanity
   */
 
-#ifdef GPU_DOMAIN_WALL_DIRAC
-
   template <typename Float, int nColor, typename Arg>
   class Dslash5 : public TunableVectorYZ {
 
@@ -267,8 +265,6 @@ namespace quda {
     default: errorQuda("Unsupported number of colors %d\n", in.Ncolor());
     }
   }
-
-#endif
 
   //Apply the 5th dimension dslash operator to a colorspinor field
   //out = Dslash5*in

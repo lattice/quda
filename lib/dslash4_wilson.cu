@@ -23,8 +23,6 @@ namespace quda {
 
 namespace quda {
 
-#ifdef GPU_WILSON_DIRAC
-
   /**
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
@@ -106,8 +104,6 @@ namespace quda {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
   }
-
-#endif // GPU_WILSON_DIRAC
 
   //Apply the Wilson operator
   //out(x) = M*in = - kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)

@@ -18,8 +18,6 @@ namespace quda {
 
 namespace quda {
 
-#ifdef GPU_DOMAIN_WALL_DIRAC
-
   /**
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
@@ -142,8 +140,6 @@ namespace quda {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
   }
-
-#endif // GPU_DOMAIN_WALL_DIRAC
 
   //Apply the 4-d preconditioned domain-wall Dslash operator
   //out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)

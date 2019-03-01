@@ -19,8 +19,6 @@ namespace quda {
 
 namespace quda {
 
-#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-
   /**
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
@@ -155,8 +153,6 @@ namespace quda {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
   }
-
-#endif // GPU_NDEG_TWISTED_MASS_DIRAC
 
   //Apply the non-degenerate twisted-mass Dslash operator
   //out(x) = M*in = a*(1 + i*b*gamma_5*tau_3 + c*tau_1)*D + x
