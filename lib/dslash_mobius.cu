@@ -26,6 +26,7 @@
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
 
@@ -53,9 +54,6 @@ namespace quda {
 
 #include <dslash_quda.cuh>
   }
-
-  // declare the dslash events
-#include <dslash_events.cuh>
 
   using namespace mobius;
 
@@ -264,8 +262,6 @@ namespace quda {
   };
 #endif // GPU_DOMAIN_WALL_DIRAC
 
-#include <dslash_policy.cuh>
-
   //-----------------------------------------------------
   // Modification for 4D preconditioned Mobius DWF operator
   // Additional Arg. is added to give a function name.
@@ -284,6 +280,7 @@ namespace quda {
 		      const int *commOverride, const int DS_type, TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
+    using namespace dslash;
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     DslashCuda *dslash = nullptr;

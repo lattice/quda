@@ -6,11 +6,7 @@
 #include <dslash.h>
 #include <worker.h>
 
-namespace quda {
-#include <dslash_events.cuh>
 #include <dslash_policy.cuh>
-}
-
 #include <kernels/dslash_wilson_clover.cuh>
 
 /**
@@ -105,7 +101,7 @@ namespace quda {
     WilsonCloverArg<Float,nColor,recon,true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
     TwistedClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,true> > twisted(arg, out, in);
 
-    DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                                in.VolumeCB(), in.GhostFaceCB(), profile);
     policy.apply(0);
 

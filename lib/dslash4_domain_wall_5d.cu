@@ -5,11 +5,7 @@
 #include <dslash.h>
 #include <worker.h>
 
-namespace quda {
-#include <dslash_events.cuh>
 #include <dslash_policy.cuh>
-}
-
 #include <kernels/dslash_domain_wall_5d.cuh>
 
 /**
@@ -104,7 +100,7 @@ namespace quda {
     DomainWall5DArg<Float,nColor,recon> arg(out, in, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
     DomainWall5D<Float,nDim,nColor,DomainWall5DArg<Float,nColor,recon> > twisted(arg, out, in);
 
-    DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                                in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
     policy.apply(0);
 

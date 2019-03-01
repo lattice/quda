@@ -26,6 +26,7 @@
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
 
@@ -50,9 +51,6 @@ namespace quda {
 
 #include <dslash_quda.cuh>
   }
-
-  // declare the dslash events
-#include <dslash_events.cuh>
 
   using namespace domainwall;
 
@@ -205,8 +203,6 @@ namespace quda {
   };
 #endif // GPU_DOMAIN_WALL_DIRAC
 
-#include <dslash_policy.cuh>
-
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			    const cudaColorSpinorField *in, const int parity, const int dagger, 
 			    const cudaColorSpinorField *x, const double &m_f, const double &k2, 
@@ -229,7 +225,7 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 
     delete dslash;

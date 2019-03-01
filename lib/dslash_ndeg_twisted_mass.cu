@@ -28,6 +28,8 @@
 
 #include <inline_ptx.h>
 
+#include <dslash_policy.cuh>
+
 namespace quda {
 
   namespace ndegtwisted {
@@ -52,9 +54,6 @@ namespace quda {
 
   } // end namespace twisted
   
-  // declare the dslash events
-#include <dslash_events.cuh>
-
   using namespace ndegtwisted;
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
@@ -142,9 +141,6 @@ namespace quda {
   };
 #endif // GPU_NDEG_TWISTED_MASS_DIRAC
 
-
-#include <dslash_policy.cuh> 
-
   void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
 				 const cudaColorSpinorField *in, const int parity, const int dagger,
 				 const cudaColorSpinorField *x, const QudaTwistDslashType type,
@@ -166,7 +162,7 @@ namespace quda {
     int bulk_threads = in->Volume() / 2;
     int ghost_threads[4] = {0};
     for(int i=0;i<4;i++) ghost_threads[i] = in->GhostFace()[i] / 2;
-    DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), bulk_threads, ghost_threads, profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), bulk_threads, ghost_threads, profile);
     dslash_policy.apply(0);
 
     delete dslash;

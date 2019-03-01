@@ -5,11 +5,7 @@
 #include <dslash.h>
 #include <worker.h>
 
-namespace quda {
-#include <dslash_events.cuh>
 #include <dslash_policy.cuh>
-}
-
 #include <kernels/dslash_wilson.cuh>
 
 /**
@@ -68,8 +64,7 @@ namespace quda {
     WilsonArg<Float,nColor,recon> arg(out, in, U, kappa, x, parity, dagger, comm_override);
     Wilson<Float,nDim,nColor,WilsonArg<Float,nColor,recon> > wilson(arg, out, in);
 
-    DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-                                              in.VolumeCB(), in.GhostFaceCB(), profile);
+    dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
     policy.apply(0);
 
     checkCudaError();

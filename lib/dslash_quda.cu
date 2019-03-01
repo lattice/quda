@@ -12,6 +12,7 @@
 #include <index_helper.cuh>
 #include <color_spinor.h>
 #include <linalg.cuh>
+#include <dslash_policy.cuh>
 
 namespace quda {
 
@@ -72,6 +73,12 @@ namespace quda {
     int first_active_policy;
     int first_active_p2p_policy;
 
+    // list of dslash policies that are enabled
+    std::vector<QudaDslashPolicy> policies;
+
+    // list of p2p policies that are enabled
+    std::vector<QudaP2PPolicy> p2p_policies;
+
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
     Worker *aux_worker;
@@ -118,6 +125,12 @@ namespace quda {
     dslash_policy_init = false;
     first_active_policy = 0;
     first_active_p2p_policy = 0;
+
+    // list of dslash policies that are enabled
+    policies = std::vector<QudaDslashPolicy>(static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+
+    // list of p2p policies that are enabled
+    p2p_policies = std::vector<QudaP2PPolicy>(static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
   }
 
 

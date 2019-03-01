@@ -16,15 +16,6 @@
 
 namespace quda {
 
-  // hooks into tune.cpp variables for policy tuning
-  typedef std::map<TuneKey, TuneParam> map;
-  const map& getTuneCache();
-
-  void disableProfileCount();
-  void enableProfileCount();
-
-  void setPolicyTuning(bool);
-
   namespace blas {
 
     cudaStream_t* getStream();

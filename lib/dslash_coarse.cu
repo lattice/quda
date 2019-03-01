@@ -587,14 +587,6 @@ namespace quda {
 
   };
 
-  // hooks into tune.cpp variables for policy tuning
-  typedef std::map<TuneKey, TuneParam> map;
-  const map& getTuneCache();
-
-  void disableProfileCount();
-  void enableProfileCount();
-  void setPolicyTuning(bool);
-
   static bool dslash_init = false;
   static int config = 0; // 3-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
   static std::vector<DslashCoarsePolicy> policies(static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED), DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);

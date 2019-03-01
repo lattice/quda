@@ -6,11 +6,7 @@
 #include <dslash.h>
 #include <worker.h>
 
-namespace quda {
-#include <dslash_events.cuh>
 #include <dslash_policy.cuh>
-}
-
 #include <kernels/dslash_twisted_clover_preconditioned.cuh>
 
 /**
@@ -136,7 +132,7 @@ namespace quda {
     TwistedCloverArg<Float,nColor,recon,dynamic_clover> arg(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override);
     TwistedCloverPreconditioned<Float,nDim,nColor,TwistedCloverArg<Float,nColor,recon,dynamic_clover> > twisted(arg, out, in);
 
-    DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                               in.VolumeCB(), in.GhostFaceCB(), profile);
     policy.apply(0);
     checkCudaError();

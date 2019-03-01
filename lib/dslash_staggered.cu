@@ -34,6 +34,7 @@
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
 #ifdef USE_LEGACY_DSLASH
@@ -68,9 +69,6 @@ namespace quda {
   } // end namespace staggered
 
 #endif
-
-  // declare the dslash events
-#include <dslash_events.cuh>
 
   using namespace staggered;
 
@@ -189,8 +187,6 @@ namespace quda {
   };
 #endif // GPU_STAGGERED_DIRAC
 
-#include <dslash_policy.cuh>
-
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			   const cudaColorSpinorField *in, const int parity, 
 			   const int dagger, const cudaColorSpinorField *x,
@@ -213,7 +209,7 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 
     delete dslash;

@@ -11,14 +11,8 @@
 #include <index_helper.cuh>
 #include <gauge_field.h>
 
-namespace quda
-{
-#include <dslash_events.cuh>
 #include <dslash_policy.cuh>
-} // namespace quda
-
 #include <kernels/dslash_staggered.cuh>
-
 
 /**
    This is a staggered Dirac operator
@@ -181,8 +175,7 @@ public:
     StaggeredArg<Float, nColor, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger, comm_override);
     Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
-    DslashPolicyTune<decltype(staggered)> policy(
-        staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
+    dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
     policy.apply(0);
 
     checkCudaError();

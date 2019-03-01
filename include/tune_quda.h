@@ -7,6 +7,7 @@
 #include <cstring>
 #include <cfloat>
 #include <stdarg.h>
+#include <map>
 
 #include <tune_key.h>
 #include <quda_internal.h>
@@ -552,6 +553,27 @@ namespace quda {
    * @brief Post an event in the trace, recording where it was posted
    */
   void postTrace_(const char *func, const char *file, int line);
+
+  /**
+   * @brief Returns a reference to the tunecache map
+   * @return tunecache reference
+   */
+  const std::map<TuneKey,TuneParam>& getTuneCache();
+
+  /**
+   * @brief Enable the profile kernel counting
+   */
+  void enableProfileCount();
+
+  /**
+   * @brief Disable the profile kernel counting
+   */
+  void disableProfileCount();
+
+  /**
+   * @brief Enable / disable whether are tuning a policy
+   */
+  void setPolicyTuning(bool);
 
 } // namespace quda
 

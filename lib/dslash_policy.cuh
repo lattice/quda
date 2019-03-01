@@ -1,13 +1,35 @@
+#include <tune_quda.h>
+
+namespace quda {
+
+namespace dslash {
+
+extern int it;
+
+extern cudaEvent_t packEnd[2]; // double buffered
+extern cudaEvent_t gatherStart[Nstream];
+extern cudaEvent_t gatherEnd[Nstream];
+extern cudaEvent_t scatterStart[Nstream];
+extern cudaEvent_t scatterEnd[Nstream];
+extern cudaEvent_t dslashStart[2]; // double buffered
+
+// FIX this is a hack from hell
+// Auxiliary work that can be done while waiting on comms to finish
+extern Worker *aux_worker;
+
+#if CUDA_VERSION >= 8000
+extern cuuint32_t *commsEnd_h;
+extern CUdeviceptr commsEnd_d[Nstream];
+#endif
+
+// these variables are used for benchmarking the dslash components in isolation
+extern bool dslash_pack_compute;
+extern bool dslash_interior_compute;
+extern bool dslash_exterior_compute;
+extern bool dslash_comms;
+extern bool dslash_copy;
+
 static cudaColorSpinorField *inSpinor;
-
-// hooks into tune.cpp variables for policy tuning
-typedef std::map<TuneKey, TuneParam> map;
-const map& getTuneCache();
-
-void disableProfileCount();
-void enableProfileCount();
-
-void setPolicyTuning(bool);
 
 /**
  * Arrays used for the dynamic scheduling.
@@ -81,8 +103,6 @@ inline void setFusedParam(Arg & param, Dslash &dslash, const int* faceVolumeCB){
 #endif
 
 
-namespace {
-
   /**
      @brief This helper function simply posts all receives in all directions
      @param[out] input Field that we are doing halo exchange
@@ -92,7 +112,6 @@ namespace {
   */
   template <typename Dslash>
   inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, cudaStream_t *stream, bool gdr) {
-    using namespace dslash;
     for(int i=3; i>=0; i--){
       if (!dslash.dslashParam.commDim[i]) continue;
       for(int dir=1; dir>=0; dir--) {
@@ -115,8 +134,6 @@ namespace {
   inline void issuePack(cudaColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location, int packIndex) {
 
     if ( (location & Device) & Host) errorQuda("MemoryLocation cannot be both Device and Host");
-
-    using namespace dslash;
 
     bool pack = false;
     for (int i=3; i>=0; i--)
@@ -154,8 +171,6 @@ namespace {
   */
   template<typename Dslash>
   inline void issueGather(cudaColorSpinorField &in, const Dslash &dslash) {
-
-    using namespace dslash;
 
     for (int i = 3; i >=0; i--) {
       if (!dslash.dslashParam.commDim[i]) continue;
@@ -230,8 +245,6 @@ namespace {
   template <typename Dslash>
   inline bool commsComplete(cudaColorSpinorField &in, const Dslash &dslash, int dim, int dir,
 			    bool gdr_send, bool gdr_recv, bool zero_copy_recv, bool async, int scatterIndex=-1) {
-
-    using namespace dslash;
 
     cudaStream_t *stream = nullptr;
 
@@ -343,7 +356,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -433,7 +445,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -515,7 +526,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
     auto &dslashParam = dslash.dslashParam;
@@ -593,7 +603,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
     auto &dslashParam = dslash.dslashParam;
@@ -665,7 +674,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -743,7 +751,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
     auto &dslashParam = dslash.dslashParam;
@@ -832,7 +839,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -940,7 +946,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -1042,7 +1047,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -1136,7 +1140,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -1224,7 +1227,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -1309,7 +1311,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -1389,7 +1390,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -1476,7 +1476,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     auto &dslashParam = dslash.dslashParam;
@@ -1556,7 +1555,6 @@ namespace {
 
   void operator()(Dslash &dslash, cudaColorSpinorField* in, const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    using namespace dslash;
     profile.TPSTART(QUDA_PROFILE_TOTAL);
     
     auto &dslashParam = dslash.dslashParam;
@@ -1569,6 +1567,14 @@ namespace {
   }
 
 };
+
+
+  // whether we have initialized the dslash policy tuner
+  extern bool dslash_policy_init;
+
+  // used to keep track of which policy to start the autotuning
+  extern int first_active_policy;
+  extern int first_active_p2p_policy;
 
   enum class QudaDslashPolicy {
     QUDA_DSLASH,
@@ -1589,7 +1595,8 @@ namespace {
     QUDA_DSLASH_POLICY_DISABLED // this MUST be the last element
   };
 
-  static std::vector<QudaDslashPolicy> policies(static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+  // list of dslash policies that are enabled
+  extern std::vector<QudaDslashPolicy> policies;
 
   enum class QudaP2PPolicy {
     QUDA_P2P_DEFAULT,         // no special hanlding for p2p
@@ -1598,7 +1605,8 @@ namespace {
     QUDA_P2P_POLICY_DISABLED, // this must be the last element
   };
 
-  static std::vector<QudaP2PPolicy> p2p_policies(static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
+  // list of p2p policies that are enabled
+  extern std::vector<QudaP2PPolicy> p2p_policies;
 
   template <typename Dslash>
   struct DslashFactory {
@@ -1667,11 +1675,11 @@ namespace {
   }
 };
 
-  void enable_policy(QudaDslashPolicy p){
+  inline void enable_policy(QudaDslashPolicy p){
     policies[static_cast<std::size_t>(p)] = p;
   }
 
-  void disable_policy(QudaDslashPolicy p){
+  inline void disable_policy(QudaDslashPolicy p){
     policies[static_cast<std::size_t>(p)] = QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED;
   }
 
@@ -1697,7 +1705,6 @@ namespace {
      : dslash(dslash), dslashParam(dslash.dslashParam), in(in),
        volume(volume), ghostFace(ghostFace), config(0), profile(profile)
    {
-     using namespace dslash;
      in->streamInit(streams);
 
      if (!dslash_policy_init) {
@@ -1948,7 +1955,6 @@ namespace {
    // Find the best dslash policy
    bool advanceAux(TuneParam &param) const
    {
-     using namespace dslash;
      while ((unsigned)param.aux.x < policies.size()-1) {
        param.aux.x++;
        if (policies[param.aux.x] != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) return true;
@@ -1967,13 +1973,11 @@ namespace {
    bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
 
    void initTuneParam(TuneParam &param) const  {
-     using namespace dslash;
      Tunable::initTuneParam(param);
      param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0;
    }
 
    void defaultTuneParam(TuneParam &param) const  {
-     using namespace dslash;
      Tunable::defaultTuneParam(param);
      param.aux.x = first_active_policy; param.aux.y = first_active_p2p_policy; param.aux.z = 0;
    }
@@ -2010,4 +2014,6 @@ namespace {
 
  };
 
-} // anonymous namespace
+} // namespace dslash
+
+} // namespace quda

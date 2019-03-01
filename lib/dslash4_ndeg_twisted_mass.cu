@@ -5,11 +5,7 @@
 #include <dslash.h>
 #include <worker.h>
 
-namespace quda {
-#include <dslash_events.cuh>
 #include <dslash_policy.cuh>
-}
-
 #include <kernels/dslash_ndeg_twisted_mass.cuh>
 
 /**
@@ -85,7 +81,7 @@ namespace quda {
     NdegTwistedMassArg<Float,nColor,recon> arg(out, in, U, a, b, c, x, parity, dagger, comm_override);
     NdegTwistedMass<Float,nDim,nColor,NdegTwistedMassArg<Float,nColor,recon> > twisted(arg, out, in);
 
-    DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                                in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
     policy.apply(0);
 
