@@ -25,7 +25,8 @@ set (QUDA_OBJS
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
   dslash_twisted_clover.cu dslash_domain_wall.cu
-  dslash_domain_wall_4d.cu dslash_mobius.cu staggered_dslash.cu
+  dslash_domain_wall_4d.cu dslash_mobius.cu
+  dslash4_staggered.cu dslash4_improved_staggered.cu
   dslash4_wilson.cu dslash4_wilson_clover.cu dslash5_domain_wall.cu
   dslash4_wilson_clover_preconditioned.cu 
   dslash4_twisted_mass.cu dslash4_twisted_mass_preconditioned.cu

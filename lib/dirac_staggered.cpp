@@ -55,8 +55,7 @@ namespace quda {
 			  *gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
 			  dagger, 0, 0, commDim, profile);
 #else
-      constexpr bool improved = false;
-      ApplyDslashStaggered(out, in, *gauge, *gauge, 0., in, parity, dagger, improved, commDim, profile);
+      ApplyStaggered(out, in, *gauge, 0., in, parity, dagger, commDim, profile);
 #endif
 
     } else {
@@ -77,8 +76,7 @@ namespace quda {
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
 #else
-      constexpr bool improved = false;
-      ApplyDslashStaggered(out, in, *gauge, *gauge, k, x, parity, dagger, improved, commDim, profile);
+      ApplyStaggered(out, in, *gauge, k, x, parity, dagger, commDim, profile);
 #endif
     } else {
       errorQuda("Not supported");
@@ -99,8 +97,7 @@ namespace quda {
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
 #else
     checkFullSpinor(out, in);
-    constexpr bool improved = false;
-    ApplyDslashStaggered(out, in, *gauge, *gauge, 2.*mass, in, QUDA_INVALID_PARITY, dagger, improved, commDim, profile);
+    ApplyStaggered(out, in, *gauge, 2.*mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
 #endif
   }
 
