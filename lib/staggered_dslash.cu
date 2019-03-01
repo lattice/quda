@@ -236,7 +236,14 @@ public:
     // check all locations match
     checkLocation(out, in, U, L);
 
-    if (dslash::aux_worker) dslash::aux_worker->apply(0);
+    if (improved) {
+      for (int i=0; i<4; i++) {
+        if (comm_dim_partitioned(i) && (fatGauge.X()[i] < 6)) {
+          errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in improved staggered dslash\n");
+        }
+      }
+    }
+
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
       ApplyDslashStaggered<double>(out, in, U, L, a, x, parity, dagger, improved, comm_override, profile);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
