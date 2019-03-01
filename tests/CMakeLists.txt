@@ -158,9 +158,15 @@ set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MA
 
 ## BLAS test
 
-add_test(NAME blas_test_parity COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS} --dim 2 4 6 8 --solve-type direct-pc --gtest_output=xml:blas_test_parity.xml)
-add_test(NAME blas_test_full COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS} --dim 2 4 6 8 --solve-type direct --gtest_output=xml:blas_test_full.xml)
+if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_DOMAIN_WALL)
+  add_test(NAME blas_test_parity_wilson COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS} --dim 2 4 6 8 --solve-type direct-pc --gtest_output=xml:blas_test_parity.xml)
+  add_test(NAME blas_test_full_wilson COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS} --dim 2 4 6 8 --solve-type direct --gtest_output=xml:blas_test_full.xml)
+endif()
 
+if(QUDA_DIRAC_STAGGERED)
+  add_test(NAME blas_test_parity_staggered COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS} --dim 2 4 6 8 --dslash-type staggered --solve-type direct-pc --gtest_output=xml:blas_test_parity.xml)
+  add_test(NAME blas_test_full_staggered COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS} --dim 2 4 6 8 --dslash-type staggered --solve-type direct --gtest_output=xml:blas_test_full.xml)
+endif()
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
@@ -236,14 +242,14 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   endif()
 
   if(QUDA_DIRAC_STAGGERED)
-    add_test(NAME dslash_improved_staggered-policy${pol2} COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS} --dslash-type asqtad --test 1 --dim 2 4 6 8 --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}.xml)
+    add_test(NAME dslash_improved_staggered-policy${pol2} COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS} --dslash-type asqtad --test 1 --dim 6 8 10 12 --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}.xml)
     add_test(NAME dslash_naive_staggered-policy${pol2} COMMAND ${QUDA_CTEST_LAUNCH}  $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS} --dslash-type staggered --test 1 --dim 2 4 6 8 --gtest_output=xml:dslash_naive_staggered_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_improved_staggered-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
       set_tests_properties(dslash_naive_staggered-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
     if(QUDA_LINK_HISQ)
-      add_test(NAME dslash_improved_staggered_build-policy${pol2} COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS} --dslash-type asqtad --test 1 --dim 2 4 6 8 --compute-fat-long true --epsilon-naik -0.01 --tadpole-coeff 0.9 --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
+      add_test(NAME dslash_improved_staggered_build-policy${pol2} COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS} --dslash-type asqtad --test 1 --dim 6 8 10 12 --compute-fat-long true --epsilon-naik -0.01 --tadpole-coeff 0.9 --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
       if (polenv)
         set_tests_properties(dslash_improved_staggered_build_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
       endif()
