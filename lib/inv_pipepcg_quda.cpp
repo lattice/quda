@@ -394,23 +394,23 @@ namespace quda {
         commGlobalReductionSet(false);
         gamma = blas::reDotProduct(r_sloppy,u);
         delta = blas::reDotProduct(w,u);
-        tau   = blas::reDotProduct(s,u);
         mNorm = blas::norm2(u);
         sigma = blas::norm2(s);
         zeta  = blas::norm2(z);
+        tau   = blas::reDotProduct(s,u);
         commGlobalReductionSet(true);
       }
 
       if(K) {
         rPre = n;
+        commGlobalReductionSet(false);
         (*K)(pPre, rPre);
+        commGlobalReductionSet(true);
         m = pPre;
         blas::xpy(u, m);
       } else {
         m = w;
       }
-
-      commGlobalReductionSet(true);
 
       //Start async communications:
       MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
