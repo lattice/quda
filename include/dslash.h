@@ -86,7 +86,7 @@ namespace quda {
 
     template <typename T, typename Arg>
     inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-      if (1) { // test on Volta
+      if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
 	this->setMaxDynamicSharedBytesPerBlock(f);
       }
       void *args[] = { &arg };
