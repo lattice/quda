@@ -860,32 +860,7 @@ namespace quda {
 					       const int dim, const QudaDirection dir,
 					       const int dagger, cudaStream_t *stream, bool zero_copy)
   {
-#ifdef MULTI_GPU
-    int face_num = (dir == QUDA_BACKWARDS) ? 0 : (dir == QUDA_FORWARDS) ? 1 : 2;
-    void *packBuffer[2*QUDA_MAX_DIM];
-    MemoryLocation location[2*QUDA_MAX_DIM];
-
-    if (zero_copy) {
-      for (int d=0; d<4; d++) {
-	packBuffer[2*d+0] = my_face_dim_dir_hd[bufferIndex][d][0];
-	packBuffer[2*d+1] = my_face_dim_dir_hd[bufferIndex][d][1];
-	location[2*d+0] = Host;
-	location[2*d+1] = Host;
-      }
-    } else {
-      for (int d=0; d<4; d++) {
-	packBuffer[2*d+0] = my_face_dim_dir_d[bufferIndex][d][0];
-	packBuffer[2*d+1] = my_face_dim_dir_d[bufferIndex][d][1];
-	location[2*d+0] = Device;
-	location[2*d+1] = Device;
-      }
-    }
-
-    packFaceExtended(packBuffer, *this, location[0], nFace, R, dagger, parity, dim, face_num, *stream);
-#else
-    errorQuda("packGhostExtended not built on single-GPU build");
-#endif
-
+    errorQuda("not implemented");
   }
 
 
@@ -894,44 +869,7 @@ namespace quda {
                                                  const int dim, const QudaDirection dir, 
                                                  const int dagger, cudaStream_t* stream, bool zero_copy)
   {
-    // First call the regular unpackGhost routine to copy data into the `usual' ghost-zone region 
-    // of the data array 
-    unpackGhost(ghost_spinor, nFace, dim, dir, dagger, stream);
-
-    // Next step is to copy data from the ghost zone back to the interior region
-    int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
-
-    int len = nFace*ghostFace[dim]*Nint;
-    int offset = length + ghostOffset[dim][0];
-    offset += (dir == QUDA_BACKWARDS) ? 0 : len;
-
-#ifdef MULTI_GPU
-    const int face_num = 2;
-    const bool unpack = true;
-    const int R[4] = {0,0,0,0};
-    void *packBuffer[2*QUDA_MAX_DIM];
-    MemoryLocation location[2*QUDA_MAX_DIM];
-
-    if (zero_copy) {
-      for (int d=0; d<4; d++) {
-	packBuffer[2*d+0] = my_face_dim_dir_hd[bufferIndex][d][0];
-	packBuffer[2*d+1] = my_face_dim_dir_hd[bufferIndex][d][1];
-	location[2*d+0] = Host;
-	location[2*d+1] = Host;
-      }
-    } else {
-      for (int d=0; d<4; d++) {
-	packBuffer[2*d+0] = my_face_dim_dir_d[bufferIndex][d][0];
-	packBuffer[2*d+1] = my_face_dim_dir_d[bufferIndex][d][1];
-	location[2*d+0] = Device;
-	location[2*d+1] = Device;
-      }
-    }
-
-    packFaceExtended(packBuffer, *this, location[0], nFace, R, dagger, parity, dim, face_num, *stream, unpack);
-#else
-    errorQuda("unpackGhostExtended not built on single-GPU build");
-#endif
+    errorQuda("not implemented");
   }
 
 

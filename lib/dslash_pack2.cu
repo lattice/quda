@@ -1,3 +1,5 @@
+#ifndef USE_LEGACY_DSLASH
+
 #include <typeinfo>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
@@ -16,7 +18,7 @@
 namespace quda {
 
   static int commDim[QUDA_MAX_DIM];
-  void setPackComms2(const int *comm_dim) {
+  void setPackComms(const int *comm_dim) {
     for (int i=0; i<4; i++) commDim[i] = comm_dim[i];
     for (int i=4; i<QUDA_MAX_DIM; i++) commDim[i] = 0;
   }
@@ -710,4 +712,4 @@ public:
 
 } // namespace quda
 
-
+#endif // USE_LEGACY_DSLASH

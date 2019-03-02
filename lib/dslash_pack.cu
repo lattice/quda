@@ -1,3 +1,5 @@
+#ifdef USE_LEGACY_DSLASH
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -28,7 +30,6 @@ namespace quda {
 #ifdef MULTI_GPU
   static int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
   void setPackComms(const int *comm_dim) {
-    setPackComms2(comm_dim);
     for (int i=0; i<4; i++) commDim[i] = comm_dim[i];
     for (int i=4; i<QUDA_MAX_DIM; i++) commDim[i] = 0;
   }
@@ -145,13 +146,11 @@ namespace quda {
 						     const int &face_idx, const int &face_volume,
 						     PackParam<double2> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif
   }
 
   template <int dim, int dagger, int face_num>
@@ -160,13 +159,11 @@ namespace quda {
 						       const int &face_idx, const int &face_volume,
 						       PackParam<double2> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif
   }
 
 #undef READ_SPINOR
@@ -201,13 +198,11 @@ namespace quda {
 						     const int &face_volume,
 						     const PackParam<float4> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif
   }
 
   template <int dim, int dagger, int face_num>
@@ -216,13 +211,11 @@ namespace quda {
 						       const int &face_volume,
 						       const PackParam<float4> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif
   }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
@@ -254,13 +247,11 @@ namespace quda {
 						     const int &face_volume,
 						     const PackParam<short4> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif
   }
 
   template <int dim, int dagger, int face_num>
@@ -269,13 +260,11 @@ namespace quda {
 						       const int &face_volume,
 						       const PackParam<short4> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif
   }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
@@ -306,13 +295,11 @@ namespace quda {
                  const int &face_volume, 
                  const PackParam<char4> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif
   }
 
   template <int dim, int dagger, int face_num>
@@ -321,13 +308,11 @@ namespace quda {
                    const int &face_volume, 
                    const PackParam<char4> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif
   }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
@@ -645,13 +630,11 @@ namespace quda {
 							    const int &face_idx, const int &face_volume,
 							    PackParam<double2> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_twisted_face_dagger_core.h"
     } else {
 #include "wilson_pack_twisted_face_core.h"
     }
-#endif
   }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
@@ -684,13 +667,11 @@ namespace quda {
 							    const int &face_volume,
 							    const PackParam<float4> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_twisted_face_dagger_core.h"
     } else {
 #include "wilson_pack_twisted_face_core.h"
     }
-#endif
   }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
@@ -722,13 +703,11 @@ namespace quda {
 							    const int &face_volume,
 							    const PackParam<short4> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_twisted_face_dagger_core.h"
     } else {
 #include "wilson_pack_twisted_face_core.h"
     }
-#endif
   }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
@@ -759,13 +738,11 @@ namespace quda {
                   const int &face_volume, 
                   const PackParam<char4> &param)
   {
-#ifdef USE_LEGACY_DSLASH
     if (dagger) {
 #include "wilson_pack_twisted_face_dagger_core.h"
     } else {
 #include "wilson_pack_twisted_face_core.h"
     }
-#endif
   }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
@@ -1198,7 +1175,7 @@ namespace quda {
     }
   }
 
-#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
+#if (defined GPU_STAGGERED_DIRAC)
 
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEXDOUBLE param.inTex
@@ -1612,7 +1589,7 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-#if (defined GPU_STAGGERED_DIRAC && USE_LEGACY_DSLASH)
+#if (defined GPU_STAGGERED_DIRAC)
 
       static PackParam<FloatN> param;
       this->prepareParam(param,tp,this->dim,this->face_num);
@@ -2281,3 +2258,5 @@ namespace quda {
 #endif // MULTI_GPU
 
 }
+
+#endif

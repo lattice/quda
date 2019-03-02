@@ -24,9 +24,12 @@ namespace quda {
   void popKernelPackT();
 
   /**
-     Sets commDim array used in dslash_pack.cu
-   */
-  void setPackComms(const int *commDim);
+     @brief Helper function that sets which dimensions the packing
+     kernel should be packing for.
+     @param[in] dim_pack Array that specifies which dimenstions need
+     to be packed.
+  */
+  void setPackComms(const int *dim_pack);
 
   bool getDslashLaunch();
 
@@ -569,6 +572,7 @@ namespace quda {
 			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist);
 
 
+#ifdef USE_LEGACY_DSLASH
   /**
      @brief Dslash face packing routine
      @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
@@ -586,11 +590,7 @@ namespace quda {
   void packFace(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &in, MemoryLocation location,
 		const int nFace, const int dagger, const int parity, const int dim, const int face_num,
 		const cudaStream_t &stream, const double a=0.0, const double b=0.0);
-
-  void packFaceExtended(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &field, MemoryLocation location,
-			const int nFace, const int R[], const int dagger, const int parity, const int dim,
-			const int face_num, const cudaStream_t &stream, const bool unpack=false);
-
+#else
   /**
      @brief Dslash face packing routine
      @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
@@ -607,6 +607,7 @@ namespace quda {
   void PackGhost(void *ghost[2*QUDA_MAX_DIM], const ColorSpinorField &field,
                  MemoryLocation location, int nFace, bool dagger, int parity,
                  double a, double b, double c, const cudaStream_t &stream);
+#endif
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)

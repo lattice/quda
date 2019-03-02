@@ -8,9 +8,6 @@
 
 namespace quda {
 
-  void setPackComms(const int *); // original packing kernel
-  void setPackComms2(const int *); // rewriten packing kernel
-
   template <typename Float>
   class Dslash : public TunableVectorYZ {
 
@@ -214,7 +211,6 @@ namespace quda {
     {
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-      setPackComms2(arg.commDim);
 
       //strcpy(aux, in.AuxString());
       fillAuxBase();
