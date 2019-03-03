@@ -7,9 +7,8 @@ namespace quda {
   namespace mobius_tensor_core {
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
-    //    FIXME
-    //    - fix flops counters
-
+    
+    
     /**
       @brief Parameter structure for applying the Dslash
     */
@@ -151,32 +150,31 @@ namespace quda {
     -> Everything should be understood in a 4d checkboarding sense.
     */
     template <class storage_type, bool dagger, bool halo, class Vector, class Arg>
-    __device__ inline void apply_wilson_5d(Vector& out, const int coordinate[4], Arg& arg, int s) {
+    __device__ inline void apply_wilson_5d(Vector& out, int coordinate[4], Arg& arg, int s) {
 
       typedef typename mapper<storage_type>::type compute_type;
       typedef Matrix<complex<compute_type>, 3> Link;
       const int their_spinor_parity = arg.nParity == 2 ? 1 - arg.parity : 0;
 
       const int index_4d_cb = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
-      int x[4] = {coordinate[0], coordinate[1], coordinate[2], coordinate[3]};
 
 #pragma unroll
       for (int d = 0; d < 4; d++) // loop over dimension
       {
-        x[d]++;
-        if (!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)) {
+        coordinate[d]++;
+        if (!halo || !is_halo_4d(coordinate, arg.dim, arg.halo_shift)) {
           // Forward gather - compute fwd offset for vector fetch
-          const int fwd_idx = s * arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(x, arg.dim);
+          const int fwd_idx = s * arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
           constexpr int proj_dir = dagger ? +1 : -1;
 
           const Link U = arg.U(d, index_4d_cb, arg.parity);
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
-        x[d] -= 2;
-        if (!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)) {
+        coordinate[d]-=2;
+        if (!halo || !is_halo_4d(coordinate, arg.dim, arg.halo_shift)) {
           // Backward gather - compute back offset for spinor and gauge fetch
-          const int gauge_idx = index_4d_cb_from_coordinate_4d(x, arg.dim);
+          const int gauge_idx = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
           ;
           const int back_idx = s * arg.volume_4d_cb + gauge_idx;
           constexpr int proj_dir = dagger ? -1 : +1;
@@ -185,7 +183,7 @@ namespace quda {
           const Vector in = arg.in(back_idx, their_spinor_parity);
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
-        x[d]++;
+        coordinate[d]++;
       } // nDim
     }
 
@@ -237,7 +235,7 @@ namespace quda {
       constexpr int M_sm = M + sm_m_pad_size;
 
       half2* sm_b = shared_memory_data;
-      half* sm_c = (half*)sm_b;
+      half* sm_c = reinterpret_cast<half*>(sm_b);
 
       half* sm_a = reload ? sm_c + M * N_sm : sm_c;
       // This is for type == 1 ONLY.
@@ -336,7 +334,7 @@ namespace quda {
             in_vec = arg.in(sid_shift, explicit_parity);
           }
           // store result to shared memory
-          load_matrix_b_vector<N_sm / 2, false>(in_vec, arg, sm_b, arg.scale); // acc(accumulation) = false
+          load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, arg.scale); // acc(accumulation) = false
         }
 
         __syncthreads();
@@ -354,7 +352,7 @@ namespace quda {
               int volume_4d_cb_back = back_dim[0] * back_dim[1] * back_dim[2] * back_dim[3] >> 1;
               int sid_back_shift = threadIdx.y * volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim);
               Vector aux_in_vec = arg.x(sid_back_shift, explicit_parity);
-              load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, arg, sm_b, arg.scale * arg.m_scale); // acc = true
+              load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, arg.scale * arg.m_scale); // acc = true
             }
             store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid, arg.scale * arg.m_scale);
           }
@@ -366,7 +364,7 @@ namespace quda {
 
           if (!idle) {
             Vector aux_in_vec = arg.x(sid, explicit_parity);
-            load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, arg, sm_b, arg.scale * arg.m_scale);
+            load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, arg.scale * arg.m_scale);
           }
         }
 
@@ -571,11 +569,11 @@ namespace quda {
 
       template <bool reload, int type> void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
         switch (tp.block.x) {
-        case 8: apply<8, reload, type>(tp, arg, stream); break;
-        case 16: apply<16, reload, type>(tp, arg, stream); break;
-        case 24: apply<24, reload, type>(tp, arg, stream); break;
-        case 32: apply<32, reload, type>(tp, arg, stream); break;
-        default: errorQuda("NOT valid tp.block.x(=%d)\n", tp.block.x);
+          case  8: apply< 8, reload, type>(tp, arg, stream); break;
+          case 16: apply<16, reload, type>(tp, arg, stream); break;
+          case 24: apply<24, reload, type>(tp, arg, stream); break;
+          case 32: apply<32, reload, type>(tp, arg, stream); break;
+          default: errorQuda("NOT valid tp.block.x(=%d)\n", tp.block.x);
         }
       }
 
@@ -590,11 +588,11 @@ namespace quda {
       void apply(const cudaStream_t& stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (arg.type) {
-        case 0: apply<0>(tp, arg, stream); break;
-        case 1: apply<1>(tp, arg, stream); break;
-        case 2: apply<2>(tp, arg, stream); break;
-        case 3: apply<3>(tp, arg, stream); break;
-        case 4: apply<4>(tp, arg, stream); break;
+          case 0: apply<0>(tp, arg, stream); break;
+          case 1: apply<1>(tp, arg, stream); break;
+          case 2: apply<2>(tp, arg, stream); break;
+          case 3: apply<3>(tp, arg, stream); break;
+          case 4: apply<4>(tp, arg, stream); break;
         default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
       }
@@ -629,12 +627,12 @@ namespace quda {
       //          dslash.apply(streams[Nstream-1]);
       //        }
       //      break;
-      case 12: {
-        FusedDslashArg<storage_type, 12> arg(
-            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-        FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
-        dslash.apply(streams[Nstream - 1]);
-      } break;
+        case 12: {
+          FusedDslashArg<storage_type, 12> arg(
+              out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+          FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
+          dslash.apply(streams[Nstream - 1]);
+        } break;
       //      case 16:
       //        {
       //          FusedDslashArg<storage_type, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
@@ -676,7 +674,7 @@ namespace quda {
       } else if (checkPrecision(out, in) == QUDA_QUARTER_PRECISION && in.Ncolor() == 3) {
         apply_fused_dslash<char>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
       } else {
-        errorQuda("Tensor core implemtation ONLY supports HALF precision and n_color = 3.\n");
+        errorQuda("Tensor core implemtation ONLY supports HALF/QUARTER precision and n_color = 3.\n");
       }
 
 #else

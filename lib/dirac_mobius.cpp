@@ -222,7 +222,55 @@ namespace quda {
   }
 
 
-  DiracMobiusPC::DiracMobiusPC(const DiracParam &param) : DiracMobius(param) {  }
+  DiracMobiusPC::DiracMobiusPC(const DiracParam &param) : DiracMobius(param), 
+    m5inv_plus(Ls*Ls), m5inv_minus(Ls*Ls)
+  {
+    // Set up the matrix elements of m5inv
+    // row major
+    double b = b_5[0].real();
+    double c = c_5[0].real();
+    double alpha = b+c;
+    kappa_b = 0.5/(b*(m5+4.)+1.);
+    kappa_c = 0.5/(c*(m5+4.)-1.);
+    kappa5 = kappa_b/kappa_c;
+    double inv = 1./(1.+std::pow(kappa5,Ls)*mass); // has NOT been normalized for the factor of 2 in (1+/-gamma5) projector.
+
+    printfQuda("Mobius parameters:\n");
+    printfQuda("b       = %+6.4e\n", b);
+    printfQuda("c       = %+6.4e\n", c);
+    printfQuda("kappab  = %+6.4e\n", kappa_b);
+    printfQuda("kappac  = %+6.4e\n", kappa_c);
+    printfQuda("kappa5  = %+6.4e\n", kappa5);
+
+    // m5inv_plus/minus:
+    for(int s = 0; s < Ls; s++){
+      for(int sp = 0; sp < Ls; sp++){
+        int exp;
+        
+        exp = s<sp ? Ls-sp+s : s-sp;
+        m5inv_plus [ s*Ls+sp ] = inv*std::pow(kappa5, exp)*(s<sp ? -mass : 1.);
+        
+        exp = s>sp ? Ls-s+sp : sp-s;
+        m5inv_minus[ s*Ls+sp ] = inv*std::pow(kappa5, exp)*(s>sp ? -mass : 1.);
+      }
+    }
+    
+    printfQuda("m5inv_plus:\n");
+    for(int s = 0; s < Ls; s++){
+      for(int sp = 0; sp < Ls; sp++){
+        printfQuda("%+6.4e ", m5inv_plus[s*Ls+sp]);
+      }
+      printfQuda("\n");
+    }
+
+    printfQuda("m5inv_minus:\n");
+    for(int s = 0; s < Ls; s++){
+      for(int sp = 0; sp < Ls; sp++){
+        printfQuda("%+6.4e ", m5inv_minus[s*Ls+sp]);
+      }
+      printfQuda("\n");
+    }
+  }
 
   DiracMobiusPC::DiracMobiusPC(const DiracMobiusPC &dirac) : DiracMobius(dirac) {  }
 
@@ -606,7 +654,7 @@ namespace quda {
     const long long mat = 2ll*4ll*Ls-1ll;
     flops += vol*24ll*(hop+mat);
   }
-  
+
   void DiracMobiusPC::fused_f4(ColorSpinorField &out, const ColorSpinorField &in, 
     const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const
   {
@@ -747,7 +795,7 @@ namespace quda {
     double b = b_5[0].real();
     double c = c_5[0].real();
     
-    kappa = (c*(m5+4.)-1.) / (b*(m5+4.)+1.);
+    kappa5 = (c*(m5+4.)-1.) / (b*(m5+4.)+1.);
     double alpha = b+c;
    
     kappa_b = 0.5 / (b*(m5+4.)+1.);
@@ -767,24 +815,24 @@ namespace quda {
       eofa_u[eofa_pm?s:Ls-1-s] = N * std::pow(-1.,s) * std::pow(alpha-1.,s) / std::pow(alpha+1.,Ls+s+1);
     }
 
-    double factor = -kappa*mass;
+    double factor = -kappa5*mass;
     if(eofa_pm){
       // eofa_pm = plus
       // Computing x
       eofa_x[0] = eofa_u[0]; 
       for(int s = Ls-1; s > 0; s--){
         eofa_x[0] -= factor*eofa_u[s];
-        factor *= -kappa;
+        factor *= -kappa5;
       }
       eofa_x[0] /= 1.+factor;
       for(int s = 1; s < Ls; s++){
-        eofa_x[s] = eofa_x[s-1]*(-kappa) + eofa_u[s];
+        eofa_x[s] = eofa_x[s-1]*(-kappa5) + eofa_u[s];
       }
       // Computing y
       eofa_y[Ls-1] = 1./(1.+factor);
       sherman_morrison_fac = eofa_x[Ls-1];
       for(int s = Ls-1; s > 0; s--){
-        eofa_y[s-1] = eofa_y[s]*(-kappa);
+        eofa_y[s-1] = eofa_y[s]*(-kappa5);
       }
     }else{
       // eofa_pm = minus
@@ -792,17 +840,17 @@ namespace quda {
       eofa_x[Ls-1] = eofa_u[Ls-1]; 
       for(int s = 0; s < Ls; s++){
         eofa_x[Ls-1] -= factor*eofa_u[s];
-        factor *= -kappa;
+        factor *= -kappa5;
       }
       eofa_x[Ls-1] /= 1.+factor;
       for(int s = Ls-1; s > 0; s--){
-        eofa_x[s-1] = eofa_x[s]*(-kappa) + eofa_u[s-1];
+        eofa_x[s-1] = eofa_x[s]*(-kappa5) + eofa_u[s-1];
       }
       // Computing y
       eofa_y[0] = 1./(1.+factor);
       sherman_morrison_fac = eofa_x[0];
       for(int s = 1; s < Ls; s++){
-        eofa_y[s] = eofa_y[s-1]*(-kappa); 
+        eofa_y[s] = eofa_y[s-1]*(-kappa5); 
       }
     }
     m5inv_fac = 0.5/(1.+factor); // 0.5 for the spin project factor
@@ -836,7 +884,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, kappa5, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
    
     // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
@@ -851,7 +899,7 @@ namespace quda {
 
     a *= kappa_b*kappa_b; // a = a * kappa_b^2 
     // The kernel will actually do (m5 * in - kappa_b^2 * x)
-    mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+    mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, kappa5, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
    
     // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
@@ -864,7 +912,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
+    mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, kappa5, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
    
     // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);
@@ -879,7 +927,7 @@ namespace quda {
 
     a *= kappa_b*kappa_b; // a = a * kappa_b^2 
     // The kernel will actually do (x - kappa_b^2 * m5inv * in)
-    mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
+    mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, kappa5, eofa_u, eofa_x, eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
    
     // long long Ls = in.X(4);
     // flops += 144LL*(long long)sp_idx_length*Ls*Ls + 3LL*Ls*(Ls-1LL);

@@ -493,9 +493,11 @@ namespace quda {
   class DiracMobiusPC : public DiracMobius {
 
   protected:
-
+    double kappa_b;
+    double kappa_c;
+    double m5inv_fac = 0.;
+    std::vector<double> m5inv_plus, m5inv_minus;
   private:
-
   public:
     DiracMobiusPC(const DiracParam &param);
     DiracMobiusPC(const DiracMobiusPC &dirac);
@@ -555,8 +557,6 @@ namespace quda {
   protected:
 
   private:
-    double m5inv_fac = 0.;
-    double kappa_b = 0.;
     // The EOFA parameters
     double sherman_morrison_fac = 0.;
     double eofa_shift;

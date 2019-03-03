@@ -33,12 +33,58 @@ namespace quda {
       return (T*)__smem;
     }
   };
+  
+  // matrix a for a generic matrix: column major, M/M_sm(size/padded size) by k
+  // (spin,Ls) by (spin,Ls), where left most index is the fastest changing one(spin).
+  // x by y
+  // For now, assuming it's trivial in spin
+  template<int block_dim_x, int Ls_, int M_sm, class compute_type>
+  __device__ inline void construct_matrix_a_generic(half* sm_a, compute_type* generic){
+    
+    int offset_k = threadIdx.y*4;
+    int x = threadIdx.x;
+    
+    while(x < Ls_){
+      int offset_m = x*4;
+      float value = generic[x*Ls_+threadIdx.y]; // Assuming the input matrix is row major
 
+      // exp = 0 means we are on the diagonal.
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = value;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = value;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = value;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = value;
+        
+      // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
+      
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
+      // sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
+      
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
+      // sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
+      
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
+      // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
+    
+      x += block_dim_x;
+    }
+
+  }
+  
   // matrix a for m5inv: column major, M/M_sm(size/padded size) by k
   // (spin,Ls) by (spin,Ls), where left most index is the fastest changing one(spin).
   // x by y
   template<int block_dim_x, int Ls_, int M_sm, bool dagger, class Arg>
-  __device__ inline void construct_matrix_a_m5inv(Arg& arg, half* sm_a){
+  __device__ inline void construct_matrix_a_m5inv(Arg& arg, half* sm_a, 
+      const float* mp = nullptr, const float* mm = nullptr){
     const float k = arg.kappa;
     // if we rescale, then the actual matrix is alpha*m5inv+beta.
     // Otherwise a = 1., b = 0.;
@@ -51,33 +97,43 @@ namespace quda {
     
     while(x < Ls_){
       int offset_m = x*4;
-      int exp;
       float factorR, factorL;
-      
-      if(dagger){
-        exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
-        factorR = inv*powf(k, __int2float_rn(exp))*(x>threadIdx.y ? -arg.m_f : 1.f);
+    
+      if(mp && mm){
+        if(dagger){
+          factorR = mp[x*Ls_+threadIdx.y];
+          factorL = mm[x*Ls_+threadIdx.y];
+        }else{
+          factorR = mp[threadIdx.y*Ls_+x];
+          factorL = mm[threadIdx.y*Ls_+x];
+        }
       }else{
-        exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
-        factorR = inv*powf(k, __int2float_rn(exp))*(x<threadIdx.y ? -arg.m_f : 1.f);
+        int exp;
+        if(dagger){
+          exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
+          factorR = inv*powf(k, __int2float_rn(exp))*(x>threadIdx.y ? -arg.m_f : 1.f);
+        }else{
+          exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
+          factorR = inv*powf(k, __int2float_rn(exp))*(x<threadIdx.y ? -arg.m_f : 1.f);
+        }
+        
+        if(dagger){
+          exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
+          factorL = inv*powf(k, __int2float_rn(exp))*(x<threadIdx.y ? -arg.m_f : 1.f);
+        }else{
+          exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
+          factorL = inv*powf(k, __int2float_rn(exp))*(x>threadIdx.y ? -arg.m_f : 1.f);
+        }
       }
-      
-      if(dagger){
-        exp = x<threadIdx.y ? Ls_-threadIdx.y+x : x-threadIdx.y;
-        factorL = inv*powf(k, __int2float_rn(exp))*(x<threadIdx.y ? -arg.m_f : 1.f);
-      }else{
-        exp = x>threadIdx.y ? Ls_-x+threadIdx.y : threadIdx.y-x;
-        factorL = inv*powf(k, __int2float_rn(exp))*(x>threadIdx.y ? -arg.m_f : 1.f);
-      }
-      
+
       float RpL = factorR + factorL;
       float RmL = factorR - factorL;
       
       // exp = 0 means we are on the diagonal.
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = exp==0 ? RpL+b : RpL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = exp==0 ? RpL+b : RpL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = exp==0 ? RpL+b : RpL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = exp==0 ? RpL+b : RpL;
+      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = x==threadIdx.y ? RpL+b : RpL;
+      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = x==threadIdx.y ? RpL+b : RpL;
+      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = x==threadIdx.y ? RpL+b : RpL;
+      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = x==threadIdx.y ? RpL+b : RpL;
         
       // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
@@ -223,8 +279,8 @@ namespace quda {
   
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store to sm_b
-  template<int N_sm_d2, bool acc, class Vector, class Arg>
-  __device__ inline void load_matrix_b_vector(const Vector& v, Arg& arg, half2* sm_b, const float scale){
+  template<int N_sm_d2, bool acc, class Vector>
+  __device__ inline void load_matrix_b_vector(const Vector& v, half2* sm_b, const float scale){
     // First find the largest absolute value in v
     #pragma unroll
     for(int spin = 0; spin < 4; spin++){

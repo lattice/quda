@@ -111,13 +111,13 @@ namespace quda {
 */
   MSPCG::MSPCG(QudaInvertParam* inv_param, SolverParam& _param, TimeProfile& profile, int ic) :
     Solver(_param, profile), solver_prec(0), solver_prec_param(_param), 
-    mat(NULL),  mat_sloppy(NULL), mat_precondition(NULL),
-    nrm_op(NULL), nrm_op_sloppy(NULL), nrm_op_precondition(NULL), 
-    vct_dr(NULL), vct_dp(NULL), vct_dmmp(NULL), vct_dtmp(NULL), vct_dtmp2(NULL),
-    r(NULL), p(NULL), z(NULL), mmp(NULL), tmp(NULL), tmp2(NULL), 
-    fr(NULL), fz(NULL),
-    immp(NULL), ip(NULL), 
-    ifmmp(NULL), ifp(NULL), iftmp(NULL), 
+    mat(nullptr),  mat_sloppy(nullptr), mat_precondition(nullptr),
+    nrm_op(nullptr), nrm_op_sloppy(nullptr), nrm_op_precondition(nullptr), 
+    vct_dr(nullptr), vct_dp(nullptr), vct_dmmp(nullptr), vct_dtmp(nullptr), vct_dtmp2(nullptr),
+    r(nullptr), p(nullptr), z(nullptr), mmp(nullptr), tmp(nullptr), tmp2(nullptr), 
+    fr(nullptr), fz(nullptr),
+    immp(nullptr), ip(nullptr), 
+    ifmmp(nullptr), ifp(nullptr), iftmp(nullptr), ifset(nullptr), 
     inner_iterations(ic), reliable_update_delta(inv_param->reliable_delta)
   { 
 
@@ -127,15 +127,12 @@ namespace quda {
     R[1]=2;
     R[2]=2;
     R[3]=2;
-    // TODO: R is the checkerboarded size.
-
 
     if(inv_param->dslash_type != QUDA_MOBIUS_DWF_DSLASH){
       errorQuda("ONLY works for QUDA_MOBIUS_DWF_DSLASH.");
     }
 
     // create extended gauge field
-    // TODO: dynamical allocation need fix
     if(not gaugePrecondition){
       errorQuda("gaugePrecondition not valid.");
     }
@@ -232,9 +229,9 @@ namespace quda {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // csParam.print();
     // TODO: def
-    cudaColorSpinorField* tx = NULL;
-    cudaColorSpinorField* tt = NULL;
-    cudaColorSpinorField* tb = NULL;
+    cudaColorSpinorField* tx = nullptr;
+    cudaColorSpinorField* tt = nullptr;
+    cudaColorSpinorField* tb = nullptr;
 
     tx  = new cudaColorSpinorField(csParam);
     tt  = new cudaColorSpinorField(csParam);
@@ -262,10 +259,10 @@ namespace quda {
     cudaColorSpinorField* cx = new cudaColorSpinorField(csParam);
     blas::copy( *cb, *tb );
 
-    cudaColorSpinorField* fx = NULL;
-    cudaColorSpinorField* fy = NULL;
-    cudaColorSpinorField* fb = NULL;
-    cudaColorSpinorField* ft = NULL;
+    cudaColorSpinorField* fx = nullptr;
+    cudaColorSpinorField* fy = nullptr;
+    cudaColorSpinorField* fb = nullptr;
+    cudaColorSpinorField* ft = nullptr;
 
     constexpr int test_shift = 2;
     csParam.x[0] += 2*test_shift/2;
@@ -283,7 +280,7 @@ namespace quda {
     blas::zero(*fb);
     blas::zero(*fx);
 
-    copyExtendedColorSpinor(*fb, *tb, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
+    copyExtendedColorSpinor(*fb, *tb, QUDA_CUDA_FIELD_LOCATION, 0, nullptr, nullptr, nullptr, nullptr); // parity = 0
 
     double fx2 = norm2(*fx);
     for(double s = 0.00390625; s < 256.5; s *= 1.189207115){ // 2^-8 ~ 2^+8
@@ -357,7 +354,7 @@ namespace quda {
       blas::zero(*fx); blas::zero(*ft);
       mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(*ft, *fb, static_cast<QudaParity>(0), *fy, -1.0, sp_len0, RR0, Xs0);   
       mat_precondition->fused_f3(*cx, *fb, *fy, 1., static_cast<QudaParity>(0), shift2, shift1);
-      copyExtendedColorSpinor(*fx, *cx, QUDA_CUDA_FIELD_LOCATION, 0, NULL, NULL, NULL, NULL); // parity = 0
+      copyExtendedColorSpinor(*fx, *cx, QUDA_CUDA_FIELD_LOCATION, 0, nullptr, nullptr, nullptr, nullptr); // parity = 0
       printfQuda("f3: <------\n");
       ft2 = blas::norm2(*ft);
       printfQuda("           ft2 = %16.12e.\n", ft2);
@@ -402,11 +399,15 @@ namespace quda {
     int odd_bit = (mat_precondition->getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if(tc && (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION)){
-      mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift2, shift2);
-      mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift1, shift2);
-      mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift0, shift1);
-      mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift1, shift1);
-      mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift2, shift2);
+      if(R[0] == 2){
+        mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift2, shift2);
+        mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift1, shift2);
+        mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift0, shift1);
+        mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift1, shift1);
+        mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift2, shift2);
+      }else{
+        errorQuda("Padding can only be 2\n");
+      }
     }else{
       errorQuda("Since the preconditioner does NOT use copy_color_spin_field_extended functionalities"
         "anymore the legacy non-tensor-core code does Not work.\n");

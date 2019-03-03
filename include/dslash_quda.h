@@ -188,6 +188,7 @@ namespace quda {
       const Complex* b_5, const Complex* c_5, bool dagger, int parity, int shift[4], int halo_shift[4],
       const double scale, MdwfFusedDslashType type);
   }
+
   // The EOFA stuff
   namespace mobius_eofa{
     void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
