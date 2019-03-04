@@ -543,6 +543,9 @@ endif(QUDA_INTERFACE_BQCD)
 
 if(QUDA_INTERFACE_TIFR)
   add_definitions(-DBUILD_TIFR_INTERFACE)
+  if(NOT QUDA_LEGACY_DSLASH)
+    message(FATAL_ERROR "QUDA_INTERFACE_TIFR currently only supported with QUDA_LEGACY_DSLASH.")
+  endif()
 endif(QUDA_INTERFACE_TIFR)
 
 if(QUDA_NUMA_NVML)
