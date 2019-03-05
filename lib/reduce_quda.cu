@@ -854,9 +854,9 @@ namespace quda {
       pipePCGRRMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
       __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) {
 
-	       typedef typename ScalarType<ReduceType>::type scalar;
+	 typedef typename ScalarType<ReduceType>::type scalar;
 
-				 z = n + b.x*z;
+	 z = n + b.x*z;
          q = m + b.x*q;
          s = w + b.x*s;
          p = u + b.x*p;
@@ -865,12 +865,12 @@ namespace quda {
          u = u - a.x*q;
          w = w - a.x*z;
          r = r - a.x*s;
-				 n = w - r;
+	 n = w - r;
 
          dot_<scalar>   (sum[0].x, r, u);
          dot_<scalar>   (sum[0].y, w, u);
-				 norm2_<scalar> (sum[0].z, r);
-				 norm2_<scalar> (sum[1].x, s);
+	 norm2_<scalar> (sum[0].z, r);
+	 norm2_<scalar> (sum[1].x, s);
          norm2_<scalar> (sum[1].y, z);
          dot_<scalar>   (sum[1].z, s, u);
     }
@@ -884,20 +884,21 @@ namespace quda {
       static int flops() { return (16+6); } //! flops per real element
     };
 
-		void pipePCGRRMergedOp(double3 *buffer, const int buffer_size, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, ColorSpinorField &r, ColorSpinorField &s,
-																ColorSpinorField &m, const double &b, ColorSpinorField &q,
-							ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
-			if (x.Precision() != p.Precision()) {
-				 errorQuda("\nMixed blas is not implemented.\n");
-			}
-			if(buffer_size != 2) errorQuda("Incorrect buffer size. \n");
+    void pipePCGRRMergedOp(double3 *buffer, const int buffer_size, ColorSpinorField &x, const double &a, ColorSpinorField &p, 
+		           ColorSpinorField &u, ColorSpinorField &r, ColorSpinorField &s,
+			   ColorSpinorField &m, const double &b, ColorSpinorField &q,
+			   ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
+	if (x.Precision() != p.Precision()) {
+	  errorQuda("\nMixed blas is not implemented.\n");
+	}
+	if(buffer_size != 2) errorQuda("Incorrect buffer size. \n");
 
-			reduce::reduceCudaExp<2, double3, QudaSumFloat3,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,1,1,false>
-					(buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
-			return;
-		}
+	reduce::reduceCudaExp<2, double3, QudaSumFloat3,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,1,1,false>
+	   (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
+	return;
+    }
 
-		template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
+    template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
     struct pipe2PCGMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
       Float2 a;
       Float2 b;

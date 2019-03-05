@@ -110,25 +110,26 @@ namespace quda {
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
 
-		void pipePCGRRMergedOp(double3 *buffer, const int buffer_size, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u,
-														ColorSpinorField &r, ColorSpinorField &s, ColorSpinorField &m, const double &b, ColorSpinorField &q, ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z);
+    void pipePCGRRMergedOp(double3 *buffer, const int buffer_size, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u,
+			   ColorSpinorField &r, ColorSpinorField &s, ColorSpinorField &m, const double &b, ColorSpinorField &q, ColorSpinorField &w, 
+			   ColorSpinorField &n, ColorSpinorField &z);
 
 
-		void pipe2PCGMergedOp(double4 *buffer, const double &a, const double &b, const double &c, const double &a2, const double &b2, const double &c2,
-																ColorSpinorField &x1, ColorSpinorField &r1, ColorSpinorField &w1,
-																ColorSpinorField &q1, ColorSpinorField &d1, ColorSpinorField &h1, ColorSpinorField &z1,
-																ColorSpinorField &p1, ColorSpinorField &u1, ColorSpinorField &g1,
-																ColorSpinorField &x2, ColorSpinorField &r2, ColorSpinorField &w2,
-																ColorSpinorField &q2, ColorSpinorField &d2, ColorSpinorField &h2, ColorSpinorField &z2,
-							                  ColorSpinorField &p2, ColorSpinorField &u2, ColorSpinorField &g2);
+    void pipe2PCGMergedOp(double4 *buffer, const double &a, const double &b, const double &c, const double &a2, const double &b2, const double &c2,
+			  ColorSpinorField &x1, ColorSpinorField &r1, ColorSpinorField &w1,
+			  ColorSpinorField &q1, ColorSpinorField &d1, ColorSpinorField &h1, ColorSpinorField &z1,
+			  ColorSpinorField &p1, ColorSpinorField &u1, ColorSpinorField &g1,
+			  ColorSpinorField &x2, ColorSpinorField &r2, ColorSpinorField &w2,
+			  ColorSpinorField &q2, ColorSpinorField &d2, ColorSpinorField &h2, ColorSpinorField &z2,
+			  ColorSpinorField &p2, ColorSpinorField &u2, ColorSpinorField &g2);
 
-		void pipe2CGMergedOp(double4 *buffer, const double &a, const double &b, const double &c, const double &a2, const double &b2, const double &c2,
-																ColorSpinorField &x1, ColorSpinorField &r1, ColorSpinorField &w1,
-																ColorSpinorField &q1, ColorSpinorField &d1, ColorSpinorField &h1, ColorSpinorField &z1,
-																ColorSpinorField &p1, ColorSpinorField &u1, ColorSpinorField &g1,
-																ColorSpinorField &x2, ColorSpinorField &r2, ColorSpinorField &w2,
-																ColorSpinorField &q2, ColorSpinorField &d2, ColorSpinorField &h2, ColorSpinorField &z2,
-							                  ColorSpinorField &p2, ColorSpinorField &u2, ColorSpinorField &g2);
+    void pipe2CGMergedOp(double4 *buffer, const double &a, const double &b, const double &c, const double &a2, const double &b2, const double &c2,
+			 ColorSpinorField &x1, ColorSpinorField &r1, ColorSpinorField &w1,
+			 ColorSpinorField &q1, ColorSpinorField &d1, ColorSpinorField &h1, ColorSpinorField &z1,
+			 ColorSpinorField &p1, ColorSpinorField &u1, ColorSpinorField &g1,
+			 ColorSpinorField &x2, ColorSpinorField &r2, ColorSpinorField &w2,
+			 ColorSpinorField &q2, ColorSpinorField &d2, ColorSpinorField &h2, ColorSpinorField &z2,
+			 ColorSpinorField &p2, ColorSpinorField &u2, ColorSpinorField &g2);
 
     double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
     double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);

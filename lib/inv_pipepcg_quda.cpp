@@ -116,6 +116,16 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_INIT);
 
+    double norm2b = sqrt(norm2(b));
+
+    if(norm2b == 0){
+      printfQuda("Warning: inverting on zero-field source\n");
+      blas::copy(x, b);
+      param.true_res = 0.0;
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+      return;
+    }
+
     ColorSpinorParam csParam(b);
 
     if (!init) {
@@ -147,15 +157,19 @@ namespace quda {
     }
 
     csParam.setPrecision(param.precision);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField *lp = ColorSpinorField::Create(csParam);
-
-    csParam.setPrecision(param.precision_sloppy);
     ColorSpinorField *yp = ColorSpinorField::Create(csParam);
 
-    ColorSpinorField *rp_sloppy   = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : rp;
-    ColorSpinorField *tmpp_sloppy = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : tmpp;
-    ColorSpinorField *xp_sloppy   = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : yp;
+    ColorSpinorField *rp_sloppy = nullptr, *tmpp_sloppy = nullptr, *xp_sloppy = nullptr;
+
+    if(param.precision_sloppy != param.precision) {
+      csParam.setPrecision(param.precision_sloppy);
+      rp_sloppy   = ColorSpinorField::Create(csParam);
+      tmpp_sloppy = ColorSpinorField::Create(csParam);
+      xp_sloppy   = ColorSpinorField::Create(csParam);
+    } else {
+      rp_sloppy   = rp;
+      tmpp_sloppy = tmpp;
+    }
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &p = *pp;
@@ -168,78 +182,71 @@ namespace quda {
     ColorSpinorField &z = *zp;
 
     ColorSpinorField &y = *yp;
-    ColorSpinorField &l = *lp;
 
-    ColorSpinorField &r_sloppy = *rp_sloppy;
-    ColorSpinorField &x_sloppy = *xp_sloppy;
+    ColorSpinorField &rSloppy = *rp_sloppy;
+    ColorSpinorField &xSloppy = ( param.use_sloppy_partial_accumulator == true && param.precision_sloppy != param.precision ) ? *xp_sloppy : x;
 
     ColorSpinorField &pPre = *p_pre;
     ColorSpinorField &rPre = *r_pre;
-    ColorSpinorField &tmp  = *tmpp;
-    ColorSpinorField &tmp_sloppy  = *tmpp_sloppy;
 
-    // Check to see that we're not trying to invert on a zero-field source
-    const double b2    = blas::norm2(b);
-    y = x;
-
-    if(b2 == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      printfQuda("Warning: inverting on zero-field source\n");
-      blas::copy(x, b);
-      param.true_res = 0.0;
-      return;
-    }
-
-    //compute residual
-    mat(r, x, tmp); // => r = A*x;
-    blas::xpay(b,-1.0, r);
-    r_sloppy = r;
-
-    const double eps     = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() : pow(2.,-13));
-    const double sqrteps = param.delta*sqrt(eps);
-
-    double Dcr = 0.0, Dcs = 0.0, Dcw = 0.0, Dcz = 0.0;
-    double errr = 0.0, errrprev = 0.0, errs = 0.0, errw = 0.0, errz = 0.0;
+    ColorSpinorField &tmp        = *tmpp;
+    ColorSpinorField &tmpSloppy  = *tmpp_sloppy;
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
-    printfQuda("Stopping condition: %le\n", stop);
+    const double epsln     = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() : pow(2.,-13));
+    const double sqrteps   = param.delta*sqrt(epsln);
+
+    double Dcr   = 0.0, Dcs      = 0.0, Dcw      = 0.0, Dcz      = 0.0;
+    double errr  = 0.0, errrprev = 0.0, errs     = 0.0, errw     = 0.0, errz = 0.0;
+    double alpha = 0.0, beta     = 0.0, alphaold = 0.0, gammaold = 0.0, eta  = 0.0;
 
     double3 *local_reduce = new double3[2];//to keep double3 or double4 registers
 
-    double alpha = 0.0, beta = 0.0, alpha_old = 0.0, gamma_old = 0.0, eta = 0.0;
+    blas::flops = 0;
 
-    double &gamma = local_reduce[0].x, &delta = local_reduce[0].y, &mNorm = local_reduce[0].z;
+    double *recvbuff = new double[6];
+    MPI_Request request_handle;
+
+    double &gamma = local_reduce[0].x, &delta = local_reduce[0].y, &rnorm = local_reduce[0].z;
     double &sigma = local_reduce[1].x, &zeta  = local_reduce[1].y, &tau   = local_reduce[1].z;
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    // Compute residual
+    mat(r, x, tmp);
+    rnorm    = sqrt(xmyNorm(b,r));
+    rSloppy  = r;
+    y = x;
 
     if(K) {
-      rPre = r_sloppy;
+      rPre = rSloppy;
       commGlobalReductionSet(false);
       (*K)(pPre, rPre);
       commGlobalReductionSet(true);
       u = pPre;
       blas::zero(m);
     } else {
-      u = r_sloppy;
+      u = rSloppy;
     }
 
-    matSloppy(w, u, tmp_sloppy); // => w = A*u;
+    matSloppy(w, u, tmpSloppy);
+    zero(xSloppy);
 
-    blas::flops = 0;
+    double stop = rnorm*rnorm*param.tol*param.tol;
+    double heavy_quark_res = 0.0;
+    printfQuda(" PipePCG: Initial (relative) residual %le ", rnorm / norm2b);
 
-    double *recvbuff   = new double[6];
-    MPI_Request request_handle;
-    //
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+
+    // zero cycle
     commGlobalReductionSet(false);
 
-    gamma = blas::reDotProduct(r_sloppy,u);
-    delta = blas::reDotProduct(w,u);
-    mNorm = blas::norm2(u);
+    gamma  = reDotProduct(rSloppy, u);
+    delta  = reDotProduct(w, u);
+
+    //Start async communications:
+    MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
 
     if(K) {
       rPre = w;
@@ -251,109 +258,124 @@ namespace quda {
 
     commGlobalReductionSet(true);
 
-    //Start async communications:
-    MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
-    matSloppy(n, m, tmp_sloppy);
-    MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
-    memcpy(local_reduce, recvbuff, 3*sizeof(double));
+    matSloppy(n, m, tmpSloppy);
 
-    // START zero iteration:
-    eta   = delta;
-    alpha = gamma / eta;
+    MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
+    memcpy(local_reduce, recvbuff, 2*sizeof(double));
+
+    eta      = delta;
+    alpha    = gamma / eta, beta = 0.0;
+    alphaold = 0.0, gammaold = 0.0, tau = 0.0;
+
+    double theta  = 1.0;
 
     z = n;           //  z <- n
-  	q = m;           //  q <- m
-  	p = u;           //  p <- u
-  	s = w;           //  s <- w
-  	blas::axpy( alpha, p, x);        //  x <- x + alpha * p
-  	blas::axpy(-alpha, q, u);        //  u <- u - alpha * q
-  	blas::axpy(-alpha, z, w);        //  w <- w - alpha * z
-  	blas::axpy(-alpha, s, r_sloppy); //  r <- r - alpha * s
+    q = m;           //  q <- m
+    p = u;           //  p <- u
+    s = w;           //  s <- w
+    axpy( alpha, p, xSloppy);        //  x <- x + alpha * p
+    axpy(-alpha, q, u);        //  u <- u - alpha * q
+    axpy(-alpha, z, w);        //  w <- w - alpha * z
+    axpy(-alpha, s, rSloppy);        //  r <- r - alpha * s
     n = w;
-	  blas::mxpy(r_sloppy, n);          //  n <- w - r
+    axpy(-theta, rSloppy, n);          //  n <- w(=n) - r
 
     commGlobalReductionSet(false);
 
-    gamma_old = gamma;
-    gamma = blas::reDotProduct(r_sloppy,u);
-    delta = blas::reDotProduct(w,u);
-    mNorm = blas::norm2(u);
-    sigma = blas::norm2(s);
-    zeta  = blas::norm2(z);
-    tau   = blas::reDotProduct(s,u);
+    gammaold = gamma;
+    gamma   = reDotProduct(rSloppy, u);
+    tau     = reDotProduct(s, u);
+    delta   = reDotProduct(w, u);
+    rnorm   = sqrt(norm2(rSloppy));
+
+    sigma  = sqrt(norm2(s));
+    zeta   = sqrt(norm2(z));
+
+    //Start async communications:
+    MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
 
     if(K) {
       rPre = n;
       (*K)(pPre, rPre);
       m = pPre;
-      blas::xpy(u, m);
+      axpy(theta, u, m);
     } else {
       m = w;
     }
 
     commGlobalReductionSet(true);
 
-    //Start async communications:
-    MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
-    matSloppy(n, m, tmp_sloppy);
+    matSloppy(n, m, tmpSloppy);
+
     MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
     memcpy(local_reduce, recvbuff, 6*sizeof(double));
 
-    int j = 1;
-    double heavy_quark_res = 0.0;
-    bool updateR = false;
-    //
-    PrintStats( "PipePCG (before main loop)", j, mNorm, b2, heavy_quark_res);
+    int k = 1, totResUpdates = 0;
+    bool is_converged = false, rUpdate  = false;
 
-    while(!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter){
+    PrintStats( "PipePCG (before main loop)", k, rnorm*rnorm, norm2b*norm2b, heavy_quark_res);
+
+    while (k < param.maxiter && !is_converged) {
 
       beta = -tau / eta;
-  	  eta  = delta - beta*beta*eta;
-  	  alpha_old = alpha; alpha = gamma / eta;
+      eta = delta - beta*beta*eta;
+      alphaold = alpha; alpha = gamma / eta;
+      gammaold = gamma;
 
-      Dcr = (2.0*alpha_old*sqrt(zeta))*eps;
-      Dcs = (2.0*beta*sqrt(sigma)+2.0*alpha_old*sqrt(zeta))*eps;
-  	  Dcw = (2.0*alpha_old*sqrt(zeta))*eps;
-  	  Dcz = (2.0*beta*sqrt(zeta))*eps;
+      Dcr = (2.0*alphaold*sigma)*epsln;
+      Dcs = (2.0*beta*sigma+2.0*alphaold*zeta)*epsln;
+      Dcw = (2.0*alphaold*zeta)*epsln;
+      Dcz = (2.0*beta*zeta)*epsln;
 
-      if (j == 1 || updateR) {
-		    printfQuda("(Re-)initialize reliable parameters..");
+      commGlobalReductionSet(false);
+
+      pipePCGRRMergedOp(local_reduce,2,xSloppy,alpha,p,u,rSloppy,s,m,beta,q,w,n,z);
+
+      commGlobalReductionSet(true);
+      //
+      sigma = sqrt(sigma);
+      zeta  = sqrt(zeta);
+      rnorm = sqrt(rnorm);
+
+      if (k == 1 || rUpdate) {
+        printfQuda("(Re-)initialize reliable parameters..");
         errrprev = errr;
         errr = Dcr;
         errs = Dcs;
         errw = Dcw;
         errz = Dcz;
-        updateR = false;
+        rUpdate = false;
       } else {
         errrprev = errr;
-        errr = errr + alpha_old*errs + Dcr;
-        errs = beta*errs + errw + alpha_old*errz + Dcs;
-        errw = errw + alpha_old*errz + Dcw;
+        errr = errr + alphaold*errs + Dcr;
+        errs = beta*errs + errw + alphaold*errz + Dcs;
+        errw = errw + alphaold*errz + Dcw;
         errz = beta*errz + Dcz;
       }
 
-      bool updateR = ((j > 1 && errrprev <= (sqrteps * sqrt(gamma_old)) && errr > (sqrteps * sqrt(gamma))) );
+      // Check convergence:
+      is_converged = ((rnorm*rnorm) < stop);
+      PrintStats( "PipePCG", k, rnorm*rnorm, norm2b*norm2b, heavy_quark_res);
 
-      gamma_old = gamma;
+      rUpdate = (gamma < 0.0) || ( (k > 1 && errrprev <= (sqrteps * sqrt(gammaold)) && errr > (sqrteps * sqrt(abs(gamma)))));
 
-      if (!updateR){
-
-        commGlobalReductionSet(false);//disable global reduction
-        pipePCGRRMergedOp(local_reduce,2,y,alpha,p,u,r_sloppy,s,m,beta,q,w,n,z);
-        commGlobalReductionSet(true);
-
+      if (!rUpdate) {
+        // No residual update , just start async global reduction:
+        MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
       } else {
 
-        x_sloppy = y;
-        xpy(x_sloppy,x);
-        zero(y);
+	      x = xSloppy;
+        xpy(x,y);
+        zero(xSloppy);
 
-        mat(r, x, tmp);
-        xpay(b, -1.0, r);
-        r_sloppy = r;
+        printfQuda("Do reliable update...");
 
-        if(K) {
-          rPre = r_sloppy;
+        mat(r,y,tmp);
+        rnorm   = sqrt(xmyNorm(b,r));
+   	    rSloppy = r;
+
+	      if(K) {
+          rPre = r;
 
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
@@ -361,21 +383,13 @@ namespace quda {
 
           u = pPre;
         } else {
-          u = r_sloppy;
+          u = r;
         }
 
-        l = u;
-        mat(r, l, tmp_sloppy);
-        w = r;
 
-        n = w;
-    	  blas::mxpy(r_sloppy, n);          //  n <- w - r
-
-        l = p;
-        mat(r, l, tmp_sloppy);
-        s = r;
-
-        if(K) {
+        matSloppy(w,u,tmpSloppy);
+        matSloppy(s,p,tmpSloppy);
+	      if(K) {
           rPre = s;
 
           commGlobalReductionSet(false);
@@ -387,18 +401,25 @@ namespace quda {
           q = s;
         }
 
-        l = q;
-        mat(r, l, tmp_sloppy);
-        z = r;
-
+        matSloppy(z,q,tmpSloppy);
+        printfQuda("True absolute residual after the update %1.15e (relative %1.15e).\n", rnorm, rnorm/norm2b);
         commGlobalReductionSet(false);
-        gamma = blas::reDotProduct(r_sloppy,u);
-        delta = blas::reDotProduct(w,u);
-        mNorm = blas::norm2(u);
-        sigma = blas::norm2(s);
-        zeta  = blas::norm2(z);
-        tau   = blas::reDotProduct(s,u);
+
+        gamma   = reDotProduct(rSloppy, u);
+        tau     = reDotProduct(s, u);
+        delta   = reDotProduct(w, u);
+        rnorm   = sqrt(norm2(rSloppy));
+
+        sigma   = sqrt(norm2(s));
+        zeta    = sqrt(norm2(z));
+
+        MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
+
         commGlobalReductionSet(true);
+        n = w;
+        axpy(-theta, rSloppy, n);
+
+        totResUpdates +=1;
       }
 
       if(K) {
@@ -407,23 +428,24 @@ namespace quda {
         (*K)(pPre, rPre);
         commGlobalReductionSet(true);
         m = pPre;
-        blas::xpy(u, m);
+        axpy(theta, u, m);
       } else {
         m = w;
       }
 
-      //Start async communications:
-      MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
-      matSloppy(n, m, tmp_sloppy);
+      matSloppy(n, m, tmpSloppy);
+
       MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
       memcpy(local_reduce, recvbuff, 6*sizeof(double));
 
-      j += 1;
+      // Update iter index
+      k += 1;
 
-      PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
-    }
+    } //end while
 
     delete [] recvbuff;
+
+    printfQuda("Finish PipeFCG: %d iterations, total restarst: %d \n", k, totResUpdates);
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -431,16 +453,16 @@ namespace quda {
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matPrecon.flops())*1e-9;
     param.gflops = gflops;
-    param.iter += j;
+    param.iter += k;
 
-    if (j==param.maxiter)  warningQuda("Exceeded maximum iterations %d", param.maxiter);
+    if (k==param.maxiter)  warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residual
-    x_sloppy = y;
-    xpy(x_sloppy, x);
-    mat(r, x, tmp);
-    double true_res = blas::xmyNorm(b, r);
-    param.true_res = sqrt(true_res / b2);
+    x = xSloppy;
+    xpy(x, y);
+    x = y;
+    mat(r, y, tmp);
+    param.true_res = sqrt(blas::xmyNorm(b, r)) / norm2b;
 
     // reset the flops counters
     blas::flops = 0;
@@ -449,7 +471,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-    delete lp;
     delete yp;
 
     delete[] local_reduce;
@@ -461,7 +482,9 @@ namespace quda {
     }
 
     return;
+
   }
+
 
 #ifdef FULL_PIPELINE
 #undef FULL_PIPELINE
