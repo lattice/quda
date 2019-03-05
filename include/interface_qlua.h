@@ -166,6 +166,9 @@ qluaCntrQQ_Id parseContractIdx(const char *v);
 EXTRN_C
 qluaCntr_Type parse_qcContractType(const char *s);
 
+EXTRN_C
+void Qlua_printMemInfo();
+
 
 EXTRN_C int
 doQQ_contract_Quda(

@@ -19,8 +19,8 @@
 
 using namespace quda;
 
-
-void printCPUMemInfo(){
+void
+printCPUMemInfo(){
   struct sysinfo memInfo;
   sysinfo (&memInfo);
   long long totalPhysMem = memInfo.totalram;
@@ -34,8 +34,8 @@ void printCPUMemInfo(){
   printfQuda("  CPUMemInfo: Used  CPU Memory: %lld MBytes.\n", usedPhysMem /(1<<20));
 }
 
-
-void printGPUMemInfo(){
+void
+printGPUMemInfo(){
   size_t freeGPUMem, totalGPUMem;
   if(cudaMemGetInfo(&freeGPUMem, &totalGPUMem) != cudaSuccess)
     errorQuda("  GPUMemInfo: Memory-related error occured!\n");
@@ -46,6 +46,16 @@ void printGPUMemInfo(){
   }
 }
 
+
+EXTRN_C void
+Qlua_printMemInfo(){
+  printfQuda("\n-------------------------------------------------\n");
+  printfQuda("%s:\n", __func__);
+  printCPUMemInfo();
+  printfQuda("\n");
+  printGPUMemInfo();
+  printfQuda("-------------------------------------------------\n\n");
+}
 
 QudaVerbosity parseVerbosity(const char *v){
 
