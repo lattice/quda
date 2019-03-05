@@ -269,16 +269,16 @@ namespace quda {
 
     double theta  = 1.0;
 
-    z = n;           //  z <- n
-    q = m;           //  q <- m
-    p = u;           //  p <- u
-    s = w;           //  s <- w
-    axpy( alpha, p, xSloppy);        //  x <- x + alpha * p
-    axpy(-alpha, q, u);        //  u <- u - alpha * q
-    axpy(-alpha, z, w);        //  w <- w - alpha * z
-    axpy(-alpha, s, rSloppy);        //  r <- r - alpha * s
+    z = n;           
+    q = m;           
+    p = u;           
+    s = w;           
+    axpy( alpha, p, xSloppy);        
+    axpy(-alpha, q, u);        
+    axpy(-alpha, z, w);        
+    axpy(-alpha, s, rSloppy);        
     n = w;
-    axpy(-theta, rSloppy, n);          //  n <- w(=n) - r
+    axpy(-theta, rSloppy, n);          
 
     commGlobalReductionSet(false);
 
@@ -328,6 +328,22 @@ namespace quda {
       Dcz = (2.0*beta*zeta)*epsln;
 
       commGlobalReductionSet(false);
+      //  Merged kernel:
+      //  z = n + beta * z
+      //  q = m + beta * q
+      //  p = u + beta * p
+      //  s = w + beta * s
+      //  x = x + alpha * p
+      //  u = u - alpha * q
+      //  w = w - alpha * z
+      //  r = r - alpha * s
+      //  n = w - r
+      //  local_reduce[0].x = (r, u) gamma
+      //  local_reduce[0].y = (s, u) delta
+      //  local_reduce[0].w = (r, r) rnorm
+      //  local_reduce[1].x = (s, s) sigma
+      //  local_reduce[1].y = (z, z) zeta
+      //  local_reduce[0].w = (w, u) tau
 
       pipePCGRRMergedOp(local_reduce,2,xSloppy,alpha,p,u,rSloppy,s,m,beta,q,w,n,z);
 
@@ -484,11 +500,6 @@ namespace quda {
     return;
 
   }
-
-
-#ifdef FULL_PIPELINE
-#undef FULL_PIPELINE
-#endif
 
 #ifdef NONBLOCK_REDUCE
 #undef MPI_CHECK_
