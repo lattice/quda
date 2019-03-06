@@ -266,6 +266,7 @@ namespace quda {
       init = true;
     }
 
+    //DMH start
     //Once the CG operator is called, we are able to construct an appropriate
     //Krylov space for deflation
     if (param.eig_param.deflate == true && !deflate_init) {
@@ -297,6 +298,7 @@ namespace quda {
       param.evecs.resize(param.eig_param.nEv);
       deflate_init = true;
     }
+    //DMH end
     
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
@@ -347,6 +349,7 @@ namespace quda {
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
 
+      //DMH start
       if (param.eig_param.deflate == true) {
 	printfQuda("init yes + deflate\n");
 	//Deflate the exact part from the RHS
@@ -355,6 +358,7 @@ namespace quda {
 	eig_solver->deflate(defl_guess, rhs, param.evecs, param.evals);
 	blas::copy(x, *defl_guess[0]);
       }
+      //DMH end
       mat(r, x, y, tmp3);
       r2 = blas::xmyNorm(b, r);
       if (b2 == 0) b2 = r2;
@@ -705,10 +709,13 @@ namespace quda {
 
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
+
+    //DMH start
     if (param.eig_param.deflate == true) {
       //Reconstruct full solution
       //blas::xpy(*defl_guess[0], x);
     }
+    //DMH end
     
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
