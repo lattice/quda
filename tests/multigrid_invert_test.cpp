@@ -232,6 +232,10 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 //Parameters defining the eigensolver
 void setEigParam(QudaEigParam &mg_eig_param, int level) {
 
+  mg_eig_param.nEv = nvec[level];
+  mg_eig_param.nKr = nvec[level] + nvec[level]/2;
+  mg_eig_param.spectrum = mg_eig_spectrum[level];
+  
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
 
@@ -642,11 +646,6 @@ int main(int argc, char **argv)
   for(int i=0; i<mg_levels; i++) {
     mg_eig_param[i] = newQudaEigParam();
     setEigParam(mg_eig_param[i], i);
-    //If on the coarse level, give the invert param too
-    //for the deflated solver
-    if (i == mg_levels-1 && deflate_coarsest) {
-      mg_eig_param[i].invert_param = &inv_param;
-    }
     mg_param.eig_param[i] = &mg_eig_param[i];
   }
   //Set MG

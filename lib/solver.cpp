@@ -21,7 +21,7 @@ namespace quda {
 			 DiracMatrix &matPrecon, TimeProfile &profile)
   {
     Solver *solver = nullptr;
-
+    
        
     if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER)
       errorQuda("Explicit preconditoner not supported for %d solver", param.inv_type);
@@ -132,7 +132,7 @@ namespace quda {
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
     }
-
+    
     return solver;
   }
 

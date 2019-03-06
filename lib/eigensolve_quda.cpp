@@ -17,7 +17,7 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
-bool flags = true;
+bool flags = false;
 
 namespace quda {
   
@@ -182,26 +182,25 @@ namespace quda {
 			    std::vector<Complex> evals) {
     
     //number of evecs
-    int Nvecs = eig_vecs.size();
+    int Nvecs = eig_param->nEv;
 
-    //printfQuda("Deflating %d vectors\n", Nvecs);
+    printfQuda("Deflating %d vectors\n", Nvecs);
 
-    //Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * x_coarse = r_coarse_DEFL
+    //Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
     //for all i computed eigenvectors and values.
-
-    //1. Take block inner product: (V_i)^dag * xcoarse = A_i
-    Complex *s = new Complex[Nvecs];     
+    
+    //1. Take block inner product: (V_i)^dag * vec = A_i
+    Complex *s = new Complex[Nvecs];
     blas::cDotProduct(s, eig_vecs, vec);
     
-    //2. Perform block caxpy: x_coarse_DEFL = Sum_i V_i * (L_i)^{-1} * A_i
+    //2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
     for(int i=0; i<Nvecs; i++) {
       s[i] /= evals[i].real();
     }
-    
+
+    //3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
     blas::caxpy(s, eig_vecs, vec_defl);
-    
-    //printfQuda("Deflation complete\n");
     
   }
 

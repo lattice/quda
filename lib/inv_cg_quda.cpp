@@ -35,17 +35,20 @@ namespace quda {
       if (pp) delete pp;
       if (yp) delete yp;
       if (App) delete App;
-      if(param.precision != param.precision_sloppy) {
+      if (param.precision != param.precision_sloppy) {
 	if (rSloppyp) delete rSloppyp;
 	if (xSloppyp) delete xSloppyp;
       }
       if (tmpp) delete tmpp;
-      if(!mat.isStaggered()) {
+      if (!mat.isStaggered()) {
 	if (tmp2p && tmpp != tmp2p) delete tmp2p;
 	if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
       }
       if (rnewp) delete rnewp;
-
+      if (deflate_init) {
+	for (auto veci : param.evecs) if (veci) delete veci;
+      }
+      
       init = false;
     }
     profile.TPSTOP(QUDA_PROFILE_FREE);
@@ -263,40 +266,37 @@ namespace quda {
       init = true;
     }
 
-    std::vector<ColorSpinorField*> tempy;
-    
     //Once the CG operator is called, we are able to construct an appropriate
     //Krylov space for deflation
-    if (param.eig_param.deflate && !deflate_init) {
-      //Deflation requested + first instance of solver
-      printfQuda("Flag 1\n");
-      EigenSolver *eig_solver_lc = EigenSolver::create(&param.eig_param,
-						       *mat.Expose(),
-						       profile);
+    if (param.eig_param.deflate == true && !deflate_init) {
 
-      std::vector<ColorSpinorField*> B_evecs;
-      ColorSpinorParam csParam(*tmpp);
-      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      //Deflation requested + first instance of solver
+      eig_solver = EigenSolver::create(&param.eig_param,
+				       *mat.Expose(),
+				       profile);
+      
+      //Clone from an existing vector
+      ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       //This is the vector precision used by matResidual
-      csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+      csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);      
+      param.evecs.resize(param.eig_param.nKr);
+      for (int i=0; i<param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
+      //Construct a vector to hold deflated RHS
+      defl_guess.push_back(ColorSpinorField::Create(csParam));
       
-      for (int i=0; i<param.eig_param.nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
-      
-      printfQuda("Flag 2\n");
-      //param.evecs.resize(param.eig_param.nKr);
-      printfQuda("Flag 4\n");
       param.evals.resize(param.eig_param.nEv);
-      printfQuda("Flag 5\n");
-      for (int i=0; i<param.eig_param.nKr; i++) {
-	B_evecs.push_back(ColorSpinorField::Create(csParam));
-	if(i<param.eig_param.nEv) param.evals[i] = 0.0;
-      }
-      printfQuda("Flag 6\n");
-      (*eig_solver_lc)(B_evecs, param.evals);
+      for (int i=0; i<param.eig_param.nEv; i++)  param.evals[i] = 0.0;
+      
+      (*eig_solver)(param.evecs, param.evals);
+
+      //Erase the unwanted (nKr - nEv) vectors
+      //FIXME: Either find a better way to clean up or pass an explicit integer
+      //       to the deflation function.
+      param.evecs.erase(param.evecs.begin()+param.eig_param.nEv, param.evecs.begin()+param.eig_param.nKr);
+      param.evecs.resize(param.eig_param.nEv);
       deflate_init = true;
     }
-    
     
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
@@ -326,9 +326,9 @@ namespace quda {
     const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double deps=sqrt(u);
     constexpr double dfac = 1.1;
-    double d_new =0 ;
-    double d =0 ;
-    double dinit =0;
+    double d_new = 0;
+    double d = 0;
+    double dinit = 0;
     double xNorm = 0;
     double xnorm = 0;
     double pnorm = 0;
@@ -346,7 +346,15 @@ namespace quda {
     // compute initial residual
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      
+
+      if (param.eig_param.deflate == true) {
+	printfQuda("init yes + deflate\n");
+	//Deflate the exact part from the RHS
+	std::vector<ColorSpinorField*> rhs;
+	rhs.push_back(&x);
+	eig_solver->deflate(defl_guess, rhs, param.evecs, param.evals);
+	blas::copy(x, *defl_guess[0]);
+      }
       mat(r, x, y, tmp3);
       r2 = blas::xmyNorm(b, r);
       if (b2 == 0) b2 = r2;
@@ -500,7 +508,7 @@ namespace quda {
         updateX = ( (d <= deps*sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac * dinit);
         updateR = 0;
         // if(updateX)
-          // printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
+	// printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
         // updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
       }
       else{
@@ -697,7 +705,11 @@ namespace quda {
 
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
-
+    if (param.eig_param.deflate == true) {
+      //Reconstruct full solution
+      //blas::xpy(*defl_guess[0], x);
+    }
+    
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
@@ -711,7 +723,7 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
-
+    
     if (param.compute_true_res) {
       // compute the true residuals
       mat(r, x, y, tmp3);

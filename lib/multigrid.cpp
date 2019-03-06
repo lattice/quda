@@ -418,6 +418,10 @@ namespace quda {
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;  
       if(param.mg_global.deflate_coarsest) {
 	param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel-1];
+	printfQuda("CHECK nKr = %d, nEv = %d\n",
+		   param_coarse_solver->eig_param.nKr,
+		   param_coarse_solver->eig_param.nEv);
+	
 	param_coarse_solver->eig_param.deflate = QUDA_BOOLEAN_YES;
 	param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       }

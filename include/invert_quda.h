@@ -235,8 +235,6 @@ namespace quda {
   SolverParam() : compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
       compute_true_res(true), sloppy_converge(false), verbosity_precondition(QUDA_SILENT), mg_instance(false) { ; }
     
-    //evals(evals), evecs(nullptr),  
-
     /**
        Constructor that matches the initial values to that of the
        QudaInvertParam instance
@@ -367,6 +365,7 @@ namespace quda {
     int node_parity;
     bool deflated;
     EigenSolver *eig_solver;
+    std::vector<ColorSpinorField*> defl_guess;
     
   public:
     
@@ -565,6 +564,7 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  //DMH CGDF
   class CGDF : public CG {
     
   private:
@@ -579,10 +579,9 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
-
   //DMH CGDF
-  
 
+  
   class MPCG : public Solver {
     private:
       const DiracMatrix &mat;
