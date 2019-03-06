@@ -354,7 +354,7 @@ namespace quda {
 	printfQuda("init yes + deflate\n");
 	//Deflate the exact part from the RHS
 	std::vector<ColorSpinorField*> rhs;
-	rhs.push_back(&x);
+	rhs.push_back(&r);
 	eig_solver->deflate(defl_guess, rhs, param.evecs, param.evals);
 	blas::copy(x, *defl_guess[0]);
       }

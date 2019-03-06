@@ -197,7 +197,7 @@ namespace quda {
     for(int i=0; i<Nvecs; i++) {
       s[i] /= evals[i].real();
     }
-
+    
     //3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
     blas::caxpy(s, eig_vecs, vec_defl);
