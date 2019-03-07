@@ -101,18 +101,8 @@ namespace quda {
     int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     switch(parity) {
-    case 0:
-      switch(flavor) {
-      case 0: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, 0, 0); break;
-      case 1: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, 1, 0); break;
-      }
-      break;
-    case 1:
-      switch(flavor) {
-      case 0: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, 0, 1); break;
-      case 1: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, 1, 1); break;
-      }
-      break;
+    case 0: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, flavor, 0); break;
+    case 1: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, flavor, 1); break;
     }
   }
 
