@@ -117,7 +117,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
 #ifndef USE_LEGACY_DSLASH
-    ApplyDomainWall4D(out, in, *gauge, k, m5, b_5, c_5, in, parity, dagger, commDim, profile);
+    ApplyDomainWall4D(out, in, *gauge, k, m5, b_5, c_5, x, parity, dagger, commDim, profile);
 #else
     double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
     for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
