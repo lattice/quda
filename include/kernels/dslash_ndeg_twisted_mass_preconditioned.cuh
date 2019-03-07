@@ -9,21 +9,25 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType reconstruct_>
   struct NdegTwistedMassArg : WilsonArg<Float,nColor,reconstruct_> {
     typedef typename mapper<Float>::type real;
-    real a; // this is the Wilson-dslash scale factor
-    real b; // this is the chiral twist factor
-    real c; // this is the flavor twist factor
-    real a_inv; // inverse scaling factor - used to allow early xpay inclusion
-    real b_inv; // inverse chiral twist factor - used to allow early xpay inclusion
-    real c_inv; // inverse flavor twist factor - used to allow early xpay inclusion
-    bool asymmetric; // whether we are applying the asymetric operator or not    
+    real a;     /** this is the Wilson-dslash scale factor */
+    real b;     /** this is the chiral twist factor */
+    real c;     /** this is the flavor twist factor */
+    real a_inv; /** inverse scaling factor - used to allow early xpay inclusion */
+    real b_inv; /** inverse chiral twist factor - used to allow early xpay inclusion */
+    real c_inv; /** inverse flavor twist factor - used to allow early xpay inclusion */
+    bool asymmetric; /** whether we are applying the asymetric operator or not */
 
-    // note WilsonArg::kappa = a
     NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                        double a, double b, double c, bool xpay, const ColorSpinorField &x,
-                       int parity, bool dagger, bool asymmetric, const int *comm_override)
-      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
-      a(a), b(dagger ? -b : b), c(c),  // if dagger flip the chiral twist
-      a_inv(1.0 / (a*(1.0 + b*b - c*c))), b_inv(dagger ? b : -b), c_inv(-c), asymmetric(asymmetric)
+                       int parity, bool dagger, bool asymmetric, const int *comm_override) :
+      WilsonArg<Float,nColor,reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+      a(a),
+      b(dagger ? -b : b), // if dagger flip the chiral twist
+      c(c),
+      a_inv(1.0 / (a*(1.0 + b*b - c*c))),
+      b_inv(dagger ? b : -b),
+      c_inv(-c),
+      asymmetric(asymmetric)
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {

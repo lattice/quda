@@ -7,16 +7,17 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType reconstruct_>
   struct NdegTwistedMassArg : WilsonArg<Float,nColor,reconstruct_> {
     typedef typename mapper<Float>::type real;
-    real a; // this is the Wilson-dslash scale factor
-    real b; // this is the chiral twist factor
-    real c; // this is the flavor twist factor
+    real a; /** this is the Wilson-dslash scale factor */
+    real b; /** this is the chiral twist factor */
+    real c; /** this is the flavor twist factor */
 
-    // note WilsonArg::kappa = a
     NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                        double a, double b, double c, const ColorSpinorField &x,
-                       int parity, bool dagger, const int *comm_override)
-      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
-	a(a), b(dagger ? -b : b), c(c) // if dagger flip the chiral twist
+                       int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float,nColor,reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+      a(a),
+      b(dagger ? -b : b), // if dagger flip the chiral twist
+      c(c)
     { }
   };
 

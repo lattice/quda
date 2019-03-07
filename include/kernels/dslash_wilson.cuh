@@ -24,14 +24,22 @@ namespace quda {
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     typedef typename gauge_mapper<Float,reconstruct,18,QUDA_STAGGERED_PHASE_NO,gauge_direct_load,ghost>::type G;
 
-    F out;                // output vector field
-    const F in;           // input vector field
-    const F x;            // input vector when doing xpay
-    const G U;            // the gauge field
+    typedef typename mapper<Float>::type real;
+
+    F out;                /** output vector field */
+    const F in;           /** input vector field */
+    const F x;            /** input vector when doing xpay */
+    const G U;            /** the gauge field */
+    const real a;         /** xpay scale facotor - can be -kappa or -kappa^2 */
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-              double kappa, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override)
-      : DslashArg<Float>(in, U, kappa, parity, dagger, comm_override), out(out), in(in), U(U), x(x)
+              double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      DslashArg<Float>(in, U, parity, dagger, a != 0.0 ? true : false, 1, comm_override),
+      out(out),
+      in(in),
+      U(U),
+      x(x),
+      a(a)
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -140,10 +148,10 @@ namespace quda {
     int xs = x_cb + s*arg.dc.volume_4d_cb;
     if (xpay && kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(xs, my_spinor_parity);
-      out = x + arg.kappa * out;
+      out = x + arg.a * out;
     } else if (kernel_type != INTERIOR_KERNEL && active) {
       Vector x = arg.out(xs, my_spinor_parity);
-      out = x + (xpay ? arg.kappa * out : out);
+      out = x + (xpay ? arg.a * out : out);
     }
 
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;

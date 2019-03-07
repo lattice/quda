@@ -7,13 +7,14 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType reconstruct_>
   struct TwistedMassArg : WilsonArg<Float,nColor,reconstruct_> {
     typedef typename mapper<Float>::type real;
-    real b; // this is the twist factor
+    real a; /** xpay scale facotor */
+    real b; /** this is the twist factor */
 
-    // note WilsonArg::kappa = a
     TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    double a, double b, const ColorSpinorField &x,
-                   int parity, bool dagger, const int *comm_override)
-      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+                   int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float,nColor,reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+      a(a),
       b(dagger ? -b : b) // if dagger flip the twist
     { }
   };
@@ -44,10 +45,10 @@ namespace quda {
     if (kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
       x += arg.b*x.igamma(4);
-      out = x + arg.kappa * out;
+      out = x + arg.a * out;
     } else if (active) {
       Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + arg.kappa * out;
+      out = x + arg.a * out;
     }
 
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
