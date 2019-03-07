@@ -40,7 +40,7 @@ namespace quda {
      Note this routine only exists in xpay form.
   */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool asymmetric, bool xpay, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void ndegTwistedMass(Arg &arg, int idx, int flavor, int parity)
+  __device__ __host__ __forceinline__ void ndegTwistedMass(Arg &arg, int idx, int flavor, int parity)
   {
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,4> Vector;
