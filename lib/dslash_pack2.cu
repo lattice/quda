@@ -344,32 +344,32 @@ namespace quda {
 
     switch (dim) {
     case 0:
-      while ( local_tid < arg.dc.ghostFaceCB[0] ) {
-        int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
+      while ( local_tid < arg.nFace * arg.dc.ghostFaceCB[0] ) {
+        int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
         if (arg.nFace == 1) packStaggered<0,1>(arg, ghost_idx, s, parity);
         else                packStaggered<0,3>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
       }
       break;
     case 1:
-      while ( local_tid < arg.dc.ghostFaceCB[1] ) {
-        int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
+      while ( local_tid < arg.nFace * arg.dc.ghostFaceCB[1] ) {
+        int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
         if (arg.nFace == 1) packStaggered<1,1>(arg, ghost_idx, s, parity);
         else                packStaggered<1,3>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
       }
       break;
     case 2:
-      while ( local_tid < arg.dc.ghostFaceCB[2] ) {
-        int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
+      while ( local_tid < arg.nFace * arg.dc.ghostFaceCB[2] ) {
+        int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
         if (arg.nFace == 2) packStaggered<2,1>(arg, ghost_idx, s, parity);
         else                packStaggered<2,3>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
       }
       break;
     case 3:
-      while ( local_tid < arg.dc.ghostFaceCB[3] ) {
-        int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
+      while ( local_tid < arg.nFace * arg.dc.ghostFaceCB[3] ) {
+        int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
         if (arg.nFace == 3) packStaggered<3,1>(arg, ghost_idx, s, parity);
         else                packStaggered<3,3>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
