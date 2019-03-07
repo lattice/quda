@@ -125,9 +125,6 @@ namespace quda {
 
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
                    const char *func, const char *file, const char *line) {
-    if (getVerbosity() == QUDA_DEBUG_VERBOSE)
-      printfQuda("%s bytes = %llu\n", __func__, (long long unsigned int)count);
-
     if (count == 0) return;
 #if 1
     QudaMemCopy copy(dst, src, count, kind, false, func, file, line);
@@ -135,15 +132,14 @@ namespace quda {
 #else
     cudaMemcpy(dst, src, count, kind);
 #endif
-    checkCudaError();
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
                         const char *func, const char *file, const char *line)
   {
-    if (getVerbosity() == QUDA_DEBUG_VERBOSE)
-      printfQuda("%s bytes = %llu\n", __func__, (long long unsigned int)count);
-
     if (count == 0) return;
 
     if (kind == cudaMemcpyDeviceToDevice) {
@@ -307,7 +303,7 @@ namespace quda {
 #endif
   }
 
-  cudaError_t qudaDeviceSynchronize()
+  cudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuCtxSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
@@ -317,11 +313,13 @@ namespace quda {
     default: // should always return successful
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuCtxSynchronize returned error %s", str);
+      errorQuda("cuCtxSynchronize returned error %s (%s:%s in %s())\n", str, file, line, func);
     }
     return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
 #endif
   }

@@ -565,13 +565,16 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
 
   gaugeParam.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
+#ifdef USE_LEGACY_DSLASH
+    gaugeParam.reconstruct = link_recon;
+#else
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy
+        = (link_recon == QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
+#endif
   } else {
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   }
 
-  
-  
   // printfQuda("Fat links sending..."); 
   loadGaugeQuda(milc_fatlink_gpu, &gaugeParam);
   // printfQuda("Fat links sent\n"); 
@@ -583,7 +586,10 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
 #endif
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-
+#ifndef USE_LEGACY_DSLASH
+    gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+      gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
+#endif
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
     // printfQuda("Long links sending..."); 
     loadGaugeQuda(milc_longlink_gpu, &gaugeParam);

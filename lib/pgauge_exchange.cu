@@ -62,9 +62,6 @@ namespace quda {
   template <typename Gauge>
   struct GaugeFixUnPackArg {
     int X[4]; // grid dimensions
-#ifdef MULTI_GPU
-    int border[4];
-#endif
     Gauge dataOr;
     GaugeFixUnPackArg(Gauge & dataOr, cudaGaugeField & data)
       : dataOr(dataOr) {

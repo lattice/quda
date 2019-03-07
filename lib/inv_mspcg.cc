@@ -295,11 +295,11 @@ namespace quda {
       printfQuda(" |a-b|^2/|b|^2     = %16.12e. (This number is SUPPOSED to be tiny).\n", dd/x2);
     }
 
+#ifdef USE_LAGECY_DSLASH
     if(tc && (fb->Precision() == QUDA_HALF_PRECISION || false)){
       blas::zero(*fy);
       printfQuda("Detailed test of fused kernels with tensor cores. \n"
         "Since the legacy kernel does NOT support quarter precision, This test is ONLY available for half precision\n");
-
       double ft2, mdd;
 // f0
       {
@@ -381,7 +381,7 @@ namespace quda {
       printfQuda("f4: ------>\n");
       } 
     }
-
+#endif
     delete tx;
     delete tt;
     delete tb;
@@ -642,7 +642,7 @@ namespace quda {
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
     double stop = stopping(param.tol, b2, param.residual_type);
 
-    test_dslash(db);
+    // test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
@@ -808,14 +808,9 @@ namespace quda {
       preconditioner_timer.Stop(fname, cname, 0);
 
       linalg_timer[1].Start(fname, cname, lname);      
-#if 0
+      // replace with fused kernel?
       xpay(*r, -1., *r_old);
       zkP1rkp1 = reDotProduct(*z, *r_old);
-#else
-      // replace with fused kernel
-      Complex ztmp = xpaycDotzy(*r, -1., *r_old, *z);
-      zkP1rkp1 = ztmp.real();
-#endif
 
       // zkP1rkp1 = reDotProduct(*z, *r);
       beta = zkP1rkp1 / rkzk;

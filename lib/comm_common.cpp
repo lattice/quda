@@ -161,6 +161,18 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
 
+  // set gdr enablement
+  if (comm_gdr_enabled()) {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
+    comm_gdr_blacklist(); // set GDR blacklist
+    // by default, if GDR is enabled we disable non-p2p policies to
+    // prevent possible conflict between MPI and QUDA opening the same
+    // IPC memory handles when using CUDA-aware MPI
+    enable_peer_to_peer += 4;
+  } else {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
+  }
+
   char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
 
   // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
@@ -258,14 +270,6 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   comm_barrier();
 
   peer2peer_present = comm_peer2peer_enabled_global();
-
-  // set gdr enablement
-  if (comm_gdr_enabled()) {
-    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
-    comm_gdr_blacklist(); // set GDR blacklist
-  } else {
-    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
-  }
 
   checkCudaErrorNoSync();
   return;
@@ -428,6 +432,14 @@ int comm_coord(int dim)
 }
 
 
+inline bool isHost(const cudaPointerAttributes &attributes) {
+#if CUDA_VERSION >= 10000
+  return (attributes.type == cudaMemoryTypeHost);
+#else
+  return (attributes.memoryType == cudaMemoryTypeHost);
+#endif
+}
+
 /**
  * Send to the "dir" direction in the "dim" dimension
  */
@@ -438,7 +450,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+  if (err != cudaSuccess || isHost(attributes)) {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = safe_malloc(nbytes);
     try {
@@ -477,7 +489,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
   checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+  if (err != cudaSuccess || isHost(attributes)) {
     // test this memory allocation is ok by filling it
     try {
       std::fill(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, 0);
@@ -512,7 +524,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+  if (err != cudaSuccess || isHost(attributes)) {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = safe_malloc(blksize*nblocks);
     try {
@@ -555,7 +567,7 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
   checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+  if (err != cudaSuccess || isHost(attributes)) {
     // test this memory allocation is ok by filling it
     try {
       for (int i=0; i<nblocks; i++)
@@ -602,10 +614,8 @@ void comm_dim_partitioned_set(int dim)
 
 void comm_dim_partitioned_reset(){
   for (int i=0; i<QUDA_MAX_DIM; i++)
-   manual_set_partition[i] = 0;
-   
+    manual_set_partition[i] = 0;
 }
-
 
 int comm_dim_partitioned(int dim)
 {
@@ -669,6 +679,22 @@ bool comm_gdr_blacklist() {
 
   return blacklist;
 }
+
+const char* comm_config_string() {
+  static char config_string[16];
+  static bool config_init = false;
+
+  if (!config_init) {
+    strcpy(config_string, ",p2p=");
+    strcat(config_string, std::to_string(comm_peer2peer_enabled_global()).c_str());
+    strcat(config_string, ",gdr=");
+    strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
+    config_init = true;
+  }
+
+  return config_string;
+}
+
 
 static bool globalReduce = true;
 static bool asyncReduce = false;

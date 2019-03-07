@@ -1,7 +1,10 @@
+#ifdef USE_LEGACY_DSLASH
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <typeinfo>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -18,11 +21,12 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
-#include <dslash_helper.cuh>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
 
@@ -47,9 +51,6 @@ namespace quda {
 
 #include <dslash_quda.cuh>
   }
-
-  // declare the dslash events
-#include <dslash_events.cuh>
 
   using namespace domainwall;
 
@@ -78,6 +79,7 @@ namespace quda {
 
       // first try to advance block.x
       param.block.x += step[0];
+      //memory constraint
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0] ||
 	  sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
 	advance[0] = false;
@@ -89,16 +91,18 @@ namespace quda {
       if (!advance[0]) {  // if failed to advance block.x, now try block.y
 	param.block.y += step[1];
 
+	//memory constraint
 	if (param.block.y > (unsigned)in->X(4) ||
 	    sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
 	  advance[1] = false;
-	  param.block.y = step[1]; // reset block.x
+	  param.block.y = step[1]; // reset block.y
 	} else {
 	  advance[1] = true; // successfully advanced block.y
 	}
       }
 
-      if (advance[0] || advance[1]) {
+      //thread constraint
+      if ( (advance[0] || advance[1]) && param.block.x*param.block.y*param.block.z <= (unsigned)deviceProp.maxThreadsPerBlock) {
 	param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
 			   (in->X(4)+param.block.y-1) / param.block.y, 1);
 
@@ -199,8 +203,6 @@ namespace quda {
   };
 #endif // GPU_DOMAIN_WALL_DIRAC
 
-#include <dslash_policy.cuh>
-
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			    const cudaColorSpinorField *in, const int parity, const int dagger, 
 			    const cudaColorSpinorField *x, const double &m_f, const double &k2, 
@@ -223,7 +225,7 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 
     delete dslash;
@@ -233,3 +235,5 @@ namespace quda {
   }
 
 }
+
+#endif

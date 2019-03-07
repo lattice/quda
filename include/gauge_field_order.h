@@ -28,6 +28,7 @@
 #include <atomic.cuh>
 #include <thrust_helper.cuh>
 #include <gauge_field.h>
+#include <index_helper.cuh>
 
 namespace quda {
 
@@ -47,6 +48,7 @@ namespace quda {
       const int dim;
       const int x_cb;
       const int parity;
+      const Float phase;
       T &gauge;
 
       /**
@@ -56,8 +58,14 @@ namespace quda {
 	 @param[in] x_cb Checkerboarded space-time index we are accessing
 	 @param[in] parity Parity we are accessing
        */
-      __device__ __host__ inline gauge_wrapper<Float,T>(T &gauge, int dim, int x_cb, int parity)
-	: gauge(gauge), dim(dim), x_cb(x_cb), parity(parity) { }
+      __device__ __host__ inline gauge_wrapper<Float, T>(T &gauge, int dim, int x_cb, int parity, Float phase = 1.0) :
+          gauge(gauge),
+          dim(dim),
+          x_cb(x_cb),
+          parity(parity),
+          phase(phase)
+      {
+      }
 
       /**
 	 @brief Assignment operator with Matrix instance as input
@@ -76,7 +84,7 @@ namespace quda {
   template <typename T, int N>
     template <typename S>
     __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<typename RealType<T>::type,S> &a) {
-    a.gauge.load((typename RealType<T>::type*)data, a.x_cb, a.dim, a.parity);
+    a.gauge.load((typename RealType<T>::type *)data, a.x_cb, a.dim, a.parity, a.phase);
   }
 
   /**
@@ -86,7 +94,7 @@ namespace quda {
   template <typename T, int N>
     template <typename S>
     __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<typename RealType<T>::type,S> &a) {
-    a.gauge.load((typename RealType<T>::type*)data, a.x_cb, a.dim, a.parity);
+    a.gauge.load((typename RealType<T>::type *)data, a.x_cb, a.dim, a.parity, a.phase);
   }
 
   /**
@@ -105,6 +113,7 @@ namespace quda {
       const int dim;
       const int ghost_idx;
       const int parity;
+      const Float phase;
       T &gauge;
 
       /**
@@ -114,8 +123,14 @@ namespace quda {
 	 @param[in] ghost_idx Ghost index we are accessing
 	 @param[in] parity Parity we are accessing
        */
-      __device__ __host__ inline gauge_ghost_wrapper<Float,T>(T &gauge, int dim, int ghost_idx, int parity)
-	: gauge(gauge), dim(dim), ghost_idx(ghost_idx), parity(parity) { }
+      __device__ __host__ inline gauge_ghost_wrapper<Float, T>(T &gauge, int dim, int ghost_idx, int parity, Float phase = 1.0) :
+          gauge(gauge),
+          dim(dim),
+          ghost_idx(ghost_idx),
+          parity(parity),
+          phase(phase)
+      {
+      }
 
       /**
 	 @brief Assignment operator with Matrix instance as input
@@ -134,7 +149,7 @@ namespace quda {
   template <typename T, int N>
     template <typename S>
     __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_ghost_wrapper<typename RealType<T>::type,S> &a) {
-    a.gauge.loadGhost((typename RealType<T>::type*)data, a.ghost_idx, a.dim, a.parity);
+    a.gauge.loadGhost((typename RealType<T>::type *)data, a.ghost_idx, a.dim, a.parity, a.phase);
   }
 
   /**
@@ -144,7 +159,7 @@ namespace quda {
   template <typename T, int N>
     template <typename S>
     __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_ghost_wrapper<typename RealType<T>::type,S> &a) {
-    a.gauge.loadGhost((typename RealType<T>::type*)data, a.ghost_idx, a.dim, a.parity);
+    a.gauge.loadGhost((typename RealType<T>::type *)data, a.ghost_idx, a.dim, a.parity, a.phase);
   }
 
   namespace gauge {
@@ -1051,6 +1066,18 @@ namespace quda {
 	__device__ __host__ inline int NcolorCoarse() const { return nColorCoarse; }
 
 	/**
+	 * @brief Returns the L1 norm of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+	 * @return L1 norm
+	 */
+	__host__ double norm1(int dim=-1, bool global=true) const {
+	  double nrm1 = accessor.transform_reduce(location, dim, abs_<double,storeFloat>(accessor.scale_inv),
+                                                  thrust::plus<double>(), 0.0);
+	  if (global) comm_allreduce(&nrm1);
+	  return nrm1;
+	}
+
+	/**
 	 * @brief Returns the L2 norm squared of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return L2 norm squared
@@ -1099,16 +1126,16 @@ namespace quda {
      to avoid the run-time overhead (dummy for trivial reconstruct
      type)
   */
-  template <int N, typename Float, QudaGhostExchange ghostExchange_>
-    struct Reconstruct {
-      typedef typename mapper<Float>::type RegType;
-      Reconstruct(const GaugeField &u) { }
-      Reconstruct(const Reconstruct<N,Float,ghostExchange_> &recon) { }
+      template <int N, typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase = QUDA_STAGGERED_PHASE_NO> struct Reconstruct {
+        typedef typename mapper<Float>::type RegType;
+        Reconstruct(const GaugeField &u) {}
+        Reconstruct(const Reconstruct<N, Float, ghostExchange_> &recon) {}
 
-      __device__ __host__ inline void Pack(RegType out[N], const RegType in[N], int idx ) const {
+        __device__ __host__ inline void Pack(RegType out[N], const RegType in[N], int idx) const
+        {
 #pragma unroll
 	for (int i=0; i<N; i++) out[i] = in[i];
-      }
+        }
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir,
 					       const RegType phase, const I *X, const int *R) const {
@@ -1116,7 +1143,7 @@ namespace quda {
 	for (int i=0; i<N; i++) out[i] = in[i];
       }
       __device__ __host__ inline RegType getPhase(const RegType in[N]) const { return 0; }
-    };
+      };
 
   /**
      @brief Helper for no reconstruction with scaling (19 = 18 +
@@ -1164,18 +1191,20 @@ namespace quda {
                                                   int firstTimeSliceBound, int lastTimeSliceBound,
                                                   bool isFirstTimeSlice, bool isLastTimeSlice,
                                                   QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_NO) {
-	if (ghostExchange_==QUDA_GHOST_EXCHANGE_PAD ||
-            (ghostExchange_==QUDA_GHOST_EXCHANGE_INVALID && ghostExchange!=QUDA_GHOST_EXCHANGE_EXTENDED) ) {
-	  if ( idx >= firstTimeSliceBound ) { // halo region on the first time slice
+
+        // MWTODO: should this return tBoundary : scale or tBoundary*scale : scale
+
+        if (ghostExchange_ == QUDA_GHOST_EXCHANGE_PAD || (ghostExchange_ == QUDA_GHOST_EXCHANGE_INVALID && ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED)) {
+          if ( idx >= firstTimeSliceBound ) { // halo region on the first time slice
 	    return isFirstTimeSlice ? tBoundary : scale;
 	  } else if ( idx >= lastTimeSliceBound ) { // last link on the last time slice
 	    return isLastTimeSlice ? tBoundary : scale;
 	  } else {
 	    return scale;
 	  }
-	} else if (ghostExchange_==QUDA_GHOST_EXCHANGE_EXTENDED ||
-                   (ghostExchange_==QUDA_GHOST_EXCHANGE_INVALID && ghostExchange==QUDA_GHOST_EXCHANGE_EXTENDED) ) {
-	  if ( idx >= (R[3]-1)*X[0]*X[1]*X[2]/2 && idx < R[3]*X[0]*X[1]*X[2]/2 ) {
+        } else if (ghostExchange_ == QUDA_GHOST_EXCHANGE_EXTENDED
+            || (ghostExchange_ == QUDA_GHOST_EXCHANGE_INVALID && ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED)) {
+          if ( idx >= (R[3]-1)*X[0]*X[1]*X[2]/2 && idx < R[3]*X[0]*X[1]*X[2]/2 ) {
 	    // the boundary condition is on the R[3]-1 time slice
 	    return isFirstTimeSlice ? tBoundary : scale;
 	  } else if ( idx >= (X[3]-R[3]-1)*X[0]*X[1]*X[2]/2 && idx < (X[3]-R[3])*X[0]*X[1]*X[2]/2 ) {
@@ -1184,7 +1213,7 @@ namespace quda {
 	  } else {
 	    return scale;
 	  }
-	}
+        }
         return scale;
       }
 
@@ -1244,16 +1273,14 @@ namespace quda {
 	template<typename I>
 	__device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir,
 					       const RegType phase, const I *X, const int *R) const {
-	  const Complex *In = reinterpret_cast<const Complex*>(in);
-	  Complex *Out = reinterpret_cast<Complex*>(out);
+	  Complex Out[9];
+#pragma unroll
+	  for (int i=0; i<6; i++) Out[i] = Complex(in[2*i+0], in[2*i+1]);
 
 	  const RegType u0 = dir < 3 ? anisotropy :
 	    timeBoundary<ghostExchange_>(idx, X, R, tBoundary, static_cast<RegType>(1.0),
                                          firstTimeSliceBound, lastTimeSliceBound,
                                          isFirstTimeSlice, isLastTimeSlice, ghostExchange);
-
-#pragma unroll
-	  for(int i=0; i<6; ++i) Out[i] = In[i];
 
 	  //Out[6] = u0*conj(Out[1]*Out[5] - Out[2]*Out[4]);
           Out[6] = cmul(Out[2], Out[4]);
@@ -1269,7 +1296,13 @@ namespace quda {
           Out[8] = cmul(Out[1], Out[3]);
           Out[8] = cmac(Out[0], Out[4], -Out[8]);
           Out[8] = u0*conj(Out[8]);
-	}
+
+#pragma unroll
+          for (int i=0; i<9; i++) {
+            out[2*i+0] = Out[i].real();
+            out[2*i+1] = Out[i].imag();
+          }
+        }
 
 	__device__ __host__ inline RegType getPhase(const RegType in[18]) { return 0; }
       };
@@ -1328,6 +1361,78 @@ namespace quda {
       };
 
       /**
+     @brief Gauge reconstruct 13 helper where we reconstruct the
+     third row from the cross product of the first two rows, and
+     include a non-trivial phase factor
+     @tparam Float Storage format (e.g., double, float, short)
+     @tparam ghostExchange_ optional template the ghostExchange
+     type to avoid the run-time overhead
+  */
+      template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<13, Float, ghostExchange_, QUDA_STAGGERED_PHASE_NO> {
+        typedef typename mapper<Float>::type RegType;
+        typedef complex<RegType> Complex;
+        const Reconstruct<12, Float, ghostExchange_> reconstruct_12;
+        const RegType scale;
+
+        Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()) {}
+        Reconstruct(const Reconstruct<13, Float, ghostExchange_> &recon) : reconstruct_12(recon.reconstruct_12), scale(recon.scale) {}
+
+        __device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const { reconstruct_12.Pack(out, in, idx); }
+
+        template <typename I>
+        __device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir, const RegType phase, const I *X, const int *R) const
+        {
+          const Complex *In = reinterpret_cast<const Complex *>(in);
+          Complex *Out = reinterpret_cast<Complex *>(out);
+          const RegType coeff = static_cast<RegType>(1.0) / scale;
+
+#pragma unroll
+          for (int i = 0; i < 6; ++i) Out[i] = In[i];
+
+          Out[6] = cmul(Out[2], Out[4]);
+          Out[6] = cmac(Out[1], Out[5], -Out[6]);
+          Out[6] = coeff * conj(Out[6]);
+
+          Out[7] = cmul(Out[0], Out[5]);
+          Out[7] = cmac(Out[2], Out[3], -Out[7]);
+          Out[7] = coeff * conj(Out[7]);
+
+          Out[8] = cmul(Out[1], Out[3]);
+          Out[8] = cmac(Out[0], Out[4], -Out[8]);
+          Out[8] = coeff * conj(Out[8]);
+
+          // Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
+          RegType cos_sin[2];
+          Trig<isFixed<RegType>::value, RegType>::SinCos(static_cast<RegType>(3. * phase), &cos_sin[1], &cos_sin[0]);
+          Complex A(cos_sin[0], cos_sin[1]);
+
+          Out[6] *= A;
+          Out[7] *= A;
+          Out[8] *= A;
+        }
+
+        __device__ __host__ inline RegType getPhase(const RegType in[18]) const
+        {
+#if 1 // phase from cross product
+        Complex In[9];
+  #pragma unroll
+          for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
+          // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
+          Complex denom = conj(In[0] * In[4] - In[1] * In[3]) / scale;
+          Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
+          RegType phase = arg(expI3Phase) / static_cast<RegType>(3.0);
+#else // phase from determinant
+          Matrix<Complex, 3> a;
+#pragma unroll
+          for (int i = 0; i < 9; i++) a(i) = Complex(in[2 * i] / scale, in[2 * i + 1] / scale);
+          const Complex det = getDeterminant(a);
+          RegType phase = arg(det) / 3;
+#endif
+          return phase;
+        }
+      };
+
+      /**
          @brief Gauge reconstruct 13 helper where we reconstruct the
          third row from the cross product of the first two rows, and
          include a non-trivial phase factor
@@ -1335,30 +1440,25 @@ namespace quda {
          @tparam ghostExchange_ optional template the ghostExchange
          type to avoid the run-time overhead
       */
-      template <typename Float,QudaGhostExchange ghostExchange_>
-	struct Reconstruct<13,Float,ghostExchange_> {
-	typedef typename mapper<Float>::type RegType;
-	typedef complex<RegType> Complex;
+      template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<13, Float, ghostExchange_, QUDA_STAGGERED_PHASE_MILC> {
+        typedef typename mapper<Float>::type RegType;
+        typedef complex<RegType> Complex;
 	const Reconstruct<12,Float,ghostExchange_> reconstruct_12;
 	const RegType scale;
 
       Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()) { }
-      Reconstruct(const Reconstruct<13,Float,ghostExchange_> &recon) : reconstruct_12(recon.reconstruct_12),
-	  scale(recon.scale) { }
+      Reconstruct(const Reconstruct<13, Float, ghostExchange_, QUDA_STAGGERED_PHASE_MILC> &recon) : reconstruct_12(recon.reconstruct_12), scale(recon.scale) {}
 
-	__device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const {
-	  reconstruct_12.Pack(out, in, idx);
-      }
+      __device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const { reconstruct_12.Pack(out, in, idx); }
 
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir,
 					     const RegType phase, const I *X, const int *R) const {
-	const Complex *In = reinterpret_cast<const Complex*>(in);
-	Complex *Out = reinterpret_cast<Complex*>(out);
 	const RegType coeff = static_cast<RegType>(1.0)/scale;
 
+        Complex Out[9];
 #pragma unroll
-	for(int i=0; i<6; ++i) Out[i] = In[i];
+        for (int i=0; i<6; i++) Out[i] = Complex(in[2*i+0], in[2*i+1]);
 
         Out[6] = cmul(Out[2], Out[4]);
         Out[6] = cmac(Out[1], Out[5], -Out[6]);
@@ -1372,34 +1472,38 @@ namespace quda {
         Out[8] = cmac(Out[0], Out[4], -Out[8]);
         Out[8] = coeff*conj(Out[8]);
 
-	// Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
-	RegType cos_sin[2];
-	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
-	Complex A(cos_sin[0], cos_sin[1]);
+        Out[6] *= phase;
+        Out[7] *= phase;
+        Out[8] *= phase;
 
-	Out[6] *= A;
-	Out[7] *= A;
-	Out[8] *= A;
+#pragma unroll
+        for (int i=0; i<9; i++) {
+          out[2*i+0] = Out[i].real();
+          out[2*i+1] = Out[i].imag();
+        }
       }
 
-      __device__ __host__ inline RegType getPhase(const RegType in[18]) const {
+      __device__ __host__ inline RegType getPhase(const RegType in[18]) const
+      {
 #if 1 // phase from cross product
-	const Complex *In = reinterpret_cast<const Complex*>(in);
+        Complex In[9];
+#pragma unroll
+        for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
 	// denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
 	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) / scale;
 	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-	RegType phase = arg(expI3Phase)/static_cast<RegType>(3.0);
-#else // phase from determinant
-	Matrix<Complex,3> a;
-#pragma unroll
-	for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
-	const Complex det = getDeterminant( a );
-	RegType phase = arg(det)/3;
-#endif
-	return phase;
-      }
+  RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
 
-    };
+#else // phase from determinant
+        Matrix<Complex, 3> a;
+#pragma unroll
+        for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
+        const Complex det = getDeterminant( a );
+        RegType phase = arg(det)/3;
+#endif
+        return phase;
+      }
+      };
 
   /**
      @brief Gauge reconstruct 8 helper where we reconstruct the gauge
@@ -1445,24 +1549,19 @@ namespace quda {
     }
 
     template<typename I>
-    __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir,
-                                           const RegType phase, const I *X, const int *R,
-                                           const Complex scale=Complex(static_cast<RegType>(1.0),
-                                                                       static_cast<RegType>(1.0))) const {
-      const Complex *In = reinterpret_cast<const Complex*>(in);
-      Complex *Out = reinterpret_cast<Complex*>(out);
+    __device__ __host__ inline void Unpack(
+        RegType out[18], const RegType in[8], int idx, int dir, const RegType phase, const I *X, const int *R, const Complex scale, const Complex u) const
+    {
 
+      RegType u0 = u.real();
+      RegType u0_inv = u.imag();
+
+      Complex Out[9];
 #pragma unroll
-      for (int i=1; i<=3; i++) Out[i] = In[i]; // these elements are copied directly
+      for (int i=1; i<=3; i++) Out[i] = Complex(in[2*i+0], in[2*i+1]); // these elements are copied directly
 
       Trig<isFixed<Float>::value,RegType>::SinCos(in[0], &Out[0].y, &Out[0].x);
       Trig<isFixed<Float>::value,RegType>::SinCos(in[1], &Out[6].y, &Out[6].x);
-
-      Complex u = dir < 3 ? anisotropy :
-        timeBoundary<ghostExchange_>(idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound,
-                                     isFirstTimeSlice, isLastTimeSlice, ghostExchange);
-      RegType u0 = u.real();
-      RegType u0_inv = u.imag();
 
       // First, reconstruct first row
       RegType row_sum = Out[1].real() * Out[1].real();
@@ -1516,11 +1615,99 @@ namespace quda {
         Out[8] = cmac(u0*A, Out[2], Out[8]);
         Out[8] = -r_inv2*Out[8];
       }
+
+#pragma unroll
+      for (int i=0; i<9; i++) {
+        out[2*i+0] = Out[i].real();
+        out[2*i+1] = Out[i].imag();
+      }
+    }
+
+    template <typename I>
+    __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir, const RegType phase, const I *X, const int *R,
+        const Complex scale = Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0))) const
+    {
+      Complex u = dir < 3 ? anisotropy
+                          : timeBoundary<ghostExchange_>(
+                              idx, X, R, tBoundary, scale, firstTimeSliceBound, lastTimeSliceBound, isFirstTimeSlice, isLastTimeSlice, ghostExchange);
+      Unpack(out, in, idx, dir, phase, X, R, scale, u);
     }
 
     __device__ __host__ inline RegType getPhase(const RegType in[18]){ return 0; }
   };
 
+  /**
+   @brief Gauge reconstruct 9 helper where we reconstruct the gauge
+   matrix from 8 packed elements (maximal compression) and include a
+   non-trivial phase factor
+   @tparam Float Storage format (e.g., double, float, short)
+   @tparam ghostExchange_ optional template the ghostExchange type
+   to avoid the run-time overhead
+*/
+  template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<9, Float, ghostExchange_, QUDA_STAGGERED_PHASE_NO> {
+    typedef typename mapper<Float>::type RegType;
+    typedef complex<RegType> Complex;
+    const Reconstruct<8, Float, ghostExchange_> reconstruct_8;
+    const Complex scale; // imaginary value stores inverse
+
+    Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale(), 1.0 / u.Scale()) {}
+
+    Reconstruct(const Reconstruct<9, Float, ghostExchange_> &recon) : reconstruct_8(recon.reconstruct_8), scale(recon.scale) {}
+
+    __device__ __host__ inline RegType getPhase(const RegType in[18]) const
+    {
+#if 1 // phase from cross product
+      Complex In[9];
+      #pragma unroll
+      for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
+      // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
+      Complex denom = conj(In[0] * In[4] - In[1] * In[3]) * scale.imag();
+      Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
+      RegType phase = arg(expI3Phase) / static_cast<RegType>(3.0);
+#else // phase from determinant
+      Matrix<Complex, 3> a;
+#pragma unroll
+      for (int i = 0; i < 9; i++) a(i) = Complex(in[2*i], in[2*i+1])*scale.imag());
+      const Complex det = getDeterminant(a);
+      RegType phase = arg(det) / 3;
+#endif
+      return phase;
+    }
+
+    // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
+    __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const
+    {
+      RegType phase = getPhase(in);
+      RegType cos_sin[2];
+      Trig<isFixed<RegType>::value, RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
+      Complex z(cos_sin[0], cos_sin[1]);
+      z *= scale.imag();
+      // printf("Pack Reconstruct9-staggered phase NO ...\n");
+      Complex su3[9];
+#pragma unroll
+      for (int i = 0; i < 9; i++) su3[i] = z * Complex(in[2*i+0], in[2*i+1]);
+      reconstruct_8.Pack(out, reinterpret_cast<RegType *>(su3), idx);
+    }
+
+    template <typename I>
+    __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir, const RegType phase, const I *X, const int *R) const
+    {
+      reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)),
+          Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)));
+      // z *= scale.imag();
+      // printf("UnPack Reconstruct9-staggered phase NO ...\n");
+      RegType cos_sin[2];
+      Trig<isFixed<RegType>::value, RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
+      Complex z(cos_sin[0], cos_sin[1]);
+      z *= scale.real();
+#pragma unroll
+      for (int i = 0; i < 9; i++) {
+        Complex Out = Complex(out[2*i+0],out[2*i+1]) * z;
+        out[2*i+0] = Out.real();
+        out[2*i+1] = Out.imag();
+      };
+    }
+  };
 
   /**
      @brief Gauge reconstruct 9 helper where we reconstruct the gauge
@@ -1530,25 +1717,26 @@ namespace quda {
      @tparam ghostExchange_ optional template the ghostExchange type
      to avoid the run-time overhead
   */
-  template <typename Float, QudaGhostExchange ghostExchange_>
-    struct Reconstruct<9,Float,ghostExchange_> {
-      typedef typename mapper<Float>::type RegType;
-      typedef complex<RegType> Complex;
-      const Reconstruct<8,Float,ghostExchange_> reconstruct_8;
-      const Complex scale; // imaginary value stores inverse
+  template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<9, Float, ghostExchange_, QUDA_STAGGERED_PHASE_MILC> {
+    typedef typename mapper<Float>::type RegType;
+    typedef complex<RegType> Complex;
+    const Reconstruct<8, Float, ghostExchange_> reconstruct_8;
+    const Complex scale; // imaginary value stores inverse
 
-  Reconstruct(const GaugeField &u) : reconstruct_8(u, u.Scale()), scale(u.Scale(), 1.0/u.Scale()) {}
+    Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale(), 1.0 / u.Scale()) {}
 
     Reconstruct(const Reconstruct<9,Float,ghostExchange_> &recon) : reconstruct_8(recon.reconstruct_8),
       scale(recon.scale) { }
 
       __device__ __host__ inline RegType getPhase(const RegType in[18]) const {
 #if 1 // phase from cross product
-	const Complex *In = reinterpret_cast<const Complex*>(in);
-	// denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
+        Complex In[9];
+#pragma unroll
+        for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
+        // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
 	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) * scale.imag();
 	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-	RegType phase = arg(expI3Phase)/static_cast<RegType>(3.0);
+  RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
 #else // phase from determinant
 	Matrix<Complex,3> a;
 #pragma unroll
@@ -1559,30 +1747,49 @@ namespace quda {
 	return phase;
       }
 
-	// Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
+      __device__ __host__ inline RegType getPhase2(const RegType in[18]) const
+      {
+        Complex In[9];
+#if 1 // phase from cross product
+        for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
+        // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
+        Complex denom = conj(In[0] * In[4] - In[1] * In[3]) * scale.imag();
+        Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
+        RegType phase = arg(expI3Phase) / static_cast<RegType>(3.0);
+#else // phase from determinant
+        Matrix<Complex, 3> a;
+#pragma unroll
+        for (int i = 0; i < 9; i++) a(i) = Complex(in[2*i], in[2*i+1])*scale.imag());
+        const Complex det = getDeterminant(a);
+        RegType phase = arg(det) / 3;
+#endif
+        return phase;
+      }
+
+      // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
       __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
 	RegType phase = getPhase(in);
-	RegType cos_sin[2];
-	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
-	Complex z(cos_sin[0], cos_sin[1]);
-	Complex su3[9];
+
+	RegType su3[18];
 #pragma unroll
-	for (int i=0; i<9; i++) su3[i] = z * reinterpret_cast<const Complex*>(in)[i];
-	reconstruct_8.Pack(out, reinterpret_cast<RegType*>(su3), idx);
+	for (int i=0; i<18; i++) {
+          su3[i] = phase * in[i];
+        }
+	reconstruct_8.Pack(out, su3, idx);
       }
 
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir,
 					     const RegType phase, const I *X, const int *R) const {
-	reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, scale);
-	RegType cos_sin[2];
-	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
-	Complex z(cos_sin[0], cos_sin[1]);
+        // printf("Unpack Reconstruct9-staggered phase milc ...\n");
+        reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)),
+            Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)));
 #pragma unroll
-	for (int i=0; i<9; i++) reinterpret_cast<Complex*>(out)[i] *= z;
+	for (int i=0; i<18; i++) {
+          out[i] *= phase;        
       }
-
-    };
+    }
+  };
 
   __host__ __device__ inline constexpr int ct_sqrt(int n, int i = 1){
     return n == i ? n : (i * i < n ? ct_sqrt(n, i + 1) : i);
@@ -1598,16 +1805,17 @@ namespace quda {
   // we default to huge allocations for gauge field (for now)
   constexpr bool default_huge_alloc = true;
 
-  template <typename Float, int length, int N, int reconLenParam, QudaStaggeredPhase stag_phase=QUDA_STAGGERED_PHASE_NO, bool huge_alloc=default_huge_alloc, QudaGhostExchange ghostExchange_=QUDA_GHOST_EXCHANGE_INVALID>
-    struct FloatNOrder {
-      typedef typename mapper<Float>::type RegType;
-      typedef typename VectorType<Float,N>::type Vector;
-      typedef typename AllocType<huge_alloc>::type AllocInt;
-      Reconstruct<reconLenParam,Float,ghostExchange_> reconstruct;
-      static const int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
-      static const int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
-      Float *gauge;
-      const AllocInt offset;
+  template <typename Float, int length, int N, int reconLenParam, QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO, bool huge_alloc = default_huge_alloc,
+      QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false>
+  struct FloatNOrder {
+    typedef typename mapper<Float>::type RegType;
+    typedef typename VectorType<Float, N>::type Vector;
+    typedef typename AllocType<huge_alloc>::type AllocInt;
+    Reconstruct<reconLenParam, Float, ghostExchange_, stag_phase> reconstruct;
+    static const int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
+    static const int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
+    Float *gauge;
+    const AllocInt offset;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<RegType,N>::type TexVector;
       cudaTextureObject_t tex;
@@ -1639,14 +1847,14 @@ namespace quda {
 	if (geometry == QUDA_COARSE_GEOMETRY)
 	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
 
-	static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
-		       "staggered phase only presently supported for 18 and 12 reconstruct");
-	for (int i=0; i<4; i++) {
-	  X[i] = u.X()[i];
+        // static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
+        // 	       "staggered phase only presently supported for 18 and 12 reconstruct");
+        for (int i = 0; i < 4; i++) {
+          X[i] = u.X()[i];
 	  R[i] = u.R()[i];
 	  ghost[i] = ghost_ ? ghost_[i] : 0;
 	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
-	}
+        }
 #ifdef USE_TEXTURE_OBJECTS
 	if (u.Location() == QUDA_CUDA_FIELD_LOCATION) tex = static_cast<const cudaGaugeField&>(u).Tex();
 	if (!huge_alloc && this->gauge != u.Gauge_p() && !override) {
@@ -1673,21 +1881,24 @@ namespace quda {
       }
       virtual ~FloatNOrder() { ; }
 
-      __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+      __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const
+      {
         const int M = reconLen / N;
         RegType tmp[reconLen];
 
 #pragma unroll
         for (int i=0; i<M; i++){
-	  // first do vectorized copy from memory
+          // first do texture load from memory
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	  if (!huge_alloc) { // use textures unless we have a huge alloc
 	    TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + (dir*M + i)*stride + x);
+            // now insert into output array
 #pragma unroll
 	    for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
 	  } else
 #endif
 	  {
+            // first load from memory
 	    Vector vecTmp = vector_load<Vector>(gauge + parity*offset, (dir*M + i)*stride + x);
 	    // second do copy converting into register type
 #pragma unroll
@@ -1696,20 +1907,17 @@ namespace quda {
 	}
 
         RegType phase = 0.; // TODO - add texture support for phases
-	if (hasPhase) copy(phase, (gauge+parity*offset)[phaseOffset/sizeof(Float) + stride*dir + x]);
 
-        // The phases come after the ghost matrices
-        reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase, X, R);
+        if (hasPhase) {
+          if (stag_phase == QUDA_STAGGERED_PHASE_MILC && (reconLen == 13 || use_inphase)) {
+            phase = inphase; // < static_cast<Float>(0) ? static_cast<Float>(-1./(2.*M_PI)) : static_cast<Float>(1./2.*M_PI);
+          } else {
+            copy(phase, (gauge + parity * offset)[phaseOffset / sizeof(Float) + stride * dir + x]);
+            phase *= 2. * M_PI;
+          }
+        }
 
-	// FIXME - this is a hack from hell - needs to be moved into the reconstruct type
-	if (stag_phase == QUDA_STAGGERED_PHASE_MILC && reconLenParam == 12) {
-	  Float sign = (dir == 0 && ((coords[3] - R[3]) & 1) != 0) ||
-	    ( dir == 1 && ((coords[0] - R[0] + coords[3] - R[3]) & 1) != 0) ||
-	    ( dir == 2 && ((coords[0] - R[0] + coords[1] - R[1] + coords[3] - R[3]) & 1) != 0) ? -1.0 : 1.0;
-
-#pragma unroll
-	  for (int i=12; i<18; i++) v[i] *= sign;
-	}
+        reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
@@ -1743,9 +1951,11 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline gauge_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >
-	   operator()(int dim, int x_cb, int parity) {
-	return gauge_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >(*this, dim, x_cb, parity);
+      __device__ __host__ inline gauge_wrapper<RegType, FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>>
+      operator()(int dim, int x_cb, int parity, Float phase = 1.0)
+      {
+        return gauge_wrapper<RegType, FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>>(
+            *this, dim, x_cb, parity, phase);
       }
 
       /**
@@ -1758,15 +1968,18 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline const gauge_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >
-	   operator()(int dim, int x_cb, int parity) const {
-	return gauge_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >
-	(const_cast<FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_>&>(*this), dim, x_cb, parity);
+      __device__ __host__ inline const gauge_wrapper<RegType, FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>>
+      operator()(int dim, int x_cb, int parity, Float phase = 1.0) const
+      {
+        return gauge_wrapper<RegType, FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>>(
+            const_cast<FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase> &>(*this), dim, x_cb, parity, phase);
       }
 
-      __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
+      __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const
+      {
         if (!ghost[dir]) { // load from main field not separate array
-          load(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
+          // printf("loadGhost if %i %i %i %f\n", volumeCB+x, dir, parity, inphase);
+          load(v, volumeCB + x, dir, parity, inphase); // an offset of size volumeCB puts us at the padded region
           // This also works perfectly when phases are stored. No need to change this.
         } else {
           const int M = reconLen / N;
@@ -1775,15 +1988,24 @@ namespace quda {
 #pragma unroll
           for (int i=0; i<M; i++) {
 	    // first do vectorized copy from memory into registers
-	    Vector vecTmp = vector_load<Vector>(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase),
-						i*faceVolumeCB[dir]+x);
-	    // second do copy converting into register type
+            Vector vecTmp = vector_load<Vector>(ghost[dir] + parity * faceVolumeCB[dir] * (M * N + hasPhase), i * faceVolumeCB[dir] + x);
+            // second do copy converting into register type
 #pragma unroll
-	    for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
+            for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
           }
-          RegType phase=0.;
-          if(hasPhase) copy(phase, ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x]);
-          reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase, X, R);
+          RegType phase = 0.;
+
+          if (hasPhase) {
+
+            // if(stag_phase == QUDA_STAGGERED_PHASE_MILC )  {
+            //   phase = inphase < static_cast<Float>(0) ? static_cast<Float>(-1./(2.*M_PI)) : static_cast<Float>(1./2.*M_PI);
+            // } else {
+            copy(phase, ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x]);
+            phase *= 2. * M_PI;
+            // }
+          }
+          // printf("loadGhost else %i %i %i %f\n", x, dir, parity, phase);
+          reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
         }
       }
 
@@ -1822,9 +2044,11 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline gauge_ghost_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >
-	   Ghost(int dim, int ghost_idx, int parity) {
-	return gauge_ghost_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >(*this, dim, ghost_idx, parity);
+      __device__ __host__ inline gauge_ghost_wrapper<RegType, FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_>> Ghost(
+          int dim, int ghost_idx, int parity, Float phase = 1.0)
+      {
+        return gauge_ghost_wrapper<RegType, FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_>>(
+            *this, dim, ghost_idx, parity, phase);
       }
 
       /**
@@ -1837,10 +2061,13 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline const gauge_ghost_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >
-	   Ghost(int dim, int ghost_idx, int parity) const {
-	return gauge_ghost_wrapper<RegType,FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_> >
-	(const_cast<FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_>&>(*this), dim, ghost_idx, parity);
+      __device__
+          __host__ inline const gauge_ghost_wrapper<RegType, FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>>
+          Ghost(int dim, int ghost_idx, int parity, Float phase = 1.0) const
+      {
+        return gauge_ghost_wrapper<RegType, FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>>(
+            const_cast<FloatNOrder<Float, length, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase> &>(*this), dim, ghost_idx, parity,
+            phase);
       }
 
       __device__ __host__ inline void loadGhostEx(RegType v[length], int buff_idx, int extended_idx, int dir,
@@ -1910,8 +2137,7 @@ namespace quda {
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }
-    };
-
+  };
 
   /**
      @brief This is just a dummy structure we use for trove to define the
@@ -2027,7 +2253,8 @@ namespace quda {
       }
       virtual ~QDPOrder() { ; }
 
-      __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+      __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const
+      {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
@@ -2104,12 +2331,13 @@ namespace quda {
       }
       virtual ~QDPJITOrder() { ; }
 
-      __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
-	for (int i=0; i<length; i++) {
-	  int z = i%2;
+      __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const
+      {
+        for (int i = 0; i < length; i++) {
+          int z = i%2;
 	  int rolcol = i/2;
 	  v[i] = (RegType)gauge[dir][((z*(length/2) + rolcol)*2 + parity)*volumeCB + x];
-	}
+        }
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
@@ -2171,7 +2399,8 @@ namespace quda {
       { ; }
     virtual ~MILCOrder() { ; }
 
-    __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+    __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const
+    {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
@@ -2264,7 +2493,8 @@ namespace quda {
       { ; }
     virtual ~MILCSiteOrder() { ; }
 
-    __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+    __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const
+    {
       // get base pointer
       const Float *gauge0 = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset);
 
@@ -2322,7 +2552,8 @@ namespace quda {
     virtual ~CPSOrder() { ; }
 
     // we need to transpose and scale for CPS ordering
-    __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+    __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity, Float inphase = 1.0) const
+    {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
@@ -2427,7 +2658,8 @@ namespace quda {
       virtual ~BQCDOrder() { ; }
 
       // we need to transpose for BQCD ordering
-      __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+      __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity, Float inphase = 1.0) const
+      {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
@@ -2525,7 +2757,8 @@ namespace quda {
       virtual ~TIFROrder() { ; }
 
       // we need to transpose for TIFR ordering
-      __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+      __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity, Float inphase = 1.0) const
+      {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
@@ -2649,9 +2882,10 @@ namespace quda {
       }
 
       // we need to transpose for TIFR ordering
-      __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+      __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity, Float inphase = 1.0) const
+      {
 
-	int y = getPaddedIndex(x, parity);
+        int y = getPaddedIndex(x, parity);
 
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
@@ -2757,36 +2991,98 @@ namespace quda {
   }
 
   // Use traits to reduce the template explosion
-  template<typename T,QudaReconstructType,int N=18,QudaStaggeredPhase stag=QUDA_STAGGERED_PHASE_NO,bool huge_alloc=gauge::default_huge_alloc,QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_INVALID> struct gauge_mapper { };
+  template <typename T, QudaReconstructType, int N = 18, QudaStaggeredPhase stag = QUDA_STAGGERED_PHASE_NO, bool huge_alloc = gauge::default_huge_alloc,
+      QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false>
+  struct gauge_mapper {
+  };
 
   // double precision
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<double,QUDA_RECONSTRUCT_NO,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<double, N, 2, N, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<double,QUDA_RECONSTRUCT_13,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<double, N, 2, 13, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<double,QUDA_RECONSTRUCT_12,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<double, N, 2, 12, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<double,QUDA_RECONSTRUCT_9,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<double, N, 2, 9, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<double,QUDA_RECONSTRUCT_8,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<double, N, 2, 8, stag, huge_alloc, ghostExchange> type; };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<double, QUDA_RECONSTRUCT_NO, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<double, N, 2, N, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<double, QUDA_RECONSTRUCT_13, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<double, N, 2, 13, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<double, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<double, N, 2, 12, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<double, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<double, N, 2, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<double, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<double, N, 2, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
 
   // single precision
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<float,QUDA_RECONSTRUCT_NO,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<float, N, 2, N, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<float,QUDA_RECONSTRUCT_13,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<float, N, 4, 13, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<float,QUDA_RECONSTRUCT_12,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<float, N, 4, 12, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<float,QUDA_RECONSTRUCT_9,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<float, N, 4, 9, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<float,QUDA_RECONSTRUCT_8,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<float, N, 4, 8, stag, huge_alloc, ghostExchange> type; };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<float, QUDA_RECONSTRUCT_NO, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<float, N, 2, N, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<float, QUDA_RECONSTRUCT_13, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<float, N, 4, 13, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<float, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<float, N, 4, 12, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<float, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<float, N, 4, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<float, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<float, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
 
   // half precision
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<short,QUDA_RECONSTRUCT_NO,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<short, N, 2, N, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<short,QUDA_RECONSTRUCT_13,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<short, N, 4, 13, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<short, N, 4, 12, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<short, N, 4, 9, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<short, N, 4, 8, stag, huge_alloc, ghostExchange> type; };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<short, QUDA_RECONSTRUCT_NO, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<short, N, 2, N, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<short, QUDA_RECONSTRUCT_13, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<short, N, 4, 13, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<short, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<short, N, 4, 12, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<short, N, 4, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<short, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
 
   // quarter precision
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<char,QUDA_RECONSTRUCT_NO,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<char, N, 2, N, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<char,QUDA_RECONSTRUCT_13,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<char, N, 4, 13, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<char,QUDA_RECONSTRUCT_12,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<char, N, 4, 12, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<char,QUDA_RECONSTRUCT_9,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<char, N, 4, 9, stag, huge_alloc, ghostExchange> type; };
-  template<int N,QudaStaggeredPhase stag,bool huge_alloc,QudaGhostExchange ghostExchange> struct gauge_mapper<char,QUDA_RECONSTRUCT_8,N,stag,huge_alloc,ghostExchange> { typedef gauge::FloatNOrder<char, N, 4, 8, stag, huge_alloc, ghostExchange> type; };
-
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<char, QUDA_RECONSTRUCT_NO, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<char, N, 2, N, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<char, QUDA_RECONSTRUCT_13, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<char, N, 4, 13, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<char, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<char, N, 4, 12, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<char, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<char, N, 4, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<char, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<char, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
 
   template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };

@@ -1227,6 +1227,10 @@ get_solver_type(char* s)
     ret = QUDA_CG3NR_INVERTER;
   } else if (strcmp(s, "ca-cg") == 0){
     ret = QUDA_CA_CG_INVERTER;
+  } else if (strcmp(s, "ca-cgne") == 0){
+    ret = QUDA_CA_CGNE_INVERTER;
+  } else if (strcmp(s, "ca-cgnr") == 0){
+    ret = QUDA_CA_CGNR_INVERTER;
   } else if (strcmp(s, "ca-gcr") == 0){
     ret = QUDA_CA_GCR_INVERTER;
   } else {
@@ -1308,6 +1312,12 @@ get_solver_str(QudaInverterType type)
     break;
   case QUDA_CA_CG_INVERTER:
     ret = "ca-cg";
+    break;
+  case QUDA_CA_CGNE_INVERTER:
+    ret = "ca-cgne";
+    break;
+  case QUDA_CA_CGNR_INVERTER:
+    ret = "ca-cgnr";
     break;
   case QUDA_CA_GCR_INVERTER:
     ret = "ca-gcr";

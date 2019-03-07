@@ -1,4 +1,7 @@
+#pragma once
+
 #include <kernels/dslash_wilson.cuh>
+#include <clover_field_order.h>
 #include <linalg.cuh>
 
 namespace quda {
@@ -39,10 +42,11 @@ namespace quda {
     int x_cb = getCoords<nDim,QUDA_4D_PC,kernel_type>(coord, arg, idx, parity, thread_dim);
 
     const int my_spinor_parity = nParity == 2 ? parity : 0;
+
     Vector out;
 
     // defined in dslash_wilson.cuh
-    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
 
     if (kernel_type != INTERIOR_KERNEL && active) {
       // if we're not the interior kernel, then we must sum the partial
@@ -59,16 +63,16 @@ namespace quda {
       for (int chirality=0; chirality<2; chirality++) {
 
 	HMatrix<real,nColor*Arg::nSpin/2> A = arg.A(x_cb, parity, chirality);
-	HalfVector out_chi = out.chiral_project(chirality);
+	HalfVector chi = out.chiral_project(chirality);
 
 	if (arg.dynamic_clover) {
 	  Cholesky<HMatrix,real,nColor*Arg::nSpin/2> cholesky(A);
-	  out_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out_chi));
+	  chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(chi));
 	} else {
-	  out_chi = A * out_chi;
+	  chi = A * chi;
 	}
 
-	tmp += out_chi.chiral_reconstruct(chirality);
+	tmp += chi.chiral_reconstruct(chirality);
       }
 
       tmp.toNonRel(); // switch back to non-chiral basis
@@ -86,7 +90,7 @@ namespace quda {
 
   // CPU kernel for applying the Wilson operator to a vector
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  void wilsonCloverCPU(Arg arg)
+  void wilsonCloverPreconditionedCPU(Arg arg)
   {
 
     for (int parity= 0; parity < nParity; parity++) {
@@ -102,13 +106,13 @@ namespace quda {
 
   // GPU Kernel for applying the Wilson operator to a vector
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void wilsonCloverGPU(Arg arg)
+  __global__ void wilsonCloverPreconditionedGPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.threads) return;
 
     // for full fields set parity from y thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+    int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     switch(parity) {
     case 0: wilsonClover<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0); break;

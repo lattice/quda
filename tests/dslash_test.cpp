@@ -76,6 +76,7 @@ extern bool kernel_pack_t;
 
 extern double mass; // mass of Dirac operator
 extern double mu;
+extern double epsilon;
 
 extern QudaVerbosity verbosity;
 
@@ -118,14 +119,12 @@ void init(int argc, char **argv) {
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
   gauge_param.reconstruct = link_recon;
-  gauge_param.reconstruct_sloppy = link_recon;
-  gauge_param.cuda_prec_sloppy = cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.kappa = 0.1;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = 0.1;
+    inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
@@ -264,9 +263,6 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
-    inv_param.clover_cuda_prec_precondition = inv_param.clover_cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_refinement_sloppy = inv_param.clover_cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
     hostClover = malloc((size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
@@ -288,11 +284,10 @@ void init(int argc, char **argv) {
     csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
-  if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH ) {
-    csParam.PCtype = QUDA_4D_PC;
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    csParam.pc_type = QUDA_5D_PC;
   } else {
-    csParam.PCtype = QUDA_5D_PC;
+    csParam.pc_type = QUDA_4D_PC;
   }
 
 //ndeg_tm    
@@ -361,8 +356,7 @@ void init(int argc, char **argv) {
     inv_param.return_clover = compute_clover;
     inv_param.compute_clover_inverse = compute_clover;
     inv_param.return_clover_inverse = compute_clover;
-
-    if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) inv_param.return_clover_inverse = true;
+    inv_param.return_clover_inverse = true;
 
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
   }
@@ -600,12 +594,7 @@ DslashTime dslashCUDA(int niter) {
             if (transfer) {
               dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
             } else {
-	      if (dagger) {
-	        ((DiracTwistedCloverPC *) dirac)->TwistCloverInv(*tmp1, *cudaSpinor, (parity+1)%2);
-                dirac->Dslash(*cudaSpinorOut, *tmp1, parity);
-	      } else {
-                dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
-	      }
+              dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
             }
           } else {
             if (transfer) {
@@ -727,7 +716,8 @@ void dslashRef() {
     switch (test_type) {
     case 0:
       if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)
-	tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+	tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity,
+                  inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
         int tm_offset = 12*spinorRef->Volume();
@@ -1081,6 +1071,8 @@ int main(int argc, char **argv)
     //FIXME No flops count for twisted-clover yet
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
+    printfQuda("%llu flops per kernel call, %llu flops per site\n",
+               flops / niter, (flops / niter) / cudaSpinor->Volume());
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
 
     printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
@@ -1098,6 +1090,12 @@ int main(int argc, char **argv)
     }
 
     if (verify_results) {
+      ::testing::TestEventListeners& listeners =
+          ::testing::UnitTest::GetInstance()->listeners();
+      if (comm_rank() != 0) {
+        delete listeners.Release(listeners.default_result_printer());
+      }
+
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0) warningQuda("Tests failed");
     }

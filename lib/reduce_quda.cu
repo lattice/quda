@@ -3,60 +3,9 @@
 #include <float_vector.h>
 #include <color_spinor_field_order.h>
 
-//#define QUAD_SUM
-#ifdef QUAD_SUM
-#include <dbldbl.h>
-#endif
-
-#include <cub_helper.cuh>
-
-template<typename> struct ScalarType { };
-template<> struct ScalarType<double> { typedef double type; };
-template<> struct ScalarType<double2> { typedef double type; };
-template<> struct ScalarType<double3> { typedef double type; };
-template<> struct ScalarType<double4> { typedef double type; };
-
-template<typename> struct Vec2Type { };
-template<> struct Vec2Type<double> { typedef double2 type; };
-
-#ifdef QUAD_SUM
-#define QudaSumFloat doubledouble
-#define QudaSumFloat2 doubledouble2
-#define QudaSumFloat3 doubledouble3
-template<> struct ScalarType<doubledouble> { typedef doubledouble type; };
-template<> struct ScalarType<doubledouble2> { typedef doubledouble type; };
-template<> struct ScalarType<doubledouble3> { typedef doubledouble type; };
-template<> struct ScalarType<doubledouble4> { typedef doubledouble type; };
-template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
-#else
-#define QudaSumFloat double
-#define QudaSumFloat2 double2
-#define QudaSumFloat3 double3
-#define QudaSumFloat4 double4
-#endif
-
-
-void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
-  if (a.Precision() != b.Precision())
-    errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
-  if (a.Length() != b.Length())
-    errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());
-  if (a.Stride() != b.Stride())
-    errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());
-}
-
-void checkLength(const ColorSpinorField &a, ColorSpinorField &b) {									\
-  if (a.Length() != b.Length())
-    errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());
-  if (a.Stride() != b.Stride())
-    errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());
-}
-
-static struct {
-  const char *vol_str;
-  const char *aux_str;
-  char aux_tmp[quda::TuneKey::aux_n];
-} blasStrings;
+#include <launch_kernel.cuh>
+#include <jitify_helper.cuh>
+#include <kernels/reduce_core.cuh>
 
 // These are used for reduction kernels
 static QudaSumFloat *d_reduce=0;
@@ -66,7 +15,10 @@ static cudaEvent_t reduceEnd;
 static bool fast_reduce_enabled = false;
 
 namespace quda {
+
   namespace blas {
+
+#include <generic_reduce.cuh>
 
     cudaStream_t* getStream();
 
@@ -89,24 +41,16 @@ namespace quda {
 	   of size MAX_MULTI_BLAS_N^2 of vectors (max length 4), with
 	   possible parity dimension, and a grid-stride loop with
 	   maximum number of blocks = 2 x SM count
-
-	- inline reductions in kernels where we cannot assume a grid
-           stride loop - hence max blocks is given by the architecture
-           limit
-
       */
 
-      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount; // FIXME - should set this according to what's used in tune_quda.h
+      const int reduce_size = 4 * sizeof(QudaSumFloat);
+      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount;
 
-      const int max_reduce = 2 * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
-      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
-
-      const int max_generic_blocks = 65336; // FIXME - this isn't quite right
-      const int max_generic_reduce = 2 * MAX_MULTI_BLAS_N * max_generic_blocks * 4 * sizeof(QudaSumFloat);
+      const int max_reduce = 2 * max_reduce_blocks * reduce_size;
+      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * reduce_size;
 
       // reduction buffer size
       size_t bytes = max_reduce > max_multi_reduce ? max_reduce : max_multi_reduce;
-      bytes = bytes > max_generic_reduce ? bytes : max_generic_reduce;
 
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 
@@ -155,770 +99,595 @@ namespace quda {
       cudaEventDestroy(reduceEnd);
     }
 
-    namespace reduce {
-
-#include <texture.h>
-#include <reduce_core.cuh>
-#include <reduce_core.h>
-#include <reduce_mixed_core.h>
-
-    } // namespace reduce
-
     /**
-       Base class from which all reduction functors should derive.
+       Generic reduction kernel launcher
     */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct ReduceFunctor {
+    template <typename doubleN, typename ReduceType, typename FloatN, int M, typename Arg>
+    doubleN reduceLaunch(Arg &arg, const TuneParam &tp, const cudaStream_t &stream,
+                         Tunable &tunable)
+    {
+      if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
+        errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
-      //! pre-computation routine called before the "M-loop"
-      virtual __device__ __host__ void pre() { ; }
+      if (getFastReduce() && !commAsyncReduction()) {
+        // initialize the reduction values in 32-bit increments to INT_MIN
+        constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
+        for (unsigned int i=0; i<tp.grid.y*words; i++) {
+          reinterpret_cast<int32_t*>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
+        }
+      }
 
-      //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y,
-							   FloatN &z, FloatN &w, FloatN &v) = 0;
+#ifdef JITIFY
+      using namespace jitify::reflection;
+      tunable.jitifyError() = program->kernel("quda::blas::reduceKernel")
+        .instantiate((int)tp.block.x,Type<ReduceType>(),Type<FloatN>(),M,Type<Arg>())
+        .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+      LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,FloatN,M);
+#endif
 
-      //! post-computation routine called after the "M-loop"
-      virtual __device__ __host__ void post(ReduceType &sum) { ; }
+      if (!commAsyncReduction()) {
+#if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
+        if (deviceProp.canMapHostMemory) {
+          if (getFastReduce()) {
+            constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
+            volatile int32_t *check = reinterpret_cast<int32_t*>(h_reduce);
+            int count = 0;
+            for (unsigned int i=0; i<tp.grid.y*words; i++) {
+              // spin-wait until all values have been updated
+              while (check[i] == std::numeric_limits<int32_t>::min()) {
+                if (count++ % 10000 == 0) { // check error every 10000 iterations
+                  // if there is an error in the kernel then we need to exit the spin-wait
+                  if (cudaSuccess != cudaPeekAtLastError()) break;
+                }
+              }
+            }
+          } else {
+            qudaEventRecord(reduceEnd, stream);
+            while (cudaSuccess != qudaEventQuery(reduceEnd)) { ; }
+          }
+        } else
+#endif
+          { qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
+      }
+      doubleN cpu_sum = set(((ReduceType*)h_reduce)[0]);
+      if (tp.grid.y==2) sum(cpu_sum, ((ReduceType*)h_reduce)[1]); // add other parity if needed
+      return cpu_sum;
+    }
 
+
+    template <typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
+              typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+    class ReduceCuda : public Tunable {
+
+    private:
+      const int nParity; // for composite fields this includes the number of composites
+      mutable ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg;
+      doubleN &result;
+
+      const ColorSpinorField &x, &y, &z, &w, &v;
+
+      // host pointers used for backing up fields when tuning
+      // these can't be curried into the Spinors because of Tesla argument length restriction
+      char *X_h, *Y_h, *Z_h, *W_h, *V_h;
+      char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h, *Vnorm_h;
+
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+      virtual bool advanceSharedBytes(TuneParam &param) const
+      {
+        TuneParam next(param);
+        advanceBlockDim(next); // to get next blockDim
+        int nthreads = next.block.x * next.block.y * next.block.z;
+        param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
+          sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+        return false;
+      }
+
+    public:
+      ReduceCuda(doubleN &result, SpinorX &X, SpinorY &Y, SpinorZ &Z,
+                 SpinorW &W, SpinorV &V, Reducer &r, ColorSpinorField &x,
+                 ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
+                 ColorSpinorField &v, int length) :
+        nParity( (x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
+        arg(X, Y, Z, W, V, r, length/nParity), x(x), y(y), z(z), w(w), v(v),
+        result(result), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0),
+        Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0)
+      {
+        strcpy(aux, x.AuxString());
+        if (x.Precision() != z.Precision()) {
+          strcat(aux, ",");
+          strcat(aux, z.AuxString());
+        }
+
+#ifdef JITIFY
+        ::quda::create_jitify_program("kernels/reduce_core.cuh");
+#endif
+      }
+      virtual ~ReduceCuda() { }
+
+      inline TuneKey tuneKey() const {
+        return TuneKey(x.VolString(), typeid(arg.r).name(), aux);
+      }
+
+      void apply(const cudaStream_t &stream) {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        result = reduceLaunch<doubleN,ReduceType,FloatN,M>(arg, tp, stream, *this);
+      }
+
+      void preTune() {
+        arg.X.backup(&X_h, &Xnorm_h, x.Bytes(), x.NormBytes());
+        arg.Y.backup(&Y_h, &Ynorm_h, y.Bytes(), y.NormBytes());
+        arg.Z.backup(&Z_h, &Znorm_h, z.Bytes(), z.NormBytes());
+        arg.W.backup(&W_h, &Wnorm_h, w.Bytes(), w.NormBytes());
+        arg.V.backup(&V_h, &Vnorm_h, v.Bytes(), v.NormBytes());
+      }
+
+      void postTune() {
+        arg.X.restore(&X_h, &Xnorm_h, x.Bytes(), x.NormBytes());
+        arg.Y.restore(&Y_h, &Ynorm_h, y.Bytes(), y.NormBytes());
+        arg.Z.restore(&Z_h, &Znorm_h, z.Bytes(), z.NormBytes());
+        arg.W.restore(&W_h, &Wnorm_h, w.Bytes(), w.NormBytes());
+        arg.V.restore(&V_h, &Vnorm_h, v.Bytes(), v.NormBytes());
+      }
+
+      void initTuneParam(TuneParam &param) const {
+        Tunable::initTuneParam(param);
+        param.grid.y = nParity;
+      }
+
+      void defaultTuneParam(TuneParam &param) const {
+        Tunable::defaultTuneParam(param);
+        param.grid.y = nParity;
+      }
+
+      long long flops() const { return arg.r.flops()*vec_length<FloatN>::value*arg.length*nParity*M; }
+
+      long long bytes() const
+      {
+        // the factor two here assumes we are reading and writing to the high precision vector
+        // this will evaluate correctly for non-mixed kernels since the +2/-2 will cancel out
+        return (arg.r.streams()-2)*x.Bytes()+ 2*z.Bytes();
+      }
+
+      int tuningIter() const { return 3; }
     };
 
-    /**
-       Return the L1 norm of x
+
+    template <typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename zType,
+              int M, template <typename ReducerType, typename Float, typename FloatN> class Reducer,
+              int writeX, int writeY, int writeZ, int writeW, int writeV>
+    doubleN nativeReduce(const double2 &a, const double2 &b,
+                         ColorSpinorField &x, ColorSpinorField &y,
+                         ColorSpinorField &z, ColorSpinorField &w,
+                         ColorSpinorField &v, int length) {
+
+      checkLength(x, y); checkLength(x, z); checkLength(x, w); checkLength(x, v);
+
+      Spinor<RegType,StoreType,M,writeX,0> X(x);
+      Spinor<RegType,StoreType,M,writeY,1> Y(y);
+      Spinor<RegType,    zType,M,writeZ,2> Z(z);
+      Spinor<RegType,StoreType,M,writeW,3> W(w);
+      Spinor<RegType,StoreType,M,writeV,4> V(v);
+
+      doubleN value;
+      typedef typename scalar<RegType>::type Float;
+      typedef typename vector<Float,2>::type Float2;
+      typedef vector<Float,2> vec2;
+
+      Reducer<ReduceType, Float2, RegType> r((Float2)vec2(a), (Float2)vec2(b));
+      ReduceCuda<doubleN,ReduceType,RegType,M,
+                 decltype(X),decltype(Y),decltype(Z),decltype(W),decltype(V),
+                 Reducer<ReduceType,Float2,RegType> >
+        reduce(value, X, Y, Z, W, V, r, x, y, z, w, v, length);
+      reduce.apply(*(blas::getStream()));
+
+      blas::bytes += reduce.bytes();
+      blas::flops += reduce.flops();
+
+      checkCudaError();
+      return value;
+    }
+
+
+    /*
+      Wilson
+      double double2 M = 1/12
+      single float4  M = 1/6
+      half   short4  M = 6/6
+
+      Staggered
+      double double2 M = 1/3
+      single float2  M = 1/3
+      half   short2  M = 3/3
     */
-    template<typename ReduceType> __device__ __host__ ReduceType norm1_(const double2 &a) {
-      return (ReduceType)fabs(a.x) + (ReduceType)fabs(a.y);
+
+    /**
+       Driver for generic reduction routine with five loads.
+       @param ReduceType
+       @param siteUnroll - if this is true, then one site corresponds to exactly one thread
+    */
+    template <typename doubleN, typename ReduceType,
+              template <typename ReducerType, typename Float, typename FloatN> class Reducer,
+              int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll>
+    doubleN uni_reduce(const double2 &a, const double2 &b, ColorSpinorField &x,
+                       ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
+                       ColorSpinorField &v) {
+
+      checkPrecision(x,y,z,w,v);
+
+      doubleN value;
+      if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
+
+        if (!x.isNative() &&
+            !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION ||
+              x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_HALF_PRECISION) ) {
+          warningQuda("Device reductions on non-native fields is not supported\n");
+          doubleN value;
+          ::quda::zero(value);
+          return value;
+        }
+
+        // cannot do site unrolling for arbitrary color (needs JIT)
+        if (siteUnroll && x.Ncolor()!=3) errorQuda("Not supported");
+
+        int reduce_length = siteUnroll ? x.RealLength() : x.Length();
+
+        if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+          if (x.Nspin() == 4 || x.Nspin() == 2) { //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
+            const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
+            if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
+            value = nativeReduce<doubleN,ReduceType,double2,double2,double2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, reduce_length/(2*M));
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 1) { //staggered
+#ifdef GPU_STAGGERED_DIRAC
+            const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,double2,double2,double2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, reduce_length/(2*M));
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+        } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+            const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,float4,float4,float4,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, reduce_length/(4*M));
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin()==4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) ) {
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
+            const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+            if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
+            value = nativeReduce<doubleN,ReduceType,float2,float2,float2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, reduce_length/(2*M));
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+        } else if (x.Precision() == QUDA_HALF_PRECISION) { // half precision
+          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+            const int M = 6; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,float4,short4,short4,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { //wilson
+#if defined(GPU_MULTIGRID)
+            const int M = 12; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,float2,char2,char2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 1) {//staggered
+#ifdef GPU_STAGGERED_DIRAC
+            const int M = 3; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,float2,short2,short2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+        } else if (x.Precision() == QUDA_QUARTER_PRECISION) { // quarter precision
+          if (x.Nspin() == 4) { //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+            const int M = 6; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,float4,char4,char4,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 1) {//staggered
+#ifdef GPU_STAGGERED_DIRAC
+            const int M = 3; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,float2,char2,char2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+        } else {
+          errorQuda("precision=%d is not supported\n", x.Precision());
+        }
+      } else { // fields are on the CPU
+        // we don't have quad precision support on the GPU so use doubleN instead of ReduceType
+        if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+          Reducer<doubleN, double2, double2> r(a, b);
+          value = genericReduce<doubleN,doubleN,double,double,writeX,writeY,writeZ,writeW,writeV,Reducer<doubleN,double2,double2> >(x,y,z,w,v,r);
+        } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+          Reducer<doubleN, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
+          value = genericReduce<doubleN,doubleN,float,float,writeX,writeY,writeZ,writeW,writeV,Reducer<doubleN,float2,float2> >(x,y,z,w,v,r);
+        } else {
+          errorQuda("Precision %d not implemented", x.Precision());
+        }
+      }
+
+      const int Nreduce = sizeof(doubleN) / sizeof(double);
+      reduceDoubleArray((double*)&value, Nreduce);
+
+      return value;
     }
 
-    template<typename ReduceType> __device__ __host__ ReduceType norm1_(const float2 &a) {
-      return (ReduceType)fabs(a.x) + (ReduceType)fabs(a.y);
+    /**
+       Driver for generic reduction routine with two loads.
+       @param ReduceType
+       @param siteUnroll - if this is true, then one site corresponds to exactly one thread
+    */
+    template <typename doubleN, typename ReduceType,
+              template <typename ReducerType, typename Float, typename FloatN> class Reducer,
+              int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll>
+    doubleN mixed_reduce(const double2 &a, const double2 &b, ColorSpinorField &x,
+                         ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
+                         ColorSpinorField &v) {
+
+      checkPrecision(x,y,w,v);
+
+      doubleN value;
+      if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
+
+        if (!x.isNative() && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION) ) {
+          warningQuda("Device reductions on non-native fields is not supported\n");
+          doubleN value;
+          ::quda::zero(value);
+          return value;
+        }
+
+        // cannot do site unrolling for arbitrary color (needs JIT)
+        if (x.Ncolor()!=3) errorQuda("Not supported");
+
+        if (x.Precision() == QUDA_SINGLE_PRECISION && z.Precision() == QUDA_DOUBLE_PRECISION) {
+          if (x.Nspin() == 4){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+            const int M = 12; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,double2,float4,double2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 1) { //staggered
+#ifdef GPU_STAGGERED_DIRAC
+            const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+            const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
+            value = nativeReduce<doubleN,ReduceType,double2,float2,double2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, reduce_length/(2*M));
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+        } else if (x.Precision() == QUDA_HALF_PRECISION && z.Precision() == QUDA_DOUBLE_PRECISION) {
+          if (x.Nspin() == 4) { //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+            const int M = 12; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,double2,short4,double2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 1) { //staggered
+#ifdef GPU_STAGGERED_DIRAC
+            const int M = 3; // determines how much work per thread to do
+            value = nativeReduce<doubleN,ReduceType,double2,short2,double2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+        } else if (z.Precision() == QUDA_SINGLE_PRECISION) {
+          if (x.Nspin() == 4) { //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+            const int M = 6;
+            value = nativeReduce<doubleN,ReduceType,float4,short4,float4,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 1) {//staggered
+#ifdef GPU_STAGGERED_DIRAC
+            const int M = 3;
+            value = nativeReduce<doubleN,ReduceType,float2,short2,float2,M,Reducer,
+                                 writeX,writeY,writeZ,writeW,writeV>
+              (a, b, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+          blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
+        }
+      } else {
+        // we don't have quad precision support on the GPU so use doubleN instead of ReduceType
+        if (x.Precision() == QUDA_SINGLE_PRECISION && z.Precision() == QUDA_DOUBLE_PRECISION) {
+          Reducer<doubleN, double2, double2> r(a, b);
+          value = genericReduce<doubleN,doubleN,float,double,writeX,writeY,writeZ,writeW,writeV,Reducer<doubleN,double2,double2> >(x,y,z,w,v,r);
+        } else {
+          errorQuda("Precision %d not implemented", x.Precision());
+        }
+      }
+
+      const int Nreduce = sizeof(doubleN) / sizeof(double);
+      reduceDoubleArray((double*)&value, Nreduce);
+
+      return value;
     }
 
-    template<typename ReduceType> __device__ __host__ ReduceType norm1_(const float4 &a) {
-      return (ReduceType)fabs(a.x) + (ReduceType)fabs(a.y) + (ReduceType)fabs(a.z) + (ReduceType)fabs(a.w);
-    }
-
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct Norm1 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Norm1(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,FloatN  &w, FloatN &v)
-      { sum += norm1_<ReduceType>(x); }
-      static int streams() { return 1; } //! total number of input and output streams
-      static int flops() { return 2; } //! flops per element
-    };
 
     double norm1(const ColorSpinorField &x) {
-#ifdef HOST_DEBUG
       ColorSpinorField &y = const_cast<ColorSpinorField&>(x); // FIXME
-      return reduce::reduceCuda<double,QudaSumFloat,Norm1,0,0,0,0,0,false>
+      return uni_reduce<double,QudaSumFloat,Norm1,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
-#else
-	errorQuda("L1 norm kernel only built when HOST_DEBUG is enabled");
-      return 0.0;
-#endif
     }
-
-    /**
-       Return the L2 norm of x
-    */
-    template<typename ReduceType> __device__ __host__ void norm2_(ReduceType &sum, const double2 &a) {
-      sum += (ReduceType)a.x*(ReduceType)a.x;
-      sum += (ReduceType)a.y*(ReduceType)a.y;
-    }
-
-    template<typename ReduceType> __device__ __host__ void norm2_(ReduceType &sum, const float2 &a) {
-      sum += (ReduceType)a.x*(ReduceType)a.x;
-      sum += (ReduceType)a.y*(ReduceType)a.y;
-    }
-
-    template<typename ReduceType> __device__ __host__ void norm2_(ReduceType &sum, const float4 &a) {
-      sum += (ReduceType)a.x*(ReduceType)a.x;
-      sum += (ReduceType)a.y*(ReduceType)a.y;
-      sum += (ReduceType)a.z*(ReduceType)a.z;
-      sum += (ReduceType)a.w*(ReduceType)a.w;
-    }
-
-
-    template <typename ReduceType, typename Float2, typename FloatN>
-      struct Norm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Norm2(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,FloatN  &w, FloatN &v)
-      { norm2_<ReduceType>(sum,x); }
-      static int streams() { return 1; } //! total number of input and output streams
-      static int flops() { return 2; } //! flops per element
-    };
 
     double norm2(const ColorSpinorField &x) {
       ColorSpinorField &y = const_cast<ColorSpinorField&>(x);
-      return reduce::reduceCuda<double,QudaSumFloat,Norm2,0,0,0,0,0,false>
+      return uni_reduce<double,QudaSumFloat,Norm2,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
     }
 
-
-    /**
-       Return the real dot product of x and y
-    */
-    template<typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const double2 &a, const double2 &b) {
-      sum += (ReduceType)a.x*(ReduceType)b.x;
-      sum += (ReduceType)a.y*(ReduceType)b.y;
-    }
-
-    template<typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const float2 &a, const float2 &b) {
-      sum += (ReduceType)a.x*(ReduceType)b.x;
-      sum += (ReduceType)a.y*(ReduceType)b.y;
-    }
-
-    template<typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const float4 &a, const float4 &b) {
-      sum += (ReduceType)a.x*(ReduceType)b.x;
-      sum += (ReduceType)a.y*(ReduceType)b.y;
-      sum += (ReduceType)a.z*(ReduceType)b.z;
-      sum += (ReduceType)a.w*(ReduceType)b.w;
-    }
-
-   template <typename ReduceType, typename Float2, typename FloatN>
-    struct Dot : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Dot(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-     { dot_<ReduceType>(sum,x,y); }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 2; } //! flops per element
-    };
-
     double reDotProduct(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,Dot,0,0,0,0,0,false>
+      return uni_reduce<double,QudaSumFloat,Dot,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
-
-    /**
-     * Returns the real component of the dot product of a and b and
-     * the norm of a
-    */
-    template<typename ReduceType, typename InputType>
-    __device__ __host__ ReduceType dotNormA_(const InputType &a, const InputType &b) {
-      typedef typename ScalarType<ReduceType>::type scalar;
-      ReduceType c;
-      dot_<scalar>(c.x,a,b);
-      norm2_<scalar>(c.y,a);
-      return c;
+    double axpbyzNorm(double a, ColorSpinorField &x, double b, ColorSpinorField &y,
+                      ColorSpinorField &z) {
+      return uni_reduce<double,QudaSumFloat,axpbyzNorm2,0,0,1,0,0,false>
+	(make_double2(a, 0.0), make_double2(b, 0.0), x, y, z, x, x);
     }
 
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct DotNormA : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      DotNormA(const Float2 &a, const Float2 &b){}
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,  FloatN &w, FloatN &v)
-      {sum += dotNormA_<ReduceType,FloatN>(x,y);}
-      static int streams() { return 2; }
-      static int flops() { return 4; }
-    };
-
-    double2 reDotProductNormA(ColorSpinorField &x,ColorSpinorField &y){
-      return reduce::reduceCuda<double2,QudaSumFloat2,DotNormA,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-    }
-
-
-    /**
-       First performs the operation y[i] += a*x[i]
-       Return the norm of y
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct axpyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      axpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	y += a.x*x; norm2_<ReduceType>(sum,y); }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 4; } //! flops per element
-    };
-
-    double axpyNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,axpyNorm2,0,1,0,0,0,false>
+    double axpyReDot(double a, ColorSpinorField &x, ColorSpinorField &y) {
+      return uni_reduce<double,QudaSumFloat,AxpyReDot,0,1,0,0,0,false>
 	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
-
-
-    /**
-       First performs the operation y[i] += a*x[i]
-       Return real dot product (x,y)
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct AxpyReDot : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      AxpyReDot(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	y += a.x*x; dot_<ReduceType>(sum,x,y); }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 4; } //! flops per element
-    };
-
-    double axpyReDot(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,AxpyReDot,0,1,0,0,0,false>
-	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-    }
-
-
-    /**
-       First performs the operation y[i] = x[i] - y[i]
-       Second returns the norm of y
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct xmyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      xmyNorm2(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	y = x - y; norm2_<ReduceType>(sum,y); }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 3; } //! flops per element
-    };
-
-    double xmyNorm(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,xmyNorm2,0,1,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-    }
-
-
-    /**
-       Functor to perform the operation y += a * x  (complex-valued)
-    */
-    __device__ __host__ void Caxpy_(const double2 &a, const double2 &x, double2 &y) {
-      y.x += a.x*x.x; y.x -= a.y*x.y;
-      y.y += a.y*x.x; y.y += a.x*x.y;
-    }
-    __device__ __host__ void Caxpy_(const float2 &a, const float2 &x, float2 &y) {
-      y.x += a.x*x.x; y.x -= a.y*x.y;
-      y.y += a.y*x.x; y.y += a.x*x.y;
-    }
-    __device__ __host__ void Caxpy_(const float2 &a, const float4 &x, float4 &y) {
-      y.x += a.x*x.x; y.x -= a.y*x.y;
-      y.y += a.y*x.x; y.y += a.x*x.y;
-      y.z += a.x*x.z; y.z -= a.y*x.w;
-      y.w += a.y*x.z; y.w += a.x*x.w;
-    }
-
-    /**
-       First performs the operation y[i] = a*x[i] + y[i] (complex-valued)
-       Second returns the norm of y
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct caxpyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      caxpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	Caxpy_(a, x, y); norm2_<ReduceType>(sum,y); }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per element
-    };
 
     double caxpyNorm(const Complex &a, ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,caxpyNorm2,0,1,0,0,0,false>
+      return uni_reduce<double,QudaSumFloat,caxpyNorm2,0,1,0,0,0,false>
 	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
-
-    /**
-       double caxpyXmayNormCuda(float a, float *x, float *y, n){}
-       First performs the operation y[i] = a*x[i] + y[i]
-       Second performs the operator x[i] -= a*z[i]
-       Third returns the norm of x
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct caxpyxmaznormx : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      caxpyxmaznormx(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { Caxpy_(a, x, y); Caxpy_(-a,z,x); norm2_<ReduceType>(sum,x); }
-      static int streams() { return 5; } //! total number of input and output streams
-      static int flops() { return 10; } //! flops per element
-    };
-
     double caxpyXmazNormX(const Complex &a, ColorSpinorField &x,
 			  ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double,QudaSumFloat,caxpyxmaznormx,1,1,0,0,0,false>
+      return uni_reduce<double,QudaSumFloat,caxpyxmaznormx,1,1,0,0,0,false>
 	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
-
-    /**
-       double cabxpyzAxNorm(float a, complex b, float *x, float *y, float *z){}
-       First performs the operation z[i] = y[i] + a*b*x[i]
-       Second performs x[i] *= a
-       Third returns the norm of x
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct cabxpyzaxnorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      Float2 b;
-      cabxpyzaxnorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { x *= a.x; Caxpy_(b, x, y); z = y; norm2_<ReduceType>(sum,z); }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 10; } //! flops per element
-    };
-
-
-    double cabxpyzAxNorm(const double &a, const Complex &b,
+    double cabxpyzAxNorm(double a, const Complex &b,
 			ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double,QudaSumFloat,cabxpyzaxnorm,1,0,1,0,0,false>
+      return uni_reduce<double,QudaSumFloat,cabxpyzaxnorm,1,0,1,0,0,false>
 	(make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, z, x, x);
     }
 
-
-    /**
-       Returns complex-valued dot product of x and y
-    */
-    template<typename ReduceType>
-    __device__ __host__ void cdot_(ReduceType &sum, const double2 &a, const double2 &b) {
-      typedef typename ScalarType<ReduceType>::type scalar;
-      sum.x += (scalar)a.x*(scalar)b.x;
-      sum.x += (scalar)a.y*(scalar)b.y;
-      sum.y += (scalar)a.x*(scalar)b.y;
-      sum.y -= (scalar)a.y*(scalar)b.x;
-    }
-
-    template<typename ReduceType>
-    __device__ __host__ void cdot_(ReduceType &sum, const float2 &a, const float2 &b) {
-      typedef typename ScalarType<ReduceType>::type scalar;
-      sum.x += (scalar)a.x*(scalar)b.x;
-      sum.x += (scalar)a.y*(scalar)b.y;
-      sum.y += (scalar)a.x*(scalar)b.y;
-      sum.y -= (scalar)a.y*(scalar)b.x;
-    }
-
-    template<typename ReduceType>
-    __device__ __host__ void cdot_(ReduceType &sum, const float4 &a, const float4 &b) {
-      typedef typename ScalarType<ReduceType>::type scalar;
-      sum.x += (scalar)a.x*(scalar)b.x;
-      sum.x += (scalar)a.y*(scalar)b.y;
-      sum.x += (scalar)a.z*(scalar)b.z;
-      sum.x += (scalar)a.w*(scalar)b.w;
-      sum.y += (scalar)a.x*(scalar)b.y;
-      sum.y -= (scalar)a.y*(scalar)b.x;
-      sum.y += (scalar)a.z*(scalar)b.w;
-      sum.y -= (scalar)a.w*(scalar)b.z;
-    }
-
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct Cdot : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Cdot(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { cdot_<ReduceType>(sum,x,y); }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 4; } //! flops per element
-    };
-
-
     Complex cDotProduct(ColorSpinorField &x, ColorSpinorField &y) {
-      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
+      double2 cdot = uni_reduce<double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
       return Complex(cdot.x, cdot.y);
     }
 
-    /**
-       double2 xpaycDotzyCuda(float2 *x, float a, float2 *y, float2 *z, int n) {}
-       First performs the operation y = x + a*y
-       Second returns cdot product (z,y)
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct xpaycdotzy : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      xpaycdotzy(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { y = x + a.x*y; cdot_<ReduceType>(sum,z,y); }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per element
-    };
-
-    Complex xpaycDotzy(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z) {
-      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,xpaycdotzy,0,1,0,0,0,false>
-	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
-      return Complex(cdot.x, cdot.y);
-    }
-
-
-    /**
-       double caxpyDotzyCuda(float a, float *x, float *y, float *z, n){}
-       First performs the operation y[i] = a*x[i] + y[i]
-       Second returns the dot product (z,y)
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct caxpydotzy : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      caxpydotzy(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { Caxpy_(a, x, y); cdot_<ReduceType>(sum,z,y); }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 8; } //! flops per element
-    };
-
-
     Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,caxpydotzy,0,1,0,0,0,false>
+      double2 cdot = uni_reduce<double2,QudaSumFloat2,caxpydotzy,0,1,0,0,0,false>
 	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
       return Complex(cdot.x, cdot.y);
     }
 
-
-    /**
-       First returns the dot product (x,y)
-       Returns the norm of x
-    */
-    template<typename ReduceType, typename InputType>
-    __device__ __host__ void cdotNormA_(ReduceType &sum, const InputType &a, const InputType &b) {
-      typedef typename ScalarType<ReduceType>::type scalar;
-      typedef typename Vec2Type<scalar>::type vec2;
-      cdot_<ReduceType>(sum,a,b);
-      norm2_<scalar>(sum.z,a);
-    }
-
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct CdotNormA : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      CdotNormA(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { cdotNormA_<ReduceType>(sum,x,y); }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per element
-    };
-
     double3 cDotProductNormA(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double3,QudaSumFloat3,CdotNormA,0,0,0,0,0,false>
+      return uni_reduce<double3,QudaSumFloat3,CdotNormA,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
-
-
-    /**
-       First returns the dot product (x,y)
-       Returns the norm of y
-    */
-    template<typename ReduceType, typename InputType>
-    __device__ __host__ void cdotNormB_(ReduceType &sum, const InputType &a, const InputType &b) {
-      typedef typename ScalarType<ReduceType>::type scalar;
-      typedef typename Vec2Type<scalar>::type vec2;
-      cdot_<ReduceType>(sum,a,b);
-      norm2_<scalar>(sum.z,b);
-    }
-
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct CdotNormB : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      CdotNormB(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
-      { cdotNormB_<ReduceType>(sum,x,y); }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per element
-    };
-
-    double3 cDotProductNormB(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double3,QudaSumFloat3,CdotNormB,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-    }
-
-
-    /**
-       This convoluted kernel does the following:
-       z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct caxpbypzYmbwcDotProductUYNormY_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      Float2 b;
-      caxpbypzYmbwcDotProductUYNormY_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { Caxpy_(a, x, z); Caxpy_(b, y, z); Caxpy_(-b, w, y); cdotNormB_<ReduceType>(sum,v,y); }
-      static int streams() { return 7; } //! total number of input and output streams
-      static int flops() { return 18; } //! flops per element
-    };
 
     double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x,
 					   const Complex &b, ColorSpinorField &y,
 					   ColorSpinorField &z, ColorSpinorField &w,
 					   ColorSpinorField &u) {
       if (x.Precision() != z.Precision()) {
-	return reduce::mixed::reduceCuda<double3,QudaSumFloat3,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
+	return mixed_reduce<double3,QudaSumFloat3,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
 	  (make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
       } else {
-	return reduce::reduceCuda<double3,QudaSumFloat3,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
+	return uni_reduce<double3,QudaSumFloat3,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
 	  (make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
       }
     }
 
-
-    /**
-       Specialized kernel for the modified CG norm computation for
-       computing beta.  Computes y = y + a*x and returns norm(y) and
-       dot(y, delta(y)) where delta(y) is the difference between the
-       input and out y vector.
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct axpyCGNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      axpyCGNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	typedef typename ScalarType<ReduceType>::type scalar;
-	FloatN z_new = z + a.x*x;
-	norm2_<scalar>(sum.x,z_new);
-	dot_<scalar>(sum.y,z_new,z_new-z);
-	z = z_new;
-      }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per real element
-    };
-
-    Complex axpyCGNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
+    Complex axpyCGNorm(double a, ColorSpinorField &x, ColorSpinorField &y) {
       // swizzle since mixed is on z
       double2 cg_norm ;
       if (x.Precision() != y.Precision()) {
-	cg_norm = reduce::mixed::reduceCuda<double2,QudaSumFloat2,axpyCGNorm2,0,0,1,0,0,false>
+	cg_norm = mixed_reduce<double2,QudaSumFloat2,axpyCGNorm2,0,0,1,0,0,false>
 	  (make_double2(a, 0.0), make_double2(0.0, 0.0), x, x, y, x, x);
       } else {
-	cg_norm = reduce::reduceCuda<double2,QudaSumFloat2,axpyCGNorm2,0,0,1,0,0,false>
+	cg_norm = uni_reduce<double2,QudaSumFloat2,axpyCGNorm2,0,0,1,0,0,false>
 	  (make_double2(a, 0.0), make_double2(0.0, 0.0), x, x, y, x, x);
       }
       return Complex(cg_norm.x, cg_norm.y);
     }
 
-
-    /**
-       This kernel returns (x, x) and (r,r) and also returns the so-called
-       heavy quark norm as used by MILC: 1 / N * \sum_i (r, r)_i / (x, x)_i, where
-       i is site index and N is the number of sites.
-       When this kernel is launched, we must enforce that the parameter M
-       in the launcher corresponds to the number of FloatN fields used to
-       represent the spinor, e.g., M=6 for Wilson and M=3 for staggered.
-       This is only the case for half-precision kernels by default.  To
-       enable this, the siteUnroll template parameter must be set true
-       when reduceCuda is instantiated.
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct HeavyQuarkResidualNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      typedef typename scalar<ReduceType>::type real;
-      Float2 a;
-      Float2 b;
-      ReduceType aux;
-      HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b), aux{ } { ; }
-
-      __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
-
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	norm2_<real>(aux.x,x); norm2_<real>(aux.y,y);
-      }
-
-      //! sum the solution and residual norms, and compute the heavy-quark norm
-      __device__ __host__ void post(ReduceType &sum)
-      {
-	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
-      }
-
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 4; } //! undercounts since it excludes the per-site division
-    };
-
     double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r) {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
-      double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,HeavyQuarkResidualNorm_,0,0,0,0,0,true>
+      double3 rtn = uni_reduce<double3,QudaSumFloat3,HeavyQuarkResidualNorm_,0,0,0,0,0,true>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
       return rtn;
     }
 
-
-    /**
-      Variant of the HeavyQuarkResidualNorm kernel: this takes three
-      arguments, the first two are summed together to form the
-      solution, with the third being the residual vector.  This removes
-      the need an additional xpy call in the solvers, impriving
-      performance.
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct xpyHeavyQuarkResidualNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-	typedef typename scalar<ReduceType>::type real;
-      Float2 a;
-      Float2 b;
-      ReduceType aux;
-      xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b), aux{ } { ; }
-
-      __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
-
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	norm2_<real>(aux.x,x + y); norm2_<real>(aux.y,z);
-      }
-
-      //! sum the solution and residual norms, and compute the heavy-quark norm
-      __device__ __host__ void post(ReduceType &sum)
-      {
-	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
-      }
-
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 5; }
-    };
-
     double3 xpyHeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &y,
 				      ColorSpinorField &r) {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
-      double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,xpyHeavyQuarkResidualNorm_,0,0,0,0,0,true>
+      double3 rtn = uni_reduce<double3,QudaSumFloat3,xpyHeavyQuarkResidualNorm_,0,0,0,0,0,true>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
       return rtn;
     }
 
-    /**
-       double3 tripleCGReduction(V x, V y, V z){}
-       First performs the operation norm2(x)
-       Second performs the operatio norm2(y)
-       Third performs the operation dotPropduct(y,z)
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct tripleCGReduction_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      tripleCGReduction_(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	typedef typename ScalarType<ReduceType>::type scalar;
-	norm2_<scalar>(sum.x,x); norm2_<scalar>(sum.y,y); dot_<scalar>(sum.z,y,z);
-      }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per element
-    };
-
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double3,QudaSumFloat3,tripleCGReduction_,0,0,0,0,0,false>
+      return uni_reduce<double3,QudaSumFloat3,tripleCGReduction_,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
-
-#ifdef ALTRELIABLE
-    /**
-       double4 quadrupleCGReduction(V x, V y, V z){}
-       First performs the operation norm2(x)
-       Second performs the operatio norm2(y)
-       Third performs the operation dotPropduct(y,z)
-       Fourth performs the operation norm(z)
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct quadrupleCGReduction_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      quadrupleCGReduction_(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-  typedef typename ScalarType<ReduceType>::type scalar;
-  norm2_<scalar>(sum.x,x); norm2_<scalar>(sum.y,y); dot_<scalar>(sum.z,y,z); norm2_<scalar>(sum.w,w);
-      }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 8; } //! flops per element
-    };
-
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double4,QudaSumFloat4,quadrupleCGReduction_,0,0,0,0,0,false>
-  (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
+      return uni_reduce<double4,QudaSumFloat4,quadrupleCGReduction_,0,0,0,0,0,false>
+        (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
-#endif
-
-    /**
-       double quadrupleCG3InitNorm(d a, d b, V x, V y, V z, V w, V v){}
-        z = x;
-        w = y;
-        x += a*y;
-        y -= a*v;
-        norm2(y);
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct quadrupleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      quadrupleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-        z = x;
-        w = y;
-        x += a.x*y;
-        y -= a.x*v;
-        norm2_<ReduceType>(sum,y);
-      }
-      static int streams() { return 6; } //! total number of input and output streams
-      static int flops() { return 6; } //! flops per element check if it's right
-    };
-
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
-      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3InitNorm_,1,1,1,1,0,false>
+      return uni_reduce<double,QudaSumFloat,quadrupleCG3InitNorm_,1,1,1,1,0,false>
 	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, w, v);
     }
 
-
-    /**
-       double quadrupleCG3UpdateNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
-        tmpx = x;
-        tmpy = y;
-        x = b*(x + a*y) + (1-b)*z;
-        y = b*(y + a*v) + (1-b)*w;
-        z = tmpx;
-        w = tmpy;
-        norm2(y);
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a,b;
-      quadrupleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      FloatN tmpx{}, tmpy{};
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-        tmpx = x;
-        tmpy = y;
-        x = b.x*(x + a.x*y) + b.y*z;
-        y = b.x*(y - a.x*v) + b.y*w;
-        z = tmpx;
-        w = tmpy;
-        norm2_<ReduceType>(sum,y);
-      }
-      static int streams() { return 7; } //! total number of input and output streams
-      static int flops() { return 16; } //! flops per element check if it's right
-    };
-
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
-      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3UpdateNorm_,1,1,1,1,0,false>
+      return uni_reduce<double,QudaSumFloat,quadrupleCG3UpdateNorm_,1,1,1,1,0,false>
 	(make_double2(a, 0.0), make_double2(b, 1.-b), x, y, z, w, v);
     }
 
-    /**
-       void doubleCG3InitNorm(d a, V x, V y, V z){}
-        y = x;
-        x -= a*z;
-        norm2(x);
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct doubleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      doubleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-        y = x;
-        x -= a.x*z;
-        norm2_<ReduceType>(sum,x);
-      }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 5; } //! flops per element
-    };
-
     double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3InitNorm_,1,1,0,0,0,false>
+      return uni_reduce<double,QudaSumFloat,doubleCG3InitNorm_,1,1,0,0,0,false>
         (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, z, z);
     }
 
-    /**
-       void doubleCG3UpdateNorm(d a, d b, V x, V y, V z){}
-        tmp = x;
-        x = b*(x-a*z) + (1-b)*y;
-        y = tmp;
-        norm2(x);
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct doubleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a, b;
-      doubleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      FloatN tmp{};
-      __device__ __host__ void operator()(ReduceType &sum,FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
-        tmp = x;
-        x = b.x*(x-a.x*z) + b.y*y;
-        y = tmp;
-        norm2_<ReduceType>(sum,x);
-      }
-      static int streams() { return 4; } //! total number of input and output streams
-      static int flops() { return 9; } //! flops per element
-    };
-
     double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3UpdateNorm_,1,1,0,0,0,false>
+      return uni_reduce<double,QudaSumFloat,doubleCG3UpdateNorm_,1,1,0,0,0,false>
         (make_double2(a, 0.0), make_double2(b, 1.0-b), x, y, z, z, z);
     }
 

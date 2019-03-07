@@ -449,12 +449,13 @@ namespace quda {
       typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false, bool block_float=false, bool use_tex=false>
       class FieldOrderCB {
 
+      typedef float norm_type;
     protected:
       complex<storeFloat> *v;
     const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
       // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
       union {
-        float *norm;
+        norm_type *norm;
         Float scale;
       };
       union {
@@ -463,7 +464,7 @@ namespace quda {
       };
 #ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
-      mutable float *ghost_norm[8];
+      mutable norm_type *ghost_norm[8];
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
@@ -507,8 +508,8 @@ namespace quda {
 
         if (block_float) {
           // only if we have block_float format do we set these (only block_orthogonalize.cu at present)
-          norm = static_cast<float*>(const_cast<void*>(field.Norm()));
-          norm_offset = field.NormBytes()/(2*sizeof(float));
+          norm = static_cast<norm_type*>(const_cast<void*>(field.Norm()));
+          norm_offset = field.NormBytes()/(2*sizeof(norm_type));
         }
       }
 
@@ -523,9 +524,9 @@ namespace quda {
         for (int dim=0; dim<4; dim++) {
           for (int dir=0; dir<2; dir++) {
           ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
-          ghost_norm[2*dim+dir] =
-              reinterpret_cast<float*>(static_cast<char*>(ghost_[2*dim+dir]) +
-                a.GhostNormOffset(dim,dir)*QUDA_SINGLE_PRECISION - a.GhostOffset(dim,dir)*sizeof(ghostFloat));
+          ghost_norm[2*dim+dir] = reinterpret_cast<norm_type*>
+            (static_cast<char*>(ghost_[2*dim+dir]) + a.GhostNormOffset(dim,dir)*sizeof(norm_type)
+             - a.GhostOffset(dim,dir)*sizeof(ghostFloat));
           }
         }
       }
@@ -786,12 +787,13 @@ namespace quda {
         typedef typename VectorType<Float,N>::type Vector;
         typedef typename VectorType<RegType,N>::type RegVector;
         typedef typename AllocType<huge_alloc>::type AllocInt;
+        typedef float norm_type;
         static constexpr int length = 2 * Ns * Nc;
         static constexpr int length_ghost = spin_project ? length/2 : length;
         static constexpr int M = length / N;
         static constexpr int M_ghost = spin_project ? M/2 : M;
         Float *field;
-        float *norm;
+        norm_type *norm;
         const AllocInt offset; // offset can be 32-bit or 64-bit
         const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
@@ -806,14 +808,14 @@ namespace quda {
         int faceVolumeCB[4];
         int stride;
         mutable Float *ghost[8];
-        mutable float *ghost_norm[8];
+        mutable norm_type *ghost_norm[8];
         int nParity;
         void *backup_h; //! host memory for backing up the field when tuning
         size_t bytes;
 
-      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0, bool override=false)
+      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, norm_type *norm_=0, Float **ghost_=0, bool override=false)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
-    norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
+    norm(norm_ ? norm_ : (norm_type*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(norm_type))),
 #ifdef USE_TEXTURE_OBJECTS
     tex(0), texNorm(0), tex_offset(offset/N),
 #endif
@@ -841,53 +843,67 @@ namespace quda {
       for (int dir=0; dir<2; dir++) {
         ghost[2*dim+dir] = static_cast<Float*>(ghost_[2*dim+dir]);
         ghost_norm[2*dim+dir] =
-        reinterpret_cast<float*>(static_cast<char*>(ghost_[2*dim+dir]) + nParity*length_ghost*faceVolumeCB[dim]*sizeof(Float));
+        reinterpret_cast<norm_type*>(static_cast<char*>(ghost_[2*dim+dir]) + nParity*length_ghost*faceVolumeCB[dim]*sizeof(Float));
       }
     }
   }
 
   __device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
-#pragma unroll
-    for (int i=0; i<M; i++) {
-      // first do vectorized copy from memory
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-      if (!huge_alloc) { // use textures unless we have a huge alloc
-        TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*i + x);
-        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
-      } else
-#endif
-      {
-        Vector vecTmp = vector_load<Vector>(field + parity*offset, x + stride*i);
-        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
-      }
-    }
 
+    norm_type nrm;
     if ( isFixed<Float>::value ) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
       // use textures unless we have a large alloc
-      RegType nrm = !huge_alloc ? tex1Dfetch<float>(texNorm,x+parity*norm_offset) : norm[x+parity*norm_offset];
+      nrm = !huge_alloc ? tex1Dfetch<float>(texNorm,x+parity*norm_offset) : norm[x+parity*norm_offset];
 #else
-      RegType nrm = norm[x+parity*norm_offset];
+      nrm = norm[x+parity*norm_offset];
 #endif
-#pragma unroll
-      for (int i=0; i<length; i++) v[i] *= nrm;
     }
+
+#pragma unroll
+    for (int i=0; i<M; i++) {
+#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
+      if (!huge_alloc) { // use textures unless we have a huge alloc
+        // first do texture load from memory
+        TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*i + x);
+        // now insert into output array
+#pragma unroll
+        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
+        if ( isFixed<Float>::value ) {
+#pragma unroll
+          for (int j=0; j<N; j++) v[i*N+j] *= nrm;
+        }
+      } else
+#endif
+      {
+        // first load from memory
+        Vector vecTmp = vector_load<Vector>(field + parity*offset, x + stride*i);
+        // now copy into output and scale
+#pragma unroll
+        for (int j=0; j<N; j++) copy_and_scale(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j], nrm);
+      }
+    }
+
   }
 
   __device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
     RegType tmp[length];
 
     if ( isFixed<Float>::value ) {
-      RegType max_[length/2];
+      norm_type max_[length/2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-      for (int i=0; i<length/2; i++) max_[i] = fmaxf(fabsf(v[i]),fabsf(v[i+length/2]));
-      RegType scale = 0.0;
+      for (int i=0; i<length/2; i++) max_[i] = fmaxf(fabsf((norm_type)v[i]),fabsf((norm_type)v[i+length/2]));
+      norm_type scale = 0.0;
 #pragma unroll
       for (int i=0; i<length/2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
 
+#ifdef __CUDA_ARCH__
+      RegType scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
+#else
       RegType scale_inv = fixedMaxValue<Float>::value / scale;
+#endif
 #pragma unroll
       for (int i=0; i<length; i++) tmp[i] = v[i] * scale_inv;
     } else {
@@ -898,8 +914,9 @@ namespace quda {
 #pragma unroll
     for (int i=0; i<M; i++) {
       Vector vecTmp;
-      // first do vectorized copy converting into storage type
-      copy_scaled(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
+      // first do scalar copy converting into storage type
+#pragma unroll
+      for (int j=0; j<N; j++) copy_scaled(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
       // second do vectorized copy into memory
       vector_store(field + parity*offset, x + stride*i, vecTmp);
     }
@@ -936,27 +953,32 @@ namespace quda {
 
 
   __device__ __host__ inline void loadGhost(RegType v[length_ghost], int x, int dim, int dir, int parity=0) const {
+
+    norm_type nrm;
+    if ( isFixed<Float>::value ) {
+      nrm = ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x];
+    }
+
 #pragma unroll
     for (int i=0; i<M_ghost; i++) { // to do - add texture support
       // first do vectorized copy from memory into registers
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__) && 0 // buggy - need to account for dim/dir offset
       if (!huge_alloc) { // use textures unless we have a huge alloc
         TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity*tex_offset + stride*i + x);
-        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+#pragma unroll
+        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
+        if (isFixed<Float>::value ) {
+#pragma unroll
+          for (int i=0; i<N; i++) v[i*N+j] *= nrm;
+        }
       } else
 #endif
       {
         Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N,
                                             i*faceVolumeCB[dim]+x);
-        // second do vectorized copy converting into register type
-        copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
-      }
-    }
-
-    if ( isFixed<Float>::value ) {
-      RegType nrm = ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x];
 #pragma unroll
-      for (int i=0; i<length_ghost; i++) v[i] *= nrm;
+        for (int j=0; j<N; j++) copy_and_scale(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j], nrm);
+      }
     }
 
   }
@@ -965,16 +987,20 @@ namespace quda {
     RegType tmp[length_ghost];
 
     if ( isFixed<Float>::value ) {
-      RegType max_[length_ghost/2];
+      norm_type max_[length_ghost/2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-      for (int i=0; i<length_ghost/2; i++) max_[i] = fmaxf(fabsf(v[i]),fabsf(v[i+length_ghost/2]));
-      RegType scale = 0.0;
+      for (int i=0; i<length_ghost/2; i++) max_[i] = fmaxf((norm_type)fabsf(v[i]),(norm_type)fabsf(v[i+length_ghost/2]));
+      norm_type scale = 0.0;
 #pragma unroll
       for (int i=0; i<length_ghost/2; i++) scale = fmaxf(max_[i], scale);
       ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x] = scale;
 
+#ifdef __CUDA_ARCH__
+      RegType scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
+#else
       RegType scale_inv = fixedMaxValue<Float>::value / scale;
+#endif
 #pragma unroll
       for (int i=0; i<length_ghost; i++) tmp[i] = v[i] * scale_inv;
     } else {
@@ -985,8 +1011,9 @@ namespace quda {
 #pragma unroll
     for (int i=0; i<M_ghost; i++) {
       Vector vecTmp;
-      // first do vectorized copy converting into storage type
-      copy_scaled(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
+      // first do scalar copy converting into storage type
+#pragma unroll
+      for (int j=0; j<N; j++) copy_scaled(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
       // second do vectorized copy into memory
       vector_store(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N, i*faceVolumeCB[dim]+x, vecTmp);
     }
@@ -1044,7 +1071,9 @@ namespace quda {
     checkCudaError();
   }
 
-  size_t Bytes() const { return nParity * volumeCB * (Nc * Ns * 2 * sizeof(Float) + (typeid(Float) == typeid(short) ? sizeof(float) : 0)); }
+  size_t Bytes() const {
+    return nParity * volumeCB * (Nc* Ns * 2 * sizeof(Float) + (isFixed<Float>::value ? sizeof(norm_type) : 0));
+  }
   };
 
     /**
@@ -1332,7 +1361,7 @@ namespace quda {
     dim[0] *= (nParity == 1) ? 2 : 1; // need to full dimensions
     exDim[0] *= (nParity == 1) ? 2 : 1; // need to full dimensions
 
-    offset = (exVolumeCB*Ns*Nc*2) / 2; // compute manually since Bytes is likely wrong due to z-padding
+    offset = exVolumeCB*Ns*Nc*2; // compute manually since Bytes is likely wrong due to z-padding
   }
   virtual ~PaddedSpaceSpinorColorOrder() { ; }
 

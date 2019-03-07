@@ -1,7 +1,10 @@
+#ifdef USE_LEGACY_DSLASH
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <typeinfo>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -18,11 +21,12 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
-#include <dslash_helper.cuh>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 #if (__COMPUTE_CAPABILITY__ >= 700)
 #include <cublas_v2.h>
@@ -77,9 +81,6 @@ namespace quda {
 
 #include <dslash_quda.cuh>
   }
-
-  // declare the dslash events
-#include <dslash_events.cuh>
 
   using namespace mobius;
 
@@ -140,6 +141,7 @@ namespace quda {
 
       // first try to advance block.x
       param.block.x += step[0];
+      //memory constraint
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0] ||
           shared_bytes_per_block(param.block.x, param.block.y) > max_shared) {
         advance[0] = false;
@@ -546,8 +548,6 @@ namespace quda {
   };
 #endif // GPU_DOMAIN_WALL_DIRAC
 
-#include <dslash_policy.cuh>
-
   //-----------------------------------------------------
   // Modification for 4D preconditioned Mobius DWF operator
   // Additional Arg. is added to give a function name.
@@ -566,6 +566,7 @@ namespace quda {
 		      const int *commOverride, const int DS_type, TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
+    using namespace dslash;
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     DslashCuda *dslash = nullptr;
@@ -716,3 +717,5 @@ namespace quda {
 #endif
   }
 }
+
+#endif

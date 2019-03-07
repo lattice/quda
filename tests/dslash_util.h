@@ -154,7 +154,7 @@ static inline Float *spinorNeighbor(int i, int dir, int oddBit, Float *spinorFie
 // displacements of magnitude one always interchange odd and even lattices.
 //
 //
-template<QudaDWFPCType type>
+template<QudaPCType type>
 int neighborIndex_5d(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1) {
   // fullLatticeIndex was modified for fullLatticeIndex_4d.  It is in util_quda.cpp.
   // This code bit may not properly perform 5dPC.
@@ -180,7 +180,7 @@ int neighborIndex_5d(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int 
 }
 
 
-template <QudaDWFPCType type, typename Float>
+template <QudaPCType type, typename Float>
   Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance=1, int siteSize=24) {
   int nb = neighbor_distance;
   int j;
@@ -392,7 +392,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
   return &spinorField[j*(mySpinorSiteSize)];
 }
 
-template<QudaDWFPCType type>
+template<QudaPCType type>
 int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1)
 {
   int ret;
@@ -421,7 +421,7 @@ int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2,
   return ret;
 }
 
-template <QudaDWFPCType type>
+template <QudaPCType type>
 int x4_5d_mgpu(int i, int oddBit)
 {
   int Y = (type == QUDA_5D_PC) ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
@@ -429,7 +429,7 @@ int x4_5d_mgpu(int i, int oddBit)
 }
 
 
-template <QudaDWFPCType type, typename Float>
+template <QudaPCType type, typename Float>
 Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Float** fwd_nbr_spinor, Float** back_nbr_spinor, int neighbor_distance, int nFace, int spinorSize = 24)
 {
   int j;

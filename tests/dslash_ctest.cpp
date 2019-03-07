@@ -76,6 +76,7 @@ extern bool kernel_pack_t;
 
 extern double mass; // mass of Dirac operator
 extern double mu;
+extern double epsilon;
 extern void usage(char**);
 
 extern QudaVerbosity verbosity;
@@ -131,7 +132,7 @@ void init(int precision, QudaReconstructType link_recon) {
   inv_param.kappa = 0.1;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = 0.1;
+    inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
    dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
@@ -268,11 +269,10 @@ void init(int precision, QudaReconstructType link_recon) {
       csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
-  if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-    dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-    csParam.PCtype = QUDA_4D_PC;
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    csParam.pc_type = QUDA_5D_PC;
   } else {
-    csParam.PCtype = QUDA_5D_PC;
+    csParam.pc_type = QUDA_4D_PC;
   }
 
   //ndeg_tm
@@ -348,8 +348,7 @@ void init(int precision, QudaReconstructType link_recon) {
     inv_param.return_clover = compute_clover;
     inv_param.compute_clover_inverse = compute_clover;
     inv_param.return_clover_inverse = compute_clover;
-
-    if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) inv_param.return_clover_inverse = true;
+    inv_param.return_clover_inverse = true;
 
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
   }
@@ -575,13 +574,8 @@ void end() {
             if (transfer) {
               dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
             } else {
-             if (dagger) {
-               ((DiracTwistedCloverPC *) dirac)->TwistCloverInv(*tmp1, *cudaSpinor, (parity+1)%2);
-               dirac->Dslash(*cudaSpinorOut, *tmp1, parity);
-             } else {
               dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
             }
-          }
         } else {
           if (transfer) {
             dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
@@ -1086,6 +1080,11 @@ TEST_P(DslashTest, benchmark){
 
       initComms(argc, argv, gridsize_from_cmdline);
 
+      ::testing::TestEventListeners& listeners =
+          ::testing::UnitTest::GetInstance()->listeners();
+      if (comm_rank() != 0) {
+        delete listeners.Release(listeners.default_result_printer());
+      }
       test_rc = RUN_ALL_TESTS();
 
       finalizeComms();

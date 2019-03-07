@@ -56,6 +56,7 @@ cpuColorSpinorField* tmp;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern double reliable_delta;
+extern bool alternative_reliable;
 extern int test_type;
 extern int xdim;
 extern int ydim;
@@ -68,6 +69,9 @@ int X[4];
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
 extern int gcrNkrylov;
+extern QudaCABasis ca_basis; // basis for CA-CG solves
+extern double ca_lambda_min; // minimum eigenvalue for scaling Chebyshev CA-CG solves
+extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG solves
 
 extern bool kernel_pack_t;
 
@@ -202,6 +206,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol_restart = 1e-3; //now theoretical background for this parameter... 
   inv_param->maxiter = niter;
   inv_param->reliable_delta = reliable_delta;
+  inv_param->use_alternative_reliable = alternative_reliable;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param->pipeline = pipeline;
@@ -228,9 +233,14 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->verbosity_precondition = QUDA_SILENT;
   inv_param->cuda_prec_precondition = inv_param->cuda_prec_sloppy;
 
-  // Specify Krylov sub-size for GCR, BICGSTAB(L)
+  // Specify Krylov sub-size for GCR, BICGSTAB(L), basis size for CA-CG, CA-GCR
   inv_param->gcrNkrylov = gcrNkrylov;
 
+  // Specify basis for CA-CG, lambda min/max for Chebyshev basis
+  //   lambda_max < lambda_max -> use power iters to generate
+  inv_param->ca_basis = ca_basis;
+  inv_param->ca_lambda_min = ca_lambda_min;
+  inv_param->ca_lambda_max = ca_lambda_max;
 
   inv_param->solution_type = solution_type;
   inv_param->solve_type = solve_type;

@@ -18,7 +18,7 @@ AC_ARG_ENABLE(cpu-arch,
 
 dnl Specify GPU Arch
 AC_ARG_ENABLE(gpu-arch,
- AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60, sm_70 (default: sm_35)]),
+ AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60, sm_70, sm_75 (default: sm_35)]),
  [ gpu_arch=${enableval} ],
  [ gpu_arch="sm_35" ]
 )
@@ -233,12 +233,6 @@ AS_CASE([$build_mpi],
 	[no], [AC_PROG_CC(gcc cc) AC_PROG_CXX(g++ CC cxx)])
 
 
-AC_ARG_ENABLE(pthreads,
-  AC_HELP_STRING([--enable-pthreads], [ Enable pthreads in the multi-GPU dslash build (default: disabled)]),
-  [ posix_threads=${enableval}],
-  [ posix_threads="no" ]
-)
-
 AC_ARG_WITH(qmp,
  AC_HELP_STRING([--with-qmp=QMPDIR], [ Specify QMP installation directory]),
  [ qmp_home=${withval} ; build_qmp="yes" ],
@@ -314,16 +308,10 @@ if test "X${build_qdpjit}X" = "XyesX" ; then
 fi
 
 
-AC_ARG_ENABLE(blas-tex,
- AC_HELP_STRING([--enable-blas-tex], [ Enable texture reads for blas (default: enabled)]),
- [ blas_tex=${enableval}],
- [ blas_tex="yes" ]
-)
-
-AC_ARG_ENABLE(fermi-double-tex,
- AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default: enabled)]),
- [ fermi_double_tex=${enableval}],
- [ fermi_double_tex="yes" ]
+AC_ARG_ENABLE(use-tex,
+ AC_HELP_STRING([--enable-tex], [ Enable texture reads (default: enabled)]),
+ [ use_tex=${enableval}],
+ [ use_tex="yes" ]
 )
 
 AC_ARG_ENABLE(force-ac,
@@ -344,9 +332,9 @@ esac
 
 dnl CPU Arch
 case ${gpu_arch} in
-sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52 | sm_60 | sm_70) ;;
+sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52 | sm_60 | sm_70 | sm_75) ;;
 *)
-  AC_MSG_ERROR([ GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60, sm_70 ])
+  AC_MSG_ERROR([ GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60, sm_70, sm_75 ])
   ;;
 esac
 
@@ -656,22 +644,13 @@ if test "X${build_qio}X" = "XyesX"; then
   fi
 fi
 
-dnl Enables textures for blas functions
-case ${blas_tex} in
+dnl Enables textures
+case ${use_tex} in
 yes|no);;
 *)
-  AC_MSG_ERROR([ invalid value for --enable-blas-tex ])
+  AC_MSG_ERROR([ invalid value for --enable-tex ])
   ;;
 esac
-
-dnl Enables textures on Fermi
-case ${fermi_double_tex} in
-yes|no);;
-*)
-  AC_MSG_ERROR([ invalid value for --enable-fermi-double-tex ])
-  ;;
-esac
-
 
 
 dnl Output Substitutions
@@ -762,9 +741,6 @@ AC_SUBST( BUILD_QMP, [${build_qmp}])
 AC_MSG_NOTICE([Setting BUILD_MPI = ${build_mpi} ])
 AC_SUBST( BUILD_MPI, [${build_mpi}])
 
-AC_MSG_NOTICE([Setting POSIX_THREADS = ${posix_threads}])
-AC_SUBST( POSIX_THREADS, [${posix_threads}])
-
 AC_MSG_NOTICE([Setting MPI_NVTXS= ${mpi_nvtx}])
 AC_SUBST( MPI_NVTX, [${mpi_nvtx}])
 
@@ -810,11 +786,8 @@ AC_SUBST( QMP_HOME, [${qmp_home}] )
 AC_MSG_NOTICE([Setting QIO_HOME=${qio_home}])
 AC_SUBST( QIO_HOME, [${qio_home}] )
 
-AC_MSG_NOTICE([Setting BLAS_TEX= ${blas_tex}])
-AC_SUBST( BLAS_TEX, [${blas_tex}])
-
-AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
-AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])
+AC_MSG_NOTICE([Setting USE_TEX= ${use_tex}])
+AC_SUBST( USE_TEX, [${use_tex}])
 
 AC_MSG_NOTICE([Setting USE_QDPJIT = ${build_qdpjit} ])
 AC_SUBST( USE_QDPJIT, [${build_qdpjit}])

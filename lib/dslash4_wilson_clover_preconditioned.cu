@@ -1,20 +1,12 @@
+#ifndef USE_LEGACY_DSLASH
+
 #include <gauge_field.h>
-#include <gauge_field_order.h>
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
 #include <clover_field.h>
-#include <clover_field_order.h>
-#include <dslash_helper.cuh>
-#include <index_helper.cuh>
-#include <dslash_quda.h>
-#include <color_spinor.h>
+#include <dslash.h>
 #include <worker.h>
 
-namespace quda {
-#include <dslash_events.cuh>
 #include <dslash_policy.cuh>
-}
-
 #include <kernels/dslash_wilson_clover_preconditioned.cuh>
 
 /**
@@ -23,17 +15,18 @@ namespace quda {
 
 namespace quda {
 
-#ifdef GPU_CLOVER_DIRAC
-
   /**
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct WilsonCloverLaunch {
+  struct WilsonCloverPreconditionedLaunch {
+    static constexpr const char *kernel = "quda::wilsonCloverPreconditionedGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-      dslash.launch(wilsonCloverGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+      static_assert(nParity == 1, "preconditioned wilson-clover operator only defined for nParity=1");
+      if (xpay && dagger) errorQuda("xpay operator only defined for not dagger");
+      dslash.launch(wilsonCloverPreconditionedGPU<Float,nDim,nColor,nParity,dagger&&!xpay,xpay&&!dagger,kernel_type,Arg>, tp, arg, stream);
     }
   };
 
@@ -47,8 +40,8 @@ namespace quda {
   public:
 
     WilsonCloverPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), in(in)
-    {  }
+      : Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover_preconditioned.cuh"), arg(arg), in(in)
+    { }
 
     virtual ~WilsonCloverPreconditioned() { }
 
@@ -56,8 +49,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
       if (arg.nParity == 1) {
-        if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverLaunch,nDim,nColor,1, true>(tp, arg, stream);
-        else          Dslash<Float>::template instantiate<WilsonCloverLaunch,nDim,nColor,1,false>(tp, arg, stream);
+        if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverPreconditionedLaunch,nDim,nColor,1, true>(tp, arg, stream);
+        else          Dslash<Float>::template instantiate<WilsonCloverPreconditionedLaunch,nDim,nColor,1,false>(tp, arg, stream);
       } else {
         errorQuda("Preconditioned Wilson-clover operator not defined nParity=%d", arg.nParity);
       }
@@ -71,7 +64,7 @@ namespace quda {
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-	flops += clover_flops * in.GhostFace()[arg.kernel_type];
+	flops += clover_flops * 2 * in.GhostFace()[arg.kernel_type];
 	break;
       case EXTERIOR_KERNEL_ALL:
 	flops += clover_flops * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
@@ -139,7 +132,7 @@ namespace quda {
     WilsonCloverArg<Float,nColor,recon,dynamic_clover> arg(out, in, U, A, kappa, x, parity, dagger, comm_override);
     WilsonCloverPreconditioned<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,dynamic_clover> > wilson(arg, out, in);
 
-    DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+    dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                               in.VolumeCB(), in.GhostFaceCB(), profile);
     policy.apply(0);
 
@@ -175,8 +168,6 @@ namespace quda {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
   }
-
-#endif // GPU_CLOVER_DIRAC
 
   // Apply the preconditioned Wilson-clover operator
   // out(x) = M*in = A(x)^{-1} (-kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
@@ -214,3 +205,5 @@ namespace quda {
 
 
 } // namespace quda
+
+#endif

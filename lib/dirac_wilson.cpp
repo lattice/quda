@@ -3,9 +3,6 @@
 #include <iostream>
 #include <multigrid.h>
 
-// enable new dslash
-#define NEW_DSLASH
-
 namespace quda {
 
   DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param) { }
@@ -31,7 +28,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
     ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
 #else
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
@@ -52,7 +49,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifdef NEW_DSLASH
+#ifndef USE_LEGACY_DSLASH
     ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
 #else
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
@@ -69,40 +66,14 @@ namespace quda {
 
   void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    ColorSpinorField *In = &const_cast<ColorSpinorField&>(in);
-    if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-      ColorSpinorParam param(in);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.Precision() == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
-	(param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
-      param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      In = ColorSpinorField::Create(param);
-      *In = in;
-    }
-
-    ColorSpinorField *Out = &out;
-    if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
-      ColorSpinorParam param(out);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.Precision() == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
-	(param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
-      param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      Out = ColorSpinorField::Create(param);
-    }
-
-    checkFullSpinor(*Out, *In);
-#ifdef NEW_DSLASH
+    checkFullSpinor(out, in);
+#ifndef USE_LEGACY_DSLASH
     ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    flops += 1368ll*in.Volume();
 #else
-    DslashXpay(Out->Odd(), In->Even(), QUDA_ODD_PARITY, In->Odd(), -kappa);
-    DslashXpay(Out->Even(), In->Odd(), QUDA_EVEN_PARITY, In->Even(), -kappa);
+    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
+    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
 #endif
-
-    if (in.Location() == QUDA_CPU_FIELD_LOCATION) delete In;
-    if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
-      out = *Out;
-      delete Out;
-    }
   }
 
   void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

@@ -2,12 +2,13 @@
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <typeinfo>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
 
 //these are access control for staggered action
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
 #if (__COMPUTE_CAPABILITY__ >= 300) // Kepler works best with texture loads only
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
@@ -28,14 +29,15 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
-#include <dslash_helper.cuh>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
-
+#ifdef USE_LEGACY_DSLASH
   namespace staggered {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
@@ -50,18 +52,27 @@ namespace quda {
 #undef DD_DAG
 #define DD_DAG 1
 #include <staggered_dslash_def.h> // staggered Dslash dagger kernels
+#undef DD_DAG
+
+#define TIFR
+#define DD_DAG 0
+#include <staggered_dslash_def.h> // staggered Dslash kernels
+#undef DD_DAG
+#define DD_DAG 1
+#include <staggered_dslash_def.h> // staggered Dslash dagger kernels
+#undef DD_DAG
+#undef TIFR
 
 #undef DD_IMPROVED
 
 #include <dslash_quda.cuh>
   } // end namespace staggered
 
-  // declare the dslash events
-#include <dslash_events.cuh>
+#endif
 
   using namespace staggered;
 
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
   template <typename sFloat, typename gFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
@@ -92,6 +103,20 @@ namespace quda {
       dslashParam.a = a;
       dslashParam.a_f = a;
       dslashParam.fat_link_max = gauge.LinkMax();
+
+      if (gauge.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+#ifdef MULTI_GPU
+        strcat(aux[INTERIOR_KERNEL],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_ALL],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_X],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_Y],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_Z],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_T],",TIFR");
+#else
+        strcat(aux[INTERIOR_KERNEL],",TIFR");
+#endif // MULTI_GPU
+        strcat(aux[KERNEL_POLICY],",TIFR");
+      }
     }
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
@@ -104,7 +129,15 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       setParam();
       dslashParam.swizzle = tp.aux.x;
-      STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+      if (gauge.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+#ifdef BUILD_TIFR_INTERFACE
+        STAGGERED_DSLASH_TIFR(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+#else
+        errorQuda("TIFR interface has not been built");
+#endif
+      } else {
+        STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+      }
     }
 
     bool advanceBlockDim(TuneParam &param) const
@@ -154,14 +187,12 @@ namespace quda {
   };
 #endif // GPU_STAGGERED_DIRAC
 
-#include <dslash_policy.cuh>
-
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			   const cudaColorSpinorField *in, const int parity, 
 			   const int dagger, const cudaColorSpinorField *x,
 			   const double &k, const int *commOverride, TimeProfile &profile)
   {
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     DslashCuda *dslash = nullptr;
@@ -178,7 +209,7 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 
     delete dslash;

@@ -580,7 +580,9 @@ namespace quda {
     
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
-  
+ 
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const; // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
+
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
 		  ColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
@@ -590,24 +592,14 @@ namespace quda {
   class DiracTwistedMass : public DiracWilson {
 
   protected:
-    double mu;
-    double epsilon;
+    mutable double mu;
+    mutable double epsilon;
     void twistedApply(ColorSpinorField &out, const ColorSpinorField &in, 
 		      const QudaTwistGamma5Type twistType) const;
-    void TwistedDslash(ColorSpinorField &out, const ColorSpinorField &in,
-		       QudaParity parity, QudaTwistDslashType twistDslashType,
-		       double a, double b, double c, double d) const;
-    void TwistedDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			   const ColorSpinorField &x, QudaParity parity,
-			   QudaTwistDslashType twistDslashType,
-			   double a, double b, double c, double d) const;
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+                            QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
-    void NdegTwistedDslash(ColorSpinorField &out, const ColorSpinorField &in,
-			   QudaParity parity, QudaTwistDslashType twistDslashType,
-			   double a, double b, double c, double d) const;
-    void NdegTwistedDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			       const ColorSpinorField &x,  QudaParity parity, QudaTwistDslashType twistDslashType,
-			       double a, double b, double c, double d) const;
   public:
     DiracTwistedMass(const DiracTwistedMass &dirac);
     DiracTwistedMass(const DiracParam &param, const int nDim);
@@ -698,7 +690,12 @@ namespace quda {
     virtual ~DiracTwistedClover();
     DiracTwistedClover& operator=(const DiracTwistedClover &dirac);
 
-    void TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;	//IS PARITY REQUIRED???
+    void TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
+
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
+                        const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+                            const QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -729,6 +726,8 @@ namespace quda {
   // Even-odd preconditioned twisted mass with a clover term
   class DiracTwistedCloverPC : public DiracTwistedClover {
 
+    mutable bool reverse; /** swap the order of the derivative D and the diagonal inverse A^{-1} */
+
   public:
     DiracTwistedCloverPC(const DiracTwistedCloverPC &dirac);
     DiracTwistedCloverPC(const DiracParam &param, const int nDim);
@@ -739,9 +738,9 @@ namespace quda {
     void TwistCloverInv(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-      const QudaParity parity) const;
+                        const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-          const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+                            const QudaParity parity, const ColorSpinorField &x, const double &k) const;
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 

@@ -4,13 +4,8 @@
 #include <gauge_field.h>
 #include <register_traits.h>
 #include <index_helper.cuh>
-#include <tune_quda.h>
-#include <dslash_quda.h>
 
 namespace quda {
-
-  void setPackComms(const int *); // original packing kernel
-  void setPackComms2(const int *); // rewriten packing kernel
 
   /**
      @brief Helper function to determine if we should do halo
@@ -75,7 +70,7 @@ namespace quda {
     case EXTERIOR_KERNEL_Y:
       incomplete = incomplete || (arg.ghostDim[0] && (coord[0]==0 || coord[0]==(arg.dc.X[0]-1)));
     case EXTERIOR_KERNEL_X:
-      incomplete = incomplete;
+      break;
     }
 
     return !incomplete;
@@ -92,47 +87,57 @@ namespace quda {
      @param[out] the dimension we are working on (fused kernel only)
      @return checkerboard space-time index
   */
-  template <int nDim, QudaDWFPCType pc_type, KernelType kernel_type, typename Arg>
+  template <int nDim, QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_=1>
   __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity, int &dim) {
 
     int x_cb, X;
     dim = kernel_type; // keep compiler happy
+
+    // only for 5-d checkerboarding where we need to include the fifth dimension
+    const int Ls = (nDim == 5 && pc_type == QUDA_5D_PC ? (int)arg.dim[4] : 1);
+
     if (kernel_type == INTERIOR_KERNEL) {
       x_cb = idx;
-      getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+      if (nDim == 5) getCoords5CB(coord, idx, arg.dim, arg.X0h, parity, pc_type);
+      else getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
-      const int face_num = idx >= arg.dc.ghostFaceCB[kernel_type];
-      idx -= face_num*arg.dc.ghostFaceCB[kernel_type];
-      coordsFromFaceIndex<nDim,pc_type,kernel_type,1>(X, x_cb, coord, idx, face_num, parity, arg);
+      const int face_size = nface_ * arg.dc.ghostFaceCB[kernel_type] * Ls;
+      const int face_num = idx >= face_size;
+      idx -= face_num*face_size;
+      coordsFromFaceIndex<nDim,pc_type,kernel_type,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
 
     } else { // fused kernel
 
       // work out which dimension this thread corresponds to, then compute coords
-      if (idx < arg.threadDimMapUpper[0]) { // x face
+      if (idx < arg.threadDimMapUpper[0]*Ls) { // x face
         dim = 0;
-        const int face_num = idx >= arg.dc.ghostFaceCB[0];
-        idx -= face_num*arg.dc.ghostFaceCB[0];
-        coordsFromFaceIndex<nDim,pc_type,0,1>(X, x_cb, coord, idx, face_num, parity, arg);
-      } else if (idx < arg.threadDimMapUpper[1]) { // y face
+        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_num = idx >= face_size;
+        idx -= face_num*face_size;
+        coordsFromFaceIndex<nDim,pc_type,0,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
+      } else if (idx < arg.threadDimMapUpper[1]*Ls) { // y face
         dim = 1;
-        idx -= arg.threadDimMapLower[1];
-        const int face_num = idx >= arg.dc.ghostFaceCB[1];
-        idx -= face_num*arg.dc.ghostFaceCB[1];
-        coordsFromFaceIndex<nDim,pc_type,1,1>(X, x_cb, coord, idx, face_num, parity, arg);
-      } else if (idx < arg.threadDimMapUpper[2]){ // z face
+        idx -= arg.threadDimMapLower[1] * Ls;
+        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_num = idx >= face_size;
+        idx -= face_num*face_size;
+        coordsFromFaceIndex<nDim,pc_type,1,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
+      } else if (idx < arg.threadDimMapUpper[2]*Ls){ // z face
         dim = 2;
-        idx -= arg.threadDimMapLower[2];
-        const int face_num = idx >= arg.dc.ghostFaceCB[2];
-        idx -= face_num*arg.dc.ghostFaceCB[2];
-        coordsFromFaceIndex<nDim,pc_type,2,1>(X, x_cb, coord, idx, face_num, parity, arg);
+        idx -= arg.threadDimMapLower[2] * Ls;
+        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_num = idx >= face_size;
+        idx -= face_num*face_size;
+        coordsFromFaceIndex<nDim,pc_type,2,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       } else { // t face
         dim = 3;
-        idx -= arg.threadDimMapLower[3];
-        const int face_num = idx >= arg.dc.ghostFaceCB[3];
-        idx -= face_num*arg.dc.ghostFaceCB[3];
-        coordsFromFaceIndex<nDim,pc_type,3,1>(X, x_cb, coord, idx, face_num, parity, arg);
+        idx -= arg.threadDimMapLower[3] * Ls;
+        const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
+        const int face_num = idx >= face_size;
+        idx -= face_num*face_size;
+        coordsFromFaceIndex<nDim,pc_type,3,nface_>(X, x_cb, coord, idx, face_num, parity, arg);
       }
 
     }
@@ -249,20 +254,24 @@ namespace quda {
     KernelType kernel_type;  // interior, exterior_t, etc.
     bool remote_write;       // used by the autotuner to switch on/off remote writing vs using copy engines
 
-    int threads;              // number of threads in x-thread dimension
+    int_fastdiv threads;      // number of threads in x-thread dimension
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
-    // compatibility with dslash_policy for now
-    real twist_a;
-    real twist_b;
+    // these are set with symmetric preconditioned twisted-mass dagger
+    // operator for the packing (which needs to a do a twist)
+    real twist_a; // scale factor
+    real twist_b; // chiral twist
+    real twist_c; // flavor twist
 
-    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
-      : parity(parity), nParity(in.SiteSubset()), nFace(1), reconstruct(U.Reconstruct()),
-        X0h(nParity == 2 ? in.X(0)/2 : in.X(0)), dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
-        volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(kappa == 0.0 ? false : true),
+    // constructor needed for staggered to set xpay from derived class
+    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, bool xpay, int nFace, const int *comm_override)
+      : parity(parity), nParity(in.SiteSubset()), nFace(nFace), reconstruct(U.Reconstruct()),
+        X0h(nParity == 2 ? in.X(0)/2 : in.X(0)),
+        dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1 },
+        volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(xpay),
         kernel_type(INTERIOR_KERNEL), threads(in.VolumeCB()), threadDimMapLower{ }, threadDimMapUpper{ },
-        twist_a(0.0), twist_b(0.0)
+        twist_a(0.0), twist_b(0.0), twist_c(0.0)
     {
       for (int d=0; d<4; d++) {
         ghostDim[d] = comm_dim_partitioned(d);
@@ -277,6 +286,11 @@ namespace quda {
       dc = in.getDslashConstant();
     }
 
+// constructor for kernels that set xpay based on kappa
+    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
+      : DslashArg(in, U, kappa, parity, dagger, kappa == 0.0 ? false : true, 1, comm_override)
+      {
+      };
   };
 
   template <typename Float>
@@ -301,312 +315,10 @@ namespace quda {
     for (int i=0; i<4; i++) out << arg.threadDimMapLower[i] << (i<3 ? ", " : " }"); out << std::endl;
     out << "threadDimMapUpper = { ";
     for (int i=0; i<4; i++) out << arg.threadDimMapUpper[i] << (i<3 ? ", " : " }"); out << std::endl;
+    out << "twist_a = " << arg.twist_a;
+    out << "twist_b = " << arg.twist_b;
+    out << "twist_c = " << arg.twist_c;
     return out;
   }
 
-  template <typename Float>
-  class Dslash : public TunableVectorY {
-
-  protected:
-
-    DslashArg<Float> &arg;
-    const ColorSpinorField &out;
-    const ColorSpinorField &in;
-
-    const int nDimComms;
-
-    char aux_base[TuneKey::aux_n];
-    char aux[8][TuneKey::aux_n];
-
-    /**
-       @brief Set the base strings used by the different dslash kernel
-       types for autotuning.
-    */
-    inline void fillAuxBase() {
-      char comm[5];
-      comm[0] = (arg.commDim[0] ? '1' : '0');
-      comm[1] = (arg.commDim[1] ? '1' : '0');
-      comm[2] = (arg.commDim[2] ? '1' : '0');
-      comm[3] = (arg.commDim[3] ? '1' : '0');
-      comm[4] = '\0';
-      strcpy(aux_base,",commDim=");
-      strcat(aux_base,comm);
-
-      if (arg.xpay) strcat(aux_base,",xpay");
-      if (arg.dagger) strcat(aux_base,",dagger");
-    }
-
-    /**
-       @brief Specialize the auxiliary strings for each kernel type
-       @param[in] kernel_type The kernel_type we are generating the string got
-       @param[in] kernel_str String corresponding to the kernel type
-    */
-    inline void fillAux(KernelType kernel_type, const char *kernel_str) {
-      strcpy(aux[kernel_type],kernel_str);
-      if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type],comm_dim_partitioned_string());
-      strcat(aux[kernel_type],aux_base);
-    }
-
-    bool tuneGridDim() const { return false; }
-    unsigned int minThreads() const { return arg.threads; }
-
-    template <typename Arg>
-    inline void setParam(Arg &arg) {
-      arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
-
-      // Need to reset ghost pointers prior to every call since the
-      // ghost buffer may have been changed during policy tuning.
-      // Also, the accessor constructor calls Ghost(), which uses
-      // ghost_buf, but this is only presently set with the
-      // synchronous exchangeGhost.
-      static void *ghost[8]; // needs to be persistent across interior and exterior calls
-      for (int dim=0; dim<4; dim++) {
-
-        for (int dir=0; dir<2; dir++) {
-          // if doing interior kernel, then this is the initial call,
-          // so we set all ghost pointers else if doing exterior
-          // kernel, then we only have to update the non-p2p ghosts,
-          // since these may have been assigned to zero-copy memory
-          if (!comm_peer2peer_enabled(1-dir, dim) || arg.kernel_type == INTERIOR_KERNEL) {
-            ghost[2*dim+dir] = (Float*)((char*)in.Ghost2() + in.GhostOffset(dim,dir)*in.GhostPrecision());
-          }
-        }
-      }
-
-      arg.in.resetGhost(in, ghost);
-    }
-
-    virtual int tuningIter() const { return 10; }
-
-  public:
-
-    template <typename T, typename Arg>
-    inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-      if (1) { // test on Volta
-	this->setMaxDynamicSharedBytesPerBlock(f);
-      }
-      void *args[] = { &arg };
-      qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
-    }
-
-    /**
-       @brief This instantiate function is used to instantiate the
-       the KernelType template required for the multi-GPU dslash kernels.
-       @param[in] tp The tuning parameters to use for this kernel
-       @param[in,out] arg The argument struct for the kernel
-       @param[in] stream The cudaStream_t where the kernel will run
-     */
-    template < template <typename,int,int,int,bool,bool,KernelType,typename> class Launch,
-               int nDim, int nColor, int nParity, bool dagger, bool xpay, typename Arg>
-    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-        errorQuda("Not implemented");
-      } else {
-        switch(arg.kernel_type) {
-        case INTERIOR_KERNEL:
-          Launch<Float,nDim,nColor,nParity,dagger,xpay,INTERIOR_KERNEL,Arg>::launch(*this, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_X:
-          Launch<Float,nDim,nColor,nParity,dagger,xpay,EXTERIOR_KERNEL_X,Arg>::launch(*this, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_Y:
-          Launch<Float,nDim,nColor,nParity,dagger,xpay,EXTERIOR_KERNEL_Y,Arg>::launch(*this, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_Z:
-          Launch<Float,nDim,nColor,nParity,dagger,xpay,EXTERIOR_KERNEL_Z,Arg>::launch(*this, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_T:
-          Launch<Float,nDim,nColor,nParity,dagger,xpay,EXTERIOR_KERNEL_T,Arg>::launch(*this, tp, arg, stream); break;
-        case EXTERIOR_KERNEL_ALL:
-          Launch<Float,nDim,nColor,nParity,dagger,xpay,EXTERIOR_KERNEL_ALL,Arg>::launch(*this, tp, arg, stream); break;
-        default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
-        }
-      }
-    }
-
-    /**
-       @brief This instantiate function is used to instantiate the
-       the dagger template
-       @param[in] tp The tuning parameters to use for this kernel
-       @param[in,out] arg The argument struct for the kernel
-       @param[in] stream The cudaStream_t where the kernel will run
-     */
-    template < template <typename,int,int,int,bool,bool,KernelType,typename> class Launch,
-               int nDim, int nColor, int nParity, bool xpay, typename Arg>
-    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-      if (arg.dagger) instantiate<Launch,nDim,nColor,nParity, true,xpay>(tp, arg, stream);
-      else            instantiate<Launch,nDim,nColor,nParity,false,xpay>(tp, arg, stream);
-    }
-
-    /**
-       @brief This instantiate function is used to instantiate the
-       the nParity template
-       @param[in] tp The tuning parameters to use for this kernel
-       @param[in,out] arg The argument struct for the kernel
-       @param[in] stream The cudaStream_t where the kernel will run
-     */
-    template < template <typename,int,int,int,bool,bool,KernelType,typename> class Launch,
-               int nDim, int nColor, bool xpay, typename Arg>
-    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-      switch (arg.nParity) {
-      case 1: instantiate<Launch,nDim,nColor,1,xpay>(tp, arg, stream); break;
-      case 2: instantiate<Launch,nDim,nColor,2,xpay>(tp, arg, stream); break;
-      default:
-        errorQuda("nParity = %d undefined\n", arg.nParity);
-      }
-    }
-
-    DslashArg<Float> &dslashParam; // temporary addition for policy compatibility
-
-    Dslash(DslashArg<Float> &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : TunableVectorY(arg.nParity), arg(arg), out(out), in(in), nDimComms(4), dslashParam(arg)
-    {
-      // this sets the communications pattern for the packing kernel
-      setPackComms(arg.commDim);
-      setPackComms2(arg.commDim);
-
-      //strcpy(aux, in.AuxString());
-      fillAuxBase();
-#ifdef MULTI_GPU
-      fillAux(INTERIOR_KERNEL, "policy_kernel=interior");
-      fillAux(EXTERIOR_KERNEL_ALL, "policy_kernel=exterior_all");
-      fillAux(EXTERIOR_KERNEL_X, "policy_kernel=exterior_x");
-      fillAux(EXTERIOR_KERNEL_Y, "policy_kernel=exterior_y");
-      fillAux(EXTERIOR_KERNEL_Z, "policy_kernel=exterior_z");
-      fillAux(EXTERIOR_KERNEL_T, "policy_kernel=exterior_t");
-#else
-      fillAux(INTERIOR_KERNEL, "policy_kernel=single-GPU");
-#endif // MULTI_GPU
-      fillAux(KERNEL_POLICY, "policy");
-    }
-
-    int Nface() const { return 2*arg.nFace; } // factor of 2 is for forwards/backwards (convention used in dslash policy)
-    int Dagger() const { return arg.dagger; }
-
-    const char* getAux(KernelType type) const {
-      return aux[type];
-    }
-
-    void setAux(KernelType type, const char *aux_) {
-      strcpy(aux[type], aux_);
-    }
-
-    void augmentAux(KernelType type, const char *extra) {
-      strcat(aux[type], extra);
-    }
-
-    /**
-       @brief Save the output field since the output field is both
-       read from and written to in the exterior kernels
-     */
-    virtual void preTune() { if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.backup(); }
-
-    /**
-       @brief Restore the output field if doing exterior kernel
-     */
-    virtual void postTune() { if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.restore(); }
-
-    /*
-      per direction / dimension flops
-      spin project flops = Nc * Ns
-      SU(3) matrix-vector flops = (8 Nc - 2) * Nc
-      spin reconstruction flops = 2 * Nc * Ns (just an accumulation to all components)
-      xpay = 2 * 2 * Nc * Ns
-
-      So for the full dslash we have, where for the final spin
-      reconstruct we have -1 since the first direction does not
-      require any accumulation.
-
-      flops = (2 * Nd * Nc * Ns)  +  (2 * Nd * (Ns/2) * (8*Nc-2) * Nc)  +  ((2 * Nd - 1) * 2 * Nc * Ns)
-      flops_xpay = flops + 2 * 2 * Nc * Ns
-
-      For Wilson this should give 1344 for Nc=3,Ns=2 and 1368 for the xpay equivalent
-    */
-    virtual long long flops() const
-    {
-      int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
-      int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
-      int ghost_flops = (num_mv_multiply * mv_flops + 2*in.Ncolor()*in.Nspin());
-      int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
-      int num_dir = 2*in.Ndim();
-
-      long long flops_ = 0;
-
-      switch(arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops/2)) * 2 * in.GhostFace()[arg.kernel_type];
-        break;
-      case EXTERIOR_KERNEL_ALL:
-        {
-          long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-          flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops/2)) * ghost_sites;
-          break;
-        }
-      case INTERIOR_KERNEL:
-      case KERNEL_POLICY:
-        {
-          long long sites = in.Volume();
-          flops_ = (num_dir*(in.Nspin()/4)*in.Ncolor()*in.Nspin() +   // spin project (=0 for staggered)
-                    num_dir*num_mv_multiply*mv_flops +                // SU(3) matrix-vector multiplies
-                    ((num_dir-1)*2*in.Ncolor()*in.Nspin())) * sites;  // accumulation
-          if (arg.xpay) flops_ += xpay_flops * sites;
-
-          if (arg.kernel_type == KERNEL_POLICY) break;
-          // now correct for flops done by exterior kernel
-          long long ghost_sites = 0;
-          for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
-          flops_ -= ghost_flops * ghost_sites;
-
-          break;
-        }
-      }
-
-      return flops_;
-    }
-
-    long long bytes() const
-    {
-      int gauge_bytes = arg.reconstruct * in.Precision();
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
-      int proj_spinor_bytes = in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
-      int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + 2*spinor_bytes; // 2 since we have to load the partial
-      int num_dir = 2 * in.Ndim(); // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
-
-      long long bytes_=0;
-
-      switch(arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-        bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type];
-        break;
-      case EXTERIOR_KERNEL_ALL:
-        {
-          long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-          bytes_ = ghost_bytes * ghost_sites;
-          break;
-        }
-      case INTERIOR_KERNEL:
-      case KERNEL_POLICY:
-        {
-          long long sites = in.Volume();
-          bytes_ = (num_dir*gauge_bytes + ((num_dir-2)*spinor_bytes + 2*proj_spinor_bytes) + spinor_bytes)*sites;
-          if (arg.xpay) bytes_ += spinor_bytes;
-
-          if (arg.kernel_type == KERNEL_POLICY) break;
-          // now correct for bytes done by exterior kernel
-          long long ghost_sites = 0;
-          for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
-          bytes_ -= ghost_bytes * ghost_sites;
-
-          break;
-        }
-      }
-      return bytes_;
-    }
-
-  };
-
-}
+} // namespace quda

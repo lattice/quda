@@ -51,12 +51,10 @@ namespace quda {
       }
 
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator+=(const ColorSpinor<Float, Nc, Ns> &a) {
-	if (this != &a) {
 #pragma unroll
-	  for (int i=0; i<size; i++) {
-	    data[i] += a.data[i];
-	  }
-	}
+        for (int i=0; i<size; i++) {
+          data[i] += a.data[i];
+        }
 	return *this;
       }
 
@@ -69,6 +67,14 @@ namespace quda {
 	return *this;
       }
 
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns> &operator-=(const ColorSpinor<Float, Nc, Ns> &a)
+      {
+        if (this != &a) {
+#pragma unroll
+          for (int i = 0; i < Nc * Ns; i++) { data[i] -= a.data[i]; }
+        }
+        return *this;
+      }
       template<typename S>
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
 
@@ -111,6 +117,13 @@ namespace quda {
       */
       __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
 
+      __device__ __host__ void print() {
+        for (int s=0; s<Ns; s++) {
+          for (int c=0; c<Nc; c++) {
+            printf("s=%d c=%d %e %e\n", s, c, data[s*Nc+c].real(), data[s*Nc+c].imag());
+          }
+        }
+      }
     };
 
   /**
@@ -148,11 +161,9 @@ namespace quda {
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator+=(const ColorSpinor<Float, Nc, 4> &a) {
-      if (this != &a) {
 #pragma unroll
-	for (int i=0; i<size; i++) {
-	  data[i] += a.data[i];
-	}
+      for (int i=0; i<size; i++) {
+        data[i] += a.data[i];
       }
       return *this;
     }
@@ -652,7 +663,7 @@ namespace quda {
       *this = a;
     }
 
-  __device__ __host__ void print() {
+    __device__ __host__ void print() {
       for (int s=0; s<Ns; s++) {
 	for (int c=0; c<Nc; c++) {
 	  printf("s=%d c=%d %e %e\n", s, c, data[s*Nc+c].real(), data[s*Nc+c].imag());
@@ -697,11 +708,9 @@ namespace quda {
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator+=(const ColorSpinor<Float, Nc, 2> &a) {
-      if (this != &a) {
 #pragma unroll
-	for (int i=0; i<size; i++) {
-	  data[i] += a.data[i];
-	}
+      for (int i=0; i<size; i++) {
+        data[i] += a.data[i];
       }
       return *this;
     }

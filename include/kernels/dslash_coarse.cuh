@@ -111,7 +111,7 @@ namespace quda {
 
 	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
 	  if (doHalo<type>()) {
-	    int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+	    int ghost_idx = ghostFaceIndex<1,5>(coord, arg.dim, d, arg.nFace);
 
 #pragma unroll
 	    for(int color_local = 0; color_local < Mc; color_local++) { //Color row
@@ -176,7 +176,7 @@ namespace quda {
 	const int gauge_idx = back_idx;
 	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
 	  if (doHalo<type>()) {
-	    const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+	    const int ghost_idx = ghostFaceIndex<0,5>(coord, arg.dim, d, arg.nFace);
 #pragma unroll
 	    for (int color_local=0; color_local<Mc; color_local++) {
 	      int c_row = color_block + color_local;

@@ -47,11 +47,13 @@ extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern QudaInverterType  inv_type;
 extern double reliable_delta; // reliable update parameter
+extern bool alternative_reliable;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
 extern double kappa; // kappa of Dirac operator
 extern double mu;
+extern double epsilon;
 extern double anisotropy; // temporal anisotropy
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
@@ -61,9 +63,15 @@ extern QudaMatPCType matpc_type; // preconditioning type
 extern double clover_coeff;
 extern bool compute_clover;
 
+extern QudaVerbosity verbosity;
+extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL]; // use this for preconditioner verbosity
+
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter; // max solver iterations
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
+extern QudaCABasis ca_basis; // basis for CA-CG solves
+extern double ca_lambda_min; // minimum eigenvalue for scaling Chebyshev CA-CG solves
+extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG solves
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 extern char latfile[];
@@ -104,6 +112,8 @@ display_test_info()
 
 int main(int argc, char **argv)
 {
+
+  mg_verbosity[0] = QUDA_SILENT; // set default preconditioner verbosity
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
@@ -183,7 +193,7 @@ int main(int argc, char **argv)
   inv_param.mu = mu;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = 0.1385;
+    inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
@@ -220,8 +230,6 @@ int main(int argc, char **argv)
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
   }
 
-  //inv_param.solution_type = QUDA_MAT_SOLUTION;
-
   inv_param.matpc_type = matpc_type;
 
   inv_param.dagger = QUDA_DAG_NO;
@@ -245,6 +253,9 @@ int main(int argc, char **argv)
 
   inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = gcrNkrylov;
+  inv_param.ca_basis = ca_basis;
+  inv_param.ca_lambda_min = ca_lambda_min;
+  inv_param.ca_lambda_max = ca_lambda_max;
   inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
   if(tol_hq == 0 && tol == 0){
@@ -265,6 +276,7 @@ int main(int argc, char **argv)
   }
   inv_param.maxiter = niter;
   inv_param.reliable_delta = reliable_delta;
+  inv_param.use_alternative_reliable = alternative_reliable;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.max_res_increase = 1;
@@ -276,7 +288,7 @@ int main(int argc, char **argv)
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 10;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
   
@@ -314,11 +326,12 @@ int main(int argc, char **argv)
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
   }
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.

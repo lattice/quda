@@ -1,20 +1,12 @@
+#ifndef USE_LEGACY_DSLASH
+
 #include <gauge_field.h>
-#include <gauge_field_order.h>
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
 #include <clover_field.h>
-#include <clover_field_order.h>
-#include <dslash_helper.cuh>
-#include <index_helper.cuh>
-#include <dslash_quda.h>
-#include <color_spinor.h>
+#include <dslash.h>
 #include <worker.h>
 
-namespace quda {
-#include <dslash_events.cuh>
 #include <dslash_policy.cuh>
-}
-
 #include <kernels/dslash_wilson_clover.cuh>
 
 /**
@@ -23,18 +15,17 @@ namespace quda {
 
 namespace quda {
 
-#ifdef GPU_CLOVER_DIRAC
-
   /**
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct WilsonCloverLaunch {
+    static constexpr const char *kernel = "quda::wilsonCloverGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
       static_assert(xpay == true, "wilsonClover operator only defined for xpay");
-      dslash.launch(wilsonCloverGPU<Float,nDim,nColor,nParity,dagger,kernel_type,Arg>, tp, arg, stream);
+      dslash.launch(wilsonCloverGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
     }
   };
 
@@ -48,8 +39,8 @@ namespace quda {
   public:
 
     WilsonClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in), arg(arg), in(in)
-    {  }
+      : Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover.cuh"), arg(arg), in(in)
+    { }
 
     virtual ~WilsonClover() { }
 
@@ -108,11 +99,10 @@ namespace quda {
                          const int *comm_override, TimeProfile &profile)
   {
     constexpr int nDim = 4;
-    constexpr bool dynamic_clover = false;
-    WilsonCloverArg<Float,nColor,recon,dynamic_clover> arg(out, in, U, A, kappa, x, parity, dagger, comm_override);
-    WilsonClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,dynamic_clover> > wilson(arg, out, in);
+    WilsonCloverArg<Float,nColor,recon> arg(out, in, U, A, kappa, 0.0, x, parity, dagger, comm_override);
+    WilsonClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon> > wilson(arg, out, in);
 
-    DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+    dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                               in.VolumeCB(), in.GhostFaceCB(), profile);
     policy.apply(0);
 
@@ -148,8 +138,6 @@ namespace quda {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
   }
-
-#endif // GPU_CLOVER_DIRAC
 
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
@@ -187,3 +175,5 @@ namespace quda {
 
 
 } // namespace quda
+
+#endif

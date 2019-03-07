@@ -1,10 +1,12 @@
+#ifdef USE_LEGACY_DSLASH
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <typeinfo>
 
 #include <color_spinor_field.h>
-#include <clover_field.h>	// Do we need this now?
 
 // these control the Wilson-type actions
 #ifdef GPU_WILSON_DIRAC
@@ -14,25 +16,32 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
-#include <dslash_helper.cuh>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
 #include <uint_to_char.h>
 
-// additions for rewrite
-#include <color_spinor_field_order.h>
+#include <index_helper.cuh>
+
+namespace quda {
+
+#ifdef MULTI_GPU
+  static int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
+  void setPackComms(const int *comm_dim) {
+    for (int i=0; i<4; i++) commDim[i] = comm_dim[i];
+    for (int i=4; i<QUDA_MAX_DIM; i++) commDim[i] = 0;
+  }
+#else
+  void setPackComms(const int *comm_dim) { ; }
+#endif
 
 #define STRIPED
 #ifdef STRIPED
 #else
 #define SWIZZLE
 #endif
-
-#include <index_helper.cuh>
-
-namespace quda {
 
   namespace pack {
 
@@ -42,17 +51,6 @@ namespace quda {
   } // end namespace pack
 
   using namespace pack;
-
-#ifdef MULTI_GPU
-  static int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
-  void setPackComms(const int *comm_dim) {
-    setPackComms2(comm_dim);
-    for (int i=0; i<4; i++) commDim[i] = comm_dim[i];
-    for (int i=4; i<QUDA_MAX_DIM; i++) commDim[i] = 0;
-  }
-#else
-  void setPackComms(const int *comm_dim) { ; }
-#endif
 
 #include <dslash_index.cuh>
 
@@ -1061,7 +1059,7 @@ namespace quda {
     virtual ~PackFaceWilson() { }
 
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);//getVerbosity());
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_WILSON_DIRAC
       static PackParam<FloatN> param;
@@ -1177,7 +1175,7 @@ namespace quda {
     }
   }
 
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC)
 
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEXDOUBLE param.inTex
@@ -1264,9 +1262,9 @@ namespace quda {
 					const int out_stride, const float2 *in,
 					const float *inNorm, const int in_idx,
 					const PackParam<float2> &param) {
-    out[out_idx + 0*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx + 0*param.sp_stride);
-    out[out_idx + 1*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx + 1*param.sp_stride);
-    out[out_idx + 2*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx + 2*param.sp_stride);
+    out[out_idx + 0*out_stride] = tex1Dfetch<float2>(SPINORTEXSINGLE, in_idx + 0*param.sp_stride);
+    out[out_idx + 1*out_stride] = tex1Dfetch<float2>(SPINORTEXSINGLE, in_idx + 1*param.sp_stride);
+    out[out_idx + 2*out_stride] = tex1Dfetch<float2>(SPINORTEXSINGLE, in_idx + 2*param.sp_stride);
   }
 
   // this is rather dumb: undoing the texture load because cudaNormalizedReadMode is used
@@ -1283,20 +1281,20 @@ namespace quda {
 					const int out_stride, const short2 *in,
 					const float *inNorm, const int in_idx,
 					const PackParam<short2> &param) {
-    out[out_idx + 0*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+0*param.sp_stride));
-    out[out_idx + 1*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+1*param.sp_stride));
-    out[out_idx + 2*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+2*param.sp_stride));
-    outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXHALFNORM, in_idx);
+    out[out_idx + 0*out_stride] = float22short2(1.0f,tex1Dfetch<float2>(SPINORTEXHALF,in_idx+0*param.sp_stride));
+    out[out_idx + 1*out_stride] = float22short2(1.0f,tex1Dfetch<float2>(SPINORTEXHALF,in_idx+1*param.sp_stride));
+    out[out_idx + 2*out_stride] = float22short2(1.0f,tex1Dfetch<float2>(SPINORTEXHALF,in_idx+2*param.sp_stride));
+    outNorm[out_idx] = tex1Dfetch<float>(SPINORTEXHALFNORM, in_idx);
   }
 
   __device__ void packFaceStaggeredCore(char2 *out, float *outNorm, const int out_idx, 
           const int out_stride, const char2 *in, 
           const float *inNorm, const int in_idx, 
           const PackParam<char2> &param) {
-    out[out_idx + 0*out_stride] = float22char2(1.0f,TEX1DFETCH(float2,SPINORTEXQUARTER,in_idx+0*param.sp_stride));
-    out[out_idx + 1*out_stride] = float22char2(1.0f,TEX1DFETCH(float2,SPINORTEXQUARTER,in_idx+1*param.sp_stride));
-    out[out_idx + 2*out_stride] = float22char2(1.0f,TEX1DFETCH(float2,SPINORTEXQUARTER,in_idx+2*param.sp_stride));
-    outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXQUARTERNORM, in_idx);
+    out[out_idx + 0*out_stride] = float22char2(1.0f,tex1Dfetch<float2>(SPINORTEXQUARTER,in_idx+0*param.sp_stride));
+    out[out_idx + 1*out_stride] = float22char2(1.0f,tex1Dfetch<float2>(SPINORTEXQUARTER,in_idx+1*param.sp_stride));
+    out[out_idx + 2*out_stride] = float22char2(1.0f,tex1Dfetch<float2>(SPINORTEXQUARTER,in_idx+2*param.sp_stride));
+    outNorm[out_idx] = tex1Dfetch<float>(SPINORTEXQUARTERNORM, in_idx);
   }
 #endif
 
@@ -1591,7 +1589,7 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC)
 
       static PackParam<FloatN> param;
       this->prepareParam(param,tp,this->dim,this->face_num);
@@ -1969,7 +1967,7 @@ namespace quda {
 		  const int parity, const cudaStream_t &stream) {
 
 
-    if(in.DWFPCtype() == QUDA_4D_PC)
+    if(in.PCType() == QUDA_4D_PC)
       {
 	switch(in.Precision()) {
 	case QUDA_DOUBLE_PRECISION:
@@ -2260,3 +2258,5 @@ namespace quda {
 #endif // MULTI_GPU
 
 }
+
+#endif

@@ -4,16 +4,9 @@
 
 namespace quda {
 
-  enum Basis {
-    POWER_BASIS,
-    INVALID_BASIS
-  };
-
-  const static Basis basis = POWER_BASIS;
-
   CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
     : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
-      alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
+      basis(param.ca_basis), alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
 
   CAGCR::~CAGCR() {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
@@ -23,7 +16,7 @@ namespace quda {
       bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
                          param.precision == param.precision_sloppy &&
                          param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
-      if (basis == POWER_BASIS) {
+      if (basis == QUDA_POWER_BASIS) {
         for (int i=0; i<param.Nkrylov+1; i++) if (i>0 || !use_source) delete p[i];
       } else {
         for (int i=0; i<param.Nkrylov; i++) if (i>0 || !use_source) delete p[i];
@@ -61,7 +54,12 @@ namespace quda {
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
 
-      if (basis == POWER_BASIS) {
+      if (basis != QUDA_POWER_BASIS) {
+        warningQuda("CA-GCR does not support any basis besides QUDA_POWER_BASIS. Switching to QUDA_POWER_BASIS...\n");
+        basis = QUDA_POWER_BASIS;
+      }
+
+      if (basis == QUDA_POWER_BASIS) {
         // in power basis q[k] = p[k+1], so we don't need a separate q array
         p.resize(param.Nkrylov+1);
         q.resize(param.Nkrylov);
@@ -204,13 +202,13 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-	warningQuda("inverting on zero-field source\n");
-	x = b;
-	param.true_res = 0.0;
-	param.true_res_hq = 0.0;
-	return;
-      } else {
-	b2 = r2;
+        warningQuda("inverting on zero-field source\n");
+        x = b;
+        param.true_res = 0.0;
+        param.true_res_hq = 0.0;
+        return;
+            } else {
+        b2 = r2;
       }
     }
 
@@ -248,7 +246,7 @@ namespace quda {
       // build up a space of size nKrylov
       for (int k=0; k<nKrylov; k++) {
         matSloppy(*q[k], *p[k], tmpSloppy);
-        if (k<nKrylov-1 && basis != POWER_BASIS) blas::copy(*p[k+1], *q[k]);
+        if (k<nKrylov-1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k+1], *q[k]);
       }
 
       solve(alpha, q, *p[0]);
@@ -266,7 +264,7 @@ namespace quda {
       if (!fixed_iteration || param.return_residual) {
         // update the residual vector
         std::vector<ColorSpinorField*> R;
-        R.push_back(p[0]);
+        R.push_back(&r);
         for (int i=0; i<nKrylov; i++) alpha[i] = -alpha[i];
         blas::caxpy(alpha, q, R);
       }
@@ -274,7 +272,7 @@ namespace quda {
       total_iter+=nKrylov;
       if ( !fixed_iteration || getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         // only compute the residual norm if we need to
-        r2 = blas::norm2(*p[0]);
+        r2 = blas::norm2(r);
       }
 
       PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
@@ -283,38 +281,39 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
-	if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
-	mat(r, x, tmp);
-	r2 = blas::xmyNorm(b, r);  
-	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+        if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
+        mat(r, x, tmp);
+        r2 = blas::xmyNorm(b, r);  
+        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
         // break-out check if we have reached the limit of the precision
-	if (r2 > r2_old) {
-	  resIncrease++;
-	  resIncreaseTotal++;
-	  warningQuda("CA-GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-		      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
-	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
-	    warningQuda("CA-GCR: solver exiting due to too many true residual norm increases");
-	    break;
-	  }
-	} else {
-	  resIncrease = 0;
-	}
+        if (r2 > r2_old) {
+          resIncrease++;
+          resIncreaseTotal++;
+          warningQuda("CA-GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+          sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+            warningQuda("CA-GCR: solver exiting due to too many true residual norm increases");
+            break;
+          }
+        } else {
+          resIncrease = 0;
+        }
 
-	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
-	  restart++; // restarting if residual is still too great
+        r2_old = r2;
+      }
 
-	  PrintStats("CA-GCR (restart)", restart, r2, b2, heavy_quark_res);
-          blas::copy(*p[0], r);
+      // No matter what, if we haven't converged, we do a restart.
+      if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
+        restart++; // restarting if residual is still too great
 
-	  r2_old = r2;
+        PrintStats("CA-GCR (restart)", restart, r2, b2, heavy_quark_res);
+        blas::copy(*p[0],r); // no-op if uni-precision
 
-	  // prevent ending the Krylov space prematurely if other convergence criteria not met 
-	  if (r2 < stop) l2_converge = true; 
-	}
+        r2_old = r2;
 
-	r2_old = r2;
+        // prevent ending the Krylov space prematurely if other convergence criteria not met 
+        if (r2 < stop) l2_converge = true; 
       }
 
     }
@@ -332,7 +331,7 @@ namespace quda {
       param.true_res_hq = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
       if (param.return_residual) blas::copy(b, r);
     } else {
-      if (param.return_residual) blas::copy(b, *p[0]);
+      if (param.return_residual) blas::copy(b, r);
     }
 
     if (!param.is_preconditioner) {
@@ -355,7 +354,7 @@ namespace quda {
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
-    PrintSummary("CA-GCR", total_iter, r2, b2);
+    PrintSummary("CA-GCR", total_iter, r2, b2, stop, param.tol_hq);
   }
 
 } // namespace quda

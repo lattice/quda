@@ -1,7 +1,10 @@
+#ifdef USE_LEGACY_DSLASH
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <typeinfo>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -18,11 +21,12 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
-#include <dslash_helper.cuh>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
 
@@ -55,9 +59,6 @@ namespace quda {
 #include <dslash_quda.cuh>
 
   } // end namespace clover
-
-  // declare the dslash events
-#include <dslash_events.cuh>
 
   using namespace clover;
 
@@ -171,8 +172,6 @@ namespace quda {
   };
 #endif // GPU_CLOVER_DIRAC
 
-#include <dslash_policy.cuh>
-
   void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover &cloverInv,
 			const cudaColorSpinorField *in, const int parity, const int dagger, 
 			const cudaColorSpinorField *x, const double &a, const int *commOverride,
@@ -190,7 +189,7 @@ namespace quda {
       dslash = new CloverDslashCuda<short4, short4, short4>(out, gauge, cloverInv, in, x, a, parity, dagger, commOverride);
     }
 
-    DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
     dslash_policy.apply(0);
 
     delete dslash;
@@ -201,3 +200,5 @@ namespace quda {
   }
 
 }
+
+#endif

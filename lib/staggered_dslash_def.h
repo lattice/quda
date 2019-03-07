@@ -17,7 +17,11 @@
 #if (DD_IMPROVED==1)
 #define DD_FNAME improvedStaggeredDslash
 #else
+#ifndef TIFR
 #define DD_FNAME staggeredDslash
+#else
+#define DD_FNAME staggeredDslashTIFR
+#endif
 #endif
 
 #if (DD_DAG==0) // no dagger

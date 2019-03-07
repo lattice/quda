@@ -666,7 +666,6 @@ namespace quda {
         const ColorSpinorField& x, double m_f, double m_5, const Complex* b_5, const Complex* c_5, bool dagger,
         int parity, int shift[4], int halo_shift[4], const double scale, MdwfFusedDslashType type) {
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
-      if (in.DWFPCtype() != QUDA_4D_PC) errorQuda("ONLY 4D preconditioned fields are supported");
       checkLocation(out, in); // check all locations match
 
       if (checkPrecision(out, in) == QUDA_HALF_PRECISION && in.Ncolor() == 3) {

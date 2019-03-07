@@ -4,7 +4,9 @@
 
 namespace quda {
 
-  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(u),
+  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) :
+    LatticeFieldParam(u),
+    location(u.Location()),
     nColor(u.Ncolor()),
     nFace(u.Nface()),
     reconstruct(u.Reconstruct()),
@@ -46,12 +48,12 @@ namespace quda {
       errorQuda("Anisotropy only supported for Wilson links");
     if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
       errorQuda("Temporal gauge fixing only supported for Wilson links");
-
+#ifdef USE_LEGACY_DSLASH
     if(link_type != QUDA_ASQTAD_LONG_LINKS && (reconstruct ==  QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9))
-      errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
-       
-    if (link_type == QUDA_ASQTAD_MOM_LINKS) scale = 1.0;
-
+        errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
+    if(link_type == QUDA_ASQTAD_LONG_LINKS &&  reconstruct == QUDA_RECONSTRUCT_9)
+        errorQuda("reconstruct %d not supported for staggered long links with QUDA_LEGACY_DSLASH\n", reconstruct);
+#endif
     if(geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*nInternal;
       length = 2*stride*nInternal; // two comes from being full lattice
@@ -102,7 +104,10 @@ namespace quda {
   {
     if (typeid(*this) == typeid(cpuGaugeField)) return;
 
-    QudaFieldGeometry geometry_comms = geometry == QUDA_COARSE_GEOMETRY ? QUDA_VECTOR_GEOMETRY : geometry;
+    // if this is not a bidirectional exchange then we are doing a
+    // scalar exchange, e.g., only the link matrix in the direcion we
+    // are exchanging is exchanged, and none of the orthogonal links
+    QudaFieldGeometry geometry_comms = bidir ? (geometry == QUDA_COARSE_GEOMETRY ? QUDA_VECTOR_GEOMETRY : geometry) : QUDA_SCALAR_GEOMETRY;
 
     // calculate size of ghost zone required
     ghost_bytes_old = ghost_bytes; // save for subsequent resize checking
@@ -122,8 +127,10 @@ namespace quda {
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
   } // createGhostZone
 
-  void GaugeField::applyStaggeredPhase() {
+  void GaugeField::applyStaggeredPhase(QudaStaggeredPhase phase) {
     if (staggeredPhaseApplied) errorQuda("Staggered phases already applied");
+
+    if (phase != QUDA_STAGGERED_PHASE_INVALID) staggeredPhaseType = phase;
     applyGaugePhase(*this);
     if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) {
       if (typeid(*this)==typeid(cudaGaugeField)) {
@@ -258,7 +265,6 @@ namespace quda {
       if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
       if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, g.anisotropy);
       if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, g.tadpole);
-      //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale);
     }
     catch(std::bad_cast &e) {
       errorQuda("Failed to cast reference to GaugeField");

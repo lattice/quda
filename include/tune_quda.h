@@ -7,6 +7,7 @@
 #include <cstring>
 #include <cfloat>
 #include <stdarg.h>
+#include <map>
 
 #include <tune_key.h>
 #include <quda_internal.h>
@@ -46,11 +47,10 @@ namespace quda {
     }
 
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
-      output << "block = (" << param.block.x << ", " << param.block.y << ", " << param.block.z << ")" << std::endl;
-      output << "grid = (" << param.grid.x << ", " << param.grid.y << ", " << param.grid.z << ")" << std::endl;
-      output << "shared_bytes = " << param.shared_bytes << std::endl;
-      output << "aux = (" << param.aux.x << ", " << param.aux.y << ", " << param.aux.z << ", " << param.aux.w << ")" << std::endl;
-      output << param.comment << std::endl;
+      output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+      output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
+      output << "shared_bytes=" << param.shared_bytes;
+      output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
       return output;
     }
   };
@@ -276,12 +276,7 @@ namespace quda {
     virtual std::string paramString(const TuneParam &param) const
       {
 	std::stringstream ps;
-	ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-	if (tuneGridDim()) ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-	ps << "shared=" << param.shared_bytes << ", ";
-
-	// determine if we are tuning the auxiliary dimension
-	if (tuneAuxDim()) ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
+	ps << param;
 	return ps.str();
       }
 
@@ -336,11 +331,11 @@ namespace quda {
      * valid for the current device.
      */
     void checkLaunchParam(TuneParam &param) {
-    
-      if (param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock)
-        errorQuda("Requested block size %d greater than hardware limit %d",
-                  param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
 
+      if (param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock)
+        errorQuda("Requested block size %dx%dx%d=%d greater than hardware limit %d",
+                  param.block.x, param.block.y, param.block.z, param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
+      
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0])
 	errorQuda("Requested X-dimension block size %d greater than hardware limit %d", 
 		  param.block.x, deviceProp.maxThreadsDim[0]);
@@ -384,7 +379,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     // don't tune the grid dimension
-    bool tuneGridDim() const { return false; }
+    virtual bool tuneGridDim() const { return false; }
 
     /**
        The maximum block size in the x dimension is the total number
@@ -558,6 +553,27 @@ namespace quda {
    * @brief Post an event in the trace, recording where it was posted
    */
   void postTrace_(const char *func, const char *file, int line);
+
+  /**
+   * @brief Returns a reference to the tunecache map
+   * @return tunecache reference
+   */
+  const std::map<TuneKey,TuneParam>& getTuneCache();
+
+  /**
+   * @brief Enable the profile kernel counting
+   */
+  void enableProfileCount();
+
+  /**
+   * @brief Disable the profile kernel counting
+   */
+  void disableProfileCount();
+
+  /**
+   * @brief Enable / disable whether are tuning a policy
+   */
+  void setPolicyTuning(bool);
 
 } // namespace quda
 

@@ -397,48 +397,48 @@ namespace quda {
       if (k==nKrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
         // update the solution vector
-	updateSolution(ySloppy, alpha, beta, gamma, k, p);
+        updateSolution(ySloppy, alpha, beta, gamma, k, p);
 
-	// recalculate residual in high precision
-	blas::xpy(ySloppy, x);
+        // recalculate residual in high precision
+        blas::xpy(ySloppy, x);
 
-	if ( (r2 < stop || total_iter==param.maxiter) && param.sloppy_converge) break;
-	mat(r, x, y);
-	r2 = blas::xmyNorm(b, r);  
+        if ( (r2 < stop || total_iter==param.maxiter) && param.sloppy_converge) break;
+        mat(r, x, y);
+        r2 = blas::xmyNorm(b, r);  
 
-	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
-	// break-out check if we have reached the limit of the precision
-	if (r2 > r2_old) {
-	  resIncrease++;
-	  resIncreaseTotal++;
-	  warningQuda("GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-		      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
-	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
-	    warningQuda("GCR: solver exiting due to too many true residual norm increases");
-	    break;
-	  }
-	} else {
-	  resIncrease = 0;
-	}
+        // break-out check if we have reached the limit of the precision
+        if (r2 > r2_old) {
+          resIncrease++;
+          resIncreaseTotal++;
+          warningQuda("GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+        	      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+            warningQuda("GCR: solver exiting due to too many true residual norm increases");
+            break;
+          }
+        } else {
+          resIncrease = 0;
+        }
 
         k_break = k;
-	k = 0;
+        k = 0;
 
-	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
-	  restart++; // restarting if residual is still too great
+        if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
+          restart++; // restarting if residual is still too great
 
-	  PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
-	  blas::copy(rSloppy, r);
-	  blas::zero(ySloppy);
+          PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
+          blas::copy(rSloppy, r);
+          blas::zero(ySloppy);
 
-	  r2_old = r2;
+          r2_old = r2;
 
-	  // prevent ending the Krylov space prematurely if other convergence criteria not met 
-	  if (r2 < stop) l2_converge = true; 
-	}
+          // prevent ending the Krylov space prematurely if other convergence criteria not met 
+          if (r2 < stop) l2_converge = true; 
+        }
 
-	r2_old = r2;
+        r2_old = r2;
 
       }
 
@@ -484,7 +484,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);
 
-    PrintSummary("GCR", total_iter, r2, b2);
+    PrintSummary("GCR", total_iter, r2, b2, stop, param.tol_hq);
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
 

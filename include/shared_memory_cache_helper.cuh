@@ -1,3 +1,5 @@
+#pragma once
+
 /**
    @file shared_memory_cache_helper.cuh
 

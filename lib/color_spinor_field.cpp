@@ -22,7 +22,7 @@ namespace quda {
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor,
 	   param.Precision(), param.pad, param.siteSubset, param.siteOrder,
-	   param.fieldOrder, param.gammaBasis, param.PCtype);
+	   param.fieldOrder, param.gammaBasis, param.pc_type);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
@@ -33,7 +33,7 @@ namespace quda {
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor,
 	   field.Precision(), field.pad, field.siteSubset, field.siteOrder,
-	   field.fieldOrder, field.gammaBasis, field.PCtype);
+	   field.fieldOrder, field.gammaBasis, field.pc_type);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -102,11 +102,6 @@ namespace quda {
     size_t ghost_length = ghostVolume*nColor*nSpin*2;
     size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ? ghostNormVolume : 0;
 
-    if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-      printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
-      printfQuda("ghost length = %lu, ghost norm length = %lu\n", ghost_length, ghost_norm_length);
-    }
-
     ghost_bytes = (size_t)ghost_length*ghost_precision;
     if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
@@ -137,16 +132,19 @@ namespace quda {
       }
 
       dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
-      dslash_constant.ghostFaceCB[0] = (X[1]*X[2]*X[3])/2;
-      dslash_constant.ghostFaceCB[1] = (X[0]*X[2]*X[3])/2;
-      dslash_constant.ghostFaceCB[2] = (X[0]*X[1]*X[3])/2;
-      dslash_constant.ghostFaceCB[3] = (X[0]*X[1]*X[2])/2;
+      dslash_constant.ghostFace[0] = X[1]*X[2]*X[3];
+      dslash_constant.ghostFace[1] = X[0]*X[2]*X[3];
+      dslash_constant.ghostFace[2] = X[0]*X[1]*X[3];
+      dslash_constant.ghostFace[3] = X[0]*X[1]*X[2];
+      for (int d=0; d<4; d++) dslash_constant.ghostFaceCB[d] = dslash_constant.ghostFace[d]/2;
 
       dslash_constant.X2X1 = X[1]*X[0];
       dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
+      dslash_constant.X4X3X2X1 = X[3]*X[2]*X[1]*X[0];
       dslash_constant.X2X1mX1 = (X[1]-1)*X[0];
       dslash_constant.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
       dslash_constant.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
+      dslash_constant.X5X4X3X2X1mX4X3X2X1 = (X[4]-1)*X[3]*X[2]*X[1]*X[0];
       dslash_constant.X4X3X2X1hmX3X2X1h = dslash_constant.X4X3X2X1mX3X2X1/2;
 
       // used by indexFromFaceIndexStaggered
@@ -173,7 +171,7 @@ namespace quda {
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset,
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
-				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
+				QudaGammaBasis gammaBasis, QudaPCType pc_type) {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
@@ -188,7 +186,7 @@ namespace quda {
     nVec = Nvec;
     twistFlavor = Twistflavor;
 
-    PCtype = DWFPC;
+    this->pc_type = pc_type;
 
     precision = Prec;
     volume = 1;
@@ -238,6 +236,7 @@ namespace quda {
       composite_descr.norm_bytes  = norm_bytes;
 
       volume *= composite_descr.dim;
+      volumeCB *= composite_descr.dim;
       stride *= composite_descr.dim;
       length *= composite_descr.dim;
       real_length *= composite_descr.dim;
@@ -307,7 +306,7 @@ namespace quda {
 
       create(src.nDim, src.x, src.nColor, src.nSpin, src.nVec, src.twistFlavor,
 	     src.precision, src.pad, src.siteSubset,
-	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);
+	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type);
     }
     return *this;
   }
@@ -320,7 +319,7 @@ namespace quda {
     if (param.nVec != 0) nVec = param.nVec;
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
 
-    if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
+    if (param.pc_type != QUDA_PC_INVALID) pc_type = param.pc_type;
 
     if (param.Precision() != QUDA_INVALID_PRECISION) precision = param.Precision();
     if (param.GhostPrecision() != QUDA_INVALID_PRECISION) ghost_precision = param.GhostPrecision();
@@ -398,12 +397,6 @@ namespace quda {
 
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("\nPrinting out reset field\n");
-      std::cout << *this << std::endl;
-      printfQuda("\n");
-    }
-
     setTuningString();
   }
 
@@ -428,7 +421,7 @@ namespace quda {
     param.siteSubset = siteSubset;
     param.siteOrder = siteOrder;
     param.gammaBasis = gammaBasis;
-    param.PCtype = PCtype;
+    param.pc_type = pc_type;
     param.create = QUDA_INVALID_FIELD_CREATE;
   }
 
@@ -895,7 +888,7 @@ namespace quda {
     }
     out << "Is component = " << a.composite_descr.is_component << std::endl;
     if(a.composite_descr.is_composite) out << "Component ID = " << a.composite_descr.id << std::endl;
-    out << "PC type = " << a.PCtype << std::endl;
+    out << "pc_type = " << a.pc_type << std::endl;
     return out;
   }
 

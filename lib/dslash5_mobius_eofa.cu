@@ -546,7 +546,6 @@ namespace quda {
         const double* eofa_u, const double* eofa_x, const double* eofa_y, double sherman_morrison, bool dagger,
         Dslash5Type type) {
 #ifdef GPU_DOMAIN_WALL_DIRAC
-      if (in.DWFPCtype() != QUDA_4D_PC) errorQuda("Only 4d preconditioned fields are supported");
       checkLocation(out, in); // check all locations match
 
       switch (checkPrecision(out, in)) {

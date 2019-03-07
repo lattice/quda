@@ -30,12 +30,20 @@ namespace quda {
   template<> inline int vecLength<double4>() { return 4; }
 
   // specializations for short-float conversion
-  inline __host__ __device__ float s2f(const short &a) { return static_cast<float>(a)*fixedInvMaxValue<short>::value; }
-  inline __host__ __device__ double s2d(const short &a) { return static_cast<double>(a)*fixedInvMaxValue<short>::value; }
+  inline __host__ __device__ float s2f(short a) { return static_cast<float>(a)*fixedInvMaxValue<short>::value; }
+  inline __host__ __device__ double s2d(short a) { return static_cast<double>(a)*fixedInvMaxValue<short>::value; }
 
   // specializations for char-float conversion
-  inline __host__ __device__ float c2f(const char &a) { return static_cast<float>(a)*fixedInvMaxValue<char>::value; }
-  inline __host__ __device__ double c2d(const char &a) { return static_cast<double>(a)*fixedInvMaxValue<char>::value; }
+  inline __host__ __device__ float c2f(char a) { return static_cast<float>(a)*fixedInvMaxValue<char>::value; }
+  inline __host__ __device__ double c2d(char a) { return static_cast<double>(a)*fixedInvMaxValue<char>::value; }
+
+  // specializations for short-float conversion with additional scale factor
+  inline __host__ __device__ float s2f(short a, float c) { return static_cast<float>(a)*(fixedInvMaxValue<short>::value * c); }
+  inline __host__ __device__ double s2d(short a, double c) { return static_cast<double>(a)*(fixedInvMaxValue<short>::value * c); }
+
+  // specializations for char-float conversion with additional scale factor
+  inline __host__ __device__ float c2f(char a, float c) { return static_cast<float>(a)*(fixedInvMaxValue<char>::value * c); }
+  inline __host__ __device__ double c2d(char a, double c) { return static_cast<double>(a)*(fixedInvMaxValue<char>::value * c); }
 
   template <typename FloatN>
     __device__ inline void copyFloatN(FloatN &a, const FloatN &b) { a = b; }

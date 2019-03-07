@@ -94,7 +94,7 @@ namespace quda {
     QudaGammaBasis gammaBasis;
     QudaFieldCreate create; //
 
-    QudaDWFPCType PCtype; // used to select preconditioning method in DWF
+    QudaPCType pc_type; // used to select preconditioning method in DWF
 
     void *v; // pointer to field
     void *norm;
@@ -111,7 +111,7 @@ namespace quda {
     : LatticeFieldParam(), location(QUDA_INVALID_FIELD_LOCATION), nColor(0),
       nSpin(0), nVec(1), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS),
-      create(QUDA_INVALID_FIELD_CREATE), PCtype(QUDA_PC_INVALID),
+      create(QUDA_INVALID_FIELD_CREATE), pc_type(QUDA_PC_INVALID),
       is_composite(false), composite_dim(0), is_component(false), component_id(0) { ; }
 
       // used to create cpu params
@@ -124,8 +124,7 @@ namespace quda {
       twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
-      PCtype(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||
-	      (inv_param.dslash_type==QUDA_MOBIUS_DWF_DSLASH)||(inv_param.dslash_type==QUDA_MOBIUS_DWF_EOFA_DSLASH))?QUDA_4D_PC:QUDA_5D_PC ),
+      pc_type(inv_param.dslash_type==QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC),
       v(V), is_composite(false), composite_dim(0), is_component(false), component_id(0) {
 
         if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
@@ -182,7 +181,7 @@ namespace quda {
       location(location), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), nVec(cpuParam.nVec),
       twistFlavor(cpuParam.twistFlavor), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER),
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
-      create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0), is_composite(cpuParam.is_composite), composite_dim(cpuParam.composite_dim), is_component(false), component_id(0)
+      create(QUDA_COPY_FIELD_CREATE), pc_type(cpuParam.pc_type), v(0), is_composite(cpuParam.is_composite), composite_dim(cpuParam.composite_dim), is_component(false), component_id(0)
       {
 	siteSubset = cpuParam.siteSubset;
 	fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ?
@@ -250,7 +249,7 @@ namespace quda {
     int Ls;
 
     int volume_4d;
-    int volume_4d_cb;
+    int_fastdiv volume_4d_cb;
 
     int_fastdiv face_X[4];
     int_fastdiv face_Y[4];
@@ -260,13 +259,17 @@ namespace quda {
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XYZT[4];
 
+    int ghostFace[QUDA_MAX_DIM+1];
     int ghostFaceCB[QUDA_MAX_DIM+1];
 
     int X2X1;
     int X3X2X1;
+    int X4X3X2X1;
+
     int X2X1mX1;
     int X3X2X1mX2X1;
     int X4X3X2X1mX3X2X1;
+    int X5X4X3X2X1mX4X3X2X1;
     int X4X3X2X1hmX3X2X1h;
 
     int_fastdiv dims[4][3];
@@ -278,7 +281,7 @@ namespace quda {
     void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
 		QudaPrecision precision, int pad, QudaSiteSubset subset,
 		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
-		QudaDWFPCType PCtype);
+		QudaPCType pc_type);
     void destroy();
 
   protected:
@@ -301,7 +304,7 @@ namespace quda {
 
     QudaTwistFlavorType twistFlavor;
 
-    QudaDWFPCType PCtype; // used to select preconditioning method in DWF
+    QudaPCType pc_type; // used to select preconditioning method in DWF
 
     size_t real_length; // physical length only
     size_t length; // length including pads, but not ghost zone - used for BLAS
@@ -441,7 +444,7 @@ namespace quda {
     size_t ComponentBytes() const { return composite_descr.bytes; }
     size_t ComponentNormBytes() const { return composite_descr.norm_bytes; }
 
-    QudaDWFPCType DWFPCtype() const { return PCtype; }
+    QudaPCType PCType() const { return pc_type; }
 
     QudaSiteSubset SiteSubset() const { return siteSubset; }
     QudaSiteOrder SiteOrder() const { return siteOrder; }
@@ -485,7 +488,7 @@ namespace quda {
 
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
-    virtual void PrintVector(unsigned int x) = 0;
+    virtual void PrintVector(unsigned int x) const = 0;
 
     /**
      * Compute the n-dimensional site index given the 1-d offset index
@@ -547,6 +550,8 @@ namespace quda {
 
     bool texInit; // whether a texture object has been created or not
     mutable bool ghostTexInit; // whether the ghost texture object has been created
+    mutable QudaPrecision ghost_precision_tex; /** the precision allocated for the ghost texture */
+
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
@@ -566,6 +571,11 @@ namespace quda {
     void destroy();
     void copy(const cudaColorSpinorField &);
 
+    /**
+       @brief Zero the padded regions added on to the field.  Ensures
+       correct reductions and silences false positive warnings
+       regarding uninitialized memory.
+     */
     void zeroPad();
 
     /**
@@ -576,9 +586,6 @@ namespace quda {
 
     void loadSpinorField(const ColorSpinorField &src);
     void saveSpinorField (ColorSpinorField &src) const;
-
-    /** Keep track of which pinned-memory buffer we used for creating message handlers */
-    size_t bufferMessageHandler;
 
   public:
 
@@ -622,12 +629,13 @@ namespace quda {
        @param[in] location Are we packing directly into local device memory, zero-copy memory or remote memory
        @param[in] location_label Consistent label used for labeling
        the packing tunekey since location can be difference for each process
-       @param[in] a Twisted mass parameter (default=0)
-       @param[in] b Twisted mass parameter (default=0)
+       @param[in] a Twisted mass parameter (scale factor, default=0)
+       @param[in] b Twisted mass parameter (flavor twist factor, default=0)
+       @param[in] c Twisted mass parameter (chiral twist factor, default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
 		   cudaStream_t* stream, MemoryLocation location[2*QUDA_MAX_DIM], MemoryLocation location_label,
-                   double a=0, double b=0);
+                   double a=0, double b=0, double c=0);
 
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
@@ -689,11 +697,12 @@ namespace quda {
        @param[in] location_label Consistent label used for labeling
        the packing tunekey since location can be difference for each
        process
-       @param[in] a Used for twisted mass
-       @param[in] b Used for twisted mass
+       @param[in] a Used for twisted mass (scale factor)
+       @param[in] b Used for twisted mass (chiral twist factor)
+       @param[in] c Used for twisted mass (flavor twist factor)
     */
     void pack(int nFace, int parity, int dagger, int stream_idx,
-	      MemoryLocation location[], MemoryLocation location_label, double a=0, double b=0);
+	      MemoryLocation location[], MemoryLocation location_label, double a=0, double b=0, double c=0);
 
     void packExtended(const int nFace, const int R[], const int parity, const int dagger,
         const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);
@@ -769,7 +778,7 @@ namespace quda {
       if (bufferIndex < 2) {
         return ghost_recv_buffer_d[bufferIndex];
       } else {
-        return static_cast<char*>(ghost_pinned_buffer_hd[bufferIndex%2])+ghost_bytes;
+        return ghost_pinned_recv_buffer_hd[bufferIndex%2];
       }
     }
 
@@ -810,7 +819,7 @@ namespace quda {
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
 
-    void PrintVector(unsigned int x);
+    void PrintVector(unsigned int x) const;
 
     /**
        @brief Backs up the cudaColorSpinorField
@@ -859,7 +868,7 @@ namespace quda {
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
     static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
-    void PrintVector(unsigned int x);
+    void PrintVector(unsigned int x) const;
 
     /**
        @brief Allocate the ghost buffers
@@ -909,7 +918,9 @@ namespace quda {
       void *dstNorm=0, void*srcNorm=0);
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
-  void genericPrintVector(cpuColorSpinorField &a, unsigned int x);
+
+  void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
+  void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
 
   void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double A, double B);
   void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double alpha);
@@ -956,14 +967,14 @@ namespace quda {
      type of the fields is the same.
      @param[in] a Input field
      @param[in] b Input field
-     @return If PCtype is unique return this
+     @return If PCType is unique return this
    */
-  inline QudaDWFPCType PCType_(const char *func, const char *file, int line,
+  inline QudaPCType PCType_(const char *func, const char *file, int line,
 			       const ColorSpinorField &a, const ColorSpinorField &b) {
-    QudaDWFPCType type = QUDA_PC_INVALID;
-    if (a.DWFPCtype() == b.DWFPCtype()) type = a.DWFPCtype();
+    QudaPCType type = QUDA_PC_INVALID;
+    if (a.PCType() == b.PCType()) type = a.PCType();
     else errorQuda("PCTypes %d %d do not match (%s:%d in %s())\n",
-		   a.DWFPCtype(), b.DWFPCtype(), file, line, func);
+		   a.PCType(), b.PCType(), file, line, func);
     return type;
   }
 
@@ -975,10 +986,10 @@ namespace quda {
      @return If precision is unique return the precision
    */
   template <typename... Args>
-  inline QudaDWFPCType PCType_(const char *func, const char *file, int line,
+  inline QudaPCType PCType_(const char *func, const char *file, int line,
 			       const ColorSpinorField &a, const ColorSpinorField &b,
 			       const Args &... args) {
-    return static_cast<QudaDWFPCType>(PCType_(func,file,line,a,b) & PCType_(func,file,line,a,args...));
+    return static_cast<QudaPCType>(PCType_(func,file,line,a,b) & PCType_(func,file,line,a,args...));
   }
 
 #define checkPCType(...) PCType_(__func__, __FILE__, __LINE__, __VA_ARGS__)

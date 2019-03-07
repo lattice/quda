@@ -56,6 +56,9 @@ namespace quda {
     /**< Reliable update tolerance */
     double delta;
 
+    /**< Whether to user alternative reliable updates (CG only at the moment) */
+    bool use_alternative_reliable;
+
     /**< Whether to keep the partial solution accumulator in sloppy precision */
     bool use_sloppy_partial_accumulator;
 
@@ -178,7 +181,14 @@ namespace quda {
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;
 
+    /** Basis for CA algorithms */
+    QudaCABasis ca_basis;
 
+    /** Minimum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_min;
+
+    /** Maximum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_max; // -1 -> power iter generate
 
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
@@ -232,6 +242,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO), delta(param.reliable_delta),
+      use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
@@ -246,7 +257,8 @@ namespace quda {
       num_src(param.num_src), num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle),
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      omega(param.omega), ca_basis(param.ca_basis), ca_lambda_min(param.ca_lambda_min), ca_lambda_max(param.ca_lambda_max),
+      schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim),
       deflation_grid(param.deflation_grid), rhs_idx(0),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
@@ -269,6 +281,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       compute_null_vector(param.compute_null_vector), delta(param.delta),
+      use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
@@ -282,7 +295,8 @@ namespace quda {
       num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.Nkrylov), precondition_cycle(param.precondition_cycle),
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      omega(param.omega), ca_basis(param.ca_basis), ca_lambda_min(param.ca_lambda_min), ca_lambda_max(param.ca_lambda_max),
+      schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.precision_ritz), nev(param.nev), m(param.m),
       deflation_grid(param.deflation_grid), rhs_idx(0),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
@@ -331,6 +345,9 @@ namespace quda {
       }
       //for incremental eigCG:
       param.rhs_idx = rhs_idx;
+
+      param.ca_lambda_min = ca_lambda_min;
+      param.ca_lambda_max = ca_lambda_max;
     }
 
     void updateRhsIndex(QudaInvertParam &param) {
@@ -362,53 +379,65 @@ namespace quda {
 			  DiracMatrix &matPrecon, TimeProfile &profile);
 
     /**
-       Set the solver stopping condition
-       @param b2 L2 norm squared of the source vector
-     */
-    static double stopping(const double &tol, const double &b2, QudaResidualType residual_type);
-
-    /**
-       Test for solver convergence
-       @param r2 L2 norm squared of the residual
-       @param hq2 Heavy quark residual
-       @param r2_tol Solver L2 tolerance
-       @param hq_tol Solver heavy-quark tolerance
-     */
-    bool convergence(const double &r2, const double &hq2, const double &r2_tol,
-		     const double &hq_tol);
-
-    /**
-       Test for HQ solver convergence -- ignore L2 residual
-       @param r2 L2 norm squared of the residual
-       @param hq2 Heavy quark residual
-       @param r2_tol Solver L2 tolerance
-       @param hq_tol Solver heavy-quark tolerance
-     */
-    bool convergenceHQ(const double &r2, const double &hq2, const double &r2_tol,
-         const double &hq_tol);
-
-    /**
-       Test for L2 solver convergence -- ignore HQ residual
-       @param r2 L2 norm squared of the residual
-       @param hq2 Heavy quark residual
-       @param r2_tol Solver L2 tolerance
-       @param hq_tol Solver heavy-quark tolerance
-     */
-    bool convergenceL2(const double &r2, const double &hq2, const double &r2_tol,
-         const double &hq_tol);
-
-    /**
-       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
-     */
-    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
-
-    /**
-	Prints out the summary of the solver convergence (requires a
-	verbosity of QUDA_SUMMARIZE).  Assumes
-	SolverParam.true_res and SolverParam.true_res_hq has
-	been set
+       @brief Set the solver L2 stopping condition
+       @param[in] Desired solver tolerance
+       @param[in] b2 L2 norm squared of the source vector
+       @param[in] residual_type The type of residual we want to solve for
+       @return L2 stopping condition
     */
-    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
+    static double stopping(double tol, double b2, QudaResidualType residual_type);
+
+    /**
+       @briefTest for solver convergence
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+       @param[in] r2_tol Solver L2 tolerance
+       @param[in] hq_tol Solver heavy-quark tolerance
+       @return Whether converged
+     */
+    bool convergence(double r2, double hq2, double r2_tol, double hq_tol);
+
+    /**
+       @brief Test for HQ solver convergence -- ignore L2 residual
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+       @param[in] r2_tol Solver L2 tolerance
+       @param[in[ hq_tol Solver heavy-quark tolerance
+       @return Whether converged
+     */
+    bool convergenceHQ(double r2, double hq2, double r2_tol, double hq_tol);
+
+    /**
+       @brief Test for L2 solver convergence -- ignore HQ residual
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+       @param[in] r2_tol Solver L2 tolerance
+       @param[in] hq_tol Solver heavy-quark tolerance
+     */
+    bool convergenceL2(double r2, double hq2, double r2_tol, double hq_tol);
+
+    /**
+       @brief Prints out the running statistics of the solver
+       (requires a verbosity of QUDA_VERBOSE)
+       @param[in] name Name of solver that called this
+       @param[in] k iteration count
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+     */
+    void PrintStats(const char *name, int k, double r2, double b2, double hq2);
+
+    /**
+       @brief Prints out the summary of the solver convergence
+       (requires a verbosity of QUDA_SUMMARIZE).  Assumes
+       SolverParam.true_res and SolverParam.true_res_hq has been set
+       @param[in] name Name of solver that called this
+       @param[in] k iteration count
+       @param[in] r2 L2 norm squared of the residual
+       @param[in] hq2 Heavy quark residual
+       @param[in] r2_tol Solver L2 tolerance
+       @param[in] hq_tol Solver heavy-quark tolerance
+    */
+    void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
      * Return flops
@@ -754,11 +783,13 @@ namespace quda {
     const DiracMatrix &matSloppy;
     bool init;
 
-    Complex *W; // inner product matrix
-    Complex *C; // inner product matrix
-    Complex *alpha;
-    Complex *beta;
-    Complex *phi;
+    bool lambda_init;
+    QudaCABasis basis;
+
+    Complex *Q_AQandg; // Fused inner product matrix
+    Complex *Q_AS; // inner product matrix
+    Complex *alpha; // QAQ^{-1} g
+    Complex *beta; // QAQ^{-1} QpolyS
 
     ColorSpinorField *rp;
     ColorSpinorField *tmpp;
@@ -766,9 +797,15 @@ namespace quda {
     ColorSpinorField *tmp_sloppy;
     ColorSpinorField *tmp_sloppy2;
 
-    std::vector<ColorSpinorField*> r;  // residual vectors
-    std::vector<ColorSpinorField*> q;  // mat * residual vectors
-    std::vector<ColorSpinorField*> p;  // CG direction vectors
+    std::vector<ColorSpinorField*> S;  // residual vectors
+    std::vector<ColorSpinorField*> AS; // mat * residual vectors. Can be replaced by a single temporary.
+    std::vector<ColorSpinorField*> Q;  // CG direction vectors
+    std::vector<ColorSpinorField*> Qtmp; // CG direction vectors for pointer swap
+    std::vector<ColorSpinorField*> AQ; // mat * CG direction vectors.
+                                       // it's possible to avoid carrying these
+                                       // around, but there's a stability penalty,
+                                       // and computing QAQ becomes a pain (though
+                                       // it does let you fuse the reductions...)
 
     /**
        @brief Initiate the fields needed by the solver
@@ -781,16 +818,52 @@ namespace quda {
     /**
        @brief Compute the alpha coefficients
     */
-    void compute_alpha(Complex *x, Complex *W, Complex *phi);
+    void compute_alpha();
 
     /**
        @brief Compute the beta coefficients
     */
-    void compute_beta(Complex *beta, Complex *W, Complex *C);
+    void compute_beta();
+
+    /**
+       @ brief Check if it's time for a reliable update
+    */
+    int reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta);
 
   public:
     CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CACG();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class CACGNE : public CACG {
+
+  private:
+    DiracMMdag mmdag;
+    DiracMMdag mmdagSloppy;
+    ColorSpinorField *xp;
+    ColorSpinorField *yp;
+    bool init;
+
+  public:
+    CACGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CACGNE();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class CACGNR : public CACG {
+
+  private:
+    DiracMdagM mdagm;
+    DiracMdagM mdagmSloppy;
+    ColorSpinorField *bp;
+    bool init;
+
+  public:
+    CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CACGNR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
@@ -808,6 +881,10 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     bool init;
+
+    // Basis. Currently anything except POWER_BASIS causes a warning
+    // then swap to POWER_BASIS.
+    QudaCABasis basis;
 
     Complex *alpha; // Solution coefficient vectors
 

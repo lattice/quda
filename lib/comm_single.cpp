@@ -44,7 +44,7 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 						  size_t blksize, int nblocks, size_t stride)
 { return NULL; }
 
-void comm_free(MsgHandle *mh) {}
+void comm_free(MsgHandle *&mh) {}
 
 void comm_start(MsgHandle *mh) {}
 
@@ -59,6 +59,8 @@ void comm_allreduce_max(double* data) {}
 void comm_allreduce_min(double* data) {}
 
 void comm_allreduce_array(double* data, size_t size) {}
+
+void comm_allreduce_max_array(double* data, size_t size) {}
 
 void comm_allreduce_int(int* data) {}
 

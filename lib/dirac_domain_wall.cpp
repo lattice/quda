@@ -35,6 +35,10 @@ namespace quda {
     checkDWF(out, in);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
+
+#ifndef USE_LEGACY_DSLASH
+    ApplyDomainWall5D(out, in, *gauge, 0.0, mass, in, parity, dagger, commDim, profile);
+#else
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 			   &static_cast<const cudaColorSpinorField&>(in), 
@@ -42,6 +46,7 @@ namespace quda {
     } else {
       errorQuda("Not implemented");
     }
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -57,6 +62,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#ifndef USE_LEGACY_DSLASH
+    ApplyDomainWall5D(out, in, *gauge, k, mass, x, parity, dagger, commDim, profile);
+#else
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 			   &static_cast<const cudaColorSpinorField&>(in), 
@@ -66,6 +74,7 @@ namespace quda {
     } else {
       errorQuda("Not implemented");
     }
+#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -76,8 +85,17 @@ namespace quda {
   void DiracDomainWall::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
+
+#ifndef USE_LEGACY_DSLASH
+    ApplyDomainWall5D(out, in, *gauge, -kappa5, mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    long long Ls = in.X(4);
+    long long bulk = (Ls-2)*(in.Volume()/Ls);
+    long long wall = 2*in.Volume()/Ls;
+    flops += (1320LL+48LL)*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
+#else
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa5);
     DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa5);
+#endif
   }
 
   void DiracDomainWall::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

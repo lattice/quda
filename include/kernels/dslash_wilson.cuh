@@ -1,6 +1,13 @@
-namespace quda {
+#pragma once
 
-#include <dslash_index.cuh> // FIXME - remove
+#include <dslash_helper.cuh>
+#include <color_spinor_field_order.h>
+#include <gauge_field_order.h>
+#include <color_spinor.h>
+#include <dslash_helper.cuh>
+#include <index_helper.cuh>
+
+namespace quda {
 
   /**
      @brief Parameter structure for driving the Wilson operator
@@ -37,67 +44,75 @@ namespace quda {
      @param[out] out The out result field
      @param[in,out] arg Parameter struct
      @param[in] coord Site coordinate
-     @param[in] x_cb The checker-boarded site index
+     @param[in] x_cb The checker-boarded site index (at present this is a 4-d index only)
+     @param[in] s The fifth-dimension index
      @param[in] parity Site parity
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilson(Vector &out, Arg &arg, int coord[nDim], int x_cb,
+  __device__ __host__ inline void applyWilson(Vector &out, Arg &arg, int coord[nDim], int x_cb, int s,
                                               int parity, int idx, int thread_dim, bool &active) {
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,2> HalfVector;
     typedef Matrix<complex<real>,nColor> Link;
     const int their_spinor_parity = nParity == 2 ? 1-parity : 0;
 
+    // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
+    const int gauge_parity = (nDim == 5 ? (x_cb/arg.dc.volume_4d_cb + parity) % 2 : parity);
+
 #pragma unroll
-    for (int d = 0; d<nDim; d++) { // loop over dimension
+    for (int d = 0; d<4; d++) { // loop over dimension
       { // Forward gather - compute fwd offset for vector fetch
-        const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
+        const int fwd_idx = getNeighborIndexCB<nDim>(coord, d, +1, arg.dc);
+        const int gauge_idx = (nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
+
         const bool ghost = (coord[d] + arg.nFace >= arg.dim[d]) &&
           isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if ( doHalo<kernel_type>(d) && ghost ) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace) : idx;
+            ghostFaceIndex<1,nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
-          Link U = arg.U(d, x_cb, parity);
-          HalfVector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+          Link U = arg.U(d, gauge_idx, gauge_parity);
+          HalfVector in = arg.in.Ghost(d, 1, ghost_idx+s*arg.dc.ghostFaceCB[d], their_spinor_parity);
           if (d == 3) in *= arg.t_proj_scale; // put this in the Ghost accessor and merge with any rescaling?
 
           out += (U * in).reconstruct(d, proj_dir);
         } else if ( doBulk<kernel_type>() && !ghost ) {
 
-          Link U = arg.U(d, x_cb, parity);
-          Vector in = arg.in(fwd_idx, their_spinor_parity);
+          Link U = arg.U(d, gauge_idx, gauge_parity);
+          Vector in = arg.in(fwd_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
 
       { // Backward gather - compute back offset for spinor and gauge fetch
-        const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
-        const int gauge_idx = back_idx;
+        const int back_idx = getNeighborIndexCB<nDim>(coord, d, -1, arg.dc);
+        const int gauge_idx = (nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
         constexpr int proj_dir = dagger ? -1 : +1;
+
         const bool ghost = (coord[d] - arg.nFace < 0) &&
           isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
         if ( doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace) : idx;
+            ghostFaceIndex<0,nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
-          Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
-          HalfVector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+          const int gauge_ghost_idx = (nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
+          Link U = arg.U.Ghost(d, gauge_ghost_idx, 1-gauge_parity);
+          HalfVector in = arg.in.Ghost(d, 0, ghost_idx+s*arg.dc.ghostFaceCB[d], their_spinor_parity);
           if (d == 3) in *= arg.t_proj_scale;
 
           out += (conj(U) * in).reconstruct(d, proj_dir);
         } else if ( doBulk<kernel_type>() && !ghost ) {
 
-          Link U = arg.U(d, gauge_idx, 1-parity);
-          Vector in = arg.in(back_idx, their_spinor_parity);
+          Link U = arg.U(d, gauge_idx, 1-gauge_parity);
+          Vector in = arg.in(back_idx+s*arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -108,7 +123,7 @@ namespace quda {
 
   //out(x) = M*in = (-D + m) * in(x-mu)
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void wilson(Arg &arg, int idx, int parity)
+  __device__ __host__ inline void wilson(Arg &arg, int idx, int s, int parity)
   {
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real,nColor,4> Vector;
@@ -120,17 +135,18 @@ namespace quda {
 
     const int my_spinor_parity = nParity == 2 ? parity : 0;
     Vector out;
-    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+    applyWilson<Float,nDim,nColor,nParity,dagger,kernel_type>(out, arg, coord, x_cb, s, parity, idx, thread_dim, active);
 
+    int xs = x_cb + s*arg.dc.volume_4d_cb;
     if (xpay && kernel_type == INTERIOR_KERNEL) {
-      Vector x = arg.x(x_cb, my_spinor_parity);
+      Vector x = arg.x(xs, my_spinor_parity);
       out = x + arg.kappa * out;
     } else if (kernel_type != INTERIOR_KERNEL && active) {
-      Vector x = arg.out(x_cb, my_spinor_parity);
+      Vector x = arg.out(xs, my_spinor_parity);
       out = x + (xpay ? arg.kappa * out : out);
     }
 
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
   }
 
   // CPU kernel for applying the Wilson operator to a vector
@@ -143,7 +159,7 @@ namespace quda {
       parity = nParity == 2 ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-        wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, parity);
+        wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0, parity);
       } // 4-d volumeCB
     } // parity
 
@@ -157,11 +173,11 @@ namespace quda {
     if (x_cb >= arg.threads) return;
 
     // for full fields set parity from y thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+    int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     switch(parity) {
-    case 0: wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0); break;
-    case 1: wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 1); break;
+    case 0: wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0, 0); break;
+    case 1: wilson<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0, 1); break;
     }
 
   }

@@ -15,9 +15,6 @@
 #include <deque>
 #include <queue>
 #include <functional>
-#ifdef PTHREADS
-#include <pthread.h>
-#endif
 
 //#define LAUNCH_TIMER
 extern char* gitversion;
@@ -621,18 +618,12 @@ namespace quda {
 
   static TimeProfile launchTimer("tuneLaunch");
 
-//  static int tally = 0;
-
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
-#ifdef PTHREADS // tuning should be performed serially
-//  pthread_mutex_lock(&pthread_mutex);
-//  tally++;
-#endif
 
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -649,11 +640,9 @@ namespace quda {
 #endif
 
     static const Tunable *active_tunable; // for error checking
+    it = tunecache.find(key);
 
     // first check if we have the tuned value and return if we have it
-    //if (enabled == QUDA_TUNE_YES && tunecache.count(key)) {
-
-    it = tunecache.find(key);
     if (enabled == QUDA_TUNE_YES && it != tunecache.end()) {
 
 #ifdef LAUNCH_TIMER
@@ -663,6 +652,11 @@ namespace quda {
 
       TuneParam &param = it->second;
 
+      if (verbosity >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("Launching %s with %s at vol=%s with %s\n",
+                   key.name, key.aux, key.volume, tunable.paramString(param).c_str());
+      }
+
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_COMPUTE);
       launchTimer.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -670,11 +664,6 @@ namespace quda {
 
       tunable.checkLaunchParam(param);
 
-#ifdef PTHREADS
-      //pthread_mutex_unlock(&pthread_mutex);
-      //tally--;
-      //printfQuda("pthread_mutex_unlock a complete %d\n",tally);
-#endif
       // we could be tuning outside of the current scope
       if (!tuning && profile_count) param.n_calls++;
 
@@ -696,16 +685,12 @@ namespace quda {
     launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
 #endif
 
-
     if (enabled == QUDA_TUNE_NO) {
       tunable.defaultTuneParam(param);
       tunable.checkLaunchParam(param);
       if (verbosity >= QUDA_DEBUG_VERBOSE) {
-        printfQuda("Not tuning for %s, using block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
-                   key.name, param.block.x, param.block.y, param.block.z,
-                   param.grid.x, param.grid.y, param.grid.z,
-                   param.shared_bytes,
-                   param.aux.x, param.aux.y, param.aux.z);
+        printfQuda("Launching %s with %s at vol=%s with %s (untuned)\n",
+                   key.name, key.aux, key.volume, tunable.paramString(param).c_str());
       }
     } else if (!tuning) {
 
@@ -831,12 +816,6 @@ namespace quda {
     } else if (&tunable != active_tunable) {
       errorQuda("Unexpected call to tuneLaunch() in %s::apply()", typeid(tunable).name());
     }
-
-#ifdef PTHREADS
-//    pthread_mutex_unlock(&pthread_mutex);
-//    tally--;
-//    printfQuda("pthread_mutex_unlock b complete %d\n",tally);
-#endif
 
     param.n_calls = profile_count ? 1 : 0;
 

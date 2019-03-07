@@ -587,14 +587,6 @@ namespace quda {
 
   };
 
-  // hooks into tune.cpp variables for policy tuning
-  typedef std::map<TuneKey, TuneParam> map;
-  const map& getTuneCache();
-
-  void disableProfileCount();
-  void enableProfileCount();
-  void setPolicyTuning(bool);
-
   static bool dslash_init = false;
   static int config = 0; // 3-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
   static std::vector<DslashCoarsePolicy> policies(static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED), DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
@@ -697,7 +689,7 @@ namespace quda {
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
    inline void apply(const cudaStream_t &stream) {
-     TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
+     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (config != tp.aux.y && comm_size() > 1) {
        errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "

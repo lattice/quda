@@ -120,7 +120,9 @@
 #define QUDA_CG3NE_INVERTER 20
 #define QUDA_CG3NR_INVERTER 21
 #define QUDA_CA_CG_INVERTER 22
-#define QUDA_CA_GCR_INVERTER 23
+#define QUDA_CA_CGNE_INVERTER 23
+#define QUDA_CA_CGNR_INVERTER 24
+#define QUDA_CA_GCR_INVERTER 25
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaEigType integer(4)
@@ -165,6 +167,11 @@
 #define QUDA_L2_ABSOLUTE_RESIDUAL 2
 #define QUDA_HEAVY_QUARK_RESIDUAL 4
 #define QUDA_INVALID_RESIDUAL QUDA_INVALID_ENUM
+
+#define QudaCABasis integer(4)
+#define QUDA_POWER_BASIS 0
+#define QUDA_CHEBYSHEV_BASIS 1
+#define QUDA_INVALID_BASIS QUDA_INVALID_ENUM
 
 #/*
    # Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
@@ -337,9 +344,9 @@
 #define QUDA_GALERKIN_PROJECTION 1
 #define QUDA_INVALID_PROJECTION QUDA_INVALID_ENUM
   
-#define QudaDWFPCType integer(4)
-#define QUDA_5D_PC 0
-#define QUDA_4D_PC 1
+#define QudaPCType integer(4)
+#define QUDA_4D_PC 4
+#define QUDA_5D_PC 5
 #define QUDA_PC_INVALID QUDA_INVALID_ENUM
 
 #define QudaTwistFlavorType integer(4)
