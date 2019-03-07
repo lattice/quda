@@ -48,7 +48,12 @@ namespace quda {
       errorQuda("Anisotropy only supported for Wilson links");
     if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
       errorQuda("Temporal gauge fixing only supported for Wilson links");
-
+#ifdef USE_LEGACY_DSLASH
+    if(link_type != QUDA_ASQTAD_LONG_LINKS && (reconstruct ==  QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9))
+        errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
+    if(link_type == QUDA_ASQTAD_LONG_LINKS &&  reconstruct == QUDA_RECONSTRUCT_9)
+        errorQuda("reconstruct %d not supported for staggered long links with QUDA_LEGACY_DSLASH\n", reconstruct);
+#endif
     if(geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*nInternal;
       length = 2*stride*nInternal; // two comes from being full lattice
