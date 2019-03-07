@@ -362,7 +362,7 @@ namespace quda {
     case 2:
       while ( local_tid < arg.nFace * arg.dc.ghostFaceCB[2] ) {
         int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
-        if (arg.nFace == 2) packStaggered<2,1>(arg, ghost_idx, s, parity);
+        if (arg.nFace == 1) packStaggered<2,1>(arg, ghost_idx, s, parity);
         else                packStaggered<2,3>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
       }
@@ -370,7 +370,7 @@ namespace quda {
     case 3:
       while ( local_tid < arg.nFace * arg.dc.ghostFaceCB[3] ) {
         int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
-        if (arg.nFace == 3) packStaggered<3,1>(arg, ghost_idx, s, parity);
+        if (arg.nFace == 1) packStaggered<3,1>(arg, ghost_idx, s, parity);
         else                packStaggered<3,3>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
       }
