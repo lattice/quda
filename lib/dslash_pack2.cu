@@ -248,8 +248,16 @@ namespace quda {
   __global__ void packShmemKernel(Arg arg)
   {
     int local_tid = threadIdx.x;
-    int dim = arg.dim_map[blockIdx.x / 2];
+
     int dir = blockIdx.x % 2;
+    int dim;
+    switch (blockIdx.x/2) {
+    case 0: dim = arg.dim_map[0]; break;
+    case 1: dim = arg.dim_map[1]; break;
+    case 2: dim = arg.dim_map[2]; break;
+    case 3: dim = arg.dim_map[3]; break;
+    }
+
     int s = blockDim.y*blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
 
@@ -334,8 +342,14 @@ namespace quda {
   __global__ void packStaggeredShmemKernel(Arg arg)
   {
     int local_tid = threadIdx.x;
-    int dim = arg.dim_map[blockIdx.x / 2];
     int dir = blockIdx.x % 2;
+    int dim;
+    switch (blockIdx.x/2) {
+    case 0: dim = arg.dim_map[0]; break;
+    case 1: dim = arg.dim_map[1]; break;
+    case 2: dim = arg.dim_map[2]; break;
+    case 3: dim = arg.dim_map[3]; break;
+    }
     int s = blockDim.y*blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
 
