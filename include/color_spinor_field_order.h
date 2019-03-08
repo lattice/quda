@@ -801,8 +801,10 @@ namespace quda {
         cudaTextureObject_t tex;
         cudaTextureObject_t texNorm;
         const int tex_offset;
+#if 0 // unused at present
         cudaTextureObject_t ghostTex;
         cudaTextureObject_t ghostTexNorm;
+#endif
 #endif
         int volumeCB;
         int faceVolumeCB[4];

@@ -14,15 +14,17 @@ namespace quda {
 
     typedef typename clover_mapper<Float,length>::type C;
     typedef typename mapper<Float>::type real;
-    const C A;
-    real b; // chiral twist factor (twisted-clover only)
+    const C A;    /** the clover field */
+    const real a; /** xpay scale factor */
+    const real b; /** chiral twist factor (twisted-clover only) */
 
     WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		    const CloverField &A, double kappa, double b, const ColorSpinorField &x,
-		    int parity, bool dagger, const int *comm_override)
-      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, kappa, x, parity, dagger, comm_override),
-      A(A, false), b(dagger ? -0.5*b : 0.5*b) // factor of 1/2 comes from clover normalization we need to correct for
-
+		    const CloverField &A, double a, double b, const ColorSpinorField &x,
+		    int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float,nColor,reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+      A(A, false),
+      a(a),
+      b(dagger ? -0.5*b : 0.5*b) // factor of 1/2 comes from clover normalization we need to correct for
     { }
   };
 
@@ -70,10 +72,10 @@ namespace quda {
 
       tmp.toNonRel(); // switch back to non-chiral basis
 
-      out = tmp + arg.kappa * out;
+      out = tmp + arg.a * out;
     } else if (active) {
       Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + arg.kappa * out;
+      out = x + arg.a * out;
     }
 
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;

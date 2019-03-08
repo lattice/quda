@@ -13,13 +13,17 @@ namespace quda {
     static constexpr bool dynamic_clover = dynamic_clover_;
 
     typedef typename clover_mapper<Float,length>::type C;
-    const C A;
+    typedef typename mapper<Float>::type real;
+
+    const C A;    /** the clover field */
+    const real a; /** xpay scale factor */
 
     WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		    const CloverField &A, double kappa, const ColorSpinorField &x,
-		    int parity, bool dagger, const int *comm_override)
-      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, kappa, x, parity, dagger, comm_override),
-	A(A, dynamic_clover ? false : true) // if dynamic clover we don't want the inverse field
+                    const CloverField &A, double a, const ColorSpinorField &x,
+                    int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float,nColor,reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+      A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
+      a(a)
     { }
   };
 
@@ -79,7 +83,7 @@ namespace quda {
 
       if (xpay) {
 	Vector x = arg.x(x_cb, my_spinor_parity);
-	out = x + arg.kappa * tmp;
+	out = x + arg.a * tmp;
       } else {
 	out = tmp;
       }

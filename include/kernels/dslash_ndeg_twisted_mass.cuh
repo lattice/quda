@@ -7,16 +7,17 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType reconstruct_>
   struct NdegTwistedMassArg : WilsonArg<Float,nColor,reconstruct_> {
     typedef typename mapper<Float>::type real;
-    real a; // this is the Wilson-dslash scale factor
-    real b; // this is the chiral twist factor
-    real c; // this is the flavor twist factor
+    real a; /** this is the Wilson-dslash scale factor */
+    real b; /** this is the chiral twist factor */
+    real c; /** this is the flavor twist factor */
 
-    // note WilsonArg::kappa = a
     NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                        double a, double b, double c, const ColorSpinorField &x,
-                       int parity, bool dagger, const int *comm_override)
-      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
-	a(a), b(dagger ? -b : b), c(c) // if dagger flip the chiral twist
+                       int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float,nColor,reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+      a(a),
+      b(dagger ? -b : b), // if dagger flip the chiral twist
+      c(c)
     { }
   };
 
@@ -100,18 +101,8 @@ namespace quda {
     int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     switch(parity) {
-    case 0:
-      switch(flavor) {
-      case 0: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, 0, 0); break;
-      case 1: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, 1, 0); break;
-      }
-      break;
-    case 1:
-      switch(flavor) {
-      case 0: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, 0, 1); break;
-      case 1: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, 1, 1); break;
-      }
-      break;
+    case 0: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, flavor, 0); break;
+    case 1: ndegTwistedMass<Float,nDim,nColor,nParity,dagger,kernel_type>(arg, x_cb, flavor, 1); break;
     }
   }
 

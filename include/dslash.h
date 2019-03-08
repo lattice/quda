@@ -22,6 +22,13 @@ namespace quda {
     char aux_base[TuneKey::aux_n];
     char aux[8][TuneKey::aux_n];
 
+#ifdef JITIFY
+    // local copy of the static program pointer - this is a work
+    // around for issues with the static program pointer when
+    // HOSTDEBUG compilation is targeted (more precisely -fno-inline)
+    jitify::Program *program_;
+#endif
+
     /**
        @brief Set the base strings used by the different dslash kernel
        types for autotuning.
@@ -143,7 +150,7 @@ namespace quda {
 #ifdef JITIFY
       using namespace jitify::reflection;
       const auto kernel = Launch<void,0,0,0,false,false,INTERIOR_KERNEL,Arg>::kernel;
-      Tunable::jitify_error = program->kernel(kernel)
+      Tunable::jitify_error = program_->kernel(kernel)
         .instantiate(Type<Float>(),nDim,nColor,nParity,arg.dagger,xpay,arg.kernel_type,Type<Arg>())
         .configure(tp.grid,tp.block,tp.shared_bytes,stream)
         .launch(arg);
@@ -167,7 +174,7 @@ namespace quda {
 #ifdef JITIFY
       using namespace jitify::reflection;
       const auto kernel = Launch<void,0,0,0,false,false,INTERIOR_KERNEL,Arg>::kernel;
-      Tunable::jitify_error = program->kernel(kernel)
+      Tunable::jitify_error = program_->kernel(kernel)
         .instantiate(Type<Float>(),nDim,nColor,arg.nParity,arg.dagger,xpay,arg.kernel_type,Type<Arg>())
         .configure(tp.grid,tp.block,tp.shared_bytes,stream)
         .launch(arg);
@@ -194,7 +201,7 @@ namespace quda {
 #ifdef JITIFY
       using namespace jitify::reflection;
       const auto kernel = Launch<void,0,0,0,false,false,INTERIOR_KERNEL,Arg>::kernel;
-      Tunable::jitify_error = program->kernel(kernel)
+      Tunable::jitify_error = program_->kernel(kernel)
         .instantiate(Type<Float>(),nDim,nColor,arg.nParity,arg.dagger,arg.xpay,arg.kernel_type,Type<Arg>())
         .configure(tp.grid,tp.block,tp.shared_bytes,stream)
         .launch(arg);
@@ -228,6 +235,7 @@ namespace quda {
 
 #ifdef JITIFY
       create_jitify_program(src);
+      program_ = program;
 #endif
     }
 

@@ -10,15 +10,17 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType reconstruct_>
   struct DomainWall5DArg : WilsonArg<Float,nColor,reconstruct_> {
     typedef typename mapper<Float>::type real;
-    int Ls;
-    real m_f;
-
-    // note WilsonArg::kappa = a
+    int Ls;    /** fifth dimension length */
+    real a;    /** xpay scale factor */
+    real m_f;  /** fermion mass parameter */
+    
     DomainWall5DArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                     double a, double m_f, bool xpay, const ColorSpinorField &x,
-                    int parity, bool dagger, const int *comm_override)
-      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
-      Ls(in.X(4)), m_f(m_f)
+                    int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float,nColor,reconstruct_>(out, in, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
+      Ls(in.X(4)),
+      a(a),
+      m_f(m_f)
     { }
   };
 
@@ -68,10 +70,10 @@ namespace quda {
 
     if (xpay && kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
-      out = x + arg.kappa * out;
+      out = x + arg.a * out;
     } else if (kernel_type != INTERIOR_KERNEL && active) {
       Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + (xpay ? arg.kappa * out : out);
+      out = x + (xpay ? arg.a * out : out);
     }
 
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;

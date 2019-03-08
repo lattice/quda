@@ -7,18 +7,23 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType reconstruct_>
   struct TwistedMassArg : WilsonArg<Float,nColor,reconstruct_> {
     typedef typename mapper<Float>::type real;
-    real a; // this is the scaling factor
-    real b; // this is the twist factor
-    real c; // dummy parameter to allow us to reuse applyWilsonTM for non-degenerate operator
-    real a_inv; // inverse scaling factor - used to allow early xpay inclusion
-    real b_inv; // inverse twist factor - used to allow early xpay inclusion
-    bool asymmetric; // whether we are applying the asymmetric operator or not
+    real a; /** this is the scaling factor */
+    real b; /** this is the twist factor */
+    real c; /** dummy parameter to allow us to reuse applyWilsonTM for non-degenerate operator */
+    real a_inv; /** inverse scaling factor - used to allow early xpay inclusion */
+    real b_inv; /** inverse twist factor - used to allow early xpay inclusion */
+    bool asymmetric; /** whether we are applying the asymmetric operator or not */
 
     TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    double a, double b, bool xpay, const ColorSpinorField &x,
-                   int parity, bool dagger, bool asymmetric, const int *comm_override)
-      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
-      a(a), b(dagger ? -b : b), c(0.0), a_inv(1.0 / (a*(1 + b*b)) ), b_inv(dagger ? b : -b), asymmetric(asymmetric) // if dagger flip the twist
+                   int parity, bool dagger, bool asymmetric, const int *comm_override) :
+      WilsonArg<Float,nColor,reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+      a(a),
+      b(dagger ? -b : b),  // if dagger flip the twist
+      c(0.0),
+      a_inv(1.0 / (a*(1 + b*b)) ),
+      b_inv(dagger ? b : -b),
+      asymmetric(asymmetric)
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {

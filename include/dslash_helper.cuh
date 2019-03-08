@@ -244,7 +244,6 @@ namespace quda {
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
     int ghostDim[4];          // always equal to actual dimension partitioning (used inside kernel to ensure corect indexing)
 
-    const real kappa;     // kappa parameter = 1/(8+m)
     const bool dagger;    // dagger
     const bool xpay;      // whether we are doing xpay or not
 
@@ -265,11 +264,11 @@ namespace quda {
     real twist_c; // flavor twist
 
     // constructor needed for staggered to set xpay from derived class
-    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, bool xpay, int nFace, const int *comm_override)
+    DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace, const int *comm_override)
       : parity(parity), nParity(in.SiteSubset()), nFace(nFace), reconstruct(U.Reconstruct()),
         X0h(nParity == 2 ? in.X(0)/2 : in.X(0)),
         dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1 },
-        volumeCB(in.VolumeCB()), kappa(kappa), dagger(dagger), xpay(xpay),
+        volumeCB(in.VolumeCB()), dagger(dagger), xpay(xpay),
         kernel_type(INTERIOR_KERNEL), threads(in.VolumeCB()), threadDimMapLower{ }, threadDimMapUpper{ },
         twist_a(0.0), twist_b(0.0), twist_c(0.0)
     {
@@ -286,11 +285,6 @@ namespace quda {
       dc = in.getDslashConstant();
     }
 
-// constructor for kernels that set xpay based on kappa
-    DslashArg(const ColorSpinorField &in, const GaugeField &U, double kappa, int parity, bool dagger, const int *comm_override)
-      : DslashArg(in, U, kappa, parity, dagger, kappa == 0.0 ? false : true, 1, comm_override)
-      {
-      };
   };
 
   template <typename Float>
@@ -305,7 +299,6 @@ namespace quda {
     out << "commDim = { "; for (int i=0; i<4; i++) out << arg.commDim[i] << (i<3 ? ", " : " }"); out << std::endl;
     out << "ghostDim = { "; for (int i=0; i<4; i++) out << arg.ghostDim[i] << (i<3 ? ", " : " }"); out << std::endl;
     out << "volumeCB = " << arg.volumeCB << std::endl;
-    out << "kappa = " << arg.kappa << std::endl;
     out << "dagger = " << arg.dagger << std::endl;
     out << "xpay = " << arg.xpay << std::endl;
     out << "kernel_type = " << arg.kernel_type << std::endl;

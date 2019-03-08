@@ -49,7 +49,20 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
+      typedef typename mapper<Float>::type real;
+#ifdef JITIFY
+      // we need to break the dslash launch abstraction here to get a handle on the constant memory pointer in the kernel module
+      using namespace jitify::reflection;
+      const auto kernel = DomainWall4DLaunch<void,0,0,0,false,false,INTERIOR_KERNEL,Arg>::kernel;
+      auto instance = Dslash<Float>::program_->kernel(kernel)
+        .instantiate(Type<Float>(),nDim,nColor,arg.nParity,arg.dagger,arg.xpay,arg.kernel_type,Type<Arg>());
+      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), mobius_h, QUDA_MAX_DWF_LS*sizeof(complex<real>), stream);
+      Tunable::jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+      cudaMemcpyToSymbolAsync(mobius_d, mobius_h, QUDA_MAX_DWF_LS*sizeof(complex<real>), 0,
+                              cudaMemcpyHostToDevice, streams[Nstream-1]);
       Dslash<Float>::template instantiate<DomainWall4DLaunch,nDim,nColor>(tp, arg, stream);
+#endif
     }
 
     TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }

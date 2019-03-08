@@ -28,27 +28,27 @@ namespace quda {
     using GU = typename gauge_mapper<Float, reconstruct_u, 18, QUDA_STAGGERED_PHASE_MILC, gauge_direct_load, ghost, use_inphase>::type;
     using GL = typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, use_inphase>::type;
 
-    F out;      // output vector field
-    const F in; // input vector field
-    const F x;  // input vector when doing xpay
-    const GU U; // the gauge field
-    const GL L; // the long gauge field
+    F out;        /** output vector field */
+    const F in;   /** input vector field */
+    const F x;    /** input vector when doing xpay */
+    const GU U;   /** the gauge field */
+    const GL L;   /** the long gauge field */
 
-    const real a;
+    const real a; /** xpay scale factor */
     const real fat_link_max; // MWTODO: FIXME: This a workaround should probably be in the accessor ...
     const real tboundary;
     static constexpr bool improved = improved_;
-    StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a, const ColorSpinorField &x, int parity,
-        bool dagger, const int *comm_override) :
-        DslashArg<Float>(in, U, 0.0, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, comm_override),
-        out(out),
-        in(in, improved_ ? 3 : 1),
-        U(U),
-        L(L),
-        fat_link_max(improved_ ? U.Precision() == QUDA_HALF_PRECISION ? U.LinkMax() : 1.0 : 1.0),
-        tboundary(U.TBoundary()),
-        x(x),
-        a(a)
+    StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
+                 const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      DslashArg<Float>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, comm_override),
+      out(out),
+      in(in, improved_ ? 3 : 1),
+      U(U),
+      L(L),
+      fat_link_max(improved_ ? U.Precision() == QUDA_HALF_PRECISION ? U.LinkMax() : 1.0 : 1.0),
+      tboundary(U.TBoundary()),
+      x(x),
+      a(a)
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -77,7 +77,6 @@ namespace quda {
 
        @param[out] out The out result field
        @param[in] U The gauge field
-       @param[in] kappa Kappa value
        @param[in] in The input field
        @param[in] parity The site parity
        @param[in] x_cb The checkerboarded site index
