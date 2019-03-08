@@ -145,10 +145,10 @@ namespace quda {
     cudaGetDeviceProperties( &device_prop, 0 );
     if(device_prop.major < 7){
       tc = false;
-      printfQuda("It seems you are NOT RICH enough to have tensor cores. :_( \n(will NOT use tensor core implementations)\n");
+      errorQuda("Sorry we need Volta(device_prop.major >= 7 and you have %d) for this to work.\n", device_prop.major);
     }else{
       tc = true;
-      printfQuda("WOW you are RICH enough to have tensor cores! :_) \n(will use tensor core implementations)\n");
+      printfQuda("We will be using the tensor core implementation.\n");
     }
 
     int gR[4] = {R[0], R[1], R[2], R[3]}; 
@@ -282,7 +282,7 @@ namespace quda {
 
     copyExtendedColorSpinor(*fb, *tb, QUDA_CUDA_FIELD_LOCATION, 0, nullptr, nullptr, nullptr, nullptr); // parity = 0
 
-    double fx2 = norm2(*fx);
+    // double fx2 = norm2(*fx);
     for(double s = 0.00390625; s < 256.5; s *= 1.189207115){ // 2^-8 ~ 2^+8
       inner_dslash(*cx, *cb, s);
       blas::copy( *tt, *cx );

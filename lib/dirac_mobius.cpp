@@ -267,12 +267,12 @@ namespace quda {
     kappa5 = kappa_b/kappa_c;
     double inv = 1./(1.+std::pow(kappa5,Ls)*mass); // has NOT been normalized for the factor of 2 in (1+/-gamma5) projector.
 
-    printfQuda("Mobius parameters:\n");
-    printfQuda("b       = %+6.4e\n", b);
-    printfQuda("c       = %+6.4e\n", c);
-    printfQuda("kappab  = %+6.4e\n", kappa_b);
-    printfQuda("kappac  = %+6.4e\n", kappa_c);
-    printfQuda("kappa5  = %+6.4e\n", kappa5);
+    // printfQuda("Mobius parameters:\n");
+    // printfQuda("b       = %+6.4e\n", b);
+    // printfQuda("c       = %+6.4e\n", c);
+    // printfQuda("kappab  = %+6.4e\n", kappa_b);
+    // printfQuda("kappac  = %+6.4e\n", kappa_c);
+    // printfQuda("kappa5  = %+6.4e\n", kappa5);
 
     // m5inv_plus/minus:
     for(int s = 0; s < Ls; s++){
@@ -435,12 +435,12 @@ namespace quda {
       bool reset = newTmp(&tmp1, b.Even());
 
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-	// src = D5^-1 (b_e + k D4_eo * D4pre * D5^-1 b_o)
-	src = &(x.Odd());
-	Dslash5inv(*tmp1, b.Odd(), QUDA_ODD_PARITY);
+	      // src = D5^-1 (b_e + k D4_eo * D4pre * D5^-1 b_o)
+	      src = &(x.Odd());
+	      Dslash5inv(*tmp1, b.Odd(), QUDA_ODD_PARITY);
         Dslash4pre(*src, *tmp1, QUDA_ODD_PARITY);
         Dslash4Xpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), 1.0);
-	Dslash5inv(*src, *tmp1, QUDA_EVEN_PARITY);
+	      Dslash5inv(*src, *tmp1, QUDA_EVEN_PARITY);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD) {
         // src = b_o + k D4_oe * D4pre * D5inv b_e
@@ -448,7 +448,7 @@ namespace quda {
         Dslash5inv(*tmp1, b.Even(), QUDA_EVEN_PARITY);
         Dslash4pre(*src, *tmp1, QUDA_EVEN_PARITY);
         Dslash4Xpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), 1.0);
-	Dslash5inv(*src, *tmp1, QUDA_ODD_PARITY);
+	      Dslash5inv(*src, *tmp1, QUDA_ODD_PARITY);
         sol = &(x.Odd());
       } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // src = b_e + k D4_eo * D4pre * D5inv b_o
@@ -486,7 +486,7 @@ namespace quda {
     // create full solution
     checkFullSpinor(x, b);
     if (matpcType == QUDA_MATPC_EVEN_EVEN ||
-	matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+	       matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // psi_o = M5^-1 (b_o + k_b D4_oe D4pre x_e)
       Dslash4pre(x.Odd(), x.Even(), QUDA_EVEN_PARITY);
       Dslash4Xpay(*tmp1, x.Odd(), QUDA_ODD_PARITY, b.Odd(), 1.0);
@@ -1107,7 +1107,6 @@ namespace quda {
 
   void DiracMobiusPCEofa::full_dslash(ColorSpinorField &out, const ColorSpinorField &in) const // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
   {
-    printfQuda("Performing unpreconditioned dslash for EOFA!\n");
     checkFullSpinor(out, in);
     bool reset1 = newTmp(&tmp1, in.Odd());
     bool reset2 = newTmp(&tmp2, in.Odd());
@@ -1123,5 +1122,4 @@ namespace quda {
     deleteTmp(&tmp1, reset1);
     deleteTmp(&tmp2, reset2);
   }
-
 } // namespace quda
