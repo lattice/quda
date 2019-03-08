@@ -20,7 +20,9 @@
 bool flags = false;
 
 namespace quda {
-  
+
+  //Eigensolver class
+  //-----------------------------------------------------------------------------
   EigenSolver::EigenSolver(QudaEigParam *eig_param, TimeProfile &profile) : eig_param(eig_param), profile(profile) {
     
   }
@@ -182,31 +184,44 @@ namespace quda {
 			    std::vector<Complex> evals) {
     
     //number of evecs
-    int Nvecs = eig_param->nEv;
-
-    printfQuda("Deflating %d vectors\n", Nvecs);
-
+    int n_defl = eig_param->nEv;
+    
+    printfQuda("Deflating %d vectors\n", n_defl);
+    
     //Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
     //for all i computed eigenvectors and values.
     
+    //Pointers to the required Krylov space vectors,
+    //no extra memory is allocated.
+    std::vector<ColorSpinorField*> eig_vecs_ptr;
+    for(int i=0; i<n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
+    
     //1. Take block inner product: (V_i)^dag * vec = A_i
-    Complex *s = new Complex[Nvecs];
-    blas::cDotProduct(s, eig_vecs, vec);
+    Complex *s = new Complex[n_defl];
+    blas::cDotProduct(s, eig_vecs_ptr, vec);
     
     //2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-    for(int i=0; i<Nvecs; i++) {
+    for(int i=0; i<n_defl; i++) {
       s[i] /= evals[i].real();
     }
     
     //3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
-    blas::caxpy(s, eig_vecs, vec_defl);
+    blas::caxpy(s, eig_vecs_ptr, vec_defl);
+
+    //Sanity check in deflation.
+    for (int i=0; i<n_defl; i++)
+      for (int j=0; j<=i; j++) {
+	//printfQuda("%d %d %.6e \n", i, j, blas::cDotProduct(*eig_vecs_ptr[i], *eig_vecs_ptr[j]).real() );
+  }
+  
     
   }
-
   
   EigenSolver::~EigenSolver() {}
-  
+  //-----------------------------------------------------------------------------
+  //-----------------------------------------------------------------------------
+
   
   IRLM::IRLM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile) : EigenSolver(eig_param, profile), mat(mat){
     

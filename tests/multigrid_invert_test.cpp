@@ -157,21 +157,20 @@ display_test_info()
     printfQuda("Eigensolver parameters\n");
     for (int i=0; i<mg_levels; i++) {
       if ((i < mg_levels-1 && (low_mode_check || use_low_modes)) || (i == mg_levels-1 && deflate_coarsest)) {
-	printfQuda(" - Level %d\n", i+1);
-	printfQuda(" - solver mode %s\n", get_eig_type_str(mg_eig_type[i]));
-	printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(mg_eig_spectrum[i]));
-	printfQuda(" - number of eigenvectors requested %d\n", nvec[i]);
-	printfQuda(" - size of eigenvector search space %d\n", nvec[i]);
-	printfQuda(" - size of Krylov space %d\n", nvec[i] +nvec[i]/2);
-	printfQuda(" - solver tolerance %e\n", mg_eig_tol[i]);
-	printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n",
+	printfQuda(" - level %d solver mode %s\n", i+1, get_eig_type_str(mg_eig_type[i]));
+	printfQuda(" - level %d spectrum requested %s\n", i+1, get_eig_spectrum_str(mg_eig_spectrum[i]));
+	printfQuda(" - level %d number of eigenvectors requested %d\n", i+1, nvec[i]);
+	printfQuda(" - level %d size of eigenvector search space %d\n", i+1, nvec[i]);
+	printfQuda(" - level %d size of Krylov space %d\n", i+1, nvec[i] +nvec[i]/2);
+	printfQuda(" - level %d solver tolerance %e\n", i+1, mg_eig_tol[i]);
+	printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i+1,
 		   mg_eig_use_dagger[i] ? "true" : "false",
 		   mg_eig_use_normop[i] ? "true" : "false");
-
+	
 	if(mg_eig_use_poly_acc[i]) {
-	  printfQuda(" - Chebyshev polynomial degree %d\n", mg_eig_poly_deg[i]);
-	  printfQuda(" - Chebyshev polynomial minumum %e\n", mg_eig_amin[i]);
-	  printfQuda(" - Chebyshev polynomial maximum %e\n", mg_eig_amax[i]);
+	  printfQuda(" - level %d Chebyshev polynomial degree %d\n", i+1, mg_eig_poly_deg[i]);
+	  printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i+1, mg_eig_amin[i]);
+	  printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i+1, mg_eig_amax[i]);
 	}
       }
     }
@@ -234,6 +233,7 @@ void setEigParam(QudaEigParam &mg_eig_param, int level) {
 
   mg_eig_param.nEv = nvec[level];
   mg_eig_param.nKr = nvec[level] + nvec[level]/2;
+  mg_eig_param.nConv = nvec[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
   
   mg_eig_param.eig_type = mg_eig_type[level];

@@ -365,7 +365,8 @@ namespace quda {
     int node_parity;
     bool deflated;
     EigenSolver *eig_solver;
-    std::vector<ColorSpinorField*> defl_guess;
+    std::vector<ColorSpinorField*> defl_tmp1;
+    std::vector<ColorSpinorField*> defl_tmp2;
     
   public:
     

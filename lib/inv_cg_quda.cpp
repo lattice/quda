@@ -47,6 +47,8 @@ namespace quda {
       if (rnewp) delete rnewp;
       if (deflate_init) {
 	for (auto veci : param.evecs) if (veci) delete veci;
+	delete defl_tmp1[0];
+	delete defl_tmp2[0];
       }
       
       init = false;
@@ -283,19 +285,16 @@ namespace quda {
       csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);      
       param.evecs.resize(param.eig_param.nKr);
       for (int i=0; i<param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
-      //Construct a vector to hold deflated RHS
-      defl_guess.push_back(ColorSpinorField::Create(csParam));
+
+      //Construct vectors to hold deflated RHS
+      defl_tmp1.push_back(ColorSpinorField::Create(csParam));
+      defl_tmp2.push_back(ColorSpinorField::Create(csParam));
       
       param.evals.resize(param.eig_param.nEv);
       for (int i=0; i<param.eig_param.nEv; i++)  param.evals[i] = 0.0;
       
       (*eig_solver)(param.evecs, param.evals);
 
-      //Erase the unwanted (nKr - nEv) vectors
-      //FIXME: Either find a better way to clean up or pass an explicit integer
-      //       to the deflation function.
-      param.evecs.erase(param.evecs.begin()+param.eig_param.nEv, param.evecs.begin()+param.eig_param.nKr);
-      param.evecs.resize(param.eig_param.nEv);
       deflate_init = true;
     }
     //DMH end
@@ -350,19 +349,57 @@ namespace quda {
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
 
       //DMH start
+      //Just replace any initial guess with a deflated RHS
       if (param.eig_param.deflate == true) {
-	printfQuda("init yes + deflate\n");
+	
 	//Deflate the exact part from the RHS
 	std::vector<ColorSpinorField*> rhs;
-	rhs.push_back(&r);
-	eig_solver->deflate(defl_guess, rhs, param.evecs, param.evals);
-	blas::copy(x, *defl_guess[0]);
+	rhs.push_back(&b);
+	eig_solver->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+	
+	//Compute r_defl  = b - A * x_defl
+	mat(r, *defl_tmp1[0], y, tmp3);
+	r2 = blas::xmyNorm(b, r);
+
+	//Place the initial residiual in r. defl_tmp1 must be added
+	//to the solution at the end.
+	blas::copy(y, *defl_tmp1[0]);
+      } else {
+	//Compute r = b - A * x
+	mat(r, x, y, tmp3);
+	r2 = blas::xmyNorm(b, r);
+	if (b2 == 0) b2 = r2;
+	//y contains the original guess.
+	blas::copy(y, x);
       }
+
+      /*
+	//Try to incorporate any existing guesses
+	//Compute r0 = b - A * x0
+	mat(r, x, y, tmp3);
+	r2 = blas::xmyNorm(b, r);
+	if (b2 == 0) b2 = r2;
+	//y contains the original guess.
+	blas::copy(y, x);
+	
+	if (param.eig_param.deflate == true) {
+	printfQuda("init yes + deflate\n");
+	//Deflate the exact part from the residual
+	std::vector<ColorSpinorField*> rhs;
+	rhs.push_back(&r);
+	eig_solver->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+	
+	//Compute rnew_defl  = r0 - A * r0_defl
+	mat(*defl_tmp2[0], *defl_tmp1[0], y, tmp3);
+	r2 = blas::xmyNorm(r, *defl_tmp2[0]);
+
+	//Place the initial residiual in r. defl_tmp1 must be added
+	//to the solution at the end.
+	blas::copy(r, *defl_tmp2[0]);
+	}
+      */
       //DMH end
-      mat(r, x, y, tmp3);
-      r2 = blas::xmyNorm(b, r);
-      if (b2 == 0) b2 = r2;
-      blas::copy(y, x);
+      
     } else {
       if (&r != &b) blas::copy(r, b);
       r2 = b2;
@@ -709,11 +746,12 @@ namespace quda {
 
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
-
+    
     //DMH start
+    //Incorporate existing guesses
     if (param.eig_param.deflate == true) {
       //Reconstruct full solution
-      //blas::xpy(*defl_guess[0], x);
+      //blas::xpy(*defl_tmp1[0], x);
     }
     //DMH end
     
