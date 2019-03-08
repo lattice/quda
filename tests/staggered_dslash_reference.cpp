@@ -76,7 +76,7 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink,
 
       for (int dir = 0; dir < 8; dir++) {
 #ifdef MULTI_GPU
-        constexpr int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
+        const int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
         gFloat* fatlnk = gaugeLink_mg4dir(i, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
         gFloat* longlnk = dslash_type == QUDA_ASQTAD_DSLASH ? gaugeLink_mg4dir(i, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) : nullptr;
         sFloat *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, nFace, mySpinorSiteSize);
