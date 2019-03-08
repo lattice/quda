@@ -267,7 +267,7 @@ namespace quda {
     switch(dim) {
     case 0:
       while ( local_tid < arg.dc.ghostFaceCB[0] ) {
-        int ghost_idx = dir * arg.ghostFaceCB[0] + local_tid;
+        int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
         if (pc == QUDA_5D_PC) pack<dagger,twist,0,pc>(arg, ghost_idx+s*arg.dc.ghostFace[0], 0, parity);
         else                  pack<dagger,twist,0,pc>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
@@ -275,7 +275,7 @@ namespace quda {
       break;
     case 1:
       while ( local_tid < arg.dc.ghostFaceCB[1] ) {
-        int ghost_idx = dir * arg.ghostFaceCB[1] + local_tid;
+        int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
         if (pc == QUDA_5D_PC) pack<dagger,twist,1,pc>(arg, ghost_idx+s*arg.dc.ghostFace[1], 0, parity);
         else                  pack<dagger,twist,1,pc>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
@@ -283,7 +283,7 @@ namespace quda {
       break;
     case 2:
       while ( local_tid < arg.dc.ghostFaceCB[2] ) {
-        int ghost_idx = dir * arg.ghostFaceCB[2] + local_tid;
+        int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
         if (pc == QUDA_5D_PC) pack<dagger,twist,2,pc>(arg, ghost_idx+s*arg.dc.ghostFace[2], 0, parity);
         else                  pack<dagger,twist,2,pc>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
@@ -291,7 +291,7 @@ namespace quda {
       break;
     case 3:
       while ( local_tid < arg.dc.ghostFaceCB[3] ) {
-        int ghost_idx = dir * arg.ghostFaceCB[3] + local_tid;
+        int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
         if (pc == QUDA_5D_PC) pack<dagger,twist,3,pc>(arg, ghost_idx+s*arg.dc.ghostFace[3], 0, parity);
         else                  pack<dagger,twist,3,pc>(arg, ghost_idx, s, parity);
         local_tid += blockDim.x;
