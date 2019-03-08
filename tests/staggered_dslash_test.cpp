@@ -61,9 +61,7 @@ void *hostGauge[4];
 // In the HISQ case, we include building fat/long links in this unit test
 
 void *qdp_fatlink_cpu[4], *qdp_longlink_cpu[4];
-#ifdef MULTI_GPU
 void **ghost_fatlink_cpu, **ghost_longlink_cpu;
-#endif
 
 QudaParity parity = QUDA_EVEN_PARITY;
 extern QudaDagType dagger;
@@ -530,7 +528,6 @@ void init()
     // printfQuda("Long links sending..."); 
     loadGaugeQuda(milc_longlink_gpu, &gaugeParam);
     // printfQuda("Long links sent...\n");
-
   }
 
   if (!transfer) {
@@ -738,32 +735,19 @@ void staggeredDslashRef()
   fflush(stdout);
   switch (test_type) {
     case 0:
-#ifdef MULTI_GPU
-      staggered_dslash_mg4dir(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
-       spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
-#else
-      staggered_dslash(spinorRef->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
-#endif    
+      staggered_dslash(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+                       spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type);
       break;
     case 1:
-#ifdef MULTI_GPU
-      matdagmat_mg4dir(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
-       spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu, parity);
-#else
-      matdagmat(spinorRef->V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu->V(), parity);
-#endif
+      matdagmat(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+                spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu, parity, dslash_type);
       break;
     case 2:
-#ifdef MULTI_GPU
       // Not sure about the !dagger...
-      staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Even()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
-       reinterpret_cast<cpuColorSpinorField*>(&spinor->Odd()), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-      staggered_dslash_mg4dir(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Odd()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
-       reinterpret_cast<cpuColorSpinorField*>(&spinor->Even()), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-#else
-      staggered_dslash(spinorRef->Even().V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Odd().V(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-      staggered_dslash(spinorRef->Odd().V(), qdp_fatlink_cpu, qdp_longlink_cpu, spinor->Even().V(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type == QUDA_LAPLACE_DSLASH);
-#endif    
+      staggered_dslash(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Even()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+                       reinterpret_cast<cpuColorSpinorField*>(&spinor->Odd()), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type);
+      staggered_dslash(reinterpret_cast<cpuColorSpinorField*>(&spinorRef->Odd()), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+                       reinterpret_cast<cpuColorSpinorField*>(&spinor->Even()), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gaugeParam.cpu_prec, dslash_type);
       if (dslash_type == QUDA_LAPLACE_DSLASH) {
         xpay(spinor->V(), kappa, spinorRef->V(), spinor->Length(), gaugeParam.cpu_prec);
       } else {
