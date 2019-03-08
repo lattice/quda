@@ -581,7 +581,7 @@ namespace quda {
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
  
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const; // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
+    void full_dslash(ColorSpinorField &out, const ColorSpinorField &in) const; // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
 		  ColorSpinorField &b, const QudaSolutionType) const;

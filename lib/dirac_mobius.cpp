@@ -117,7 +117,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
 #ifndef USE_LEGACY_DSLASH
-    ApplyDomainWall4D(out, in, *gauge, k, m5, b_5, c_5, in, parity, dagger, commDim, profile);
+    ApplyDomainWall4D(out, in, *gauge, k, m5, b_5, c_5, x, parity, dagger, commDim, profile);
 #else
     double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
     for (int i=0; i<Ls; i++) { b5_[i] = b_5[i].real(); c5_[i] = c_5[i].real(); }
@@ -262,7 +262,6 @@ namespace quda {
     // row major
     double b = b_5[0].real();
     double c = c_5[0].real();
-    double alpha = b+c;
     kappa_b = 0.5/(b*(m5+4.)+1.);
     kappa_c = 0.5/(c*(m5+4.)-1.);
     kappa5 = kappa_b/kappa_c;
@@ -287,7 +286,7 @@ namespace quda {
         m5inv_minus[ s*Ls+sp ] = inv*std::pow(kappa5, exp)*(s>sp ? -mass : 1.);
       }
     }
-    
+/*    
     printfQuda("m5inv_plus:\n");
     for(int s = 0; s < Ls; s++){
       for(int sp = 0; sp < Ls; sp++){
@@ -302,7 +301,7 @@ namespace quda {
         printfQuda("%+6.4e ", m5inv_minus[s*Ls+sp]);
       }
       printfQuda("\n");
-    }
+    }*/
   }
 
   DiracMobiusPC::DiracMobiusPC(const DiracMobiusPC &dirac) : DiracMobius(dirac) {  }
@@ -1106,16 +1105,12 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
-  void DiracMobiusPCEofa::Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
+  void DiracMobiusPCEofa::full_dslash(ColorSpinorField &out, const ColorSpinorField &in) const // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
   {
     printfQuda("Performing unpreconditioned dslash for EOFA!\n");
     checkFullSpinor(out, in);
     bool reset1 = newTmp(&tmp1, in.Odd());
     bool reset2 = newTmp(&tmp2, in.Odd());
-    
-    printfQuda("in.even = %12.8e\n", blas::norm2(in.Even()));
-    printfQuda("in.odd  = %12.8e\n", blas::norm2(in.Odd()));
-    
     // Even
     m5_eofa(*tmp1, in.Even());
     Dslash4pre(*tmp2, in.Odd(), QUDA_ODD_PARITY);
@@ -1124,9 +1119,6 @@ namespace quda {
     m5_eofa(*tmp1, in.Odd());
     Dslash4pre(*tmp2, in.Even(), QUDA_EVEN_PARITY);
     Dslash4Xpay(out.Odd(), *tmp2, QUDA_ODD_PARITY, *tmp1, -1.);
-    
-    printfQuda("out.even = %12.8e\n", blas::norm2(out.Even()));
-    printfQuda("out.odd  = %12.8e\n", blas::norm2(out.Odd()));
    
     deleteTmp(&tmp1, reset1);
     deleteTmp(&tmp2, reset2);

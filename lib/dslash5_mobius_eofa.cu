@@ -448,8 +448,7 @@ namespace quda {
       }
 
       void apply(const cudaStream_t& stream) {
-        // TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (arg.type == M5_EOFA) {
           if (arg.eofa_pm) {
             if (arg.xpay) {

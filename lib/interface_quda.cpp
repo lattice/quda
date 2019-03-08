@@ -2067,7 +2067,7 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
     }
     blas::ax(gaugePrecise->Anisotropy(), in);
   }
-  bool pc = true;
+  constexpr bool pc = true;
 
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
@@ -2081,7 +2081,7 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
       dirac.m5inv_eofa(out, in);
       break;
     case 2:
-      dirac.Dslash(out, in, parity);
+      dirac.full_dslash(out, in);
       break;
     default:
       errorQuda("test_type(=%d) NOT defined for M\"obius EOFA! :( \n", test_type);
