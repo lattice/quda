@@ -957,8 +957,8 @@ extern void usage(char**);
 
 TEST(dslash, verify) {
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-11 :
+		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-2));
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
@@ -1013,7 +1013,7 @@ int main(int argc, char **argv)
 	       2*cudaSpinor->GhostBytes());
 
     double norm2_cpu = blas::norm2(*spinorRef);
-    double norm2_cpu_cuda= blas::norm2(*spinorOut);
+    double norm2_cpu_cuda = blas::norm2(*spinorOut);
     if (!transfer) {
       double norm2_cuda= blas::norm2(*cudaSpinorOut);
       printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);

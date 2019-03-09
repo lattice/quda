@@ -903,9 +903,9 @@ public:
  TEST_P(StaggeredDslashTest, verify) {
 
     double deviation = 1.0;
-    double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-9 :
-      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 :
-      (inv_param.cuda_prec == QUDA_HALF_PRECISION ? 1e-1 : 2.0))); // catches case where we skip a test
+    double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-11 :
+      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-4 :
+      (inv_param.cuda_prec == QUDA_HALF_PRECISION ? 1e-2 : 2.0))); // catches case where we skip a test
 
     if (global_skip) { tol = 2.0; }
 

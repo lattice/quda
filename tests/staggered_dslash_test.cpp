@@ -734,8 +734,8 @@ void staggeredDslashRef()
 
 TEST(dslash, verify) {
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-11 :
+		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-2));
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
