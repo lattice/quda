@@ -1,6 +1,7 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
+#include <blas_quda.h>
 
 namespace quda {
 
@@ -241,14 +242,14 @@ namespace quda {
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
     int ret = 0;
     if (a.Ncolor() == 3) {
-      const int Nc = 3;
+      constexpr int Nc = 3;
       if (a.Nspin() == 4) {
-	const int Ns = 4;
+	constexpr int Ns = 4;
 	FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
 	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
 	ret = compareSpinor(A, B, tol);
       } else if (a.Nspin() == 1) {
-	const int Ns = 1;
+	constexpr int Ns = 1;
 	FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
 	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
 	ret = compareSpinor(A, B, tol);
@@ -264,7 +265,7 @@ namespace quda {
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
     int ret = 0;
     if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
-	a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+	b.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       ret = genericCompare<oFloat,iFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a, b, tol);
     } else {
       errorQuda("Unsupported field order %d\n", a.FieldOrder());
@@ -275,11 +276,16 @@ namespace quda {
 
   template <typename oFloat>
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
+    double rescale = 1.0/sqrt(blas::norm2(a));
+    auto a_(a), b_(b);
+    blas::ax(rescale,a_);
+    blas::ax(rescale,b_);
+
     int ret = 0;
     if (b.Precision() == QUDA_DOUBLE_PRECISION) {
-      ret = genericCompare<oFloat,double>(a, b, tol);
+      ret = genericCompare<oFloat,double>(a_, b_, tol);
     } else if (b.Precision() == QUDA_SINGLE_PRECISION) {
-      ret = genericCompare<oFloat,float>(a, b, tol);
+      ret = genericCompare<oFloat,float>(a_, b_, tol);
     } else {
       errorQuda("Precision not supported");
     }

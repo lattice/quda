@@ -867,7 +867,20 @@ namespace quda {
     cpuColorSpinorField& operator=(const cudaColorSpinorField&);
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
+
+    /**
+       @brief Perform a component by component comparison of two
+       color-spinor fields.  In doing we normalize with respect to the
+       first colorspinor field, e.g., we compare || a_i - b_i || / || a ||
+       @param[in] a Ground truth color spinor field
+       @param[in] b Field we are checking
+
+       @param[in] resolution How many bins per order of magnitude to
+       use.  The default resolution=1 means that we have 16 bins
+       covering the range [1e-15,1.0].
+     */
     static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
+
     void PrintVector(unsigned int x) const;
 
     /**
