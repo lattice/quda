@@ -348,6 +348,7 @@ namespace quda {
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
 
+#if 1
       //DMH start
       //Just replace any initial guess with a deflated RHS
       if (param.eig_param.deflate == true) {
@@ -372,32 +373,28 @@ namespace quda {
 	//y contains the original guess.
 	blas::copy(y, x);
       }
-
-      /*
-	//Try to incorporate any existing guesses
-	//Compute r0 = b - A * x0
-	mat(r, x, y, tmp3);
-	r2 = blas::xmyNorm(b, r);
-	if (b2 == 0) b2 = r2;
-	//y contains the original guess.
-	blas::copy(y, x);
-	
-	if (param.eig_param.deflate == true) {
-	printfQuda("init yes + deflate\n");
+#endif
+#if 0
+      //Try to incorporate any existing guess
+      //Deflate the x0 guess
+      if (param.eig_param.deflate == true) {
 	//Deflate the exact part from the residual
 	std::vector<ColorSpinorField*> rhs;
-	rhs.push_back(&r);
+	rhs.push_back(&b);
 	eig_solver->deflate(defl_tmp1, rhs, param.evecs, param.evals);
 	
-	//Compute rnew_defl  = r0 - A * r0_defl
-	mat(*defl_tmp2[0], *defl_tmp1[0], y, tmp3);
-	r2 = blas::xmyNorm(r, *defl_tmp2[0]);
-
-	//Place the initial residiual in r. defl_tmp1 must be added
-	//to the solution at the end.
-	blas::copy(r, *defl_tmp2[0]);
-	}
-      */
+	//Add to initial guess
+	blas::xpy(*defl_tmp1[0], x);
+      }
+      
+      //Compute r0 = b - A * x0
+      mat(r, x, y, tmp3);
+      r2 = blas::xmyNorm(b, r);
+      if (b2 == 0) b2 = r2;
+      //y contains the original guess.
+      blas::copy(y, x);
+      
+#endif 
       //DMH end
       
     } else {

@@ -1744,16 +1744,16 @@ QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
 //Parameters for the stand alone eigensolver
-int eig_nEv = 8;
-int eig_nKr = 12;
-int eig_nConv = 6;
-int eig_check_interval = 12;
+int eig_nEv = 24;
+int eig_nKr = 32;
+int eig_nConv = 24;
+int eig_check_interval = 10;
 int eig_max_restarts = 1000;
-double eig_tol = 1e-4;
-bool eig_use_poly_acc = false;
-int eig_poly_deg = 15;
-double eig_amin = 0.0;
-double eig_amax = 4;
+double eig_tol = 1e-6;
+bool eig_use_poly_acc = true;
+int eig_poly_deg = 100;
+double eig_amin = 1.0;
+double eig_amax = 10.0;
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
 bool eig_compute_svd = false;
