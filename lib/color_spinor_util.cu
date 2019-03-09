@@ -247,12 +247,30 @@ namespace quda {
 	constexpr int Ns = 4;
 	FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
 	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
-	ret = compareSpinor(A, B, tol);
+
+        double rescale = 1.0/A.abs_max();
+
+        auto a_(a), b_(b);
+        blas::ax(rescale,a_);
+        blas::ax(rescale,b_);
+	FieldOrderCB<oFloat,Ns,Nc,1,order> A_(a_);
+	FieldOrderCB<iFloat,Ns,Nc,1,order> B_(b_);
+
+        ret = compareSpinor(A_, B_, tol);
       } else if (a.Nspin() == 1) {
 	constexpr int Ns = 1;
 	FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
 	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
-	ret = compareSpinor(A, B, tol);
+
+        double rescale = 1.0/A.abs_max();
+
+        auto a_(a), b_(b);
+        blas::ax(rescale,a_);
+        blas::ax(rescale,b_);
+	FieldOrderCB<oFloat,Ns,Nc,1,order> A_(a_);
+	FieldOrderCB<iFloat,Ns,Nc,1,order> B_(b_);
+
+        ret = compareSpinor(A_, B_, tol);
       }
     } else {
       errorQuda("Number of colors %d not supported", a.Ncolor());
@@ -276,16 +294,11 @@ namespace quda {
 
   template <typename oFloat>
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
-    double rescale = 1.0/sqrt(blas::norm2(a));
-    auto a_(a), b_(b);
-    blas::ax(rescale,a_);
-    blas::ax(rescale,b_);
-
     int ret = 0;
     if (b.Precision() == QUDA_DOUBLE_PRECISION) {
-      ret = genericCompare<oFloat,double>(a_, b_, tol);
+      ret = genericCompare<oFloat,double>(a, b, tol);
     } else if (b.Precision() == QUDA_SINGLE_PRECISION) {
-      ret = genericCompare<oFloat,float>(a_, b_, tol);
+      ret = genericCompare<oFloat,float>(a, b, tol);
     } else {
       errorQuda("Precision not supported");
     }
