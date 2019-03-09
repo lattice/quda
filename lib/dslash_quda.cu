@@ -79,6 +79,9 @@ namespace quda {
     // list of p2p policies that are enabled
     std::vector<QudaP2PPolicy> p2p_policies;
 
+    // string used as a tunekey to ensure we retune if the dslash policy env changes
+    char policy_string[TuneKey::aux_n];
+
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
     Worker *aux_worker;
@@ -131,6 +134,8 @@ namespace quda {
 
     // list of p2p policies that are enabled
     p2p_policies = std::vector<QudaP2PPolicy>(static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
+
+    strcat(policy_string, ",pol=");
   }
 
 

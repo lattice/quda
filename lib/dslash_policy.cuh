@@ -1598,6 +1598,9 @@ inline void setFusedParam(Arg & param, Dslash &dslash, const int* faceVolumeCB){
   // list of dslash policies that are enabled
   extern std::vector<QudaDslashPolicy> policies;
 
+  // string used as a tunekey to ensure we retune if the dslash policy env changes
+  extern char policy_string[TuneKey::aux_n];
+
   enum class QudaP2PPolicy {
     QUDA_P2P_DEFAULT,         // no special hanlding for p2p
     QUDA_P2P_COPY_ENGINE,     // use copy engine for p2p traffic
@@ -1789,6 +1792,11 @@ inline void setFusedParam(Arg & param, Dslash &dslash, const int* faceVolumeCB){
 	   enable_policy(QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC);
 	 }
 #endif
+       }
+
+       // construct string specifying which policies have been enabled
+       for (int i=0; i<(int)QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED; i++) {
+         strcat(policy_string, (int)policies[i] == i ? "1" : "0");
        }
 
        static char *dslash_pack_env = getenv("QUDA_ENABLE_DSLASH_PACK");
@@ -1988,6 +1996,7 @@ inline void setFusedParam(Arg & param, Dslash &dslash, const int* faceVolumeCB){
      TuneKey key = dslash.tuneKey();
      strcat(key.aux,comm_dim_topology_string());
      strcat(key.aux,comm_config_string()); // any change in P2P/GDR will be stored as a separate tunecache entry
+     strcat(key.aux,policy_string); // any change in policies enabled will be stored as a separate entry
      dslashParam.kernel_type = kernel_type;
      return key;
    }
