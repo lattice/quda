@@ -826,7 +826,7 @@ namespace quda {
     printfQuda("Output directed to %s\n", arpack_logfile);
 
     //Create Eigensolver object for member function use
-    TimeProfile profile("dummy");
+    TimeProfile profile("Dummy");
     EigenSolver *eig_solver = EigenSolver::create(eig_param, mat, profile);
     
     //Construct parameters and memory allocation
