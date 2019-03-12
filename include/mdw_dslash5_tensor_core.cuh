@@ -415,8 +415,6 @@ namespace quda {
     }
   } 
 
-#else
-#error "Domain wall dslash WITH tensor cores has not been built"
 #endif // defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
 
 } // namespace quda
