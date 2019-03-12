@@ -522,45 +522,58 @@ namespace quda {
 
     virtual ~Pack() { }
 
+    template <typename T, typename Arg>
+    inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    {
+      if (deviceProp.major >= 7) { // enable max shared memory mode on GPUs that support it
+	this->setMaxDynamicSharedBytesPerBlock(f);
+      }
+
+      void *args[] = { &arg };
+      qudaLaunchKernel((const void*)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+    }
+
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (field.Nspin() == 4) {
-        PackArg<Float,nColor,4> arg(ghost, field, nFace, dagger, parity, threads, a, b, c);
+        using Arg = PackArg<Float,nColor,4>;
+	Arg arg(ghost, field, nFace, dagger, parity, threads, a, b, c);
         arg.swizzle = tp.aux.x;
         arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
 
         if (field.PCType() == QUDA_4D_PC) {
           if (arg.dagger) {
             switch(arg.twist) {
-            case 0: packKernel<true, 0, QUDA_4D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-            case 1: packKernel<true, 1, QUDA_4D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-            case 2: packKernel<true, 2, QUDA_4D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+            case 0: launch(packKernel<true, 0, QUDA_4D_PC, Arg>, tp, arg, stream); break;
+            case 1: launch(packKernel<true, 1, QUDA_4D_PC, Arg>, tp, arg, stream); break;
+            case 2: launch(packKernel<true, 2, QUDA_4D_PC, Arg>, tp, arg, stream); break;
             }
           } else {
             switch(arg.twist) {
-            case 0: packKernel<false, 0, QUDA_4D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+	    case 0: launch(packKernel<false, 0, QUDA_4D_PC, Arg>, tp, arg, stream); break;
             default: errorQuda("Twisted packing only for dagger");
             }
           }
         } else if (arg.pc_type == QUDA_5D_PC) {
           if (arg.twist) errorQuda("Twist packing not defined");
           if (arg.dagger) {
-            packKernel<true, 0, QUDA_5D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            launch(packKernel<true, 0, QUDA_5D_PC, Arg>, tp, arg, stream);
           } else {
-            packKernel<false, 0, QUDA_5D_PC> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            launch(packKernel<false, 0, QUDA_5D_PC, Arg>, tp, arg, stream);
           }
         }
       } else if (field.Nspin() == 1) {
-        PackArg<Float,nColor,1> arg(ghost, field, nFace, dagger, parity, threads, a, b, c);
+        using Arg = PackArg<Float,nColor,1>;
+	Arg arg(ghost, field, nFace, dagger, parity, threads, a, b, c);
         arg.swizzle = tp.aux.x;
         arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
 #ifdef STRIPED
-        packStaggeredKernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        launch(packStaggeredKernel<Arg>, tp, arg, stream);
 #else
-        if (location & Host) packStaggeredShmemKernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-        else                 packStaggeredKernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        if (location & Host) launch(packStaggeredShmemKernel<Arg>, tp, arg, stream);
+        else                 launch(packStaggeredKernel<Arg>, tp, arg, stream);
 #endif
       } else {
         errorQuda("Unsupported nSpin = %d\n", field.Nspin());
@@ -569,14 +582,19 @@ namespace quda {
 
     bool tuneSharedBytes() const { return false; }
 
+#if 0
+    // not used at present, but if tuneSharedBytes is enabled then
+    // this allows tuning up the full dynamic shared memory if needed
+    unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
+#endif
+
     void initTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::initTuneParam(param);
       // if doing a zero-copy policy then ensure that each thread block
       // runs exclusively on a given SM - this is to ensure quality of
       // service for the packing kernel when running concurrently.
-      // FIXME - we could set max shared memory on Volta
-      if (location & Host) param.shared_bytes = deviceProp.sharedMemPerBlock / 2 + 1;
+      if (location & Host) param.shared_bytes = maxDynamicSharedBytesPerBlock() / 2 + 1;
 #ifndef STRIPED
       if (location & Host) param.grid.x = minGridSize();
 #endif
@@ -588,8 +606,7 @@ namespace quda {
       // if doing a zero-copy policy then ensure that each thread block
       // runs exclusively on a given SM - this is to ensure quality of
       // service for the packing kernel when running concurrently.
-      // FIXME - we could set max shared memory on Volta
-      if (location & Host) param.shared_bytes = deviceProp.sharedMemPerBlock / 2 + 1;
+      if (location & Host) param.shared_bytes = maxDynamicSharedBytesPerBlock() / 2 + 1;
 #ifndef STRIPED
       if (location & Host) param.grid.x = minGridSize();
 #endif
