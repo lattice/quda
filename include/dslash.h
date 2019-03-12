@@ -78,7 +78,7 @@ namespace quda {
           // so we set all ghost pointers else if doing exterior
           // kernel, then we only have to update the non-p2p ghosts,
           // since these may have been assigned to zero-copy memory
-          if (!comm_peer2peer_enabled(1-dir, dim) || arg.kernel_type == INTERIOR_KERNEL) {
+          if (!comm_peer2peer_enabled(dir, dim) || arg.kernel_type == INTERIOR_KERNEL) {
             ghost[2*dim+dir] = (Float*)((char*)in.Ghost2() + in.GhostOffset(dim,dir)*in.GhostPrecision());
           }
         }
