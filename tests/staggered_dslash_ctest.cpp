@@ -85,8 +85,6 @@ extern int device;
 extern bool verify_results;
 extern int niter;
 
-extern bool kernel_pack_t;
-
 extern double mass; // the mass of the Dirac operator
 extern double kappa; // will get overriden
 
@@ -232,8 +230,6 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
 
   inv_param.cuda_prec = prec;
   gaugeParam.reconstruct = link_recon;
-
-  setKernelPackT(kernel_pack_t);
 
   setVerbosity(QUDA_SUMMARIZE);
 

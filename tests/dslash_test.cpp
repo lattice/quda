@@ -72,8 +72,6 @@ extern bool verify_results;
 extern int niter;
 extern char latfile[];
 
-extern bool kernel_pack_t;
-
 extern double mass; // mass of Dirac operator
 extern double mu;
 extern double epsilon;
@@ -97,12 +95,9 @@ void init(int argc, char **argv) {
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
              dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-    // for these we always use kernel packing
     dw_setDims(gauge_param.X, Lsdim);
-    setKernelPackT(true);
   } else {
     setDims(gauge_param.X);
-    setKernelPackT(kernel_pack_t);
     Ls = 1;
   }
 

@@ -154,6 +154,9 @@ namespace quda {
     // check all locations match
     checkLocation(out, in, x, U);
 
+    // with 5-d checkerboarding we must use kernel packing
+    pushKernelPackT(true);
+
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
       ApplyDomainWall5D<double>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
@@ -165,6 +168,9 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
+
+    popKernelPackT();
+
 #else
     errorQuda("Domain-wall dslash has not been built");
 #endif // GPU_DOMAIN_WALL_DIRAC

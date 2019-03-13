@@ -71,8 +71,6 @@ extern QudaCABasis ca_basis; // basis for CA-CG solves
 extern double ca_lambda_min; // minimum eigenvalue for scaling Chebyshev CA-CG solves
 extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG solves
 
-extern bool kernel_pack_t;
-
 // Dirac operator type
 extern QudaDslashType dslash_type;
 extern QudaMatPCType matpc_type; // preconditioning type

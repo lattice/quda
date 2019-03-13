@@ -75,8 +75,6 @@ extern int device;
 extern bool verify_results;
 extern int niter;
 
-extern bool kernel_pack_t;
-
 extern double mass; // the mass of the Dirac operator
 extern double kappa; // will get overriden
 
@@ -190,8 +188,6 @@ void init()
 {
 
   initQuda(device);
-
-  setKernelPackT(kernel_pack_t);
 
   setVerbosity(QUDA_VERBOSE);
 

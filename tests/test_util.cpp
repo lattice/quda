@@ -1695,7 +1695,6 @@ double tol_hq = 0.;
 double reliable_delta = 0.1;
 bool alternative_reliable = false;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
-bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -1804,7 +1803,6 @@ void usage(char** argv )
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --rank-order <col/row>                    # Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)\n");
-  printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
@@ -2224,13 +2222,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--kernel-pack-t") == 0){
-    kernel_pack_t = true;
-    ret= 0;
-    goto out;
-  }
-
-
   if( strcmp(argv[i], "--multishift") == 0){
     if (i+1 >= argc){
       usage(argv);
