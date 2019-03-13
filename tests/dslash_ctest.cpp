@@ -79,16 +79,25 @@ extern void usage(char**);
 
 extern QudaVerbosity verbosity;
 
-const char *prec_str[] = {"half", "single", "double"};
+const char *prec_str[] = {"quarter", "half", "single", "double"};
 const char *recon_str[] = {"r18", "r12", "r8"};
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
 
+QudaPrecision getPrecision(int i) {
+  switch (i) {
+  case 0: return QUDA_QUARTER_PRECISION;
+  case 1: return QUDA_HALF_PRECISION;
+  case 2: return QUDA_SINGLE_PRECISION;
+  case 3: return QUDA_DOUBLE_PRECISION;
+  }
+  return QUDA_INVALID_PRECISION;
+}
 
 void init(int precision, QudaReconstructType link_recon) {
 
-  cuda_prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
+  cuda_prec = getPrecision(precision);
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
@@ -130,7 +139,7 @@ void init(int precision, QudaReconstructType link_recon) {
     inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-   dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
+	     dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
     inv_param.m5 = -1.5;
     kappa5 = 0.5/(5 + inv_param.m5);
   } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
@@ -943,7 +952,7 @@ exit(-1);
 
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
-  auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
+  auto prec = getPrecision(precision);
   // printfQuda("running the following test:\n");
 
   printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type    niter\n");
@@ -1028,7 +1037,8 @@ TEST_P(DslashTest, verify){
   }
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-11 :
-    (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-2));
+    (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-4 :
+     (inv_param.cuda_prec == QUDA_HALF_PRECISION ? 1e-3 : 1e-1)) );
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
@@ -1099,9 +1109,18 @@ TEST_P(DslashTest, benchmark){
      return ss.str();
    }
 
-
+#ifndef USE_LEGACY_DSLASH
 #ifdef MULTI_GPU
    INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getdslashtestname);
 #else
    INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getdslashtestname);
+#endif
+
+#else
+
+#ifdef MULTI_GPU
+   INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(1,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getdslashtestname);
+#else
+   INSTANTIATE_TEST_CASE_P(QUDA, DslashTest, Combine( Range(1,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getdslashtestname);
+#endif
 #endif
