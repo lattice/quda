@@ -89,6 +89,13 @@ namespace quda {
 
     virtual int tuningIter() const { return 10; }
 
+    int blockStep() const { return 16; }
+    int blockMin() const { return 16; }
+
+    unsigned int maxSharedBytesPerBlock() const {
+      return maxDynamicSharedBytesPerBlock();
+    }
+
   public:
 
     template <typename T, typename Arg>
