@@ -64,12 +64,25 @@ namespace quda {
       ghost_bytes(0), ghost_bytes_old(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, my_face_d{ },
       from_face_h{ }, from_face_hd{ }, from_face_d{ },
-      mh_recv_fwd{ }, mh_recv_back{ }, mh_send_fwd{ }, mh_send_back{ },
-      mh_recv_rdma_fwd{ }, mh_recv_rdma_back{ }, mh_send_rdma_fwd{ }, mh_send_rdma_back{ },
       initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     precisionCheck();
+
+    for (int dir=0; dir<2; dir++) { // XLC cannot do multi-dimensional array initialization
+      for (int dim=0; dim<QUDA_MAX_DIM; dim++) {
+        mh_recv_fwd[dir][dim] = nullptr;
+        mh_recv_back[dir][dim] = nullptr;
+        mh_send_fwd[dir][dim] = nullptr;
+        mh_send_back[dir][dim] = nullptr;
+
+        mh_recv_rdma_fwd[dir][dim] = nullptr;
+        mh_recv_rdma_back[dir][dim] = nullptr;
+        mh_send_rdma_fwd[dir][dim] = nullptr;
+        mh_send_rdma_back[dir][dim] = nullptr;
+      }
+    }
+
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
@@ -114,12 +127,25 @@ namespace quda {
       ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, my_face_d{ },
       from_face_h{ }, from_face_hd{ }, from_face_d{ },
-      mh_recv_fwd{ }, mh_recv_back{ }, mh_send_fwd{ }, mh_send_back{ },
-      mh_recv_rdma_fwd{ }, mh_recv_rdma_back{ }, mh_send_rdma_fwd{ }, mh_send_rdma_back{ },
       initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     precisionCheck();
+
+    for (int dir=0; dir<2; dir++) { // XLC cannot do multi-dimensional array initialization
+      for (int dim=0; dim<QUDA_MAX_DIM; dim++) {
+        mh_recv_fwd[dir][dim] = nullptr;
+        mh_recv_back[dir][dim] = nullptr;
+        mh_send_fwd[dir][dim] = nullptr;
+        mh_send_back[dir][dim] = nullptr;
+
+        mh_recv_rdma_fwd[dir][dim] = nullptr;
+        mh_recv_rdma_back[dir][dim] = nullptr;
+        mh_send_rdma_fwd[dir][dim] = nullptr;
+        mh_send_rdma_back[dir][dim] = nullptr;
+      }
+    }
+
     for (int i=0; i<nDim; i++) {
       x[i] = field.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
