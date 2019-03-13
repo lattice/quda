@@ -56,7 +56,9 @@ namespace quda {
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
+    int_fastdiv blocks_per_dir;
     int dim_map[4];
+    int active_dims;
 
     int_fastdiv swizzle;
     int sites_per_block;
@@ -90,6 +92,7 @@ namespace quda {
 
         dim_map[d++] = i;
       }
+      active_dims = d;
     }
 
   };
@@ -247,16 +250,19 @@ namespace quda {
   template <bool dagger, int twist, QudaPCType pc, typename Arg>
   __global__ void packShmemKernel(Arg arg)
   {
-    int local_tid = threadIdx.x;
-
-    int dir = blockIdx.x % 2;
+    // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
+    int local_block_idx = blockIdx.x % arg.blocks_per_dir;
+    int dim_dir = blockIdx.x / arg.blocks_per_dir;
+    int dir = dim_dir % 2;
     int dim;
-    switch (blockIdx.x/2) {
+    switch (dim_dir/2) {
     case 0: dim = arg.dim_map[0]; break;
     case 1: dim = arg.dim_map[1]; break;
     case 2: dim = arg.dim_map[2]; break;
     case 3: dim = arg.dim_map[3]; break;
     }
+
+    int local_tid = local_block_idx * blockDim.x + threadIdx.x;
 
     int s = blockDim.y*blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
@@ -270,7 +276,7 @@ namespace quda {
         int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
         if (pc == QUDA_5D_PC) pack<dagger,twist,0,pc>(arg, ghost_idx+s*arg.dc.ghostFace[0], 0, parity);
         else                  pack<dagger,twist,0,pc>(arg, ghost_idx, s, parity);
-        local_tid += blockDim.x;
+        local_tid += arg.blocks_per_dir*blockDim.x;
       }
       break;
     case 1:
@@ -278,7 +284,7 @@ namespace quda {
         int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
         if (pc == QUDA_5D_PC) pack<dagger,twist,1,pc>(arg, ghost_idx+s*arg.dc.ghostFace[1], 0, parity);
         else                  pack<dagger,twist,1,pc>(arg, ghost_idx, s, parity);
-        local_tid += blockDim.x;
+	local_tid += arg.blocks_per_dir*blockDim.x;
       }
       break;
     case 2:
@@ -286,7 +292,7 @@ namespace quda {
         int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
         if (pc == QUDA_5D_PC) pack<dagger,twist,2,pc>(arg, ghost_idx+s*arg.dc.ghostFace[2], 0, parity);
         else                  pack<dagger,twist,2,pc>(arg, ghost_idx, s, parity);
-        local_tid += blockDim.x;
+	local_tid += arg.blocks_per_dir*blockDim.x;
       }
       break;
     case 3:
@@ -294,7 +300,7 @@ namespace quda {
         int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
         if (pc == QUDA_5D_PC) pack<dagger,twist,3,pc>(arg, ghost_idx+s*arg.dc.ghostFace[3], 0, parity);
         else                  pack<dagger,twist,3,pc>(arg, ghost_idx, s, parity);
-        local_tid += blockDim.x;
+	local_tid += arg.blocks_per_dir*blockDim.x;
       }
       break;
     }
@@ -341,15 +347,20 @@ namespace quda {
   template <typename Arg>
   __global__ void packStaggeredShmemKernel(Arg arg)
   {
-    int local_tid = threadIdx.x;
-    int dir = blockIdx.x % 2;
+    // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
+    int local_block_idx = blockIdx.x % arg.blocks_per_dir;
+    int dim_dir = blockIdx.x / arg.blocks_per_dir;
+    int dir = dim_dir % 2;
     int dim;
-    switch (blockIdx.x/2) {
+    switch (dim_dir/2) {
     case 0: dim = arg.dim_map[0]; break;
     case 1: dim = arg.dim_map[1]; break;
     case 2: dim = arg.dim_map[2]; break;
     case 3: dim = arg.dim_map[3]; break;
     }
+
+    int local_tid = local_block_idx * blockDim.x + threadIdx.x;
+
     int s = blockDim.y*blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
 
@@ -362,7 +373,7 @@ namespace quda {
         int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
         if (arg.nFace == 1) packStaggered<0,1>(arg, ghost_idx, s, parity);
         else                packStaggered<0,3>(arg, ghost_idx, s, parity);
-        local_tid += blockDim.x;
+        local_tid += arg.blocks_per_dir * blockDim.x;
       }
       break;
     case 1:
@@ -370,7 +381,7 @@ namespace quda {
         int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
         if (arg.nFace == 1) packStaggered<1,1>(arg, ghost_idx, s, parity);
         else                packStaggered<1,3>(arg, ghost_idx, s, parity);
-        local_tid += blockDim.x;
+        local_tid += arg.blocks_per_dir * blockDim.x;
       }
       break;
     case 2:
@@ -378,7 +389,7 @@ namespace quda {
         int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
         if (arg.nFace == 1) packStaggered<2,1>(arg, ghost_idx, s, parity);
         else                packStaggered<2,3>(arg, ghost_idx, s, parity);
-        local_tid += blockDim.x;
+        local_tid += arg.blocks_per_dir * blockDim.x;
       }
       break;
     case 3:
@@ -386,7 +397,7 @@ namespace quda {
         int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
         if (arg.nFace == 1) packStaggered<3,1>(arg, ghost_idx, s, parity);
         else                packStaggered<3,3>(arg, ghost_idx, s, parity);
-        local_tid += blockDim.x;
+        local_tid += arg.blocks_per_dir * blockDim.x;
       }
       break;
     }
@@ -421,9 +432,9 @@ namespace quda {
 	// the 3 * number of dimensions we are communicating
         int max = 3;
 #else
-	// if zero-copy policy then assign exactly one thread block
+	// if zero-copy policy then assign exactly up to four thread blocks
 	// per direction per dimension (effectively no grid-size tuning)
-        int max = 2;
+        int max = 2 * 4;
 #endif
         int nDimComms = 0;
         for (int d=0; d<field.Ndim(); d++) nDimComms += commDim[d];
@@ -439,18 +450,35 @@ namespace quda {
 #ifdef STRIPED
 	// if zero-copy policy then set a minimum number of blocks to be
 	// the 1 * number of dimensions we are communicating
-        int max = 3;
+        int min = 3;
 #else
 	// if zero-copy policy then assign exactly one thread block
 	// per direction per dimension (effectively no grid-size tuning)
-        int max = 2;
+        int min = 2;
 #endif
         int nDimComms = 0;
         for (int d=0; d<field.Ndim(); d++) nDimComms += commDim[d];
-        return max*nDimComms;
+        return min*nDimComms;
       } else {
         return TunableVectorYZ::minGridSize();
       }
+    }
+
+    int gridStep() const {
+#ifdef STRIPED
+      return TunableVectorYZ::gridStep();
+#else
+      if (location & Host) {
+	// the shmem kernel must ensure the grid size autotuner
+	// increments in steps of 2 * number partitioned dimensions
+	// for equal division of blocks to each direction/dimension
+        int nDimComms = 0;
+        for (int d=0; d<field.Ndim(); d++) nDimComms += commDim[d];
+	return 2*nDimComms;
+      } else {
+	return TunableVectorYZ::gridStep();
+      }
+#endif
     }
 
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
@@ -542,8 +570,10 @@ namespace quda {
 	Arg arg(ghost, field, nFace, dagger, parity, threads, a, b, c);
         arg.swizzle = tp.aux.x;
         arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
+	arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
 
-        if (field.PCType() == QUDA_4D_PC) {
+#ifdef STRIPED
+	if (field.PCType() == QUDA_4D_PC) {
           if (arg.dagger) {
             switch(arg.twist) {
             case 0: launch(packKernel<true, 0, QUDA_4D_PC, Arg>, tp, arg, stream); break;
@@ -564,16 +594,40 @@ namespace quda {
             launch(packKernel<false, 0, QUDA_5D_PC, Arg>, tp, arg, stream);
           }
         }
+#else
+	if (field.PCType() == QUDA_4D_PC) {
+          if (arg.dagger) {
+            switch(arg.twist) {
+            case 0: launch(location & Host ? packShmemKernel<true, 0, QUDA_4D_PC, Arg> : packKernel<true, 0, QUDA_4D_PC, Arg>, tp, arg, stream); break;
+            case 1: launch(location & Host ? packShmemKernel<true, 1, QUDA_4D_PC, Arg> : packKernel<true, 0, QUDA_4D_PC, Arg>, tp, arg, stream); break;
+            case 2: launch(location & Host ? packShmemKernel<true, 2, QUDA_4D_PC, Arg> : packKernel<true, 2, QUDA_4D_PC, Arg>, tp, arg, stream); break;
+            }
+          } else {
+            switch(arg.twist) {
+	    case 0: launch(location & Host ? packShmemKernel<false, 0, QUDA_4D_PC, Arg> : packKernel<false, 0, QUDA_4D_PC, Arg>, tp, arg, stream); break;
+            default: errorQuda("Twisted packing only for dagger");
+            }
+          }
+        } else if (arg.pc_type == QUDA_5D_PC) {
+          if (arg.twist) errorQuda("Twist packing not defined");
+          if (arg.dagger) {
+            launch(packKernel<true, 0, QUDA_5D_PC, Arg>, tp, arg, stream);
+          } else {
+            launch(packKernel<false, 0, QUDA_5D_PC, Arg>, tp, arg, stream);
+          }
+        }
+#endif
       } else if (field.Nspin() == 1) {
         using Arg = PackArg<Float,nColor,1>;
 	Arg arg(ghost, field, nFace, dagger, parity, threads, a, b, c);
         arg.swizzle = tp.aux.x;
         arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
+	arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
+
 #ifdef STRIPED
         launch(packStaggeredKernel<Arg>, tp, arg, stream);
 #else
-        if (location & Host) launch(packStaggeredShmemKernel<Arg>, tp, arg, stream);
-        else                 launch(packStaggeredKernel<Arg>, tp, arg, stream);
+        launch(location & Host ? packStaggeredShmemKernel<Arg> : packStaggeredKernel<Arg>, tp, arg, stream);
 #endif
       } else {
         errorQuda("Unsupported nSpin = %d\n", field.Nspin());
