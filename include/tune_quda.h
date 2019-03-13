@@ -78,7 +78,7 @@ namespace quda {
     {
       if (tuneGridDim()) {
 	const unsigned int max_blocks = maxGridSize();
-	const int step = 1;
+	const int step = gridStep();
 	param.grid.x += step;
 	if (param.grid.x > max_blocks) {
 	  param.grid.x = minGridSize();
@@ -94,6 +94,13 @@ namespace quda {
     virtual unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (param.block.y*param.block.z); }
     virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
     virtual unsigned int minGridSize() const { return 1; }
+
+    /**
+       @brief gridStep sets the step size when iterating the grid size
+       in advanceGridDim.
+       @return Grid step size
+    */
+    virtual int gridStep() const { return 1; }
 
     virtual int blockStep() const { return deviceProp.warpSize; }
     virtual int blockMin() const { return deviceProp.warpSize; }
