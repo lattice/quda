@@ -175,8 +175,9 @@ namespace quda {
     for(int i=0; i<j; i++) s[i] *= -1.0;
     blas::caxpy(s, d_vecs_j, r);
     
+    delete s;
   }
-
+  
   //Deflate vec, place result in vec_defl
   void EigenSolver::deflate(std::vector<ColorSpinorField*> vec_defl,
 			    std::vector<ColorSpinorField*> vec,
@@ -701,8 +702,8 @@ namespace quda {
       //orthogonal to the existing Krylov space. We must
       //orthogonalise it.
       //printfQuda("orthogonalising Beta %d = %e\n", j, beta[j]);
-      orthogonalise(v, r, j);
-      //blockOrthogonalise(v, r, j);
+      //orthogonalise(v, r, j);
+      blockOrthogonalise(v, r, j);
       //b_j = ||r||
       beta[j] = sqrt(blas::norm2(*r[0]));
     }
