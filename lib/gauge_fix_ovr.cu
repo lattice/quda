@@ -18,7 +18,7 @@ namespace quda {
   static int numParams = 18;
 
 #define LAUNCH_KERNEL_GAUGEFIX(kernel, tp, stream, arg, parity, ...)     \
-  if ( tp.block.z == 0 ) { \
+  if ( tp.aux.x == 0 ) { \
     switch ( tp.block.x ) {             \
     case 256:                \
       kernel<0, 32,__VA_ARGS__>           \
@@ -40,7 +40,7 @@ namespace quda {
       errorQuda("%s not implemented for %d threads", # kernel, tp.block.x); \
     } \
   } \
-  else if ( tp.block.z == 1 ) { \
+  else if ( tp.aux.x == 1 ) { \
     switch ( tp.block.x ) {             \
     case 256:                \
       kernel<1, 32,__VA_ARGS__>           \
@@ -62,7 +62,7 @@ namespace quda {
       errorQuda("%s not implemented for %d threads", # kernel, tp.block.x); \
     } \
   } \
-  else if ( tp.block.z == 2 ) { \
+  else if ( tp.aux.x == 2 ) { \
     switch ( tp.block.x ) {             \
     case 256:                \
       kernel<2, 32,__VA_ARGS__>           \
@@ -84,7 +84,7 @@ namespace quda {
       errorQuda("%s not implemented for %d threads", # kernel, tp.block.x); \
     } \
   } \
-  else if ( tp.block.z == 3 ) { \
+  else if ( tp.aux.x == 3 ) { \
     switch ( tp.block.x ) {             \
     case 128:                \
       kernel<3, 32,__VA_ARGS__>           \
@@ -122,7 +122,7 @@ namespace quda {
       errorQuda("%s not implemented for %d threads", # kernel, tp.block.x); \
     } \
   } \
-  else if ( tp.block.z == 4 ) { \
+  else if ( tp.aux.x == 4 ) { \
     switch ( tp.block.x ) {             \
     case 128:                \
       kernel<4, 32,__VA_ARGS__>           \
@@ -160,7 +160,7 @@ namespace quda {
       errorQuda("%s not implemented for %d threads", # kernel, tp.block.x); \
     } \
   } \
-  else if ( tp.block.z == 5 ) { \
+  else if ( tp.aux.x == 5 ) { \
     switch ( tp.block.x ) {             \
     case 128:                \
       kernel<5, 32,__VA_ARGS__>           \
@@ -199,7 +199,7 @@ namespace quda {
     } \
   } \
   else{ \
-    errorQuda("Not implemented for %d", tp.block.z); \
+    errorQuda("Not implemented for %d", tp.aux.x); \
   }
 
 
@@ -237,17 +237,17 @@ namespace quda {
   __global__ void computeFix_quality(GaugeFixQualityArg<Gauge> argQ){
     typedef complex<Float> Cmplx;
 
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int idx_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
     double2 data = make_double2(0.0,0.0);
-    while ( idx < argQ.threads ) {
+    while ( idx_cb < argQ.threads ) {
       int X[4];
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = argQ.X[dr];
 
       int x[4];
-      getCoords(x, idx, X, parity);
+      getCoords(x, idx_cb, X, parity);
 #ifdef MULTI_GPU
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) {
@@ -257,15 +257,14 @@ namespace quda {
 #endif
       Matrix<Cmplx,3> delta;
       setZero(&delta);
-      idx = linkIndex(x,X);
       //load upward links
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
         Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float*)(U.data),idx, mu, parity);
+        argQ.dataOr.load((Float*)(U.data), linkIndex(x, X), mu, parity);
         delta -= U;
       }
       //18*gauge_dir
-      data.x = -delta(0,0).x - delta(1,1).x - delta(2,2).x;
+      data.x += -delta(0,0).x - delta(1,1).x - delta(2,2).x;
       //2
       //load downward links
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
@@ -278,11 +277,11 @@ namespace quda {
       //18
       SubTraceUnit(delta);
       //12
-      data.y = getRealTraceUVdagger(delta, delta);
+      data.y += getRealTraceUVdagger(delta, delta);
       //35
       //T=36*gauge_dir+65
 
-      idx += blockDim.x*gridDim.x;
+      idx_cb += blockDim.x*gridDim.x;
     }
     reduce2d<blockSize,2>(argQ, data);
   }
@@ -456,10 +455,6 @@ namespace quda {
   }
 
 
-
-
-
-
   /**
    * @brief Tunable object for the gauge fixing kernel
    */
@@ -468,89 +463,83 @@ namespace quda {
     GaugeFixArg<Float, Gauge> arg;
     int parity;
     mutable char aux_string[128]; // used as a label in the autotuner
-    protected:
+  protected:
 
-    dim3 createGrid   (const dim3 &block) const {
-      unsigned int blockx = block.x / 8;
-      if ( block.z > 2 ) blockx = block.x / 4;
+    dim3 createGrid(const TuneParam &param) const {
+      unsigned int blockx = param.block.x / 8;
+      if ( param.aux.x > 2 ) blockx = param.block.x / 4;
       unsigned int gx  = (arg.threads + blockx - 1) / blockx;
       return dim3(gx, 1, 1);
     }
+
     bool advanceBlockDim  (TuneParam &param) const {
-      //Use param.block.z to tune and save state for best kernel option
+      //Use param.aux.x to tune and save state for best kernel option
       // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
       const unsigned int min_threads0 = 32 * 8;
       const unsigned int min_threads1 = 32 * 4;
       const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
       const unsigned int atmadd = 0;
       unsigned int min_threads = min_threads0;
-      param.block.z += atmadd;  //USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
-      if ( param.block.z > 2 ) min_threads = 32 * 4;
+      param.aux.x += atmadd;  //USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
+      if ( param.aux.x > 2 ) min_threads = 32 * 4;
       param.block.x += min_threads;
       param.block.y = 1;
-      param.grid  = createGrid(param.block);
+      param.grid = createGrid(param);
 
-
-
-      if  ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
-        if ( param.block.z == 0 ) param.shared_bytes = param.block.x * 4 * sizeof(Float);
-        else if ( param.block.z == 1 || param.block.z == 2 ) param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
-        else if ( param.block.z == 3 ) param.shared_bytes = param.block.x * 4 * sizeof(Float);
-        else if ( param.block.z == 4 || param.block.z == 5 ) param.shared_bytes = param.block.x * sizeof(Float);
+      if ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
+        param.shared_bytes = sharedBytesPerBlock(param);
         return true;
-      }
-      else if ( param.block.z == 0 ) {
+      } else if ( param.aux.x == 0 ) {
         param.block.x = min_threads0;
         param.block.y = 1;
-        param.block.z = 1;  //USE FOR ATOMIC ADD
-        param.grid  = createGrid(param.block);
+        param.aux.x = 1;  //USE FOR ATOMIC ADD
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
         return true;
-      }
-      else if ( param.block.z == 1 ) {
+      } else if ( param.aux.x == 1 ) {
         param.block.x = min_threads0;
         param.block.y = 1;
-        param.block.z = 2;  //USE FOR NO ATOMIC ADD and LESS SHARED MEM
-        param.grid  = createGrid(param.block);
+        param.aux.x = 2;  //USE FOR NO ATOMIC ADD and LESS SHARED MEM
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
         return true;
-      }
-      else if ( param.block.z == 2 ) {
+      } else if ( param.aux.x == 2 ) {
         param.block.x = min_threads1;
         param.block.y = 1;
-        param.block.z = 3;      //USE FOR NO ATOMIC ADD
-        param.grid  = createGrid(param.block);
+        param.aux.x = 3;      //USE FOR NO ATOMIC ADD
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * 4 * sizeof(Float);
         return true;
-      }
-      else if ( param.block.z == 3 ) {
+      } else if ( param.aux.x == 3 ) {
         param.block.x = min_threads1;
         param.block.y = 1;
-        param.block.z = 4;
-        param.grid  = createGrid(param.block);
+        param.aux.x = 4;
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * sizeof(Float);
         return true;
-      }
-      else if ( param.block.z == 4 ) {
+      } else if ( param.aux.x == 4 ) {
         param.block.x = min_threads1;
         param.block.y = 1;
-        param.block.z = 5;
-        param.grid  = createGrid(param.block);
+        param.aux.x = 5;
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * sizeof(Float);
         return true;
-      }
-      else
+      } else {
         return false;
+      }
     }
-    private:
+  private:
     unsigned int sharedBytesPerThread() const {
       return 0;
     }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      if ( param.block.z == 0 ) return param.block.x * 4 * sizeof(Float);
-      else if ( param.block.z == 1 || param.block.z == 2 ) return param.block.x * 4 * sizeof(Float) / 8;
-      else if ( param.block.z == 3 ) return param.block.x * 4 * sizeof(Float);
-      else return param.block.x * sizeof(Float);
+      switch (param.aux.x) {
+      case 0: return param.block.x * 4 * sizeof(Float);
+      case 1: return param.block.x * 4 * sizeof(Float) / 8;
+      case 2: return param.block.x * 4 * sizeof(Float) / 8;
+      case 3: return param.block.x * 4 * sizeof(Float);
+      default: return param.block.x * sizeof(Float);
+      }
     }
 
     bool tuneSharedBytes() const {
@@ -563,13 +552,7 @@ namespace quda {
       return arg.threads;
     }
 
-    public:
-    virtual void initTuneParam(TuneParam &param) const {
-      param.block = dim3(256, 1, 0);
-      param.grid = createGrid(param.block);
-      param.shared_bytes = param.block.x * 4 * sizeof(Float);
-    }
-
+  public:
     GaugeFix(GaugeFixArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
     ~GaugeFix () { }
 
@@ -582,7 +565,13 @@ namespace quda {
       LAUNCH_KERNEL_GAUGEFIX(computeFix, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
 
-    /** Sets default values for when tuning is disabled - this is guaranteed to work, but will be slow */
+    virtual void initTuneParam(TuneParam &param) const {
+      param.block = dim3(256, 1, 1);
+      param.aux.x = 0;
+      param.grid = createGrid(param);
+      param.shared_bytes = sharedBytesPerBlock(param);
+}
+
     virtual void defaultTuneParam(TuneParam &param) const {
       initTuneParam(param);
     }
@@ -599,7 +588,7 @@ namespace quda {
 
     std::string paramString(const TuneParam &param) const {
       std::stringstream ps(Tunable::paramString(param));
-      ps << ", atomicadd=" << param.block.z;
+      ps << ", atomicadd=" << param.aux.x;
       return ps.str();
     }
 
@@ -733,103 +722,93 @@ namespace quda {
   }
 
 
-
-
-
-
-
-
   /**
-   * @brief Tunable object for the interior points of the gauge fixing kernel in multi-GPU implementation
+   * @brief Tunable object for the interior points of the gauge fixing
+   * kernel in multi-GPU implementation
    */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFixInteriorPoints : Tunable {
     GaugeFixInteriorPointsArg<Float, Gauge> arg;
     int parity;
     mutable char aux_string[128]; // used as a label in the autotuner
-    protected:
+  protected:
 
-    dim3 createGrid   (const dim3 &block) const {
-      unsigned int blockx = block.x / 8;
-      if ( block.z > 2 ) blockx = block.x / 4;
+    dim3 createGrid (const TuneParam &param) const {
+      unsigned int blockx = param.block.x / 8;
+      if ( param.aux.x > 2 ) blockx = param.block.x / 4;
       unsigned int gx  = (arg.threads + blockx - 1) / blockx;
       return dim3(gx, 1, 1);
     }
+
     bool advanceBlockDim  (TuneParam &param) const {
-      //Use param.block.z to tune and save state for best kernel option
+      //Use param.aux.x to tune and save state for best kernel option
       // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
       const unsigned int min_threads0 = 32 * 8;
       const unsigned int min_threads1 = 32 * 4;
       const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
       const unsigned int atmadd = 0;
       unsigned int min_threads = min_threads0;
-      param.block.z += atmadd;  //USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
-      if ( param.block.z > 2 ) min_threads = 32 * 4;
+      param.aux.x += atmadd;  //USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
+      if ( param.aux.x > 2 ) min_threads = 32 * 4;
       param.block.x += min_threads;
       param.block.y = 1;
-      param.grid  = createGrid(param.block);
+      param.grid = createGrid(param);
 
-
-
-      if  ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
-        if ( param.block.z == 0 ) param.shared_bytes = param.block.x * 4 * sizeof(Float);
-        else if ( param.block.z == 1 || param.block.z == 2 ) param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
-        else if ( param.block.z == 3 ) param.shared_bytes = param.block.x * 4 * sizeof(Float);
-        else if ( param.block.z == 4 || param.block.z == 5 ) param.shared_bytes = param.block.x * sizeof(Float);
+      if ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
+        param.shared_bytes = sharedBytesPerBlock(param);
         return true;
-      }
-      else if ( param.block.z == 0 ) {
+      } else if ( param.aux.x == 0 ) {
         param.block.x = min_threads0;
         param.block.y = 1;
-        param.block.z = 1;  //USE FOR ATOMIC ADD
-        param.grid  = createGrid(param.block);
+        param.aux.x = 1;  //USE FOR ATOMIC ADD
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
         return true;
-      }
-      else if ( param.block.z == 1 ) {
+      } else if ( param.aux.x == 1 ) {
         param.block.x = min_threads0;
         param.block.y = 1;
-        param.block.z = 2;  //USE FOR NO ATOMIC ADD and LESS SHARED MEM
-        param.grid  = createGrid(param.block);
+        param.aux.x = 2;  //USE FOR NO ATOMIC ADD and LESS SHARED MEM
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
         return true;
-      }
-      else if ( param.block.z == 2 ) {
+      } else if ( param.aux.x == 2 ) {
         param.block.x = min_threads1;
         param.block.y = 1;
-        param.block.z = 3;      //USE FOR NO ATOMIC ADD
-        param.grid  = createGrid(param.block);
+        param.aux.x = 3;      //USE FOR NO ATOMIC ADD
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * 4 * sizeof(Float);
         return true;
-      }
-      else if ( param.block.z == 3 ) {
+      } else if ( param.aux.x == 3 ) {
         param.block.x = min_threads1;
         param.block.y = 1;
-        param.block.z = 4;
-        param.grid  = createGrid(param.block);
+        param.aux.x = 4;
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * sizeof(Float);
         return true;
-      }
-      else if ( param.block.z == 4 ) {
+      } else if ( param.aux.x == 4 ) {
         param.block.x = min_threads1;
         param.block.y = 1;
-        param.block.z = 5;
-        param.grid  = createGrid(param.block);
+        param.aux.x = 5;
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * sizeof(Float);
         return true;
-      }
-      else
+      } else {
         return false;
+      }
     }
-    private:
+
+  private:
     unsigned int sharedBytesPerThread() const {
       return 0;
     }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      if ( param.block.z == 0 ) return param.block.x * 4 * sizeof(Float);
-      else if ( param.block.z == 1 || param.block.z == 2 ) return param.block.x * 4 * sizeof(Float) / 8;
-      else if ( param.block.z == 3 ) return param.block.x * 4 * sizeof(Float);
-      else return param.block.x * sizeof(Float);
+      switch (param.aux.x) {
+      case 0: return param.block.x * 4 * sizeof(Float);
+      case 1: return param.block.x * 4 * sizeof(Float) / 8;
+      case 2: return param.block.x * 4 * sizeof(Float) / 8;
+      case 3: return param.block.x * 4 * sizeof(Float);
+      default: return param.block.x * sizeof(Float);
+      }
     }
 
     bool tuneSharedBytes() const {
@@ -842,26 +821,29 @@ namespace quda {
       return arg.threads;
     }
 
-    public:
-    virtual void initTuneParam(TuneParam &param) const {
-      param.block = dim3(256, 1, 0);
-      param.grid = createGrid(param.block);
-      param.shared_bytes = param.block.x * 4 * sizeof(Float);
-    }
-    GaugeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
-    ~GaugeFixInteriorPoints () { }
-    void setParity(const int par){
-      parity = par;
-    }
+  public:
+    GaugeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> &arg) :
+      arg(arg), parity(0) { }
 
-    void apply(const cudaStream_t &stream){
+    ~GaugeFixInteriorPoints () { }
+
+    void setParity(const int par) { parity = par; }
+
+    void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFixInteriorPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
 
+    virtual void initTuneParam(TuneParam &param) const
+    {
+      param.block = dim3(256, 1, 1);
+      param.aux.x = 0;
+      param.grid = createGrid(param);
+      param.shared_bytes = sharedBytesPerBlock(param);
+    }
 
-    /** Sets default values for when tuning is disabled - this is guaranteed to work, but will be slow */
-    virtual void defaultTuneParam(TuneParam &param) const {
+    virtual void defaultTuneParam(TuneParam &param) const
+    {
       initTuneParam(param);
     }
 
@@ -877,7 +859,7 @@ namespace quda {
 
     std::string paramString(const TuneParam &param) const {
       std::stringstream ps(Tunable::paramString(param));
-      ps << ", atomicadd=" << param.block.z;
+      ps << ", atomicadd=" << param.aux.x;
       return ps.str();
     }
 
@@ -896,20 +878,6 @@ namespace quda {
       return 8LL * 2 * arg.threads * numParams * sizeof(Float);
     }                                                                           // Only correct if there is no link reconstruction load+save
   };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   template <typename Float, typename Gauge>
@@ -1028,87 +996,81 @@ namespace quda {
     mutable char aux_string[128]; // used as a label in the autotuner
     protected:
 
-    dim3 createGrid   (const dim3 &block) const {
-      unsigned int blockx = block.x / 8;
-      if ( block.z > 2 ) blockx = block.x / 4;
+    dim3 createGrid(const TuneParam &param) const {
+      unsigned int blockx = param.block.x / 8;
+      if ( param.aux.x > 2 ) blockx = param.block.x / 4;
       unsigned int gx  = (arg.threads + blockx - 1) / blockx;
       return dim3(gx, 1, 1);
     }
-    bool advanceBlockDim  (TuneParam &param) const {
-      //Use param.block.z to tune and save state for best kernel option
+
+    bool advanceBlockDim (TuneParam &param) const {
+      //Use param.aux.x to tune and save state for best kernel option
       // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
       const unsigned int min_threads0 = 32 * 8;
       const unsigned int min_threads1 = 32 * 4;
       const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
       const unsigned int atmadd = 0;
       unsigned int min_threads = min_threads0;
-      param.block.z += atmadd;  //USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
-      if ( param.block.z > 2 ) min_threads = 32 * 4;
+      param.aux.x += atmadd;  //USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
+      if ( param.aux.x > 2 ) min_threads = 32 * 4;
       param.block.x += min_threads;
       param.block.y = 1;
-      param.grid  = createGrid(param.block);
+      param.grid = createGrid(param);
 
-
-
-      if  ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
-        if ( param.block.z == 0 ) param.shared_bytes = param.block.x * 4 * sizeof(Float);
-        else if ( param.block.z == 1 || param.block.z == 2 ) param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
-        else if ( param.block.z == 3 ) param.shared_bytes = param.block.x * 4 * sizeof(Float);
-        else if ( param.block.z == 4 || param.block.z == 5 ) param.shared_bytes = param.block.x * sizeof(Float);
+      if ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
+        param.shared_bytes = sharedBytesPerBlock(param);
         return true;
-      }
-      else if ( param.block.z == 0 ) {
+      } else if ( param.aux.x == 0 ) {
         param.block.x = min_threads0;
         param.block.y = 1;
-        param.block.z = 1;  //USE FOR ATOMIC ADD
-        param.grid  = createGrid(param.block);
+        param.aux.x = 1;  //USE FOR ATOMIC ADD
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
         return true;
-      }
-      else if ( param.block.z == 1 ) {
+      } else if ( param.aux.x == 1 ) {
         param.block.x = min_threads0;
         param.block.y = 1;
-        param.block.z = 2;  //USE FOR NO ATOMIC ADD and LESS SHARED MEM
-        param.grid  = createGrid(param.block);
+        param.aux.x = 2;  //USE FOR NO ATOMIC ADD and LESS SHARED MEM
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
         return true;
-      }
-      else if ( param.block.z == 2 ) {
+      } else if ( param.aux.x == 2 ) {
         param.block.x = min_threads1;
         param.block.y = 1;
-        param.block.z = 3;      //USE FOR NO ATOMIC ADD
-        param.grid  = createGrid(param.block);
+        param.aux.x = 3;      //USE FOR NO ATOMIC ADD
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * 4 * sizeof(Float);
         return true;
-      }
-      else if ( param.block.z == 3 ) {
+      } else if ( param.aux.x == 3 ) {
         param.block.x = min_threads1;
         param.block.y = 1;
-        param.block.z = 4;
-        param.grid  = createGrid(param.block);
+        param.aux.x = 4;
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * sizeof(Float);
         return true;
-      }
-      else if ( param.block.z == 4 ) {
+      } else if ( param.aux.x == 4 ) {
         param.block.x = min_threads1;
         param.block.y = 1;
-        param.block.z = 5;
-        param.grid  = createGrid(param.block);
+        param.aux.x = 5;
+        param.grid = createGrid(param);
         param.shared_bytes = param.block.x * sizeof(Float);
         return true;
-      }
-      else
+      } else {
         return false;
+      }
     }
     private:
     unsigned int sharedBytesPerThread() const {
       return 0;
     }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      if ( param.block.z == 0 ) return param.block.x * 4 * sizeof(Float);
-      else if ( param.block.z == 1 || param.block.z == 2 ) return param.block.x * 4 * sizeof(Float) / 8;
-      else if ( param.block.z == 3 ) return param.block.x * 4 * sizeof(Float);
-      else return param.block.x * sizeof(Float);
+      switch (param.aux.x) {
+      case 0: return param.block.x * 4 * sizeof(Float);
+      case 1: return param.block.x * 4 * sizeof(Float) / 8;
+      case 2: return param.block.x * 4 * sizeof(Float) / 8;
+      case 3: return param.block.x * 4 * sizeof(Float);
+      default: return param.block.x * sizeof(Float);
+      }
     }
 
     bool tuneSharedBytes() const {
@@ -1121,12 +1083,7 @@ namespace quda {
       return arg.threads;
     }
 
-    public:
-    virtual void initTuneParam(TuneParam &param) const {
-      param.block = dim3(256, 1, 0);
-      param.grid = createGrid(param.block);
-      param.shared_bytes = param.block.x * 4 * sizeof(Float);
-    }
+  public:
     GaugeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
     ~GaugeFixBorderPoints () {
       if ( comm_partitioned() ) for ( int i = 0; i < 2; i++ ) pool_device_free(arg.borderpoints[i]);
@@ -1140,7 +1097,13 @@ namespace quda {
       LAUNCH_KERNEL_GAUGEFIX(computeFixBorderPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
 
-    /** Sets default values for when tuning is disabled - this is guaranteed to work, but will be slow */
+    virtual void initTuneParam(TuneParam &param) const {
+      param.block = dim3(256, 1, 1);
+      param.aux.x = 0;
+      param.grid = createGrid(param);
+      param.shared_bytes = sharedBytesPerBlock(param);
+    }
+
     virtual void defaultTuneParam(TuneParam &param) const {
       initTuneParam(param);
     }
@@ -1157,7 +1120,7 @@ namespace quda {
 
     std::string paramString(const TuneParam &param) const {
       std::stringstream ps(Tunable::paramString(param));
-      ps << ", atomicadd=" << param.block.z;
+      ps << ", atomicadd=" << param.aux.x;
       return ps.str();
     }
 

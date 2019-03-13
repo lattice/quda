@@ -312,11 +312,6 @@ TEST_F(GaugeAlgTest,Coulomb_FFT){
 }
 
 
-
-
-
-
-
 int main(int argc, char **argv){
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
