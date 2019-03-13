@@ -209,6 +209,9 @@ namespace quda {
 			    const int *commOverride, TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
+    // with 5-d checkerboarding we must use kernel packing
+    pushKernelPackT(true);
+
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     DslashCuda *dslash = 0;
@@ -229,6 +232,8 @@ namespace quda {
     dslash_policy.apply(0);
 
     delete dslash;
+
+    popKernelPackT();
 #else
     errorQuda("Domain wall dslash has not been built");
 #endif
