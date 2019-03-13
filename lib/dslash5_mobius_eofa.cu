@@ -96,8 +96,8 @@ namespace quda {
 
         switch (type) {
         case M5_EOFA:
-          for (int s = 0; s < Ls; s++) { eofa_coeffs->u[s] = eofa_u[s]; }
-          cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>) / 3, 0, cudaMemcpyHostToDevice,
+          for (int s = 0; s < Ls; s++) { eofa_coeffs->u[s] = eofa_u[s]; printfQuda("eofa_coeffs->u[%02d]=%.6f\n", s, eofa_coeffs->u[s]);}
+          cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>), 0, cudaMemcpyHostToDevice,
               streams[Nstream - 1]);
           break;
         case M5INV_EOFA:

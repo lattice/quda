@@ -838,10 +838,10 @@ namespace quda {
     double b = b_5[0].real();
     double c = c_5[0].real();
     
-    kappa5 = (c*(m5+4.)-1.) / (b*(m5+4.)+1.);
+    // kappa5 = (c*(m5+4.)-1.) / (b*(m5+4.)+1.);
     double alpha = b+c;
    
-    kappa_b = 0.5 / (b*(m5+4.)+1.);
+    // kappa_b = 0.5 / (b*(m5+4.)+1.);
 
     double eofa_norm = alpha * (mq3-mq2) * std::pow(alpha+1., 2.*Ls)
                           / ( std::pow(alpha+1.,Ls) + mq2*std::pow(alpha-1.,Ls) )
@@ -1000,7 +1000,7 @@ namespace quda {
       Dslash4pre(*tmp1, out, parity[0]);
       m5inv_eofa(out, *tmp1);
       Dslash4(*tmp1, out, parity[1]);
-      Dslash4preXpay(out, *tmp1, parity[1], in, -1.0);
+      Dslash4preXpay(out, *tmp1, parity[1], in, -1.);
     } else if (!symmetric && !dagger) {
       Dslash4pre(*tmp1, in, parity[1]);
       Dslash4(out, *tmp1, parity[0]);
@@ -1110,15 +1110,28 @@ namespace quda {
     checkFullSpinor(out, in);
     bool reset1 = newTmp(&tmp1, in.Odd());
     bool reset2 = newTmp(&tmp2, in.Odd());
-    // Even
-    m5_eofa(*tmp1, in.Even());
-    Dslash4pre(*tmp2, in.Odd(), QUDA_ODD_PARITY);
-    Dslash4Xpay(out.Even(), *tmp2, QUDA_EVEN_PARITY, *tmp1, -1.);
-    // Odd
-    m5_eofa(*tmp1, in.Odd());
-    Dslash4pre(*tmp2, in.Even(), QUDA_EVEN_PARITY);
-    Dslash4Xpay(out.Odd(), *tmp2, QUDA_ODD_PARITY, *tmp1, -1.);
-   
+    if(!dagger){
+      // Even
+      m5_eofa(*tmp1, in.Even());
+      Dslash4pre(*tmp2, in.Odd(), QUDA_ODD_PARITY);
+      Dslash4Xpay(out.Even(), *tmp2, QUDA_EVEN_PARITY, *tmp1, -1.);
+      // Odd
+      m5_eofa(*tmp1, in.Odd());
+      Dslash4pre(*tmp2, in.Even(), QUDA_EVEN_PARITY);
+      Dslash4Xpay(out.Odd(), *tmp2, QUDA_ODD_PARITY, *tmp1, -1.);
+    }else{
+      printfQuda("Quda EOFA full dslash dagger=yes\n");
+      // Even
+      m5_eofa(*tmp1, in.Even());
+      // Dslash5(*tmp1, in.Even(), QUDA_EVEN_PARITY);
+      Dslash4(*tmp2, in.Odd(), QUDA_EVEN_PARITY);
+      Dslash4preXpay(out.Even(), *tmp2, QUDA_EVEN_PARITY, *tmp1, -1./kappa_b);
+      // Odd
+      m5_eofa(*tmp1, in.Odd());
+      // Dslash5(*tmp1, in.Odd(), QUDA_ODD_PARITY);
+      Dslash4(*tmp2, in.Even(), QUDA_ODD_PARITY);
+      Dslash4preXpay(out.Odd(), *tmp2, QUDA_ODD_PARITY, *tmp1, -1./kappa_b);
+    }
     deleteTmp(&tmp1, reset1);
     deleteTmp(&tmp2, reset2);
   }
