@@ -881,7 +881,7 @@ namespace quda {
       // eofa_pm = minus
       // Computing x
       eofa_x[Ls-1] = eofa_u[Ls-1]; 
-      for(int s = 0; s < Ls; s++){
+      for(int s = 0; s < Ls-1; s++){
         eofa_x[Ls-1] -= factor*eofa_u[s];
         factor *= -kappa5;
       }
@@ -898,6 +898,16 @@ namespace quda {
     }
     m5inv_fac = 0.5/(1.+factor); // 0.5 for the spin project factor
     sherman_morrison_fac = -0.5/(1.+sherman_morrison_fac); // 0.5 for the spin project factor
+/*    
+    printfQuda("Mobius parameters:\n");
+    printfQuda("b       = %+6.4e\n", b);
+    printfQuda("c       = %+6.4e\n", c);
+    printfQuda("kappab  = %+6.4e\n", kappa_b);
+    printfQuda("kappac  = %+6.4e\n", kappa_c);
+    printfQuda("kappa5  = %+6.4e\n", kappa5); 
+    printfQuda("m5inv_fac             = %+16.12e\n", m5inv_fac); 
+    printfQuda("sherman_morrison_fac  = %+16.12e\n", sherman_morrison_fac); 
+*/  
   }
 
   // Specify the EOFA specific parameters
