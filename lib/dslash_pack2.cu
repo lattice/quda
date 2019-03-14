@@ -138,7 +138,8 @@ namespace quda {
       default: errorQuda("Number of faces not supported");
       }
 
-      twist = ((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0);
+      twist = ((b != 0.0) ? (c != 0.0 ? 2 : 1) : 0);
+      if (twist && a == 0.0) errorQuda("Twisted packing requires non-zero scale factor a");
       if (twist) strcat(aux, twist==2 ? ",twist-doublet" : ",twist-singlet");
 
 #ifndef STRIPED
