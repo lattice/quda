@@ -93,7 +93,7 @@ namespace quda {
     int s = blockIdx.y*blockDim.y + threadIdx.y;
     if (s >= arg.Ls) return;
 
-    // for full fields set parity from y thread index else use arg setting
+    // for full fields set parity from z thread index else use arg setting
     int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     switch(parity) {

@@ -138,7 +138,7 @@ namespace quda {
     // for this operator flavor can be spread onto different blocks
     int flavor = blockIdx.y*blockDim.y + threadIdx.y;
 
-    // for full fields set parity from y thread index else use arg setting
+    // for full fields set parity from z thread index else use arg setting
     int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     if (arg.asymmetric) {

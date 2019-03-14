@@ -106,7 +106,7 @@ namespace quda {
 
     int x5_cb = s*arg.threads + x_cb; // 5-d checkerboard index
 
-    // for full fields set parity from y thread index else use arg setting
+    // for full fields set parity from z thread index else use arg setting
     int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     switch(parity) {
