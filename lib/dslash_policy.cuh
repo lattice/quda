@@ -328,7 +328,10 @@ inline void setFusedParam(Arg & param, Dslash &dslash, const int* faceVolumeCB){
       // in the below we switch to the mapped ghost buffer and update the tuneKey to reflect this
       in.bufferIndex += 2;
       strcpy(aux_copy,dslash.getAux(dslash.dslashParam.kernel_type));
-      dslash.augmentAux(dslash.dslashParam.kernel_type, ",zero_copy");
+      if (comm_peer2peer_enabled_global())
+        dslash.augmentAux(dslash.dslashParam.kernel_type, ",zero_copy,p2p=1");
+      else
+        dslash.augmentAux(dslash.dslashParam.kernel_type, ",zero_copy,p2p=0");
       set_mapped = true;
     } else {
       if (!set_mapped) errorQuda("set_mapped not set");
