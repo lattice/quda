@@ -136,6 +136,9 @@ namespace quda {
 
     QluaUtilArg *utilArg;
 
+    //- Number of vectors to contract, for propagators nVec = 12
+    int nVec;
+
     //- contraction type
     qluaCntr_Type cntrType;
     
@@ -160,9 +163,9 @@ namespace quda {
     //- cudaPropFrw_bsh: Device forward (shifted) propagator
     //- cudaPropBkw: Device backward propagator
     //- cudaPropAux: Device vector used for shifts, will be getting swapped with cudaPropFrw_bsh
-    cpuColorSpinorField *cpuPropFrw[QUDA_PROP_NVEC];
-    cudaColorSpinorField *cudaPropFrw_bsh[QUDA_PROP_NVEC];
-    cudaColorSpinorField *cudaPropBkw[QUDA_PROP_NVEC];
+    cpuColorSpinorField *cpuPropFrw[QUDA_MAX_NVEC];
+    cudaColorSpinorField *cudaPropFrw_bsh[QUDA_MAX_NVEC];
+    cudaColorSpinorField *cudaPropBkw[QUDA_MAX_NVEC];
     cudaColorSpinorField *cudaPropAux;
 
     /* device gauge fields
@@ -196,7 +199,7 @@ namespace quda {
 
 
   void qcCPUtoCudaVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec);
-  void qcCPUtoCudaProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp);
+  void qcCPUtoCudaProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp, int Nvec);
   void qcSetGaugeToUnity(cudaGaugeField *U, int mu, const int *R);
   void qcCopyExtendedGaugeField(cudaGaugeField *dst, cudaGaugeField *src, const int *R);
   void qcCopyCudaLink(cudaGaugeField *dst, int i_dst, cudaGaugeField *src, int i_src, const int *R);

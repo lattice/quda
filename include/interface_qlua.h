@@ -28,7 +28,8 @@ typedef double QUDA_REAL;
 #define QUDA_Ns 4
 #define QUDA_DIM 4
 #define QUDA_MAX_RANK 6
-#define QUDA_PROP_NVEC 12
+#define QUDA_MAX_NVEC 32
+#define QUDA_NVEC_PROP 12
 #define QUDA_TIME_AXIS 3
 #define QUDA_LEN_G (QUDA_Ns*QUDA_Ns)
 
@@ -109,6 +110,7 @@ typedef struct {
 } cntrQQParam;
 
 typedef struct {
+  int nVec;
   int QsqMax;
   int Nmoms;
   int Ndata;

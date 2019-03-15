@@ -236,8 +236,10 @@ namespace quda {
     const int nFace  = 1;
     x->exchangeGhost((QudaParity)(1), nFace, 0); //- first argument is redundant when nParity = 2. nFace MUST be 1 for now.
   }
-  void qcExchangeGhostProp(ColorSpinorField **x){
-    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+
+  //- Deprecated function
+  void qcExchangeGhostProp(ColorSpinorField **x, int Nvec=12){
+    for(int ivec=0;ivec<Nvec;ivec++){
       qcExchangeGhostVec(x[ivec]);
     }
   }
@@ -259,8 +261,8 @@ namespace quda {
   void qcCPUtoCudaVec(cudaColorSpinorField *cudaVec, cpuColorSpinorField *cpuVec){
     *cudaVec = *cpuVec;
   }  
-  void qcCPUtoCudaProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp){
-    for(int i=0;i<QUDA_PROP_NVEC;i++)
+  void qcCPUtoCudaProp(cudaColorSpinorField **cudaProp, cpuColorSpinorField **cpuProp, int Nvec){
+    for(int i=0;i<Nvec;i++)
       qcCPUtoCudaVec(cudaProp[i], cpuProp[i]);
   }
   //---------------------------------------------------------------------------
@@ -596,7 +598,7 @@ namespace quda {
     if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) )
       errorQuda("%s: Contraction type %s not supported!\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
-    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, paramAPI.mpParam.cntrType, paramAPI.preserveBasis); 
+    QluaContractArg arg(cudaProp1, cudaProp2, cudaProp3, paramAPI.mpParam.cntrType, paramAPI.preserveBasis, paramAPI.mpParam.nVec); 
     QluaContractArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(arg) );
     checkCudaError();
@@ -663,7 +665,7 @@ namespace quda {
       errorQuda("%s: This function supports only TMD and PDF contractions!\n", func_name);
 
     if(qcs->cntrType == what_tmd_g_F_B){
-      qcTMD_Arg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, qcs->wlinks, qcs->i_wl_vbv, qcs->paramAPI.preserveBasis);    
+      qcTMD_Arg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, qcs->wlinks, qcs->i_wl_vbv, qcs->paramAPI.preserveBasis, qcs->nVec);    
       qcTMD_Arg *arg_dev;
       cudaMalloc((void**)&(arg_dev), sizeof(arg) );
       checkCudaError();
@@ -689,7 +691,7 @@ namespace quda {
       cudaFree(arg_dev);
     }
     else{
-      QluaContractArg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, NULL, qcs->cntrType, qcs->paramAPI.preserveBasis); 
+      QluaContractArg arg(qcs->cudaPropFrw_bsh, qcs->cudaPropBkw, NULL, qcs->cntrType, qcs->paramAPI.preserveBasis, qcs->nVec); 
       QluaContractArg *arg_dev;
       cudaMalloc((void**)&(arg_dev), sizeof(arg) );
       checkCudaError();

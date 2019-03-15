@@ -856,7 +856,7 @@ int momProjCorr_uLocal(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQuda_de
 }
 
 
-//-- CK-TODO: Make this function support only Standard contractions
+//-- This function supports only Standard (ultra-local) contractions
 EXTRN_C int
 QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qudaLattice *qS, const int *momlist,
 			   QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3, QUDA_REAL *h_gauge[],
@@ -876,8 +876,8 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
 
   if(paramAPI.mpParam.cntrType == what_none)
     errorQuda("%s: Contraction type not parsed correctly or not supported!\n", func_name);
-  else if(paramAPI.mpParam.cntrType == what_tmd_g_F_B)
-    errorQuda("%s: This function does not support TMD contractions!\n", func_name);
+  else if((paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B))
+    errorQuda("%s: This function does not support the qPDF and TMD contractions!\n", func_name);
   else
     printfQuda("%s: Got Contraction type %s\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
@@ -895,7 +895,8 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   //------------------------------------------------------------------------------------------
 
   //-- Load the propagators into cuda-CSFs
-  int nVec = QUDA_PROP_NVEC;
+  int nVec = paramAPI.mpParam.nVec;
+  printfQuda("%s: Got nVec = %d\n", func_name, nVec);
   LONG_T fieldLgh = paramAPI.mpParam.locvol * Nc * Ns * 2;
 
   cudaColorSpinorField *cudaProp1[nVec];
@@ -1210,8 +1211,12 @@ TMD_QPDF_initState_Quda(void **Vqcs, const qudaLattice *qS,
   if(paramAPI.mpParam.expSgn != 1 && paramAPI.mpParam.expSgn != -1)
     errorQuda("%s: Got invalid exponential sign, expSgn = %d!\n", func_name, paramAPI.mpParam.expSgn);
 
+
+  int nVec = paramAPI.mpParam.nVec;
+
   //-- Print parameters
   printfQuda("%s:\n", func_name);
+  printfQuda("  Got nVec     = %d\n", nVec);
   printfQuda("  Got local lattice (x,y,z,t) = (%d,%d,%d,%d)\n",
 	     paramAPI.mpParam.localL[0], paramAPI.mpParam.localL[1],
 	     paramAPI.mpParam.localL[2], paramAPI.mpParam.localL[3]);
@@ -1253,6 +1258,7 @@ TMD_QPDF_initState_Quda(void **Vqcs, const qudaLattice *qS,
   //-- Initialize generic variables of qcs
   qcs->cntrType = paramAPI.mpParam.cntrType;
   qcs->push_res = paramAPI.mpParam.push_res;
+  qcs->nVec     = paramAPI.mpParam.nVec;
   qcs->paramAPI = paramAPI;
 
   //- Setup the indices of the wlinks Color-Matrices
@@ -1327,7 +1333,6 @@ TMD_QPDF_initState_Quda(void **Vqcs, const qudaLattice *qS,
   //-- Load the propagators into cuda-CSFs
   double t3 = MPI_Wtime();
 
-  int nVec = QUDA_PROP_NVEC;
   LONG_T csVecLgh  = paramAPI.mpParam.locvol * Nc * Ns * 2;
 
   //- Allocate device pointers of Forward and Backward propagators
@@ -1455,7 +1460,7 @@ TMD_QPDF_freeState_Quda(void **Vqcs){
   }
 
   //- Delete propagators
-  for(int i=0;i<QUDA_PROP_NVEC;i++){
+  for(int i=0;i<qcs->nVec;i++){
     delete qcs->cpuPropFrw[i];
     delete qcs->cudaPropFrw_bsh[i];
     delete qcs->cudaPropBkw[i];
@@ -1551,9 +1556,9 @@ TMDstep_momProj_Quda(void *Vqcs,
     b_lpath_ptr = qcs->b_lpath;
     memset(b_lpath_ptr, 0, sizeof(qcs->b_lpath));
     
-    qcCPUtoCudaProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
-    qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b, qcs->qcR);       //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
-    qcCopyExtendedGaugeField(qcs->bsh_u, qcs->gf_u, qcs->qcR);   //- (re)set qcs->bsh_u to qcs->gf_u
+    qcCPUtoCudaProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw, qcs->nVec);  //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
+    qcSetGaugeToUnity(qcs->wlinks, qcs->i_wl_b, qcs->qcR);              //- (re)set qcs->wlinks[qcs->i_wl_b] {Wb} to unit matrix
+    qcCopyExtendedGaugeField(qcs->bsh_u, qcs->gf_u, qcs->qcR);          //- (re)set qcs->bsh_u to qcs->gf_u
     double t21 = MPI_Wtime();
     if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("TIMING - %s: b_path reset done in %f sec.\n", func_name, t21-t20);
@@ -1566,7 +1571,7 @@ TMDstep_momProj_Quda(void *Vqcs,
 
     //- Non-Covariant shift of qcs->cudaPropFrw_bsh in dir 'c'
     double t1 = MPI_Wtime();
-    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+    for(int ivec=0;ivec<qcs->nVec;ivec++){
       perform_ShiftCudaVec_nonCov(qcs->cudaPropAux, qcs->cudaPropFrw_bsh[ivec], shfFlag);
       qcSwapCudaVec(&(qcs->cudaPropFrw_bsh[ivec]), &(qcs->cudaPropAux));
     }
@@ -1718,7 +1723,7 @@ QPDFstep_momProj_Quda(void *Vqcs,
     b_lpath_ptr = qcs->b_lpath;
     memset(b_lpath_ptr, 0, sizeof(qcs->b_lpath));
     
-    qcCPUtoCudaProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
+    qcCPUtoCudaProp(qcs->cudaPropFrw_bsh, qcs->cpuPropFrw, qcs->nVec);      //- (re)set qcs->cudaPropFrw_bsh to qcs->hostPropFrw 
     double t21 = MPI_Wtime();
     if(getVerbosity() >= QUDA_VERBOSE)
       printfQuda("TIMING - %s: b_path reset done in %f sec.\n", func_name, t21-t20);
@@ -1731,7 +1736,7 @@ QPDFstep_momProj_Quda(void *Vqcs,
 
     //- Covariant shift of qcs->cudaPropFrw_bsh in dir 'c'
     double t1 = MPI_Wtime();
-    for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+    for(int ivec=0;ivec<qcs->nVec;ivec++){
       perform_ShiftCudaVec_Cov(qcs->cudaPropAux, qcs->cudaPropFrw_bsh[ivec], qcs->gf_u, shfFlag);
       qcSwapCudaVec(&(qcs->cudaPropFrw_bsh[ivec]), &(qcs->cudaPropAux));
     }

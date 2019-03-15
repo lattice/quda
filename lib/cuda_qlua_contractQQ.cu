@@ -24,10 +24,10 @@ namespace quda {
     const int Ns = QUDA_Ns;						\
     const int Nc = QUDA_Nc;						\
     									\
-    Vector In1[QUDA_PROP_NVEC];						\
-    Vector In2[QUDA_PROP_NVEC];						\
+    Vector In1[QUDA_NVEC_PROP];						\
+    Vector In2[QUDA_NVEC_PROP];						\
     									\
-    for(int i=0;i<12;i++){						\
+    for(int i=0;i<arg->nVec;i++){					\
       In1[i] = arg->pIn1[i](x_cb, pty);					\
       In2[i] = arg->pIn2[i](x_cb, pty);					\
     }									\
@@ -75,7 +75,7 @@ namespace quda {
   
   __device__ __host__ inline void computeContractQQ(ContractQQArg *arg, int x_cb, int pty){
     
-    Vector out[QUDA_PROP_NVEC];
+    Vector out[QUDA_NVEC_PROP];
     
     switch(arg->cntrID){
     case cntr12:
@@ -180,10 +180,8 @@ namespace quda {
     
     if(Nc != QUDA_Nc) errorQuda("cudaContractQQ: Supports only Ncolor = %d. Got Nc = %d\n", QUDA_Nc, Nc);
     if(Ns != QUDA_Ns) errorQuda("cudaContractQQ: Supports only Nspin = %d.  Got Ns = %d\n", QUDA_Ns, Ns);
-    if(cQQParam.nVec != QUDA_PROP_NVEC) errorQuda("cudaContractQQ: Supports only nVec = %d.  Got nVec = %d\n", QUDA_PROP_NVEC, cQQParam.nVec);
     
-    ContractQQArg arg(propOut, propIn1, propIn2, parity, cQQParam);
-    
+    ContractQQArg arg(propOut, propIn1, propIn2, parity, cQQParam);    
     ContractQQArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(ContractQQArg) );
     cudaMemcpy(arg_dev, &arg, sizeof(ContractQQArg), cudaMemcpyHostToDevice);

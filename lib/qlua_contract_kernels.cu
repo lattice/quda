@@ -951,7 +951,7 @@ namespace quda {
     const int Nc = QC_Nc;
 
     if(!preserveBasis)
-      rotateVectorBasis(vec,QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
+      rotateVectorBasis(vec, QLUA_quda2qdp); //-- Rotate basis back to the QDP conventions
 
     for(int jc = 0; jc < Nc; jc++){
       for(int js = 0; js < Ns; js++){
@@ -1001,10 +1001,10 @@ namespace quda {
     complex<QC_REAL> prop2[QC_LEN_P];
     complex<QC_REAL> prop3[QC_LEN_P];
 
-    Vector vec1[QUDA_PROP_NVEC];
-    Vector vec2[QUDA_PROP_NVEC];
-    Vector vec3[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
+    Vector vec1[QUDA_NVEC_PROP];
+    Vector vec2[QUDA_NVEC_PROP];
+    Vector vec3[QUDA_NVEC_PROP];
+    for(int i=0;i<arg->nVec;i++){
       vec1[i] = arg->prop1[i](x_cb, pty);
       vec2[i] = arg->prop2[i](x_cb, pty);
       vec3[i] = arg->prop3[i](x_cb, pty);
@@ -1034,9 +1034,9 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    Vector vec1[QUDA_PROP_NVEC];
-    Vector vec2[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
+    Vector vec1[QUDA_NVEC_PROP];
+    Vector vec2[QUDA_NVEC_PROP];
+    for(int i=0;i<arg->nVec;i++){
       vec1[i] = arg->prop1[i](x_cb, pty);
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
@@ -1063,9 +1063,9 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    Vector vec1[QUDA_PROP_NVEC];
-    Vector vec2[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
+    Vector vec1[QUDA_NVEC_PROP];
+    Vector vec2[QUDA_NVEC_PROP];
+    for(int i=0;i<arg->nVec;i++){
       vec1[i] = arg->prop1[i](x_cb, pty);
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
@@ -1093,9 +1093,9 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    Vector vec1[QUDA_PROP_NVEC];
-    Vector vec2[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
+    Vector vec1[QUDA_NVEC_PROP];
+    Vector vec2[QUDA_NVEC_PROP];
+    for(int i=0;i<arg->nVec;i++){
       vec1[i] = arg->prop1[i](x_cb, pty);
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
@@ -1122,9 +1122,9 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    Vector vec1[QUDA_PROP_NVEC];
-    Vector vec2[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
+    Vector vec1[QUDA_NVEC_PROP];
+    Vector vec2[QUDA_NVEC_PROP];
+    for(int i=0;i<arg->nVec;i++){
       vec1[i] = arg->prop1[i](x_cb, pty);
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
@@ -1151,9 +1151,9 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    Vector vec1[QUDA_PROP_NVEC];
-    Vector vec2[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
+    Vector vec1[QUDA_NVEC_PROP];
+    Vector vec2[QUDA_NVEC_PROP];
+    for(int i=0;i<arg->nVec;i++){
       vec1[i] = arg->prop1[i](x_cb, pty);
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
@@ -1180,9 +1180,9 @@ namespace quda {
     complex<QC_REAL> prop1[QC_LEN_P];
     complex<QC_REAL> prop2[QC_LEN_P];
 
-    Vector vec1[QUDA_PROP_NVEC];
-    Vector vec2[QUDA_PROP_NVEC];
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
+    Vector vec1[QUDA_NVEC_PROP];
+    Vector vec2[QUDA_NVEC_PROP];
+    for(int i=0;i<arg->nVec;i++){
       vec1[i] = arg->prop1[i](x_cb, pty);
       vec2[i] = arg->prop2[i](x_cb, pty);
     }
@@ -1227,7 +1227,7 @@ namespace quda {
     gres[QC_LIDX_G(i1, i2)] = 0.;
     /* loop over vectors */
 #pragma unroll
-    for (int i=0; i<QUDA_PROP_NVEC; i++){
+    for (int i=0; i<arg->nVec; i++){
       /* load v1, v2 */
       if (0 == i12) {
         *(reinterpret_cast<Vector *>(v1)) = arg->prop1[i](x_cb, pty);
@@ -1312,7 +1312,7 @@ namespace quda {
     gres[QC_LIDX_G(i1, i2)] = 0.;
     /* loop over vectors */
 #pragma unroll
-    for (int i=0; i<QUDA_PROP_NVEC; i++){
+    for (int i=0; i<arg->nVec; i++){
       /* load v1, v2 */
       if (0 == i12) {
         *(reinterpret_cast<Vector *>(v1)) = arg->fwdProp[i](x_cb, pty);

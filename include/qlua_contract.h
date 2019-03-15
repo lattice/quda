@@ -53,8 +53,9 @@ namespace quda {
 
     const int Ns = QUDA_Ns;
     const int Nc = QUDA_Nc;
+    const int NV = QUDA_NVEC_PROP;
 
-    Vector res[QUDA_PROP_NVEC];
+    Vector res[NV];
 
     complex<QUDA_REAL> zro = complex<QUDA_REAL>{0,0};
     complex<QUDA_REAL> val = complex<QUDA_REAL>{sqrt(0.5),0};
@@ -90,7 +91,7 @@ namespace quda {
           }}}
     }
 
-    for(int v = 0; v<QUDA_PROP_NVEC; v++)
+    for(int v = 0; v<NV; v++)
       vecIO[v] = res[v];
 
   }
@@ -98,9 +99,9 @@ namespace quda {
 
   struct ContractQQArg {
 
-    Propagator pIn1[QUDA_PROP_NVEC];  // Input propagator 1
-    Propagator pIn2[QUDA_PROP_NVEC];  // Input propagator 2
-    Propagator pOut[QUDA_PROP_NVEC];  // Output propagator
+    Propagator pIn1[QUDA_MAX_NVEC];  // Input propagator 1
+    Propagator pIn2[QUDA_MAX_NVEC];  // Input propagator 2
+    Propagator pOut[QUDA_MAX_NVEC];  // Output propagator
 
     const int parity;                 // only use this for single parity fields
     const int nParity;                // number of parities we're working on
@@ -119,6 +120,9 @@ namespace quda {
       volumeCB(propIn1[0]->VolumeCB()), nVec(cQQParam.nVec), cntrID(cQQParam.cntrID)
     {
 
+      if(nVec != QUDA_NVEC_PROP)
+	errorQuda("ContractQQArg: QuarkQQ Contractions support only nVec = %d. Got nVec = %d\n", QUDA_NVEC_PROP, nVec);
+
       for(int ivec=0;ivec<nVec;ivec++){
         pIn1[ivec].init(*propIn1[ivec]);
         pIn2[ivec].init(*propIn2[ivec]);
@@ -132,10 +136,11 @@ namespace quda {
 
   struct QluaContractArg {
     
-    Propagator prop1[QUDA_PROP_NVEC]; // Input
-    Propagator prop2[QUDA_PROP_NVEC]; // Propagators
-    Propagator prop3[QUDA_PROP_NVEC]; //
+    Propagator prop1[QUDA_MAX_NVEC]; // Input
+    Propagator prop2[QUDA_MAX_NVEC]; // Propagators
+    Propagator prop3[QUDA_MAX_NVEC]; //
     
+    const int nVec;                   // Number of vectors within Propagator Structure (for "regular" prop, nVec = 12)
     const qluaCntr_Type cntrType;     // contraction type
     const int parity;                 // hard code to 0 for now
     const int nParity;                // number of parities we're working on
@@ -150,21 +155,25 @@ namespace quda {
     QluaContractArg(cudaColorSpinorField **propIn1,
 		    cudaColorSpinorField **propIn2,
 		    cudaColorSpinorField **propIn3,
-		    qluaCntr_Type cntrType, bool preserveBasis)
+		    qluaCntr_Type cntrType, bool preserveBasis, int nVec_)
       : cntrType(cntrType), parity(0), nParity(propIn1[0]->SiteSubset()), nFace(1),
 	dim{ (3-nParity) * propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3), 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       lL{propIn1[0]->X(0), propIn1[0]->X(1), propIn1[0]->X(2), propIn1[0]->X(3)},
-      volumeCB(propIn1[0]->VolumeCB()),volume(propIn1[0]->Volume()), preserveBasis(preserveBasis)
+      volumeCB(propIn1[0]->VolumeCB()),volume(propIn1[0]->Volume()), preserveBasis(preserveBasis), nVec(nVec_)
     {
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+
+      if((cntrType != what_qpdf_g_F_B) && (cntrType != what_qbarq_g_F_aB) && (nVec != QUDA_NVEC_PROP))
+	errorQuda("QluaContractArg: Ultra-local contractions apart from qbarq_g_F_aB support only nVec = %d. Got nVec = %d\n", QUDA_NVEC_PROP, nVec);
+
+      for(int ivec=0;ivec<nVec;ivec++){
         prop1[ivec].init(*propIn1[ivec]);
         prop2[ivec].init(*propIn2[ivec]);
       }
       
       if(cntrType == what_baryon_sigma_UUS){
         if(propIn3 == NULL) errorQuda("QluaContractArg: Input propagator-3 is not allocated!\n");
-        for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++)
+        for(int ivec=0;ivec<nVec;ivec++)
           prop3[ivec].init(*propIn3[ivec]);
       }
     }
@@ -359,10 +368,11 @@ namespace quda {
 
   struct qcTMD_Arg : public ArgGeom {
 
-    Propagator fwdProp[QUDA_PROP_NVEC];
-    Propagator bwdProp[QUDA_PROP_NVEC];
+    Propagator fwdProp[QUDA_MAX_NVEC];
+    Propagator bwdProp[QUDA_MAX_NVEC];
     GaugeU U;
 
+    int nVec;
     int i_mu;
     bool preserveBasis;
     bool extendedGauge;
@@ -370,11 +380,11 @@ namespace quda {
     qcTMD_Arg () {}
     
     qcTMD_Arg(cudaColorSpinorField **fwdProp_, cudaColorSpinorField **bwdProp_,
-	      cudaGaugeField *U_, int i_mu_, bool preserveBasis_)
+	      cudaGaugeField *U_, int i_mu_, bool preserveBasis_, int nVec_)
       : ArgGeom(U_), i_mu(i_mu_), preserveBasis(preserveBasis_),
-	extendedGauge((U_->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) ? true : false)
+      extendedGauge((U_->GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) ? true : false), nVec(nVec_)
     {
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
+      for(int ivec=0;ivec<nVec;ivec++){
 	fwdProp[ivec].init(*fwdProp_[ivec]);
 	bwdProp[ivec].init(*bwdProp_[ivec]);
       }
