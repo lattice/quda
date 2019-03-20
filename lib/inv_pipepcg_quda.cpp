@@ -202,12 +202,13 @@ namespace quda {
     double errr  = 0.0, errrprev = 0.0, errs     = 0.0, errw     = 0.0, errz = 0.0;
     double alpha = 0.0, beta     = 0.0, alphaold = 0.0, gammaold = 0.0, eta  = 0.0;
 
-    double3 *local_reduce = new double3[2];//to keep double3 or double4 registers
+    double3 *local_reduce = new double3[2];
 
     blas::flops = 0;
 
     double *recvbuff = new double[6];
     MPI_Request request_handle;
+    //MPI_Status  request_status;
 
     double &gamma = local_reduce[0].x, &delta = local_reduce[0].y, &rnorm = local_reduce[0].z;
     double &sigma = local_reduce[1].x, &zeta  = local_reduce[1].y, &tau   = local_reduce[1].z;
@@ -234,29 +235,29 @@ namespace quda {
 
     double stop = rnorm*rnorm*param.tol*param.tol;
     double heavy_quark_res = 0.0;
-    printfQuda(" PipePCG: Initial (relative) residual %le ", rnorm / norm2b);
+    printfQuda(" PipePCG: Initial (relative) residual %le \n", rnorm / norm2b);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     // zero cycle
     commGlobalReductionSet(false);
-
     gamma  = reDotProduct(rSloppy, u);
     delta  = reDotProduct(w, u);
+    commGlobalReductionSet(true);
 
     //Start async communications:
     MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
 
     if(K) {
       rPre = w;
+      commGlobalReductionSet(false);
       (*K)(pPre, rPre);
+      commGlobalReductionSet(true);
       m = pPre;
     } else {
       m = w;
     }
-
-    commGlobalReductionSet(true);
 
     matSloppy(n, m, tmpSloppy);
 
@@ -269,46 +270,49 @@ namespace quda {
 
     double theta  = 1.0;
 
-    z = n;           
-    q = m;           
-    p = u;           
-    s = w;           
-    axpy( alpha, p, xSloppy);        
-    axpy(-alpha, q, u);        
-    axpy(-alpha, z, w);        
-    axpy(-alpha, s, rSloppy);        
+    z = n;
+    q = m;
+    p = u;
+    s = w;
+    axpy( alpha, p, xSloppy);
+    axpy(-alpha, q, u);
+    axpy(-alpha, z, w);
+    axpy(-alpha, s, rSloppy);
     n = w;
-    axpy(-theta, rSloppy, n);          
+    axpy(-theta, rSloppy, n);
 
     commGlobalReductionSet(false);
-
     gammaold = gamma;
     gamma   = reDotProduct(rSloppy, u);
     tau     = reDotProduct(s, u);
     delta   = reDotProduct(w, u);
-    rnorm   = sqrt(norm2(rSloppy));
-
-    sigma  = sqrt(norm2(s));
-    zeta   = sqrt(norm2(z));
+    rnorm   = norm2(rSloppy);
+    sigma   = norm2(s);
+    zeta    = norm2(z);
+    commGlobalReductionSet(true);
 
     //Start async communications:
     MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
 
     if(K) {
       rPre = n;
+      commGlobalReductionSet(false);
       (*K)(pPre, rPre);
+      commGlobalReductionSet(true);
       m = pPre;
       axpy(theta, u, m);
     } else {
       m = w;
     }
 
-    commGlobalReductionSet(true);
-
     matSloppy(n, m, tmpSloppy);
 
     MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
     memcpy(local_reduce, recvbuff, 6*sizeof(double));
+
+    rnorm = sqrt(rnorm);
+    sigma = sqrt(sigma);
+    zeta  = sqrt(zeta);
 
     int k = 1, totResUpdates = 0;
     bool is_converged = false, rUpdate  = false;
@@ -327,7 +331,6 @@ namespace quda {
       Dcw = (2.0*alphaold*zeta)*epsln;
       Dcz = (2.0*beta*zeta)*epsln;
 
-      commGlobalReductionSet(false);
       //  Merged kernel:
       //  z = n + beta * z
       //  q = m + beta * q
@@ -345,93 +348,60 @@ namespace quda {
       //  local_reduce[1].y = (z, z) zeta
       //  local_reduce[0].w = (w, u) tau
 
-      pipePCGRRMergedOp(local_reduce,2,xSloppy,alpha,p,u,rSloppy,s,m,beta,q,w,n,z);
-
-      commGlobalReductionSet(true);
-      //
-      sigma = sqrt(sigma);
-      zeta  = sqrt(zeta);
-      rnorm = sqrt(rnorm);
-
-      if (k == 1 || rUpdate) {
-        printfQuda("(Re-)initialize reliable parameters..");
-        errrprev = errr;
-        errr = Dcr;
-        errs = Dcs;
-        errw = Dcw;
-        errz = Dcz;
-        rUpdate = false;
-      } else {
-        errrprev = errr;
-        errr = errr + alphaold*errs + Dcr;
-        errs = beta*errs + errw + alphaold*errz + Dcs;
-        errw = errw + alphaold*errz + Dcw;
-        errz = beta*errz + Dcz;
-      }
-
-      // Check convergence:
-      is_converged = ((rnorm*rnorm) < stop);
-      PrintStats( "PipePCG", k, rnorm*rnorm, norm2b*norm2b, heavy_quark_res);
-
-      rUpdate = (gamma < 0.0) || ( (k > 1 && errrprev <= (sqrteps * sqrt(gammaold)) && errr > (sqrteps * sqrt(abs(gamma)))));
-
       if (!rUpdate) {
-        // No residual update , just start async global reduction:
+        commGlobalReductionSet(false);
+        pipePCGRRMergedOp(local_reduce,2,xSloppy,alpha,p,u,rSloppy,s,m,beta,q,w,n,z);
+        commGlobalReductionSet(true);
+        //
         MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
       } else {
-
-	      x = xSloppy;
+        printfQuda("Do reliable update...\n");
+        xpay(u, beta, p);
+        axpy( alpha, p, xSloppy);
+        //
+        x = xSloppy;
         xpy(x,y);
         zero(xSloppy);
 
-        printfQuda("Do reliable update...");
-
-        mat(r,y,tmp);
-        rnorm   = sqrt(xmyNorm(b,r));
+        mat(r,y, tmp);
+        xpay(b,-1.0,r);
    	    rSloppy = r;
 
 	      if(K) {
           rPre = r;
-
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
-
           u = pPre;
         } else {
           u = r;
         }
 
-
         matSloppy(w,u,tmpSloppy);
         matSloppy(s,p,tmpSloppy);
+
 	      if(K) {
           rPre = s;
-
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
-
           q = pPre;
         } else {
           q = s;
         }
-
         matSloppy(z,q,tmpSloppy);
-        printfQuda("True absolute residual after the update %1.15e (relative %1.15e).\n", rnorm, rnorm/norm2b);
-        commGlobalReductionSet(false);
 
+        commGlobalReductionSet(false);
         gamma   = reDotProduct(rSloppy, u);
         tau     = reDotProduct(s, u);
         delta   = reDotProduct(w, u);
-        rnorm   = sqrt(norm2(rSloppy));
-
-        sigma   = sqrt(norm2(s));
-        zeta    = sqrt(norm2(z));
+        rnorm   = norm2(rSloppy);
+        sigma   = norm2(s);
+        zeta    = norm2(z);
+        commGlobalReductionSet(true);
 
         MPI_CHECK_(MPI_Iallreduce((double*)local_reduce, recvbuff, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
 
-        commGlobalReductionSet(true);
         n = w;
         axpy(-theta, rSloppy, n);
 
@@ -453,6 +423,34 @@ namespace quda {
 
       MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
       memcpy(local_reduce, recvbuff, 6*sizeof(double));
+
+      sigma = sqrt(sigma);
+      zeta  = sqrt(zeta);
+      rnorm = sqrt(rnorm);
+      //
+      if (k == 1 || rUpdate) {
+        printfQuda("(Re-)initialize reliable parameters..\n");
+        errrprev = errr;
+        errr = Dcr;
+        errs = Dcs;
+        errw = Dcw;
+        errz = Dcz;
+        rUpdate = false;
+      } else {
+        errrprev = errr;
+        errr = errr + alphaold*errs + Dcr;
+        errs = beta*errs + errw + alphaold*errz + Dcs;
+        errw = errw + alphaold*errz + Dcw;
+        errz = beta*errz + Dcz;
+      }
+
+      // Do we need to refine iterative residual
+      rUpdate = (gamma < 0.0) || ( (k > 1 && errrprev <= (sqrteps * sqrt(gammaold)) && errr > (sqrteps * sqrt(abs(gamma)))));
+
+      // Check convergence:
+      is_converged = ((rnorm*rnorm) < stop);
+
+      PrintStats( "PipePCG", k, rnorm*rnorm, norm2b*norm2b, heavy_quark_res);
 
       // Update iter index
       k += 1;
@@ -501,8 +499,6 @@ namespace quda {
 
   }
 
-#ifdef NONBLOCK_REDUCE
 #undef MPI_CHECK_
-#endif
 
 } // namespace quda
