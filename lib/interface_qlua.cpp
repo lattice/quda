@@ -1786,6 +1786,41 @@ QPDFstep_momProj_Quda(void *Vqcs,
 }
 
 
+EXTRN_C int
+QluaCheckMemoryStatus(long long nElem){
+
+  printfQuda("%s: Memory Report before allocations:\n", __func__);
+  Qlua_printMemInfo();
+
+  double *p_h = NULL;
+  double *p_d = NULL;
+  size_t allocBytes = sizeof(double)*nElem;
+
+  printfQuda("%s: Got nElem = %lld, MBytes = %zd\n", __func__, nElem, allocBytes/(1<<20));
+
+  p_h = (double*) malloc(allocBytes);
+  if(p_h == NULL) errorQuda("%s: Cannot allocate host pointer!\n", __func__);
+  memset(p_h, 0, allocBytes);
+
+  cudaMalloc((void**)&p_d, allocBytes);
+  checkCudaError();
+  cudaMemset(p_d, 0, allocBytes);
+  checkCudaError();
+
+  printfQuda("%s: Memory Report after allocations:\n", __func__);
+  Qlua_printMemInfo();
+
+  free(p_h);
+  cudaFree(p_d);
+  p_h = NULL;
+  p_d = NULL;
+
+  printfQuda("%s: Memory Report after freeing memory:\n", __func__);
+  Qlua_printMemInfo();
+  
+  return 0;
+}
+
 //- Legacy function, just keep it here so that Qlua-build does not complain
 EXTRN_C int
 momentumProjectionPropagator_Quda(QUDA_REAL *corrOut,

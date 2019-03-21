@@ -171,6 +171,9 @@ qluaCntr_Type parse_qcContractType(const char *s);
 EXTRN_C
 void Qlua_printMemInfo();
 
+EXTRN_C
+int QluaCheckMemoryStatus(long long nElem);
+
 
 EXTRN_C int
 doQQ_contract_Quda(
