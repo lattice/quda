@@ -49,8 +49,7 @@ printGPUMemInfo(){
 
 EXTRN_C void
 Qlua_printMemInfo(){
-  printfQuda("\n-------------------------------------------------\n");
-  printfQuda("%s:\n", __func__);
+  printfQuda("----------------Qlua_printMemInfo----------------\n");
   printCPUMemInfo();
   printfQuda("\n");
   printGPUMemInfo();
@@ -1276,8 +1275,7 @@ TMD_QPDF_initState_Quda(void **Vqcs, const qudaLattice *qS,
 
   if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Initial Memory Report (before memory allocations):\n", func_name);
-    printGPUMemInfo();
-    printCPUMemInfo();
+    Qlua_printMemInfo();
   }
 
   //- Load the gauge fields
@@ -1414,8 +1412,7 @@ TMD_QPDF_initState_Quda(void **Vqcs, const qudaLattice *qS,
 
   if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Final Memory Report (after memory allocations):\n", func_name);
-    printGPUMemInfo();
-    printCPUMemInfo();
+    Qlua_printMemInfo();
   }
 
   double t6 = MPI_Wtime();
@@ -1443,8 +1440,7 @@ TMD_QPDF_freeState_Quda(void **Vqcs){
 
   if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Memory Report before freeing memory:\n", func_name);
-    printGPUMemInfo();
-    printCPUMemInfo();
+    Qlua_printMemInfo();
   }
 
   //- Delete gauge fields
@@ -1497,8 +1493,7 @@ TMD_QPDF_freeState_Quda(void **Vqcs){
 
   if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Memory Report after freeing memory:\n", func_name);
-    printGPUMemInfo();
-    printCPUMemInfo();
+    Qlua_printMemInfo();
   }
 
   double t2 = MPI_Wtime();
@@ -1529,8 +1524,7 @@ TMDstep_momProj_Quda(void *Vqcs,
 
   if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Memory Report before TMD step %d:\n", func_name, qcs->iStep);
-    printGPUMemInfo();
-    printCPUMemInfo();
+    Qlua_printMemInfo();
   }
     
   const char *b_lpath_inc = NULL;
@@ -1675,8 +1669,7 @@ TMDstep_momProj_Quda(void *Vqcs,
 
   if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Memory Report after TMD step %d:\n", func_name, qcs->iStep);
-    printGPUMemInfo();
-    printCPUMemInfo();
+    Qlua_printMemInfo();
   }
   double t15 = MPI_Wtime();
   printfQuda("TIMING - %s: GPU TMD step %d finished successfully in %f sec. Returning...\n", func_name, qcs->iStep, t15-t14);
@@ -1781,8 +1774,7 @@ QPDFstep_momProj_Quda(void *Vqcs,
 
   if(getVerbosity() >= QUDA_VERBOSE){
     printfQuda("%s: Memory Report after PDF step %d:\n", func_name, qcs->iStep);
-    printGPUMemInfo();
-    printCPUMemInfo();
+    Qlua_printMemInfo();
   }
 
   double t15 = MPI_Wtime();
