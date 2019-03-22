@@ -53,8 +53,11 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink,
 
   gFloat *fatlinkEven[4], *fatlinkOdd[4];
   gFloat *longlinkEven[4], *longlinkOdd[4];
+
+#ifdef MULTI_GPU
   gFloat *ghostFatlinkEven[4], *ghostFatlinkOdd[4];
   gFloat *ghostLonglinkEven[4], *ghostLonglinkOdd[4];
+#endif
 
   for (int dir = 0; dir < 4; dir++) {
     fatlinkEven[dir] = fatlink[dir];
@@ -62,10 +65,12 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink,
     longlinkEven[dir] =longlink[dir];
     longlinkOdd[dir] = longlink[dir] + Vh*gaugeSiteSize;
 
+#ifdef MULTI_GPU
     ghostFatlinkEven[dir] = ghostFatlink[dir];
     ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir]/2)*gaugeSiteSize;
     ghostLonglinkEven[dir] = ghostLonglink[dir];
     ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3*(faceVolume[dir]/2)*gaugeSiteSize;
+#endif
   }
 
   for (int xs=0; xs<nSrc; xs++) {
