@@ -4,9 +4,9 @@
 #include <comm_quda.h>
 #include <blas_quda.h>
 
-#include <thrust_helper.cuh>
 using namespace quda;
-#include <cub/cub.cuh>
+
+#include <cub/block/block_reduce.cuh>
 
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>
@@ -21,47 +21,6 @@ using namespace quda;
  */
 
 namespace quda {
-
-  /**
-     Helper functor for generic addition reduction.
-  */
-  template <typename T>
-  struct Summ {
-    __host__ __device__ __forceinline__ T operator() (const T &a, const T &b){
-      return a + b;
-    }
-  };
-
-  /**
-     Helper functor for double2 addition reduction.
-  */
-  template <>
-  struct Summ<double2>{
-    __host__ __device__ __forceinline__ double2 operator() (const double2 &a, const double2 &b){
-      return make_double2(a.x + b.x, a.y + b.y);
-    }
-  };
-
-  /**
-     Helper functor for double3 addition reduction.
-  */
-  template <>
-  struct Summ<double3>{
-    __host__ __device__ __forceinline__ double3 operator() (const double3 &a, const double3 &b){
-      return make_double3(a.x + b.x, a.y + b.y, a.z + b.z);
-    }
-  };
-
-  /**
-     Helper functor for doubledouble4 addition reduction.
-  */
-  template <>
-  struct Summ<double4>{
-    __host__ __device__ __forceinline__ double4 operator() (const double4 &a, const double4 &b){
-      return make_double4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
-    }
-  };
-
 
   /**
      struct which acts as a wrapper to a vector of data.
@@ -126,13 +85,14 @@ namespace quda {
   __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
   __shared__ bool isLastBlockDone;
 
-  template <int block_size_x, int block_size_y, typename T>
+  template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum>
   __device__ inline void reduce2d(ReduceArg<T> arg, const T &in, const int idx=0) {
 
     typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
 
-    T aggregate = BlockReduce(cub_tmp).Sum(in);
+    Reducer r;
+    T aggregate = (do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r));
 
     if (threadIdx.x == 0 && threadIdx.y == 0) {
       arg.partial[idx*gridDim.x + blockIdx.x] = aggregate;
@@ -153,11 +113,12 @@ namespace quda {
       T sum;
       zero(sum);
       while (i<gridDim.x) {
-	sum += arg.partial[idx*gridDim.x + i];
+        sum = r(sum, arg.partial[idx*gridDim.x + i]);
+	//sum += arg.partial[idx*gridDim.x + i];
 	i += block_size_x*block_size_y;
       }
 
-      sum = BlockReduce(cub_tmp).Sum(sum);
+      sum = (do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum,r));
 
       // write out the final reduced value
       if (threadIdx.y*block_size_x + threadIdx.x == 0) {
@@ -167,8 +128,8 @@ namespace quda {
     }
   }
 
-  template <int block_size, typename T>
-  __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T>(arg, in, idx); }
+  template <int block_size, typename T, bool do_sum = true, typename Reducer = cub::Sum>
+  __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx); }
 
 
   __shared__ volatile bool isLastWarpDone[16];

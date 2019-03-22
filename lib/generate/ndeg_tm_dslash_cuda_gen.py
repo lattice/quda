@@ -320,8 +320,8 @@ if (kernel_type == INTERIOR_KERNEL) {
   coordsFromIndex3D<EVEN_X>(X, coord, sid, param);
 
   // only need to check Y and Z dims currently since X and T set to match exactly
-  if (coord[1] >= param.X[1]) return;
-  if (coord[2] >= param.X[2]) return;
+  if (coord[1] >= param.dc.X[1]) return;
+  if (coord[2] >= param.dc.X[2]) return;
 
 """)
         else:
@@ -438,16 +438,16 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
-    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
+    boundary = ["coord[0]==(param.dc.X[0]-1)", "coord[0]==0", "coord[1]==(param.dc.X[1]-1)", "coord[1]==0", "coord[2]==(param.dc.X[2]-1)", "coord[2]==0", "coord[3]==(param.dc.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.dc.X[0]-1)", "coord[0]>0", "coord[1]<(param.dc.X[1]-1)", "coord[1]>0", "coord[2]<(param.dc.X[2]-1)", "coord[2]>0", "coord[3]<(param.dc.X[3]-1)", "coord[3]>0"]
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+X1", "X-X1", "X+X2X1", "X-X2X1", "X+X3X2X1", "X-X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.dc.X[0]", "X-param.dc.X[0]", "X+param.dc.X2X1", "X-param.dc.X2X1", "X+param.dc.X3X2X1", "X-param.dc.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-X1m1", "X+X1m1", "X-X2X1mX1", "X+X2X1mX1", "X-X3X2X1mX2X1", "X+X3X2X1mX2X1",
-                   "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.dc.X[0]-1)", "X+(param.dc.X[0]-1)", "X-param.dc.X2X1mX1", "X+param.dc.X2X1mX1", "X-param.dc.X3X2X1mX2X1", "X+param.dc.X3X2X1mX2X1",
+                   "X-param.dc.X4X3X2X1mX3X2X1", "X+param.dc.X4X3X2X1mX3X2X1"]
 
     cond = ""
     cond += "#ifdef MULTI_GPU\n"
@@ -478,7 +478,7 @@ def gen(dir, pack_only=False):
         str += "const int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
+        str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : param.dc.Vh+face_idx);\n"
         str += "#else\n"
         str += "const int ga_idx = sp_idx;\n"
         str += "#endif\n"
@@ -502,7 +502,7 @@ def gen(dir, pack_only=False):
     decl_half += "\n"
 
     load_gauge = "// read gauge matrix from device memory\n"
-    load_gauge += "READ_GAUGE_MATRIX(G, GAUGE"+`dir%2`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
+    load_gauge += "READ_GAUGE_MATRIX(G, GAUGE"+`dir%2`+"TEX, "+`dir`+", ga_idx, param.gauge_stride);\n\n"
 
     reconstruct_gauge = "// reconstruct gauge matrix\n"
     reconstruct_gauge += "RECONSTRUCT_GAUGE_MATRIX("+`dir`+");\n\n"
@@ -529,12 +529,12 @@ def gen(dir, pack_only=False):
 
 
     load_half_cond = ""
-    load_half_cond += "const int sp_stride_pad = FLAVORS*ghostFace[static_cast<int>(kernel_type)];\n"
+    load_half_cond += "const int sp_stride_pad = FLAVORS*param.dc.ghostFace[static_cast<int>(kernel_type)];\n"
     #load_half += "#if (DD_PREC==2) // half precision\n"
     #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
     #load_half += "#endif\n"
 
-    #if dir >= 6: load_half_cond += "const int t_proj_scale = TPROJSCALE;\n"
+    if dir >= 6: load_half_cond += "const int t_proj_scale = TPROJSCALE;\n"
     load_half_cond += "\n"
 
     load_half_flv1 = "// read half spinor for the first flavor from device memory\n"
@@ -546,22 +546,22 @@ def gen(dir, pack_only=False):
 #if (dir+1) % 2 == 0:
  #         load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
   #  else:
-#flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
+#flavor offset: extra param.dc.ghostFace[static_cast<int>(kernel_type)]
    #       load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
 
-    load_half_flv1 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+    load_half_flv1 += "READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, "+`dir`+");\n\n"
 
     load_half_flv2 = "// read half spinor for the second flavor from device memory\n"
-    load_half_flv2 += "const int fl_idx = sp_idx + ghostFace[static_cast<int>(kernel_type)];\n"
+    load_half_flv2 += "const int fl_idx = sp_idx + param.dc.ghostFace[static_cast<int>(kernel_type)];\n"
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
     #if (dir+1) % 2 == 0:
-     #     load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
+     #     load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+param.dc.ghostFace[static_cast<int>(kernel_type)]);\n\n"
     #else:
-#flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-     #     load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
+#flavor offset: extra param.dc.ghostFace[static_cast<int>(kernel_type)]
+     #     load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+param.dc.ghostFace[static_cast<int>(kernel_type)]);\n\n"
 
-    load_half_flv2 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
+    load_half_flv2 += "READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+param.dc.ghostFace[static_cast<int>(kernel_type)],"+`dir`+");\n\n"
 
     project = "// project spinor into half spinors\n"
     for h in range(0, 2):
@@ -637,12 +637,8 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
     copy_half = ""
     for h in range(0, 2):
         for c in range(0, 3):
-            #copy_half += h1_re(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_re(h,c)+";  "
-            #copy_half += h1_im(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_im(h,c)+";\n"
-            #copy_half += h1_re(h,c)+" = "+in_re(h,c)+";  "
-            #copy_half += h1_im(h,c)+" = "+in_im(h,c)+";\n"
-            copy_half += h1_re(h,c)+" = "+("2*" if (dir >= 6) else "")+in_re(h,c)+";  "
-            copy_half += h1_im(h,c)+" = "+("2*" if (dir >= 6) else "")+in_im(h,c)+";\n"
+            copy_half += h1_re(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_re(h,c)+";  "
+            copy_half += h1_im(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_im(h,c)+";\n"
 
     copy_half += "\n"
 
@@ -748,7 +744,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 
     if dir >= 6:
         str += decl_half
-        str += "if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.dc.X4X3X2X1hmX3X2X1h)\n"
         str += block("{\n" + prep_half_cond1 + prep_half_flv1 + prep_half_cond2 + load_half_cond + prep_face_flv1 + prep_half + prep_half_cond3 + ident + reconstruct_flv1 + "}\n" + "{\n" + prep_half_cond1 + prep_half_flv2 + prep_half_cond2 + load_half_cond + prep_face_flv2 + prep_half + prep_half_cond3 + ident + reconstruct_flv2 + "}\n")
         str += " else "
         str += block(load_gauge + reconstruct_gauge + "{\n"+ prep_half_cond1 + prep_half_flv1 + prep_half_cond2 + load_half_cond + prep_face_flv1 + prep_half + prep_half_cond3 + mult + reconstruct_flv1 + "}\n" + "{\n"+ prep_half_cond1 + prep_half_flv2 + prep_half_cond2 + load_half_cond + prep_face_flv2 + prep_half + prep_half_cond3 + mult + reconstruct_flv2 +"}\n")
@@ -1053,13 +1049,13 @@ int incomplete = 0; // Have all 8 contributions been computed for this site?
 
 switch(kernel_type) { // intentional fall-through
 case INTERIOR_KERNEL:
-  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==X4m1));
+  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==(param.dc.X[3]-1)));
 case EXTERIOR_KERNEL_T:
-  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==X3m1));
+  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==(param.dc.X[2]-1)));
 case EXTERIOR_KERNEL_Z:
-  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==X2m1));
+  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==(param.dc.X[1]-1)));
 case EXTERIOR_KERNEL_Y:
-  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==X1m1));
+  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==(param.dc.X[0]-1)));
 }
 
 """)

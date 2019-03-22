@@ -1,16 +1,12 @@
-#ifndef _QUDA_MATRIX_H_
-#define _QUDA_MATRIX_H_
+#pragma once
 
 #include <cstdio>
-
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
-#include <cuda.h>
 
 #include <register_traits.h>
 #include <float_vector.h>
-
 #include <complex_quda.h>
 
 namespace quda {
@@ -26,7 +22,7 @@ namespace quda {
 
   template<>
     __device__ __host__ inline
-    float2 Zero<float2>::val()  
+    float2 Zero<float2>::val()
     {
       return make_float2(0.,0.);
     }
@@ -67,13 +63,17 @@ namespace quda {
   template<class T, int N>
     class Matrix
     {
-      private:
+      typedef typename RealType<T>::type real;
+
+    private:
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
       public:
         T data[N*N];
 
-	__device__ __host__ inline Matrix() {
+        __device__ __host__ constexpr int size() const { return N; }
+
+        __device__ __host__ inline Matrix() {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) zero(data[i]);
 	}
@@ -88,7 +88,7 @@ namespace quda {
 	  for (int i=0; i<N*N; i++) data[i] = data_[i];
 	}
 
-	__device__ __host__ inline Matrix(const HMatrix<typename RealType<T>::type,N> &a);
+	__device__ __host__ inline Matrix(const HMatrix<real,N> &a);
 
         __device__ __host__ inline T const & operator()(int i, int j) const {
           return data[index(i,j)];
@@ -117,29 +117,86 @@ namespace quda {
 	}
 
 	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline Matrix(const gauge_wrapper<real, S> &s);
 
 	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline void operator=(const gauge_wrapper<real, S> &s);
 
 	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<real, S> &s);
 
 	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
+	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<real, S> &s);
 
-	/**
+        /**
+           @brief Compute the matrix L1 norm - this is the maximum of
+           the absolute column sums.
+           @return Compute L1 norm
+        */
+        __device__ __host__ inline real L1() {
+          real l1 = 0;
+#pragma unroll
+          for (int j=0; j<N; j++) {
+            real col_sum = 0;
+#pragma unroll
+            for (int i=0; i<N; i++) {
+              col_sum += abs(data[i*N + j]);
+            }
+            l1 = col_sum > l1 ? col_sum : l1;
+          }
+          return l1;
+        }
+
+        /**
+           @brief Compute the matrix L2 norm.  We actually compute the
+           Frobenius norm which is an upper bound on the L2 norm.
+           @return Computed L2 norm
+        */
+        __device__ __host__ inline real L2() {
+          real l2 = 0;
+#pragma unroll
+          for (int j=0; j<N; j++) {
+#pragma unroll
+            for (int i=0; i<N; i++) {
+              l2 += norm(data[i*N + j]);
+            }
+          }
+          return sqrt(l2);
+        }
+
+        /**
+           @brief Compute the matrix Linfinity norm - this is the maximum of
+           the absolute row sums.
+           @return Computed Linfinity norm
+        */
+        __device__ __host__ inline real Linf() {
+          real linf = 0;
+#pragma unroll
+          for (int i=0; i<N; i++) {
+            real row_sum = 0;
+#pragma unroll
+            for (int j=0; j<N; j++) {
+              row_sum += abs(data[i*N + j]);
+            }
+            linf = row_sum > linf ? row_sum : linf;
+          }
+          return linf;
+        }
+
+        /**
 	   Return 64-bit XOR checksum computed from the
 	   elements of the matrix.  Compute the checksum on each
 	   64-bit word that constitutes the Matrix
 	 */
 	__device__ __host__ inline uint64_t checksum() const {
-	  // ensure length is rounded up to 64-bit multiple
-	  constexpr int length = (N*N*sizeof(T) + sizeof(uint64_t) - 1)/ sizeof(uint64_t);
-	  const uint64_t* base = reinterpret_cast<const uint64_t*>( static_cast< const void* >(data) );
-	  uint64_t checksum_ = base[0];
-	  for (int i=1; i<length; i++) checksum_ ^= base[i];
-	  return checksum_;
+          // ensure length is rounded up to 64-bit multiple
+          constexpr int length = (N*N*sizeof(T) + sizeof(uint64_t) - 1)/ sizeof(uint64_t);
+          uint64_t base_[length] = { };
+          T *data_ = reinterpret_cast<T*>( static_cast<void*>(base_) );
+          for (int i=0; i<N*N; i++) data_[i] = data[i];
+          uint64_t checksum_ = base_[0];
+          for (int i=1; i<length; i++) checksum_ ^= base_[i];
+          return checksum_;
         }
     };
 
@@ -496,45 +553,45 @@ namespace quda {
     }
 
 
-  template<class T> 
+  template<class T>
     __device__  __host__ inline
-    void computeMatrixInverse(const Matrix<T,3>& u, Matrix<T,3>* uinv)
+    Matrix<T,3> inverse(const Matrix<T,3> &u)
     {
-
-      const T & det = getDeterminant(u);
-      const T & det_inv = static_cast<typename T::value_type>(1.0)/det;
+      const T det = getDeterminant(u);
+      const T det_inv = static_cast<typename T::value_type>(1.0)/det;
+      Matrix<T,3> uinv;
 
       T temp;
 
       temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
-      (*uinv)(0,0) = (det_inv*temp);
+      uinv(0,0) = (det_inv*temp);
 
       temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
-      (*uinv)(0,1) = (temp*det_inv);
+      uinv(0,1) = (temp*det_inv);
 
       temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
-      (*uinv)(0,2) = (temp*det_inv);
+      uinv(0,2) = (temp*det_inv);
 
       temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
-      (*uinv)(1,0) = (det_inv*temp);
+      uinv(1,0) = (det_inv*temp);
 
       temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
-      (*uinv)(1,1) = (temp*det_inv);
+      uinv(1,1) = (temp*det_inv);
 
       temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
-      (*uinv)(1,2) = (temp*det_inv);
+      uinv(1,2) = (temp*det_inv);
 
       temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
-      (*uinv)(2,0) = (det_inv*temp);
+      uinv(2,0) = (det_inv*temp);
 
       temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
-      (*uinv)(2,1) = (temp*det_inv);
+      uinv(2,1) = (temp*det_inv);
 
       temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
-      (*uinv)(2,2) = (temp*det_inv);
+      uinv(2,2) = (temp*det_inv);
 
-      return;
-    } 
+      return uinv;
+    }
 
 
 
@@ -563,7 +620,7 @@ namespace quda {
         (*m)(i,i) = make_float2(1,0);
 #pragma unroll
         for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = make_float2(0.,0.);    
+          (*m)(i,j) = (*m)(j,i) = make_float2(0.,0.);
         }
       }
       return;
@@ -579,7 +636,7 @@ namespace quda {
         (*m)(i,i) = make_double2(1,0);
 #pragma unroll
         for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = make_double2(0.,0.);    
+          (*m)(i,j) = (*m)(j,i) = make_double2(0.,0.);
         }
       }
       return;
@@ -652,10 +709,10 @@ namespace quda {
 
 
   // Matrix and array are very similar
-  // Maybe I should factor out the similar 
-  // code. However, I want to make sure that 
-  // the compiler knows to store the 
-  // data elements in registers, so I won't do 
+  // Maybe I should factor out the similar
+  // code. However, I want to make sure that
+  // the compiler knows to store the
+  // data elements in registers, so I won't do
   // it right now.
   template<class T, int N>
     class Array
@@ -671,7 +728,7 @@ namespace quda {
           }
 
         // assignment function
-        __device__ __host__ inline 
+        __device__ __host__ inline
           T & operator[](int i){
             return data[i];
           }
@@ -704,7 +761,7 @@ namespace quda {
     }
 
   template<class T, int N>
-    __device__ __host__ inline 
+    __device__ __host__ inline
     void outerProd(const T (&a)[N], const T (&b)[N], Matrix<T,N>* m){
 #pragma unroll
       for (int i=0; i<N; ++i){
@@ -755,7 +812,7 @@ namespace quda {
 
 
   template<class T, class U, int N>
-    __device__ inline 
+    __device__ inline
     void loadMatrixFromArray(const T* const array, const int idx, const int stride, Matrix<U,N> *mat)
     {
 #pragma unroll
@@ -765,10 +822,10 @@ namespace quda {
     }
 
 
-  __device__ inline  
+  __device__ inline
     void loadLinkVariableFromArray(const float2* const array, const int dir, const int idx, const int stride, Matrix<complex<double>,3> *link)
-    { 
-      float2 single_temp; 
+    {
+      float2 single_temp;
 #pragma unroll
       for (int i=0; i<9; ++i){
         single_temp = array[idx + (dir*9 + i)*stride];
@@ -781,7 +838,7 @@ namespace quda {
 
 
   template<class T, int N, class U>
-    __device__ inline 
+    __device__ inline
     void writeMatrixToArray(const Matrix<T,N>& mat, const int idx, const int stride, U* const array)
     {
 #pragma unroll
@@ -790,7 +847,7 @@ namespace quda {
       }
     }
 
-  __device__ inline 
+  __device__ inline
     void appendMatrixToArray(const Matrix<complex<double>,3>& mat, const int idx, const int stride, double2* const array)
     {
 #pragma unroll
@@ -800,7 +857,7 @@ namespace quda {
       }
     }
 
-  __device__ inline 
+  __device__ inline
     void appendMatrixToArray(const Matrix<complex<float>,3>& mat, const int idx, const int stride, float2* const array)
     {
 #pragma unroll
@@ -816,7 +873,7 @@ namespace quda {
     void writeLinkVariableToArray(const Matrix<T,3> & link, const int dir, const int idx, const int stride, U* const array)
     {
 #pragma unroll
-      for (int i=0; i<9; ++i){ 
+      for (int i=0; i<9; ++i){
         array[idx + (dir*9 + i)*stride] = link.data[i];
       }
       return;
@@ -825,13 +882,13 @@ namespace quda {
 
 
 
-  __device__ inline 
+  __device__ inline
     void writeLinkVariableToArray(const Matrix<complex<double>,3> & link, const int dir, const int idx, const int stride, float2* const array)
     {
       float2 single_temp;
 
 #pragma unroll
-      for (int i=0; i<9; ++i){ 
+      for (int i=0; i<9; ++i){
         single_temp.x = link.data[i].x;
         single_temp.y = link.data[i].y;
         array[idx + (dir*9 + i)*stride] = single_temp;
@@ -877,7 +934,7 @@ namespace quda {
 
 
   template<class T, class U>
-    __device__  inline 
+    __device__  inline
     void writeMomentumToArray(const Matrix<T,3> & mom, const int dir, const int idx, const U coeff, const int stride, T* const array)
     {
       typedef typename T::value_type real;
@@ -908,7 +965,7 @@ namespace quda {
 
 
 
-  template<class Cmplx> 
+  template<class Cmplx>
     __device__  __host__ inline
     void computeLinkInverse(Matrix<Cmplx,3>* uinv, const Matrix<Cmplx,3>& u)
     {
@@ -946,8 +1003,8 @@ namespace quda {
       (*uinv)(2,2) = (temp*det_inv);
 
       return;
-    } 
-  // template this! 
+    }
+  // template this!
   inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
 #pragma unroll
     for (int i=0; i<3; ++i){
@@ -1067,7 +1124,7 @@ namespace quda {
       }
     }
 
-#pragma unroll 
+#pragma unroll
     for (int i=0; i<3; i++) {
 #pragma unroll
       for (int j=0; j<3; j++) {
@@ -1087,12 +1144,12 @@ namespace quda {
       Cmplx temp(0,0);
       int i=0;
       int j=0;
-      
+
       //error = ||U^dagger U - I||_L2
 #pragma unroll
-      for (i=0; i<3; ++i) 
+      for (i=0; i<3; ++i)
 #pragma unroll
-	for (j=0; j<3; ++j) 
+	for (j=0; j<3; ++j)
 	  if(i==j) {
 	    temp = identity_comp(i,j);
 	    temp -= 1.0;
@@ -1104,8 +1161,8 @@ namespace quda {
       //error is L2 norm, should be (very close) to zero.
       return error;
     }
-  
-  template<class T> 
+
+  template<class T>
     __device__  __host__ inline
     void exponentiate_iQ(const Matrix<T,3>& Q, Matrix<T,3>* exp_iQ)
     {
@@ -1117,7 +1174,7 @@ namespace quda {
       //Declarations
       typedef decltype(Q(0,0).x) undMatType;
 
-      undMatType inv3 = 1.0/3.0;      
+      undMatType inv3 = 1.0/3.0;
       undMatType c0, c1, c0_max, Tr_re;
       undMatType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
       undMatType theta;
@@ -1133,23 +1190,23 @@ namespace quda {
       temp1 = temp1 * Q;
       Tr_re = getTrace(temp1).x;
       c1 = 0.5*Tr_re;
-      
+
       //We now have the coeffiecients c0 and c1.
       //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
       //      where       fj = fj(c0,c1), j=0,1,2.
-      
+
       //[17]
       c0_max = 2*pow(c1*inv3,1.5);
-      
+
       //[25]
       theta  = acos(c0/c0_max);
-      
+
       //[23]
       u_p = sqrt(c1*inv3)*cos(theta*inv3);
-      
+
       //[24]
       w_p = sqrt(c1)*sin(theta*inv3);
-      
+
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
       undMatType u_sq = u_p*u_p;
       undMatType w_sq = w_p*w_p;
@@ -1162,15 +1219,15 @@ namespace quda {
       undMatType sinc_w;
       undMatType hj_re = 0.0;
       undMatType hj_im = 0.0;
-  
+
       //[33] Added one more term to the series given in the paper.
-      if (w_p < 0.05 && w_p > -0.05) {      
+      if (w_p < 0.05 && w_p > -0.05) {
 	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       }
       else sinc_w = sin(w_p)/w_p;
-      
-    
+
+
       //[34] Test for c0 < 0.
       int parity = 0;
       if(c0 < 0) {
@@ -1178,43 +1235,43 @@ namespace quda {
 	parity = 1;
 	//calculate fj with c0 > 0 and then convert all fj.
       }
-      
+
       //Get all the numerators for fj,
       //[30] f0
       hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
       hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
       f0_re = hj_re*denom_inv;
       f0_im = hj_im*denom_inv;
-      
+
       //[31] f1
       hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
       hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
       f1_re = hj_re*denom_inv;
       f1_im = hj_im*denom_inv;
-      
+
       //[32] f2
       hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
-      hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;  
+      hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;
       f2_re = hj_re*denom_inv;
       f2_im = hj_im*denom_inv;
-      
+
       //[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
       if (parity == 1) {
-	f0_im *= -1.0; 
+	f0_im *= -1.0;
 	f1_re *= -1.0;
 	f2_im *= -1.0;
       }
-      
+
       T f0_c;
       T f1_c;
       T f2_c;
-      
+
       f0_c.x = f0_re;
       f0_c.y = f0_im;
-      
-      f1_c.x = f1_re;  
-      f1_c.y = f1_im;  
-      
+
+      f1_c.x = f1_re;
+      f1_c.y = f1_im;
+
       f2_c.x = f2_re;
       f2_c.y = f2_im;
 
@@ -1225,7 +1282,7 @@ namespace quda {
       // +f0*I
       temp1 = f0_c * UnitM;
       *exp_iQ = temp1;
-      
+
       // +f1*Q
       temp1 = f1_c * Q;
       *exp_iQ += temp1;
@@ -1241,4 +1298,4 @@ namespace quda {
 
 
 } // end namespace quda
-#endif // _QUDA_MATRIX_H_
+

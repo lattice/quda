@@ -43,7 +43,23 @@ namespace quda {
 #undef GPU_CLOVER_DIRAC
 #undef GPU_DOMAIN_WALL_DIRAC
 #define DD_IMPROVED 0
+
+#define DD_DAG 0
 #include <staggered_dslash_def.h> // staggered Dslash kernels
+#undef DD_DAG
+#define DD_DAG 1
+#include <staggered_dslash_def.h> // staggered Dslash dagger kernels
+#undef DD_DAG
+
+#define TIFR
+#define DD_DAG 0
+#include <staggered_dslash_def.h> // staggered Dslash kernels
+#undef DD_DAG
+#define DD_DAG 1
+#include <staggered_dslash_def.h> // staggered Dslash dagger kernels
+#undef DD_DAG
+#undef TIFR
+
 #undef DD_IMPROVED
 
 #include <dslash_quda.cuh>
@@ -74,30 +90,52 @@ namespace quda {
     }
 
   public:
-    StaggeredDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
-			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
-			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger), nSrc(in->X(4))
-    { 
-      bindSpinorTex<sFloat>(in, out, x);
-      dslashParam.gauge0 = (void*)gauge0;
-      dslashParam.gauge1 = (void*)gauge1;
+    StaggeredDslashCuda(cudaColorSpinorField *out, const GaugeField &gauge, const cudaColorSpinorField *in,
+			const cudaColorSpinorField *x, const double a,
+                        const int parity, const int dagger, const int *commOverride)
+      : DslashCuda(out, in, x, gauge, parity, dagger, commOverride), nSrc(in->X(4))
+    {
+      if (gauge.Reconstruct() == QUDA_RECONSTRUCT_9 || gauge.Reconstruct() == QUDA_RECONSTRUCT_13) {
+        errorQuda("Reconstruct %d not supported", gauge.Reconstruct());
+      }
       dslashParam.a = a;
       dslashParam.a_f = a;
+      dslashParam.fat_link_max = gauge.LinkMax();
+
+      if (gauge.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+#ifdef MULTI_GPU
+        strcat(aux[INTERIOR_KERNEL],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_ALL],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_X],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_Y],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_Z],",TIFR");
+        strcat(aux[EXTERIOR_KERNEL_T],",TIFR");
+#else
+        strcat(aux[INTERIOR_KERNEL],",TIFR");
+#endif // MULTI_GPU
+        strcat(aux[KERNEL_POLICY],",TIFR");
+      }
     }
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
     void apply(const cudaStream_t &stream)
     {
-#ifdef USE_TEXTURE_OBJECTS
-      dslashParam.ghostTex = in->GhostTex();
-      dslashParam.ghostTexNorm = in->GhostTexNorm();
+#ifndef USE_TEXTURE_OBJECTS
+      if (dslashParam.kernel_type == INTERIOR_KERNEL) bindSpinorTex<sFloat>(in, out, x);
 #endif // USE_TEXTURE_OBJECTS
-
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      setParam();
       dslashParam.swizzle = tp.aux.x;
-      STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+      if (gauge.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+#ifdef BUILD_TIFR_INTERFACE
+        STAGGERED_DSLASH_TIFR(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+#else
+        errorQuda("TIFR interface has not been built");
+#endif
+      } else {
+        STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+      }
     }
 
     bool advanceBlockDim(TuneParam &param) const
@@ -154,49 +192,16 @@ namespace quda {
 			   const int dagger, const cudaColorSpinorField *x,
 			   const double &k, const int *commOverride, TimeProfile &profile)
   {
-    inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->createComms(1);
-
 #ifdef GPU_STAGGERED_DIRAC
+    const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
-    dslashParam.Ls = out->X(4);
-
-    dslashParam.parity = parity;
-    dslashParam.gauge_stride = gauge.Stride();
-    dslashParam.fat_link_max = gauge.LinkMax(); // May need to use this in the preconditioning step 
-    // in the solver for the improved staggered action
-
-    for(int i=0;i<4;i++){
-      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
-      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
-      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
-      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
-      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
-    }
-    void *gauge0, *gauge1;
-    bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-    if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge precision (%d) and spinor precision (%d) not supported", gauge.Precision(), in->Precision());
-
-    if (gauge.Reconstruct() == QUDA_RECONSTRUCT_9 || gauge.Reconstruct() == QUDA_RECONSTRUCT_13) {
-      errorQuda("Reconstruct %d not supported", gauge.Reconstruct());
-    }
-
-    DslashCuda *dslash = 0;
-    size_t regSize = sizeof(float);
-
+    DslashCuda *dslash = nullptr;
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      dslash = new StaggeredDslashCuda<double2, double2>
-	(out, (double2*)gauge0, (double2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
-      regSize = sizeof(double);
+      dslash = new StaggeredDslashCuda<double2, double2>(out, gauge, in, x, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new StaggeredDslashCuda<float2, float2>
-	(out, (float2*)gauge0, (float2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
+      dslash = new StaggeredDslashCuda<float2, float2>(out, gauge, in, x, k, parity, dagger, commOverride);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
-      dslash = new StaggeredDslashCuda<short2, short2>
-	(out, (short2*)gauge0, (short2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
+      dslash = new StaggeredDslashCuda<short2, short2>(out, gauge, in, x, k, parity, dagger, commOverride);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d
@@ -204,14 +209,10 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger,  in->Volume()/in->X(4), ghostFace, profile);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 
     delete dslash;
-    unbindGaugeTex(gauge);
-
-    checkCudaError();
-
 #else
     errorQuda("Staggered dslash has not been built");
 #endif  // GPU_STAGGERED_DIRAC

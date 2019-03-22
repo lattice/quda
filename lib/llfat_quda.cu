@@ -4,14 +4,11 @@
 
 #include <quda_internal.h>
 #include <gauge_field.h>
-#include <clover_field.h>
 #include <llfat_quda.h>
-#include <read_gauge.h>
-#include <force_common.h>
-#include <dslash_quda.h>
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 #include <fast_intdiv.h>
+#include <tune_quda.h>
 
 #define MIN_COEFF 1e-7
 
@@ -209,34 +206,34 @@ namespace quda {
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_NO>::type L;
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	typedef LinkArg<double,L,L> Arg;
-	Arg arg(L(fat), L(u), coeff, fat, u);
-	OneLink<double,Arg> oneLink(arg,fat);
-	oneLink.apply(0);
+        typedef LinkArg<double,L,L> Arg;
+        Arg arg(L(fat), L(u), coeff, fat, u);
+        OneLink<double,Arg> oneLink(arg,fat);
+        oneLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
-	typedef LinkArg<double,L,G> Arg;
-	Arg arg(L(fat), G(u), coeff, fat, u);
-	OneLink<double,Arg> oneLink(arg,fat);
-	oneLink.apply(0);
+        typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
+        typedef LinkArg<double,L,G> Arg;
+        Arg arg(L(fat), G(u), coeff, fat, u);
+        OneLink<double,Arg> oneLink(arg,fat);
+        oneLink.apply(0);
       } else {
-	errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
+        errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
       }
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
       typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_NO>::type L;
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	typedef LinkArg<float,L,L> Arg;
-	Arg arg(L(fat), L(u), coeff, fat, u);
-	OneLink<float,Arg> oneLink(arg,fat);
-	oneLink.apply(0);
+        typedef LinkArg<float,L,L> Arg;
+        Arg arg(L(fat), L(u), coeff, fat, u);
+        OneLink<float,Arg> oneLink(arg,fat);
+        oneLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
-	typedef LinkArg<float,L,G> Arg;
-	Arg arg(L(fat), G(u), coeff, fat, u);
-	OneLink<float,Arg> oneLink(arg,fat);
-	oneLink.apply(0);
+        typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
+        typedef LinkArg<float,L,G> Arg;
+        Arg arg(L(fat), G(u), coeff, fat, u);
+        OneLink<float,Arg> oneLink(arg,fat);
+        oneLink.apply(0);
       } else {
-	errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
+        errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
       }
     } else {
       errorQuda("Unsupported precision %d\n", u.Precision());
@@ -572,7 +569,7 @@ namespace quda {
       } //rho
     } //nu
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     checkCudaError();
 #else
     errorQuda("Fat-link computation not enabled");

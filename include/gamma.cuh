@@ -22,8 +22,8 @@ namespace quda {
     //QudaGammaBasis basis;
 
   public:
-    Gamma() { }
-    Gamma(const Gamma &g) { }
+    __device__ __host__ inline Gamma() { }
+    __device__ __host__ inline Gamma(const Gamma &g) { }
 
     __device__ __host__ inline int getcol(int row) const {
       if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
@@ -95,7 +95,7 @@ namespace quda {
       return 0;
     }
 
-    __device__ __host__ complex<ValueType> getelem(int row) const {
+    __device__ __host__ inline complex<ValueType> getelem(int row) const {
       complex<ValueType> I(0,1);
       if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
 	switch(dir) {
@@ -215,6 +215,77 @@ namespace quda {
     __device__ __host__ inline complex<ValueType> getrowelem(int row, int &col) const {
       col = getcol(row);
       return getelem(row);
+    }
+
+    // Multiplies a given row of the gamma matrix to a complex number
+    __device__ __host__ inline complex<ValueType> apply(int row, const complex<ValueType> &a) const {
+      complex<ValueType> I(0,1);
+      if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+	switch(dir) {
+	case 0:
+	  switch(row) {
+	  case 0: case 1: return complex<ValueType>(-a.imag(), a.real()); //  I
+	  case 2: case 3: return complex<ValueType>(a.imag(), -a.real()); // -I
+	  }
+	  break;
+	case 1:
+	  switch(row) {
+	  case 0: case 3: return -a;
+	  case 1: case 2: return a;
+          }
+          break;
+	case 2:
+	  switch(row) {
+	  case 0: case 3: return complex<ValueType>(-a.imag(), a.real()); //  I
+	  case 1: case 2: return complex<ValueType>(a.imag(), -a.real()); // -I
+          }
+          break;
+	case 3:
+	  switch(row) {
+	  case 0: case 1: case 2: case 3: return a;
+          }
+          break;
+	case 4:
+	  switch(row) {
+	  case 0: case 1: return complex<ValueType>(-a.real(), -a.imag());
+	  case 2: case 3: return a;
+	  }
+	  break;
+	}
+      } else if (basis == QUDA_UKQCD_GAMMA_BASIS) {
+	switch(dir) {
+	case 0:
+	  switch(row) {
+	  case 0: case 1: return complex<ValueType>(-a.imag(), a.real()); //  I
+	  case 2: case 3:return complex<ValueType>(a.imag(), -a.real()); // -I
+	  }
+	  break;
+	case 1:
+	  switch(row) {
+	  case 0: case 3: return a;
+	  case 1: case 2: return -a;
+	  }
+	  break;
+	case 2:
+	  switch(row) {
+	  case 0: case 3: return complex<ValueType>(-a.imag(), a.real()); //  I
+	  case 1: case 2: return complex<ValueType>(a.imag(), -a.real()); // -I
+	  }
+	  break;
+	case 3:
+	  switch(row) {
+	  case 0: case 1: return a;
+	  case 2: case 3: return -a;
+	  }
+	  break;
+	case 4:
+	  switch(row) {
+	  case 0: case 1: case 2: case 3: return a;
+	  }
+	  break;
+	}
+      }
+      return a;
     }
 
     //Returns the type of Gamma matrix

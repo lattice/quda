@@ -75,8 +75,14 @@ void initComms(int argc, char **argv, const int *commDims)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
 
-  // FIXME? - tests crash without this
-  QMP_declare_logical_topology(commDims, 4);
+  // make sure the QMP logical ordering matches QUDA's
+  if (rank_order == 0) {
+    int map[] = { 3, 1, 2, 0 };
+    QMP_declare_logical_topology_map(commDims, 4, map, 4);
+  } else {
+    int map[] = { 0, 1, 2, 3 };
+    QMP_declare_logical_topology_map(commDims, 4, map, 4);
+  }
 
 #elif defined(MPI_COMMS)
 #ifdef PTHREADS
@@ -94,6 +100,7 @@ void initComms(int argc, char **argv, const int *commDims)
 
   printfQuda("Rank order is %s major (%s running fastest)\n",
 	     rank_order == 0 ? "column" : "row", rank_order == 0 ? "t" : "x");
+
 }
 
 
@@ -863,7 +870,15 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 
 }
 
-
+void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type, QudaPrecision local_prec) {
+  if (local_prec == QUDA_DOUBLE_PRECISION) {
+    applyGaugeFieldScaling_long((double**)gauge, Vh, param, dslash_type);
+  } else if (local_prec == QUDA_SINGLE_PRECISION) {
+    applyGaugeFieldScaling_long((float**)gauge, Vh, param, dslash_type);
+  } else {
+    errorQuda("Invalid type %d for applyGaugeFieldScaling_long\n", local_prec);
+  }
+}
 
 template <typename Float>
 static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
@@ -1043,6 +1058,14 @@ void constructUnitaryGaugeField(Float **res)
   }
 }
 
+template <typename Float> 
+static void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type) {
+
+  if(type == 3)  applyGaugeFieldScaling_long((Float**)res, Vh, param, QUDA_STAGGERED_DSLASH);
+
+  return;
+}
+
 
 void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
   if (type == 0) {
@@ -1075,14 +1098,25 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
     if (precision == QUDA_DOUBLE_PRECISION) {
       // if doing naive staggered then set to long links so that the staggered phase is applied
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((double**)fatlink, param, dslash_type);
+      if(type != 3) constructGaugeField((double**)fatlink, param, dslash_type);
+      else applyStaggeredScaling((double**)fatlink, param, type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((double**)longlink, param, dslash_type);
+      if (dslash_type == QUDA_ASQTAD_DSLASH)
+      {
+        if(type != 3) constructGaugeField((double**)longlink, param, dslash_type);
+        else applyStaggeredScaling((double**)longlink, param, type);
+      }
     }else {
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((float**)fatlink, param, dslash_type);
+      if(type != 3) constructGaugeField((float**)fatlink, param, dslash_type);
+      else applyStaggeredScaling((float**)fatlink, param, type);
+
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((float**)longlink, param, dslash_type);
+      if (dslash_type == QUDA_ASQTAD_DSLASH) 
+      {
+        if(type != 3) constructGaugeField((float**)longlink, param, dslash_type);
+        else applyStaggeredScaling((float**)longlink, param, type);
+      }
     }
   }
 
@@ -1105,6 +1139,8 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
       }
     }
   }
+
+  if (type==3) return;
 
   // set all links to zero to emulate the 1-link operator (needed for host comparison)
   if (dslash_type == QUDA_STAGGERED_DSLASH) { 
@@ -1607,6 +1643,7 @@ QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision prec_sloppy = QUDA_INVALID_PRECISION;
+QudaPrecision prec_refinement_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 QudaPrecision  prec_ritz = QUDA_INVALID_PRECISION;
@@ -1619,10 +1656,14 @@ int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
+char gauge_outfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
 int gcrNkrylov = 10;
+QudaCABasis ca_basis = QUDA_POWER_BASIS;
+double ca_lambda_min = 0.0;
+double ca_lambda_max = -1.0;
 int pipeline = 0;
 int solution_accumulator_pipeline = 0;
 int test_type = 0;
@@ -1637,31 +1678,42 @@ double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
 double anisotropy = 1.0;
+double tadpole_factor = 1.0;
+double eps_naik = 0.0;
 double clover_coeff = 0.1;
 bool compute_clover = false;
+bool compute_fatlong = false; 
 double tol = 1e-7;
 double tol_hq = 0.;
+double reliable_delta = 0.1;
+bool alternative_reliable = false;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
 
+
 int mg_levels = 2;
 
 QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL] = { };
 QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL] = { };
 
-int nu_pre = 2;
-int nu_post = 2;
+int nu_pre[QUDA_MAX_MG_LEVEL] = { };
+int nu_post[QUDA_MAX_MG_LEVEL] = { };
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
-QudaSolveType mg_solve_type[QUDA_MAX_MG_LEVEL] = { };
+QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL] = { };
+QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL] = { };
 int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
 double setup_tol[QUDA_MAX_MG_LEVEL] = { };
 int setup_maxiter[QUDA_MAX_MG_LEVEL] = { };
 int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL] = { };
+QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL] = { };
+int setup_ca_basis_size[QUDA_MAX_MG_LEVEL] = { };
+double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL] = { };
+double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL] = { };
 QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
 bool pre_orthonormalize = false;
 bool post_orthonormalize = true;
@@ -1669,8 +1721,13 @@ double omega = 0.85;
 QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL] = { };
 double coarse_solver_tol[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL] = { };
+QudaPrecision smoother_halo_prec = QUDA_INVALID_PRECISION;
 double smoother_tol[QUDA_MAX_MG_LEVEL] = { };
 int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL] = { };
+QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL] = { };
+int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL] = { };
+double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL] = { };
+double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL] = { };
 bool generate_nullspace = true;
 bool generate_all_levels = true;
 QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL] = { };
@@ -1692,6 +1749,14 @@ QudaExtLibType deflation_ext_lib  = QUDA_EIGEN_EXTLIB;
 QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
+double heatbath_beta_value = 6.2;
+int heatbath_warmup_steps = 10;
+int heatbath_num_steps = 10;
+int heatbath_num_heatbath_per_step = 5;
+int heatbath_num_overrelax_per_step = 5;
+bool heatbath_coldstart = false;
+
+
 static int dim_partitioned[4] = {0,0,0,0};
 
 int dimPartitioned(int dim)
@@ -1711,6 +1776,7 @@ void usage(char** argv )
   printf("    --verbosity <silent/summurize/verbose>    # The the verbosity on the top level of QUDA( default summarize)\n");
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
+  printf("    --prec-refine <double/single/half>        # Sloppy precision for refinement in GPU\n");
   printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
   printf("    --prec-ritz <double/single/half>  # Eigenvector precision in GPU\n");
   printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n");
@@ -1737,8 +1803,12 @@ void usage(char** argv )
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
+  printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
-  printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l (default 10)\n");
+  printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)\n");
+  printf("    --ca-basis-type <power/chebyshev>         # The basis to use for CA-CG (default power)\n");
+  printf("    --cheby-basis-eig-min                     # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)\n");
+  printf("    --cheby-basis-eig-max                     # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG (default is to guess with power iterations)\n");
   printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n");
   printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
@@ -1747,7 +1817,10 @@ void usage(char** argv )
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
+  printf("    --tadpole-coeff                           # Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)\n");
+  printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
+  printf("    --compute-fat-long                        # Compute the fat/long field or use random numbers (default false)\n");
   printf("    --clover-coeff                            # Clover coefficient (default 1.0)\n");
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
@@ -1755,14 +1828,16 @@ void usage(char** argv )
   printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
+  printf("    --reliable-delta <delta>                  # Set reliable update delta factor\n");
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
   printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
-  printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
-  printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
-  printf("    --mg-solve-type <level solve>             # The type of solve to do (direct, direct-pc) (default direct-pc) \n");
+  printf("    --mg-nu-pre <level 1-20>                  # The number of pre-smoother applications to do at a given multigrid level (default 2)\n");
+  printf("    --mg-nu-post <level 1-20>                 # The number of post-smoother applications to do at a given multigrid level (default 2)\n");
+  printf("    --mg-coarse-solve-type <level solve>      # The type of solve to do on each level (direct, direct-pc) (default = solve_type)\n");
+  printf("    --mg-smoother-solve-type <level solve>    # The type of solve to do in smoother (direct, direct-pc (default) )\n");
   printf("    --mg-solve-location <level cpu/cuda>      # The location where the multigrid solver will run (default cuda)\n");
   printf("    --mg-setup-location <level cpu/cuda>      # The location where the multigrid setup will be computed (default cuda)\n");
   printf("    --mg-setup-inv <level inv>                # The inverter to use for the setup of multigrid (default bicgstab)\n");
@@ -1770,6 +1845,10 @@ void usage(char** argv )
   printf("    --mg-setup-maxiter-refresh <level iter>   # The maximum number of solver iterations to use when refreshing the pre-existing null space vectors (default 100)\n");
   printf("    --mg-setup-iters <level iter>             # The number of setup iterations to use for the multigrid (default 1)\n");
   printf("    --mg-setup-tol <level tol>                # The tolerance to use for the setup of multigrid (default 5e-6)\n");
+  printf("    --mg-setup-ca-basis-type <level power/chebyshev> # The basis to use for CA-CG setup of multigrid(default power)\n");
+  printf("    --mg-setup-ca-basis-size <level size>     # The basis size to use for CA-CG setup of multigrid (default 4)\n");
+  printf("    --mg-setup-cheby-basis-eig-min <level val> # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default 0)\n");
+  printf("    --mg-setup-cheby-basis-eig-max <level val> # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default is to guess with power iterations)\n");
   printf("    --mg-setup-type <null/test>               # The type of setup to use for the multigrid (default null)\n");
   printf("    --mg-pre-orth <true/false>                # If orthonormalize the vector before inverting in the setup of multigrid (default false)\n");
   printf("    --mg-post-orth <true/false>               # If orthonormalize the vector after inverting in the setup of multigrid (default true)\n");
@@ -1777,8 +1856,13 @@ void usage(char** argv )
   printf("    --mg-coarse-solver <level gcr/etc.>       # The solver to wrap the V cycle on each level (default gcr, only for levels 1+)\n");
   printf("    --mg-coarse-solver-tol <level gcr/etc.>   # The coarse solver tolerance for each level (default 0.25, only for levels 1+)\n");
   printf("    --mg-coarse-solver-maxiter <level n>      # The coarse solver maxiter for each level (default 100)\n");
+  printf("    --mg-coarse-solver-ca-basis-type <level power/chebyshev> # The basis to use for CA-CG setup of multigrid(default power)\n");
+  printf("    --mg-coarse-solver-ca-basis-size <level size>  # The basis size to use for CA-CG setup of multigrid (default 4)\n");
+  printf("    --mg-coarse-solver-cheby-basis-eig-min <level val> # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default 0)\n");
+  printf("    --mg-coarse-solver-cheby-basis-eig-max <level val> # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default is to guess with power iterations)\n");
   printf("    --mg-smoother <level mr/etc.>             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-smoother-tol <level resid_tol>       # The smoother tolerance to use for each multigrid (default 0.25)\n");
+  printf("    --mg-smoother-halo-prec                   # The smoother halo precision (applies to all levels - defaults to null_precision)\n");
   printf("    --mg-schwarz-type <level false/add/mul>   # Whether to use Schwarz preconditioning (requires MR smoother and GCR setup solver) (default false)\n");
   printf("    --mg-schwarz-cycle <level cycle>          # The number of Schwarz cycles to apply per smoother application (default=1)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
@@ -1806,6 +1890,12 @@ void usage(char** argv )
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
 
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
+  printf("    --heatbath-beta <beta>                    # Beta value used in heatbath test (default 6.2)\n");
+  printf("    --heatbath-warmup-steps <n>               # Number of warmup steps in heatbath test (default 10)\n");
+  printf("    --heatbath-num-steps <n>                  # Number of measurement steps in heatbath test (default 10)\n");
+  printf("    --heatbath-num-hb-per-step <n>            # Number of heatbath hits per heatbath step (default 5)\n");
+  printf("    --heatbath-num-or-per-step <n>            # Number of overrelaxation hits per heatbath step (default 5)\n");
+  printf("    --heatbath-coldstart <true/false>         # Whether to use a cold or hot start in heatbath test (default false)\n");
   printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv); 
@@ -1898,6 +1988,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--prec-refine") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    prec_refinement_sloppy =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--prec-precondition") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2350,6 +2450,45 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--compute-fat-long") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    if (strcmp(argv[i+1], "true") == 0){
+      compute_fatlong = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      compute_fatlong = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid compute_fatlong type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+
+  if( strcmp(argv[i], "--epsilon-naik") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    eps_naik = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--tadpole-coeff") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    tadpole_factor = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--anisotropy") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2375,6 +2514,33 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     tol_hq= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--reliable-delta") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    reliable_delta = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--alternative-reliable") == 0){
+    if (i+1 >= argc) {
+      usage(argv);
+    }
+    if (strcmp(argv[i+1], "true") == 0) {
+      alternative_reliable = true;
+    } else if (strcmp(argv[i+1], "false") == 0) {
+      alternative_reliable = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid multishift boolean\n");
+      exit(1);
+    }
     i++;
     ret = 0;
     goto out;
@@ -2419,13 +2585,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
+
+  if( strcmp(argv[i], "--save-gauge") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    strcpy(gauge_outfile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
   
   if( strcmp(argv[i], "--nsrc") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
     Nsrc = atoi(argv[i+1]);
-    if (Nsrc < 1 || Nsrc > 128){
+    if (Nsrc < 0 || Nsrc > 128){ // allow 0 for testing setup in isolation
       printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
       usage(argv);
     }
@@ -2497,9 +2673,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    nu_pre= atoi(argv[i+1]);
-    if (nu_pre < 0 || nu_pre > 20){
-      printf("ERROR: invalid pre-smoother applications value (nu_pre=%d)\n", nu_pre);
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    nu_pre[level] = atoi(argv[i+1]);
+    if (nu_pre[level] < 0 || nu_pre[level] > 20){
+      printf("ERROR: invalid pre-smoother applications value (nu_pre=%d)\n", nu_pre[level]);
       usage(argv);
     }
     i++;
@@ -2511,9 +2694,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    nu_post= atoi(argv[i+1]);
-    if (nu_post < 0 || nu_post > 20){
-      printf("ERROR: invalid pre-smoother applications value (nu_pist=%d)\n", nu_post);
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    nu_post[level] = atoi(argv[i+1]);
+    if (nu_post[level] < 0 || nu_post[level] > 20){
+      printf("ERROR: invalid pre-smoother applications value (nu_post=%d)\n", nu_post[level]);
       usage(argv);
     }
     i++;
@@ -2521,7 +2711,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--mg-solve-type") == 0){
+  if( strcmp(argv[i], "--mg-coarse-solve-type") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
@@ -2532,7 +2722,24 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }
     i++;
 
-    mg_solve_type[level] = get_solve_type(argv[i+1]);
+    coarse_solve_type[level] = get_solve_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-smoother-solve-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    smoother_solve_type[level] = get_solve_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2655,6 +2862,91 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     setup_maxiter_refresh[level] = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-ca-basis-type") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i+1], "power") == 0){
+      setup_ca_basis[level] = QUDA_POWER_BASIS;
+    }else if (strcmp(argv[i+1], "chebyshev") == 0 || strcmp(argv[i+1], "cheby") == 0){
+      setup_ca_basis[level] = QUDA_CHEBYSHEV_BASIS;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for basis ca cg type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-ca-basis-size") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_ca_basis_size[level] = atoi(argv[i+1]);
+    if (setup_ca_basis_size[level] < 1){
+      printf("ERROR: invalid basis size for CA-CG (%d < 1)\n", setup_ca_basis_size[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-cheby-basis-eig-min") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_ca_lambda_min[level] = atof(argv[i+1]);
+    if (setup_ca_lambda_min[level] < 0.0){
+      printf("ERROR: invalid minimum eigenvalue for CA-CG (%f < 0.0)\n", setup_ca_lambda_min[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-cheby-basis-eig-max") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_ca_lambda_max[level] = atof(argv[i+1]);
+    // negative value induces power iterations to guess
     i++;
     ret = 0;
     goto out;
@@ -2827,6 +3119,103 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     coarse_solver_maxiter[level] = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+    if( strcmp(argv[i], "--mg-coarse-solver-ca-basis-type") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i+1], "power") == 0){
+      coarse_solver_ca_basis[level] = QUDA_POWER_BASIS;
+    }else if (strcmp(argv[i+1], "chebyshev") == 0 || strcmp(argv[i+1], "cheby") == 0){
+      coarse_solver_ca_basis[level] = QUDA_CHEBYSHEV_BASIS;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for basis ca cg type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarse-solver-ca-basis-size") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_ca_basis_size[level] = atoi(argv[i+1]);
+    if (coarse_solver_ca_basis_size[level] < 1){
+      printf("ERROR: invalid basis size for CA-CG (%d < 1)\n", coarse_solver_ca_basis_size[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarse-solver-cheby-basis-eig-min") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_ca_lambda_min[level] = atof(argv[i+1]);
+    if (coarse_solver_ca_lambda_min[level] < 0.0){
+      printf("ERROR: invalid minimum eigenvalue for CA-CG (%f < 0.0)\n", coarse_solver_ca_lambda_min[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarse-solver-cheby-basis-eig-max") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_ca_lambda_max[level] = atof(argv[i+1]);
+    // negative value induces power iterations to guess
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+
+
+  if( strcmp(argv[i], "--mg-smoother-halo-prec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    smoother_halo_prec =  get_prec(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -3140,7 +3529,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--ngcrkrylov") == 0){
+  if( strcmp(argv[i], "--ngcrkrylov") == 0 || strcmp(argv[i], "--ca-basis-size") == 0) {
     if (i+1 >= argc){
       usage(argv);
     }
@@ -3153,13 +3542,57 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
+
+  if( strcmp(argv[i], "--ca-basis-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "power") == 0){
+      ca_basis = QUDA_POWER_BASIS;
+    }else if (strcmp(argv[i+1], "chebyshev") == 0 || strcmp(argv[i+1], "cheby") == 0){
+      ca_basis = QUDA_CHEBYSHEV_BASIS;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for basis ca cg type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--cheby-basis-eig-min") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    ca_lambda_min = atof(argv[i+1]);
+    if (ca_lambda_min < 0.0){
+      printf("ERROR: invalid minimum eigenvalue for CA-CG (%f < 0.0)\n", ca_lambda_min);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--cheby-basis-eig-max") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    ca_lambda_max = atof(argv[i+1]);
+    // negative value induces power iterations to guess
+    i++;
+    ret = 0;
+    goto out;
+  }
   
   if( strcmp(argv[i], "--pipeline") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
     pipeline = atoi(argv[i+1]);
-    if (pipeline < 0 || pipeline > 8){
+    if (pipeline < 0 || pipeline > 16){
       printf("ERROR: invalid pipeline length (%d)\n", pipeline);
       usage(argv);
     }
@@ -3177,6 +3610,95 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid solution pipeline length (%d)\n", solution_accumulator_pipeline);
       usage(argv);
     }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-beta") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_beta_value = atof(argv[i+1]);
+    if (heatbath_beta_value <= 0.0){
+      printf("ERROR: invalid beta (%f)\n", heatbath_beta_value);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-warmup-steps") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_warmup_steps = atoi(argv[i+1]);
+    if (heatbath_warmup_steps < 0){
+      printf("ERROR: invalid number of warmup steps (%d)\n", heatbath_warmup_steps);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-num-steps") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_num_steps = atoi(argv[i+1]);
+    if (heatbath_num_steps < 0){
+      printf("ERROR: invalid number of heatbath steps (%d)\n", heatbath_num_steps);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-num-hb-per-step") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_num_heatbath_per_step = atoi(argv[i+1]);
+    if (heatbath_num_heatbath_per_step <= 0){
+      printf("ERROR: invalid number of heatbath hits per step (%d)\n", heatbath_num_heatbath_per_step);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-num-or-per-step") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    heatbath_num_overrelax_per_step = atoi(argv[i+1]);
+    if (heatbath_num_overrelax_per_step <= 0){
+      printf("ERROR: invalid number of overrelaxation hits per step (%d)\n", heatbath_num_overrelax_per_step);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--heatbath-coldstart") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      heatbath_coldstart = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      heatbath_coldstart = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for heatbath_coldstart type\n");
+      usage(argv);
+    }
+
     i++;
     ret = 0;
     goto out;

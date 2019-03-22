@@ -169,10 +169,10 @@ extern "C" {
   bool comm_peer2peer_present();
 
   /**
-     Query if peer-to-peer communication is enabled globally
-     @return Whether peer-to-peer is enabled globally
+     Query what peer-to-peer communication is enabled globally
+     @return 2-bit number reporting 1 for copy engine, 2 for remote writes
   */
-  bool comm_peer2peer_enabled_global();
+  int comm_peer2peer_enabled_global();
 
   /**
      Query if peer-to-peer communication is enabled
@@ -264,6 +264,7 @@ extern "C" {
   void comm_allreduce_max(double* data);
   void comm_allreduce_min(double* data);
   void comm_allreduce_array(double* data, size_t size);
+  void comm_allreduce_max_array(double* data, size_t size);
   void comm_allreduce_int(int* data);
   void comm_allreduce_xor(uint64_t *data);
   void comm_broadcast(void *data, size_t nbytes);
@@ -277,6 +278,13 @@ extern "C" {
   int commCoords(int);
   int commDimPartitioned(int dir);
   void commDimPartitionedSet(int dir);
+  
+  /**
+   * @brief Reset the comm dim partioned array to zero,
+   * @details This should only be needed for automated testing 
+   * when different partitioning is applied within a single run.
+   */
+  void commDimPartitionedReset();
   bool commGlobalReduction();
   void commGlobalReductionSet(bool global_reduce);
 

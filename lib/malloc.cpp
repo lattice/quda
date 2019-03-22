@@ -56,6 +56,14 @@ namespace quda {
   static long total_host_bytes, max_total_host_bytes;
   static long total_pinned_bytes, max_total_pinned_bytes;
 
+  long device_allocated_peak() { return max_total_bytes[DEVICE]; }
+
+  long pinned_allocated_peak() { return max_total_bytes[PINNED]; }
+
+  long mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+
+  long host_allocated_peak() { return max_total_bytes[HOST]; }
+
   static void print_trace (void) {
     void *array[10];
     size_t size;
@@ -261,6 +269,7 @@ namespace quda {
     return ptr;
   }
 
+#define HOST_ALLOC // this needs to be set presently on P9
 
   /**
    * Allocate page-locked ("pinned") host memory, and map it into the
@@ -270,13 +279,22 @@ namespace quda {
   void *mapped_malloc_(const char *func, const char *file, int line, size_t size)
   {
     MemAlloc a(func, file, line);
+
+#ifdef HOST_ALLOC
+    void *ptr;
+    cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostRegisterMapped | cudaHostRegisterPortable);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Aborting");
+    }
+#else
     void *ptr = aligned_malloc(a, size);
-    
     cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped);
     if (err != cudaSuccess) {
       printfQuda("ERROR: Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
+#endif
     track_malloc(MAPPED, a, ptr);
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, a.base_size);
@@ -355,6 +373,7 @@ namespace quda {
     }
     if (alloc[HOST].count(ptr)) {
       track_free(HOST, ptr);
+      free(ptr);
     } else if (alloc[PINNED].count(ptr)) {
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) {
@@ -362,19 +381,28 @@ namespace quda {
 	errorQuda("Aborting");
       }
       track_free(PINNED, ptr);
+      free(ptr);
     } else if (alloc[MAPPED].count(ptr)) {
+#ifdef HOST_ALLOC
+      cudaError_t err = cudaFreeHost(ptr);
+      if (err != cudaSuccess) {
+	printfQuda("ERROR: Failed to free host memory (%s:%d in %s())\n", file, line, func);
+	errorQuda("Aborting");
+      }
+#else
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) {
 	printfQuda("ERROR: Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
 	errorQuda("Aborting");
       }
+      free(ptr);
+#endif
       track_free(MAPPED, ptr);
     } else {
       printfQuda("ERROR: Attempt to free invalid host pointer (%s:%d in %s())\n", file, line, func);
       print_trace();
       errorQuda("Aborting");
     }
-    free(ptr);
   }
 
 
@@ -402,6 +430,33 @@ namespace quda {
     }
   }
 
+  QudaFieldLocation get_pointer_location(const void *ptr) {
+
+    CUpointer_attribute attribute[] = { CU_POINTER_ATTRIBUTE_MEMORY_TYPE };
+    CUmemorytype mem_type;
+    void *data[] = { &mem_type };
+    CUresult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<CUdeviceptr>(ptr));
+    if (error != CUDA_SUCCESS) {
+      const char *string;
+      cuGetErrorString(error, &string);
+      errorQuda("cuPointerGetAttributes failed with error %s", string);
+    }
+
+    // catch pointers that have not been created in CUDA
+    if (mem_type == 0) mem_type = CU_MEMORYTYPE_HOST;
+
+    switch (mem_type) {
+    case CU_MEMORYTYPE_DEVICE:
+    case CU_MEMORYTYPE_UNIFIED:
+      return QUDA_CUDA_FIELD_LOCATION;
+    case CU_MEMORYTYPE_HOST:
+      return QUDA_CPU_FIELD_LOCATION;
+    default:
+      errorQuda("Unknown memory type %d", mem_type);
+      return QUDA_INVALID_FIELD_LOCATION;
+    }
+
+  }
 
   namespace pool {
 

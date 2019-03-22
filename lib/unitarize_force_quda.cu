@@ -20,13 +20,10 @@
 #endif
 
 namespace quda{
-namespace {
-  #include <svd_quda.h>
-}
 
-namespace { // anonymous
+  namespace { // anonymous
 #include <svd_quda.h>
-}
+  }
 
 #define HISQ_UNITARIZE_PI 3.14159265358979323846
 #define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0
@@ -603,19 +600,18 @@ namespace { // anonymous
 
     template<typename Float, typename Gauge>
     void unitarizeForce(Gauge newForce, const Gauge oldForce, const Gauge gauge,
-			const GaugeField &meta, int* fails, long long *flops) {
+			const GaugeField &meta, int* fails) {
 
       UnitarizeForceArg<Gauge,Gauge> arg(newForce, oldForce, gauge, meta, fails, unitarize_eps, force_filter,
 					 max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
       UnitarizeForce<Float,UnitarizeForceArg<Gauge,Gauge> > unitarizeForce(arg, meta);
       unitarizeForce.apply(0);
-      cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
-      if(flops) *flops = unitarizeForce.flops(); 
+      qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
       checkCudaError();
     }
 
     void unitarizeForce(cudaGaugeField &newForce, const cudaGaugeField &oldForce, const cudaGaugeField &gauge,
-			int* fails, long long *flops) {
+			int* fails) {
 
       if (oldForce.Reconstruct() != QUDA_RECONSTRUCT_NO)
 	errorQuda("Force field should not use reconstruct %d", oldForce.Reconstruct());
@@ -635,10 +631,10 @@ namespace { // anonymous
       if (gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
 	  typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_NO>::type G;
-	  unitarizeForce<double>(G(newForce), G(oldForce), G(gauge), gauge, fails, flops);
+	  unitarizeForce<double>(G(newForce), G(oldForce), G(gauge), gauge, fails);
 	} else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
 	  typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_NO>::type G;
-	  unitarizeForce<float>(G(newForce), G(oldForce), G(gauge), gauge, fails, flops);
+	  unitarizeForce<float>(G(newForce), G(oldForce), G(gauge), gauge, fails);
 	}
       } else {
 	errorQuda("Data order %d not supported", gauge.Order());

@@ -16,15 +16,15 @@ fermion actions:
 * Domain wall (4-d or 5-d preconditioned)
 * Mobius fermion
 
-Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned
-GCR are provided, including robust mixed-precision variants supporting
-combinations of double, single, and half (16-bit "block floating
-point") precision.  The library also includes auxilliary routines
-necessary for Hybrid Monte Carlo, such as HISQ link fattening, force
-terms and clover- field construction.  Use of many GPUs in parallel is
-supported throughout, with communication handled by QMP or MPI.
-Support for eigen-vector deflation solvers is also included
-(https://github.com/lattice/quda/wiki/Deflated-Solvers).
+Implementations of CG, multi-shift CG, BiCGStab, BiCGStab(l), and
+DD-preconditioned GCR are provided, including robust mixed-precision
+variants supporting combinations of double, single, and half (16-bit
+"block floating point") precision.  The library also includes
+auxilliary routines necessary for Hybrid Monte Carlo, such as HISQ
+link fattening, force terms and clover- field construction.  Use of
+many GPUs in parallel is supported throughout, with communication
+handled by QMP or MPI.  Support for eigen-vector deflation solvers is
+also included (https://github.com/lattice/quda/wiki/Deflated-Solvers).
 
 We note that while this release of QUDA includes an initial
 implementation of adaptive multigrid, this is considered experimental
@@ -35,10 +35,12 @@ details can be found at https://github.com/lattice/quda/wiki/Multigrid-Solver.
 
 ## Software Compatibility:
 
-The library has been tested under Linux (CentOS 5.8 and Ubuntu 14.04)
-using releases 7.5, 8.0 and 9.0 of the CUDA toolkit.  CUDA 7.0 and
-earlier are not supported (though they may continue to work fine). The
-library also works on recent 64-bit Intel-based Macs. 
+The library has been tested under Linux (CentOS 6 and Ubuntu 16.04)
+using releases 7.5, 8.0 and 9.0, 9.1 and 9.2 of the CUDA toolkit.
+CUDA 7.0 is not supported, though they may continue to work fine.
+Eariler versions of the CUDA toolkit will not work.  QUDA has been
+tested in conjuction with both x86-64 and IBM POWER8/POWER9 CPUs.  The
+library also works on 64-bit Intel-based Macs.
 
 See also Known Issues below.
 
@@ -54,8 +56,8 @@ capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
 appropriate value to the `QUDA_GPU_ARCH` variable in cmake.
 
-As of QUDA 0.8.0, only devices of compute capability 2.0 or greater are
-supported.  See also "Known Issues" below.
+QUDA 0.9.0, supports devices of compute capability 2.0 or greater.
+See also "Known Issues" below.
 
 
 ## Installation:
@@ -85,7 +87,7 @@ or specify e.g. -DQUDA_GPU_ARCH=sm_60 for a Pascal GPU in step 2.
 
 ### Multi-GPU support
 
-QUDA supports using multiple GPUs through MPI and QUDA.
+QUDA supports using multiple GPUs through MPI and QMP.
 To enable multi-GPU support either set `QUDA_MPI` or `QUDA_QMP` to ON when configuring QUDA through cmake. 
 
 Note that in any case cmake will automatically try to detect your MPI installation. If you need to specify a particular MPI please set `MPI_C_COMPILER` and `MPI_CXX_COMPILER` in cmake. 
@@ -134,14 +136,22 @@ installed).  Attempting to use parameters tuned for one card on a
 different card may lead to unexpected errors.
 
 This autotuning information can also be used to build up a first-order
-kernel profile: since the autotuner measures how long a kernel takes to
-run, if we simply keep track of the number of kernel calls, from the
-product of these two quantities we have a time profile of a given job
-run.  If `QUDA_RESOURCE_PATH` is set, then this profiling information is
-output to the file "profile.tsv" in this specified directory.
-Optionally, the output filename can be specified using the
+kernel profile: since the autotuner measures how long a kernel takes
+to run, if we simply keep track of the number of kernel calls, from
+the product of these two quantities we have a time profile of a given
+job run.  If `QUDA_RESOURCE_PATH` is set, then this profiling
+information is output to the file "profile.tsv" in this specified
+directory.  Optionally, the output filename can be specified using the
 `QUDA_PROFILE_OUTPUT` environment variable, to avoid overwriting
-previously generated profile outputs.
+previously generated profile outputs.  In addition to the kernel
+profile, a policy profile, e.g., collections of kernels and/or other
+algorithms that are auto-tuned, is also output to the file
+"profile_async_async.tsv".  The policy profile for example includes
+the entire multi-GPU dslash, whose style and order of communication is
+autotuned.  Hence while the dslash kernel entries appearing the kernel
+profile do include communucation time, the entries in the policy
+profile include all constituent parts (halo packing, interior update,
+communication and exterior update).
 
 ## Using the Library:
 
@@ -163,12 +173,13 @@ quda.h.  Therefore, any code to be linked against QUDA should also be
 compiled with this option.
 
 * When the auto-tuner is active in a multi-GPU run it may cause issues
-with binary reproducibility of this run. This is caused by the
-possibility of different launch configurations being used on different
-GPUs in the tuning run. If binary reproducibility is strictly required
-make sure that a run with active tuning has completed. This will
-ensure that the same launch configurations for a given Kernel is used
-on all GPUs and binary reproducibility.
+with binary reproducibility of this run if domain-decomposition
+preconditioning is used. This is caused by the possibility of
+different launch configurations being used on different GPUs in the
+tuning run simultaneously. If binary reproducibility is strictly
+required make sure that a run with active tuning has completed. This
+will ensure that the same launch configurations for a given kernel is
+used on all GPUs and binary reproducibility.
 
 ## Getting Help:
 
@@ -191,6 +202,21 @@ R. Babich, M. A. Clark, B. Joo, G. Shi, R. C. Brower, and S. Gottlieb,
 Performance Computing, Networking, Storage and Analysis (SC), 2011
 [arXiv:1109.2935 [hep-lat]].
 
+When taking advantage of adaptive multigrid, please also cite:
+
+M. A. Clark, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
+"Accelerating Lattice QCD Multigrid on GPUs Using Fine-Grained
+Parallelization," International Conference for High Performance
+Computing, Networking, Storage and Analysis (SC), 2016
+[arXiv:1612.07873 [hep-lat]].
+
+When taking advantage of block CG, please also cite:
+
+M. A. Clark, A. Strelchenko, A. Vaquero, M. Wagner, and E. Weinberg,
+"Pushing Memory Bandwidth Limitations Through Efficient
+Implementations of Block-Krylov Space Solvers on GPUs,"
+To be published in Comput. Phys. Commun. (2018) [arXiv:1710.09745 [hep-lat]].
+
 Several other papers that might be of interest are listed at
 http://lattice.github.com/quda .
 
@@ -211,18 +237,18 @@ http://lattice.github.com/quda .
 *  Arjun Gambhir (William and Mary)
 *  Steven Gottlieb (Indiana University) 
 *  Kyriakos Hadjiyiannakou (Cyprus)
-*  Dean Howarth (Rensselaer Polytechnic Institute)
+*  Dean Howarth (Boston University)
 *  Balint Joo (Jefferson Laboratory)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartek Kostrzewa (Bonn)
 *  Claudio Rebbi (Boston University) 
-*  Guochun Shi (NCSA) 
+*  Guochun Shi (NCSA)
 *  Hauke Sandmeyer (Bielefeld)
 *  Mario Schröck (INFN)
 *  Alexei Strelchenko (Fermi National Accelerator Laboratory)
-*  Alejandro Vaquero (INFN Sezione Milano Bicocca) 
+*  Alejandro Vaquero (Utah University)
 *  Mathias Wagner (NVIDIA)
-*  Evan Weinberg (Boston University)
+*  Evan Weinberg (NVIDIA)
 *  Frank Winter (Jlab)
 
 

@@ -6,18 +6,16 @@
 
 namespace quda {
   
-  template <typename sFloatOut, typename sFloatIn, int length, typename InOrder>
+  template <typename sFloatOut, typename sFloatIn, int Nc, typename InOrder>
   void copyGaugeMG(const InOrder &inOrder, GaugeField &out, const GaugeField &in,
 		   QudaFieldLocation location, sFloatOut *Out, sFloatOut **outGhost, int type) {
 
     typedef typename mapper<sFloatOut>::type FloatOut;
     typedef typename mapper<sFloatIn>::type FloatIn;
+    constexpr int length = 2*Nc*Nc;
 
-if (out.Reconstruct() != QUDA_RECONSTRUCT_NO) 
+    if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
       errorQuda("Reconstruct type %d not supported", out.Reconstruct());
-
-    int faceVolumeCB[QUDA_MAX_DIM];
-    for (int i=0; i<4; i++) faceVolumeCB[i] = out.SurfaceCB(i) * out.Nface(); 
 
 #ifdef FINE_GRAINED_ACCESS
     if (out.Precision() == QUDA_HALF_PRECISION) {
@@ -25,7 +23,7 @@ if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
 	out.Scale(in.Scale());
       } else {
 	InOrder in_(const_cast<GaugeField&>(in));
-	out.Scale(in_.abs_max());
+	out.Scale( in.abs_max() );
       }
     }
 #endif
@@ -34,43 +32,36 @@ if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
 
 #ifdef FINE_GRAINED_ACCESS
       if (outGhost) {
-	typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER,false,sFloatOut> G;
-	copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(), faceVolumeCB,
-					   out.Ndim(), out.Geometry(), out, in, location, type);
+	typedef typename gauge::FieldOrder<FloatOut,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false,sFloatOut> G;
+	copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out, in, location, type);
       } else {
-	typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER,true,sFloatOut> G;
-	copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(), faceVolumeCB,
-					   out.Ndim(), out.Geometry(), out, in, location, type);
+	typedef typename gauge::FieldOrder<FloatOut,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,true,sFloatOut> G;
+	copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out, in, location, type);
       }
 #else
       typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO,length>::type G;
       copyGauge<FloatOut,FloatIn,length>
-	(G(out,Out,outGhost), inOrder, out.Volume(), faceVolumeCB,
-	 out.Ndim(), out.Geometry(), out, in, location, type);
+	(G(out,Out,outGhost), inOrder, out, in, location, type);
 #endif
 
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef FINE_GRAINED_ACCESS
-      typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_QDP_GAUGE_ORDER,true,sFloatOut> G;
-      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(),
-					 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
+      typedef typename gauge::FieldOrder<FloatOut,Nc,1,QUDA_QDP_GAUGE_ORDER,true,sFloatOut> G;
+      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out, in, location, type);
 #else
       typedef typename QDPOrder<FloatOut,length> G;
-      copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out.Volume(),
-					 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
+      copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #endif
 
     } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef FINE_GRAINED_ACCESS
-      typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_MILC_GAUGE_ORDER,true,sFloatOut> G;
-      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(),
-					 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
+      typedef typename gauge::FieldOrder<FloatOut,Nc,1,QUDA_MILC_GAUGE_ORDER,true,sFloatOut> G;
+      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out, in, location, type);
 #else
       typedef typename MILCOrder<FloatOut,length> G;
-      copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out.Volume(),
-					 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
+      copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #endif
 
     } else {
@@ -79,48 +70,50 @@ if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
 
   }
 
-  template <typename sFloatOut, typename sFloatIn, int length>
+  template <typename sFloatOut, typename sFloatIn, int Nc>
     void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 		     sFloatOut *Out, sFloatIn *In, sFloatOut **outGhost, sFloatIn **inGhost, int type) {
 
     typedef typename mapper<sFloatOut>::type FloatOut;
     typedef typename mapper<sFloatIn>::type FloatIn;
+#ifndef FINE_GRAINED_ACCESS
+    constexpr int length = 2*Nc*Nc;
+#endif
 
     if (in.Reconstruct() != QUDA_RECONSTRUCT_NO) 
       errorQuda("Reconstruct type %d not supported", in.Reconstruct());
 
-    // reconstruction only supported on FloatN fields currently
     if (in.isNative()) {      
 #ifdef FINE_GRAINED_ACCESS
       if (inGhost) {
-	typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER,false,sFloatIn> G;
-	copyGaugeMG<sFloatOut,sFloatIn,length> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
+	typedef typename gauge::FieldOrder<FloatIn,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false,sFloatIn> G;
+	copyGaugeMG<sFloatOut,sFloatIn,Nc> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
       } else {
-	typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER,true,sFloatIn> G;
-	copyGaugeMG<sFloatOut,sFloatIn,length> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
+	typedef typename gauge::FieldOrder<FloatIn,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,true,sFloatIn> G;
+	copyGaugeMG<sFloatOut,sFloatIn,Nc> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
       }
 #else
       typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO,length>::type G;
-      copyGaugeMG<FloatOut,FloatIn,length> (G(in, In,inGhost), out, in, location, Out, outGhost, type);
+      copyGaugeMG<FloatOut,FloatIn,Nc> (G(in, In,inGhost), out, in, location, Out, outGhost, type);
 #endif
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef FINE_GRAINED_ACCESS
-      typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_QDP_GAUGE_ORDER,true,sFloatIn> G;
-      copyGaugeMG<sFloatOut,sFloatIn,length>(G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
+      typedef typename gauge::FieldOrder<FloatIn,Nc,1,QUDA_QDP_GAUGE_ORDER,true,sFloatIn> G;
+      copyGaugeMG<sFloatOut,sFloatIn,Nc>(G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
 #else
       typedef typename QDPOrder<FloatIn,length> G;
-      copyGaugeMG<FloatOut,FloatIn,length>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
+      copyGaugeMG<FloatOut,FloatIn,Nc>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
 #endif
 
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef FINE_GRAINED_ACCESS
-      typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_MILC_GAUGE_ORDER,true,sFloatIn> G;
-      copyGaugeMG<sFloatOut,sFloatIn,length>(G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
+      typedef typename gauge::FieldOrder<FloatIn,Nc,1,QUDA_MILC_GAUGE_ORDER,true,sFloatIn> G;
+      copyGaugeMG<sFloatOut,sFloatIn,Nc>(G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, in, location, Out, outGhost, type);
 #else
       typedef typename MILCOrder<FloatIn,length> G;
-      copyGaugeMG<FloatOut,FloatIn,length>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
+      copyGaugeMG<FloatOut,FloatIn,Nc>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
 #endif
 
     } else {
@@ -133,38 +126,19 @@ if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
   void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, 
 		   FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
 
+    switch(in.Ncolor()) {
 #ifdef GPU_MULTIGRID
-    if (in.Ncolor() == 8) {
-      const int Nc = 8;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else  if (in.Ncolor() == 12) { // Free field Wilson
-      const int Nc = 12;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else  if (in.Ncolor() == 16) {
-      const int Nc = 16;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else  if (in.Ncolor() == 24) {
-      const int Nc = 24;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else  if (in.Ncolor() == 32) {
-      const int Nc = 32;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else  if (in.Ncolor() == 40) {
-      const int Nc = 40;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else  if (in.Ncolor() == 48) {
-      const int Nc = 48;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else  if (in.Ncolor() == 56) {
-      const int Nc = 56;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else  if (in.Ncolor() == 64) {
-      const int Nc = 64;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else 
+    case  8: copyGaugeMG<FloatOut,FloatIn, 8>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 12: copyGaugeMG<FloatOut,FloatIn,12>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 16: copyGaugeMG<FloatOut,FloatIn,16>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 24: copyGaugeMG<FloatOut,FloatIn,24>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 32: copyGaugeMG<FloatOut,FloatIn,32>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 40: copyGaugeMG<FloatOut,FloatIn,40>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 48: copyGaugeMG<FloatOut,FloatIn,48>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 56: copyGaugeMG<FloatOut,FloatIn,56>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 64: copyGaugeMG<FloatOut,FloatIn,64>(out, in, location, Out, In, outGhost, inGhost, type); break;
 #endif // GPU_MULTIGRID
-    {
-      errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
+    default: errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }
   }
 

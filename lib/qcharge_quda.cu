@@ -11,7 +11,7 @@
 #include <index_helper.cuh>
 
 #ifndef Pi2
-#define Pi2   6.2831853071795864769252867665590
+#define Pi2 6.2831853071795864769252867665590
 #endif
 
 namespace quda {
@@ -22,61 +22,44 @@ namespace quda {
     int threads; // number of active threads required
     Gauge data;
     QChargeArg(const Gauge &data, GaugeField& Fmunu)
-      : ReduceArg<double>(), data(data), threads(Fmunu.Volume()) {}
+      : ReduceArg<double>(), data(data), threads(Fmunu.VolumeCB()) {}
   };
 
   // Core routine for computing the topological charge from the field strength
   template<int blockSize, typename Float, typename Gauge>
-    __global__
-    void qChargeComputeKernel(QChargeArg<Float,Gauge> arg) {
-      int idx = threadIdx.x + blockIdx.x*blockDim.x;
+  __global__ void qChargeComputeKernel(QChargeArg<Float,Gauge> arg) {
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int parity = threadIdx.y;
 
-      double tmpQ1 = 0.;
+    double Q = 0.0;
 
-      if(idx < arg.threads) {
-        int parity = 0;  
-        if(idx >= arg.threads/2) {
-          parity = 1;
-          idx -= arg.threads/2;
-        }
+    while (idx < arg.threads) {
+      // Load the field-strength tensor from global memory
+      Matrix<complex<Float>,3> F[6];
+      for (int i=0; i<6; ++i) F[i] = arg.data(i, idx, parity);
 
-        // Load the field-strength tensor from global memory
-        Matrix<complex<Float>,3> F[6], temp1, temp2, temp3;
-        double tmpQ2, tmpQ3;
-        for(int i=0; i<6; ++i){
-          arg.data.load((Float*)(F[i].data), idx, i, parity);
-        }
+      double Q1 = getTrace(F[0]*F[5]).real();
+      double Q2 = getTrace(F[1]*F[4]).real();
+      double Q3 = getTrace(F[3]*F[2]).real();
+      Q += (Q1 + Q3 - Q2);
 
-        temp1 = F[0]*F[5];
-        temp2 = F[1]*F[4];
-        temp3 = F[3]*F[2];
-
-        tmpQ1 = (getTrace(temp1)).x;
-        tmpQ2 = (getTrace(temp2)).x;
-        tmpQ3 = (getTrace(temp3)).x;
-        tmpQ1 += (tmpQ3 - tmpQ2);
-        tmpQ1 /= (Pi2*Pi2);
-      }
-
-      double Q = tmpQ1;
-      reduce<blockSize>(arg, Q);
+      idx += blockDim.x*gridDim.x;
     }
+    Q /= (Pi2*Pi2);
+
+    reduce2d<blockSize,2>(arg, Q);
+  }
 
   template<typename Float, typename Gauge>
-    class QChargeCompute : Tunable {
+    class QChargeCompute : TunableLocalParity {
       QChargeArg<Float,Gauge> arg;
       const QudaFieldLocation location;
       GaugeField *vol;
 
-      private: 
-      unsigned int sharedBytesPerThread() const { return 0; };
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    private:
+      bool tuneGridDim() const { return true; }
 
-//      bool tuneSharedBytes() const { return false; } // Don't tune the shared memory.
-      bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-      unsigned int minThreads() const { return arg.threads; }
-
-      public:
+    public:
       QChargeCompute(QChargeArg<Float,Gauge> &arg, GaugeField *vol, QudaFieldLocation location) 
         : arg(arg), vol(vol), location(location) {
 	writeAuxString("threads=%d,prec=%lu",arg.threads,sizeof(Float));
@@ -85,14 +68,13 @@ namespace quda {
       virtual ~QChargeCompute() { }
 
       void apply(const cudaStream_t &stream) {
-        if(location == QUDA_CUDA_FIELD_LOCATION){
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
           arg.result_h[0] = 0.;
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           LAUNCH_KERNEL(qChargeComputeKernel, tp, stream, arg, Float);
-          cudaDeviceSynchronize();
-        }else{ // run the CPU code
+          qudaDeviceSynchronize();
+        } else { // run the CPU code
 	  errorQuda("qChargeComputeKernel not supported on CPU");
-//          qChargeComputeCPU(arg);
         }
       }
 
@@ -100,11 +82,9 @@ namespace quda {
 	return TuneKey(vol->VolString(), typeid(*this).name(), aux);
       }
 
-      long long flops() const { return arg.threads*(3*198+9); }
-      long long bytes() const { return arg.threads*(6*18)*sizeof(Float); }
+      long long flops() const { return 2*arg.threads*(3*198+9); }
+      long long bytes() const { return 2*arg.threads*(6*18)*sizeof(Float); }
     };
-
-
 
   template<typename Float, typename Gauge>
     void computeQCharge(const Gauge data, GaugeField& Fmunu, QudaFieldLocation location, Float &qChg){

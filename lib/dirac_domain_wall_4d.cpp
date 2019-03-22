@@ -4,27 +4,14 @@
 
 namespace quda {
 
-  namespace domainwall4d {
-#include <dslash_init.cuh>
-  }
-
-// Modification for the 4D preconditioned domain wall operator
+  // Modification for the 4D preconditioned domain wall operator
   DiracDomainWall4DPC::DiracDomainWall4DPC(const DiracParam &param)
-    : DiracDomainWallPC(param)
-  {
-    domainwall4d::initConstants(*param.gauge, profile);
-  }
+    : DiracDomainWallPC(param) { }
 
-  DiracDomainWall4DPC::DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac) 
-    : DiracDomainWallPC(dirac)
-  {
-    domainwall4d::initConstants(*dirac.gauge, profile);
-  }
+  DiracDomainWall4DPC::DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac)
+    : DiracDomainWallPC(dirac) { }
 
-  DiracDomainWall4DPC::~DiracDomainWall4DPC()
-  {
-
-  }
+  DiracDomainWall4DPC::~DiracDomainWall4DPC() { }
 
   DiracDomainWall4DPC& DiracDomainWall4DPC::operator=(const DiracDomainWall4DPC &dirac)
   {

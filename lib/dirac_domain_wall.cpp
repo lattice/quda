@@ -4,21 +4,11 @@
 
 namespace quda {
 
-  namespace domainwall {
-#include <dslash_init.cuh>
-  }
-
   DiracDomainWall::DiracDomainWall(const DiracParam &param) : 
-    DiracWilson(param, 5), m5(param.m5), kappa5(0.5/(5.0 + m5)) 
-  { 
-    domainwall::initConstants(*param.gauge, profile);
-  }
+    DiracWilson(param, 5), m5(param.m5), kappa5(0.5/(5.0 + m5)) { }
 
-  DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) : 
-    DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5.0 + m5)) 
-  { 
-    domainwall::initConstants(*dirac.gauge, profile);
-  }
+  DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) :
+    DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5.0 + m5)) { }
 
   DiracDomainWall::~DiracDomainWall() { }
 

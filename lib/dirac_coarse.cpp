@@ -4,12 +4,12 @@
 
 namespace quda {
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup)
+  DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup, bool mapped)
     : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
       Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Yhat_h(nullptr),
       Y_d(nullptr), X_d(nullptr), Xinv_d(nullptr), Yhat_d(nullptr),
       enable_gpu(false), enable_cpu(false), gpu_setup(gpu_setup),
-      init_gpu(gpu_setup), init_cpu(!gpu_setup)
+      init_gpu(gpu_setup), init_cpu(!gpu_setup), mapped(mapped)
   {
     initializeCoarse();
   }
@@ -21,7 +21,7 @@ namespace quda {
       Y_h(Y_h), X_h(X_h), Xinv_h(Xinv_h), Yhat_h(Yhat_h),
       Y_d(Y_d), X_d(X_d), Xinv_d(Xinv_d), Yhat_d(Yhat_d),
       enable_gpu( Y_d ? true : false), enable_cpu(Y_h ? true : false), gpu_setup(true),
-      init_gpu(enable_gpu ? false : true), init_cpu(enable_cpu ? false : true)
+      init_gpu(enable_gpu ? false : true), init_cpu(enable_cpu ? false : true), mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED)
   {
 
   }
@@ -31,7 +31,8 @@ namespace quda {
       Y_h(dirac.Y_h), X_h(dirac.X_h), Xinv_h(dirac.Xinv_h), Yhat_h(dirac.Yhat_h),
       Y_d(dirac.Y_d), X_d(dirac.X_d), Xinv_d(dirac.Xinv_d), Yhat_d(dirac.Yhat_d),
       enable_gpu(dirac.enable_gpu), enable_cpu(dirac.enable_cpu), gpu_setup(dirac.gpu_setup),
-      init_gpu(enable_gpu ? false : true), init_cpu(enable_cpu ? false : true)
+      init_gpu(enable_gpu ? false : true), init_cpu(enable_cpu ? false : true),
+      mapped(dirac.mapped)
   {
 
   }
@@ -52,7 +53,7 @@ namespace quda {
     }
   }
 
-  void DiracCoarse::createY(bool gpu) const
+  void DiracCoarse::createY(bool gpu, bool mapped) const
   {
     int ndim = transfer->Vectors().Ndim();
     int x[QUDA_MAX_DIM];
@@ -60,7 +61,6 @@ namespace quda {
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
     int Nc_c = transfer->nvec();     // Coarse Color
     int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs(); // Coarse Spin
-
     GaugeFieldParam gParam;
     memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
     gParam.nColor = Nc_c*Ns_c;
@@ -69,12 +69,14 @@ namespace quda {
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.setPrecision(transfer->Vectors(QUDA_CPU_FIELD_LOCATION).Precision()); // always use "CPU" precision for Y/X fields
+    // use null-space precision for coarse links on gpu
+    gParam.setPrecision( transfer->NullPrecision(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION) );
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     gParam.nFace = 1;
     gParam.geometry = QUDA_COARSE_GEOMETRY;
+    if (mapped) gParam.mem_type = QUDA_MEMORY_MAPPED;
 
     int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
     gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
@@ -108,8 +110,8 @@ namespace quda {
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
-    // use null-space precision for preconditioned links
-    gParam.setPrecision(transfer->Vectors(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION).Precision());
+    // use null-space precision for preconditioned links on gpu
+    gParam.setPrecision( transfer->NullPrecision(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION) );
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -134,7 +136,7 @@ namespace quda {
 
   void DiracCoarse::initializeCoarse()
   {
-    createY(gpu_setup);
+    createY(gpu_setup, mapped);
 
     if (gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,mass,Mu(),MuFactor());
     else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,mass,Mu(),MuFactor());
@@ -160,7 +162,7 @@ namespace quda {
     switch(location) {
     case QUDA_CUDA_FIELD_LOCATION:
       if (enable_gpu) return;
-      createY(true);
+      createY(true, mapped);
       createYhat(true);
       Y_d->copy(*Y_h);
       Yhat_d->copy(*Yhat_h);
@@ -223,9 +225,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out,in);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (8*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
@@ -240,9 +242,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out,in);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger, commDim);
+      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim);
+      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim, halo_precision);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
@@ -253,9 +255,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out,in);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
@@ -295,8 +297,10 @@ namespace quda {
   {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
+      initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
     } else {
+      initializeLazy(QUDA_CUDA_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
     }
   }
@@ -318,9 +322,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out,in);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim);
+      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim);
+      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
     }
 
     int n = in.Nspin()*in.Ncolor();
@@ -473,8 +477,10 @@ namespace quda {
   {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
+      initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
     } else {
+      initializeLazy(QUDA_CUDA_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
     }
   }

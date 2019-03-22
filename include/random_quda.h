@@ -1,10 +1,8 @@
+#pragma once
 
-#ifndef RANDOM_GPU_H
-#define RANDOM_GPU_H
-
-//#include <stdio.h>
-//#include <string.h>
-//#include <iostream>
+#ifdef __CUDACC_RTC__
+#define RNG int
+#else
 #include <curand_kernel.h>
 
 namespace quda {
@@ -18,14 +16,13 @@ typedef struct curandStateMRG32k3a cuRNGState;
 #endif
 
 /**
-    @brief Class declaration to initialize and hold CURAND RNG states
+   @brief Class declaration to initialize and hold CURAND RNG states
 */
 class RNG {
 public:
     RNG(int rng_sizes, int seedin, const int XX[4]);
-    RNG(int rng_sizes, int seedin);
     /*! free array */
-    void Release(); 
+    void Release();
     /*! initialize curand rng states with seed */
     void Init();
     /*! @brief return curand rng array size */
@@ -45,7 +42,7 @@ private:
     /*! initial rng seed */
     int seed;
     /*! @brief number of curand states */
-    int rng_size;  
+    int rng_size;
     /*! @brief offset in the index, in case of multigpus */
     int node_offset;
     int X[4];
@@ -54,9 +51,6 @@ private:
     /*! @brief CURAND array states initialization */
     void INITRNG(int rng_sizes, int seedin, int offsetin);
 };
-
-
-
 
 
 /**
@@ -71,7 +65,7 @@ inline  __device__ Real Random(cuRNGState &state, Real a, Real b){
     Real res;
     return res;
 }
- 
+
 template<>
 inline  __device__ float Random<float>(cuRNGState &state, float a, float b){
     return a + (b - a) * curand_uniform(&state);
@@ -92,7 +86,7 @@ inline  __device__ Real Random(cuRNGState &state){
     Real res;
     return res;
 }
- 
+
 template<>
 inline  __device__ float Random<float>(cuRNGState &state){
     return curand_uniform(&state);
@@ -143,4 +137,4 @@ struct normal<double> {
 
 }
 
-#endif 
+#endif

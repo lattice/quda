@@ -201,14 +201,24 @@ namespace quda {
     static void *ghost_recv_buffer_d[2];
 
     /**
-       Double buffered static pinned send/recv buffers
+       Double buffered static pinned send buffers
     */
-    static void *ghost_pinned_buffer_h[2];
+    static void *ghost_pinned_send_buffer_h[2];
 
     /**
-       Mapped version of ghost_pinned
+       Double buffered static pinned recv buffers
     */
-    static void *ghost_pinned_buffer_hd[2];
+    static void *ghost_pinned_recv_buffer_h[2];
+
+    /**
+       Mapped version of pinned send buffers
+    */
+    static void *ghost_pinned_send_buffer_hd[2];
+
+    /**
+       Mapped version of pinned recv buffers
+    */
+    static void *ghost_pinned_recv_buffer_hd[2];
 
     /**
        Remove ghost pointer for sending to
@@ -250,9 +260,14 @@ namespace quda {
     */
     mutable int ghostNormOffset[QUDA_MAX_DIM][2];
 
-    /** Pinned memory buffer used for sending all messages */
+    /**
+       Pinned memory buffer used for sending all messages
+    */
     void *my_face_h[2];
-    /** Mapped version of my_face_h */
+
+    /**
+       Mapped version of my_face_h
+    */
     void *my_face_hd[2];
 
     /** Local pointers to the pinned my_face buffer */
@@ -341,6 +356,9 @@ namespace quda {
     /** Used as a label in the autotuner */
     char vol_string[TuneKey::volume_n];
     
+    /** used as a label in the autotuner */
+    char aux_string[TuneKey::aux_n];
+
     /** Sets the vol_string for use in tuning */
     virtual void setTuningString();
 
@@ -349,6 +367,7 @@ namespace quda {
 
     void precisionCheck() {
       switch(precision) {
+      case QUDA_QUARTER_PRECISION:
       case QUDA_HALF_PRECISION:
       case QUDA_SINGLE_PRECISION:
       case QUDA_DOUBLE_PRECISION:
@@ -582,6 +601,9 @@ namespace quda {
 
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
+
+    /** Return the aux string used by the autotuner */
+    inline const char *AuxString() const { return aux_string; }
 
     /** @brief Backs up the LatticeField */
     virtual void backup() const { errorQuda("Not implemented"); }

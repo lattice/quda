@@ -198,7 +198,7 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
     // initialize the reduction values in 32-bit increments to INT_MIN
     constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
     void *h_reduce = getHostReduceBuffer();
-    for (int i=0; i<tp.grid.z*NXZ*arg.NYW*words; i++) {
+    for (unsigned int i=0; i<tp.grid.z*NXZ*arg.NYW*words; i++) {
       reinterpret_cast<int32_t*>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
     }
   }
@@ -216,7 +216,7 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
 	constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
 	volatile int32_t *check = reinterpret_cast<int32_t*>(getHostReduceBuffer());
 	int count = 0;
-	for (int i=0; i<tp.grid.z*NXZ*arg.NYW*words; i++) {
+	for (unsigned int i=0; i<tp.grid.z*NXZ*arg.NYW*words; i++) {
 	  // spin-wait until all values have been updated
 	  while (check[i] == std::numeric_limits<int32_t>::min()) {
 	    if (count++ % 10000 == 0) { // check error every 10000 iterations
@@ -226,19 +226,19 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
 	  }
 	}
       } else {
-	cudaEventRecord(*getReduceEvent(), stream);
-	while(cudaSuccess != cudaEventQuery(*getReduceEvent())) {}
+	qudaEventRecord(*getReduceEvent(), stream);
+	while(cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
       }
     } else
 #endif
-      { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
+      { qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
   }
 
   // need to transpose for same order with vector thread reduction
   for (int i=0; i<NXZ; i++) {
     for (int j=0; j<arg.NYW; j++) {
       result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[j*NXZ+i]);
-      if (tp.grid.z==2) result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+j*NXZ+i]);
+      if (tp.grid.z==2) sum(result[i*arg.NYW+j], ((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+j*NXZ+i]);
     }
   }
 }
@@ -303,7 +303,10 @@ public:
     strcpy(name, num_to_string<NXZ>::value);
     strcat(name, std::to_string(NYW).c_str());
     strcat(name, typeid(arg.r).name());
-    return TuneKey(blasStrings.vol_str, name, blasStrings.aux_tmp);
+    char aux[TuneKey::aux_n];
+    strcpy(aux, "policy_kernel,");
+    strcat(aux,blasStrings.aux_tmp);
+    return TuneKey(blasStrings.vol_str, name, aux);
   }
 
   void apply(const cudaStream_t &stream){

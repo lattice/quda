@@ -2,33 +2,42 @@
 
 #if (__COMPUTE_CAPABILITY__ >= 700)
 // for running on Volta we set large shared memory mode to prefer hitting in L2
-#define SET_CACHE(x) cudaFuncSetAttribute(x, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
+#define SET_CACHE(f) qudaFuncSetAttribute( (const void*)f, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared)
 #else
-#define SET_CACHE(x)
+#define SET_CACHE(f)
+#endif
+
+#if 1
+#define LAUNCH_KERNEL(f, grid, block, shared, stream, param)            \
+  void *args[] = { &param };                                            \
+  void (*func)( const DslashParam ) = &(f);                             \
+  qudaLaunchKernel( (const void*)func, grid, block, args, shared, stream);
+#else
+#define LAUNCH_KERNEL(f, grid, block, shared, stream, param) f<<<grid, block, shared, stream>>>(param)
 #endif
 
 #define EVEN_MORE_GENERIC_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type> );	\
-      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   }
 
@@ -47,27 +56,27 @@
 #define EVEN_MORE_GENERIC_STAGGERED_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 18 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
-      FUNC ## FLOAT ## 18 ## 13 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 13 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 18 ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 12 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_9) {			\
-      FUNC ## FLOAT ## 18 ## 9 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 9 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 18 ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 8 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
-      FUNC ## FLOAT ## 18 ## 13 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 13 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 18 ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_9) {			\
-      FUNC ## FLOAT ## 18 ## 9 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 9 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 18 ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }                                                                   \
   }
 
@@ -166,21 +175,37 @@
 
 // macro used for staggered dslash
 #define STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param)	\
-  GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param)
+  if (!dagger) {                                                        \
+    GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) \
+      } else {                                                          \
+    GENERIC_DSLASH(staggeredDslash, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
+      }
+
+// macro used for staggered dslash
+#define STAGGERED_DSLASH_TIFR(gridDim, blockDim, shared, stream, param)	\
+  if (!dagger) {                                                        \
+    GENERIC_DSLASH(staggeredDslashTIFR, , Axpy, gridDim, blockDim, shared, stream, param) \
+      } else {                                                          \
+    GENERIC_DSLASH(staggeredDslashTIFR, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
+      }
 
 #define IMPROVED_STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param) \
-  GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) 
+  if (!dagger) {                                                        \
+    GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) \
+      } else {                                                          \
+    GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
+      }
 
 #define EVEN_MORE_GENERIC_ASYM_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
     SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-    FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+    LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
   } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
     SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type> ); \
-    FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+    LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
   } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
     SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> ); \
-    FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+    LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
   }									
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
@@ -248,46 +273,46 @@
   if (x == 0 && d == 0) {						\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Twist ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## Twist ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Twist ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Twist ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## Twist ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Twist ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else {								\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Twist ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## Twist ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Twist ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else if (x != 0 && d == 0) {					\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Twist ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## Twist ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Twist ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Twist ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## Twist ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Twist ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Twist ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## Twist ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Twist ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else if (x == 0 && d != 0) {					\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else {								\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   } else{								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       SET_CACHE( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       SET_CACHE( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
       SET_CACHE( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> ); \
-      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      LAUNCH_KERNEL( FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type>, gridDim, blockDim, shared, stream, param); \
     }									\
   }
 
@@ -355,122 +380,193 @@
 // allow a simple interface.
 class DslashCuda : public Tunable {
 
-public:
-  double twist_a;
-  double twist_b;
-
 protected:
   cudaColorSpinorField *out;
   const cudaColorSpinorField *in;
   const cudaColorSpinorField *x;
+  const GaugeField &gauge;
   const QudaReconstructType reconstruct;
   char *saveOut, *saveOutNorm;
   const int dagger;
+  static bool init;
 
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
   bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
   // all dslashes expect a 4-d volume here (dwf Ls is y thread dimension)
   unsigned int minThreads() const { return dslashParam.threads; }
+  char aux_base[TuneKey::aux_n];
   char aux[8][TuneKey::aux_n];
+  static char ghost_str[TuneKey::aux_n]; // string with ghostDim information
 
-  void fillAux(KernelType kernel_type, const char *kernel_str) {
-    strcpy(aux[kernel_type],kernel_str);
-#ifdef MULTI_GPU
+  /**
+     @brief Set the base strings used by the different dslash kernel
+     types for autotuning.
+  */
+  inline void fillAuxBase() {
     char comm[5];
     comm[0] = (dslashParam.commDim[0] ? '1' : '0');
     comm[1] = (dslashParam.commDim[1] ? '1' : '0');
     comm[2] = (dslashParam.commDim[2] ? '1' : '0');
     comm[3] = (dslashParam.commDim[3] ? '1' : '0');
     comm[4] = '\0'; 
-    strcat(aux[kernel_type],",comm=");
-    strcat(aux[kernel_type],comm);
-    if (kernel_type == INTERIOR_KERNEL) {
-      char ghost[5];
-      ghost[0] = (dslashParam.ghostDim[0] ? '1' : '0');
-      ghost[1] = (dslashParam.ghostDim[1] ? '1' : '0');
-      ghost[2] = (dslashParam.ghostDim[2] ? '1' : '0');
-      ghost[3] = (dslashParam.ghostDim[3] ? '1' : '0');
-      ghost[4] = '\0';
-      strcat(aux[kernel_type],",ghost=");
-      strcat(aux[kernel_type],ghost);
+    strcpy(aux_base,",comm=");
+    strcat(aux_base,comm);
+
+    switch (reconstruct) {
+    case QUDA_RECONSTRUCT_NO: strcat(aux_base,",reconstruct=18"); break;
+    case QUDA_RECONSTRUCT_13: strcat(aux_base,",reconstruct=13"); break;
+    case QUDA_RECONSTRUCT_12: strcat(aux_base,",reconstruct=12"); break;
+    case QUDA_RECONSTRUCT_9:  strcat(aux_base, ",reconstruct=9"); break;
+    case QUDA_RECONSTRUCT_8:  strcat(aux_base, ",reconstruct=8"); break;
+    default: break;
     }
-#endif
 
-    if (reconstruct == QUDA_RECONSTRUCT_NO) 
-      strcat(aux[kernel_type],",reconstruct=18");
-    else if (reconstruct == QUDA_RECONSTRUCT_13) 
-      strcat(aux[kernel_type],",reconstruct=13");
-    else if (reconstruct == QUDA_RECONSTRUCT_12) 
-      strcat(aux[kernel_type],",reconstruct=12");
-    else if (reconstruct == QUDA_RECONSTRUCT_9) 
-      strcat(aux[kernel_type],",reconstruct=9");
-    else if (reconstruct == QUDA_RECONSTRUCT_8) 
-      strcat(aux[kernel_type],",reconstruct=8");
+    if (x) strcat(aux_base,",Xpay");
+    if (dagger) strcat(aux_base,",dagger");
+  }
 
-    if (x) strcat(aux[kernel_type],",Xpay");
-    if (dagger) strcat(aux[kernel_type],",dagger");
+  /**
+     @brief Specialize the auxiliary strings for each kernel type
+     @param[in] kernel_type The kernel_type we are generating the string got
+     @param[in] kernel_str String corresponding to the kernel type
+  */
+  inline void fillAux(KernelType kernel_type, const char *kernel_str) {
+    strcpy(aux[kernel_type],kernel_str);
+    if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type],ghost_str);
+    strcat(aux[kernel_type],aux_base);
+  }
+
+  /**
+     @brief Set the dslashParam for the current multi-GPU parameters
+     (set these at the last minute to ensure we always use the correct
+     ones while policy autotuning).
+   */
+  inline void setParam()
+  {
+    // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
+    dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
+    dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
+
+    // update the ghosts for the non-p2p directions
+    for (int dim=0; dim<4; dim++) {
+      if (!dslashParam.commDim[dim]) continue;
+
+      for (int dir=0; dir<2; dir++) {
+        /* if doing interior kernel, then this is the initial call, so
+        we must set all ghost pointers else if doing exterior kernel, then
+        we only have to update the non-p2p ghosts, since these may
+        have been assigned to zero-copy memory */
+        if (!comm_peer2peer_enabled(1-dir, dim) || dslashParam.kernel_type == INTERIOR_KERNEL) {
+          dslashParam.ghost[2*dim+dir] = (void*)in->Ghost2();
+          dslashParam.ghostNorm[2*dim+dir] = (float*)(in->Ghost2());
+
+#ifdef USE_TEXTURE_OBJECTS
+          dslashParam.ghostTex[2*dim+dir] = in->GhostTex();
+          dslashParam.ghostTexNorm[2*dim+dir] = in->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
+        }
+      }
+    }
+
   }
 
 public:
-  DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-	     const cudaColorSpinorField *x, const QudaReconstructType reconstruct,
-	     const int dagger) 
-    : out(out), in(in), x(x), reconstruct(reconstruct), 
-      dagger(dagger), saveOut(0), saveOutNorm(0), twist_a(0.0), twist_b(0.0)  {
+  DslashParam dslashParam;
 
+  DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
+	     const cudaColorSpinorField *x, const GaugeField &gauge,
+             const int parity, const int dagger, const int *commOverride)
+    : out(out), in(in), x(x), gauge(gauge), reconstruct(gauge.Reconstruct()),
+      dagger(dagger), saveOut(0), saveOutNorm(0) {
+
+    if (in->Precision() != gauge.Precision())
+      errorQuda("Mixing gauge %d and spinor %d precision not supported", gauge.Precision(), in->Precision());
+
+    constexpr int nDimComms = 4;
+    for (int i=0; i<nDimComms; i++){
+      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
+      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
+      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
+      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
+      dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
+      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : comm_dim_partitioned(i); // switch off comms if override = 0
+    }
+
+    // set parameters particular for this instance
     dslashParam.out = (void*)out->V();
     dslashParam.outNorm = (float*)out->Norm();
     dslashParam.in = (void*)in->V();
     dslashParam.inNorm = (float*)in->Norm();
     dslashParam.x = x ? (void*)x->V() : nullptr;
     dslashParam.xNorm = x ? (float*)x->Norm() : nullptr;
-    dslashParam.ghost = (void*)in->Ghost2();
-    dslashParam.ghostNorm = (float*)(in->Ghost2());
 
-#ifdef MULTI_GPU 
-    fillAux(INTERIOR_KERNEL, "type=interior");
-    fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all");
-    fillAux(EXTERIOR_KERNEL_X, "type=exterior_x");
-    fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y");
-    fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z");
-    fillAux(EXTERIOR_KERNEL_T, "type=exterior_t");
-#else
-    fillAux(INTERIOR_KERNEL, "type=single-GPU");
-#endif // MULTI_GPU
-    fillAux(KERNEL_POLICY, "policy");
+#ifdef USE_TEXTURE_OBJECTS
+    dslashParam.inTex = in->Tex();
+    dslashParam.inTexNorm = in->TexNorm();
+    if (out) dslashParam.outTex = out->Tex();
+    if (out) dslashParam.outTexNorm = out->TexNorm();
+    if (x) dslashParam.xTex = x->Tex();
+    if (x) dslashParam.xTexNorm = x->TexNorm();
+#endif // USE_TEXTURE_OBJECTS
+
+    dslashParam.parity = parity;
+    bindGaugeTex(static_cast<const cudaGaugeField&>(gauge), parity, dslashParam);
 
     dslashParam.sp_stride = in->Stride();
+
+    dslashParam.dc = in->getDslashConstant(); // get precomputed constants
+
+    dslashParam.gauge_stride = gauge.Stride();
+    dslashParam.gauge_fixed = gauge.GaugeFixed();
+
+    dslashParam.anisotropy = gauge.Anisotropy();
+    dslashParam.anisotropy_f = (float)dslashParam.anisotropy;
+
+    dslashParam.t_boundary = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+    dslashParam.t_boundary_f = (float)dslashParam.t_boundary;
+
+    dslashParam.An2 = make_float2(gauge.Anisotropy(), 1.0 / (gauge.Anisotropy()*gauge.Anisotropy()));
+    dslashParam.TB2 = make_float2(dslashParam.t_boundary_f, 1.0 / (dslashParam.t_boundary * dslashParam.t_boundary));
+
+    dslashParam.coeff = 1.0;
+    dslashParam.coeff_f = 1.0f;
+
+    dslashParam.twist_a = 0.0;
+    dslashParam.twist_b = 0.0;
+
+    dslashParam.No2 = make_float2(1.0f, 1.0f);
+    dslashParam.Pt0 = (comm_coord(3) == 0) ? true : false;
+    dslashParam.PtNm1 = (comm_coord(3) == comm_dim(3)-1) ? true : false;
 
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
-    // this is a c/b field so double the x dimension
-    dslashParam.X[0] = in->X(0)*2;
-    for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
-#ifdef GPU_DOMAIN_WALL_DIRAC
-    dslashParam.Ls = in->X(4); // needed by tuneLaunch()
-#endif
-    dslashParam.Xh[0] = in->X(0);
-    for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
-    dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
-
-    int face[4];
-    for (int dim=0; dim<4; dim++) {
-      for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
-      face[dim] = Nface()/2;
-      
-      dslashParam.face_X[dim] = face[0];
-      dslashParam.face_Y[dim] = face[1];
-      dslashParam.face_Z[dim] = face[2];
-      dslashParam.face_T[dim] = face[3];
-      dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
-      dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
-      dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
+    if (!init) { // these parameters are constant across all dslash instances for a given run
+      char ghost[5]; // set the ghost string
+      for (int dim=0; dim<nDimComms; dim++) ghost[dim] = (dslashParam.ghostDim[dim] ? '1' : '0');
+      ghost[4] = '\0';
+      strcpy(ghost_str,",ghost=");
+      strcat(ghost_str,ghost);
+      init = true;
     }
+
+    fillAuxBase();
+#ifdef MULTI_GPU
+    fillAux(INTERIOR_KERNEL, "policy_kernel=interior");
+    fillAux(EXTERIOR_KERNEL_ALL, "policy_kernel=exterior_all");
+    fillAux(EXTERIOR_KERNEL_X, "policy_kernel=exterior_x");
+    fillAux(EXTERIOR_KERNEL_Y, "policy_kernel=exterior_y");
+    fillAux(EXTERIOR_KERNEL_Z, "policy_kernel=exterior_z");
+    fillAux(EXTERIOR_KERNEL_T, "policy_kernel=exterior_t");
+#else
+    fillAux(INTERIOR_KERNEL, "policy_kernel=single-GPU");
+#endif // MULTI_GPU
+    fillAux(KERNEL_POLICY, "policy");
+
   }
 
-  virtual ~DslashCuda() { }
+  virtual ~DslashCuda() { unbindGaugeTex(static_cast<const cudaGaugeField&>(gauge)); }
   virtual TuneKey tuneKey() const  
   { return TuneKey(in->VolString(), typeid(*this).name(), aux[dslashParam.kernel_type]); }
 
@@ -613,9 +709,9 @@ public:
 
   virtual long long bytes() const {
     int gauge_bytes = reconstruct * in->Precision();
-    bool isHalf = in->Precision() == sizeof(short) ? true : false;
-    int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
-    int proj_spinor_bytes = (in->Nspin()==4 ? 1 : 2) * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+    bool isFixed = (in->Precision() == sizeof(short) || in->Precision() == sizeof(char)) ? true : false;
+    int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isFixed ? sizeof(float) : 0);
+    int proj_spinor_bytes = (in->Nspin()==4 ? 1 : 2) * in->Ncolor() * in->Nspin() * in->Precision() + (isFixed ? sizeof(float) : 0);
     int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + spinor_bytes;
     int num_dir = 2 * 4; // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
 
@@ -652,8 +748,11 @@ public:
     return bytes_;
   }
 
-
 };
+
+//static declarations
+bool DslashCuda::init = false;
+char DslashCuda::ghost_str[TuneKey::aux_n];
 
 /** This derived class is specifically for driving the Dslash kernels
     that use shared memory blocking.  This only applies on Fermi and
@@ -735,8 +834,9 @@ protected:
 
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
-    : DslashCuda(out, in, x, reconstruct, dagger) { ; }
+		   const cudaColorSpinorField *x, const GaugeField &gauge,
+                   int parity, int dagger, const int *commOverride)
+    : DslashCuda(out, in, x, gauge, parity, dagger, commOverride) { ; }
   virtual ~SharedDslashCuda() { ; }
 
   virtual void initTuneParam(TuneParam &param) const
@@ -759,8 +859,9 @@ public:
 class SharedDslashCuda : public DslashCuda {
 public:
   SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		   const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
-    : DslashCuda(out, in, x, reconstruct, dagger) { }
+		   const cudaColorSpinorField *x, const GaugeField &gauge,
+                   int parity, int dagger, const int *commOverride)
+    : DslashCuda(out, in, x, gauge, parity, dagger, commOverride) { }
   virtual ~SharedDslashCuda() { }
 };
 #endif

@@ -17,7 +17,7 @@ struct MsgHandle_s {
 static int gpuid = -1;
 
 static char partition_string[16];
-static char topology_string[16];
+static char topology_string[128];
 
 // While we can emulate an all-gather using QMP reductions, this
 // scales horribly as the number of nodes increases, so for
@@ -122,7 +122,37 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   host_free(hostname_recv_buf);
 
   snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
-  snprintf(topology_string, 16, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+
+  // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
+  char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
+  if (device_order_env) {
+
+    // to ensure we have process consistency define using rank 0
+    if (comm_rank() == 0) {
+      std::stringstream device_list_raw(device_order_env); // raw input
+      std::stringstream device_list;                       // formatted (no commas)
+
+      int device;
+      int deviceCount;
+      cudaGetDeviceCount(&deviceCount);
+      while (device_list_raw >> device) {
+        // check this is a valid policy choice
+        if ( device < 0 ) {
+          errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device);
+        }
+
+        device_list << device;
+        if (device_list_raw.peek() == ',') device_list_raw.ignore();
+      }
+      snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s",
+               comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3), device_list.str().c_str());
+    }
+
+    comm_broadcast(topology_string, 128);
+  } else {
+    snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+  }
+
 }
 
 int comm_rank(void)
@@ -273,6 +303,12 @@ void comm_allreduce_array(double* data, size_t size)
   QMP_CHECK( QMP_sum_double_array(data, size) );
 }
 
+void comm_allreduce_max_array(double* data, size_t size)
+{
+  for (int i=0; i<size; i++) {
+    QMP_CHECK( QMP_max_double(data+i) );
+  }
+}
 
 void comm_allreduce_int(int* data)
 {
@@ -282,7 +318,7 @@ void comm_allreduce_int(int* data)
 void comm_allreduce_xor(uint64_t *data)
 {
   if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
-  QMP_CHECK( QMP_xor_ulong(data); );
+  QMP_CHECK( QMP_xor_ulong( reinterpret_cast<unsigned long*>(data) ));
 }
 
 void comm_broadcast(void *data, size_t nbytes)

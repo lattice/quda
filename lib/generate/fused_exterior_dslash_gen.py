@@ -414,7 +414,7 @@ int sid;
 
   bool active = false;
   for(int dir=0; dir<4; ++dir){
-   active = active  || isActive(dim,dir,+1,coord,param.commDim,param.X);
+   active = active  || isActive(dim,dir,+1,coord,param.commDim,param.dc.X);
   }
   if(!active) return;
 
@@ -460,20 +460,20 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
-    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
+    boundary = ["coord[0]==(param.dc.X[0]-1)", "coord[0]==0", "coord[1]==(param.dc.X[1]-1)", "coord[1]==0", "coord[2]==(param.dc.X[2]-1)", "coord[2]==0", "coord[3]==(param.dc.X[3]-1)", "coord[3]==0"]
+    interior = ["coord[0]<(param.dc.X[0]-1)", "coord[0]>0", "coord[1]<(param.dc.X[1]-1)", "coord[1]>0", "coord[2]<(param.dc.X[2]-1)", "coord[2]>0", "coord[3]<(param.dc.X[3]-1)", "coord[3]>0"]
     offset = ["+1", "-1", "+1", "-1", "+1", "-1", "+1", "-1"]
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
-    sp_idx = ["X+1", "X-1", "X+X1", "X-X1", "X+X2X1", "X-X2X1", "X+X3X2X1", "X-X3X2X1"]
+    sp_idx = ["X+1", "X-1", "X+param.dc.X[0]", "X-param.dc.X[0]", "X+param.dc.X2X1", "X-param.dc.X2X1", "X+param.dc.X3X2X1", "X-param.dc.X3X2X1"]
 
     # index of neighboring site (across boundary)
-    sp_idx_wrap = ["X-X1m1", "X+X1m1", "X-X2X1mX1", "X+X2X1mX1", "X-X3X2X1mX2X1", "X+X3X2X1mX2X1",
-                   "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
+    sp_idx_wrap = ["X-(param.dc.X[0]-1)", "X+(param.dc.X[0]-1)", "X-param.dc.X2X1mX1", "X+param.dc.X2X1mX1", "X-param.dc.X3X2X1mX2X1", "X+param.dc.X3X2X1mX2X1",
+                   "X-param.dc.X4X3X2X1mX3X2X1", "X+param.dc.X4X3X2X1mX3X2X1"]
 
     cond = ""
-    cond += "if ( isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.X) && " +boundary[dir]+" )\n"
+    cond += "if ( isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.dc.X) && " +boundary[dir]+" )\n"
 
     str = ""
 
@@ -496,7 +496,7 @@ def gen(dir, pack_only=False):
     if dir % 2 == 0:
         str += "const int ga_idx = sid;\n"
     else:
-        str += "const int ga_idx = Vh+face_idx;\n"
+        str += "const int ga_idx = param.dc.Vh+face_idx;\n"
     str += "\n"
 
     # scan the projector to determine which loads are required
@@ -526,17 +526,16 @@ def gen(dir, pack_only=False):
     load_spinor += "\n"
 
     load_half = ""
-    load_half += "const int sp_stride_pad = ghostFace[" + `dir/2` + "];\n"
+    load_half += "const int sp_stride_pad = param.dc.ghostFace[" + `dir/2` + "];\n"
 
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"
     load_half += "// read half spinor from device memory\n"
 
-# we have to use the same volume index for backwards and forwards gathers
-# instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    load_half += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+    # we have to use the same volume index for backwards and forwards gathers
+    load_half += "READ_SPINOR_GHOST(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx, "+`dir`+");\n\n"
     load_gauge = "// read gauge matrix from device memory\n"
-    load_gauge += "READ_GAUGE_MATRIX(G, GAUGE"+`dir%2`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
+    load_gauge += "READ_GAUGE_MATRIX(G, GAUGE"+`dir%2`+"TEX, "+`dir`+", ga_idx, param.gauge_stride);\n\n"
 
     reconstruct_gauge = "// reconstruct gauge matrix\n"
     reconstruct_gauge += "RECONSTRUCT_GAUGE_MATRIX("+`dir`+");\n\n"
@@ -691,7 +690,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         reconstruct += "\n"
 
     if dir >= 6:
-        str += "if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
+        str += "if (param.gauge_fixed && ga_idx < param.dc.X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
         str += block(decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct)

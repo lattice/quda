@@ -42,9 +42,9 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
-#define m5 m5_d
-#define mdwf_b5 mdwf_b5_d
-#define mdwf_c5 mdwf_c5_d
+#define m5 param.m5_d
+#define mdwf_b5 param.mdwf_b5_d
+#define mdwf_c5 param.mdwf_c5_d
 #define mferm param.mferm
 #define a param.a
 #define b param.b
@@ -75,9 +75,9 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
-#define m5 m5_f
-#define mdwf_b5 mdwf_b5_f
-#define mdwf_c5 mdwf_c5_f
+#define m5 param.m5_f
+#define mdwf_b5 param.mdwf_b5_f
+#define mdwf_c5 param.mdwf_c5_f
 #define mferm param.mferm_f
 #define a param.a
 #define b param.b
@@ -125,17 +125,17 @@ VOLATILE spinorFloat o32_im;
 #include "io_spinor.h"
 
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*param.Ls) return;
+if (sid >= param.threads*param.dc.Ls) return;
 
 
 int X, coord[5], boundaryCrossing;
 
 
 
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
+boundaryCrossing = sid/param.dc.Xh[0] + sid/(param.dc.X[1]*param.dc.Xh[0]) + sid/(param.dc.X[2]*param.dc.X[1]*param.dc.Xh[0]);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-coord[4] = X/(X1*X2*X3*X4);
+coord[4] = X/(param.dc.X[0]*param.dc.X[1]*param.dc.X[2]*param.dc.X[3]);
 
  o00_re = 0; o00_im = 0;
  o01_re = 0; o01_im = 0;
@@ -166,7 +166,7 @@ VOLATILE spinorFloat kappa;
 // 'w' means output vector
 // 'v' means input vector
 {
-  int base_idx = sid%param.volume4CB;
+  int base_idx = sid%param.dc.volume_4d_cb;
   int sp_idx;
 
 // let's assume the index,
@@ -174,16 +174,16 @@ VOLATILE spinorFloat kappa;
 // s' = input vector index and
 // 'a'= kappa5
 
-  spinorFloat inv_d_n = static_cast<spinorFloat>(0.5) / ( static_cast<spinorFloat>(1.0) + POW(kappa,param.Ls)*mferm );
+  spinorFloat inv_d_n = static_cast<spinorFloat>(0.5) / ( static_cast<spinorFloat>(1.0) + POW(kappa,param.dc.Ls)*mferm );
   spinorFloat factorR;
   spinorFloat factorL;
 
-  for(int s = 0; s < param.Ls; s++)
+  for(int s = 0; s < param.dc.Ls; s++)
   {
-    int exponent = coord[4] < s ? param.Ls-s+coord[4] : coord[4]-s;
+    int exponent = coord[4] < s ? param.dc.Ls-s+coord[4] : coord[4]-s;
     factorR = inv_d_n * POW(kappa,exponent) * ( coord[4] < s ? -mferm : static_cast<spinorFloat>(1.0) );
 
-    sp_idx = base_idx + s*param.volume4CB;
+    sp_idx = base_idx + s*param.dc.volume_4d_cb;
     // read spinor from device memory
     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
@@ -212,7 +212,7 @@ VOLATILE spinorFloat kappa;
     o32_re += factorR*(i12_re + i32_re);
     o32_im += factorR*(i12_im + i32_im);
 
-    int exponent2 = coord[4] > s ? param.Ls-coord[4]+s : s-coord[4];
+    int exponent2 = coord[4] > s ? param.dc.Ls-coord[4]+s : s-coord[4];
     factorL = inv_d_n * POW(kappa,exponent2) * ( coord[4] > s ? -mferm : static_cast<spinorFloat>(1.0));
 
     o00_re += factorL*(i00_re - i20_re);

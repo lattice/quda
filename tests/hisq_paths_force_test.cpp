@@ -8,13 +8,12 @@
 #include "misc.h"
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
-#include "hw_quda.h"
+#include "momentum.h"
 #include <dslash_quda.h> 
 #include <sys/time.h>
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-#include "fermion_force_reference.h"
 using namespace quda;
 
 extern void usage(char** argv);
@@ -52,10 +51,6 @@ QudaPrecision hw_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cpu_hw_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision mom_prec = QUDA_DOUBLE_PRECISION;
 
-void* siteLink_1d;
-void* siteLink_2d[4];
-void* siteLink_ex_2d[4];
-
 cudaGaugeField *cudaGauge_ex = NULL;
 cpuGaugeField  *cpuGauge_ex  = NULL;
 cudaGaugeField *cudaForce_ex = NULL;
@@ -64,10 +59,8 @@ cpuGaugeField *cpuOprod_ex = NULL;
 cudaGaugeField *cudaOprod_ex = NULL;
 cpuGaugeField *cpuLongLinkOprod_ex = NULL;
 cudaGaugeField *cudaLongLinkOprod_ex = NULL;
-#ifdef MULTI_GPU
-GaugeFieldParam gParam_ex;
-#endif
 
+GaugeFieldParam gParam_ex;
 GaugeFieldParam gParam;
 
 static void setPrecision(QudaPrecision precision)
@@ -79,9 +72,7 @@ static void setPrecision(QudaPrecision precision)
   return;
 }
 
-
-  void
-total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io, double* flops)
+void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io, double* flops)
 {
   //total IO counting for the middle/side/all link kernels
   //Explanation about these numbers can be founed in the corresnponding kernel functions in
@@ -110,7 +101,6 @@ total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io,
     {2,0}
   };
 
-
   int num_calls_side_link[2]= {192, 48};
   int side_link_data_io[2][2] = {
     {1, 6},
@@ -121,8 +111,6 @@ total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io,
     {0, 1}
   };
 
-
-
   int num_calls_all_link[2] ={192, 192};
   int all_link_data_io[2][2] = {
     {3, 8},
@@ -132,7 +120,6 @@ total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io,
     {6, 3},
     {4, 2}
   };
-
 
   double total_io = 0;
   for(int i = 0;i < 6; i++){
@@ -174,10 +161,15 @@ total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io,
   return ;  
 }
 
+#ifdef MULTI_GPU
+static int R[4] = {2, 2, 2, 2};
+#else
+static int R[4] = {0, 0, 0, 0};
+#endif
+
 // allocate memory
 // set the layout, etc.
-  static void
-hisq_force_init()
+static void hisq_force_init()
 {
   initQuda(device);
 
@@ -188,193 +180,58 @@ hisq_force_init()
 
   setDims(qudaGaugeParam.X);
 
-
   qudaGaugeParam.cpu_prec = link_prec;
   qudaGaugeParam.cuda_prec = link_prec;
   qudaGaugeParam.reconstruct = link_recon;
-
-  //  qudaGaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  qudaGaugeParam.gauge_order = gauge_order;
   qudaGaugeParam.anisotropy = 1.0;
 
-
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
-  qudaGaugeParam_ex.X[0] = qudaGaugeParam.X[0] + 4;
-  qudaGaugeParam_ex.X[1] = qudaGaugeParam.X[1] + 4;
-  qudaGaugeParam_ex.X[2] = qudaGaugeParam.X[2] + 4;
-  qudaGaugeParam_ex.X[3] = qudaGaugeParam.X[3] + 4;
-
-
 
   gParam = GaugeFieldParam(0, qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
+
+  gParam.order = gauge_order;
   cpuGauge = new cpuGaugeField(gParam);
 
-#ifdef MULTI_GPU
   gParam_ex = GaugeFieldParam(0, qudaGaugeParam_ex);
-  gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.order = gauge_order;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = R[d]; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region for CPU
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
-#endif
 
-  int gSize = qudaGaugeParam.cpu_prec;
-  // this is a hack to get the gauge field to appear as a void** rather than void*
-  for(int i=0;i < 4;i++){
-    if(cudaMallocHost(&siteLink_2d[i], V*gaugeSiteSize* qudaGaugeParam.cpu_prec) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for sitelink_2d\n");
-    }
-    if(cudaMallocHost((void**)&siteLink_ex_2d[i], V_ex*gaugeSiteSize*qudaGaugeParam.cpu_prec) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for sitelink_ex_2d\n");
-    }
-    if(siteLink_2d[i] == NULL || siteLink_ex_2d[i] == NULL){
-      errorQuda("malloc failed for siteLink_2d/siteLink_ex_2d\n");
-    }
-    memset(siteLink_2d[i], 0, V*gaugeSiteSize* qudaGaugeParam.cpu_prec);
-    memset(siteLink_ex_2d[i], 0, V_ex*gaugeSiteSize*qudaGaugeParam.cpu_prec);
-  }
-  //siteLink_1d is only used in fermion reference computation
-  siteLink_1d = malloc(4*V*gaugeSiteSize* qudaGaugeParam.cpu_prec);
-
-
-  // fills the gauge field with random numbers
-  createSiteLinkCPU(siteLink_2d, qudaGaugeParam.cpu_prec, 1);
-
-  int X1 = Z[0];
-  int X2 = Z[1];
-  int X3 = Z[2];
-  int X4 = Z[3];
-  for(int i=0; i < V_ex; i++){
-    int sid = i;
-    int oddBit=0;
-    if(i >= Vh_ex){
-      sid = i - Vh_ex;
-      oddBit = 1;
-    }
-
-    int za = sid/E1h;
-    int x1h = sid - za*E1h;
-    int zb = za/E2;
-    int x2 = za - zb*E2;
-    int x4 = zb/E3;
-    int x3 = zb - x4*E3;
-    int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-    int x1 = 2*x1h + x1odd;
-
-
-    if( x1< 2 || x1 >= X1 +2
-        || x2< 2 || x2 >= X2 +2
-        || x3< 2 || x3 >= X3 +2
-        || x4< 2 || x4 >= X4 +2){
-      continue;
-    }
-
-
-
-    x1 = (x1 - 2 + X1) % X1;
-    x2 = (x2 - 2 + X2) % X2;
-    x3 = (x3 - 2 + X3) % X3;
-    x4 = (x4 - 2 + X4) % X4;
-
-    int idx = (x4*X3*X2*X1+x3*X2*X1+x2*X1+x1)>>1;
-    if(oddBit){
-      idx += Vh;
-    }
-    for(int dir= 0; dir < 4; dir++){
-      char* src = (char*)siteLink_2d[dir];
-      char* dst = (char*)siteLink_ex_2d[dir];
-      memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
-    }//dir
-
-  }//i
-
-
-
-
-  for(int dir = 0; dir < 4; dir++){
-    for(int i = 0;i < V; i++){
-      char* src = (char*)siteLink_2d[dir];
-      char* dst = (char*)siteLink_1d;
-      memcpy(dst + (4*i+dir)*gaugeSiteSize*link_prec, src + i*gaugeSiteSize*link_prec, gaugeSiteSize \
-          *link_prec);
-    }
+  if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
+    createSiteLinkCPU((void**)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, 1);
+  } else {
+    errorQuda("Unsupported gauge order %d", gauge_order);
   }
 
-  if(gauge_order == QUDA_MILC_GAUGE_ORDER){
-    for(int dir = 0; dir < 4; dir++){
-      for(int i = 0;i < V; i++){
-        char* src = (char*)siteLink_2d[dir];
-        char* dst = (char*)cpuGauge->Gauge_p();
-        memcpy(dst + (4*i+dir)*gaugeSiteSize*link_prec, src + i*gaugeSiteSize*link_prec, gaugeSiteSize*link_prec);   
-      }
-    }
-  }else{
-    for(int dir=0;dir < 4; dir++){
-      char* src = (char*)siteLink_2d[dir];
-      char* dst = ((char**)cpuGauge->Gauge_p())[dir];
-      memcpy(dst, src, V*gaugeSiteSize*link_prec);
-    }
-  }
-#ifdef MULTI_GPU
-  //for multi-gpu we have to use qdp format now
-  if(gauge_order == QUDA_MILC_GAUGE_ORDER){
-    errorQuda("multi_gpu milc is not supported\n");    
-  }
-  for(int dir=0;dir < 4; dir++){
-    char* src = (char*)siteLink_ex_2d[dir];
-    char* dst = ((char**)cpuGauge_ex->Gauge_p())[dir];
-    memcpy(dst, src, V_ex*gaugeSiteSize*link_prec);
-  }  
+  copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
-#endif
-
-
-
-#ifdef MULTI_GPU
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam_ex.setPrecision(prec);
   gParam_ex.reconstruct = link_recon;
-  //gParam_ex.pad = E1*E2*E3/2;
   gParam_ex.pad = 0;
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region
   cudaGauge_ex = new cudaGaugeField(gParam_ex);
   qudaGaugeParam.site_ga_pad = gParam_ex.pad;
   //record gauge pad size  
 
-#else
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam.setPrecision(qudaGaugeParam.cuda_prec);
-  gParam.reconstruct = link_recon;
-  gParam.pad = X1*X2*X3/2;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaGauge = new cudaGaugeField(gParam);
-  //record gauge pad size
-  qudaGaugeParam.site_ga_pad = gParam.pad;
-
-#endif
-
-#ifdef MULTI_GPU
   gParam_ex.pad = 0;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.create = QUDA_ZERO_FIELD_CREATE;
   gParam_ex.order = gauge_order;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = R[d]; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region for CPU
   cpuForce_ex = new cpuGaugeField(gParam_ex); 
-  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER; 
+
+
+  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region
   cudaForce_ex = new cudaGaugeField(gParam_ex); 
-#else
-  gParam.pad = 0;
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.order = gauge_order;
-  cpuForce = new cpuGaugeField(gParam); 
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaForce = new cudaGaugeField(gParam); 
-#endif
 
   // create the momentum matrix
   gParam.pad = 0;
@@ -396,7 +253,6 @@ hisq_force_init()
 
   createHwCPU(hw, hw_prec);
 
-
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.order = gauge_order;
@@ -406,98 +262,31 @@ hisq_force_init()
   cpuLongLinkOprod = new cpuGaugeField(gParam);
   computeLinkOrderedOuterProduct(hw, cpuLongLinkOprod->Gauge_p(), hw_prec, 3, gauge_order);
 
-#ifdef MULTI_GPU
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.order = gauge_order;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = R[d]; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region for CPU
   cpuOprod_ex = new cpuGaugeField(gParam_ex);
   cpuLongLinkOprod_ex = new cpuGaugeField(gParam_ex);
 
-  for(int i=0; i < V_ex; i++){
-    int sid = i;
-    int oddBit=0;
-    if(i >= Vh_ex){
-      sid = i - Vh_ex;
-      oddBit = 1;
-    }
+  copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
 
-    int za = sid/E1h;
-    int x1h = sid - za*E1h;
-    int zb = za/E2;
-    int x2 = za - zb*E2;
-    int x4 = zb/E3;
-    int x3 = zb - x4*E3;
-    int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-    int x1 = 2*x1h + x1odd;
-
-
-    if( x1< 2 || x1 >= X1 +2
-        || x2< 2 || x2 >= X2 +2
-        || x3< 2 || x3 >= X3 +2
-        || x4< 2 || x4 >= X4 +2){
-      continue;
-    }
-
-
-
-    x1 = (x1 - 2 + X1) % X1;
-    x2 = (x2 - 2 + X2) % X2;
-    x3 = (x3 - 2 + X3) % X3;
-    x4 = (x4 - 2 + X4) % X4;
-
-    int idx = (x4*X3*X2*X1+x3*X2*X1+x2*X1+x1)>>1;
-    if(oddBit){
-      idx += Vh;
-    }
-    for(int dir= 0; dir < 4; dir++){
-      char* src = ((char**)cpuOprod->Gauge_p())[dir];
-      char* dst = ((char**)cpuOprod_ex->Gauge_p())[dir];
-      memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
-
-      src = ((char**)cpuLongLinkOprod->Gauge_p())[dir];
-      dst = ((char**)cpuLongLinkOprod_ex->Gauge_p())[dir];
-      memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
-
-    }//dir
-  }//i
-
+  copyExtendedGauge(*cpuLongLinkOprod_ex, *cpuLongLinkOprod, QUDA_CPU_FIELD_LOCATION);
 
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region
   cudaOprod_ex = new cudaGaugeField(gParam_ex);
-  gParam_ex.order = gauge_order;
-#else
 
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaOprod = new cudaGaugeField(gParam);
-  cudaLongLinkOprod = new cudaGaugeField(gParam);
-
-#endif
-
-  return;
 }
 
-
-  static void 
-hisq_force_end()
+static void hisq_force_end()
 {
-  for(int i = 0;i < 4; i++){
-    cudaFreeHost(siteLink_2d[i]);
-    cudaFreeHost(siteLink_ex_2d[i]);
-  }
-  free(siteLink_1d);
-
   delete cudaMom;
   delete cudaGauge;
-#ifdef MULTI_GPU
   delete cudaForce_ex;
   delete cudaGauge_ex; 
   //delete cudaOprod_ex; // already deleted
   delete cudaLongLinkOprod_ex;
-#else
-  delete cudaForce;
-  delete cudaOprod;
-  delete cudaLongLinkOprod;
-#endif  
 
   delete cpuGauge;
   delete cpuMom;
@@ -505,24 +294,17 @@ hisq_force_end()
   delete cpuOprod;  
   delete cpuLongLinkOprod;
 
-#ifdef MULTI_GPU
   delete cpuGauge_ex;
   delete cpuForce_ex;
   delete cpuOprod_ex;  
   delete cpuLongLinkOprod_ex;
-#else
-  delete cpuForce;
-#endif
 
   free(hw);
 
   endQuda();
-
-  return;
 }
 
-  static int 
-hisq_force_test(void)
+static int hisq_force_test(void)
 {
   setVerbosity(QUDA_VERBOSE);
 
@@ -538,112 +320,64 @@ hisq_force_test(void)
   act_path_coeff[4] = -0.007200;
   act_path_coeff[5] = -0.123113;
 
-
   //double d_weight = 1.0;
   double d_act_path_coeff[6];
   for(int i=0; i<6; ++i){
     d_act_path_coeff[i] = act_path_coeff[i];
   }
 
-
-
-
-#ifdef MULTI_GPU
-  int R[4] = {2, 2, 2, 2};
   cpuGauge_ex->exchangeExtendedGhost(R,true);
-  cudaGauge_ex->loadCPUField(*cpuGauge_ex);
-#else
-  cudaGauge->loadCPUField(*cpuGauge);
-#endif
+  cudaGauge_ex->loadCPUField(*cpuGauge);
+  cudaGauge_ex->exchangeExtendedGhost(cudaGauge_ex->R());
 
-
-
-
-#ifdef MULTI_GPU
   cpuOprod_ex->exchangeExtendedGhost(R,true);
-  cudaOprod_ex->loadCPUField(*cpuOprod_ex);
-#else
-  cudaOprod->loadCPUField(*cpuOprod);
-#endif
+  cudaOprod_ex->loadCPUField(*cpuOprod);
+  cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
 
-
-
-
-#ifdef MULTI_GPU
   cpuLongLinkOprod_ex->exchangeExtendedGhost(R,true);
-#endif
-
-
 
   struct timeval ht0, ht1;
   gettimeofday(&ht0, NULL);
   if (verify_results){
-#ifdef MULTI_GPU
     hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
     hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
     hisqCompleteForceCPU(qudaGaugeParam, *cpuForce_ex, *cpuGauge_ex, refMom);
-#else
-    hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod, *cpuGauge, cpuForce);
-    hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod, *cpuGauge, cpuForce);
-    hisqCompleteForceCPU(qudaGaugeParam, *cpuForce, *cpuGauge, refMom);
-#endif
-
   }
-
-
-
   gettimeofday(&ht1, NULL);
 
   struct timeval t0, t1, t2, t3;
 
   gettimeofday(&t0, NULL);
 
-#ifdef MULTI_GPU
-  fermion_force::hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
+  fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
   cudaDeviceSynchronize(); 
   gettimeofday(&t1, NULL);
 
   delete cudaOprod_ex; //doing this to lower the peak memory usage
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+  for (int d=0; d<4; d++) { gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0; gParam_ex.x[d] = gParam.x[d] + 2*gParam_ex.r[d]; }  // set halo region
   cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
-  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod_ex);
-  fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);  
+  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod);
+  cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
+  fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
   cudaDeviceSynchronize(); 
 
   gettimeofday(&t2, NULL);
 
-#else
-  fermion_force::hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod, *cudaGauge, cudaForce);
-  cudaDeviceSynchronize(); 
-  gettimeofday(&t1, NULL);
-
-  checkCudaError();
-  cudaLongLinkOprod->loadCPUField(*cpuLongLinkOprod);
-  fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
-  cudaDeviceSynchronize(); 
-  gettimeofday(&t2, NULL);
-#endif
-
-  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.create = QUDA_ZERO_FIELD_CREATE; // initialize to zero
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.pad = 0; //X1*X2*X3/2;
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaMom = new cudaGaugeField(gParam); // Are the elements initialised to zero? - No!
+  cudaMom = new cudaGaugeField(gParam);
 
   //record the mom pad
   qudaGaugeParam.mom_ga_pad = gParam.pad;
 
-#ifdef MULTI_GPU
-  fermion_force::hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);  
-#else
-  fermion_force::hisqCompleteForceCuda(qudaGaugeParam, *cudaForce, *cudaGauge, cudaMom);
-#endif
-
-
+  fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
+  updateMomentum(*cudaMom, 1.0, *cudaForce_ex, __func__);
 
   cudaDeviceSynchronize();
-
   gettimeofday(&t3, NULL);
 
   checkCudaError();
@@ -674,8 +408,7 @@ hisq_force_test(void)
 }
 
 
-  static void
-display_test_info()
+static void display_test_info()
 {
   printfQuda("running the following fermion force computation test:\n");
 
@@ -689,8 +422,7 @@ display_test_info()
 
 }
 
-  int 
-main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
   int i;
   for (i =1;i < argc; i++){
@@ -720,20 +452,17 @@ main(int argc, char **argv)
     usage(argv);
   }
 
-#ifdef MULTI_GPU
   if(gauge_order == QUDA_MILC_GAUGE_ORDER){
     errorQuda("Multi-gpu for milc order is not supported\n");
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-#endif
 
   setPrecision(prec);
 
   display_test_info();
 
   int accuracy_level = hisq_force_test();
-
 
   finalizeComms();
 

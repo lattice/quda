@@ -41,10 +41,13 @@ extern int gridsize_from_cmdline[];
 extern QudaPrecision prec;
 extern QudaPrecision  prec_sloppy;
 extern QudaPrecision  prec_precondition;
+extern QudaPrecision  prec_refinement_sloppy;
 extern QudaReconstructType link_recon;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern QudaInverterType  inv_type;
+extern double reliable_delta; // reliable update parameter
+extern bool alternative_reliable;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
@@ -59,9 +62,15 @@ extern QudaMatPCType matpc_type; // preconditioning type
 extern double clover_coeff;
 extern bool compute_clover;
 
+extern QudaVerbosity verbosity;
+extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL]; // use this for preconditioner verbosity
+
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter; // max solver iterations
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
+extern QudaCABasis ca_basis; // basis for CA-CG solves
+extern double ca_lambda_min; // minimum eigenvalue for scaling Chebyshev CA-CG solves
+extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG solves
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 extern char latfile[];
@@ -98,6 +107,8 @@ display_test_info()
 int main(int argc, char **argv)
 {
 
+  mg_verbosity[0] = QUDA_SILENT; // set default preconditioner verbosity
+
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -107,6 +118,7 @@ int main(int argc, char **argv)
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (prec_refinement_sloppy == QUDA_INVALID_PRECISION) prec_refinement_sloppy = prec_sloppy;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
@@ -132,6 +144,7 @@ int main(int argc, char **argv)
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = prec;
   QudaPrecision cuda_prec_sloppy = prec_sloppy;
+  QudaPrecision cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   QudaPrecision cuda_prec_precondition = prec_precondition;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
@@ -157,6 +170,9 @@ int main(int argc, char **argv)
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
   gauge_param.cuda_prec_precondition = cuda_prec_precondition;
   gauge_param.reconstruct_precondition = link_recon_precondition;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+  gauge_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
+
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.dslash_type = dslash_type;
@@ -218,7 +234,8 @@ int main(int argc, char **argv)
       dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
       dslash_type == QUDA_TWISTED_MASS_DSLASH || 
       dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
-      multishift || inv_type == QUDA_CG_INVERTER || inv_type == QUDA_CG3_INVERTER) {
+      multishift || inv_type == QUDA_CG_INVERTER ||
+      inv_type == QUDA_CG3_INVERTER || inv_type == QUDA_CA_CG_INVERTER) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -229,6 +246,9 @@ int main(int argc, char **argv)
 
   inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = gcrNkrylov;
+  inv_param.ca_basis = ca_basis;
+  inv_param.ca_lambda_min = ca_lambda_min;
+  inv_param.ca_lambda_max = ca_lambda_max;
   inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
   if(tol_hq == 0 && tol == 0){
@@ -248,7 +268,8 @@ int main(int argc, char **argv)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = reliable_delta;
+  inv_param.use_alternative_reliable = alternative_reliable;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.max_res_increase = 1;
@@ -260,13 +281,14 @@ int main(int argc, char **argv)
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 10;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -299,7 +321,7 @@ int main(int argc, char **argv)
     inv_param.clover_coeff = clover_coeff;
   }
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
@@ -367,6 +389,10 @@ int main(int argc, char **argv)
 
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);
+
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   // load the clover term, if desired
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)

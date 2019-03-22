@@ -17,18 +17,14 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaPrecision null_precision, bool enable_gpu, bool gpu_setup, TimeProfile &profile)
-    : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
-      fine_to_coarse_h(0), coarse_to_fine_h(0), 
-      fine_to_coarse_d(0), coarse_to_fine_d(0), 
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaPrecision null_precision, TimeProfile &profile)
+    : B(B), Nvec(Nvec), null_precision(null_precision), V_h(nullptr), V_d(nullptr),
+      fine_tmp_h(nullptr), fine_tmp_d(nullptr), coarse_tmp_h(nullptr), coarse_tmp_d(nullptr), geo_bs(nullptr),
+      fine_to_coarse_h(nullptr), coarse_to_fine_h(nullptr), fine_to_coarse_d(nullptr), coarse_to_fine_d(nullptr),
       spin_bs(spin_bs), spin_map(0), nspin_fine(B[0]->Nspin()), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
-      enable_gpu(enable_gpu), gpu_setup(gpu_setup), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
-      flops_(0), profile(profile)
+      enable_gpu(false), enable_cpu(false), gpu_setup(true), use_gpu(true), flops_(0), profile(profile)
   {
-#if __COMPUTE_CAPABILITY__ < 300 // block orthogonalization only supported on Kepler onwards
-    gpu_setup = false;
-#endif
-
+    postTrace();
     int ndim = B[0]->Ndim();
 
     for (int d = 0; d < ndim; d++) {
@@ -60,52 +56,8 @@ namespace quda {
     for (int d=1; d<ndim; d++) sprintf(block_str, "%s x %d", block_str, geo_bs[d]);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: using block size %s\n", block_str);
 
-    // create the storage for the final block orthogonal elements
-    ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
-
-    // the ordering of the V vector is defined by these parameters and
-    // the Packed functions in ColorSpinorFieldOrder
-
-    param.nSpin = B[0]->Nspin(); // spin has direct mapping
-    param.nColor = B[0]->Ncolor()*Nvec; // nColor = number of colors * number of vectors
-    param.nVec = Nvec;
-    param.create = QUDA_ZERO_FIELD_CREATE;
-    // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
-    if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
-      //keep it the same for staggered:
-      param.siteSubset = QUDA_FULL_SITE_SUBSET;
-      param.x[0] *= 2;
-    }
-
-    // for cpu transfer this is the V field, for gpu it's just a temporary until we port the block orthogonalization
-    V_h = ColorSpinorField::Create(param);
-
-    param.location = QUDA_CUDA_FIELD_LOCATION;
-    param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//ok for staggered
-
-    param.setPrecision(null_precision);
-    V_d = enable_gpu ? ColorSpinorField::Create(param) : nullptr;
-    param.setPrecision(V_h->Precision());
-
-    // used for cpu<->gpu transfers
-    param = ColorSpinorParam(*B[0]);
-    param.create = QUDA_NULL_FIELD_CREATE;
-    fine_tmp_h = ColorSpinorField::Create(param);
-
-    // useful to have around
-    coarse_tmp_h = fine_tmp_h->CreateCoarse(geo_bs, spin_bs, Nvec);
-
-    // create temporaries we use to enable us to change basis and for cpu<->gpu transfers
-    if (enable_gpu) {
-      param = ColorSpinorParam(*B[0]);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      param.create = QUDA_NULL_FIELD_CREATE;
-      fine_tmp_d = ColorSpinorField::Create(param);
-
-      // used for basis changing
-      coarse_tmp_d = fine_tmp_d->CreateCoarse(geo_bs, spin_bs, Nvec);
-    }
+    createV(B[0]->Location()); // allocate V field
+    createTmp(QUDA_CPU_FIELD_LOCATION); // allocate temporaries
 
     // allocate and compute the fine-to-coarse and coarse-to-fine site maps
     fine_to_coarse_h = static_cast<int*>(pool_pinned_malloc(B[0]->Volume()*sizeof(int)));
@@ -120,52 +72,115 @@ namespace quda {
 
     // allocate the fine-to-coarse spin map
     spin_map = static_cast<int**>(safe_malloc(nspin_fine*sizeof(int*)));
-    for (int s = 0; s < B[0]->Nspin(); s++)
-    {
-      spin_map[s] = static_cast<int*>(safe_malloc(2*sizeof(int)));
-    }
+    for (int s = 0; s < B[0]->Nspin(); s++) spin_map[s] = static_cast<int*>(safe_malloc(2*sizeof(int)));
     createSpinMap(spin_bs);
 
     reset();
+    postTrace();
   }
 
-  void Transfer::reset() {
+  void Transfer::createV(QudaFieldLocation location) const
+  {
+    postTrace();
+    // create the storage for the final block orthogonal elements
+    ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
 
-    if (enable_gpu && gpu_setup) {
+    // the ordering of the V vector is defined by these parameters and
+    // the Packed functions in ColorSpinorFieldOrder
 
-      std::vector<ColorSpinorField*> B_d;
-      for (int i=0; i<Nvec; i++) {
-	ColorSpinorParam param(*B[i]);
-	param.location = QUDA_CUDA_FIELD_LOCATION;
-	param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-	B_d.push_back(ColorSpinorField::Create(param));
-	*B_d[i] = *B[i];
-      }
+    param.nSpin = B[0]->Nspin(); // spin has direct mapping
+    param.nColor = B[0]->Ncolor()*Nvec; // nColor = number of colors * number of vectors
+    param.nVec = Nvec;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
+    if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      //keep it the same for staggered:
+      param.siteSubset = QUDA_FULL_SITE_SUBSET;
+      param.x[0] *= 2;
+    }
+    param.location = location;
+    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.setPrecision(location == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0]->Precision());
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: filling V field with null-space components\n");
-
-      // orthogonalize the blocks
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
-      BlockOrthogonalize(*V_d, B_d, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
-
-      for (int i=0; i<Nvec; i++) delete B_d[i];
-
-      *V_h = *V_d;
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator back to CPU\n");
-
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      V_d = ColorSpinorField::Create(param);
+      enable_gpu = true;
     } else {
+      V_h = ColorSpinorField::Create(param);
+      enable_cpu = true;
+    }
+    postTrace();
+  }
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: filling V field with null-space components\n");
+  void Transfer::createTmp(QudaFieldLocation location) const
+  {
+    postTrace();
+    ColorSpinorParam param(*B[0]);
+    param.create = QUDA_NULL_FIELD_CREATE;
+    param.location = location;
+    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
 
-      // orthogonalize the blocks
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      if (fine_tmp_d && coarse_tmp_d) return;
+      fine_tmp_d = ColorSpinorField::Create(param);
+      coarse_tmp_d = fine_tmp_d->CreateCoarse(geo_bs, spin_bs, Nvec);
+    } else {
+      fine_tmp_h = ColorSpinorField::Create(param);
+      coarse_tmp_h = fine_tmp_h->CreateCoarse(geo_bs, spin_bs, Nvec);
+    }
+    postTrace();
+  }
+
+  void Transfer::initializeLazy(QudaFieldLocation location) const
+  {
+    if (!enable_cpu && !enable_gpu) errorQuda("Neither CPU or GPU coarse fields initialized");
+
+    // delayed allocating this temporary until we need it
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) createTmp(QUDA_CUDA_FIELD_LOCATION);
+
+    switch (location) {
+    case QUDA_CUDA_FIELD_LOCATION:
+      if (enable_gpu) return;
+      createV(location);
+      *V_d = *V_h;
+      createTmp(location);
+      fine_to_coarse_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
+      coarse_to_fine_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      break;
+    case QUDA_CPU_FIELD_LOCATION:
+      if (enable_cpu) return;
+      createV(location);
+      *V_h = *V_d;
+      break;
+    default:
+      errorQuda("Unknown location %d", location);
+    }
+  }
+
+  void Transfer::reset()
+  {
+    postTrace();
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
+
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+      if (!enable_gpu) errorQuda("enable_gpu = %d so cannot reset", enable_gpu);
+      BlockOrthogonalize(*V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
+      if (enable_cpu) {
+        *V_h = *V_d;
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator back to CPU\n");
+      }
+    } else {
+      if (!enable_cpu) errorQuda("enable_cpu = %d so cannot reset", enable_cpu);
       BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs);
-
-      if (enable_gpu) {
+      if (enable_gpu) { // if the GPU fields has been initialized then we need to update
       	*V_d = *V_h;
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
       }
     }
+    postTrace();
   }
 
   Transfer::~Transfer() {
@@ -196,6 +211,8 @@ namespace quda {
 
     if (site_subset == site_subset_) return;
     site_subset = site_subset_;
+
+    return; // FIXME apply memory optimization
 
     // this function only does something non-trivial if the operator is on the GPU
     if (!enable_gpu) return;
@@ -305,6 +322,7 @@ namespace quda {
 
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
+    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const ColorSpinorField *V = use_gpu ? V_d : V_h;
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
 
@@ -344,6 +362,7 @@ namespace quda {
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;
+    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const ColorSpinorField *V = use_gpu ? V_d : V_h;
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
@@ -373,7 +392,7 @@ namespace quda {
 
     // only need to synchronize if we're transferring from GPU to CPU
     if (out.Location() == QUDA_CPU_FIELD_LOCATION && in.Location() == QUDA_CUDA_FIELD_LOCATION)
-      cudaDeviceSynchronize();
+      qudaDeviceSynchronize();
 
     flops_ += 8*out.Ncolor()*in.Ncolor()*in.VolumeCB()*in.SiteSubset();
 

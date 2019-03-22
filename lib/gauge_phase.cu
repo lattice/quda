@@ -2,6 +2,7 @@
 #include <comm_quda.h>
 #include <complex_quda.h>
 #include <index_helper.cuh>
+#include <tune_quda.h>
 
 /**
    This code has not been checked.  In particular, I suspect it is
@@ -13,8 +14,9 @@ namespace quda {
 
 #ifdef GPU_GAUGE_TOOLS
 
-  template <typename Float, typename Order>
+  template <typename Float, int Nc, typename Order>
   struct GaugePhaseArg {
+    static constexpr int nColor = Nc;
     Order order;
     int X[4];
     int threads;
@@ -64,7 +66,7 @@ namespace quda {
       } else if (dim == 3) { // also apply boundary condition
 	phase = (t == arg.X[3]-1) ? arg.tBoundary : 1.0;
       }
-    } if (phaseType == QUDA_STAGGERED_PHASE_TIFR) {
+    } else if (phaseType == QUDA_STAGGERED_PHASE_TIFR) {
       if (dim==0) {
 	phase = (1.0 - 2.0 * ((3 + t + z + y) % 2) );		
       } else if (dim == 1) {
@@ -89,38 +91,34 @@ namespace quda {
     return phase;
   }
 
-  template <typename Float, int length, QudaStaggeredPhase phaseType, int dim, typename Arg>
+  template <typename Float, QudaStaggeredPhase phaseType, int dim, typename Arg>
   __device__ __host__ void gaugePhase(int indexCB, int parity, Arg &arg) {
-    typedef typename mapper<Float>::type RegType;
+    typedef typename mapper<Float>::type real;
 
     int x[4];
     getCoords(x, indexCB, arg.X, parity);
 
-    RegType phase = getPhase<dim,Float,phaseType>(x[0], x[1], x[2], x[3], arg);
-    RegType u[length];
-    arg.order.load(u, indexCB, dim, parity);
-    for (int i=0; i<length; i++) u[i] *= phase;
+    real phase = getPhase<dim,Float,phaseType>(x[0], x[1], x[2], x[3], arg);
+    Matrix<complex<real>,Arg::nColor> u = arg.order(dim, indexCB, parity);
+    u *= phase;
 
     // apply imaginary chemical potential if needed
-    if (dim==3 && arg.i_mu != 0.0) {
-      complex<RegType>* v = reinterpret_cast<complex<RegType>*>(u);
-      for (int i=0; i<length/2; i++) v[i] *= arg.i_mu_phase;
-    }
+    if (dim==3 && arg.i_mu != 0.0) u *= arg.i_mu_phase;
 
-    arg.order.save(u, indexCB, dim, parity);
+    arg.order(dim, indexCB, parity) = u;
   }
 
   /**
      Generic CPU staggered phase application
   */
-  template <typename Float, int length, QudaStaggeredPhase phaseType, typename Arg>
-  void gaugePhase(Arg &arg) {  
+  template <typename Float, QudaStaggeredPhase phaseType, typename Arg>
+  void gaugePhase(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
       for (int indexCB=0; indexCB < arg.threads; indexCB++) {
-	gaugePhase<Float,length,phaseType,0>(indexCB, parity, arg);
-	gaugePhase<Float,length,phaseType,1>(indexCB, parity, arg);
-	gaugePhase<Float,length,phaseType,2>(indexCB, parity, arg);
-	gaugePhase<Float,length,phaseType,3>(indexCB, parity, arg);
+	gaugePhase<Float,phaseType,0>(indexCB, parity, arg);
+	gaugePhase<Float,phaseType,1>(indexCB, parity, arg);
+	gaugePhase<Float,phaseType,2>(indexCB, parity, arg);
+	gaugePhase<Float,phaseType,3>(indexCB, parity, arg);
       }
     }
   }
@@ -128,57 +126,40 @@ namespace quda {
   /**
      Generic GPU staggered phase application
   */
-  template <typename Float, int length, QudaStaggeredPhase phaseType, typename Arg>
-  __global__ void gaugePhaseKernel(Arg arg) {  
+  template <typename Float, QudaStaggeredPhase phaseType, typename Arg>
+  __global__ void gaugePhaseKernel(Arg arg) {
     int indexCB = blockIdx.x * blockDim.x + threadIdx.x; 	
     if (indexCB >= arg.threads) return;
-    int parity = blockIdx.y;
-
-    gaugePhase<Float,length,phaseType,0>(indexCB, parity, arg);
-    gaugePhase<Float,length,phaseType,1>(indexCB, parity, arg);
-    gaugePhase<Float,length,phaseType,2>(indexCB, parity, arg);
-    gaugePhase<Float,length,phaseType,3>(indexCB, parity, arg);
+    int parity = blockIdx.y * blockDim.y + threadIdx.y;
+    gaugePhase<Float,phaseType,0>(indexCB, parity, arg);
+    gaugePhase<Float,phaseType,1>(indexCB, parity, arg);
+    gaugePhase<Float,phaseType,2>(indexCB, parity, arg);
+    gaugePhase<Float,phaseType,3>(indexCB, parity, arg);
   }
 
-  template <typename Float, int length, QudaStaggeredPhase phaseType, typename Arg>
-  class GaugePhase : Tunable {
+  template <typename Float, QudaStaggeredPhase phaseType, typename Arg>
+  class GaugePhase : TunableVectorY {
     Arg &arg;
     const GaugeField &meta; // used for meta data only
-    QudaFieldLocation location;
 
   private:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
-
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
 
   public:
-    GaugePhase(Arg &arg, const GaugeField &meta, QudaFieldLocation location) 
-      : arg(arg), meta(meta), location(location) { 
+    GaugePhase(Arg &arg, const GaugeField &meta)
+      : TunableVectorY(2), arg(arg), meta(meta) {
       writeAuxString("stride=%d,prec=%lu",arg.order.stride,sizeof(Float));
     }
     virtual ~GaugePhase() { ; }
   
-    bool advanceBlockDim(TuneParam &param) const {
-      bool rtn = Tunable::advanceBlockDim(param);
-      param.grid.y = 2;
-      return rtn;
-    }
-    
-    void initTuneParam(TuneParam &param) const {
-      Tunable::initTuneParam(param);
-      param.grid.y = 2;
-    }
-
     void apply(const cudaStream_t &stream) {
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	tp.grid.y = 2; // parity is the y grid dimension
-	gaugePhaseKernel<Float, length, phaseType, Arg> 
+	gaugePhaseKernel<Float, phaseType, Arg>
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       } else {
-	gaugePhase<Float, length, phaseType, Arg>(arg);
+	gaugePhase<Float, phaseType, Arg>(arg);
       }
     }
 
@@ -194,42 +175,40 @@ namespace quda {
   };
 
 
-  template <typename Float, int length, typename Order>
-  void gaugePhase(Order order, const GaugeField &u,  QudaFieldLocation location) {
+  template <typename Float, int Nc, typename Order>
+  void gaugePhase(Order order, const GaugeField &u) {
     if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
-      GaugePhaseArg<Float,Order> arg(order, u);
-      GaugePhase<Float,length,QUDA_STAGGERED_PHASE_MILC,
-		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
+      GaugePhaseArg<Float,Nc,Order> arg(order, u);
+      GaugePhase<Float,QUDA_STAGGERED_PHASE_MILC,
+		 GaugePhaseArg<Float,Nc,Order> > phase(arg, u);
       phase.apply(0);
     } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_CPS) {
-      GaugePhaseArg<Float,Order> arg(order, u);
-      GaugePhase<Float,length,QUDA_STAGGERED_PHASE_CPS,
-		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
+      GaugePhaseArg<Float,Nc,Order> arg(order, u);
+      GaugePhase<Float,QUDA_STAGGERED_PHASE_CPS,
+		 GaugePhaseArg<Float,Nc,Order> > phase(arg, u);
       phase.apply(0);
     } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
-      GaugePhaseArg<Float,Order> arg(order, u);
-      GaugePhase<Float,length,QUDA_STAGGERED_PHASE_TIFR,
-		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
+      GaugePhaseArg<Float,Nc,Order> arg(order, u);
+      GaugePhase<Float,QUDA_STAGGERED_PHASE_TIFR,
+		 GaugePhaseArg<Float,Nc,Order> > phase(arg, u);
       phase.apply(0);
     } else {
       errorQuda("Undefined phase type");
     }
 
-    if (location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (u.Location() == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
   /** This is the template driver for gaugePhase */
   template <typename Float>
   void gaugePhase(GaugeField &u) {
-    const int length = 18;
-
-    QudaFieldLocation location = 
-      (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
+    if (u.Ncolor() != 3) errorQuda("Unsupported number of colors %d", u.Ncolor());
+    constexpr int Nc = 3;
 
     if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	gaugePhase<Float,length>(G(u), u, location);
+	gaugePhase<Float,Nc>(G(u), u);
       } else {
 	errorQuda("Unsupported reconstruction type");
       }
@@ -254,6 +233,11 @@ namespace quda {
 #else
     errorQuda("Gauge tools are not build");
 #endif
+
+    if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
+      // ensure that ghosts are updated if needed
+      u.exchangeGhost();
+    }
 
   }
 

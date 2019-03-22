@@ -56,6 +56,7 @@ extern "C" {
   } QudaTboundary;
 
   typedef enum QudaPrecision_s {
+    QUDA_QUARTER_PRECISION = 1,
     QUDA_HALF_PRECISION = 2,
     QUDA_SINGLE_PRECISION = 4,
     QUDA_DOUBLE_PRECISION = 8,
@@ -120,6 +121,10 @@ extern "C" {
     QUDA_CG3_INVERTER,
     QUDA_CG3NE_INVERTER,
     QUDA_CG3NR_INVERTER,
+    QUDA_CA_CG_INVERTER,
+    QUDA_CA_CGNE_INVERTER,
+    QUDA_CA_CGNR_INVERTER,
+    QUDA_CA_GCR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -171,6 +176,13 @@ extern "C" {
     QUDA_HEAVY_QUARK_RESIDUAL = 4, // Fermilab heavy quark residual
     QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
   } QudaResidualType;
+
+  // Which basis to use for CA algorithms
+  typedef enum QudaCABasis_s {
+    QUDA_POWER_BASIS,
+    QUDA_CHEBYSHEV_BASIS,
+    QUDA_INVALID_BASIS = QUDA_INVALID_ENUM
+  } QudaCABasis; 
 
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
   //
@@ -352,7 +364,13 @@ extern "C" {
     QUDA_CORNER_SOURCE,
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
-  
+
+  typedef enum QudaNoiseType_s {
+    QUDA_NOISE_GAUSS,
+    QUDA_NOISE_UNIFORM,
+    QUDA_NOISE_INVALID = QUDA_INVALID_ENUM
+  } QudaNoiseType;
+
   // used to select projection method for deflated solvers
   typedef enum QudaProjectionType_s {
       QUDA_MINRES_PROJECTION,

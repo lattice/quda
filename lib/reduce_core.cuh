@@ -90,7 +90,7 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
   if (getFastReduce() && !commAsyncReduction()) {
     // initialize the reduction values in 32-bit increments to INT_MIN
     constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
-    for (int i=0; i<tp.grid.y*words; i++) {
+    for (unsigned int i=0; i<tp.grid.y*words; i++) {
       reinterpret_cast<int32_t*>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
     }
   }
@@ -104,7 +104,7 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
 	constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
 	volatile int32_t *check = reinterpret_cast<int32_t*>(h_reduce);
 	int count = 0;
-	for (int i=0; i<tp.grid.y*words; i++) {
+	for (unsigned int i=0; i<tp.grid.y*words; i++) {
 	  // spin-wait until all values have been updated
 	  while (check[i] == std::numeric_limits<int32_t>::min()) {
 	    if (count++ % 10000 == 0) { // check error every 10000 iterations
@@ -114,12 +114,12 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
 	  }
 	}
       } else {
-	cudaEventRecord(reduceEnd, stream);
-	while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
+	qudaEventRecord(reduceEnd, stream);
+	while (cudaSuccess != qudaEventQuery(reduceEnd)) { ; }
       }
     } else
 #endif
-      { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
+      { qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
   }
   doubleN cpu_sum = set(((ReduceType*)h_reduce)[0]);
   if (tp.grid.y==2) sum(cpu_sum, ((ReduceType*)h_reduce)[1]); // add other parity if needed
@@ -231,13 +231,6 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
 		   ColorSpinorField &v, int length) {
 
   checkLength(x, y); checkLength(x, z); checkLength(x, w); checkLength(x, v);
-
-  if (!x.isNative()) {
-    warningQuda("Device reductions on non-native fields is not supported\n");
-    doubleN value;
-    ::quda::zero(value);
-    return value;
-  }
 
   blasStrings.vol_str = x.VolString();
   strcpy(blasStrings.aux_tmp, x.AuxString());
@@ -358,7 +351,7 @@ template <typename ReduceType, typename Float, typename zFloat, int nSpin, QudaF
     value = genericReduce<ReduceType,Float,zFloat,nSpin,576,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else {
     ::quda::zero(value);
-    errorQuda("nColor = %d not implemeneted",x.Ncolor());
+    errorQuda("nColor = %d not implemented",x.Ncolor());
   }
   return value;
 }
@@ -377,7 +370,7 @@ template <typename ReduceType, typename Float, typename zFloat, QudaFieldOrder o
     value = genericReduce<ReduceType,Float,zFloat,1,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
 #endif
   } else {
-    errorQuda("nSpin = %d not implemeneted",x.Nspin());
+    errorQuda("nSpin = %d not implemented",x.Nspin());
   }
   return value;
 }
@@ -392,7 +385,7 @@ doubleN genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField
     value = genericReduce<ReduceType,Float,zFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,writeV,R>
       (x, y, z, w, v, r);
   } else {
-    warningQuda("CPU reductions not implemeneted for %d field order", x.FieldOrder());
+    warningQuda("CPU reductions not implemented for %d field order", x.FieldOrder());
   }
   return set(value);
 }

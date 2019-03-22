@@ -422,7 +422,7 @@ namespace quda {
     InitGaugeHot<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
     checkCudaError();
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
     data.exchangeExtendedGhost(data.R(),false);
   }

@@ -1,3 +1,5 @@
+#include <tune_quda.h>
+
 #pragma once
 
 namespace quda {

@@ -270,6 +270,21 @@ namespace quda {
     /** Wrapper for the sloppy smoothing coarse grid operator */
     DiracMatrix *matCoarseSmootherSloppy;
 
+    /** Parallel hyper-cubic random number generator for generating null-space vectors */
+    RNG *rng;
+
+    /**
+       @brief Load the null space vectors in from file
+       @param B Loaded null-space vectors (pre-allocated)
+    */
+    void loadVectors(std::vector<ColorSpinorField*> &B);
+
+    /**
+       @brief Save the null space vectors in from file
+       @param B Save null-space vectors from here
+    */
+    void saveVectors(std::vector<ColorSpinorField*> &B) const;
+
   public:
     /** 
       Constructor for MG class
@@ -291,9 +306,19 @@ namespace quda {
     void reset(bool refresh=false);
 
     /**
+       @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
+    */
+    void dumpNullVectors() const;
+
+    /**
        @brief Create the smoothers
     */
     void createSmoother();
+
+    /**
+       @brief Destroy the smoothers
+    */
+    void destroySmoother();
 
     /**
        @brief Create the coarse dirac operator
@@ -304,6 +329,11 @@ namespace quda {
        @brief Create the solver wrapper
     */
     void createCoarseSolver();
+
+    /**
+       @brief Destroy the solver wrapper
+    */
+    void destroyCoarseSolver();
 
     /**
        This method verifies the correctness of the MG method.  It checks:
@@ -319,18 +349,6 @@ namespace quda {
        @param in The residual vector (or equivalently the right hand side vector)
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    /**
-       @brief Load the null space vectors in from file
-       @param B Loaded null-space vectors (pre-allocated)
-    */
-    void loadVectors(std::vector<ColorSpinorField*> &B);
-
-    /**
-       @brief Save the null space vectors in from file
-       @param B Save null-space vectors from here
-    */
-    void saveVectors(std::vector<ColorSpinorField*> &B);
 
     /**
        @brief Generate the null-space vectors
@@ -352,9 +370,27 @@ namespace quda {
 
   };
 
+  /**
+     @brief Apply the coarse dslash stencil.  This single driver
+     accounts for all variations with and without the clover field,
+     with and without dslash, and both single and full parity fields
+     @param[out] out The result vector
+     @param[in] inA The first input vector
+     @param[in] inB The second input vector
+     @param[in] Y Coarse link field
+     @param[in] X Coarse clover field
+     @param[in] kappa Scaling parameter
+     @param[in] parity Parity of the field (if single parity)
+     @param[in] dslash Are we applying dslash?
+     @param[in] clover Are we applying clover?
+     @param[in] dagger Apply dagger operator?
+     @param[in] commDim Which dimensions are partitioned?
+     @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
+   */
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
-		   bool dslash=true, bool clover=true, bool dagger=false, const int *commDim=0);
+		   bool dslash=true, bool clover=true, bool dagger=false, const int *commDim=0,
+                   QudaPrecision halo_precision=QUDA_INVALID_PRECISION);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)

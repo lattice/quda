@@ -47,14 +47,14 @@ namespace quda {
     zero(*r), zero(x);
     double r2 = xmyNorm(b,*r);
     double alpha=0.; 
-    double2 rAr;
+    double3 rAr;
 
     int k=0;
     while(k < param.maxiter-1){
 
       mat(*Ar, *r, *y);
-      rAr = reDotProductNormA(*r, *Ar);
-      alpha = rAr.y/rAr.x;
+      rAr = cDotProductNormA(*r, *Ar);
+      alpha = rAr.z/rAr.x;
       axpy(alpha, *r, x);
       axpy(-alpha, *Ar, *r);
 
@@ -67,8 +67,8 @@ namespace quda {
     }
 
 
-    rAr = reDotProductNormA(*r, *Ar);
-    alpha = rAr.y/rAr.x;
+    rAr = cDotProductNormA(*r, *Ar);
+    alpha = rAr.z/rAr.x;
     axpy(alpha, *r, x);
     if(getVerbosity() >= QUDA_VERBOSE){
       axpy(-alpha, *Ar, *r);

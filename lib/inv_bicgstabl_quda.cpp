@@ -34,7 +34,7 @@ namespace quda {
     {
       tau[begin+k][j] = Tau[k]/sigma[begin+k];
     }
-
+    delete []Tau;
   }
   
   void BiCGstabL::updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j)
@@ -78,13 +78,7 @@ namespace quda {
         }
         blas::caxpy(-tau[j-1][j], *r[j-1], *r[j]);
         break;
-      case 2: // two-way pipelining
-      case 3: // three-way pipelining
-      case 4: // four-way pipelining
-      case 5: // five-way pipelining
-      case 6: // six-way pipelining
-      case 7: // seven-way pipelining
-      case 8: // eight-way pipelining
+    default:
         {
           const int N = pipeline;
           // We're orthogonalizing r[j] against r[1], ..., r[j-1].
@@ -107,8 +101,6 @@ namespace quda {
           }
         }
         break;
-      default:
-        errorQuda("Pipeline length %d type not defined", pipeline);
     }
 
   }
@@ -735,7 +727,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_FREE);
     
     // ...yup...
-    PrintSummary(solver_name.c_str(), k, r2, b2);
+    PrintSummary(solver_name.c_str(), k, r2, b2, stop, param.tol_hq);
     
     // Done!
     profile.TPSTOP(QUDA_PROFILE_FREE);

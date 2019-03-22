@@ -22,8 +22,11 @@ namespace quda {
   cudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
   cudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
-  void *LatticeField::ghost_pinned_buffer_h[2] = {nullptr, nullptr};
-  void *LatticeField::ghost_pinned_buffer_hd[2] = {nullptr, nullptr};
+  void *LatticeField::ghost_pinned_send_buffer_h[2] = {nullptr, nullptr};
+  void *LatticeField::ghost_pinned_send_buffer_hd[2] = {nullptr, nullptr};
+
+  void *LatticeField::ghost_pinned_recv_buffer_h[2] = {nullptr, nullptr};
+  void *LatticeField::ghost_pinned_recv_buffer_hd[2] = {nullptr, nullptr};
 
   // gpu ghost receive buffer
   void *LatticeField::ghost_recv_buffer_d[2] = {nullptr, nullptr};
@@ -87,6 +90,7 @@ namespace quda {
     case QUDA_DOUBLE_PRECISION:
     case QUDA_SINGLE_PRECISION:
     case QUDA_HALF_PRECISION:
+    case QUDA_QUARTER_PRECISION:
       break;
     default:
       errorQuda("Unknown precision %d", precision);
@@ -142,7 +146,8 @@ namespace quda {
 	  for (int b=0; b<2; b++) {
 	    device_pinned_free(ghost_recv_buffer_d[b]);
 	    device_pinned_free(ghost_send_buffer_d[b]);
-	    host_free(ghost_pinned_buffer_h[b]);
+	    host_free(ghost_pinned_send_buffer_h[b]);
+	    host_free(ghost_pinned_recv_buffer_h[b]);
 	  }
 	}
       }
@@ -155,11 +160,17 @@ namespace quda {
 	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
 	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
 
-	  // pinned buffer used for sending and receiving
-	  ghost_pinned_buffer_h[b] = mapped_malloc(2*ghost_bytes);
+	  // pinned buffer used for sending
+	  ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
 
-	  // set the matching device-mapper pointer
-	  cudaHostGetDevicePointer(&ghost_pinned_buffer_hd[b], ghost_pinned_buffer_h[b], 0);
+	  // set the matching device-mapped pointer
+	  cudaHostGetDevicePointer(&ghost_pinned_send_buffer_hd[b], ghost_pinned_send_buffer_h[b], 0);
+
+	  // pinned buffer used for receiving
+	  ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
+
+	  // set the matching device-mapped pointer
+	  cudaHostGetDevicePointer(&ghost_pinned_recv_buffer_hd[b], ghost_pinned_recv_buffer_h[b], 0);
 	}
 
 	initGhostFaceBuffer = true;
@@ -186,10 +197,16 @@ namespace quda {
       if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
-      // free pinned memory buffers
-      if (ghost_pinned_buffer_h[b]) host_free(ghost_pinned_buffer_h[b]);
-      ghost_pinned_buffer_h[b] = nullptr;
-      ghost_pinned_buffer_hd[b] = nullptr;
+      // free pinned send memory buffer
+      if (ghost_pinned_recv_buffer_h[b]) host_free(ghost_pinned_recv_buffer_h[b]);
+
+      // free pinned send memory buffer
+      if (ghost_pinned_send_buffer_h[b]) host_free(ghost_pinned_send_buffer_h[b]);
+
+      ghost_pinned_recv_buffer_h[b] = nullptr;
+      ghost_pinned_recv_buffer_hd[b] = nullptr;
+      ghost_pinned_send_buffer_h[b] = nullptr;
+      ghost_pinned_send_buffer_hd[b] = nullptr;
     }
     initGhostFaceBuffer = false;
   }
@@ -200,10 +217,10 @@ namespace quda {
 
     // initialize the ghost pinned buffers
     for (int b=0; b<2; b++) {
-      my_face_h[b] = ghost_pinned_buffer_h[b];
-      my_face_hd[b] = ghost_pinned_buffer_hd[b];
-      from_face_h[b] = static_cast<char*>(my_face_h[b]) + ghost_bytes;
-      from_face_hd[b] = static_cast<char*>(my_face_hd[b]) + ghost_bytes;
+      my_face_h[b] = ghost_pinned_send_buffer_h[b];
+      my_face_hd[b] = ghost_pinned_send_buffer_hd[b];
+      from_face_h[b] = ghost_pinned_recv_buffer_h[b];
+      from_face_hd[b] = ghost_pinned_recv_buffer_hd[b];
     }
 
     // initialize ghost send pointers
@@ -490,8 +507,7 @@ namespace quda {
 
   void LatticeField::setTuningString() {
     char vol_tmp[TuneKey::volume_n];
-    int check;
-    check = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
+    int check  = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
     if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
     for (int d=1; d<nDim; d++) {
       strcpy(vol_tmp, vol_string);

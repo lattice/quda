@@ -4,7 +4,6 @@
  * September 2017
  */
 
-#include <transfer.h>
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <gauge_field.h>

@@ -12,7 +12,7 @@ namespace quda {
   Dirac::Dirac(const DiracParam &param) 
     : gauge(param.gauge), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
       dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), type(param.type), 
-      tune(QUDA_TUNE_NO), profile("Dirac", false)
+      halo_precision(param.halo_precision), profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
   }
@@ -20,7 +20,7 @@ namespace quda {
   Dirac::Dirac(const Dirac &dirac) 
     : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
       dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), type(dirac.type), 
-      tune(QUDA_TUNE_NO), profile("Dirac", false)
+      halo_precision(dirac.halo_precision), profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
@@ -39,7 +39,6 @@ namespace quda {
       flops = 0;
       tmp1 = dirac.tmp1;
       tmp2 = dirac.tmp2;
-      tune = dirac.tune;
 
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
 
