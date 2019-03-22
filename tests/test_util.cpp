@@ -49,6 +49,22 @@ extern float fat_link_max;
  */
 int gridsize_from_cmdline[4] = {1,1,1,1};
 
+void get_gridsize_from_env(int * const dims) {
+  char *grid_size_env = getenv("QUDA_TEST_GRID_SIZE");
+  if (grid_size_env) {
+    std::stringstream grid_list(grid_size_env);
+
+    int dim;
+    int i = 0;
+    while (grid_list >> dim) {
+      if (i>=4) errorQuda("Unexpected grid size array length");
+      dims[i] = dim;
+      if (grid_list.peek() == ',') grid_list.ignore();
+      i++;
+    }
+  }
+}
+
 static int lex_rank_from_coords_t(const int *coords, void *fdata)
 {
   int rank = coords[0];
@@ -69,8 +85,10 @@ static int lex_rank_from_coords_x(const int *coords, void *fdata)
 
 static int rank_order = 0;
 
-void initComms(int argc, char **argv, const int *commDims)
+void initComms(int argc, char **argv, int * const commDims)
 {
+  if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
+
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
@@ -83,16 +101,10 @@ void initComms(int argc, char **argv, const int *commDims)
     int map[] = { 0, 1, 2, 3 };
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   }
-
 #elif defined(MPI_COMMS)
-#ifdef PTHREADS
-  int provided;
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-#else
   MPI_Init(&argc, &argv);
 #endif
 
-#endif
   QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
 
   initCommsGridQuda(4, commDims, func, NULL);
@@ -1081,10 +1093,7 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
 
 }
 
-void
-construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
-			       QudaPrecision precision, QudaGaugeParam* param,
-			       QudaDslashType dslash_type)
+void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, QudaPrecision precision, QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1118,49 +1127,46 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
         else applyStaggeredScaling((float**)longlink, param, type);
       }
     }
-  }
 
-  if (param->reconstruct == QUDA_RECONSTRUCT_9 || param->reconstruct == QUDA_RECONSTRUCT_13) {
-    // incorporate non-trivial phase into long links
-
-    const double phase = (M_PI * rand())/RAND_MAX;
-    const complex<double> z = polar(1.0, phase);
-    for (int dir=0; dir<4; ++dir) {
-      for (int i=0; i<V; ++i) {
-        for (int j=0; j<gaugeSiteSize; j+=2) {
-          if (precision == QUDA_DOUBLE_PRECISION) {
-            complex<double> *l = (complex<double>*)( &(((double*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
-          } else {
-            complex<float> *l = (complex<float>*)( &(((float*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      // incorporate non-trivial phase into long links
+      const double phase = (M_PI * rand()) / RAND_MAX;
+      const complex<double> z = polar(1.0, phase);
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              complex<double> *l = (complex<double> *)(&(((double *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            } else {
+              complex<float> *l = (complex<float> *)(&(((float *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            }
           }
-        } 
+        }
+      }
+    }
+
+    if (type == 3) return;
+
+    // set all links to zero to emulate the 1-link operator (needed for host comparison)
+    if (dslash_type == QUDA_STAGGERED_DSLASH) {
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              ((double *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((double *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            } else {
+              ((float *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((float *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            }
+          }
+        }
       }
     }
   }
-
-  if (type==3) return;
-
-  // set all links to zero to emulate the 1-link operator (needed for host comparison)
-  if (dslash_type == QUDA_STAGGERED_DSLASH) { 
-    for(int dir=0; dir<4; ++dir){
-      for(int i=0; i<V; ++i){
-	for(int j=0; j<gaugeSiteSize; j+=2){
-	  if(precision == QUDA_DOUBLE_PRECISION){
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }else{
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }
-	} 
-      }
-    }
-  }
-
 }
-
 
 template <typename Float>
 static void constructCloverField(Float *res, double norm, double diag) {
@@ -1678,6 +1684,7 @@ bool verify_results = true;
 double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
+double epsilon = 0.01;
 double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
@@ -1689,7 +1696,6 @@ double tol_hq = 0.;
 double reliable_delta = 0.1;
 bool alternative_reliable = false;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
-bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -1798,7 +1804,6 @@ void usage(char** argv )
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --rank-order <col/row>                    # Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)\n");
-  printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
@@ -1820,7 +1825,8 @@ void usage(char** argv )
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
-  printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
+  printf("    --mu                                      # Twisted-Mass chiral twist of Dirac operator (default 0.1)\n");
+  printf("    --epsilon                                 # Twisted-Mass flavor twist of Dirac operator (default 0.01)\n");
   printf("    --tadpole-coeff                           # Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)\n");
   printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
@@ -2220,13 +2226,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--kernel-pack-t") == 0){
-    kernel_pack_t = true;
-    ret= 0;
-    goto out;
-  }
-
-
   if( strcmp(argv[i], "--multishift") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2459,6 +2458,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mu = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--epsilon") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    epsilon = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;

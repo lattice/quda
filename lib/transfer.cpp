@@ -22,7 +22,7 @@ namespace quda {
       fine_tmp_h(nullptr), fine_tmp_d(nullptr), coarse_tmp_h(nullptr), coarse_tmp_d(nullptr), geo_bs(nullptr),
       fine_to_coarse_h(nullptr), coarse_to_fine_h(nullptr), fine_to_coarse_d(nullptr), coarse_to_fine_d(nullptr),
       spin_bs(spin_bs), spin_map(0), nspin_fine(B[0]->Nspin()), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
-      enable_gpu(false), enable_cpu(false), gpu_setup(true), use_gpu(true), flops_(0), profile(profile)
+      enable_gpu(false), enable_cpu(false), use_gpu(true), flops_(0), profile(profile)
   {
     postTrace();
     int ndim = B[0]->Ndim();

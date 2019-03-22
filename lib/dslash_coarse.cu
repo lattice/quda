@@ -15,7 +15,6 @@ namespace quda {
 
 #ifdef GPU_MULTIGRID
 
-
   template <typename Float, typename yFloat, typename ghostFloat, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool dagger, DslashType type>
   class DslashCoarse : public TunableVectorY {
 
@@ -587,14 +586,6 @@ namespace quda {
     }
 
   };
-
-  // hooks into tune.cpp variables for policy tuning
-  typedef std::map<TuneKey, TuneParam> map;
-  const map& getTuneCache();
-
-  void disableProfileCount();
-  void enableProfileCount();
-  void setPolicyTuning(bool);
 
   static bool dslash_init = false;
   static int config = 0; // 3-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune

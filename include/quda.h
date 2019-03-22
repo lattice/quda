@@ -14,6 +14,12 @@
 #include <stdio.h> /* for FILE */
 #include <quda_constants.h>
 
+#ifndef __CUDACC_RTC__
+#define double_complex double _Complex
+#else // keep NVRTC happy since it can't handle C types
+#define double_complex double2
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -101,8 +107,8 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
-    double b_5[QUDA_MAX_DWF_LS];  /**< MDWF coefficients */
-    double c_5[QUDA_MAX_DWF_LS];  /**< will be used only for the mobius type of Fermion */
+    double_complex b_5[QUDA_MAX_DWF_LS];  /**< Mobius coefficients - only real part used if regular Mobius */
+    double_complex c_5[QUDA_MAX_DWF_LS];  /**< Mobius coefficients - only real part used if regular Mobius */
 
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */
@@ -1232,6 +1238,9 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
+// remove NVRTC WAR
+#undef double_complex
 
 /* #include <quda_new_interface.h> */
 

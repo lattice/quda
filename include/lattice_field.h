@@ -1,10 +1,12 @@
 #ifndef _LATTICE_FIELD_H
 #define _LATTICE_FIELD_H
 
+#include <map>
 #include <quda.h>
 #include <iostream>
 #include <comm_quda.h>
-#include <map>
+#include <util_quda.h>
+#include <object.h>
 
 /**
  * @file lattice_field.h
@@ -170,6 +172,9 @@ namespace quda {
     /** Precision of the ghost */
     mutable QudaPrecision ghost_precision;
 
+    /** Bool which is triggered if the ghost precision is reset */
+    mutable bool ghost_precision_reset;
+
     /** For fixed-point fields that need a global scaling factor */
     double scale;
 
@@ -261,7 +266,7 @@ namespace quda {
     mutable int ghostNormOffset[QUDA_MAX_DIM][2];
 
     /**
-       Pinned memory buffer used for sending all messages
+       Pinned memory buffer used for sending messages
     */
     void *my_face_h[2];
 
@@ -269,6 +274,11 @@ namespace quda {
        Mapped version of my_face_h
     */
     void *my_face_hd[2];
+
+    /**
+       Device memory buffer for sending messages
+     */
+    void *my_face_d[2];
 
     /** Local pointers to the pinned my_face buffer */
     void *my_face_dim_dir_h[2][QUDA_MAX_DIM][2];
@@ -279,10 +289,20 @@ namespace quda {
     /** Local pointers to the device ghost_send buffer */
     void *my_face_dim_dir_d[2][QUDA_MAX_DIM][2];
 
-    /** Memory buffer used for receiving all messages */
+    /**
+       Memory buffer used for receiving all messages
+    */
     void *from_face_h[2];
-    /** Mapped version of from_face_h */
+
+    /**
+       Mapped version of from_face_h
+    */
     void *from_face_hd[2];
+
+    /**
+       Device memory buffer for receiving messages
+     */
+    void *from_face_d[2];
 
     /** Local pointers to the pinned from_face buffer */
     void *from_face_dim_dir_h[2][QUDA_MAX_DIM][2];
@@ -608,8 +628,8 @@ namespace quda {
     /** @brief Backs up the LatticeField */
     virtual void backup() const { errorQuda("Not implemented"); }
 
-    /** @brief Restores the cpuGaugeField */
-    virtual void restore() { errorQuda("Not implemented"); }
+    /** @brief Restores the LatticeField */
+    virtual void restore() const { errorQuda("Not implemented"); }
   };
   
   /**
@@ -688,6 +708,21 @@ namespace quda {
      @param reorder_location_ The location to set where data will be reordered
   */
   void reorder_location_set(QudaFieldLocation reorder_location_);
+
+  /**
+     @brief Helper function for setting auxilary string
+     @param[in] meta LatticeField used for querying field location
+     @return String containing location and compilation type
+   */
+  inline const char* compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION)
+  {
+    QudaFieldLocation location = (location_ == QUDA_INVALID_FIELD_LOCATION ? meta.Location() : location_);
+#ifdef JITIFY
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+#else
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+#endif
+  }
 
 } // namespace quda
 

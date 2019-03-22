@@ -29,16 +29,17 @@
 
 #include <mpi.h>
 
-#define MPI_CHECK_(mpi_call) do {                    \
-  int status = mpi_call;                            \
-  if (status != MPI_SUCCESS) {                      \
-    char err_string[128];                           \
-    int err_len;                                    \
-    MPI_Error_string(status, err_string, &err_len); \
-    err_string[127] = '\0';                         \
-    errorQuda("(MPI) %s", err_string);              \
-  }                                                 \
+#define MPI_CHECK_(mpi_call) do {                   		\
+  int status = comm_size() == 1 ? MPI_SUCCESS : mpi_call;	\
+  if (status != MPI_SUCCESS) {                      		\
+    char err_string[128];                           		\
+    int err_len;                                    		\
+    MPI_Error_string(status, err_string, &err_len); 		\
+    err_string[127] = '\0';                         		\
+    errorQuda("(MPI) %s", err_string);              		\
+  }                                                 		\
 } while (0)
+
 
 namespace quda {
 
@@ -92,19 +93,10 @@ namespace quda {
         delete r_pre;
       }
 
-      delete pp;
-
       delete tmpp;
       delete rp;
 
-      delete zp;
-      delete qp;
-      delete sp;
-      delete up;
-      delete mp;
-      delete np;
-
-      delete wp;
+      delete work_space;
     }
 
     if(K) delete K;
@@ -136,14 +128,10 @@ namespace quda {
       tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
 
       csParam.setPrecision(param.precision_sloppy);
-      pp = ColorSpinorField::Create(csParam);
-      zp = ColorSpinorField::Create(csParam);
-      wp = ColorSpinorField::Create(csParam);
-      sp = ColorSpinorField::Create(csParam);
-      qp = ColorSpinorField::Create(csParam);
-      np = ColorSpinorField::Create(csParam);
-      mp = ColorSpinorField::Create(csParam);
-      up = ColorSpinorField::Create(csParam);
+      csParam.is_composite  =true;
+      csParam.composite_dim = 8;
+      work_space = ColorSpinorField::Create(csParam);
+      csParam.is_composite  =false;
 
       // these low precision fields are used by the inner solver
       if (K) {
@@ -172,19 +160,20 @@ namespace quda {
     }
 
     ColorSpinorField &r = *rp;
-    ColorSpinorField &p = *pp;
-    ColorSpinorField &s = *sp;
-    ColorSpinorField &u = *up;
-    ColorSpinorField &w = *wp;
-    ColorSpinorField &q = *qp;
-    ColorSpinorField &n = *np;
-    ColorSpinorField &m = *mp;
-    ColorSpinorField &z = *zp;
+
+    ColorSpinorField &p = (*work_space)[0];
+    ColorSpinorField &s = (*work_space)[1];
+    ColorSpinorField &u = (*work_space)[2];
+    ColorSpinorField &w = (*work_space)[3];
+    ColorSpinorField &q = (*work_space)[4];
+    ColorSpinorField &n = (*work_space)[5];
+    ColorSpinorField &m = (*work_space)[6];
+    ColorSpinorField &z = (*work_space)[7];
 
     ColorSpinorField &y = *yp;
 
     ColorSpinorField &rSloppy = *rp_sloppy;
-    ColorSpinorField &xSloppy = ( param.use_sloppy_partial_accumulator == true && param.precision_sloppy != param.precision ) ? *xp_sloppy : x;
+    ColorSpinorField &xSloppy = (/* param.use_sloppy_partial_accumulator == true &&*/ param.precision_sloppy != param.precision ) ? *xp_sloppy : x;
 
     ColorSpinorField &pPre = *p_pre;
     ColorSpinorField &rPre = *r_pre;
@@ -208,7 +197,6 @@ namespace quda {
 
     double *recvbuff = new double[6];
     MPI_Request request_handle;
-    //MPI_Status  request_status;
 
     double &gamma = local_reduce[0].x, &delta = local_reduce[0].y, &rnorm = local_reduce[0].z;
     double &sigma = local_reduce[1].x, &zeta  = local_reduce[1].y, &tau   = local_reduce[1].z;
@@ -262,7 +250,7 @@ namespace quda {
     matSloppy(n, m, tmpSloppy);
 
     MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
-    memcpy(local_reduce, recvbuff, 2*sizeof(double));
+    if (comm_size() > 1) memcpy(local_reduce, recvbuff, 2*sizeof(double));
 
     eta      = delta;
     alpha    = gamma / eta, beta = 0.0;
@@ -308,7 +296,7 @@ namespace quda {
     matSloppy(n, m, tmpSloppy);
 
     MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
-    memcpy(local_reduce, recvbuff, 6*sizeof(double));
+    if (comm_size() > 1) memcpy(local_reduce, recvbuff, 6*sizeof(double));
 
     rnorm = sqrt(rnorm);
     sigma = sqrt(sigma);
@@ -346,7 +334,7 @@ namespace quda {
       //  local_reduce[0].w = (r, r) rnorm
       //  local_reduce[1].x = (s, s) sigma
       //  local_reduce[1].y = (z, z) zeta
-      //  local_reduce[0].w = (w, u) tau
+      //  local_reduce[1].w = (w, u) tau
 
       if (!rUpdate) {
         commGlobalReductionSet(false);
@@ -422,7 +410,7 @@ namespace quda {
       matSloppy(n, m, tmpSloppy);
 
       MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
-      memcpy(local_reduce, recvbuff, 6*sizeof(double));
+      if (comm_size() > 1) memcpy(local_reduce, recvbuff, 6*sizeof(double));
 
       sigma = sqrt(sigma);
       zeta  = sqrt(zeta);

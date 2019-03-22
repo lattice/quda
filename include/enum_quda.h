@@ -289,6 +289,7 @@ extern "C" {
     QUDA_CLOVERPC_DIRAC,
     QUDA_DOMAIN_WALL_DIRAC,
     QUDA_DOMAIN_WALLPC_DIRAC,
+    QUDA_DOMAIN_WALL_4D_DIRAC,
     QUDA_DOMAIN_WALL_4DPC_DIRAC,
     QUDA_MOBIUS_DOMAIN_WALL_DIRAC,
     QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC,
@@ -380,12 +381,12 @@ extern "C" {
       QUDA_INVALID_PROJECTION = QUDA_INVALID_ENUM
   } QudaProjectionType;
 
-  // used to select preconditioning method in domain-wall fermion
-  typedef enum QudaDWFPCType_s {
-    QUDA_5D_PC,
-    QUDA_4D_PC,
+  // used to select checkerboard preconditioning method
+  typedef enum QudaPCType_s {
+    QUDA_4D_PC = 4,
+    QUDA_5D_PC = 5,
     QUDA_PC_INVALID = QUDA_INVALID_ENUM
-  } QudaDWFPCType;
+  } QudaPCType;
 
   typedef enum QudaTwistFlavorType_s {
     QUDA_TWIST_SINGLET = 1,

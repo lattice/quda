@@ -44,7 +44,7 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 						  size_t blksize, int nblocks, size_t stride)
 { return NULL; }
 
-void comm_free(MsgHandle *mh) {}
+void comm_free(MsgHandle *&mh) {}
 
 void comm_start(MsgHandle *mh) {}
 

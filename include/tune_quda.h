@@ -7,6 +7,7 @@
 #include <cstring>
 #include <cfloat>
 #include <stdarg.h>
+#include <map>
 
 #include <tune_key.h>
 #include <quda_internal.h>
@@ -77,7 +78,7 @@ namespace quda {
     {
       if (tuneGridDim()) {
 	const unsigned int max_blocks = maxGridSize();
-	const int step = 1;
+	const int step = gridStep();
 	param.grid.x += step;
 	if (param.grid.x > max_blocks) {
 	  param.grid.x = minGridSize();
@@ -93,6 +94,13 @@ namespace quda {
     virtual unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (param.block.y*param.block.z); }
     virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
     virtual unsigned int minGridSize() const { return 1; }
+
+    /**
+       @brief gridStep sets the step size when iterating the grid size
+       in advanceGridDim.
+       @return Grid step size
+    */
+    virtual int gridStep() const { return 1; }
 
     virtual int blockStep() const { return deviceProp.warpSize; }
     virtual int blockMin() const { return deviceProp.warpSize; }
@@ -116,12 +124,13 @@ namespace quda {
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_threads = maxBlockSize(param);
-      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
+      const unsigned int max_shared = maxSharedBytesPerBlock();
       bool ret;
 
       param.block.x += blockStep();
       int nthreads = param.block.x*param.block.y*param.block.z;
-      if (param.block.x > max_threads || sharedBytesPerThread()*nthreads > max_shared) {
+      if (param.block.x > max_threads || sharedBytesPerThread()*nthreads > max_shared ||
+          sharedBytesPerBlock(param) > max_shared) {
 	resetBlockDim(param);
 	ret = false;
       } else {
@@ -135,12 +144,14 @@ namespace quda {
     }
 
     /**
-     * @brief For some reason this can't be queried from the device properties, so
-     * here we set set this.  Based on Table 14 of the CUDA
-     * Programming Guide 9.0 (Technical Specifications per Compute Capability)
+     * @brief For some reason this can't be queried from the device
+     * properties, so here we set set this.  Based on Table 14 of the
+     * CUDA Programming Guide 10.0 (Technical Specifications per
+     * Compute Capability)
      * @return The maximum number of simultaneously resident blocks per SM
      */
-    unsigned int maxBlocksPerSM() const {
+    unsigned int maxBlocksPerSM() const
+    {
       switch (deviceProp.major) {
       case 2:
 	return 8;
@@ -148,17 +159,71 @@ namespace quda {
 	return 16;
       case 5:
       case 6:
-        return 32;
+	return 32;
       case 7:
-        switch (deviceProp.minor) {
-        case 0: return 32;
-        case 5: return 16;
-        }
+	switch (deviceProp.minor) {
+	case 0: return 32;
+	case 5: return 16;
+	}
       default:
 	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
 	return 0;
       }
     }
+
+    /**
+     * @brief Enable the maximum dynamic shared bytes for the kernel
+     * "func" (values given by maxDynamicSharedBytesPerBlock()).
+     * @param[in] func Function pointer to the kernel we want to
+     * enable max shared memory per block for
+     */
+    template <typename F>
+    inline void setMaxDynamicSharedBytesPerBlock(F *func) const {
+#if CUDA_VERSION >= 9000
+      qudaFuncSetAttribute((const void*)func, cudaFuncAttributePreferredSharedMemoryCarveout,
+			   (int)cudaSharedmemCarveoutMaxShared);
+      qudaFuncSetAttribute((const void*)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+			   maxDynamicSharedBytesPerBlock());
+#endif
+    }
+
+    /**
+     * @brief This can't be correctly queried in CUDA for all
+     * architectures so here we set set this.  Based on Table 14 of
+     * the CUDA Programming Guide 10.0 (Technical Specifications per
+     * Compute Capability).
+     * @return The maximum dynamic shared memory to CUDA thread block
+     */
+    unsigned int maxDynamicSharedBytesPerBlock() const {
+      switch (deviceProp.major) {
+      case 2:
+      case 3:
+      case 5:
+      case 6:
+	return 48*1024;
+      case 7:
+	switch (deviceProp.minor) {
+	case 0: return 96*1024;
+	case 5: return 64*1024;
+	}
+      default:
+	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
+	return 0;
+      }
+    }
+
+    /**
+     * @brief The maximum shared memory that a CUDA thread block can
+     * use in the autotuner.  This isn't necessarily the same as
+     * maxDynamicSharedMemoryPerBlock since that may need explicit opt
+     * in to enable (by calling setMaxDynamicSharedBytes for the
+     * kernel in question).  If the CUDA kernel in question does this
+     * opt in then this function can be overloaded to return
+     * maxDynamicSharedBytesPerBlock.
+     * @return The maximum shared bytes limit per block the autotung
+     * will utilize.
+     */
+    virtual unsigned int maxSharedBytesPerBlock() const { return deviceProp.sharedMemPerBlock; }
 
     /**
      * The goal here is to throttle the number of thread blocks per SM
@@ -170,7 +235,7 @@ namespace quda {
     virtual bool advanceSharedBytes(TuneParam &param) const
     {
       if (tuneSharedBytes()) {
-	const int max_shared = deviceProp.sharedMemPerBlock;
+	const int max_shared = maxSharedBytesPerBlock();
 	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), maxBlocksPerSM());
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
@@ -180,8 +245,8 @@ namespace quda {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
 	  int nthreads = next.block.x * next.block.y * next.block.z;
-	  param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-	    sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+	  param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(next) ?
+	    sharedBytesPerThread()*nthreads : sharedBytesPerBlock(next);
 	  return false;
 	} else {
 	  return true;
@@ -495,6 +560,27 @@ namespace quda {
    * @brief Post an event in the trace, recording where it was posted
    */
   void postTrace_(const char *func, const char *file, int line);
+
+  /**
+   * @brief Returns a reference to the tunecache map
+   * @return tunecache reference
+   */
+  const std::map<TuneKey,TuneParam>& getTuneCache();
+
+  /**
+   * @brief Enable the profile kernel counting
+   */
+  void enableProfileCount();
+
+  /**
+   * @brief Disable the profile kernel counting
+   */
+  void disableProfileCount();
+
+  /**
+   * @brief Enable / disable whether are tuning a policy
+   */
+  void setPolicyTuning(bool);
 
 } // namespace quda
 

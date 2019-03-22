@@ -122,7 +122,7 @@ void initialize(int argc, char **argv) {
     errorQuda("Operator type %d is not supported.", dslash_type);
   } else {   
     setDims(gauge_param.X);
-    setKernelPackT(kernel_pack_t);
+    //setKernelPackT(kernel_pack_t);
     Ls = 1;
   }
 
@@ -244,7 +244,7 @@ void initialize(int argc, char **argv) {
     csParam.nSpin  = 4;
     csParam.nDim   = 4;
     for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
-    csParam.PCtype = QUDA_5D_PC;
+    csParam.pc_type = QUDA_5D_PC;
 
     csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     csParam.create    = QUDA_ZERO_FIELD_CREATE;

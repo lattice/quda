@@ -57,7 +57,7 @@ namespace quda {
     return;
   }
 
-  enum KernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
+  enum OprodKernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
 
   template<typename Float, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
     struct CloverForceArg {
@@ -67,7 +67,7 @@ namespace quda {
       unsigned int dir;
       unsigned int ghostOffset[4];
       unsigned int displacement;
-      KernelType kernelType;
+      OprodKernelType kernelType;
       bool partitioned[4];
       InputA inA;
       InputB inB_shift;
@@ -81,7 +81,7 @@ namespace quda {
 		   const unsigned int dir,
 		   const unsigned int *ghostOffset,
 		   const unsigned int displacement,
-		   const KernelType kernelType,
+		   const OprodKernelType kernelType,
 		   const double coeff,
 		   InputA& inA,
 		   InputB& inB_shift,
@@ -109,8 +109,8 @@ namespace quda {
   };
 
   template <IndexType idxType>
-    static __device__ __forceinline__ void coordsFromIndex(int& idx, int c[4],
-        const unsigned int cb_idx, const unsigned int parity, const int X[4])
+  __device__ inline void coordsFromIndex(int& idx, int c[4], const unsigned int cb_idx,
+                                         const unsigned int parity, const int X[4])
     {
       const int &LX = X[0];
       const int &LY = X[1];
@@ -164,10 +164,10 @@ namespace quda {
       c[3] = t;
     }
 
-
-
   // Get the  coordinates for the exterior kernels
-  __device__ static void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
+  __device__ inline void coordsFromIndexExterior(int x[4], const unsigned int cb_idx, const int X[4],
+                                                 const unsigned int dir, const int displacement,
+                                                 const unsigned int parity)
   {
     int Xh[2] = {X[0]/2, X[1]/2};
     switch(dir){
@@ -277,7 +277,7 @@ namespace quda {
 
     int x[4];
     while (cb_idx<arg.length){
-      coordsFromIndex(x, cb_idx, arg.X, dim, arg.displacement, arg.parity);
+      coordsFromIndexExterior(x, cb_idx, arg.X, dim, arg.displacement, arg.parity);
       const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
       arg.inA.load(static_cast<Complex*>(A.data), bulk_cb_idx);
       arg.inC.load(static_cast<Complex*>(C.data), bulk_cb_idx);
@@ -335,7 +335,7 @@ namespace quda {
 
 	if(arg.kernelType == OPROD_INTERIOR_KERNEL){
 	  interiorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	} else if(arg.kernelType == OPROD_EXTERIOR_KERNEL) {
+	} else if (arg.kernelType == OPROD_EXTERIOR_KERNEL) {
 	       if (arg.dir == 0) exteriorOprodKernel<0><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
 	  else if (arg.dir == 1) exteriorOprodKernel<1><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
 	  else if (arg.dir == 2) exteriorOprodKernel<2><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
@@ -462,7 +462,7 @@ namespace quda {
       } // i=3,..,0
     } // computeCloverForceCuda
 
-#endif // GPU_CLOVER_FORCE
+#endif // GPU_CLOVER_DIRAC
 
   void computeCloverForce(GaugeField& force,
 			  const GaugeField& U,

@@ -2,12 +2,13 @@
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <typeinfo>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
 
 //these are access control for staggered action
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
 #if (__COMPUTE_CAPABILITY__ >= 300) // Kepler works best with texture loads only
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
@@ -27,13 +28,15 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
-
+#ifdef USE_LEGACY_DSLASH
   namespace improvedstaggered {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
@@ -54,13 +57,11 @@ namespace quda {
 
 #include <dslash_quda.cuh>
   } // end namespace improvedstaggered
-
-  // declare the dslash events
-#include <dslash_events.cuh>
+#endif
 
   using namespace improvedstaggered;
 
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
   template <typename sFloat, typename fatGFloat, typename longGFloat, typename phaseFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
@@ -273,14 +274,12 @@ namespace quda {
   };
 #endif // GPU_STAGGERED_DIRAC
 
-#include <dslash_policy.cuh>
-
   void improvedStaggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
 				   const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 				   const int parity, const int dagger, const cudaColorSpinorField *x,
 				   const double &k, const int *commOverride, TimeProfile &profile)
   {
-#ifdef GPU_STAGGERED_DIRAC
+#if (defined GPU_STAGGERED_DIRAC && defined USE_LEGACY_DSLASH)
     const_cast<cudaColorSpinorField*>(in)->createComms(3);
 
     DslashCuda *dslash = nullptr;
@@ -300,7 +299,7 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 
     delete dslash;

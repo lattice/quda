@@ -93,8 +93,8 @@ module quda_fortran
      real(8) :: m5    ! Domain wall height
      integer(4) :: Ls       ! Extent of the 5th dimension (for domain wall)
 
-     real(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
-     real(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! will be used only for the mobius type of Fermion
+     complex(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
+     complex(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! MDWF coefficients
 
      real(8) :: mu    ! Twisted mass parameter
      real(8) :: epsilon ! Twisted mass parameter

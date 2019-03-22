@@ -96,7 +96,6 @@ set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
 # Multi-GPU options
 set(QUDA_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
 set(QUDA_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
-set(QUDA_POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dslash")
 
 #BLAS library
 set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
@@ -131,13 +130,16 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
 set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
 set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)")
-set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
-set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
+set(QUDA_LEGACY_DSLASH OFF CACHE BOOL "enable legacy dslash kernels?")
+set(QUDA_TEX ON CACHE BOOL "enable texture reads?")
 set(QUDA_NVML OFF CACHE BOOL "use NVML to report CUDA graphics driver version" )
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
-set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template for multi-blas /-reduce")
+set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
+
+# Set CTest options
 set(QUDA_CTEST_SEP_DSLASH_POLICIES OFF CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
+
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 11 CACHE STRING "set the CXX Standard (11 or 14)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
@@ -163,14 +165,15 @@ set(QUDA_JULIA OFF CACHE BOOL "build QUDA for Julia binding")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
-mark_as_advanced(QUDA_BLAS_TEX)
-mark_as_advanced(QUDA_FERMI_DBLE_TEX)
+mark_as_advanced(QUDA_LEGACY_DSLASH)
+mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
-
+mark_as_advanced(QUDA_CTEST_LAUNCH)
+mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_MPI_NVTX)
@@ -527,7 +530,6 @@ if(QUDA_JITIFY)
   LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
   LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
   configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
-  include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 endif()
 
 if(QUDA_USE_EIGEN)
@@ -620,13 +622,13 @@ if(QUDA_NVTX)
   LIST(APPEND QUDA_LIBS ${CUDA_nvToolsExt_LIBRARY})
 endif(QUDA_NVTX)
 
-if(NOT QUDA_BLAS_TEX)
-  add_definitions(-DDIRECT_ACCESS_BLAS)
-endif(NOT QUDA_BLAS_TEX)
+if(QUDA_LEGACY_DSLASH)
+  add_definitions(-DUSE_LEGACY_DSLASH)
+endif(QUDA_LEGACY_DSLASH)
 
-if(NOT QUDA_FERMI_DBLE_TEX)
-  add_definitions(-DFERMI_NO_DBLE_TEX)
-endif(NOT QUDA_FERMI_DBLE_TEX)
+if(QUDA_TEX)
+  add_definitions(-DUSE_TEXTURE_OBJECTS)
+endif(QUDA_TEX)
 
 if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
@@ -650,6 +652,9 @@ endif(QUDA_INTERFACE_BQCD)
 
 if(QUDA_INTERFACE_TIFR)
   add_definitions(-DBUILD_TIFR_INTERFACE)
+  if(NOT QUDA_LEGACY_DSLASH)
+    message(FATAL_ERROR "QUDA_INTERFACE_TIFR currently only supported with QUDA_LEGACY_DSLASH.")
+  endif()
 endif(QUDA_INTERFACE_TIFR)
 
 if(QUDA_NUMA_NVML)
@@ -681,7 +686,7 @@ set(CMAKE_CUDA_STANDARD_REQUIRED True)
 mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
 
-# NVCC FLAGS independet off build type
+# NVCC FLAGS independent off build type
 
 set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
 set(CMAKE_CUDA_FLAGS "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
@@ -716,8 +721,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
 include_directories(include)
 include_directories(lib)
-
-
+if(QUDA_JITIFY)
+  include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
+endif()
 
 # QUDA_HASH for tunecache
 if(NOT GITVERSION)
@@ -727,7 +733,6 @@ file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CU
 STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
-
 
 # this allows simplified running of clang-tidy 
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")

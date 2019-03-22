@@ -83,14 +83,10 @@ namespace quda {
       report("PCG");
       solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
       break;
-	  case QUDA_PIPEPCG_INVERTER:
-	    report("PipePCG");
-	    solver = new PipePCG(mat, matSloppy, matPrecon, param, profile);
-	    break;
-	  case QUDA_PIPE2PCG_INVERTER:
-	    report("Pipe2PCG");
-	    solver = new Pipe2PCG(mat, matSloppy, matPrecon, param, profile);
-	    break;
+    case QUDA_PIPEPCG_INVERTER:
+      report("PipePCG");
+      solver = new PipePCG(mat, matSloppy, matPrecon, param, profile);
+      break;
     case QUDA_MPCG_INVERTER:
       report("MPCG");
       solver = new MPCG(mat, param, profile);

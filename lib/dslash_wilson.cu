@@ -1,7 +1,10 @@
+#ifdef USE_LEGACY_DSLASH
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <typeinfo>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -19,10 +22,12 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
 
@@ -50,8 +55,6 @@ namespace quda {
 
   } // end namespace wilson
 
-  // declare the dslash events
-#include <dslash_events.cuh>
 
   using namespace wilson;
 
@@ -102,8 +105,6 @@ namespace quda {
   };
 #endif // GPU_WILSON_DIRAC
 
-#include <dslash_policy.cuh>
-
   // Wilson wrappers
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 			const int parity, const int dagger, const cudaColorSpinorField *x, const double &k,
@@ -121,7 +122,7 @@ namespace quda {
       dslash = new WilsonDslashCuda<short4, short4>(out, gauge, in, x, k, parity, dagger, commOverride);
     }
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
     dslash_policy.apply(0);
 
     delete dslash;
@@ -132,3 +133,5 @@ namespace quda {
   }
 
 }
+
+#endif

@@ -29,7 +29,7 @@
   
   extern int mySpinorSiteSize;
 
-  void initComms(int argc, char **argv, const int *commDims);
+  void initComms(int argc, char **argv, int * const commDims);
   void finalizeComms();
   void initRand();
 

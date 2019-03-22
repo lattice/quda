@@ -54,6 +54,7 @@ extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
 extern double kappa; // kappa of Dirac operator
 extern double mu;
+extern double epsilon;
 extern double anisotropy; // temporal anisotropy
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
@@ -188,7 +189,7 @@ int main(int argc, char **argv)
   inv_param.mu = mu;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = 0.1385;
+    inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
@@ -221,8 +222,6 @@ int main(int argc, char **argv)
   } else {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
   }
-
-  //inv_param.solution_type = QUDA_MAT_SOLUTION;
 
   inv_param.matpc_type = matpc_type;
 
@@ -319,6 +318,7 @@ int main(int argc, char **argv)
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
   }
@@ -413,10 +413,12 @@ int main(int argc, char **argv)
     // perform the inversion
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
       //((float*)spinorIn)[0] = 1.0;
-      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+      //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = static_cast<float> (1.0 / sqrt( static_cast<double> (comm_size() * inv_param.Ls*V*spinorSiteSize) ));
     } else {
       //((double*)spinorIn)[0] = 1.0;
-      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+      //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = 1.0 / sqrt( static_cast<double> (comm_size() * inv_param.Ls*V*spinorSiteSize) );      
     }
 
     if (multishift) {
@@ -527,9 +529,8 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        double *kappa_b, *kappa_c;
-        kappa_b = (double*)malloc(Lsdim*sizeof(double));
-        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
@@ -585,9 +586,8 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        double *kappa_b, *kappa_c;
-        kappa_b = (double*)malloc(Lsdim*sizeof(double));
-        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
@@ -661,9 +661,8 @@ int main(int argc, char **argv)
         dw_4d_matpc(spinorTmp, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
         dw_4d_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        double *kappa_b, *kappa_c;
-        kappa_b = (double*)malloc(Lsdim*sizeof(double));
-        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));

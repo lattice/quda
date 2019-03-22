@@ -16,9 +16,8 @@ PYTHON = @QUDA_PYTHON@	  # python 2.5 or later required for 'make gen'
 # compilation options
 HOST_DEBUG = @HOST_DEBUG@			# compile host debug code
 DEVICE_DEBUG = @DEVICE_DEBUG@		# compile device debug code for cuda-gdb
-VERBOSE = @VERBOSE@			# display kernel register useage
-BLAS_TEX = @BLAS_TEX@			# enable texture reads in BLAS?
-FERMI_DBLE_TEX = @FERMI_DBLE_TEX@		# enable double-precision texture reads on Fermi?
+VERBOSE = @VERBOSE@			# display kernel register usage
+USE_TEX = @USE_TEX@			# enable texture reads?
 
 BUILD_WILSON_DIRAC = @BUILD_WILSON_DIRAC@			# build Wilson Dirac operators?
 BUILD_CLOVER_DIRAC = @BUILD_CLOVER_DIRAC@			# build clover Dirac operators?
@@ -43,7 +42,6 @@ DYNAMIC_CLOVER = @DYNAMIC_CLOVER@	# Dynamic inversion saves memory but decreases
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
 BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
-POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dslash
 
 #BLAS library
 BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
@@ -210,13 +208,7 @@ ifeq ($(strip $(BUILD_SSTEP)), yes)
   COPT += -DSSTEP
 endif
 
-ifeq ($(strip $(POSIX_THREADS)), yes)
-  NVCCOPT += -DPTHREADS
-  COPT += -DPTHREADS
-endif
-
 LIB += -lpthread
-
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
@@ -306,14 +298,10 @@ ifeq ($(strip $(VERBOSE)), yes)
 endif
 
 NVCCOPT += -DMAX_MULTI_BLAS_N=4
-ifeq ($(strip $(BLAS_TEX)), no)
-  NVCCOPT += -DDIRECT_ACCESS_BLAS
-  COPT += -DDIRECT_ACCESS_BLAS
-endif
 
-ifeq ($(strip $(FERMI_DBLE_TEX)), no)
-  NVCCOPT += -DFERMI_NO_DBLE_TEX
-  COPT += -DFERMI_NO_DBLE_TEX
+ifeq ($(strip $(USE_TEX)), no)
+  NVCCOPT += -DUSE_TEXTURE_OBJECTS
+  COPT += -DUSE_TEXTURE_OBJECTS
 endif
 
 ifeq ($(strip $(BUILD_QDP_INTERFACE)), yes)

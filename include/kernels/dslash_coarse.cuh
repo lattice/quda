@@ -80,31 +80,6 @@ namespace quda {
   }
 
   /**
-     Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
-
-     @param x Computed spatial index
-     @param cb_index 1-d checkerboarded index
-     @param X Full lattice dimensions
-     @param parity Site parity
-   */
-  template <typename I>
-  static __device__ __host__ inline void getCoordsCB(int x[], int cb_index, const I X[], const I X0h, int parity) {
-    //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-    //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-    //x[1] = (cb_index/(X[0]/2)) % X[1];
-    //x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-
-    int za = (cb_index / X0h);
-    int zb =  (za / X[1]);
-    x[1] = (za - zb * X[1]);
-    x[3] = (zb / X[2]);
-    x[2] = (zb - x[3] * X[2]);
-    int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
-    x[0] = (2 * cb_index + x1odd  - za * X[0]);
-    return;
-  }
-
-  /**
      Applies the coarse dslash on a given parity and checkerboard site index
 
      @param out The result - kappa * Dslash in
@@ -136,7 +111,7 @@ namespace quda {
 
 	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
 	  if (doHalo<type>()) {
-	    int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+	    int ghost_idx = ghostFaceIndex<1,5>(coord, arg.dim, d, arg.nFace);
 
 #pragma unroll
 	    for(int color_local = 0; color_local < Mc; color_local++) { //Color row
@@ -201,7 +176,7 @@ namespace quda {
 	const int gauge_idx = back_idx;
 	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
 	  if (doHalo<type>()) {
-	    const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+	    const int ghost_idx = ghostFaceIndex<0,5>(coord, arg.dim, d, arg.nFace);
 #pragma unroll
 	    for (int color_local=0; color_local<Mc; color_local++) {
 	      int c_row = color_block + color_local;

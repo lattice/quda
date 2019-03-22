@@ -8,7 +8,7 @@ extern "C" {
   typedef struct MsgHandle_s MsgHandle;
   typedef struct Topology_s Topology;
 
-  /* defined in quda.h; redefining here to avoid circular references */ 
+  /* defined in quda.h; redefining here to avoid circular references */
   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
   /* implemented in comm_common.cpp */
@@ -132,6 +132,14 @@ extern "C" {
   */
   const char* comm_dim_topology_string();
 
+  /**
+     @brief Return a string that defines the P2P/GDR environment
+     variable configuration (for use as a tuneKey to enable unique
+     policies).
+     @return String specifying comm config
+  */
+  const char* comm_config_string();
+
   /* implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp */
 
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
@@ -237,12 +245,12 @@ extern "C" {
   /**
      Create a persistent strided message handler for a displaced send
      @param buffer Buffer from which message will be sent
-     @param displacement Array of offsets specifying the relative node to which we are sending 
+     @param displacement Array of offsets specifying the relative node to which we are sending
      @param blksize Size of block in bytes
      @param nblocks Number of blocks
      @param stride Stride between blocks in bytes
   */
-  MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[], 
+  MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
 						 size_t blksize, int nblocks, size_t stride);
 
   /**
@@ -256,7 +264,7 @@ extern "C" {
   MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
 						    size_t blksize, int nblocks, size_t stride);
 
-  void comm_free(MsgHandle *mh);
+  void comm_free(MsgHandle *&mh);
   void comm_start(MsgHandle *mh);
   void comm_wait(MsgHandle *mh);
   int comm_query(MsgHandle *mh);
@@ -278,10 +286,10 @@ extern "C" {
   int commCoords(int);
   int commDimPartitioned(int dir);
   void commDimPartitionedSet(int dir);
-  
+
   /**
    * @brief Reset the comm dim partioned array to zero,
-   * @details This should only be needed for automated testing 
+   * @details This should only be needed for automated testing
    * when different partitioning is applied within a single run.
    */
   void commDimPartitionedReset();
