@@ -510,6 +510,7 @@ namespace quda {
     */
     template <typename Float, int length, int N, bool huge_alloc=false>
       struct FloatNOrder {
+        using Accessor = FloatNOrder<Float,length,N,huge_alloc>;
 	typedef typename mapper<Float>::type RegType;
 	typedef typename VectorType<Float,N>::type Vector;
 	typedef typename AllocType<huge_alloc>::type AllocInt;
@@ -578,9 +579,9 @@ namespace quda {
 	   @return Instance of a colorspinor_wrapper that curries in access to
 	   this field at the above coordinates.
 	*/
-	__device__ __host__ inline clover_wrapper<RegType,FloatNOrder<Float,length,N> >
-	  operator()(int x_cb, int parity, int chirality) {
-	  return clover_wrapper<RegType,FloatNOrder<Float,length,N> >(*this, x_cb, parity, chirality);
+	__device__ __host__ inline clover_wrapper<RegType,Accessor> operator()(int x_cb, int parity, int chirality)
+        {
+	  return clover_wrapper<RegType,Accessor>(*this, x_cb, parity, chirality);
 	}
 
 	/**
@@ -593,10 +594,9 @@ namespace quda {
 	   @return Instance of a colorspinor_wrapper that curries in access to
 	   this field at the above coordinates.
 	*/
-	__device__ __host__ inline const clover_wrapper<RegType,FloatNOrder<Float,length,N> >
-	  operator()(int x_cb, int parity, int chirality) const {
-	  return clover_wrapper<RegType,FloatNOrder<Float,length,N> >
-	    (const_cast<FloatNOrder<Float,length,N>&>(*this), x_cb, parity, chirality);
+	__device__ __host__ inline const clover_wrapper<RegType,Accessor> operator()(int x_cb, int parity, int chirality) const
+        {
+	  return clover_wrapper<RegType,Accessor>(const_cast<Accessor&>(*this), x_cb, parity, chirality);
 	}
 
 	/**
