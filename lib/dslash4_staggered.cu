@@ -29,7 +29,7 @@ namespace quda
     {
       dslash.launch(staggeredGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
-};
+  };
 
   template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<Float>
   {

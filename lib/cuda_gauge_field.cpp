@@ -76,8 +76,8 @@ namespace quda {
     createTexObject(tex, gauge, true);
     createTexObject(evenTex, even, false);
     createTexObject(oddTex, odd, false);
-    if(reconstruct == QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9)
-    {  // Create texture objects for the phases
+    if (reconstruct == QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9) {
+      // Create texture objects for the phases
       bool isPhase = true;
       createTexObject(phaseTex, (char*)gauge + phase_offset, true, isPhase);
       createTexObject(evenPhaseTex, (char*)even + phase_offset, false, isPhase);
@@ -101,7 +101,7 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, bool full, bool isPhase) {
 
-    if( isNative() && geometry != QUDA_COARSE_GEOMETRY ){
+    if ( isNative() && geometry != QUDA_COARSE_GEOMETRY ) {
       // create the texture for the field components
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
@@ -143,7 +143,7 @@ namespace quda {
       resDesc.resType = cudaResourceTypeLinear;
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
-      resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/(!full ? 2 : 1) : (bytes-phase_bytes)/(!full ? 2 : 1);
+      resDesc.res.linear.sizeInBytes = (isPhase ? phase_bytes : bytes) / (!full ? 2 : 1);
 
       if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
 	errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",

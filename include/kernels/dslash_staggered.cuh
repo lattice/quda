@@ -21,8 +21,7 @@ namespace quda {
 
     static constexpr QudaReconstructType reconstruct_u = reconstruct_u_;
     static constexpr QudaReconstructType reconstruct_l = reconstruct_l_;
-    // TODO: recon 9/13 seems to break with gauge_direct_load = false
-    static constexpr bool gauge_direct_load = true; // false means texture load
+    static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     static constexpr bool use_inphase = improved_ ? false : true;
     using GU = typename gauge_mapper<Float, reconstruct_u, 18, QUDA_STAGGERED_PHASE_MILC, gauge_direct_load, ghost, use_inphase>::type;
