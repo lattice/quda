@@ -783,6 +783,7 @@ namespace quda {
      */
     template <typename Float, int Ns, int Nc, int N, bool spin_project=false, bool huge_alloc=false>
       struct FloatNOrder {
+        using Accessor = FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc>;
         typedef typename mapper<Float>::type RegType;
         typedef typename VectorType<Float,N>::type Vector;
         typedef typename VectorType<RegType,N>::type RegVector;
@@ -933,9 +934,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
-    operator()(int x_cb, int parity) {
-    return colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >(*this, x_cb, parity);
+  __device__ __host__ inline colorspinor_wrapper<RegType,Accessor> operator()(int x_cb, int parity)
+  {
+    return colorspinor_wrapper<RegType,Accessor>(*this, x_cb, parity);
   }
 
   /**
@@ -947,10 +948,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
-          operator()(int x_cb, int parity) const {
-    return colorspinor_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
-    (const_cast<FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc>&>(*this), x_cb, parity);
+  __device__ __host__ inline const colorspinor_wrapper<RegType,Accessor> operator()(int x_cb, int parity) const
+  {
+    return colorspinor_wrapper<RegType,Accessor>(const_cast<Accessor&>(*this), x_cb, parity);
   }
 
 
@@ -1031,9 +1031,9 @@ namespace quda {
      @return Instance of a colorspinor_ghost_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
-    Ghost(int dim, int dir, int ghost_idx, int parity) {
-    return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >(*this, dim, dir, ghost_idx, parity);
+  __device__ __host__ inline colorspinor_ghost_wrapper<RegType,Accessor> Ghost(int dim, int dir, int ghost_idx, int parity)
+  {
+    return colorspinor_ghost_wrapper<RegType,Accessor>(*this, dim, dir, ghost_idx, parity);
   }
 
   /**
@@ -1047,10 +1047,9 @@ namespace quda {
      @return Instance of a colorspinor_ghost+wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
-    Ghost(int dim, int dir, int ghost_idx, int parity) const {
-    return colorspinor_ghost_wrapper<RegType,FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc> >
-      (const_cast<FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc>&>(*this), dim, dir, ghost_idx, parity);
+  __device__ __host__ inline const colorspinor_ghost_wrapper<RegType,Accessor> Ghost(int dim, int dir, int ghost_idx, int parity) const
+  {
+    return colorspinor_ghost_wrapper<RegType,Accessor>(const_cast<Accessor&>(*this), dim, dir, ghost_idx, parity);
   }
 
   /**
