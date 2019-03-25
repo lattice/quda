@@ -603,129 +603,124 @@ namespace quda {
 
 
 
-		/**
-		  reduction fused kernels for the pipelined PCG solvers
+    /**
+      reduction fused kernels for the pipelined PCG solvers
+     */
+    
+    template <typename ReduceType, typename SpinorX, typename SpinorP,
+	     typename SpinorU, typename SpinorR, typename SpinorS, typename SpinorM,
+	     typename SpinorQ, typename SpinorW, typename SpinorN, typename SpinorZ, typename Reducer>
+    struct ExtendedReductionArg : public ReduceArg<ReduceType> {
+      SpinorX X;
+      SpinorP P;
+      SpinorU U;
+      SpinorR R;
+      SpinorS S;
+      SpinorM M;
+      SpinorQ Q;
+      SpinorW W;
+      SpinorN N;
+      SpinorZ Z;
+      Reducer r;
+      const int length;
 
-		*/
-
-		template <typename ReduceType, typename SpinorX, typename SpinorP,
-		typename SpinorU, typename SpinorR, typename SpinorS, typename SpinorM,
-		typename SpinorQ, typename SpinorW, typename SpinorN, typename SpinorZ, typename Reducer>
-		struct ExtendedReductionArg : public ReduceArg<ReduceType> {
-		  SpinorX X;
-		  SpinorP P;
-		  SpinorU U;
-		  SpinorR R;
-		  SpinorS S;
-		  SpinorM M;
-		  SpinorQ Q;
-		  SpinorW W;
-		  SpinorN N;
-		  SpinorZ Z;
-
-		  Reducer r;
-
-		  const int length;
-		  ExtendedReductionArg(SpinorX X, SpinorP P, SpinorU U, SpinorR R, SpinorS S, SpinorM M, SpinorQ Q, SpinorW W, SpinorN N, SpinorZ Z, Reducer r, int length)
+      ExtendedReductionArg(SpinorX X, SpinorP P, SpinorU U, SpinorR R, SpinorS S, SpinorM M, SpinorQ Q, SpinorW W, SpinorN N, SpinorZ Z, Reducer r, int length)
 		    : X(X), P(P), U(U), R(R), S(S), M(M), Q(Q), W(W), N(N), Z(Z), r(r), length(length) { ; }
-		};
+    };
+    
+    /**
+      Generic reduction kernel with up to eight loads and eight saves.
+     */
+    template <int block_size, typename ReduceType, typename FloatN, int Nreduce, int M_, typename Arg>
+    __global__ void extreduceKernel(Arg arg) {
+      unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+      unsigned int parity = blockIdx.y;
+      unsigned int gridSize = gridDim.x*blockDim.x;
 
-		/**
-		   Generic reduction kernel with up to eight loads and eight saves.
-		 */
-		template <int block_size, typename ReduceType, typename FloatN, int Nreduce, int M_, typename Arg>
-		__global__ void extreduceKernel(Arg arg) {
+      ReduceType sum[Nreduce];
+#pragma unroll
+      for (int j=0; j<Nreduce;j++) ::quda::zero(sum[j]);
 
-		  unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-		  unsigned int parity = blockIdx.y;
-		  unsigned int gridSize = gridDim.x*blockDim.x;
+      while (i < arg.length) {
+	FloatN x[M_], p[M_], u[M_], r[M_], s[M_],m[M_], q[M_], w[M_], n[M_], z[M_];
+	arg.X.load(x, i, parity);
+	arg.P.load(p, i, parity);
+	arg.U.load(u, i, parity);
+	arg.R.load(r, i, parity);
+	arg.S.load(s, i, parity);
+	
+	arg.M.load(m, i, parity);
+	arg.Q.load(q, i, parity);
+	arg.W.load(w, i, parity);
+	arg.N.load(n, i, parity);
+	arg.Z.load(z, i, parity);
+	
+	arg.r.pre();
+#pragma unroll
+	for (int j=0; j<M_; j++) arg.r(sum, x[j], p[j], u[j], r[j], s[j], m[j], q[j], w[j], n[j], z[j]);
 
-		  ReduceType sum[Nreduce];
-		#pragma unroll
-		  for (int j=0; j<Nreduce;j++) ::quda::zero(sum[j]);
+	arg.r.post(sum);
 
-		  while (i < arg.length) {
-		    FloatN x[M_], p[M_], u[M_], r[M_], s[M_],m[M_], q[M_], w[M_], n[M_], z[M_];
-		    arg.X.load(x, i, parity);
-		    arg.P.load(p, i, parity);
-		    arg.U.load(u, i, parity);
-		    arg.R.load(r, i, parity);
-		    arg.S.load(s, i, parity);
+	arg.X.save(x, i, parity);
+        arg.P.save(p, i, parity);
+        arg.U.save(u, i, parity);
+        arg.R.save(r, i, parity);
+        arg.S.save(s, i, parity);
 
-		    arg.M.load(m, i, parity);
-		    arg.Q.load(q, i, parity);
-		    arg.W.load(w, i, parity);
-		    arg.N.load(n, i, parity);
-		    arg.Z.load(z, i, parity);
+        arg.M.save(m, i, parity);
+        arg.Q.save(q, i, parity);
+        arg.W.save(w, i, parity);
+	arg.N.save(n, i, parity);
+	arg.Z.save(z, i, parity);
+	
+	i += gridSize;
+      }
+      
+      if(Nreduce > 1) ::quda::array_reduce<Nreduce, block_size, ReduceType>(arg, sum, parity);
+      else            ::quda::reduce<block_size, ReduceType>(arg, sum[0], parity);
 
-
-		    arg.r.pre();
-
-		#pragma unroll
-		    for (int j=0; j<M_; j++) arg.r(sum, x[j], p[j], u[j], r[j], s[j], m[j], q[j], w[j], n[j], z[j]);
-
-		    arg.r.post(sum);
-
-		    arg.X.save(x, i, parity);
-		    arg.P.save(p, i, parity);
-		    arg.U.save(u, i, parity);
-		    arg.R.save(r, i, parity);
-		    arg.S.save(s, i, parity);
-
-		    arg.M.save(m, i, parity);
-		    arg.Q.save(q, i, parity);
-		    arg.W.save(w, i, parity);
-		    arg.N.save(n, i, parity);
-		    arg.Z.save(z, i, parity);
-
-		    i += gridSize;
-		  }
-
-		  if(Nreduce > 1) ::quda::array_reduce<Nreduce, block_size, ReduceType>(arg, sum, parity);
-		  else            ::quda::reduce<block_size, ReduceType>(arg, sum[0], parity);
-		}
+      return;
+    }
 
 
-		template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
-		struct ExtendedReduceFunctor {
+    template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
+    struct ExtendedReduceFunctor {
 
-			//! pre-computation routine called before the "M-loop"
-			virtual __device__ __host__ void pre() { ; }
-
-			//! where the reduction is usually computed and any auxiliary operations
-			virtual __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u,FloatN &r,
+      //! pre-computation routine called before the "M-loop"
+      virtual __device__ __host__ void pre() { ; }
+      
+      //! where the reduction is usually computed and any auxiliary operations
+      virtual __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u,FloatN &r,
 							FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) = 0;
+      //! where the reduction is usually computed and any auxiliary operations
+      virtual __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
+		      FloatN &d1, FloatN &h1, FloatN &z1, FloatN &p1, FloatN &u1, FloatN &g1,
+		      FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2,
+		      FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) = 0;
+      //! post-computation routine called after the "M-loop"
+      virtual __device__ __host__ void post(ReduceType sum[Nreduce]) { ; }
+    };
+    
+    template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
+    struct pipePCGRRMergedOp_ : public ExtendedReduceFunctor<Nreduce, ReduceType, Float2, FloatN> {
+      Float2 a;
+      Float2 b;
+      pipePCGRRMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u, FloatN &r, 
+		      FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) {
 
-			//! where the reduction is usually computed and any auxiliary operations
-			virtual __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
-							FloatN &d1, FloatN &h1, FloatN &z1, FloatN &p1, FloatN &u1, FloatN &g1,
-																									FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2,
-																									FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) = 0;
+        typedef typename scalar<ReduceType>::type scalar;				
 
-			//! post-computation routine called after the "M-loop"
-			virtual __device__ __host__ void post(ReduceType sum[Nreduce]) { ; }
-
-		};
-
-		template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
-		struct pipePCGRRMergedOp_ : public ExtendedReduceFunctor<Nreduce, ReduceType, Float2, FloatN> {
-			Float2 a;
-			Float2 b;
-			pipePCGRRMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-			__device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) {
-
-	      typedef typename scalar<ReduceType>::type scalar;				
-
-	      z = n + b.x*z;
-			  q = m + b.x*q;
-			  s = w + b.x*s;
-			  p = u + b.x*p;
-
-			  x = x + a.x*p;
-			  u = u - a.x*q;
-			  w = w - a.x*z;
-			  r = r - a.x*s;
-	      n = w - r;
+	z = n + b.x*z;
+	q = m + b.x*q;
+	s = w + b.x*s;
+	p = u + b.x*p;
+	
+	x = x + a.x*p;
+	u = u - a.x*q;
+	w = w - a.x*z;
+	r = r - a.x*s;
+	n = w - r;
 
         dot_<scalar>   (sum[0].x, r, u);
         dot_<scalar>   (sum[0].y, w, u);
@@ -733,16 +728,16 @@ namespace quda {
         norm2_<scalar> (sum[1].x, s);
         norm2_<scalar> (sum[1].y, z);
         dot_<scalar>   (sum[1].z, s, u);
-		  }
+      }
 
-			__device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
+      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
 							FloatN &d1, FloatN &h1, FloatN &z1, FloatN &p1, FloatN &u1, FloatN &g1,
-																									FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2,
-																									FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) {}
+							FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2,
+							FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) {}
 
-			static int streams() { return 18; } //! total number of input and output streams
-			static int flops() { return (16+6); } //! flops per real element
-		};
+      static int streams() { return 18; } //! total number of input and output streams
+      static int flops() { return (16+6); } //! flops per real element
+    };
 
   } // namespace blas
 
