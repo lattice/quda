@@ -766,33 +766,33 @@ namespace quda {
        @tparam huge_alloc Template parameter that enables 64-bit
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
-     */
+    */
     template <typename Float, int Ns, int Nc, int N, bool huge_alloc=false>
-      struct FloatNOrder {
-  typedef typename mapper<Float>::type RegType;
-  typedef typename VectorType<Float,N>::type Vector;
-  typedef typename VectorType<RegType,N>::type RegVector;
-  typedef typename AllocType<huge_alloc>::type AllocInt;
-  static const int length = 2 * Ns * Nc;
-  static const int M = length / N;
-  Float *field;
-  float *norm;
-  const AllocInt offset; // offset can be 32-bit or 64-bit
-  const AllocInt norm_offset;
+    struct FloatNOrder {
+      typedef typename mapper<Float>::type RegType;
+      typedef typename VectorType<Float,N>::type Vector;
+      typedef typename VectorType<RegType,N>::type RegVector;
+      typedef typename AllocType<huge_alloc>::type AllocInt;
+      static const int length = 2 * Ns * Nc;
+      static const int M = length / N;
+      Float *field;
+      float *norm;
+      AllocInt offset; // offset can be 32-bit or 64-bit
+      AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
-  typedef typename TexVectorType<RegType,N>::type TexVector;
-  cudaTextureObject_t tex;
-  cudaTextureObject_t texNorm;
-  const int tex_offset;
+      typedef typename TexVectorType<RegType,N>::type TexVector;
+      cudaTextureObject_t tex;
+      cudaTextureObject_t texNorm;
+      int tex_offset;
 #endif
-  int volumeCB;
-  int faceVolumeCB[4];
-  int stride;
-  Float *ghost[8];
-  int nParity;
-  void *backup_h; //! host memory for backing up the field when tuning
-  size_t bytes;
-
+      int volumeCB;
+      int faceVolumeCB[4];
+      int stride;
+      Float *ghost[8];
+      int nParity;
+      void *backup_h; //! host memory for backing up the field when tuning
+      size_t bytes;
+      
       FloatNOrder() :
 	offset(0), norm_offset(0),
 #ifdef USE_TEXTURE_OBJECTS
@@ -802,28 +802,28 @@ namespace quda {
 
 	
       FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0, bool override=false)
-      : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
-    norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
+	: field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
+	  norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
 #ifdef USE_TEXTURE_OBJECTS
-    tex(0), texNorm(0), tex_offset(offset/N),
+	  tex(0), texNorm(0), tex_offset(offset/N),
 #endif
-    volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset()), backup_h(nullptr), bytes(a.Bytes())
-  {
-    for (int i=0; i<4; i++) {
-      ghost[2*i+0] = ghost_ ? ghost_[2*i+0] : static_cast<Float*>(a.Ghost()[2*i+0]);
-      ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : static_cast<Float*>(a.Ghost()[2*i+1]);
-      faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
-    }
+	  volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset()), backup_h(nullptr), bytes(a.Bytes())
+      {
+	for (int i=0; i<4; i++) {
+	  ghost[2*i+0] = ghost_ ? ghost_[2*i+0] : static_cast<Float*>(a.Ghost()[2*i+0]);
+	  ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : static_cast<Float*>(a.Ghost()[2*i+1]);
+	  faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
+	}
 #ifdef USE_TEXTURE_OBJECTS
-    if (a.Location() == QUDA_CUDA_FIELD_LOCATION) {
-      tex = static_cast<const cudaColorSpinorField&>(a).Tex();
-      texNorm = static_cast<const cudaColorSpinorField&>(a).TexNorm();
-    }
-    if (!huge_alloc && (this->field != a.V() || (a.Precision() == QUDA_HALF_PRECISION && this->norm != a.Norm()) || (a.Precision() == QUDA_QUARTER_PRECISION && this->norm != a.Norm())) && !override) {
-      errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
-    }
+	if (a.Location() == QUDA_CUDA_FIELD_LOCATION) {
+	  tex = static_cast<const cudaColorSpinorField&>(a).Tex();
+	  texNorm = static_cast<const cudaColorSpinorField&>(a).TexNorm();
+	}
+	if (!huge_alloc && (this->field != a.V() || (a.Precision() == QUDA_HALF_PRECISION && this->norm != a.Norm()) || (a.Precision() == QUDA_QUARTER_PRECISION && this->norm != a.Norm())) && !override) {
+	  errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
+	}
 #endif
-  }
+      }
 
       void init(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0, bool override=false)
       {
@@ -841,7 +841,7 @@ namespace quda {
 	  ghost[2*i+0] = ghost_ ? ghost_[2*i+0] : static_cast<Float*>(a.Ghost()[2*i+0]);
 	  ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : static_cast<Float*>(a.Ghost()[2*i+1]);
 	  faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
-	  }
+	}
 	
 #ifdef USE_TEXTURE_OBJECTS
 	tex = 0;

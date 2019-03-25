@@ -15,6 +15,7 @@
 #include <color_spinor.h>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
+#include <tune_quda.h>
 #include <interface_qlua_internal.h>
 
 #define QUDA_LEN_G (QUDA_Ns*QUDA_Ns)
