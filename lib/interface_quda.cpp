@@ -2354,7 +2354,6 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
 
   // create the dirac operator
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
-
   Dirac &dirac = *d;
   //------------------------------------------------------
   
@@ -2404,7 +2403,6 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   delete h_tmp;
   
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
-
   profileEigensolve.TPSTART(QUDA_PROFILE_COMPUTE);
 
   //If you use polynomial acceleration on a non-symmetric matrix,
@@ -2416,8 +2414,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   EigenSolver *eig_solve = EigenSolver::create(eig_param, dirac, profileEigensolve);
   (*eig_solve)(kSpace, evals);
   
-  profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
-  
+  profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);  
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);  
   delete d;
   delete dSloppy;
@@ -5554,10 +5551,11 @@ void plaq_quda_(double plaq[3]) {
 
 void plaqQuda (double plq[3])
 {
+  
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (!gaugePrecise) errorQuda("Cannot compute plaquette as there is no resident gauge field");
-
+  
   cudaGaugeField *data = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
   extendedGaugeResident = data;
 
@@ -5722,20 +5720,20 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
     cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
     STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho);
   }
-
+  
   delete cudaGaugeTemp;
-
+  
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
-
+  
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
     printfQuda("Plaquette after %d STOUT steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
   }
-
+  
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
- void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
+void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
 {
   profileOvrImpSTOUT.TPSTART(QUDA_PROFILE_TOTAL);
 

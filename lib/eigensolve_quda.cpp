@@ -27,6 +27,8 @@ namespace quda {
     
   }
 
+  //We bake the matrix operator 'mat' and the eigensolver parameters into the
+  //eigensolver. 
   EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile) {
     
     EigenSolver *eig_solver = nullptr;
@@ -42,11 +44,12 @@ namespace quda {
     }
     return eig_solver;
   }
-  
+
+  //Utilities and functions common to all Eigensolver instances
+  //------------------------------------------------------------------------------
   void EigenSolver::matVec(const Dirac &mat,
 			   ColorSpinorField &out,
-			   const ColorSpinorField &in,
-			   QudaEigParam *eig_param){
+			   const ColorSpinorField &in){
     
     if(eig_param->use_norm_op && eig_param->use_dagger) {
       mat.MMdag(out,in);
@@ -68,12 +71,11 @@ namespace quda {
   
   void EigenSolver::chebyOp(const Dirac &mat,
 			    ColorSpinorField &out,
-			    const ColorSpinorField &in,
-			    QudaEigParam *eig_param){
-
+			    const ColorSpinorField &in){
+    
     //Just do a simple matVec if no poly acc is requested
     if(!eig_param->use_poly_acc) {
-      matVec(mat, out, in, eig_param);
+      matVec(mat, out, in);
       return;
     }
 
@@ -99,7 +101,9 @@ namespace quda {
 
     //out = d2 * in + d1 * out
     //C_1(x) = x
-    matVec(mat, out, in, eig_param);
+    //matVec(mat, out, in, eig_param);
+    matVec(mat, out, in);
+    //matVec(out, in);
     blas::caxpby(d2, const_cast<ColorSpinorField&>(in), d1, out);
     if(eig_param->poly_deg == 1) return;
 
@@ -128,7 +132,8 @@ namespace quda {
       d3 = -sigma*sigma_old;
 
       //mat*C_{m}(x)
-      matVec(mat, out, *tmp2, eig_param);
+      //matVec(out, *tmp2);
+      matVec(mat, out, *tmp2);
 
       blas::ax(d3,*tmp1);
       Complex d1c(d1,0.0);
@@ -171,7 +176,7 @@ namespace quda {
     //Block dot products stored in s.
     blas::cDotProduct(s, d_vecs_j, r);
     
-    //Block orthonormalise
+    //Block orthogonalise
     for(int i=0; i<j; i++) s[i] *= -1.0;
     blas::caxpy(s, d_vecs_j, r);
     
@@ -214,10 +219,81 @@ namespace quda {
     for (int i=0; i<n_defl; i++)
       for (int j=0; j<=i; j++) {
 	//printfQuda("%d %d %.6e \n", i, j, blas::cDotProduct(*eig_vecs_ptr[i], *eig_vecs_ptr[j]).real() );
+      }
   }
-  
+
+  /*
+  //supports seperate reading or single file read
+  void Eigensolver::loadVectors(std::vector<ColorSpinorField*> eig_vecs) {
     
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_IO);
+    
+    std::string vec_infile(param.eig_global.vec_infile);
+
+    std::vector<ColorSpinorField*> &B = RV->Components(); 
+
+    const int Nvec = B.size();
+    printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
+
+    void **V = new void*[Nvec];
+    for (int i=0; i<Nvec; i++) { 
+      V[i] = B[i]->V();
+      if (V[i] == NULL) {
+	printfQuda("Could not allocate V[%d]\n", i);
+      }
+    }
+
+    if (strcmp(vec_infile.c_str(),"")!=0) {
+      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+    } else {
+      errorQuda("No eigenspace file defined.");
+    }
+
+    printfQuda("Done loading vectors\n");
+    profile.TPSTOP(QUDA_PROFILE_IO);
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
+    return;
   }
+
+  void Deflation::saveVectors(ColorSpinorField *RV) {
+    if(RV->IsComposite()) errorQuda("\nNot a composite field.\n");
+
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_IO);
+
+    std::string vec_outfile(param.eig_global.vec_outfile);
+
+
+    std::vector<ColorSpinorField*> &B = RV->Components();
+
+    if (strcmp(param.eig_global.vec_outfile,"")!=0) {
+      const int Nvec = B.size();
+      printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
+
+      void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
+      for (int i=0; i<Nvec; i++) {
+	V[i] = B[i]->V();
+	if (V[i] == NULL) {
+	  printfQuda("Could not allocate V[%d]\n", i);
+	}
+      }
+
+      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+
+      host_free(V);
+      printfQuda("Done saving vectors\n");
+    }
+
+    profile.TPSTOP(QUDA_PROFILE_IO);
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
+    return;
+  }
+  */
   
   EigenSolver::~EigenSolver() {}
   //-----------------------------------------------------------------------------
@@ -370,7 +446,8 @@ namespace quda {
     //Initial k step factorisation
     time = -clock();
     for(k=0; k<nEv; k++) {
-      lanczosStep(mat, kSpace, r, d_vecs_tmp, locked, eig_param, alpha, beta, k);
+      //lanczosStep(mat, kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
+      lanczosStep(kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
       if(flags) printfQuda("EV Flag k=%d\n", k);
     }
     printfQuda("Initial %d step factorisation complete\n", k);
@@ -382,7 +459,8 @@ namespace quda {
 
       time = -clock();
       for(k=nEv; k<nKr; k++) {
-	lanczosStep(mat, kSpace, r, d_vecs_tmp, locked, eig_param, alpha, beta, k);
+	lanczosStep(kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
+	//lanczosStep(mat, kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
 	if(flags) printfQuda("EV Flag k=%d\n", k);
       }
       if(flags) printfQuda("Restart %d complete\n", restart_iter+1);
@@ -540,7 +618,8 @@ namespace quda {
 	for(int i=0; i<nEv; i++) {
 
 	  //r = A * v_i
-	  matVec(mat, *r[0], *d_vecs_tmp[i], eig_param);
+	  matVec(mat, *r[0], *d_vecs_tmp[i]);
+	  //matVec(*r[0], *d_vecs_tmp[i]);
 	  //lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
 	  evals[i] = blas::cDotProduct(*d_vecs_tmp[i], *r[0])/sqrt(blas::norm2(*d_vecs_tmp[i]));
 	  
@@ -602,7 +681,7 @@ namespace quda {
     //---------------------------------------------------------------------------
     
     
-    //Post computation information
+    //Post computation report
     //---------------------------------------------------------------------------
     if(!converged) {
       printfQuda("IRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d restart steps. "
@@ -623,7 +702,7 @@ namespace quda {
 
       //Compute SVD
       time_svd = -clock();
-      if(eig_param->compute_svd) computeSVD(mat, kSpace, d_vecs_tmp, evals, eig_param, inverse);
+      if(eig_param->compute_svd) computeSVD(kSpace, d_vecs_tmp, evals, inverse);
       time_svd += clock();
 
     }
@@ -652,12 +731,11 @@ namespace quda {
 
   // Lanczos Member functions
   //---------------------------------------------------------------------------
-  void IRLM::lanczosStep(const Dirac &mat,
+  void IRLM::lanczosStep(//const Dirac &mat,
 			 std::vector<ColorSpinorField*> v,
 			 std::vector<ColorSpinorField*> r,
 			 std::vector<ColorSpinorField*> evecs,
 			 bool *locked,
-			 QudaEigParam *eig_param,
 			 double *alpha, double *beta, int j) {
     
     //Compute r = A * v_j - b_{j-i} * v_{j-1}
@@ -673,7 +751,7 @@ namespace quda {
       blas::caxpy(-s, *evecs[i], *v[j]);
     }
 
-    chebyOp(mat, *r[0], *v[j], eig_param);
+    chebyOp(mat, *r[0], *v[j]);
     
     //Deflate locked eigenvectors from the residual
     //DMH: This step ensures that the new Krylov vector
@@ -702,7 +780,6 @@ namespace quda {
       //orthogonal to the existing Krylov space. We must
       //orthogonalise it.
       //printfQuda("orthogonalising Beta %d = %e\n", j, beta[j]);
-      //orthogonalise(v, r, j);
       blockOrthogonalise(v, r, j);
       //b_j = ||r||
       beta[j] = sqrt(blas::norm2(*r[0]));
@@ -716,11 +793,9 @@ namespace quda {
     }
   }
   
-  void IRLM::computeSVD(const Dirac &mat,
-			std::vector<ColorSpinorField*> &kSpace,
+  void IRLM::computeSVD(std::vector<ColorSpinorField*> &kSpace,
 			std::vector<ColorSpinorField*> &evecs,
 			std::vector<Complex> &evals,
-			QudaEigParam *eig_param,
 			bool inverse) {
     
     printfQuda("Computing SVD of M%s\n", eig_param->use_dagger ? "dag": "");
@@ -766,8 +841,9 @@ namespace quda {
       Complex lambda = evals[idx];
 
       //M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-      matVec(mat, *tmp[0], *evecs[idx], eig_param);
-
+      //matVec(*tmp[0], *evecs[idx]);
+      matVec(mat, *tmp[0], *evecs[idx]);
+      
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
       Complex sigma_sq = blas::cDotProduct(*tmp[0], *tmp[0]);
       sigma_tmp[i] = Complex(sqrt(sigma_sq.real()) , sqrt(abs(sigma_sq.imag())));
@@ -1078,7 +1154,7 @@ namespace quda {
 
 	*d_v = *h_v;
 	//apply matrix-vector operation here:
-	eig_solver->chebyOp(mat, *d_v2, *d_v, eig_param);
+	eig_solver->chebyOp(mat, *d_v2, *d_v);
 	*h_v2 = *d_v2;
 	
 	t2 +=clock();
@@ -1186,7 +1262,8 @@ namespace quda {
       *d_v = *h_v3;
 
       // d_v2 = M*v
-      eig_solver->matVec(mat, *d_v2, *d_v, eig_param);
+      //eig_solver->matVec(*d_v2, *d_v);
+      eig_solver->matVec(mat, *d_v2, *d_v);
       
       // lambda = v^dag * M*v
       h_evals_[idx] = blas::cDotProduct(*d_v, *d_v2);

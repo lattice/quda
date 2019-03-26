@@ -20,9 +20,6 @@ namespace quda {
     virtual void operator()(std::vector<ColorSpinorField*> &kSpace,
 			    std::vector<Complex> &evals) = 0;
     
-    /**
-       EiegnSolver factory
-    */
     static EigenSolver* create(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
     
     /**
@@ -31,12 +28,11 @@ namespace quda {
        @param[in] mat Matrix operator
        @param[in] out Output spinor
        @param[in] in Input spinor
-       @param[in] eig_param Eigensolver parameters
     */
+    
     void matVec(const Dirac &mat,
 		ColorSpinorField &out,
-		const ColorSpinorField &in,
-		QudaEigParam *eig_param);
+		const ColorSpinorField &in);
     
     /**
        @brief Promoted the specified matVec operation:
@@ -44,12 +40,10 @@ namespace quda {
        @param[in] mat Matrix operator
        @param[in] out Output spinor
        @param[in] in Input spinor
-       @param[in] eig_param Eigensolver parameters
     */
     void chebyOp(const Dirac &mat,
 		 ColorSpinorField &out,
-		 const ColorSpinorField &in,
-		 QudaEigParam *eig_param);
+		 const ColorSpinorField &in);
 
     /**
        @brief Orthogonalise input vector r against
@@ -108,80 +102,36 @@ namespace quda {
     
     /**
        @brief Lanczos step: extends the Kylov space.
-       @param[in] mat matrix operator
        @param[in] v Vector space
        @param[in] r Current vector to add
        @param[in] evecs List of eigenvectors
        @param[in] locked List of converged eigenvectors
-       @param[in] eig_param Eigensolver parameters
        @param[in] alpha Diagonal of tridiagonal
        @param[in] beta Subdiagonal of tridiagonal
        @param[in] j Index of last vector added       
     */
-    void lanczosStep(const Dirac &mat,
-		     std::vector<ColorSpinorField*> v,
+    void lanczosStep(std::vector<ColorSpinorField*> v,
 		     std::vector<ColorSpinorField*> r,
 		     std::vector<ColorSpinorField*> evecs,
 		     bool *locked,
-		     QudaEigParam *eig_param,
 		     double *alpha, double *beta, int j);
-
+    
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left 
-       @param[in] mat matrix operator
        @param[in] v Vector space
        @param[in] r Current vector to add
        @param[in] kSpace
        @param[in] evecs Computed eigenvectors of NormOp
        @param[in] evals Computed eigenvalues of NormOp
-       @param[in] eig_param Eigensolver parameters
        @param[in] inverse Inverse sort if using PolyAcc       
     */
-    void computeSVD(const Dirac &mat,
-		    std::vector<ColorSpinorField*> &kSpace,
+    void computeSVD(std::vector<ColorSpinorField*> &kSpace,
 		    std::vector<ColorSpinorField*> &evecs,
 		    std::vector<Complex> &evals,
-		    QudaEigParam *eig_param,
 		    bool inverse);
     
   };
-
-  class DeflationEigenSolver : public EigenSolver {
-    
-  private:
-    EigenSolver *eig_solver;
-    const Dirac &dirac;
-    const char *prefix;
-
-  public:
-  DeflationEigenSolver(EigenSolver &eig_solver, const Dirac &dirac, QudaEigParam &eig_param, TimeProfile &profile, const char *prefix)
-    : EigenSolver(&eig_param, profile), eig_solver(&eig_solver), dirac(dirac), prefix(prefix) { }
-    virtual ~DeflationEigenSolver() { delete eig_solver; }
-
-    void operator()(std::vector<ColorSpinorField*> &evecs,
-		    std::vector<Complex> evals) {
-
-      setOutputPrefix(prefix);
-
-      //ColorSpinorField *out=nullptr;
-      //ColorSpinorField *in=nullptr;
-
-      (*eig_solver)(evecs, evals);
-
-      setOutputPrefix("");
-      
-    }
-  };
-
-
   
-  void irlmSolve(std::vector<ColorSpinorField*> kSpace,
-		 std::vector<Complex> &evals, const Dirac &mat,
-		 QudaEigParam *eig_param);
-
-  void iramSolve(std::vector<ColorSpinorField*> kSpace,
-		 std::vector<Complex> &evals, const Dirac &mat,
-		 QudaEigParam *eig_param);
   
   void arpack_solve(void *h_evecs, void *h_evals,
 		    const Dirac &mat,
