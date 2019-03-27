@@ -95,6 +95,17 @@ QudaPrecision getPrecision(int i) {
   return QUDA_INVALID_PRECISION;
 }
 
+double getTolerance(QudaPrecision prec) {
+  switch (prec) {
+    case QUDA_QUARTER_PRECISION: return 5e-2;
+    case QUDA_HALF_PRECISION: return 1e-3;
+    case QUDA_SINGLE_PRECISION: return 1e-4;
+    case QUDA_DOUBLE_PRECISION: return 1e-11;
+    case QUDA_INVALID_PRECISION: return 1.0;
+  }
+  return 1.0;
+}
+
 void init(int precision, QudaReconstructType link_recon) {
 
   cuda_prec = getPrecision(precision);
@@ -998,6 +1009,12 @@ public:
 
     }
     updateR();
+
+    if ( (QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0 ||
+         (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
+      GTEST_SKIP();
+    }
+
     init(prec, recon);
     display_test_info(prec, recon);
   }
@@ -1019,11 +1036,6 @@ public:
 
 TEST_P(DslashTest, verify)
 {
-  if ( (QUDA_PRECISION & ::testing::get<0>(GetParam())) == 0 ||
-       (QUDA_RECONSTRUCT & getReconstructNibble(gauge_param.reconstruct)) == 0) {
-    GTEST_SKIP();
-  }
-
   dslashRef();
 
   dslashCUDA(1); // warm-up run
@@ -1040,9 +1052,7 @@ TEST_P(DslashTest, verify)
     printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
   }
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-    (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-5 :
-     (inv_param.cuda_prec == QUDA_HALF_PRECISION ? 1e-3 : 1e-1)) );
+  double tol = getTolerance(inv_param.cuda_prec);
   if (gauge_param.reconstruct == QUDA_RECONSTRUCT_8 && inv_param.cuda_prec >= QUDA_HALF_PRECISION) tol *= 10; // if recon 8, we tolerate a greater deviation
 
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
@@ -1050,11 +1060,6 @@ TEST_P(DslashTest, verify)
 
 TEST_P(DslashTest, benchmark)
 {
-  if ( (QUDA_PRECISION & ::testing::get<0>(GetParam())) == 0 ||
-       (QUDA_RECONSTRUCT & getReconstructNibble(gauge_param.reconstruct)) == 0) {
-    GTEST_SKIP();
-  }
-
   dslashCUDA(1); // warm-up run
 
   if (!transfer) dirac->Flops();

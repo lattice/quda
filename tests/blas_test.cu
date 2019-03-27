@@ -55,6 +55,16 @@ void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
   }
 }
 
+QudaPrecision getPrecision(int i) {
+  switch (i) {
+  case 0: return QUDA_QUARTER_PRECISION;
+  case 1: return QUDA_HALF_PRECISION;
+  case 2: return QUDA_SINGLE_PRECISION;
+  case 3: return QUDA_DOUBLE_PRECISION;
+  }
+  return QUDA_INVALID_PRECISION;
+}
+
 void
 display_test_info()
 {
@@ -73,13 +83,13 @@ display_test_info()
 int Nprec = 4;
 
 bool skip_kernel(int precision, int kernel) {
-  if ( (QUDA_PRECISION & (int)(std::pow(2,precision)) ) == 0 ) return true;
+  if ( (QUDA_PRECISION & getPrecision(precision)) == 0 ) return true;
 
   // if we've selected a given kernel then make sure we only run that
   if (test_type != -1 && kernel != test_type) return true;
 
   // if we've selected a given precision then make sure we only run that
-  QudaPrecision this_prec = precision == 3 ? QUDA_DOUBLE_PRECISION : precision == 2 ? QUDA_SINGLE_PRECISION : precision == 1 ? QUDA_HALF_PRECISION : QUDA_QUARTER_PRECISION;
+  auto this_prec = getPrecision(precision);
   if (prec != QUDA_INVALID_PRECISION && this_prec != prec) return true;
 
   if ( Nspin == 2 && ( precision == 0 || precision ==1 ) ) {

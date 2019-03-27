@@ -362,7 +362,7 @@ void mixed_blas(const double2 &a, const double2 &b, const double2 &c, ColorSpino
     } else if (x.Precision() == QUDA_QUARTER_PRECISION) {
 
 #if QUDA_PRECISION & 1
-      instantiate<Apply,char>(out, in, U, args...);
+      
       if (y.Precision() == QUDA_DOUBLE_PRECISION) {
 
 #if QUDA_PRECISION & 8
