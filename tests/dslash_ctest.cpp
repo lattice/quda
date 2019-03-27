@@ -108,6 +108,7 @@ double getTolerance(QudaPrecision prec) {
 
 void init(int precision, QudaReconstructType link_recon) {
 
+  printfQuda("%s\n", __func__);
   cuda_prec = getPrecision(precision);
 
   gauge_param = newQudaGaugeParam();
@@ -443,6 +444,7 @@ void init(int precision, QudaReconstructType link_recon) {
 }
 
 void end() {
+  printfQuda("%s\n", __func__);
   if (!transfer) {
     if(dirac != NULL)
     {
@@ -994,12 +996,22 @@ class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, in
 protected:
   ::testing::tuple<int, int, int> param;
 
-public:
+  bool skip() {
+    QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
+    if ( (QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0 ||
+         (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
+      return true;
+    }
+    return false;
+  }
+
+ public:
   virtual ~DslashTest() { }
   virtual void SetUp() {
     int prec = ::testing::get<0>(GetParam());
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
 
+    if (skip()) GTEST_SKIP();
 
     int value = ::testing::get<2>(GetParam());
     for(int j=0; j < 4;j++){
@@ -1010,15 +1022,15 @@ public:
     }
     updateR();
 
-    if ( (QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0 ||
-         (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
-      GTEST_SKIP();
-    }
-
     init(prec, recon);
     display_test_info(prec, recon);
   }
-  virtual void TearDown() { end(); }
+
+  virtual void TearDown()
+  {
+    if (skip()) GTEST_SKIP();
+    end();
+  }
 
   static void SetUpTestCase() {
     initQuda(device);

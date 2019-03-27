@@ -839,12 +839,39 @@ class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int
 protected:
   ::testing::tuple<int, int, int> param;
 
+  bool skip() {
+    QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
+
+    if ( (QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0 ||
+         (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
+      return true;
+    }
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong &&
+          (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
+      warningQuda("Fixed precision unsupported in fat/long compute, skipping...");
+      return true;
+    }
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong && (getReconstructNibble(recon) & 1) ) {
+      warningQuda("Reconstruct 9 unsupported in fat/long compute, skipping...");
+      return true;
+    }
+
+    if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
+      warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
+      return true;
+    }
+    return false;
+  }
+
 public:
   virtual ~StaggeredDslashTest() { }
   virtual void SetUp() {
     int prec = ::testing::get<0>(GetParam());
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
 
+    if (skip()) GTEST_SKIP();
 
     int value = ::testing::get<2>(GetParam());
     for(int j=0; j < 4;j++){
@@ -870,31 +897,15 @@ public:
     spinorRef = nullptr;
     tmpCpu = nullptr;
 
-    if ( (QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0 ||
-         (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
-      GTEST_SKIP();
-    }
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong &&
-          (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
-      warningQuda("Fixed precision unsupported in fat/long compute, skipping...");
-      GTEST_SKIP();
-    }
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong && (getReconstructNibble(recon) & 1) ) {
-      warningQuda("Reconstruct 9 unsupported in fat/long compute, skipping...");
-      GTEST_SKIP();
-    }
-
-    if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
-      warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
-      GTEST_SKIP();
-    }
-
     init(prec, recon, value);
     display_test_info(prec, recon);
   }
-  virtual void TearDown() { end(); }
+
+  virtual void TearDown()
+  {
+    if (skip()) GTEST_SKIP();
+    end();
+  }
 
   static void SetUpTestCase() {
     initQuda(device);
