@@ -277,15 +277,20 @@ namespace quda {
 
         if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 
+#if QUDA_PRECISION & 8
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
           const int M = 1;
           multiBlas<NXZ,double2,double2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Length()/(2*M));
 #else
           errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
 
         } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
 
+#if QUDA_PRECISION & 4
           if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 1;
@@ -303,9 +308,13 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
           } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
 
         } else if (y[0]->Precision() == QUDA_HALF_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
 
+#if QUDA_PRECISION & 2
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
           if (x[0]->Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
@@ -324,9 +333,13 @@ namespace quda {
           } else {
             errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
           }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
 
         } else if (y[0]->Precision() == QUDA_QUARTER_PRECISION && x[0]->Precision() == QUDA_QUARTER_PRECISION) {
 
+#if QUDA_PRECISION & 1
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
           if (x[0]->Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
@@ -345,10 +358,13 @@ namespace quda {
           } else {
             errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
           }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
 
         } else {
 
-      errorQuda("Precision combination x=%d not supported\n", x[0]->Precision());
+          errorQuda("Precision combination x=%d not supported\n", x[0]->Precision());
 
         }
       } else { // fields on the cpu
@@ -368,62 +384,94 @@ namespace quda {
     {
       if (checkLocation(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+        if (y[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 
-          if (x[0]->Nspin() == 4) {
+#if QUDA_PRECISION & 8
+          if (x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
+            if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 12;
-            multiBlas<NXZ,double2,float4,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 12;
+              multiBlas<NXZ,double2,float4,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          } else if (x[0]->Nspin() == 1) {
+            } else if (x[0]->Nspin() == 1) {
 #if defined(GPU_STAGGERED_DIRAC)
-            const int M = 3;
-            multiBlas<NXZ,double2,float2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 3;
+              multiBlas<NXZ,double2,float2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          }
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
 
-        } else if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
+          } else if (x[0]->Precision() == QUDA_HALF_PRECISION) {
 
-          if (x[0]->Nspin() == 4) {
+#if QUDA_PRECISION & 2
+            if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 12;
-            multiBlas<NXZ,double2,short4,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 12;
+              multiBlas<NXZ,double2,short4,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          } else if (x[0]->Nspin() == 1) {
+            } else if (x[0]->Nspin() == 1) {
 #if defined(GPU_STAGGERED_DIRAC)
-            const int M = 3;
-            multiBlas<NXZ,double2,short2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 3;
+              multiBlas<NXZ,double2,short2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
+
+          } else {
+            errorQuda("Not implemented for this precision combination %d %d", x[0]->Precision(), y[0]->Precision());
           }
-
-        } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
-
-          if (x[0]->Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 6;
-            multiBlas<NXZ,float4,short4,float4,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
 #endif
 
-          } else if (x[0]->Nspin()==2 || x[0]->Nspin()==1) {
+        } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION) {
+
+#if (QUDA_PRECISION & 4)
+          if (x[0]->Precision() == QUDA_HALF_PRECISION) {
+
+#if (QUDA_PRECISION & 2)
+            if (x[0]->Nspin() == 4) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+              const int M = 6;
+              multiBlas<NXZ,float4,short4,float4,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+
+            } else if (x[0]->Nspin()==2 || x[0]->Nspin()==1) {
 
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
-            const int M = 3;
-            multiBlas<NXZ,float2,short2,float2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 3;
+              multiBlas<NXZ,float2,short2,float2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+            } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
 
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
+#endif
+
+          } else {
+            errorQuda("Precision combination x=%d y=%d not supported\n", x[0]->Precision(), y[0]->Precision());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
         } else {
           errorQuda("Precision combination x=%d y=%d not supported\n", x[0]->Precision(), y[0]->Precision());
         }

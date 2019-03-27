@@ -335,6 +335,8 @@ namespace quda {
         int reduce_length = siteUnroll ? x.RealLength() : x.Length();
 
         if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+
+#if QUDA_PRECISION & 8
           if (x.Nspin() == 4 || x.Nspin() == 2) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
             const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
@@ -355,7 +357,13 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
         } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
@@ -376,7 +384,13 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
         } else if (x.Precision() == QUDA_HALF_PRECISION) { // half precision
+
+#if QUDA_PRECISION & 2
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 6; // determines how much work per thread to do
@@ -405,7 +419,13 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
         } else if (x.Precision() == QUDA_QUARTER_PRECISION) { // quarter precision
+
+#if QUDA_PRECISION & 1
           if (x.Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 6; // determines how much work per thread to do
@@ -425,6 +445,10 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
         } else {
           errorQuda("precision=%d is not supported\n", x.Precision());
         }
@@ -474,69 +498,109 @@ namespace quda {
         // cannot do site unrolling for arbitrary color (needs JIT)
         if (x.Ncolor()!=3) errorQuda("Not supported");
 
-        if (x.Precision() == QUDA_SINGLE_PRECISION && z.Precision() == QUDA_DOUBLE_PRECISION) {
-          if (x.Nspin() == 4){ //wilson
+        if (z.Precision() == QUDA_DOUBLE_PRECISION) {
+
+#if QUDA_PRECISION & 8
+          if (x.Precision() == QUDA_SINGLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
+            if (x.Nspin() == 4){ //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 12; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,double2,float4,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 12; // determines how much work per thread to do
+              value = nativeReduce<doubleN,ReduceType,double2,float4,double2,M,Reducer,
+                                   writeX,writeY,writeZ,writeW,writeV>
+                (a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1) { //staggered
+            } else if (x.Nspin() == 1) { //staggered
 #ifdef GPU_STAGGERED_DIRAC
-            const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-            const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
-            value = nativeReduce<doubleN,ReduceType,double2,float2,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, reduce_length/(2*M));
+              const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+              const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
+              value = nativeReduce<doubleN,ReduceType,double2,float2,double2,M,Reducer,
+                                   writeX,writeY,writeZ,writeW,writeV>
+                (a, b, x, y, z, w, v, reduce_length/(2*M));
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-        } else if (x.Precision() == QUDA_HALF_PRECISION && z.Precision() == QUDA_DOUBLE_PRECISION) {
-          if (x.Nspin() == 4) { //wilson
+            } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
+          } else if (x.Precision() == QUDA_HALF_PRECISION) {
+
+#if QUDA_PRECISION & 2
+            if (x.Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 12; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,double2,short4,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 12; // determines how much work per thread to do
+              value = nativeReduce<doubleN,ReduceType,double2,short4,double2,M,Reducer,
+                                   writeX,writeY,writeZ,writeW,writeV>
+                (a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1) { //staggered
+            } else if (x.Nspin() == 1) { //staggered
 #ifdef GPU_STAGGERED_DIRAC
-            const int M = 3; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,double2,short2,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 3; // determines how much work per thread to do
+              value = nativeReduce<doubleN,ReduceType,double2,short2,double2,M,Reducer,
+                                   writeX,writeY,writeZ,writeW,writeV>
+                (a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+            } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
+          } else {
+            errorQuda("Not implemented for this precision combination %d %d", x.Precision(), z.Precision());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, z.Precision());
+#endif
+
         } else if (z.Precision() == QUDA_SINGLE_PRECISION) {
-          if (x.Nspin() == 4) { //wilson
+
+#if QUDA_PRECISION & 4
+          if (x.Precision() == QUDA_HALF_PRECISION) {
+
+#if QUDA_PRECISION & 2
+            if (x.Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 6;
-            value = nativeReduce<doubleN,ReduceType,float4,short4,float4,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 6;
+              value = nativeReduce<doubleN,ReduceType,float4,short4,float4,M,Reducer,
+                                   writeX,writeY,writeZ,writeW,writeV>
+                (a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1) {//staggered
+            } else if (x.Nspin() == 1) {//staggered
 #ifdef GPU_STAGGERED_DIRAC
-            const int M = 3;
-            value = nativeReduce<doubleN,ReduceType,float2,short2,float2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 3;
+              value = nativeReduce<doubleN,ReduceType,float2,short2,float2,M,Reducer,
+                                   writeX,writeY,writeZ,writeW,writeV>
+                (a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-          blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
+            } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+            blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+          } else {
+            errorQuda("Not implemented for this precision combination %d %d", x.Precision(), z.Precision());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
+        } else {
+          errorQuda("Not implemented for this precision combination %d %d", x.Precision(), z.Precision());
         }
+
       } else {
         // we don't have quad precision support on the GPU so use doubleN instead of ReduceType
         if (x.Precision() == QUDA_SINGLE_PRECISION && z.Precision() == QUDA_DOUBLE_PRECISION) {
