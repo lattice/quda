@@ -102,53 +102,23 @@ namespace quda {
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  void ApplyNdegTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                          double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity,
-                                          bool dagger, bool asymmetric,  const int *comm_override, TimeProfile &profile)
-  {
-    constexpr int nDim = 4;
-    NdegTwistedMassArg<Float,nColor,recon> arg(out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override);
-    NdegTwistedMassPreconditioned<Float,nDim,nColor,NdegTwistedMassArg<Float,nColor,recon> > twisted(arg, out, in);
+  struct NdegTwistedMassPreconditionedApply {
 
-    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-                                               in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-    policy.apply(0);
+    inline NdegTwistedMassPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                              double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity,
+                                              bool dagger, bool asymmetric,  const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+      NdegTwistedMassArg<Float,nColor,recon> arg(out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override);
+      NdegTwistedMassPreconditioned<Float,nDim,nColor,NdegTwistedMassArg<Float,nColor,recon> > twisted(arg, out, in);
 
-    checkCudaError();
-  }
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+                                                         in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      policy.apply(0);
 
-  // template on the gauge reconstruction
-  template <typename Float, int nColor>
-  void ApplyNdegTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                          double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity,
-                                          bool dagger, bool asymmetric, const int *comm_override, TimeProfile &profile)
-  {
-    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyNdegTwistedMassPreconditioned<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, a, b, c, xpay, x, parity, dagger,
-                                                                           asymmetric, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyNdegTwistedMassPreconditioned<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, a, b, c, xpay, x, parity, dagger,
-                                                                           asymmetric, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyNdegTwistedMassPreconditioned<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, a, b, c, xpay, x, parity, dagger,
-                                                                          asymmetric, comm_override, profile);
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      checkCudaError();
     }
-  }
-
-  // template on the number of colors
-  template <typename Float>
-  void ApplyNdegTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                          double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity,
-                                          bool dagger, bool asymmetric, const int *comm_override, TimeProfile &profile)
-  {
-    if (in.Ncolor() == 3) {
-      ApplyNdegTwistedMassPreconditioned<Float,3>(out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
+  };
 
   //Apply the non-degenerate twisted-mass Dslash operator
   //out(x) = M*in = a*(1 + i*b*gamma_5*tau_3 + c*tau_1)*D + x
@@ -171,17 +141,7 @@ namespace quda {
     // with symmetric dagger operator we must use kernel packing
     if (dagger && !asymmetric) pushKernelPackT(true);
 
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyNdegTwistedMassPreconditioned<double>(out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyNdegTwistedMassPreconditioned<float>(out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyNdegTwistedMassPreconditioned<short>(out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyNdegTwistedMassPreconditioned<char>(out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
+    instantiate<NdegTwistedMassPreconditionedApply>(out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override, profile);
 
     if (dagger && !asymmetric) popKernelPackT();
 #else

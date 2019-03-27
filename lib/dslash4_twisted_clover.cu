@@ -93,50 +93,23 @@ namespace quda {
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                          const int *comm_override, TimeProfile &profile)
-  {
-    constexpr int nDim = 4;
-    WilsonCloverArg<Float,nColor,recon,true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
-    TwistedClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,true> > twisted(arg, out, in);
+  struct TwistedCloverApply {
 
-    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-                                               in.VolumeCB(), in.GhostFaceCB(), profile);
-    policy.apply(0);
+    inline TwistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
+                              double a, double b, const ColorSpinorField &x, int parity, bool dagger,
+                              const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+      WilsonCloverArg<Float,nColor,recon,true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
+      TwistedClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,true> > twisted(arg, out, in);
 
-    checkCudaError();
-  }
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+                                                         in.VolumeCB(), in.GhostFaceCB(), profile);
+      policy.apply(0);
 
-  // template on the gauge reconstruction
-  template <typename Float, int nColor>
-  void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                          const int *comm_override, TimeProfile &profile)
-  {
-    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyTwistedClover<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyTwistedClover<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyTwistedClover<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      checkCudaError();
     }
-  }
-
-  // template on the number of colors
-  template <typename Float>
-  void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                          const int *comm_override, TimeProfile &profile)
-  {
-    if (in.Ncolor() == 3) {
-      ApplyTwistedClover<Float,3>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
+  };
 
   //Apply the twisted-mass Dslash operator
   //out(x) = M*in = (A + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
@@ -156,17 +129,7 @@ namespace quda {
     // check all locations match
     checkLocation(out, in, U, C);
 
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyTwistedClover<double>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyTwistedClover<float>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyTwistedClover<short>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyTwistedClover<char>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
+    instantiate<TwistedCloverApply>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Twisted-clover dslash has not been built");
 #endif // GPU_TWISTED_CLOVEr_DIRAC
