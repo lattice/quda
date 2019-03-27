@@ -44,7 +44,7 @@ namespace quda {
       in(in, improved_ ? 3 : 1),
       U(U),
       L(L),
-      fat_link_max(improved_ ? U.Precision() == QUDA_HALF_PRECISION ? U.LinkMax() : 1.0 : 1.0),
+      fat_link_max(improved_ ? isFixed<Float>::value ? U.LinkMax() : 1.0 : 1.0),
       tboundary(U.TBoundary()),
       x(x),
       a(a)
