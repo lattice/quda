@@ -28,7 +28,7 @@
 #include <qio_field.h>
 
 #include <assert.h>
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 using namespace quda;
 
@@ -1093,7 +1093,7 @@ for (int p = 0; p < 16; p++) {
 
 
 #ifdef MULTI_GPU
- INSTANTIATE_TEST_CASE_P(QUDA, StaggeredDslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getstaggereddslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getstaggereddslashtestname);
 #else
- INSTANTIATE_TEST_CASE_P(QUDA, StaggeredDslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getstaggereddslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getstaggereddslashtestname);
 #endif

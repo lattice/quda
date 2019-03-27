@@ -11,7 +11,7 @@
 #include <dslash_util.h>
 
 // google test
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 extern int test_type;
 extern QudaPrecision prec;
@@ -73,6 +73,8 @@ display_test_info()
 int Nprec = 4;
 
 bool skip_kernel(int precision, int kernel) {
+  if ( (QUDA_PRECISION & (int)(std::pow(2,precision)) ) == 0 ) return true;
+
   // if we've selected a given kernel then make sure we only run that
   if (test_type != -1 && kernel != test_type) return true;
 
@@ -952,7 +954,7 @@ const char *names[] = {
 
 int main(int argc, char** argv)
 {
-  
+
   ::testing::InitGoogleTest(&argc, argv);
   int result = 0;
 
@@ -990,7 +992,7 @@ int main(int argc, char** argv)
   cudaGetLastError();
 
   // lastly check for correctness
-  if (verify_results) {    
+  if (verify_results) {
     ::testing::TestEventListeners& listeners =
       ::testing::UnitTest::GetInstance()->listeners();
     if (comm_rank() != 0) {
@@ -1031,10 +1033,11 @@ public:
 TEST_P(BlasTest, verify) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
+  if (skip_kernel(prec,kernel)) GTEST_SKIP();
 
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
-  double deviation = skip_kernel(prec,kernel) ? 1.0 : test(kernel); 
+  double deviation = test(kernel);
   // printfQuda("%-35s error = %e\n", names[kernel], deviation);
   double tol = (prec == 3 ? 1e-12 : (prec == 2 ? 1e-6 : (prec == 1 ? 1e-4 : 1e-2 )));
   tol = (kernel < 4) ? 5e-2 : tol; // use different tolerance for copy
@@ -1044,6 +1047,8 @@ TEST_P(BlasTest, verify) {
 TEST_P(BlasTest, benchmark) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
+  if (skip_kernel(prec,kernel)) GTEST_SKIP();
+
   // do the initial tune
   benchmark(kernel, 1);
 
@@ -1057,7 +1062,7 @@ TEST_P(BlasTest, benchmark) {
   double gbytes = quda::blas::bytes/(secs*1e9);
   RecordProperty("Gflops", std::to_string(gflops));
   RecordProperty("GBs", std::to_string(gbytes));
-  printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);  
+  printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
 }
 
 
@@ -1071,4 +1076,4 @@ std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int>> param
 }
 
 // instantiate all test cases
-INSTANTIATE_TEST_CASE_P(QUDA, BlasTest, Combine( Range(0,4), Range(0, Nkernels) ), getblasname);
+INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine( Range(0,4), Range(0, Nkernels) ), getblasname);

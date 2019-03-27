@@ -11,7 +11,7 @@
 #include <dslash_util.h>
 
 // google test
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 extern int test_type;
 extern QudaPrecision prec;
@@ -422,21 +422,21 @@ TEST_P(CopyTest, verify) {
 }
 
 // quarter precision
-INSTANTIATE_TEST_CASE_P(copyHS_quarter, CopyTest, ::testing::Values( make_int2(0,0) ));
-INSTANTIATE_TEST_CASE_P(copyMS_quarter, CopyTest, ::testing::Values( make_int2(0,1) ));
-INSTANTIATE_TEST_CASE_P(copyLS_quarter, CopyTest, ::testing::Values( make_int2(0,2) ));
+INSTANTIATE_TEST_SUITE_P(copyHS_quarter, CopyTest, ::testing::Values( make_int2(0,0) ));
+INSTANTIATE_TEST_SUITE_P(copyMS_quarter, CopyTest, ::testing::Values( make_int2(0,1) ));
+INSTANTIATE_TEST_SUITE_P(copyLS_quarter, CopyTest, ::testing::Values( make_int2(0,2) ));
 
 // half precision
-INSTANTIATE_TEST_CASE_P(copyHS_half, CopyTest, ::testing::Values( make_int2(1,0) ));
-INSTANTIATE_TEST_CASE_P(copyMS_half, CopyTest, ::testing::Values( make_int2(1,1) ));
-INSTANTIATE_TEST_CASE_P(copyLS_half, CopyTest, ::testing::Values( make_int2(1,2) ));
+INSTANTIATE_TEST_SUITE_P(copyHS_half, CopyTest, ::testing::Values( make_int2(1,0) ));
+INSTANTIATE_TEST_SUITE_P(copyMS_half, CopyTest, ::testing::Values( make_int2(1,1) ));
+INSTANTIATE_TEST_SUITE_P(copyLS_half, CopyTest, ::testing::Values( make_int2(1,2) ));
 
 // single precision
-INSTANTIATE_TEST_CASE_P(copyHS_single, CopyTest, ::testing::Values( make_int2(2,0) ));
-INSTANTIATE_TEST_CASE_P(copyMS_single, CopyTest, ::testing::Values( make_int2(2,1) ));
-INSTANTIATE_TEST_CASE_P(copyLS_single, CopyTest, ::testing::Values( make_int2(2,2) ));
+INSTANTIATE_TEST_SUITE_P(copyHS_single, CopyTest, ::testing::Values( make_int2(2,0) ));
+INSTANTIATE_TEST_SUITE_P(copyMS_single, CopyTest, ::testing::Values( make_int2(2,1) ));
+INSTANTIATE_TEST_SUITE_P(copyLS_single, CopyTest, ::testing::Values( make_int2(2,2) ));
 
 // double precision
-INSTANTIATE_TEST_CASE_P(copyHS_double, CopyTest, ::testing::Values( make_int2(3,0) ));
-INSTANTIATE_TEST_CASE_P(copyMS_double, CopyTest, ::testing::Values( make_int2(3,1) ));
-INSTANTIATE_TEST_CASE_P(copyLS_double, CopyTest, ::testing::Values( make_int2(3,2) ));
+INSTANTIATE_TEST_SUITE_P(copyHS_double, CopyTest, ::testing::Values( make_int2(3,0) ));
+INSTANTIATE_TEST_SUITE_P(copyMS_double, CopyTest, ::testing::Values( make_int2(3,1) ));
+INSTANTIATE_TEST_SUITE_P(copyLS_double, CopyTest, ::testing::Values( make_int2(3,2) ));

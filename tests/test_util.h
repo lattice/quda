@@ -121,4 +121,19 @@
   }
 #endif
 
+inline int getReconstructNibble(QudaReconstructType recon) {
+  switch (recon) {
+  case QUDA_RECONSTRUCT_NO:
+    return 4;
+  case QUDA_RECONSTRUCT_13:
+  case QUDA_RECONSTRUCT_12:
+    return 2;
+  case QUDA_RECONSTRUCT_9:
+  case QUDA_RECONSTRUCT_8:
+    return 1;
+  default:
+    return 0;
+  }
+}
+
 #endif // _TEST_UTIL_H
