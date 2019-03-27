@@ -476,13 +476,12 @@ namespace quda {
           errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
         } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
-      } else {
-        errorQuda("Precision %d not supported\n", precision);
-      }
 #else
       errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
 #endif
-
+      } else {
+        errorQuda("Precision %d not supported\n", precision);
+      }
     }
 
     /**
