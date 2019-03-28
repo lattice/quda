@@ -434,11 +434,7 @@ namespace quda {
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
                         void *Out, void *In, void **ghostOut, void **ghostIn, int type) {
     if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8
       copyGauge(out, in, location, (FloatOut*)Out, (double*)In, (FloatOut**)ghostOut, (double**)ghostIn, type);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-#endif
     } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
       copyGauge(out, in, location, (FloatOut*)Out, (float*)In, (FloatOut**)ghostOut, (float**)ghostIn, type);
