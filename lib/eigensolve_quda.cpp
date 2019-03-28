@@ -21,6 +21,8 @@ bool flags = false;
 
 namespace quda {
 
+  using namespace Eigen;
+  
   //Eigensolver class
   //-----------------------------------------------------------------------------
   EigenSolver::EigenSolver(QudaEigParam *eig_param, TimeProfile &profile) : eig_param(eig_param), profile(profile) {
@@ -214,7 +216,7 @@ namespace quda {
     //3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
     blas::caxpy(s, eig_vecs_ptr, vec_defl);
-
+    
     //Sanity check in deflation.
     for (int i=0; i<n_defl; i++)
       for (int j=0; j<=i; j++) {
@@ -333,7 +335,15 @@ namespace quda {
       alpha[i] = 0.0;
       beta[i] = 0.0;
     }
-
+    
+    //Eigen objects
+    MatrixXd triDiagNew = MatrixXd::Identity(nEv, nEv);
+    SelfAdjointEigenSolver<MatrixXd> eigenSolverTDnew;
+    
+    //Quda MultiBLAS freindly Q arrays
+    Complex *Qmat = new Complex[nEv*nKr];
+    Complex *Qmat_nev = new Complex[nEv*nEv];
+    
     //Tracks if an eigenpair is locked
     bool *locked = (bool*)malloc((nKr)*sizeof(bool));
     for(int i=0; i<nKr; i++) locked[i] = false;
@@ -432,8 +442,10 @@ namespace quda {
     //---------------------------------------------------------------------------
     
     // Begin Eigensolver computation
-    //---------------------------------------------------------------------------    
+    //---------------------------------------------------------------------------
+    printfQuda("*****************************\n");
     printfQuda("**** START IRLM SOLUTION ****\n");
+    printfQuda("*****************************\n");
     printfQuda("nConv %d\n", nConv);
     printfQuda("nEv %d\n", nEv);
     printfQuda("nKr %d\n", nKr);
@@ -446,7 +458,6 @@ namespace quda {
     //Initial k step factorisation
     time = -clock();
     for(k=0; k<nEv; k++) {
-      //lanczosStep(mat, kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
       lanczosStep(kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
       if(flags) printfQuda("EV Flag k=%d\n", k);
     }
@@ -460,105 +471,35 @@ namespace quda {
       time = -clock();
       for(k=nEv; k<nKr; k++) {
 	lanczosStep(kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
-	//lanczosStep(mat, kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
 	if(flags) printfQuda("EV Flag k=%d\n", k);
       }
       if(flags) printfQuda("Restart %d complete\n", restart_iter+1);
       time += clock();
       time_ls += time;
 
-      //Compute the Tridiagonal matrix T_{k,k}
-      if(flags) printfQuda("Computing Tridiag\n");
+      if(flags) printfQuda("Constructing New Tridiag from QR\n");
       time = -clock();
-      using Eigen::MatrixXd;
-      MatrixXd triDiag = MatrixXd::Zero(nKr, nKr);
-
-      for(int i=0; i<nKr; i++) {
-	triDiag(i,i) = alpha[i];
-	if(i<nKr-1) {
-	  triDiag(i+1,i) = beta[i];
-	  triDiag(i,i+1) = beta[i];
-	}
-      }
-
-      //Eigensolve the T_k matrix
-      Eigen::Tridiagonalization<MatrixXd> TD(triDiag);
-      Eigen::SelfAdjointEigenSolver<MatrixXd> eigenSolverTD;
-      eigenSolverTD.computeFromTridiagonal(TD.diagonal(), TD.subDiagonal());
-
-      // Initialise Q
-      MatrixXd Q  = MatrixXd::Identity(nKr, nKr);
-      MatrixXd Qj = MatrixXd::Zero(nKr, nKr);
-      MatrixXd TmMuI;
-
-      //DMH: This is where the LR/SR spectrum is projected.
-      //     For SR, we project out the (nKr - nEv) LARGEST eigenvalues
-      //     For LR, we project out the (nKr - nEv) SMALLEST eigenvalues
-      //     Eigen returns Eigenvalues from Hermitian matrices in ascending order.
-      //     We take advantage of this here, but be mindful that Arnoldi
-      //     type solves will require some degree of sorting.
-      double evals_ritz[nKr-nEv];
-      if(inverse) for(int j=0; j<(nKr-nEv); j++) evals_ritz[j] = eigenSolverTD.eigenvalues()[j];
-      else for(int j=0; j<(nKr-nEv); j++) evals_ritz[j] = eigenSolverTD.eigenvalues()[j+nEv];
-
-      //DMH: This can be batch parallelised on the GPU.
-      //     Will be useful when (nKr - nEv) is large.
-      //     The N lots of QR decomp can be batched, and
-      //     the Q_0 * Q_1 * ... * Q_{N-1} product
-      //     can be done in pairs in parallel, like
-      //     a sum reduction.
-      //     (Q_0 * Q_1) * (Q_2 * Q_3) * ... * (Q_{N-2} * Q_{N-1})
-      //     =  (Q_{0*1} * Q_{2*3}) * ... * (Q_{(N-2)(N-1)})
-      //     ...
-      //     =  Q_{0*1*2*3*...*(N-2)(N-1)}
-
-      if(flags) printfQuda("Computing QR\n");
-      for(int j=0; j<(nKr-nEv); j++) {
-
-	//Apply the shift \mu_j
-	TmMuI = triDiag;
-	MatrixXd Id = MatrixXd::Identity(nKr, nKr);;
-	TmMuI -= evals_ritz[j]*Id;
-
-	//QR decomposition of Tm - \mu_i I
-	Eigen::HouseholderQR<MatrixXd> QR(TmMuI);
-
-	//Retain Qj matrices as a product.
-	Qj = QR.householderQ();
-	Q = Q * Qj;
-
-	//Update the Tridiag
-	triDiag = Qj.adjoint() * triDiag;
-	triDiag = triDiag * Qj;
-      }
+      //alpha and beta will be updated in this function. The Q
+      //matrix is put in Qmat for use in the multiBLAS function
+      computeQRfromTridiag(Qmat, alpha, beta, inverse);      
       time += clock();
       time_e += time;
-
+      
       //Block basis rotation
       if(flags) printfQuda("Performing QR Rotation\n");
       time = -clock();
-      Complex *Qmat_d = new Complex[nEv*nKr];
-      //Place data in accessible array
-      for(int i=0; i<nEv; i++) {
-	for(int j=0; j<nKr; j++) {
-	  Qmat_d[j*nEv + i].real(Q.col(i)[j]);
-	  Qmat_d[j*nEv + i].imag(0.0);
-	}
-      }
-
       for(int i=0; i<nEv; i++) blas::zero(*d_vecs_tmp[i]);
-
-      blas::caxpy(Qmat_d, kSpace, d_vecs_tmp);
+      blas::caxpy(Qmat, kSpace, d_vecs_tmp);
       //Copy back to Krylov space array
       for(int i=0; i<nEv; i++) {
 	*kSpace[i] = *d_vecs_tmp[i];
       }
-
+      
       //Update the residual
       // r_{nev} = r_{nkv} * \sigma_{nev}  |  \sigma_{nev} = Q(nkv,nev)
-      blas::ax(Q(nKr-1,nEv-1), *r[0]);
+      blas::ax(Qmat[(nKr-1)*nEv + nEv-1].real(), *r[0]);
       // r_{nev} += v_{nev+1} * beta_k  |  beta_k = Tm(nev+1,nev)
-      blas::axpy(triDiag(nEv,nEv-1), *kSpace[nEv], *r[0]);
+      blas::axpy(beta[nEv-1], *kSpace[nEv], *r[0]);
 
       //Construct the new starting vector
       double beta_k = sqrt(blas::norm2(*r[0]));
@@ -570,28 +511,27 @@ namespace quda {
       time_mb += time;
 
       //Convergence check
-      if(flags) printfQuda("Performing convergence check\n");
       if((restart_iter+1)%check_interval == 0) {
-
+	if(flags) printfQuda("Performing convergence check\n");
+	
 	time = -clock();
 
-	//Construct the nEv,nEv Tridiagonal matrix for convergence check
-	MatrixXd triDiagNew = MatrixXd::Identity(nEv, nEv);
+	//Construct the updated tridiag for the convergence check
 	for(int i=0; i<nEv; i++) {
-	  triDiagNew(i,i) = triDiag(i,i);
+	  triDiagNew(i,i) = alpha[i];
 	  if(i<nEv-1) {
-	    triDiagNew(i+1,i) = triDiag(i+1,i);
-	    triDiagNew(i,i+1) = triDiag(i,i+1);
+	    triDiagNew(i+1,i) = beta[i];
+	    triDiagNew(i,i+1) = beta[i];
 	  }
 	}
-	Eigen::SelfAdjointEigenSolver<MatrixXd> eigenSolverTDnew(triDiagNew);
-
-	Complex *Qmat_d_nev = new Complex[nEv*nEv];
+	Tridiagonalization<MatrixXd> TDnew(triDiagNew);
+	eigenSolverTDnew.computeFromTridiagonal(TDnew.diagonal(), TDnew.subDiagonal());
+	
 	//Place data in accessible array
 	for(int i=0; i<nEv; i++) {
 	  for(int j=0; j<nEv; j++) {
-	    Qmat_d_nev[j*nEv + i].real(eigenSolverTDnew.eigenvectors().col(i)[j]);
-	    Qmat_d_nev[j*nEv + i].imag(0.0);
+	    Qmat_nev[j*nEv + i].real(eigenSolverTDnew.eigenvectors().col(i)[j]);
+	    Qmat_nev[j*nEv + i].imag(0.0);
 	  }
 	}
 
@@ -608,7 +548,7 @@ namespace quda {
 	  blas::zero(*d_vecs_tmp[i]);
 	}
 
-	blas::caxpy(Qmat_d_nev, d_vecs_ptr, d_vecs_tmp);
+	blas::caxpy(Qmat_nev, d_vecs_ptr, d_vecs_tmp);
 	time += clock();
 	time_mb += time;
 
@@ -619,7 +559,7 @@ namespace quda {
 
 	  //r = A * v_i
 	  matVec(mat, *r[0], *d_vecs_tmp[i]);
-	  //matVec(*r[0], *d_vecs_tmp[i]);
+
 	  //lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
 	  evals[i] = blas::cDotProduct(*d_vecs_tmp[i], *r[0])/sqrt(blas::norm2(*d_vecs_tmp[i]));
 	  
@@ -667,14 +607,6 @@ namespace quda {
 	time_c += time;
 
       }
-
-      //Update the triDiag
-      for(int i=0; i<nEv; i++) {
-	alpha[i] = triDiag(i,i);
-	if(i < nEv-1) beta[i] = triDiag(i,i+1);
-      }
-      triDiag(nEv-1,nEv) = beta_k;
-      triDiag(nEv,nEv-1) = beta_k;
 
       restart_iter++;
     }
@@ -725,14 +657,16 @@ namespace quda {
     for(int i=0; i<nEv; i++) {
       delete d_vecs_tmp[i];
     }
-    
-    printfQuda("END IRLM SOLUTION\n");    
-  }
 
+    printfQuda("*****************************\n");
+    printfQuda("***** END IRLM SOLUTION *****\n");
+    printfQuda("*****************************\n");
+
+  }
+  
   // Lanczos Member functions
   //---------------------------------------------------------------------------
-  void IRLM::lanczosStep(//const Dirac &mat,
-			 std::vector<ColorSpinorField*> v,
+  void IRLM::lanczosStep(std::vector<ColorSpinorField*> v,
 			 std::vector<ColorSpinorField*> r,
 			 std::vector<ColorSpinorField*> evecs,
 			 bool *locked,
@@ -791,6 +725,90 @@ namespace quda {
       blas::zero(*v[j+1]);
       blas::axpy(1.0/beta[j], *r[0], *v[j+1]);
     }
+  }
+
+  void IRLM::computeQRfromTridiag(Complex *Qmat, double *alpha, double *beta, bool inverse) {
+
+    int nEv = eig_param->nEv;
+    int nKr = eig_param->nKr;
+    
+    MatrixXd triDiag = MatrixXd::Zero(nKr, nKr);
+    MatrixXd Q = MatrixXd::Identity(nKr, nKr);
+    MatrixXd Qj = MatrixXd::Zero(nKr, nKr);
+    MatrixXd TmMuI = MatrixXd::Zero(nKr, nKr);
+    MatrixXd Id = MatrixXd::Identity(nKr, nKr);
+    SelfAdjointEigenSolver<MatrixXd> eigenSolverTD;
+    
+    //Construct Tridiagonal matrix T_{k,k}
+    for(int i=0; i<nKr; i++) {
+      triDiag(i,i) = alpha[i];
+      if(i<nKr-1) {
+	triDiag(i+1,i) = beta[i];
+	triDiag(i,i+1) = beta[i];
+      }
+    }
+
+    //Eigensolve the T_k matrix
+    Tridiagonalization<MatrixXd> TD(triDiag);
+    eigenSolverTD.computeFromTridiagonal(TD.diagonal(), TD.subDiagonal());
+    
+    //DMH: This is where the LR/SR spectrum is projected.
+    //     For SR, we project out the (nKr - nEv) LARGEST eigenvalues
+    //     For LR, we project out the (nKr - nEv) SMALLEST eigenvalues
+    //     Eigen returns Eigenvalues from Hermitian matrices in ascending order.
+    //     We take advantage of this here, but be mindful that Arnoldi
+    //     type solves will require some degree of sorting.
+    double evals_ritz[nKr-nEv];
+    if(inverse) for(int j=0; j<(nKr-nEv); j++) evals_ritz[j] = eigenSolverTD.eigenvalues()[j];
+    else for(int j=0; j<(nKr-nEv); j++) evals_ritz[j] = eigenSolverTD.eigenvalues()[j+nEv];
+    
+    //DMH: This can be batch parallelised on the GPU.
+    //     Will be useful when (nKr - nEv) is large.
+    //     The N lots of QR decomp can be batched, and
+    //     the Q_0 * Q_1 * ... * Q_{N-1} product
+    //     can be done in pairs in parallel, like
+    //     a sum reduction.
+    //     (Q_0 * Q_1) * (Q_2 * Q_3) * ... * (Q_{N-2} * Q_{N-1})
+    //     =  (Q_{0*1} * Q_{2*3}) * ... * (Q_{(N-2)(N-1)})
+    //     ...
+    //     =  Q_{0*1*2*3*...*(N-2)(N-1)}
+    
+    if(flags) printfQuda("Computing QR\n");
+    
+    for(int j=0; j<(nKr-nEv); j++) {
+      
+      //Apply the shift \mu_j
+      TmMuI = triDiag;
+      //Id is the identity matrix
+      TmMuI -= evals_ritz[j]*Id;
+      
+      //QR decomposition of Tm - \mu_i I
+      HouseholderQR<MatrixXd> QR(TmMuI);
+      
+      //Retain Qj matrices as a product.
+      Qj = QR.householderQ();
+      Q = Q * Qj;
+      
+      //Update the Tridiag
+      triDiag = Qj.adjoint() * triDiag;
+      triDiag = triDiag * Qj;
+    }
+    
+    //Place Q data in accessible arrays
+    for(int i=0; i<nEv; i++) {
+      for(int j=0; j<nKr; j++) {
+	Qmat[j*nEv + i].real(Q.col(i)[j]);
+	Qmat[j*nEv + i].imag(0.0);
+      }
+    }
+    
+    //Update the triDiag
+    for(int i=0; i<nKr; i++) {
+      alpha[i] = triDiag(i,i);
+      if(i < nKr-1) beta[i] = triDiag(i,i+1);
+    }
+    
+    if(flags) printfQuda("QR Flag computeQR Complete\n");
   }
   
   void IRLM::computeSVD(std::vector<ColorSpinorField*> &kSpace,

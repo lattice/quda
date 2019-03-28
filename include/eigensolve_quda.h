@@ -115,6 +115,15 @@ namespace quda {
 		     std::vector<ColorSpinorField*> evecs,
 		     bool *locked,
 		     double *alpha, double *beta, int j);
+
+    /**
+       @brief Computes QR factorisation from the Lanczos tridiagonal matrix
+       @param[in] Qmat Complex array for Q part of QR
+       @param[in] alpha Leading diagonal part of Lanczos tridiagonal matrix
+       @param[in] beta Sub-leading diagonal part of Lanczos tridiagonal matrix
+       @param[in] inverse Project out the largest/smallest eigenvalues
+    */    
+    void computeQRfromTridiag(Complex *Qmat, double *alpha, double *beta, bool inverse);
     
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left 
