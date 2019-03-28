@@ -283,16 +283,13 @@ namespace quda {
     copyExtendedColorSpinor(*fb, *tb, QUDA_CUDA_FIELD_LOCATION, 0, nullptr, nullptr, nullptr, nullptr); // parity = 0
 
     // double fx2 = norm2(*fx);
-    for(double s = 0.00390625; s < 256.5; s *= 1.189207115){ // 2^-8 ~ 2^+8
-      inner_dslash(*cx, *cb, s);
+    for(double s = 1.526624328e-5; s < 65504.1; s *= 1.189207115){ // 2^-8 ~ 2^+8
+      inner_dslash(*cx, *cb, s*sqrt(b2/cb->Volume()/24.));
       blas::copy( *tt, *cx );
       
       double x2_ = blas::norm2(*tt);
       double dd = xmyNorm(*tx, *tt);
-      printfQuda(" loss scale        = %8.4e ------> \n", s);
-      printfQuda(" | a |^2           = %16.12e. \n", x2_);
-      printfQuda(" |a-b|^2           = %16.12e. (This number is SUPPOSED to be tiny).\n", dd);
-      printfQuda(" |a-b|^2/|b|^2     = %16.12e. (This number is SUPPOSED to be tiny).\n", dd/x2);
+      printfQuda(" loss scale, | a |^2, |a-b|^2, |a-b|^2/|b|^2: %8.4e %16.12e %16.12e %16.12e\n", s, x2_, dd, dd/x2);
     }
 
 #ifdef USE_LAGECY_DSLASH
@@ -429,6 +426,8 @@ namespace quda {
   {
     commGlobalReductionSet(false);
 
+    constexpr double loss_scale = 1.0;
+
     blas::zero(ix);
 
     double rk2 = blas::norm2(ib);
@@ -439,7 +438,7 @@ namespace quda {
     for(int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++){
      
       double ip2 = blas::norm2(*ip); 
-      inner_dslash(*immp, *ip, sqrt(ip2/ip->Volume()/24.));
+      inner_dslash(*immp, *ip, sqrt(ip2/ip->Volume()/24.)/loss_scale);
       
       Mpk2 = reDotProduct(*ip, *immp);
 
@@ -527,7 +526,6 @@ namespace quda {
     tmp  = new cudaColorSpinorField(csParam);
     tmp2  = new cudaColorSpinorField(csParam);
 
-// TODO: test
     r_old = new cudaColorSpinorField(csParam);
 
     csParam.setPrecision(dirac_param_precondition.gauge->Precision());

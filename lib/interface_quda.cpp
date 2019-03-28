@@ -6,6 +6,7 @@
 #include <sys/time.h>
 
 #include <quda.h>
+#include <quda_mobius.h>
 #include <quda_fortran.h>
 #include <quda_internal.h>
 #include <comm_quda.h>
@@ -2396,6 +2397,65 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
+void ritzQuda(void *hp_x, void *hp_b, QudaInvertParam& inv_param, bool find_min){
+    using namespace quda;
+
+    printfQuda("initializing ritzQuda ... \n");
+    
+    cudaGaugeField *cudaGauge = checkGauge(&inv_param);
+
+    ColorSpinorField *b = nullptr;
+    ColorSpinorField *x = nullptr;
+
+    const int *X = cudaGauge->X();
+
+    constexpr bool pc_solution = true;
+    constexpr bool pc_solve = true; // For Mobius/EOFA we want the preconditioned version.
+
+    // wrap CPU host side pointers
+    ColorSpinorParam cpuParam(hp_b, inv_param, X, pc_solution, inv_param.input_location);
+    ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
+
+//    cpuParam.v = hp_x;
+//    cpuParam.location = inv_param.output_location;
+//    ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+
+    // download source
+    ColorSpinorParam cudaParam(cpuParam, inv_param);
+    cudaParam.create = QUDA_COPY_FIELD_CREATE;
+    b = new cudaColorSpinorField(*h_b, cudaParam);
+   
+    // initialize solution
+    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+    x = new cudaColorSpinorField(cudaParam);
+
+    Dirac *d = nullptr;
+    Dirac *dSloppy = nullptr;
+    Dirac *dPre = nullptr;
+    
+    // create the dirac operator
+    createDirac(d, dSloppy, dPre, inv_param, pc_solve);
+
+    DiracMdagM op(*d);
+    
+    printfQuda("initialized ritzQuda. \n");
+
+    blas::axpby(0., *x, 1./sqrt(blas::norm2(*b)), *b);
+
+    for(int i = 0; i < 1000; i++){
+      // printfQuda("starting iteration #%05d.\n", i);
+      op(*x, *b);
+      if(find_min) blas::axpby(10., *b, -1., *x);
+      blas::copy(*b, *x);
+      double l = sqrt(blas::norm2(*b));
+      printfQuda("iteration #%05d: l = %16.12e.\n", i, find_min?10.-l:l);
+      blas::axpby(0., *x, 1./l, *b);
+    }
+    
+    delete b;
+    delete x;
+    delete h_b;
+}
 
 void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
                  void *hp_alpha, void *hp_beta, QudaEigParam *eig_param)

@@ -268,31 +268,52 @@ namespace quda {
     return c;
   }
   
-  __device__ inline half __half_max_abs_half2__(half max, const half2 input){
-    static constexpr uint32_t mask = ~((0x1u<<31) + (0x1u<<15)); // 01111111 11111111 01111111 11111111 
+  __device__ inline void __half_max_abs_half2__(half& max, half2& input){
+    static_assert(sizeof(half2) == sizeof(uint32_t));
+    // Just mask the exponent part
+    static constexpr uint32_t is_normal_mask_l = 0x83ffffffu;  // 10000011 11111111 11111111 11111111 
+    static constexpr uint32_t is_normal_mask_h = 0xffff83ffu;  // 11111111 11111111 10000011 11111111 
+    
+    uint32_t is_normal_masked_l = *reinterpret_cast<uint32_t*>(&input) | is_normal_mask_l;
+    uint32_t is_normal_masked_h = *reinterpret_cast<uint32_t*>(&input) | is_normal_mask_h;
+    
+    // Check if the halves are normal
+    if(is_normal_masked_l == 0xffffffffu){                     // 10000011 11111111 11111111 11111111
+      *reinterpret_cast<uint32_t*>(&input) = *reinterpret_cast<uint32_t*>(&input) & is_normal_mask_l;
+    }
+    if(is_normal_masked_h == 0xffffffffu){                     // 10000011 11111111 11111111 11111111
+      *reinterpret_cast<uint32_t*>(&input) = *reinterpret_cast<uint32_t*>(&input) & is_normal_mask_h;
+    }
+    
     // Set the fisrt bit of the halves to 0.
-    uint32_t input_masked = *reinterpret_cast<const uint32_t*>(&input) & mask;
-    max = __hgt(max, reinterpret_cast<half2*>(&input_masked)->x) ? max : reinterpret_cast<half2*>(&input_masked)->x;
-    max = __hgt(max, reinterpret_cast<half2*>(&input_masked)->y) ? max : reinterpret_cast<half2*>(&input_masked)->y;
-    return max;
+    static constexpr uint32_t maximum_mask = 0x7fff7fffu;      // 01111111 11111111 01111111 11111111 
+    
+    uint32_t input_masked = *reinterpret_cast<uint32_t*>(&input) & maximum_mask;
+    half2 lh = *reinterpret_cast<half2*>(&input_masked);
+    if(__hgt(lh.x, max)){
+      max = lh.x;
+    }
+    if(__hgt(lh.y, max)){
+      max = lh.y;
+    }
   }
   
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store to sm_b
   template<int N_sm_d2, bool acc, class Vector>
   __device__ inline void load_matrix_b_vector(const Vector& v, half2* sm_b, const float scale){
-    // First find the largest absolute value in v
+    // static constexpr float H_MAX = 65504.0f; // Prevent the creation of NaN.
     #pragma unroll
     for(int spin = 0; spin < 4; spin++){
       #pragma unroll
       for(int color = 0; color < 3; color++){
+        float real = __fdividef(v(spin, color).real(), scale); // real = real>H_MAX?H_MAX:real;
+        float imag = __fdividef(v(spin, color).imag(), scale); // imag = imag>H_MAX?H_MAX:imag;
+        int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
         if(acc){
-          int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
-          sm_b[ idx ] = __hadd2( sm_b[ idx ], 
-            __floats2half2_rn(__fdividef(v(spin, color).real(), scale), __fdividef(v(spin, color).imag(), scale)) );
+          sm_b[idx] = __hadd2(sm_b[idx], __floats2half2_rn(real, imag));
         }else{
-          sm_b[ (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color ] = 
-            __floats2half2_rn(__fdividef(v(spin, color).real(), scale), __fdividef(v(spin, color).imag(), scale));
+          sm_b[idx] = __floats2half2_rn(real, imag);
         }
       }
     }
@@ -301,14 +322,14 @@ namespace quda {
   // Store results(scaled short/char values and scale) in shared memroy to global memroy.
   template<class storage_type, int N_sm, class Output>
   __device__ inline void store_matrix_c(Output& output, half2* sm_b, int sid, const float scale){
-    half max_ = (half)0.0f;
+    half max_ = 0.0f;
     constexpr int N_sm_d2 = N_sm/2;
-    
     #pragma unroll
     for(int spin = 0; spin < 4; spin++){
       #pragma unroll
       for(int color = 0; color < 3; color++){
-        max_ = __half_max_abs_half2__(max_, sm_b[ (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color ]);
+        int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
+        __half_max_abs_half2__(max_, sm_b[idx]);
       }
     }
 
