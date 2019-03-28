@@ -1221,7 +1221,7 @@ namespace quda {
       // not actually used - here for reference
       template <typename Float, typename I>
       __device__ __host__ inline Float milcStaggeredPhase(int dim, const int x[], const I R[]) {
-	// could consider non-extended varient too?
+	// could consider non-extended variant too?
 	Float sign = static_cast<Float>(1.0);
 	switch (dim) {
 	case 0: if ( ((x[3] - R[3]) & 1) != 0)                             sign = -static_cast<Float>(1.0); break;
