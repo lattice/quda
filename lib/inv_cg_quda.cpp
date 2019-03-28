@@ -268,6 +268,7 @@ namespace quda {
       init = true;
     }
 
+    /*
     //DMH start
     //Once the CG operator is called, we are able to construct an appropriate
     //Krylov space for deflation
@@ -298,6 +299,7 @@ namespace quda {
       deflate_init = true;
     }
     //DMH end
+    */
     
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
@@ -348,7 +350,7 @@ namespace quda {
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
 
-#if 1
+#if 0
       //DMH start
       //Just replace any initial guess with a deflated RHS
       if (param.eig_param.deflate == true) {

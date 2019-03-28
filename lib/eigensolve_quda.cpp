@@ -296,13 +296,14 @@ namespace quda {
     time_mb += time_;
   }
 
-  void EigenSolver::loadVectors(std::vector<ColorSpinorField*> &eig_vecs) {
+  
+  void EigenSolver::loadVectors(std::vector<ColorSpinorField*> &eig_vecs, std::string vec_infile) {
     
     //profile.TPSTOP(QUDA_PROFILE_INIT);
     //profile.TPSTART(QUDA_PROFILE_IO);
 
 #ifdef HAVE_QIO    
-    std::string vec_infile(eig_param->vec_infile);   
+    //std::string vec_infile(eig_param->vec_infile);   
     const int Nvec = eig_vecs.size();
     if (strcmp(vec_infile.c_str(),"")!=0) {
       printfQuda("Start loading %04d vectors from %s\n", Nvec, vec_infile.c_str());
@@ -324,7 +325,6 @@ namespace quda {
       }
       
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
-      //void **V = new void*[Nvec];
       for (int i=0; i<Nvec; i++) { 
 	V[i] = tmp[i]->V();
 	if (V[i] == NULL) {
@@ -356,15 +356,14 @@ namespace quda {
     return;
   }
   
-  void EigenSolver::saveVectors(std::vector<ColorSpinorField*> &eig_vecs) {
+  void EigenSolver::saveVectors(std::vector<ColorSpinorField*> &eig_vecs,
+				std::string vec_outfile) {
     
     //profile.TPSTOP(QUDA_PROFILE_INIT);
     //profile.TPSTART(QUDA_PROFILE_IO);
 
-#ifdef HAVE_QIO    
-    std::string vec_outfile(eig_param->vec_outfile);
+#ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
-
     std::vector<ColorSpinorField*> tmp;
     if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
       ColorSpinorParam csParam(*eig_vecs[0]);
@@ -381,30 +380,27 @@ namespace quda {
         tmp.push_back(eig_vecs[i]);
       }
     }    
-    if (strcmp(eig_param->vec_outfile,"")!=0) {
-      printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str()); 
-      
-      void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
-      for (int i=0; i<Nvec; i++) {
-	V[i] = tmp[i]->V();
-	if (V[i] == NULL) {
-	  printfQuda("Could not allocate space for eigenVector[%04d]\n", i);
-	}
+
+    printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str()); 
+    
+    void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
+    for (int i=0; i<Nvec; i++) {
+      V[i] = tmp[i]->V();
+      if (V[i] == NULL) {
+	printfQuda("Could not allocate space for eigenVector[%04d]\n", i);
       }
-      
-      write_spinor_field(vec_outfile.c_str(), &V[0], eig_vecs[0]->Precision(),
-			 eig_vecs[0]->X(), eig_vecs[0]->Ncolor(), eig_vecs[0]->Nspin(),
-			 Nvec, 0,  (char**)0);
-      
-      host_free(V);
-      printfQuda("Done saving vectors\n");
-      if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-	for (int i=0; i<Nvec; i++) delete tmp[i];
-      }
-      
-    } else {
-      errorQuda("No eigenspace output file defined.");
     }
+    
+    write_spinor_field(vec_outfile.c_str(), &V[0], eig_vecs[0]->Precision(),
+		       eig_vecs[0]->X(), eig_vecs[0]->Ncolor(), eig_vecs[0]->Nspin(),
+		       Nvec, 0,  (char**)0);
+    
+    host_free(V);
+    printfQuda("Done saving vectors\n");
+    if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+      for (int i=0; i<Nvec; i++) delete tmp[i];
+    }
+    
 #else
     errorQuda("\nQIO library was not built.\n");      
 #endif
@@ -447,7 +443,7 @@ namespace quda {
     if (strcmp(eig_param->vec_infile,"") != 0) {
 
       printfQuda("Loading eigenvectors\n");
-      loadVectors(kSpace);
+      loadVectors(kSpace, eig_param->vec_infile);
       
       //Create the device side residual vector by cloning
       //the kSpace passed to the function.
@@ -715,7 +711,7 @@ namespace quda {
     //Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile,"") != 0) {
       printfQuda("saving eigenvectors\n");
-      saveVectors(kSpace);
+      saveVectors(kSpace, eig_param->vec_outfile);
     }
     
     printfQuda("*****************************\n");

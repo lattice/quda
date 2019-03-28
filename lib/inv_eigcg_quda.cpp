@@ -654,7 +654,7 @@ namespace quda {
 
     deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
     Deflation &defl         = *(defl_p->defl);
-
+    
     //If deflation space is complete: use initCG solver
     if( defl.is_complete() ) {
 

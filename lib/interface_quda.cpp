@@ -2410,7 +2410,8 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   if(eig_param->use_poly_acc && !eig_param->use_norm_op) {
     errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
   }
-  
+
+  //DMH solver param here 
   EigenSolver *eig_solve = EigenSolver::create(eig_param, dirac, profileEigensolve);
   (*eig_solve)(kSpace, evals);
   

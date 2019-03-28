@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
+#include <qio_field.h>
 #include <eigensolve_quda.h>
 #include <vector>
 #include <memory>
@@ -281,6 +282,7 @@ namespace quda {
     SolverParam(const SolverParam &param) : inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), eig_param(param.eig_param), use_init_guess(param.use_init_guess),
+					    //residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       compute_null_vector(param.compute_null_vector), delta(param.delta),
       use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
@@ -357,16 +359,10 @@ namespace quda {
   
   class Solver {
 
-    friend class EigenSolver;
-    
   protected:
     SolverParam &param;
     TimeProfile &profile;
     int node_parity;
-    bool deflated;
-    EigenSolver *eig_solver;
-    std::vector<ColorSpinorField*> defl_tmp1;
-    std::vector<ColorSpinorField*> defl_tmp2;
     
   public:
     
@@ -446,6 +442,11 @@ namespace quda {
     */
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
+    bool deflated;
+    EigenSolver *eig_solver;
+    std::vector<ColorSpinorField*> defl_tmp1;
+    std::vector<ColorSpinorField*> defl_tmp2;
+    
     /**
      * Return flops
      * @return flops expended by this operator

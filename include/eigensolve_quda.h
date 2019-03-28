@@ -2,12 +2,15 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+//#include <invert_quda.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 
 namespace quda {
 
   class EigenSolver {
+
+    //friend class MG;
     
   protected:
     QudaEigParam *eig_param;
@@ -102,18 +105,22 @@ namespace quda {
     void basisRotateQ(Complex *Qmat,
 		      std::vector<ColorSpinorField*> &kSpace,
 		      std::vector<ColorSpinorField*> &tmp);
-
+    
     /**
-       @brief Load eigenvectors from file
+       @brief Load vectors from file
        @param[in] eig_vecs The eigenvectors to load
-    */            
-    void loadVectors(std::vector<ColorSpinorField*> &eig_vecs);
+       @param[in] file The filename to load
+    */
+    void loadVectors(std::vector<ColorSpinorField*> &eig_vecs,
+    		     std::string file);
 
     /**
-       @brief Save eigenvectors to file
+       @brief Save vectors to file
        @param[in] eig_vecs The eigenvectors to save
-    */            
-    void saveVectors(std::vector<ColorSpinorField*> &eig_vecs);
+       @param[in] file The filename to save
+    */
+    void saveVectors(std::vector<ColorSpinorField*> &eig_vecs,
+    		     std::string file);
     
   };
   

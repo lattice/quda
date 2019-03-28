@@ -1,6 +1,7 @@
 #pragma once
 
 #include <invert_quda.h>
+//#include <eigensolve_quda.h>
 #include <transfer.h>
 #include <vector>
 #include <complex_quda.h>
@@ -23,7 +24,7 @@ namespace quda {
      given level.
    */
   struct MGParam : SolverParam {
-
+    
     /** This points to the parameter struct that is passed into QUDA.
 	We use this to set per-level parameters */
     QudaMultigridParam  &mg_global;
@@ -179,7 +180,7 @@ namespace quda {
      Adaptive Multigrid solver
    */
   class MG : public Solver {
-
+    
   private:
     /** Local copy of the multigrid metadata */
     MGParam &param;
@@ -276,7 +277,7 @@ namespace quda {
 
     /** Parallel hyper-cubic random number generator for generating null-space vectors */
     RNG *rng;
-
+    
   public:
     /** 
       Constructor for MG class
@@ -285,6 +286,12 @@ namespace quda {
     */
     MG(MGParam &param, TimeProfile &profile);
 
+    //friend void EigenSolver::loadVectors(std::vector<ColorSpinorField*> &vecs,
+    //std::string file);
+
+    //friend void EigenSolver::saveVectors(std::vector<ColorSpinorField*> &vecs,
+    //std::string file);
+    
     /**
        Destructor for MG class. Frees any existing coarse grid MG
        instance

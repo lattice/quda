@@ -23,7 +23,7 @@ namespace quda {
       rng(nullptr)
   {
     postTrace();
-    
+
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
     setVerbosity(param.mg_global.verbosity[param.level]);
@@ -80,8 +80,6 @@ namespace quda {
 	    loadVectors(param.B);
 	  } else if (param.mg_global.use_low_modes) {
 	    generateEigenVectors(); //Run the eigensolver
-	    //temporary check that the null vectors are populated and normalised
-	    //for(unsigned int j=0; j<param.B.size(); j++) printfQuda("NV norm %f\n", sqrt(blas::norm2(*(param.B[j]))));
 	  } else {
 	    generateNullVectors(param.B);
 	  }
@@ -91,20 +89,9 @@ namespace quda {
       } else { // generate free field vectors
 	buildFreeVectors(param.B);
       }
-    } else {
-      //We're on the coarsest grid. Create eigenvectors for deflation
-      if (param.mg_global.deflate_coarsest) {
-	//if (strcmp(param.mg_global.vec_infile,"") !=0 ) { // only load if infile is defined and not computing
-	//loadVectors(param.B);
-	//} else {
-	//printfQuda("Running Eigensolver on level %d\n", param.level+1);
-	//generateEigenVectors(); //Run the eigensolver
-	//temporary check that the null vectors are populated and normalised
-	//for(unsigned int j=0; j<param.B.size(); j++) printfQuda("NV norm %f\n", sqrt(blas::norm2(*(param.B[j]))));
-	//}
-      }      
-    }      
+    }
     
+  
     // in case of iterative setup with MG the coarse level may be already built
     if (!transfer) reset();
     
@@ -113,7 +100,7 @@ namespace quda {
   }
 
   void MG::reset(bool refresh) {
-
+    
     postTrace();
     setVerbosity(param.mg_global.verbosity[param.level]);
     setOutputPrefix(prefix);
@@ -445,12 +432,10 @@ namespace quda {
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
       if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
-	printfQuda("QUDA_MATPC_SOLUTION on level %d\n", param.mg_global.coarse_grid_solution_type[param.level+1]); 
 	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
 	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
 	coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
       } else {
-	printfQuda("NOT QUDA_MATPC_SOLUTION on level %d\n", param.mg_global.coarse_grid_solution_type[param.level+1]); 
 	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
 	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
 	coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
@@ -920,136 +905,22 @@ namespace quda {
 
   //supports separate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
-
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
-    profile_global.TPSTART(QUDA_PROFILE_IO);
-
+    
     std::string vec_infile(param.mg_global.vec_infile);
     vec_infile += "_level_";
     vec_infile += std::to_string(param.level);
-
-    const int Nvec = B.size();
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
-
-    if (strcmp(vec_infile.c_str(),"")!=0) {
-#ifdef HAVE_QIO
-      std::vector<ColorSpinorField*> B_;
-      if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-        ColorSpinorParam csParam(*B[0]);
-        csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-        csParam.setPrecision(B[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : B[0]->Precision());
-        csParam.location = QUDA_CPU_FIELD_LOCATION;
-        csParam.create = QUDA_NULL_FIELD_CREATE;
-        for (int i=0; i<Nvec; i++) {
-          B_.push_back(ColorSpinorField::Create(csParam));
-        }
-      } else {
-        for (int i=0; i<Nvec; i++) {
-          B_.push_back(B[i]);
-        }
-      }
-
-      void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
-      for (int i=0; i<Nvec; i++) V[i] = B_[i]->V();
-
-      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
-
-      host_free(V);
-
-      if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-        for (int i=0; i<Nvec; i++) {
-          *B[i] = *B_[i];
-          delete B_[i];
-        }
-      }
-
-#else
-      errorQuda("\nQIO library was not built.\n");      
-#endif
-    } else {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using %d constant nullvectors\n", Nvec);
-
-      for (int i = 0; i < (Nvec < 2 ? Nvec : 2); i++) {
-	zero(*B[i]);
-#if 1
-	ColorSpinorParam csParam(*B[i]);
-	csParam.create = QUDA_ZERO_FIELD_CREATE;
-	ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
-	for (int s=i; s<4; s+=2) {
-	  for (int c=0; c<B[i]->Ncolor(); c++) {
-            tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
-	    //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, s, 2); // sin in dim 3, mode s, offset = 2
-	    xpy(*tmp,*B[i]);
-	  }
-	}
-	delete tmp;
-#else
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using random source for nullvector = %d\n",i);
-	B[i]->Source(QUDA_RANDOM_SOURCE);
-#endif
-      }
-
-      for (int i=2; i<Nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
-    }
-
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done loading vectors\n");
-    profile_global.TPSTOP(QUDA_PROFILE_IO);
-    profile_global.TPSTART(QUDA_PROFILE_INIT);
+    eig_solver->loadVectors(B, vec_infile);
+    
   }
 
+  
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
-#ifdef HAVE_QIO
-
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
-    profile_global.TPSTART(QUDA_PROFILE_IO);
-
-    const int Nvec = B.size();
-    std::vector<ColorSpinorField*> B_;
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-      ColorSpinorParam csParam(*B[0]);
-      csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-      csParam.setPrecision(B[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : B[0]->Precision());
-      csParam.location = QUDA_CPU_FIELD_LOCATION;
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      for (int i=0; i<Nvec; i++) {
-        B_.push_back(ColorSpinorField::Create(csParam));
-        *B_[i] = *B[i];
-      }
-    } else {
-      for (int i=0; i<Nvec; i++) {
-        B_.push_back(B[i]);
-      }
-    }
 
     std::string vec_outfile(param.mg_global.vec_outfile);
     vec_outfile += "_level_";
     vec_outfile += std::to_string(param.level);
-
-    if (strcmp(param.mg_global.vec_outfile,"")!=0) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
-
-      void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
-      for (int i=0; i<Nvec; i++) V[i] = B_[i]->V();
-
-      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
-
-      host_free(V);
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done saving vectors\n");
-    }
-
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-      for (int i=0; i<Nvec; i++) delete B_[i];
-    }
-
-    profile_global.TPSTOP(QUDA_PROFILE_IO);
-    profile_global.TPSTART(QUDA_PROFILE_INIT);
-#else
-    if (strcmp(param.mg_global.vec_outfile,"")!=0) {
-      errorQuda("\nQIO library was not built.\n");
-    }
-#endif
+    eig_solver->saveVectors(B, vec_outfile);
+    
   }
 
   void MG::generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh) {
@@ -1427,7 +1298,8 @@ namespace quda {
       int nConv = param.B.size(); param.mg_global.eig_param[param.level]->nConv = nConv;
       int nEv   = param.B.size(); param.mg_global.eig_param[param.level]->nEv = nEv;
       int nKr   = nEv+nEv/2; param.mg_global.eig_param[param.level]->nKr = nKr;
-      
+
+      //Dummy array to keep the eigensolver happy.
       std::vector<Complex> evals(nEv, 0.0);
       
       std::vector<ColorSpinorField*> B_evecs;
@@ -1438,31 +1310,9 @@ namespace quda {
       csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
       for (int i=0; i<nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
-      
-      //Eigensolver function
-      //const Dirac &mat = *param.matResidual->Expose();
-      //irlmSolve(B_evecs, evals, mat, param.mg_global.eig_param[param.level]);
 
       EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *param.matResidual->Expose(), profile);
       (*eig_solve)(B_evecs, evals);
-      
-      if(param.level == param.Nlevel-1) {
-	//This is the coarsest grid. We save the eigenvalues
-	for(unsigned int i=0; i<param.B.size(); i++) {
-	  param.evals[i] = evals[i];
-	  //Check we got the right evals
-	  printfQuda("eval[%d] (%e,%e) : (%e,%e)\n", i, param.evals[i].real(), param.evals[i].imag(), evals[i].real(), evals[i].imag());
-	}
-      }
-
-#if 0
-      sprintf(prefix,"");
-      setOutputPrefix(prefix);            
-      //Inspect 0th vector 
-      B_evecs[0]->PrintVector(0);
-      sprintf(prefix,"MG level %d (%s): Eigensolver: ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-      setOutputPrefix(prefix);
-#endif
       
       //Copy evecs back to MG
       for (unsigned int i=0; i<param.B.size(); i++) {
