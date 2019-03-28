@@ -57,9 +57,6 @@ extern int pipeline; // length of pipeline for fused operations in GCR or BiCGst
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
-extern char vec_infile[];
-extern char vec_outfile[];
-
 //Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
 
@@ -87,6 +84,8 @@ extern QudaEigType eig_type;
 extern bool eig_arpack_check;
 extern char eig_arpack_logfile[];
 extern char eig_QUDA_logfile[];
+extern char eig_vec_infile[];
+extern char eig_vec_outfile[];
 
 extern bool verify_results;
 
@@ -306,6 +305,9 @@ void setEigParam(QudaEigParam &eig_param) {
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
   strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
+
+  strcpy(eig_param.vec_infile, eig_vec_infile);
+  strcpy(eig_param.vec_outfile, eig_vec_outfile);
   
 }
 

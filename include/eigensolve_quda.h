@@ -102,6 +102,18 @@ namespace quda {
     void basisRotateQ(Complex *Qmat,
 		      std::vector<ColorSpinorField*> &kSpace,
 		      std::vector<ColorSpinorField*> &tmp);
+
+    /**
+       @brief Load eigenvectors from file
+       @param[in] eig_vecs The eigenvectors to load
+    */            
+    void loadVectors(std::vector<ColorSpinorField*> &eig_vecs);
+
+    /**
+       @brief Save eigenvectors to file
+       @param[in] eig_vecs The eigenvectors to save
+    */            
+    void saveVectors(std::vector<ColorSpinorField*> &eig_vecs);
     
   };
   

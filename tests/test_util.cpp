@@ -1762,6 +1762,8 @@ QudaEigType eig_type = QUDA_IMP_RST_LANCZOS;
 bool eig_arpack_check = false;
 char eig_arpack_logfile[256] = "arpack_logfile.log";
 char eig_QUDA_logfile[256] = "QUDA_logfile.log";
+char eig_vec_infile[256] = "";
+char eig_vec_outfile[256] = "";
 
 //Parameters for the MG eigensolver.
 //The coarsest grid params are for deflation,
@@ -1904,7 +1906,6 @@ void usage(char** argv )
   printf("    --df-max-restart-num <n>                  # Set maximum number of the initCG restarts in the deflation stage (default 3)\n");
   printf("    --df-tol-eigenval <tol>                   # Set maximum eigenvalue residual norm (default 1e-1)\n");
 
-
   printf("    --solver-ext-lib-type <eigen/magma>       # Set external library for the solvers  (default Eigen library)\n");
   printf("    --df-ext-lib-type <eigen/magma>           # Set external library for the deflation methods  (default Eigen library)\n");
   printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory location)\n");
@@ -1928,7 +1929,9 @@ void usage(char** argv )
   printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (lanczos, irlm, arnoldi, iram, trlm,...)\n");
   printf("    --eig-QUDA-logfile <file_name>            # The filename storing the stdout from the QUDA eigensolver\n");
   printf("    --eig-arpack-check <true/false>           # Cross check the device data against ARPACK (requires ARPACK, default false)\n");
-
+  printf("    --eig-load-vec <file>                     # Load eigenvectors to <file> (requires QIO)\n");
+  printf("    --eig-save-vec <file>                     # Save eigenvectors to <file> (requires QIO)\n");
+  
   //Multigrid Eigensolver
   printf("    --mg-eig-check-interval <level> <n>               # Perform a convergence check every nth restart/iteration in the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
   printf("    --mg-eig-max-restarts <level> <n>                 # Perform n iterations of the restart in the IRAM/IRLM eigensolver\n");
@@ -3721,6 +3724,26 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--eig-load-vec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    strcpy(eig_vec_infile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--eig-save-vec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    strcpy(eig_vec_outfile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   //DMH
   if( strcmp(argv[i], "--mg-eig-check-interval") == 0){
     if (i+1 >= argc){

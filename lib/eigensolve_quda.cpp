@@ -7,10 +7,9 @@
 #include <quda_internal.h>
 #include <quda_arpack_interface.h>
 #include <eigensolve_quda.h>
+#include <qio_field.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
 #include <util_quda.h>
 #include <sys/time.h>
 
@@ -35,7 +34,7 @@ namespace quda {
   EigenSolver::EigenSolver(QudaEigParam *eig_param, TimeProfile &profile) : eig_param(eig_param), profile(profile) {
     
   }
-
+  
   //We bake the matrix operator 'mat' and the eigensolver parameters into the
   //eigensolver. 
   EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile) {
@@ -53,9 +52,10 @@ namespace quda {
     }
     return eig_solver;
   }
-
+  
   //Utilities and functions common to all Eigensolver instances
   //------------------------------------------------------------------------------
+
   void EigenSolver::matVec(const Dirac &mat,
 			   ColorSpinorField &out,
 			   const ColorSpinorField &in){
@@ -296,80 +296,124 @@ namespace quda {
     time_mb += time_;
   }
 
-
-  
-  /*
-  //supports seperate reading or single file read
-  void Eigensolver::loadVectors(std::vector<ColorSpinorField*> eig_vecs) {
+  void EigenSolver::loadVectors(std::vector<ColorSpinorField*> &eig_vecs) {
     
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_IO);
-    
-    std::string vec_infile(param.eig_global.vec_infile);
+    //profile.TPSTOP(QUDA_PROFILE_INIT);
+    //profile.TPSTART(QUDA_PROFILE_IO);
 
-    std::vector<ColorSpinorField*> &B = RV->Components(); 
-
-    const int Nvec = B.size();
-    printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
-
-    void **V = new void*[Nvec];
-    for (int i=0; i<Nvec; i++) { 
-      V[i] = B[i]->V();
-      if (V[i] == NULL) {
-	printfQuda("Could not allocate V[%d]\n", i);
-      }
-    }
-
+#ifdef HAVE_QIO    
+    std::string vec_infile(eig_param->vec_infile);   
+    const int Nvec = eig_vecs.size();
     if (strcmp(vec_infile.c_str(),"")!=0) {
-      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
-    } else {
-      errorQuda("No eigenspace file defined.");
-    }
+      printfQuda("Start loading %04d vectors from %s\n", Nvec, vec_infile.c_str());
 
-    printfQuda("Done loading vectors\n");
-    profile.TPSTOP(QUDA_PROFILE_IO);
-    profile.TPSTART(QUDA_PROFILE_INIT);
-
-    return;
-  }
-
-  void Deflation::saveVectors(ColorSpinorField *RV) {
-    if(RV->IsComposite()) errorQuda("\nNot a composite field.\n");
-
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_IO);
-
-    std::string vec_outfile(param.eig_global.vec_outfile);
-
-
-    std::vector<ColorSpinorField*> &B = RV->Components();
-
-    if (strcmp(param.eig_global.vec_outfile,"")!=0) {
-      const int Nvec = B.size();
-      printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
-
+      std::vector<ColorSpinorField*> tmp;
+      if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+        ColorSpinorParam csParam(*eig_vecs[0]);
+        csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+        csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : eig_vecs[0]->Precision());
+        csParam.location = QUDA_CPU_FIELD_LOCATION;
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+        for (int i=0; i<Nvec; i++) {
+          tmp.push_back(ColorSpinorField::Create(csParam));
+        }
+      } else {
+        for (int i=0; i<Nvec; i++) {
+          tmp.push_back(eig_vecs[i]);
+        }
+      }
+      
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
-      for (int i=0; i<Nvec; i++) {
-	V[i] = B[i]->V();
+      //void **V = new void*[Nvec];
+      for (int i=0; i<Nvec; i++) { 
+	V[i] = tmp[i]->V();
 	if (V[i] == NULL) {
-	  printfQuda("Could not allocate V[%d]\n", i);
+	  printfQuda("Could not allocate space for eigenVector[%d]\n", i);
 	}
       }
-
-      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
-			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
-
+      
+      read_spinor_field(vec_infile.c_str(), &V[0], eig_vecs[0]->Precision(),
+			eig_vecs[0]->X(), eig_vecs[0]->Ncolor(), eig_vecs[0]->Nspin(),
+			Nvec, 0,  (char**)0);
       host_free(V);
-      printfQuda("Done saving vectors\n");
+      if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+        for (int i=0; i<Nvec; i++) {
+          *eig_vecs[i] = *tmp[i];
+          delete tmp[i];
+        }
+      }
+      
+      printfQuda("Done loading vectors\n");
+    } else {
+      errorQuda("No eigenspace input file defined.");
     }
-
-    profile.TPSTOP(QUDA_PROFILE_IO);
-    profile.TPSTART(QUDA_PROFILE_INIT);
+#else
+    errorQuda("\nQIO library was not built.\n");      
+#endif
+    //profile.TPSTOP(QUDA_PROFILE_IO);
+    //profile.TPSTART(QUDA_PROFILE_INIT);
 
     return;
   }
-  */
+  
+  void EigenSolver::saveVectors(std::vector<ColorSpinorField*> &eig_vecs) {
+    
+    //profile.TPSTOP(QUDA_PROFILE_INIT);
+    //profile.TPSTART(QUDA_PROFILE_IO);
+
+#ifdef HAVE_QIO    
+    std::string vec_outfile(eig_param->vec_outfile);
+    const int Nvec = eig_vecs.size();
+
+    std::vector<ColorSpinorField*> tmp;
+    if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+      ColorSpinorParam csParam(*eig_vecs[0]);
+      csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : eig_vecs[0]->Precision());
+      csParam.location = QUDA_CPU_FIELD_LOCATION;
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      for (int i=0; i<Nvec; i++) {
+        tmp.push_back(ColorSpinorField::Create(csParam));
+        *tmp[i] = *eig_vecs[i];
+      }
+    } else {
+      for (int i=0; i<Nvec; i++) {
+        tmp.push_back(eig_vecs[i]);
+      }
+    }    
+    if (strcmp(eig_param->vec_outfile,"")!=0) {
+      printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str()); 
+      
+      void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
+      for (int i=0; i<Nvec; i++) {
+	V[i] = tmp[i]->V();
+	if (V[i] == NULL) {
+	  printfQuda("Could not allocate space for eigenVector[%04d]\n", i);
+	}
+      }
+      
+      write_spinor_field(vec_outfile.c_str(), &V[0], eig_vecs[0]->Precision(),
+			 eig_vecs[0]->X(), eig_vecs[0]->Ncolor(), eig_vecs[0]->Nspin(),
+			 Nvec, 0,  (char**)0);
+      
+      host_free(V);
+      printfQuda("Done saving vectors\n");
+      if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+	for (int i=0; i<Nvec; i++) delete tmp[i];
+      }
+      
+    } else {
+      errorQuda("No eigenspace output file defined.");
+    }
+#else
+    errorQuda("\nQIO library was not built.\n");      
+#endif
+    //profile.TPSTOP(QUDA_PROFILE_IO);
+    //profile.TPSTART(QUDA_PROFILE_INIT);
+
+    return;
+  }
+  
   
   EigenSolver::~EigenSolver() {}
   //-----------------------------------------------------------------------------
@@ -383,7 +427,7 @@ namespace quda {
   
   void IRLM::operator()(std::vector<ColorSpinorField*> &kSpace,
 			std::vector<Complex> &evals){
-
+        
     // Preliminaries: Memory allocation, local variables.
     //---------------------------------------------------------------------------
     int nEv = eig_param->nEv;
@@ -398,8 +442,38 @@ namespace quda {
     if ( nEv == 0 ) errorQuda("nEv=0 passed to Eigensolver\n");
     if ( nKr == 0 ) errorQuda("nKr=0 passed to Eigensolver\n");
     if ( nConv == 0 ) errorQuda("nConv=0 passed to Eigensolver\n");
-    
+        
+    //Check to see if we are loading eigenvectors
+    if (strcmp(eig_param->vec_infile,"") != 0) {
+
+      printfQuda("Loading eigenvectors\n");
+      loadVectors(kSpace);
+      
+      //Create the device side residual vector by cloning
+      //the kSpace passed to the function.
+      std::vector<ColorSpinorField*> r;
+      ColorSpinorParam csParam(*kSpace[0]);
+      r.push_back(ColorSpinorField::Create(csParam));
+      double *residua = (double*)malloc(nKr*sizeof(double));
+
+      //Error estimates (residua) given by ||A*vec - lambda*vec||
+      computeEvals(mat, evals, residua, kSpace, r);
+      for(int i=0; i<nEv; i++) {
+	printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
+		   i, evals[i].real(), evals[i].imag(), residua[i]);
+      }
+      //Local clean-up
+      delete r[0];
+      return;
+    }
+
     double *residua = (double*)malloc(nKr*sizeof(double));
+    
+    //Create the device side residual vector by cloning
+    //the kSpace passed to the function.
+    std::vector<ColorSpinorField*> r;
+    ColorSpinorParam csParam(*kSpace[0]);
+    r.push_back(ColorSpinorField::Create(csParam));
     
     //Tridiagonal matrix
     double alpha[nKr];
@@ -417,14 +491,6 @@ namespace quda {
     for(int i=0; i<nKr; i++) locked[i] = false;
 
     if(flags) printfQuda("EV Flag 1\n");
-
-    //Create the device side residual vector by cloning
-    //the kSpace passed to the function.
-    std::vector<ColorSpinorField*> r;
-    if(flags) printfQuda("EV Flag 1.1\n");
-    ColorSpinorParam csParam(*kSpace[0]);
-    if(flags) printfQuda("EV Flag 1.2\n");
-    r.push_back(ColorSpinorField::Create(csParam));
 
     if(flags) printfQuda("EV Flag 2\n");
 
@@ -646,6 +712,12 @@ namespace quda {
       delete d_vecs_tmp[i];
     }
 
+    //Only save if outfile is defined
+    if (strcmp(eig_param->vec_outfile,"") != 0) {
+      printfQuda("saving eigenvectors\n");
+      saveVectors(kSpace);
+    }
+    
     printfQuda("*****************************\n");
     printfQuda("***** END IRLM SOLUTION *****\n");
     printfQuda("*****************************\n");
@@ -708,10 +780,6 @@ namespace quda {
       delete s;
     }
     
-    //for(unsigned int i=0; i<evecs.size() && locked[i]; i++) {
-    //Complex s0 = blas::cDotProduct(*evecs[i], *r[0]);
-    //blas::caxpy(-s0, *evecs[i], *r[0]);
-    //}
 
     //r = r - b_{j-1} * v_{j-1}
     if(j>0) blas::axpy(-beta[j-1], *v[j-1], *r[0]);
