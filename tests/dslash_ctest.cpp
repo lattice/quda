@@ -85,16 +85,6 @@ const char *recon_str[] = {"r18", "r12", "r8"};
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
 
-QudaPrecision getPrecision(int i) {
-  switch (i) {
-  case 0: return QUDA_QUARTER_PRECISION;
-  case 1: return QUDA_HALF_PRECISION;
-  case 2: return QUDA_SINGLE_PRECISION;
-  case 3: return QUDA_DOUBLE_PRECISION;
-  }
-  return QUDA_INVALID_PRECISION;
-}
-
 double getTolerance(QudaPrecision prec) {
   switch (prec) {
     case QUDA_QUARTER_PRECISION: return 5e-2;
@@ -1138,16 +1128,16 @@ std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, 
 
 #ifndef USE_LEGACY_DSLASH
 #ifdef MULTI_GPU
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest, Combine( Range(0,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getdslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest, Combine( Range(0,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)), getdslashtestname);
 #else
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest, Combine( Range(0,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getdslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest, Combine( Range(0,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ), getdslashtestname);
 #endif
 
 #else
 
 #ifdef MULTI_GPU
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest, Combine( Range(1,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getdslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest, Combine( Range(1,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)), getdslashtestname);
 #else
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest, Combine( Range(1,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getdslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest, Combine( Range(1,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ), getdslashtestname);
 #endif
 #endif

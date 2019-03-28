@@ -120,16 +120,6 @@ static double max_allowed_error = 1e-11;
 int argc_copy;
 char** argv_copy;
 
-QudaPrecision getPrecision(int i) {
-  switch (i) {
-  case 0: return QUDA_QUARTER_PRECISION;
-  case 1: return QUDA_HALF_PRECISION;
-  case 2: return QUDA_SINGLE_PRECISION;
-  case 3: return QUDA_DOUBLE_PRECISION;
-  }
-  return QUDA_INVALID_PRECISION;
-}
-
 double getTolerance(QudaPrecision prec) {
   switch (prec) {
     case QUDA_QUARTER_PRECISION: return 1e-1;

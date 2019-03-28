@@ -55,18 +55,7 @@ void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
   }
 }
 
-QudaPrecision getPrecision(int i) {
-  switch (i) {
-  case 0: return QUDA_QUARTER_PRECISION;
-  case 1: return QUDA_HALF_PRECISION;
-  case 2: return QUDA_SINGLE_PRECISION;
-  case 3: return QUDA_DOUBLE_PRECISION;
-  }
-  return QUDA_INVALID_PRECISION;
-}
-
-void
-display_test_info()
+void display_test_info()
 {
   printfQuda("running the following test:\n");
   printfQuda("S_dimension T_dimension Nspin Ncolor\n");
@@ -1075,14 +1064,13 @@ TEST_P(BlasTest, benchmark) {
   printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
 }
 
-
 std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int>> param){
-   int prec = ::testing::get<0>(param.param);
-   int kernel = ::testing::get<1>(param.param);
-   std::string str(names[kernel]);
-   str += std::string("_");
-   str += std::string(prec_str[prec]);
-   return str;//names[kernel] + "_" + prec_str[prec];
+  int prec = ::testing::get<0>(param.param);
+  int kernel = ::testing::get<1>(param.param);
+  std::string str(names[kernel]);
+  str += std::string("_");
+  str += std::string(prec_str[prec]);
+  return str;//names[kernel] + "_" + prec_str[prec];
 }
 
 // instantiate all test cases

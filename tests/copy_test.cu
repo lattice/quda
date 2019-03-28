@@ -69,6 +69,8 @@ display_test_info()
 int Nprec = 4;
 
 bool skip_kernel(int precision, int kernel) {
+  if ( (QUDA_PRECISION & getPrecision(prec)) == 0) return true;
+
   // if we've selected a given kernel then make sure we only run that
   if (test_type != -1 && kernel != test_type) return true;
 
@@ -275,7 +277,6 @@ double benchmark(int kernel, const int niter) {
 
 #define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)
 
-
 double test(int kernel) {
 
   double error = 0;
@@ -392,15 +393,18 @@ int main(int argc, char** argv)
 
 // The following tests each kernel at each precision using the google testing framework
 
-class CopyTest : public ::testing::TestWithParam<int2> {
+using ::testing::Range;
+using ::testing::Combine;
+
+class CopyTest : public ::testing::TestWithParam<::testing::tuple<int, int>> {
 protected:
-  int2 param;
+  ::testing::tuple<int, int> param;
 
 public:
   virtual ~CopyTest() { }
   virtual void SetUp() {
     param = GetParam();
-    initFields(param.x);
+    initFields(::testing::get<0>(GetParam()));
   }
   virtual void TearDown() { freeFields(); }
 
@@ -409,34 +413,26 @@ public:
 };
 
 TEST_P(CopyTest, verify) {
-  int prec = param.x;
-  int kernel = param.y;
+  int prec = ::testing::get<0>(GetParam());
+  int kernel = ::testing::get<1>(GetParam());
+  if (skip_kernel(prec,kernel)) GTEST_SKIP();
 
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
-  double deviation =  skip_kernel(prec,kernel) ? 1.0 : test(kernel);
+  double deviation = test(kernel);
   printfQuda("%-35s error = %e\n", names[kernel], deviation);
   //double tol = (prec == 3 ? 1e-10 : (prec == 2 ? 1e-5 : (prec == 1 ? 1e-3 : 1e-1)));
   double tol = 5e-2;
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
-// quarter precision
-INSTANTIATE_TEST_SUITE_P(copyHS_quarter, CopyTest, ::testing::Values( make_int2(0,0) ));
-INSTANTIATE_TEST_SUITE_P(copyMS_quarter, CopyTest, ::testing::Values( make_int2(0,1) ));
-INSTANTIATE_TEST_SUITE_P(copyLS_quarter, CopyTest, ::testing::Values( make_int2(0,2) ));
+std::string getcopyname(testing::TestParamInfo<::testing::tuple<int, int>> param){
+  int prec = ::testing::get<0>(param.param);
+  int kernel = ::testing::get<1>(param.param);
+  std::string str(names[kernel]);
+  str += std::string("_");
+  str += std::string(prec_str[prec]);
+  return str;//names[kernel] + "_" + prec_str[prec];
+}
 
-// half precision
-INSTANTIATE_TEST_SUITE_P(copyHS_half, CopyTest, ::testing::Values( make_int2(1,0) ));
-INSTANTIATE_TEST_SUITE_P(copyMS_half, CopyTest, ::testing::Values( make_int2(1,1) ));
-INSTANTIATE_TEST_SUITE_P(copyLS_half, CopyTest, ::testing::Values( make_int2(1,2) ));
-
-// single precision
-INSTANTIATE_TEST_SUITE_P(copyHS_single, CopyTest, ::testing::Values( make_int2(2,0) ));
-INSTANTIATE_TEST_SUITE_P(copyMS_single, CopyTest, ::testing::Values( make_int2(2,1) ));
-INSTANTIATE_TEST_SUITE_P(copyLS_single, CopyTest, ::testing::Values( make_int2(2,2) ));
-
-// double precision
-INSTANTIATE_TEST_SUITE_P(copyHS_double, CopyTest, ::testing::Values( make_int2(3,0) ));
-INSTANTIATE_TEST_SUITE_P(copyMS_double, CopyTest, ::testing::Values( make_int2(3,1) ));
-INSTANTIATE_TEST_SUITE_P(copyLS_double, CopyTest, ::testing::Values( make_int2(3,2) ));
+INSTANTIATE_TEST_SUITE_P(QUDA, CopyTest, Combine( Range(0,4), Range(0,3) ), getcopyname);

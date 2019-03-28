@@ -121,6 +121,16 @@
   }
 #endif
 
+inline QudaPrecision getPrecision(int i) {
+  switch (i) {
+  case 0: return QUDA_QUARTER_PRECISION;
+  case 1: return QUDA_HALF_PRECISION;
+  case 2: return QUDA_SINGLE_PRECISION;
+  case 3: return QUDA_DOUBLE_PRECISION;
+  }
+  return QUDA_INVALID_PRECISION;
+}
+
 inline int getReconstructNibble(QudaReconstructType recon) {
   switch (recon) {
   case QUDA_RECONSTRUCT_NO:
