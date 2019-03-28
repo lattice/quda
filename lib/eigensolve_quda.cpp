@@ -19,6 +19,13 @@
 
 bool flags = false;
 
+//Timings for various components of eigensolver
+double time_;
+double time_e = 0.0;   //time in Eigen
+double time_mv = 0.0;  //time in matVec
+double time_mb = 0.0;  //time in multiblas
+double time_svd= 0.0;  //time to compute SVD
+
 namespace quda {
 
   using namespace Eigen;
@@ -77,7 +84,10 @@ namespace quda {
     
     //Just do a simple matVec if no poly acc is requested
     if(!eig_param->use_poly_acc) {
+      time_ = -clock();
       matVec(mat, out, in);
+      time_ += clock();
+      time_mv += time_;
       return;
     }
 
@@ -103,9 +113,12 @@ namespace quda {
 
     //out = d2 * in + d1 * out
     //C_1(x) = x
-    //matVec(mat, out, in, eig_param);
+    time_ = -clock();
     matVec(mat, out, in);
-    //matVec(out, in);
+    time_ += clock();
+    time_mv += time_;
+
+    time_ = -clock();
     blas::caxpby(d2, const_cast<ColorSpinorField&>(in), d1, out);
     if(eig_param->poly_deg == 1) return;
 
@@ -118,7 +131,9 @@ namespace quda {
 
     blas::copy(*tmp1,in);
     blas::copy(*tmp2,out);
-
+    time_ += clock();
+    time_mb += time_;
+    
     //Using Chebyshev polynomial recursion relation,
     //C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
 
@@ -134,9 +149,12 @@ namespace quda {
       d3 = -sigma*sigma_old;
 
       //mat*C_{m}(x)
-      //matVec(out, *tmp2);
+      time_ = -clock();
       matVec(mat, out, *tmp2);
+      time_ += clock();
+      time_mv += time_;
 
+      time_ = -clock();      
       blas::ax(d3,*tmp1);
       Complex d1c(d1,0.0);
       Complex d2c(d2,0.0);
@@ -144,6 +162,9 @@ namespace quda {
 
       blas::copy(*tmp1,*tmp2);
       blas::copy(*tmp2,out);
+      time_ += clock();
+      time_mb += time_;
+      
       sigma_old = sigma;
 
     }
@@ -156,12 +177,14 @@ namespace quda {
   void EigenSolver::orthogonalise(std::vector<ColorSpinorField*> v,
 				  std::vector<ColorSpinorField*> r,
 				  int j) {
-    
+    time_ = -clock();
     Complex s(0.0,0.0);
     for(int i=0; i<j; i++) {
       s = blas::cDotProduct(*v[i], *r[0]);
       blas::caxpy(-s, *v[i], *r[0]);
     }
+    time_ += clock();
+    time_mb += time_;
   }
   
 
@@ -169,7 +192,7 @@ namespace quda {
   void EigenSolver::blockOrthogonalise(std::vector<ColorSpinorField*> v,
 				       std::vector<ColorSpinorField*> r,
 				       int j) {
-    
+    time_ = -clock();
     Complex *s = new Complex[j];
     std::vector<ColorSpinorField*> d_vecs_j;
     for(int i=0; i<j; i++) {
@@ -183,8 +206,11 @@ namespace quda {
     blas::caxpy(s, d_vecs_j, r);
     
     delete s;
+    time_ += clock();
+    time_mb += time_;
+    
   }
-  
+
   //Deflate vec, place result in vec_defl
   void EigenSolver::deflate(std::vector<ColorSpinorField*> vec_defl,
 			    std::vector<ColorSpinorField*> vec,
@@ -224,6 +250,54 @@ namespace quda {
       }
   }
 
+  void EigenSolver::computeEvals(const Dirac &mat,
+				 std::vector<Complex> &evals,
+				 double *residua,
+				 std::vector<ColorSpinorField*> d_vecs_tmp,
+				 std::vector<ColorSpinorField*> r) {
+
+    int nEv = eig_param->nEv;
+    
+    for(int i=0; i<nEv; i++) {
+      
+      //r = A * v_i
+      time_ = -clock();
+      matVec(mat, *r[0], *d_vecs_tmp[i]);
+      time_ += clock();
+      time_mv += time_;
+
+      time_ = -clock();
+      //lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
+      evals[i] = blas::cDotProduct(*d_vecs_tmp[i], *r[0])/sqrt(blas::norm2(*d_vecs_tmp[i]));
+      
+      //Measure ||lambda_i*v_i - A*v_i||
+      Complex n_unit(-1.0,0.0);
+      blas::caxpby(evals[i], *d_vecs_tmp[i], n_unit, *r[0]);
+      residua[i] = sqrt(blas::norm2(*r[0]));
+      time_ += clock();
+      time_mb += time_;
+    }
+  }
+  
+  void EigenSolver::basisRotateQ(Complex *Qmat,
+				 std::vector<ColorSpinorField*> &kSpace,
+				 std::vector<ColorSpinorField*> &d_vecs_tmp) {
+    
+    int nEv = eig_param->nEv;
+
+    time_ = -clock();
+    for(int i=0; i<nEv; i++) blas::zero(*d_vecs_tmp[i]);
+    blas::caxpy(Qmat, kSpace, d_vecs_tmp);
+    //Copy back to Krylov space array
+    for(int i=0; i<nEv; i++) {
+      *kSpace[i] = *d_vecs_tmp[i];
+    }
+    time_ += clock();
+    time_mb += time_;
+  }
+
+
+  
   /*
   //supports seperate reading or single file read
   void Eigensolver::loadVectors(std::vector<ColorSpinorField*> eig_vecs) {
@@ -325,8 +399,7 @@ namespace quda {
     if ( nKr == 0 ) errorQuda("nKr=0 passed to Eigensolver\n");
     if ( nConv == 0 ) errorQuda("nConv=0 passed to Eigensolver\n");
     
-    double *residual = (double*)malloc(nKr*sizeof(double));
-    double *residual_old = (double*)malloc(nKr*sizeof(double));
+    double *residua = (double*)malloc(nKr*sizeof(double));
     
     //Tridiagonal matrix
     double alpha[nKr];
@@ -335,14 +408,9 @@ namespace quda {
       alpha[i] = 0.0;
       beta[i] = 0.0;
     }
-    
-    //Eigen objects
-    MatrixXd triDiagNew = MatrixXd::Identity(nEv, nEv);
-    SelfAdjointEigenSolver<MatrixXd> eigenSolverTDnew;
-    
-    //Quda MultiBLAS freindly Q arrays
+        
+    //Quda MultiBLAS freindly array
     Complex *Qmat = new Complex[nEv*nKr];
-    Complex *Qmat_nev = new Complex[nEv*nEv];
     
     //Tracks if an eigenpair is locked
     bool *locked = (bool*)malloc((nKr)*sizeof(bool));
@@ -412,13 +480,6 @@ namespace quda {
     int k=0;
     int check_interval = eig_param->check_interval;
 
-    double time;
-    double time_e = 0.0;   //time in Eigen (host)
-    double time_c = 0.0;   //time in convergence check
-    double time_ls = 0.0;  //time in Lanczos step
-    double time_mb = 0.0;  //time in multiblas
-    double time_svd= 0.0;  //time to compute SVD
-
     //Ensure we are not trying to compute on a zero-field source
     //and test for an initial guess
     double norm = sqrt(blas::norm2(*kSpace[0]));
@@ -456,45 +517,27 @@ namespace quda {
     }
     
     //Initial k step factorisation
-    time = -clock();
-    for(k=0; k<nEv; k++) {
-      lanczosStep(kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
-      if(flags) printfQuda("EV Flag k=%d\n", k);
-    }
+    for(k=0; k<nEv; k++) lanczosStep(kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
     printfQuda("Initial %d step factorisation complete\n", k);
-    time += clock();
-    time_ls += time;
 
     //Loop over restart iterations.
     while(restart_iter < max_restarts && !converged) {
 
-      time = -clock();
-      for(k=nEv; k<nKr; k++) {
-	lanczosStep(kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
-	if(flags) printfQuda("EV Flag k=%d\n", k);
-      }
-      if(flags) printfQuda("Restart %d complete\n", restart_iter+1);
-      time += clock();
-      time_ls += time;
-
+      for(k=nEv; k<nKr; k++) lanczosStep(kSpace, r, d_vecs_tmp, locked, alpha, beta, k);
+      printfQuda("Restart %d complete\n", restart_iter+1);
+      
       if(flags) printfQuda("Constructing New Tridiag from QR\n");
-      time = -clock();
       //alpha and beta will be updated in this function. The Q
-      //matrix is put in Qmat for use in the multiBLAS function
+      //matrix is put in Qmat for use in multiBLAS functions.
       computeQRfromTridiag(Qmat, alpha, beta, inverse);      
-      time += clock();
-      time_e += time;
       
       //Block basis rotation
       if(flags) printfQuda("Performing QR Rotation\n");
-      time = -clock();
-      for(int i=0; i<nEv; i++) blas::zero(*d_vecs_tmp[i]);
-      blas::caxpy(Qmat, kSpace, d_vecs_tmp);
-      //Copy back to Krylov space array
-      for(int i=0; i<nEv; i++) {
-	*kSpace[i] = *d_vecs_tmp[i];
-      }
-      
+      //Puts the rotated vectors into d_vecs_tmp.
+      //Number of rotated vectors id nEv.
+      basisRotateQ(Qmat, kSpace, d_vecs_tmp);
+
+      time_ = -clock();
       //Update the residual
       // r_{nev} = r_{nkv} * \sigma_{nev}  |  \sigma_{nev} = Q(nkv,nev)
       blas::ax(Qmat[(nKr-1)*nEv + nEv-1].real(), *r[0]);
@@ -506,79 +549,29 @@ namespace quda {
       blas::zero(*kSpace[nEv]);
       blas::axpy(1.0/beta_k, *r[0], *kSpace[nEv]);
       beta[nEv-1] = beta_k;
-
-      time += clock();
-      time_mb += time;
-
+      time_ += clock();
+      time_mb += time_;
+      
       //Convergence check
       if((restart_iter+1)%check_interval == 0) {
+
 	if(flags) printfQuda("Performing convergence check\n");
-	
-	time = -clock();
 
-	//Construct the updated tridiag for the convergence check
+	//Constructs the rotation matrix from the tridiagonal
+	//and puts the nEv rotated vectors into d_vecs_tmp.	
+	basisRotateTriDiag(alpha, beta, nEv, kSpace, d_vecs_tmp); 
+
+	//Error estimates (residua) given by ||A*vec - lambda*vec||
+	computeEvals(mat, evals, residua, d_vecs_tmp, r);
+
+	//Lock new eigenpairs
 	for(int i=0; i<nEv; i++) {
-	  triDiagNew(i,i) = alpha[i];
-	  if(i<nEv-1) {
-	    triDiagNew(i+1,i) = beta[i];
-	    triDiagNew(i,i+1) = beta[i];
-	  }
-	}
-	Tridiagonalization<MatrixXd> TDnew(triDiagNew);
-	eigenSolverTDnew.computeFromTridiagonal(TDnew.diagonal(), TDnew.subDiagonal());
-	
-	//Place data in accessible array
-	for(int i=0; i<nEv; i++) {
-	  for(int j=0; j<nEv; j++) {
-	    Qmat_nev[j*nEv + i].real(eigenSolverTDnew.eigenvectors().col(i)[j]);
-	    Qmat_nev[j*nEv + i].imag(0.0);
-	  }
-	}
-
-	time += clock();
-	time_e += time;
-
-	//Basis rotation
-	//Pointers to the required Krylov space vectors,
-	//no extra memory is allocated.
-	time = -clock();
-	std::vector<ColorSpinorField*> d_vecs_ptr;
-	for(int i=0; i<nEv; i++) {
-	  d_vecs_ptr.push_back(kSpace[i]);
-	  blas::zero(*d_vecs_tmp[i]);
-	}
-
-	blas::caxpy(Qmat_nev, d_vecs_ptr, d_vecs_tmp);
-	time += clock();
-	time_mb += time;
-
-	//Check for convergence
-	//Error estimates given by ||A*vec - lambda*vec||
-	time = -clock();
-	for(int i=0; i<nEv; i++) {
-
-	  //r = A * v_i
-	  matVec(mat, *r[0], *d_vecs_tmp[i]);
-
-	  //lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-	  evals[i] = blas::cDotProduct(*d_vecs_tmp[i], *r[0])/sqrt(blas::norm2(*d_vecs_tmp[i]));
-	  
-	  //Measure ||lambda_i*v_i - A*v_i||
-	  Complex n_unit(-1.0,0.0);
-	  blas::caxpby(evals[i], *d_vecs_tmp[i], n_unit, *r[0]);
-	  residual[i] = sqrt(blas::norm2(*r[0]));
-
-	  //Copy over residual
-	  residual_old[i] = residual[i];
-	}
-
-	for(int i=0; i<nEv; i++) {
-	  if(residual[i] < tol && !locked[i]) {
+	  if(residua[i] < tol && !locked[i]) {
 
 	    //This is a new eigenpair, lock it
 	    locked[i] = true;
 	    printfQuda("**** locking vector %d, converged eigenvalue = (%+.16e,%+.16e) resid %+.16e ****\n",
-		       i, evals[i].real(), evals[i].imag(), residual[i]);
+		       i, evals[i].real(), evals[i].imag(), residua[i]);
 
 	    num_converged++;
 	  }
@@ -586,7 +579,7 @@ namespace quda {
 
 	printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter+1);
 
-	//Check that the lowest nConv Eigenpairs have converged.
+	//Check for convergence
 	bool all_locked = true;
 	if(num_converged >= nConv) {
 	  for(int i=0; i<nConv; i++) {
@@ -598,14 +591,11 @@ namespace quda {
 	  }
 
 	  if(all_locked) {
-	    //Transfer eigenvectors to kSpace array
+	    //Transfer eigenvectors to kSpace array and exit IRLM
 	    for(int i=0; i<nConv; i++) *kSpace[i] =  *d_vecs_tmp[i];
 	    converged = true;
 	  }
-	}
-	time += clock();
-	time_c += time;
-
+	}	
       }
 
       restart_iter++;
@@ -625,11 +615,10 @@ namespace quda {
 	printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
 		   i, alpha[i], 0.0, beta[i]);
       }
-
-
+      
       for(int i=0; i<nEv; i++) {
 	printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
-		   i, evals[i].real(), evals[i].imag(), residual[i]);
+		   i, evals[i].real(), evals[i].imag(), residua[i]);
       }
 
       //Compute SVD
@@ -642,13 +631,12 @@ namespace quda {
     double t2 = clock() - t1;
     double total;
 
-    if(eig_param->compute_svd) total = (time_e + time_c + time_ls + time_mb + time_svd)/CLOCKS_PER_SEC;
-    else total = (time_e + time_c + time_ls + time_mb)/CLOCKS_PER_SEC;
+    if(eig_param->compute_svd) total = (time_e + time_mv + time_mb + time_svd)/CLOCKS_PER_SEC;
+    else total = (time_e + time_mv + time_mb)/CLOCKS_PER_SEC;
     printfQuda("Time to solve problem using IRLM = %e\n", t2/CLOCKS_PER_SEC);
     printfQuda("Time spent using EIGEN           = %e  %.1f%%\n", time_e/CLOCKS_PER_SEC, 100*(time_e/CLOCKS_PER_SEC)/total);
-    printfQuda("Time spent in lanczos step       = %e  %.1f%%\n", time_ls/CLOCKS_PER_SEC, 100*(time_ls/CLOCKS_PER_SEC)/total);
-    printfQuda("Time spent in multi blas         = %e  %.1f%%\n", time_mb/CLOCKS_PER_SEC, 100*(time_mb/CLOCKS_PER_SEC)/total);
-    printfQuda("Time spent in convergence check  = %e  %.1f%%\n", time_c/CLOCKS_PER_SEC, 100*(time_c/CLOCKS_PER_SEC)/total);
+    printfQuda("Time spent in matVec             = %e  %.1f%%\n", time_mv/CLOCKS_PER_SEC, 100*(time_mv/CLOCKS_PER_SEC)/total);
+    printfQuda("Time spent in (multi)blas        = %e  %.1f%%\n", time_mb/CLOCKS_PER_SEC, 100*(time_mb/CLOCKS_PER_SEC)/total);
     if(eig_param->compute_svd) printfQuda("Time spent computing svd         = %e  %.1f%%\n", time_svd/CLOCKS_PER_SEC, 100*(time_svd/CLOCKS_PER_SEC)/total);
     //---------------------------------------------------------------------------
 
@@ -671,29 +659,59 @@ namespace quda {
 			 std::vector<ColorSpinorField*> evecs,
 			 bool *locked,
 			 double *alpha, double *beta, int j) {
-    
+
     //Compute r = A * v_j - b_{j-i} * v_{j-1}
     //r = A * v_j
 
+    time_ = -clock();
     //Purge locked eigenvectors from the residual
     //DMH: This step ensures that the next mat vec
     //     does not reintroduce components of the
     //     existing eigenspace
-    Complex s(0.0,0.0);
-    for(unsigned int i=0; i<evecs.size() && locked[i]; i++) {
-      s = blas::cDotProduct(*evecs[i], *v[j]);
-      blas::caxpy(-s, *evecs[i], *v[j]);
-    }
 
+    int locked_size = 0;
+    std::vector<ColorSpinorField*> d_vecs_locked;
+    for(int i=0; i<j; i++) {
+      if(locked[i]) {
+	d_vecs_locked.push_back(v[i]);
+	locked_size++;
+      }
+    }
+    if(locked_size > 0) {
+      Complex *s = new Complex[locked_size];    
+      //Block dot products stored in s.
+      std::vector<ColorSpinorField*> d_vec_vj;
+      d_vec_vj.push_back(v[j]);
+      blas::cDotProduct(s, d_vecs_locked, d_vec_vj);
+      for(int i=0; i<locked_size; i++) s[i] *= -1.0;  
+      blas::caxpy(s, d_vecs_locked, d_vec_vj);
+      delete s;
+    }
+    
+    time_ += clock();
+    time_mb += time_;
+    
     chebyOp(mat, *r[0], *v[j]);
     
     //Deflate locked eigenvectors from the residual
     //DMH: This step ensures that the new Krylov vector
     //     remains orthogonal to the found eigenspace
-    for(unsigned int i=0; i<evecs.size() && locked[i]; i++) {
-      s = blas::cDotProduct(*evecs[i], *r[0]);
-      blas::caxpy(-s, *evecs[i], *r[0]);
+    //     We may resuse the pointers to locked eigenvectors.
+    if(locked_size > 0) {
+      Complex *s = new Complex[locked_size];    
+      //Block dot products stored in s.
+      std::vector<ColorSpinorField*> d_vec_vj;
+      d_vec_vj.push_back(r[0]);
+      blas::cDotProduct(s, d_vecs_locked, d_vec_vj);
+      for(int i=0; i<locked_size; i++) s[i] *= -1.0;  
+      blas::caxpy(s, d_vecs_locked, d_vec_vj);
+      delete s;
     }
+    
+    //for(unsigned int i=0; i<evecs.size() && locked[i]; i++) {
+    //Complex s0 = blas::cDotProduct(*evecs[i], *r[0]);
+    //blas::caxpy(-s0, *evecs[i], *r[0]);
+    //}
 
     //r = r - b_{j-1} * v_{j-1}
     if(j>0) blas::axpy(-beta[j-1], *v[j-1], *r[0]);
@@ -738,6 +756,8 @@ namespace quda {
     MatrixXd TmMuI = MatrixXd::Zero(nKr, nKr);
     MatrixXd Id = MatrixXd::Identity(nKr, nKr);
     SelfAdjointEigenSolver<MatrixXd> eigenSolverTD;
+
+    time_ = -clock();
     
     //Construct Tridiagonal matrix T_{k,k}
     for(int i=0; i<nKr; i++) {
@@ -807,10 +827,61 @@ namespace quda {
       alpha[i] = triDiag(i,i);
       if(i < nKr-1) beta[i] = triDiag(i,i+1);
     }
+
+    time_ += clock();
+    time_e += time_;
     
     if(flags) printfQuda("QR Flag computeQR Complete\n");
   }
   
+  void IRLM::basisRotateTriDiag(double *alpha, double *beta, int nEv,
+				std::vector<ColorSpinorField*> &kSpace,
+				std::vector<ColorSpinorField*> &d_vecs_tmp) {
+
+    //Eigen objects
+    MatrixXd triDiagNew = MatrixXd::Identity(nEv, nEv);
+    SelfAdjointEigenSolver<MatrixXd> eigenSolverTDnew;
+    Complex *Qmat_nev = new Complex[nEv*nEv];
+    
+    time_ = -clock();
+    
+    //Construct the updated tridiag for the convergence check
+    for(int i=0; i<nEv; i++) {
+      triDiagNew(i,i) = alpha[i];
+      if(i<nEv-1) {
+	triDiagNew(i+1,i) = beta[i];
+	triDiagNew(i,i+1) = beta[i];
+      }
+    }
+    Tridiagonalization<MatrixXd> TDnew(triDiagNew);
+    eigenSolverTDnew.computeFromTridiagonal(TDnew.diagonal(), TDnew.subDiagonal());
+    
+    //Place data in accessible array
+    for(int i=0; i<nEv; i++) {
+      for(int j=0; j<nEv; j++) {
+	Qmat_nev[j*nEv + i].real(eigenSolverTDnew.eigenvectors().col(i)[j]);
+	Qmat_nev[j*nEv + i].imag(0.0);
+      }
+    }    
+    time_ += clock();
+    time_e += time_;
+    
+    //Basis rotation
+    //Pointers to the required Krylov space vectors,
+    //no extra memory is allocated.
+    time_ = -clock();
+    std::vector<ColorSpinorField*> d_vecs_ptr;
+    for(int i=0; i<nEv; i++) {
+      d_vecs_ptr.push_back(kSpace[i]);
+      blas::zero(*d_vecs_tmp[i]);
+    }
+    
+    blas::caxpy(Qmat_nev, d_vecs_ptr, d_vecs_tmp);
+    time_ += clock();
+    time_mb += time_;    
+  }    
+  
+
   void IRLM::computeSVD(std::vector<ColorSpinorField*> &kSpace,
 			std::vector<ColorSpinorField*> &evecs,
 			std::vector<Complex> &evals,
@@ -927,7 +998,7 @@ namespace quda {
     //Construct parameters and memory allocation
     //---------------------------------------------------------------------------------
     double time_ar = 0.0; //time in ARPACK
-    double time_mv = 0.0; //time in QUDA mat vec + data transfer
+    time_mv = 0.0; //time in QUDA mat vec + data transfer
     double time_ev = 0.0; //time in computing Eigenvectors
 
     //MPI objects
@@ -947,7 +1018,7 @@ namespace quda {
 
     // all FORTRAN communication uses underscored
     int ido_ = 0;
-    int info_ = 1; //if 0, use random vector. If 1, initial residulal lives in resid_
+    int info_ = 1; //if 0, use random vector. If 1, initial residual lives in resid_
     int *ipntr_ = (int*)malloc(14*sizeof(int));
     int *iparam_ = (int*)malloc(11*sizeof(int));
     int n_    = local_vol*4*3,

@@ -69,11 +69,39 @@ namespace quda {
 
     /**
        @brief Deflate vector with Eigenvectors
-    */
+       @param[in] vec_defl The deflated vector
+       @param[in] vec The input vector
+       @param[in] evecs The eigenvectors to use in deflation
+       @param[in] evals The eigenvalues to use in deflation
+    */    
     void deflate(std::vector<ColorSpinorField*> vec_defl,
 		 std::vector<ColorSpinorField*> vec,
 		 std::vector<ColorSpinorField*> evecs,
 		 std::vector<Complex> evals);
+    
+    /**
+       @brief Compute eigenvalues and their residiua
+       @param[in] mat Matrix operator
+       @param[in] evals The eigenvalues
+       @param[out] residua The residua of the eigenpair
+       @param[in] evecs The eigenvectors
+       @param[in] tmp A workspace vector
+    */        
+    void computeEvals(const Dirac &mat,
+		      std::vector<Complex> &evals,
+		      double *residua,
+		      std::vector<ColorSpinorField*> evecs,
+		      std::vector<ColorSpinorField*> tmp);
+
+    /**
+       @brief Rotate eigenvectors by dense matrix
+       @param[in] Qmat The dense rotation matrix
+       @param[in] kSpace the vectors to be rotated
+       @param[in] tmp Workspace vectors
+    */            
+    void basisRotateQ(Complex *Qmat,
+		      std::vector<ColorSpinorField*> &kSpace,
+		      std::vector<ColorSpinorField*> &tmp);
     
   };
   
@@ -116,6 +144,19 @@ namespace quda {
 		     bool *locked,
 		     double *alpha, double *beta, int j);
 
+    /**
+       @brief Rotate eigenvectors by dense matrix dervied
+       from the tridiagonal matrix in Lanczos
+       @param[in] alpha Leading diagonal part of Lanczos tridiagonal matrix
+       @param[in] beta Sub-leading diagonal part of Lanczos tridiagonal matrix
+       @param[in] nEv The number of vectors to be rotated
+       @param[in] kSpace the vectors to be rotated
+       @param[in] tmp Workspace vectors
+    */            
+    void basisRotateTriDiag(double *alpha, double *beta, int nEv,
+			    std::vector<ColorSpinorField*> &kSpace,
+			    std::vector<ColorSpinorField*> &tmp);
+        
     /**
        @brief Computes QR factorisation from the Lanczos tridiagonal matrix
        @param[in] Qmat Complex array for Q part of QR
