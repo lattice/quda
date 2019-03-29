@@ -117,7 +117,7 @@ namespace quda {
       */
       __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
 
-      __device__ __host__ void print() {
+      __device__ __host__ void print() const {
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
             printf("s=%d c=%d %e %e\n", s, c, data[s*Nc+c].real(), data[s*Nc+c].imag());
@@ -663,7 +663,7 @@ namespace quda {
       *this = a;
     }
 
-    __device__ __host__ void print() {
+    __device__ __host__ void print() const {
       for (int s=0; s<Ns; s++) {
 	for (int c=0; c<Nc; c++) {
 	  printf("s=%d c=%d %e %e\n", s, c, data[s*Nc+c].real(), data[s*Nc+c].imag());
@@ -907,7 +907,7 @@ namespace quda {
     template<typename S>
       __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<Float, S> &s);
 
-    __device__ __host__ void print() {
+    __device__ __host__ void print() const {
       for (int s=0; s<Ns; s++) {
 	for (int c=0; c<Nc; c++) {
 	  printf("s=%d c=%d %e %e\n", s, c, data[s*Nc+c].real(), data[s*Nc+c].imag());
