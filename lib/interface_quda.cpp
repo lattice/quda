@@ -698,7 +698,19 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   profileGauge.TPSTART(QUDA_PROFILE_INIT);
   // Set the specific input parameters and create the cpu gauge field
+#ifdef JULIA_INTERFACE //current hack for julia bindings
+  void *hh_gauge[4];
+  const int Vol = param->X[0]*param->X[1]*param->X[2]*param->X[3];
+  const int gaugeSiteSize = 18;
+
+  for (int dir = 0; dir < 4; dir++) {
+      hh_gauge[dir] = param->cpu_prec == QUDA_DOUBLE_PRECISION ? static_cast<void*>(&((static_cast<double*>(h_gauge))[dir*Vol*gaugeSiteSize])) : static_cast<void*>(&((static_cast<float*>(h_gauge))[dir*Vol*gaugeSiteSize]));
+  }
+ 
+  GaugeFieldParam gauge_param(hh_gauge, *param);
+#else
   GaugeFieldParam gauge_param(h_gauge, *param);
+#endif
 
   // if we are using half precision then we need to compute the fat
   // link maximum while still on the cpu

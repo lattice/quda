@@ -624,6 +624,47 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  class Pipe2PCG : public Solver {
+    private:
+      const DiracMatrix &mat;
+      const DiracMatrix &matSloppy;
+      const DiracMatrix &matPrecon;
+
+      Solver *K;
+      SolverParam Kparam; // parameters for preconditioner solve
+
+      bool init;
+      //work space for the sloppy precision internal fields
+      ColorSpinorField *up;
+      ColorSpinorField *wp;
+      ColorSpinorField *mp;
+      ColorSpinorField *np;
+      //
+      ColorSpinorFieldSet *pp;
+      ColorSpinorFieldSet *sp;
+      ColorSpinorFieldSet *qp;
+      ColorSpinorFieldSet *zp;
+
+      // high precision fields
+      ColorSpinorField *rp;
+      ColorSpinorField *tmpp;
+      // low precision fields used in the preconditioner
+      ColorSpinorField *r_pre;
+      ColorSpinorField *p_pre;
+
+    public:
+      Pipe2PCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+      /**
+        @param K Preconditioner
+      */
+      Pipe2PCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+
+      virtual ~Pipe2PCG();
+
+      void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+
 
   class BiCGstab : public Solver {
 
