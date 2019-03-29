@@ -178,13 +178,21 @@ void uni_blas(const double2 &a, const double2 &b, const double2 &c, ColorSpinorF
     }
 
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+
+#if QUDA_PRECISION & 8
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
       const int M = 1;
       nativeBlas<double2,double2,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Length()/(2*M));
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
       if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
         const int M = 1;
@@ -200,7 +208,13 @@ void uni_blas(const double2 &a, const double2 &b, const double2 &c, ColorSpinorF
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
       } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
     } else if (x.Precision() == QUDA_HALF_PRECISION) {
+
+#if QUDA_PRECISION & 2
       if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
       if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
@@ -226,7 +240,13 @@ void uni_blas(const double2 &a, const double2 &b, const double2 &c, ColorSpinorF
       } else {
 	errorQuda("nSpin=%d is not supported\n", x.Nspin());
       }
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
     } else if (x.Precision() == QUDA_QUARTER_PRECISION) {
+
+#if QUDA_PRECISION & 1
       if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
       if (x.Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
@@ -245,8 +265,11 @@ void uni_blas(const double2 &a, const double2 &b, const double2 &c, ColorSpinorF
       } else {
         errorQuda("nSpin=%d is not supported\n", x.Nspin());
       }
-    }
-    else {
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
+    } else {
       errorQuda("precision=%d is not supported\n", x.Precision());
     }
   } else { // fields on the cpu
@@ -285,6 +308,8 @@ void mixed_blas(const double2 &a, const double2 &b, const double2 &c, ColorSpino
     }
 
     if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
       if (x.Nspin() == 4) {
         const int M = 12;
         nativeBlas<double2,float4,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
@@ -292,49 +317,105 @@ void mixed_blas(const double2 &a, const double2 &b, const double2 &c, ColorSpino
         const int M = 3;
         nativeBlas<double2,float2,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
       }
-    } else if (x.Precision() == QUDA_HALF_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
-      if (x.Nspin() == 4) {
-        const int M = 12;
-        nativeBlas<double2,short4,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
-      } else if (x.Nspin() == 1) {
-        const int M = 3;
-        nativeBlas<double2,short2,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
+    } else if (x.Precision() == QUDA_HALF_PRECISION) {
+
+#if QUDA_PRECISION & 2
+      if (y.Precision() == QUDA_DOUBLE_PRECISION) {
+
+#if QUDA_PRECISION & 8
+        if (x.Nspin() == 4) {
+          const int M = 12;
+          nativeBlas<double2,short4,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        } else if (x.Nspin() == 1) {
+          const int M = 3;
+          nativeBlas<double2,short2,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        }
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
+#endif
+
+      } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
+        if (x.Nspin() == 4) {
+          const int M = 6;
+          nativeBlas<float4,short4,float4,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        } else if (x.Nspin() == 1) {
+          const int M = 3;
+          nativeBlas<float2,short2,float2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        }
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
+#endif
+
+      } else {
+        errorQuda("Not implemented for this precision combination %d %d", x.Precision(), y.Precision());
       }
-    } else if (x.Precision() == QUDA_HALF_PRECISION && y.Precision() == QUDA_SINGLE_PRECISION) {
-      if (x.Nspin() == 4) {
-        const int M = 6;
-        nativeBlas<float4,short4,float4,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
-      } else if (x.Nspin() == 1) {
-        const int M = 3;
-        nativeBlas<float2,short2,float2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
+    } else if (x.Precision() == QUDA_QUARTER_PRECISION) {
+
+#if QUDA_PRECISION & 1
+      
+      if (y.Precision() == QUDA_DOUBLE_PRECISION) {
+
+#if QUDA_PRECISION & 8
+        if (x.Nspin() == 4) {
+          const int M = 6;
+          nativeBlas<double2,char4,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        } else if (x.Nspin() == 1) {
+          const int M = 3;
+          nativeBlas<double2,char2,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        }
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
+#endif
+
+      } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
+        if (x.Nspin() == 4) {
+          const int M = 6;
+          nativeBlas<float4,char4,float4,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        } else if (x.Nspin() == 1) {
+          const int M = 3;
+          nativeBlas<float2,char2,float2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        }
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
+#endif
+
+      } else if (y.Precision() == QUDA_HALF_PRECISION) {
+
+#if QUDA_PRECISION & 2
+        if (x.Nspin() == 4) {
+          const int M = 6;
+          nativeBlas<float4,char4,short4,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        } else if (x.Nspin() == 1) {
+          const int M = 3;
+          nativeBlas<float2,char2,short2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
+        }
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
+#endif
+
+      } else {
+        errorQuda("Not implemented for this precision combination %d %d", x.Precision(), y.Precision());
       }
-    } else if (x.Precision() == QUDA_QUARTER_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
-      if (x.Nspin() == 4) {
-        const int M = 6;
-        nativeBlas<double2,char4,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
-      } else if (x.Nspin() == 1) {
-        const int M = 3;
-        nativeBlas<double2,char2,double2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
-      }
-    } else if (x.Precision() == QUDA_QUARTER_PRECISION && y.Precision() == QUDA_SINGLE_PRECISION) {
-      if (x.Nspin() == 4) {
-        const int M = 6;
-        nativeBlas<float4,char4,float4,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
-      } else if (x.Nspin() == 1) {
-        const int M = 3;
-        nativeBlas<float2,char2,float2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
-      }
-    } else if (x.Precision() == QUDA_QUARTER_PRECISION && y.Precision() == QUDA_HALF_PRECISION) {
-      if (x.Nspin() == 4) {
-        const int M = 6;
-        nativeBlas<float4,char4,short4,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
-      } else if (x.Nspin() == 1) {
-        const int M = 3;
-        nativeBlas<float2,char2,short2,M,Functor,writeX,writeY,writeZ,writeW,writeV>(a,b,c,x,y,z,w,v,x.Volume());
-      }
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
     } else {
       errorQuda("Not implemented for this precision combination %d %d", x.Precision(), y.Precision());
     }
+
   } else { // fields on the cpu
     using namespace quda::colorspinor;
     if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {

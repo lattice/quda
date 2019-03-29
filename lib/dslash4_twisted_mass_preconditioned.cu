@@ -79,50 +79,23 @@ namespace quda {
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  void ApplyTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                      double a, double b, bool xpay, const ColorSpinorField &x, int parity,
-                                      bool dagger, bool asymmetric, const int *comm_override, TimeProfile &profile)
-  {
-    constexpr int nDim = 4;
-    TwistedMassArg<Float,nColor,recon> arg(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override);
-    TwistedMassPreconditioned<Float,nDim,nColor,TwistedMassArg<Float,nColor,recon> > twisted(arg, out, in);
+  struct TwistedMassPreconditionedApply {
 
-    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-                                              in.VolumeCB(), in.GhostFaceCB(), profile);
-    policy.apply(0);
+    inline TwistedMassPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                          double a, double b, bool xpay, const ColorSpinorField &x, int parity,
+                                          bool dagger, bool asymmetric, const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+      TwistedMassArg<Float,nColor,recon> arg(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override);
+      TwistedMassPreconditioned<Float,nDim,nColor,TwistedMassArg<Float,nColor,recon> > twisted(arg, out, in);
 
-    checkCudaError();
-  }
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+                                                         in.VolumeCB(), in.GhostFaceCB(), profile);
+      policy.apply(0);
 
-  // template on the gauge reconstruction
-  template <typename Float, int nColor>
-  void ApplyTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                      double a, double b, bool xpay, const ColorSpinorField &x, int parity,
-                                      bool dagger, bool asymmetric, const int *comm_override, TimeProfile &profile)
-  {
-    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyTwistedMassPreconditioned<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyTwistedMassPreconditioned<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyTwistedMassPreconditioned<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      checkCudaError();
     }
-  }
-
-  // template on the number of colors
-  template <typename Float>
-  void ApplyTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                      double a, double b, bool xpay, const ColorSpinorField &x, int parity,
-                                      bool dagger, bool asymmetric, const int *comm_override, TimeProfile &profile)
-  {
-    if (in.Ncolor() == 3) {
-      ApplyTwistedMassPreconditioned<Float,3>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
+  };
 
   /*
     Apply the preconditioned twisted-mass Dslash operator
@@ -147,20 +120,9 @@ namespace quda {
     // with symmetric dagger operator we must use kernel packing
     if (dagger && !asymmetric) pushKernelPackT(true);
 
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyTwistedMassPreconditioned<double>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyTwistedMassPreconditioned<float>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyTwistedMassPreconditioned<short>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyTwistedMassPreconditioned<char>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
+    instantiate<TwistedMassPreconditionedApply>(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
 
     if (dagger && !asymmetric) popKernelPackT();
-
 #else
     errorQuda("Twisted-mass dslash has not been built");
 #endif // GPU_TWISTED_MASS_DIRAC

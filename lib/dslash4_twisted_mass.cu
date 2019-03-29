@@ -70,50 +70,22 @@ namespace quda {
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  void ApplyTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                        double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                        const int *comm_override, TimeProfile &profile)
-  {
-    constexpr int nDim = 4;
-    TwistedMassArg<Float,nColor,recon> arg(out, in, U, a, b, x, parity, dagger, comm_override);
-    TwistedMass<Float,nDim,nColor,TwistedMassArg<Float,nColor,recon> > twisted(arg, out, in);
+  struct TwistedMassApply {
 
-    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-                                              in.VolumeCB(), in.GhostFaceCB(), profile);
-    policy.apply(0);
+    inline TwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
+                            const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+      TwistedMassArg<Float,nColor,recon> arg(out, in, U, a, b, x, parity, dagger, comm_override);
+      TwistedMass<Float,nDim,nColor,TwistedMassArg<Float,nColor,recon> > twisted(arg, out, in);
 
-    checkCudaError();
-  }
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+                                                         in.VolumeCB(), in.GhostFaceCB(), profile);
+      policy.apply(0);
 
-  // template on the gauge reconstruction
-  template <typename Float, int nColor>
-  void ApplyTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                        double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                        const int *comm_override, TimeProfile &profile)
-  {
-    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyTwistedMass<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyTwistedMass<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyTwistedMass<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      checkCudaError();
     }
-  }
-
-  // template on the number of colors
-  template <typename Float>
-  void ApplyTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                        double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                        const int *comm_override, TimeProfile &profile)
-  {
-    if (in.Ncolor() == 3) {
-      ApplyTwistedMass<Float,3>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
+  };
 
   //Apply the twisted-mass Dslash operator
   //out(x) = M*in = (1 + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
@@ -133,17 +105,7 @@ namespace quda {
     // check all locations match
     checkLocation(out, in, U);
 
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyTwistedMass<double>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyTwistedMass<float>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyTwistedMass<short>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyTwistedMass<char>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
+    instantiate<TwistedMassApply>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Twisted-mass dslash has not been built");
 #endif // GPU_TWISTED_MASS_DIRAC

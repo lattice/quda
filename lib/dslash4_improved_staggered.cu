@@ -1,6 +1,5 @@
 #ifndef USE_LEGACY_DSLASH
 
-
 #include <dslash.h>
 #include <worker.h>
 #include <dslash_helper.cuh>
@@ -159,51 +158,28 @@ public:
     TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon_u, QudaReconstructType recon_l>
-  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a, const ColorSpinorField &x,
-                              int parity,bool dagger, const int *comm_override, TimeProfile &profile)
-  {
-    constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
-    constexpr bool improved = true;
-    StaggeredArg<Float, nColor, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger, comm_override);
-    Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
+  template <typename Float, int nColor, QudaReconstructType recon_l>
+  struct ImprovedStaggeredApply {
 
-    dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
-    policy.apply(0);
+    inline ImprovedStaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &L, const GaugeField &U,
+                                  double a, const ColorSpinorField &x, int parity, bool dagger,
+                                  const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
+      constexpr bool improved = true;
+      constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
+      StaggeredArg<Float, nColor, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger, comm_override);
+      Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
-    checkCudaError();
-  }
+      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
+      policy.apply(0);
 
-  // template on the gauge reconstruction
-  template <typename Float, int nColor>
-  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a, const ColorSpinorField &x,
-                              int parity, bool dagger, const int *comm_override, TimeProfile &profile)
-  {
-    if (L.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-      ApplyImprovedStaggered<Float, nColor, QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_NO>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
-    } else if (L.Reconstruct() == QUDA_RECONSTRUCT_13) {
-      ApplyImprovedStaggered<Float, nColor, QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
-    } else if (L.Reconstruct() == QUDA_RECONSTRUCT_9) {
-      ApplyImprovedStaggered<Float, nColor, QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_9>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      checkCudaError();
     }
-  }
+  };
 
-  // template on the number of colors
-  template <typename Float>
-  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a, const ColorSpinorField &x,
-                              int parity, bool dagger, const int *comm_override, TimeProfile &profile)
-  {
-    if (in.Ncolor() == 3) {
-      ApplyImprovedStaggered<Float, 3>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
-
-  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a, const ColorSpinorField &x,
-                              int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
+                              const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 
 #ifdef GPU_STAGGERED_DIRAC
@@ -222,15 +198,8 @@ public:
       }
     }
 
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyImprovedStaggered<double>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyImprovedStaggered<float>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyImprovedStaggered<short>(out, in, U, L, a, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
+    // L must be first gauge field argument since we template on long reconstruct
+    instantiate<ImprovedStaggeredApply,StaggeredReconstruct>(out, in, L, U, a, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Staggered dslash has not been built");
 #endif

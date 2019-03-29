@@ -119,54 +119,27 @@ namespace quda {
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  void ApplyTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                                        double a, double b, bool xpay, const ColorSpinorField &x, int parity,
-                                        bool dagger, const int *comm_override, TimeProfile &profile)
-  {
-    constexpr int nDim = 4;
+  struct TwistedCloverPreconditionedApply {
+
+    inline TwistedCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                            const CloverField &C, double a, double b, bool xpay, const ColorSpinorField &x,
+                                            int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
 #ifdef DYNAMIC_CLOVER
-    constexpr bool dynamic_clover = true;
+      constexpr bool dynamic_clover = true;
 #else
-    constexpr bool dynamic_clover = false;
+      constexpr bool dynamic_clover = false;
 #endif
-    TwistedCloverArg<Float,nColor,recon,dynamic_clover> arg(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override);
-    TwistedCloverPreconditioned<Float,nDim,nColor,TwistedCloverArg<Float,nColor,recon,dynamic_clover> > twisted(arg, out, in);
+      TwistedCloverArg<Float,nColor,recon,dynamic_clover> arg(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override);
+      TwistedCloverPreconditioned<Float,nDim,nColor,TwistedCloverArg<Float,nColor,recon,dynamic_clover> > twisted(arg, out, in);
 
-    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-                                              in.VolumeCB(), in.GhostFaceCB(), profile);
-    policy.apply(0);
-    checkCudaError();
-  }
-
-  // template on the gauge reconstruction
-  template <typename Float, int nColor>
-  void ApplyTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                                        double a, double b, bool xpay, const ColorSpinorField &x, int parity,
-                                        bool dagger, const int *comm_override, TimeProfile &profile)
-  {
-    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyTwistedCloverPreconditioned<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyTwistedCloverPreconditioned<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyTwistedCloverPreconditioned<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+                                                         in.VolumeCB(), in.GhostFaceCB(), profile);
+      policy.apply(0);
+      checkCudaError();
     }
-  }
-
-  // template on the number of colors
-  template <typename Float>
-  void ApplyTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                                        double a, double b, bool xpay, const ColorSpinorField &x, int parity,
-                                        bool dagger, const int *comm_override, TimeProfile &profile)
-  {
-    if (in.Ncolor() == 3) {
-      ApplyTwistedCloverPreconditioned<Float,3>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
+  };
 
   /*
     Apply the preconditioned twisted-mass Dslash operator
@@ -188,18 +161,7 @@ namespace quda {
     // check all locations match
     checkLocation(out, in, U, C);
 
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyTwistedCloverPreconditioned<double>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyTwistedCloverPreconditioned<float>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyTwistedCloverPreconditioned<short>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyTwistedCloverPreconditioned<char>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
-
+    instantiate<TwistedCloverPreconditionedApply>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Twisted-clover dslash has not been built");
 #endif // GPU_TWISTED_CLOVER_DIRAC

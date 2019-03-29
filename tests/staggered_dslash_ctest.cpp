@@ -28,7 +28,7 @@
 #include <qio_field.h>
 
 #include <assert.h>
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 using namespace quda;
 
@@ -105,7 +105,7 @@ extern int Nsrc; // number of spinors to apply to simultaneously
 
 Dirac* dirac;
 
-const char *prec_str[] = {"half", "single", "double"};
+const char *prec_str[] = {"quarter", "half", "single", "double"};
 const char *recon_str[] = {"r18", "r13", "r9"};
 
 // Unitarization coefficients
@@ -119,6 +119,17 @@ static double max_allowed_error = 1e-11;
 // For loading the gauge fields
 int argc_copy;
 char** argv_copy;
+
+double getTolerance(QudaPrecision prec) {
+  switch (prec) {
+    case QUDA_QUARTER_PRECISION: return 1e-1;
+    case QUDA_HALF_PRECISION: return 1e-3;
+    case QUDA_SINGLE_PRECISION: return 1e-4;
+    case QUDA_DOUBLE_PRECISION: return 1e-11;
+    case QUDA_INVALID_PRECISION: return 1.0;
+  }
+  return 1.0;
+}
 
 
 // Wrap everything for the GPU construction of fat/long links here
@@ -198,35 +209,8 @@ void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
 }
 
 
-bool skip_kernel(int prec, QudaReconstructType link_recon) {
-  // If we're building fat/long links, there are some
-  // tests we have to skip.
-  if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong) {
-    if (prec == 0 /* half */) {
-      warningQuda("Half precision unsupported in fat/long compute, skipping...");
-      global_skip = true;
-      return true;
-    }
-    if (link_recon == QUDA_RECONSTRUCT_8) {
-      warningQuda("Reconstruct 9 is unsupported in fat/long compute, skipping...");
-      global_skip = true;
-      return true;
-    }
-  }
-
-  if (dslash_type == QUDA_LAPLACE_DSLASH && prec == 0) {
-    global_skip = true;
-    warningQuda("Half precision unsupported for Laplace operator.\n");
-    return true;
-  }
-
-  global_skip = false;
-  return false;
-}
-
 void init(int precision, QudaReconstructType link_recon, int partition) {
-
-  auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
+  auto prec = getPrecision(precision);
 
   inv_param.cuda_prec = prec;
   gaugeParam.reconstruct = link_recon;
@@ -845,12 +829,39 @@ class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int
 protected:
   ::testing::tuple<int, int, int> param;
 
+  bool skip() {
+    QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
+
+    if ( (QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0 ||
+         (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
+      return true;
+    }
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong &&
+          (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
+      warningQuda("Fixed precision unsupported in fat/long compute, skipping...");
+      return true;
+    }
+
+    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong && (getReconstructNibble(recon) & 1) ) {
+      warningQuda("Reconstruct 9 unsupported in fat/long compute, skipping...");
+      return true;
+    }
+
+    if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
+      warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
+      return true;
+    }
+    return false;
+  }
+
 public:
   virtual ~StaggeredDslashTest() { }
   virtual void SetUp() {
     int prec = ::testing::get<0>(GetParam());
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
 
+    if (skip()) GTEST_SKIP();
 
     int value = ::testing::get<2>(GetParam());
     for(int j=0; j < 4;j++){
@@ -876,12 +887,15 @@ public:
     spinorRef = nullptr;
     tmpCpu = nullptr;
 
-    if (!skip_kernel(prec,recon)) {
-      init(prec, recon, value);
-    }
+    init(prec, recon, value);
     display_test_info(prec, recon);
   }
-  virtual void TearDown() { end(); }
+
+  virtual void TearDown()
+  {
+    if (skip()) GTEST_SKIP();
+    end();
+  }
 
   static void SetUpTestCase() {
     initQuda(device);
@@ -897,13 +911,8 @@ public:
 };
 
  TEST_P(StaggeredDslashTest, verify) {
-
     double deviation = 1.0;
-    double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-11 :
-      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-4 :
-      (inv_param.cuda_prec == QUDA_HALF_PRECISION ? 1e-2 : 2.0))); // catches case where we skip a test
-
-    if (global_skip) { tol = 2.0; }
+    double tol = getTolerance(inv_param.cuda_prec); 
 
     bool failed = false; // for the nan catch
 
@@ -945,39 +954,35 @@ public:
 
 TEST_P(StaggeredDslashTest, benchmark) {
 
-    // check for skip_kernel
-    if (spinorRef != nullptr) {
-
-      { // warm-up run
-        // printfQuda("Tuning...\n");
-        dslashCUDA(1);
-      }
-
-      // reset flop counter
-      dirac->Flops();
-
-      DslashTime dslash_time = dslashCUDA(niter);
-
-      *spinorOut = *cudaSpinorOut;
-
-      printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
-
-      unsigned long long flops = dirac->Flops();
-      double gflops=1.0e-9*flops/dslash_time.event_time;
-      printfQuda("GFLOPS = %f\n", gflops );
-      RecordProperty("Gflops", std::to_string(gflops));
-
-      RecordProperty("Halo_bidirectitonal_BW_GPU", 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time);
-      RecordProperty("Halo_bidirectitonal_BW_CPU", 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time);
-      RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max);
-      RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min);
-      RecordProperty("Halo_message_size_bytes",2*cudaSpinor->GhostBytes());
-
-      printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
-       1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
-       1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
-       2*cudaSpinor->GhostBytes());
+    { // warm-up run
+      // printfQuda("Tuning...\n");
+      dslashCUDA(1);
     }
+
+    // reset flop counter
+    dirac->Flops();
+
+    DslashTime dslash_time = dslashCUDA(niter);
+
+    *spinorOut = *cudaSpinorOut;
+
+    printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
+
+    unsigned long long flops = dirac->Flops();
+    double gflops=1.0e-9*flops/dslash_time.event_time;
+    printfQuda("GFLOPS = %f\n", gflops );
+    RecordProperty("Gflops", std::to_string(gflops));
+
+    RecordProperty("Halo_bidirectitonal_BW_GPU", 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time);
+    RecordProperty("Halo_bidirectitonal_BW_CPU", 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time);
+    RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max);
+    RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min);
+    RecordProperty("Halo_message_size_bytes",2*cudaSpinor->GhostBytes());
+
+    printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
+     1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
+     1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
+     2*cudaSpinor->GhostBytes());
 
   }
 
@@ -1091,9 +1096,18 @@ for (int p = 0; p < 16; p++) {
    return ss.str();
  }
 
+#ifndef USE_LEGACY_DSLASH
+#ifdef MULTI_GPU
+   INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest, Combine( Range(0,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getstaggereddslashtestname);
+#else
+   INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest, Combine( Range(0,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getstaggereddslashtestname);
+#endif
+
+#else
 
 #ifdef MULTI_GPU
- INSTANTIATE_TEST_CASE_P(QUDA, StaggeredDslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getstaggereddslashtestname);
+   INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest, Combine( Range(1,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), Range(0,16)),getstaggereddslashtestname);
 #else
- INSTANTIATE_TEST_CASE_P(QUDA, StaggeredDslashTest, Combine( Range(0,3), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getstaggereddslashtestname);
+   INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest, Combine( Range(1,4), ::testing::Values(QUDA_RECONSTRUCT_NO,QUDA_RECONSTRUCT_12,QUDA_RECONSTRUCT_8), ::testing::Values(0) ),getstaggereddslashtestname);
+#endif
 #endif

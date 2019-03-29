@@ -1,11 +1,11 @@
 
-include_directories(.)
+include_directories(. googletest/include googletest)
 
 
 
 ## enable tests
 #build a common library for all test utilities
-set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp face_gauge.cpp)
+set(QUDA_TEST_COMMON googletest/src/gtest-all.cc test_util.cpp misc.cpp face_gauge.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 
 set(TEST_LIBS quda quda_test )
@@ -105,10 +105,6 @@ QUDA_CHECKBUILDTEST(pack_test QUDA_BUILD_ALL_TESTS)
 cuda_add_executable(blas_test blas_test.cu)
 target_link_libraries(blas_test ${TEST_LIBS})
 QUDA_CHECKBUILDTEST(blas_test QUDA_BUILD_ALL_TESTS)
-
-cuda_add_executable(copy_test copy_test.cu)
-target_link_libraries(copy_test ${TEST_LIBS})
-QUDA_CHECKBUILDTEST(copy_test QUDA_BUILD_ALL_TESTS)
 
 cuda_add_executable(covdev_test covdev_test.cpp  covdev_reference.cpp)
 target_link_libraries(covdev_test ${TEST_LIBS})

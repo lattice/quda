@@ -92,50 +92,23 @@ namespace quda {
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                         double a, double m_f, const ColorSpinorField &x,
-                         int parity, bool dagger, const int *comm_override, TimeProfile &profile)
-  {
-    constexpr int nDim = 5;
-    DomainWall5DArg<Float,nColor,recon> arg(out, in, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
-    DomainWall5D<Float,nDim,nColor,DomainWall5DArg<Float,nColor,recon> > twisted(arg, out, in);
+  struct DomainWall5DApply {
 
-    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-                                               in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-    policy.apply(0);
+    inline DomainWall5DApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                             double a, double m_f, const ColorSpinorField &x,
+                             int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 5;
+      DomainWall5DArg<Float,nColor,recon> arg(out, in, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
+      DomainWall5D<Float,nDim,nColor,DomainWall5DArg<Float,nColor,recon> > twisted(arg, out, in);
 
-    checkCudaError();
-  }
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+                                                         in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      policy.apply(0);
 
-  // template on the gauge reconstruction
-  template <typename Float, int nColor>
-  void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                         double a, double m_f, const ColorSpinorField &x,
-                         int parity, bool dagger, const int *comm_override, TimeProfile &profile)
-  {
-    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyDomainWall5D<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyDomainWall5D<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyDomainWall5D<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      checkCudaError();
     }
-  }
-
-  // template on the number of colors
-  template <typename Float>
-  void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                         double a, double m_f, const ColorSpinorField &x,
-                         int parity, bool dagger, const int *comm_override, TimeProfile &profile)
-  {
-    if (in.Ncolor() == 3) {
-      ApplyDomainWall5D<Float,3>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
+  };
 
   //Apply the 4-d preconditioned domain-wall Dslash operator
   //out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
@@ -157,20 +130,9 @@ namespace quda {
     // with 5-d checkerboarding we must use kernel packing
     pushKernelPackT(true);
 
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyDomainWall5D<double>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyDomainWall5D<float>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyDomainWall5D<short>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyDomainWall5D<char>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
+    instantiate<DomainWall5DApply>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
 
     popKernelPackT();
-
 #else
     errorQuda("Domain-wall dslash has not been built");
 #endif // GPU_DOMAIN_WALL_DIRAC

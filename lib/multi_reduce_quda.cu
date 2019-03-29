@@ -383,6 +383,8 @@ namespace quda {
       QudaPrecision precision = checkPrecision(*x[0],*y[0],*z[0],*w[0]);
 
       if (precision == QUDA_DOUBLE_PRECISION) {
+
+#if QUDA_PRECISION & 8
         if (x[0]->Nspin() == 4 || x[0]->Nspin() == 2) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
           const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
@@ -401,7 +403,13 @@ namespace quda {
           errorQuda("blas has not been built for Nspin=%d field", x[0]->Nspin());
 #endif
         } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
+#endif
+
       } else if (precision == QUDA_SINGLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
           const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
@@ -420,7 +428,13 @@ namespace quda {
           errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
         } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
+#endif
+
       } else if (precision == QUDA_HALF_PRECISION) { // half precision
+
+#if QUDA_PRECISION & 2
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
           const int M = 6;
@@ -438,7 +452,13 @@ namespace quda {
           errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
         } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
+#endif
+
       } else if (precision == QUDA_QUARTER_PRECISION) { // quarter precision
+
+#if QUDA_PRECISION & 1
         if (x[0]->Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
           const int M = 6;
@@ -456,10 +476,12 @@ namespace quda {
           errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
         } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, precision);
+#endif
       } else {
         errorQuda("Precision %d not supported\n", precision);
       }
-
     }
 
     /**

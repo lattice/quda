@@ -22,7 +22,7 @@
 #include <qio_field.h>
 
 #include <assert.h>
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 using namespace quda;
 
@@ -107,6 +107,17 @@ static double max_allowed_error = 1e-11;
 // For loading the gauge fields
 int argc_copy;
 char** argv_copy;
+
+double getTolerance(QudaPrecision prec) {
+  switch (prec) {
+    case QUDA_QUARTER_PRECISION: return 1e-1;
+    case QUDA_HALF_PRECISION: return 1e-3;
+    case QUDA_SINGLE_PRECISION: return 1e-4;
+    case QUDA_DOUBLE_PRECISION: return 1e-11;
+    case QUDA_INVALID_PRECISION: return 1.0;
+  }
+  return 1.0;
+}
 
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,

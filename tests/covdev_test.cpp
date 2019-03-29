@@ -18,7 +18,7 @@
 #include <gauge_field.h>
 
 #include <assert.h>
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 using namespace quda;
 

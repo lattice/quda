@@ -8,9 +8,10 @@
 #include <index_helper.cuh>
 
 namespace quda {
- /**
+
+  /**
      @brief Parameter structure for driving the Staggered Dslash operator
-   */
+  */
   template <typename Float, int nColor, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_, bool improved_>
   struct StaggeredArg : DslashArg<Float> {
     typedef typename mapper<Float>::type real;
@@ -44,7 +45,7 @@ namespace quda {
       in(in, improved_ ? 3 : 1),
       U(U),
       L(L),
-      fat_link_max(improved_ ? U.Precision() == QUDA_HALF_PRECISION ? U.LinkMax() : 1.0 : 1.0),
+      fat_link_max(improved_ ? isFixed<Float>::value ? U.LinkMax() : 1.0 : 1.0),
       tboundary(U.TBoundary()),
       x(x),
       a(a)
@@ -54,32 +55,16 @@ namespace quda {
     }
   };
 
-
- // MWTODO: THis should probably be placed in the correct header
-  template <typename Float, typename I> __device__ __host__ inline int StaggeredPhase(const int coords[], const I X[], int d, int dir, Float tboundary)
-  {
-    Float sign; // = static_cast<Float>(1.0);
-    // int coords[4];
-    // getCoords(coords, x, X, parity);
-    switch (d) {
-    case 0: sign = (coords[3]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
-    case 1: sign = (coords[3] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
-    case 2: sign = (coords[3] + coords[1] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
-    case 3: sign = (coords[3] + dir >= X[3] || coords[3] + dir < 0) ? tboundary : static_cast<Float>(1.0); break;
-    default: sign = static_cast<Float>(1.0);
-    }
-    return sign;
-  }
-
   /**
-       Applies the off-diagonal part of the Staggered / Asqtad operator
+     @brief Applies the off-diagonal part of the Staggered / Asqtad
+     operator.
 
-       @param[out] out The out result field
-       @param[in] U The gauge field
-       @param[in] in The input field
-       @param[in] parity The site parity
-       @param[in] x_cb The checkerboarded site index
-     */
+     @param[out] out The out result field
+     @param[in] U The gauge field
+     @param[in] in The input field
+     @param[in] parity The site parity
+     @param[in] x_cb The checkerboarded site index
+  */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
   __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, int coord[nDim], int x_cb, int parity, int idx, int thread_dim, bool &active)
   {

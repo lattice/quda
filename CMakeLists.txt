@@ -137,6 +137,9 @@ set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
 
+set(QUDA_PRECISION "14" CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
+set(QUDA_RECONSTRUCT "7" CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+
 # Set CTest options
 set(QUDA_CTEST_SEP_DSLASH_POLICIES OFF CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
@@ -171,6 +174,8 @@ mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
+mark_as_advanced(QUDA_PRECISION)
+mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -508,6 +513,12 @@ endif(QUDA_ARPACK)
 
 # MAX_MULTI_BLAS_N
 add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})
+
+# set which precisions to enable
+add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
+
+# set which precisions to enable
+add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)

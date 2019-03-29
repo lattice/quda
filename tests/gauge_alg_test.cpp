@@ -23,7 +23,7 @@
 #endif
 
 
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 using   namespace quda;
 

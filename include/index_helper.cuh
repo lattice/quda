@@ -819,4 +819,30 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, int pa
 #endif
   }
 
+  /**
+     @brief Compute the staggered phase factor at unit shift from the
+     current lattice coordinates.  The routine below optimizes out the
+     shift where possible, hence is only visible where we need to
+     consider the boundary condition.
+
+     @param[in] coords Lattice coordinates
+     @param[in] X Lattice dimensions
+     @param[in] dim Dimension we are hopping
+     @param[in] dir Direction of the unit hop (+1 or -1)
+     @param[in] tboundary Boundary condition
+   */
+  template <typename Float, typename I>
+  __device__ __host__ inline int StaggeredPhase(const int coords[], const I X[], int dim, int dir, Float tboundary)
+  {
+    Float sign;
+    switch (dim) {
+    case 0: sign = (coords[3]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
+    case 1: sign = (coords[3] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
+    case 2: sign = (coords[3] + coords[1] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
+    case 3: sign = (coords[3] + dir >= X[3] || coords[3] + dir < 0) ? tboundary : static_cast<Float>(1.0); break;
+    default: sign = static_cast<Float>(1.0);
+    }
+    return sign;
+  }
+
 } // namespace quda

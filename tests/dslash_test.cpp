@@ -19,7 +19,7 @@
 
 #include <qio_field.h>
 // google test frame work
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -77,6 +77,17 @@ extern double mu;
 extern double epsilon;
 
 extern QudaVerbosity verbosity;
+
+double getTolerance(QudaPrecision prec) {
+  switch (prec) {
+    case QUDA_QUARTER_PRECISION: return 5e-2;
+    case QUDA_HALF_PRECISION: return 1e-3;
+    case QUDA_SINGLE_PRECISION: return 1e-4;
+    case QUDA_DOUBLE_PRECISION: return 1e-11;
+    case QUDA_INVALID_PRECISION: return 1.0;
+  }
+  return 1.0;
+}
 
 void init(int argc, char **argv) {
 
@@ -952,8 +963,9 @@ extern void usage(char**);
 
 TEST(dslash, verify) {
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-11 :
-		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-2));
+  double tol = getTolerance(inv_param.cuda_prec);
+  if (gauge_param.reconstruct == QUDA_RECONSTRUCT_8) tol *= 10; // if recon 8, we tolerate a greater deviation
+
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
