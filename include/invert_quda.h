@@ -48,6 +48,9 @@ namespace quda {
      */    
     QudaResidualType residual_type;
 
+    /**< Whether deflate the initial guess */
+    bool deflate;
+    
     /**< Used to define deflation */
     QudaEigParam eig_param;
     
@@ -372,8 +375,6 @@ namespace quda {
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
-
-
     
     /**
        Solver factory
@@ -442,8 +443,11 @@ namespace quda {
     */
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
-    bool deflated;
+    /**
+       Deflation objects
+    */
     EigenSolver *eig_solver;
+    bool deflate_init = false;
     std::vector<ColorSpinorField*> defl_tmp1;
     std::vector<ColorSpinorField*> defl_tmp2;
     
@@ -467,15 +471,13 @@ namespace quda {
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
     std::vector<ColorSpinorField*> p;
-    bool init;    
-    bool deflate_init;
+    bool init;
     
   public:
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
     /**
-     * @brief: Run CG.
-     * 
+     * @brief Run CG.
      * @param out Solution vector.
      * @param in Right-hand side.
      */
@@ -486,7 +488,6 @@ namespace quda {
     /**
      * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
      * @details This can be used when continuing a CG, e.g. as refinement step after a multi-shift solve.
-     * 
      * @param out Solution-vector.
      * @param in Right-hand side.
      * @param p_init Initial-search direction.
@@ -494,7 +495,8 @@ namespace quda {
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
 
-
+    void constructDeflationSpace();
+    
     void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
   };
 
@@ -939,10 +941,43 @@ namespace quda {
     const char *prefix;
 
   public:
-  PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile, const char *prefix)
-    : Solver(param, profile), solver(&solver), dirac(dirac), prefix(prefix) { }
+  PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param,
+		       TimeProfile &profile, const char *prefix)
+    : Solver(param, profile), solver(&solver), dirac(dirac), prefix(prefix) {
+      
+      //DMH
+      if(param.deflate) {
+	/*
+	//Compute the deflation sub-space
+	eig_solver = EigenSolver::create(&param.eig_param,
+					 dirac,
+					 profile);
+	
+	//Clone from an existing vector
+	ColorSpinorParam csParam(x);
+	csParam.create = QUDA_ZERO_FIELD_CREATE;
+	//This is the vector precision used by matResidual
+	csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+	param.evecs.resize(param.eig_param.nKr);
+	for (int i=0; i<param.eig_param.nKr; i++)
+	  param.evecs[i] = ColorSpinorField::Create(csParam);
+	
+	//Construct vectors to hold deflated RHS
+	defl_tmp1.push_back(ColorSpinorField::Create(csParam));
+	defl_tmp2.push_back(ColorSpinorField::Create(csParam));
+	
+	param.evals.resize(param.eig_param.nEv);
+	for (int i=0; i<param.eig_param.nEv; i++)  param.evals[i] = 0.0;
+	
+	(*eig_solver)(param.evecs, param.evals);
+	
+	deflate_init = true;
+	*/
+      }      
+    }
+    
     virtual ~PreconditionedSolver() { delete solver; }
-
+    
     void operator()(ColorSpinorField &x, ColorSpinorField &b) {
       setOutputPrefix(prefix);
 
@@ -1109,12 +1144,34 @@ namespace quda {
 
     bool init;
 
+    //START ShitShow
+    /** projection matrix full (maximum) dimension (nev*deflation_grid) */
+    int tot_dim; 
+    
+    /** current dimension (must match rhs_idx: if(rhs_idx < deflation_grid) curr_nevs <= nev * rhs_idx) */           
+    int cur_dim;
+
+
+
+
+
+
+
+    //END ShitSHow
+    
   public:
 
     IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~IncEigCG();
 
+    /**
+       @breif Expands deflation space.
+       @param V container of new eigenvectors
+       @param nev number of vectors to load
+     */
+    void increment(ColorSpinorField &V, int nev);
+    
     void RestartVT(const double beta, const double rho);
     void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2); 
     //EigCG solver:
@@ -1123,6 +1180,15 @@ namespace quda {
     int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //Incremental eigCG solver (for eigcg and initcg calls)
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       @brief Test whether the deflation space is complete
+       and therefore cannot be further extended      
+     */
+    bool isDeflSpaceComplete() {
+      return (cur_dim == tot_dim);
+    }
+    
   };
 
 //forward declaration

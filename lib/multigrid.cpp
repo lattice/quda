@@ -405,13 +405,9 @@ namespace quda {
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;  
       if(param.mg_global.deflate_coarsest) {
 	param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel-1];
-	printfQuda("CHECK nKr = %d, nEv = %d, nConv = %d\n",
-		   param_coarse_solver->eig_param.nKr,
-		   param_coarse_solver->eig_param.nEv,
-		   param_coarse_solver->eig_param.nConv);
-	
-	param_coarse_solver->eig_param.deflate = QUDA_BOOLEAN_YES;
+	param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
 	param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+	printfQuda("deflate coarsest true\n");
       }
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
       param_coarse_solver->global_reduction = true;
@@ -813,50 +809,9 @@ namespace quda {
         if ( debug ) printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", norm2(x), r2, norm2(*r_coarse));
 
         // recurse to the next lower level
-	if(param.level == param.Nlevel-2 && param.mg_global.deflate_coarsest) {
-	  /*
-	  
-	  //Deflate the residual injected into coarsest grid solve
-	  //==============================================================
-	  //Create temp guess vector
-	  ColorSpinorField *x_coarse_defl = nullptr;
-	  ColorSpinorParam csParam(*x_coarse);
-	  x_coarse_defl = ColorSpinorField::Create(csParam);
-	  
-	  //Pointer wrapper for initial guess
-	  std::vector<ColorSpinorField*> x_coarse_defl_ptr;
-	  x_coarse_defl_ptr.push_back(x_coarse_defl);
-
-	  //Pointer wrapper for residual
-	  std::vector<ColorSpinorField*> r_coarse_ptr;
-	  r_coarse_ptr.push_back(r_coarse);
-	  
-	  //printfQuda("before deflation x_coarse_defl = %e r_coarse = %e\n", norm2(*x_coarse_defl_ptr[0]), norm2(*r_coarse));
-	  deflateEigenvectors(x_coarse_defl_ptr, r_coarse_ptr, coarse->param.B, coarse->param.evals);
-	  //printfQuda("between x_coarse_defl = %e r_coarse = %e\n", norm2(*x_coarse_defl_ptr[0]), norm2(*r_coarse));
-	  //==============================================================
-	  
-	  //Call deflated solver
-	  (*coarse_solver)(*x_coarse_defl_ptr[0], *r_coarse);
-	  
-          //printfQuda("between x_coarse_defl = %e r_coarse = %e\n", norm2(*x_);
-	  setOutputPrefix(prefix); // restore prefix after return from coarse grid
-	  //printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse_defl_ptr[0]), norm2(*r_coarse));
-	  //copy back to x_coarse
-	  *x_coarse = *x_coarse_defl;
-	  delete x_coarse_defl;
-	  */
-	  //printfQuda("before inv x_coarse = %e r_coarse_tmp = %e\n", norm2(*x_coarse), norm2(*r_coarse));	  
-	  (*coarse_solver)(*x_coarse, *r_coarse); 
-	  setOutputPrefix(prefix); // restore prefix after return from coarse grid
-	  if ( debug ) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
-	  
-	} else {
-	  //printfQuda("before inv x_coarse = %e r_coarse_tmp = %e\n", norm2(*x_coarse), norm2(*r_coarse));	  
-	  (*coarse_solver)(*x_coarse, *r_coarse); 
-	  setOutputPrefix(prefix); // restore prefix after return from coarse grid
-	  if ( debug ) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
-	}
+	(*coarse_solver)(*x_coarse, *r_coarse); 
+	setOutputPrefix(prefix); // restore prefix after return from coarse grid
+	if ( debug ) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
 	
         // prolongate back to this grid
         ColorSpinorField &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // define according to inner solution type
