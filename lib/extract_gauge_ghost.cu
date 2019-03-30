@@ -16,9 +16,9 @@ namespace quda {
 
     if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhost<short,length>(FloatNOrder<short,length,2,19>
-				     (u, 0, (short**)Ghost), u, location, extract, offset);
+	if (isFixed<Float>::value && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  extractGhost<Float,length>(FloatNOrder<Float,length,2,19>
+				     (u, 0, (Float**)Ghost), u, location, extract, offset);
 	} else {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
 	  extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);

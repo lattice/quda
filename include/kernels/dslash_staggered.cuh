@@ -195,8 +195,8 @@ namespace quda {
     int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
     switch (parity) {
-    	case 0: staggered<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 0); break;
-    	case 1: staggered<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 1); break;
+    case 0: staggered<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 0); break;
+    case 1: staggered<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 1); break;
     }
   }
 }
