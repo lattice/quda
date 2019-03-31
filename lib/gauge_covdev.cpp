@@ -2,7 +2,7 @@
 #include <blas_quda.h>
 #include <iostream>
 #include <multigrid.h>
-#include <covDev.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
@@ -21,12 +21,13 @@ namespace quda {
   void GaugeCovDev::DslashCD(ColorSpinorField &out, const ColorSpinorField &in,  const QudaParity parity, const int mu) const
   {
     checkSpinorAlias(in, out);
-
-    ApplyCovDev(out, in, *gauge, parity, mu);
-
+    
+    ApplyCovDev(out, in, *gauge, mu, 0., in, parity, dagger, commDim, profile);
+    //ApplyCovDev(out, in, *gauge, parity, commDim, profile, mu);
+    
     flops += 1320ll*in.Volume(); // FIXME
   }
-
+  
   void GaugeCovDev::MCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const
   {
     checkFullSpinor(out, in);
@@ -37,10 +38,10 @@ namespace quda {
   {
     bool reset = newTmp(&tmp1, in);
     checkFullSpinor(*tmp1, in);
-
+    
     MCD(*tmp1, in, mu);
     MCD(out, *tmp1, (mu+4)%8);
-
+    
     deleteTmp(&tmp1, reset);
   }
 

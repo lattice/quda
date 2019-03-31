@@ -50,8 +50,8 @@ void *links[4];
 void **ghostLink;
 #endif
 
-QudaParity parity = QUDA_EVEN_PARITY;
 extern QudaDagType dagger;
+QudaParity parity = QUDA_EVEN_PARITY;
 int transfer = 0; // include transfer time in the benchmark?
 extern int xdim;
 extern int ydim;
@@ -120,7 +120,7 @@ void init()
   inv_param.cuda_prec = cuda_prec;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
-  inv_param.dagger = dagger;
+  inv_param.dagger = QUDA_DAG_NO;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = dslash_type;
   inv_param.mass = mass;
@@ -284,7 +284,7 @@ double dslashCUDA(int niter, int mu) {
     if (transfer){
       //MatQuda(spinorGPU, spinor, &inv_param);
     } else {
-        dirac->MCD(*cudaSpinorOut, *cudaSpinor, mu);
+      dirac->MCD(*cudaSpinorOut, *cudaSpinor, mu);
     }
   }
 
@@ -302,7 +302,7 @@ double dslashCUDA(int niter, int mu) {
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
-
+  
   return secs;
 }
 
@@ -333,10 +333,13 @@ static int dslashTest()
   // return code for google test
   int test_rc = 0;
   init();
-
-  int attempts = 1;
-
+  
+  int attempts = 2;
   for (int i=0; i<attempts; i++) {
+
+    //Test forward directions, then backward
+    i == 0 ? dagger = QUDA_DAG_YES : dagger = QUDA_DAG_NO;
+    
     for (int mu=0; mu<4; mu++) { // We test all directions in one go
       int muCuda = mu + (dagger ? 4 : 0);
       int muCpu  = mu*2 + (dagger ? 1 : 0);
@@ -345,7 +348,7 @@ static int dslashTest()
         printfQuda("Tuning...\n");
         dslashCUDA(1,muCuda);
       }
-      printfQuda("Executing %d kernel loops...", niter);
+      printfQuda("Executing %d kernel loop(s)...", niter);
 
       double secs = dslashCUDA(niter, muCuda);
 
@@ -360,16 +363,17 @@ static int dslashTest()
 		 1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
 
       double spinor_ref_norm2 = blas::norm2(*spinorRef);
-      double spinor_out_norm2 =  blas::norm2(*spinorOut);
-
+      blas::copy(*tmpCpu, *spinorOut);
+      double spinor_out_norm2 = blas::xmyNorm(*spinorOut, *tmpCpu);
+      
       if (!transfer) {
         double cuda_spinor_out_norm2 =  blas::norm2(*cudaSpinorOut);
-        printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", mu, spinor_ref_norm2, cuda_spinor_out_norm2,
-		   spinor_out_norm2);
+        printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%.6e\n", muCuda,
+		   spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
       } else {
         printfQuda("Result mu = %d: CPU=%f , CPU-CUDA=%f", mu, spinor_ref_norm2, spinor_out_norm2);
       }
-
+      
       if (verify_results) {
         test_rc = RUN_ALL_TESTS();
         if (test_rc != 0) warningQuda("Tests failed");
@@ -426,7 +430,7 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
-
+  
   // return result of RUN_ALL_TESTS
   int test_rc = dslashTest();
 

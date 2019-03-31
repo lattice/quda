@@ -401,7 +401,7 @@ namespace quda {
   void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                          double a, double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
                          int parity, bool dagger, const int *comm_override, TimeProfile &profile);
-
+  
   enum Dslash5Type {
     DSLASH5_DWF,
     DSLASH5_MOBIUS_PRE,
@@ -430,6 +430,46 @@ namespace quda {
 		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
 		    double a, bool dagger, Dslash5Type type);
 
+  /**
+     @brief Driver for applying the Laplace stencil
+
+     out = - kappa * A * in
+
+     where A is the gauge laplace linear operator.
+
+     If x is defined, the operation is given by out = x - kappa * A in.
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the gauge Laplace
+     @param[in] kappa Scale factor applied
+     @param[in] x Vector field we accumulate onto to
+  */
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+		    double kappa, const ColorSpinorField *x, int parity);
+
+  /**
+     @brief Driver for applying the covariant derivative
+
+     out = U * in
+
+     where U is the gauge field in a particular direction.
+
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the covariant derivative
+     @param[in] mu Direction of the derivative. For mu > 3 it goes backwards
+  */
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in,
+		   const GaugeField &U, int mu, double a, const ColorSpinorField &x,
+		   int parity, bool dagger, const int *comm_override,
+		   TimeProfile &profile);
+  
 #else
 
   // plain Wilson Dslash

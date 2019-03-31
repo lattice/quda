@@ -2,7 +2,7 @@
 #include <blas_quda.h>
 #include <iostream>
 #include <multigrid.h>
-#include <stencil.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
