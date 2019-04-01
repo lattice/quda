@@ -9,9 +9,9 @@ set (QUDA_OBJS
   gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
   inv_cg3_quda.cpp inv_cg3ne_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
-  inv_pcg_quda.cpp inv_pipepcg_quda.cpp inv_pipe2pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
+  inv_pcg_quda.cpp inv_pipepcg_quda.cpp inv_pipefcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
-  color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
+  color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
@@ -28,7 +28,7 @@ set (QUDA_OBJS
   dslash_domain_wall_4d.cu dslash_mobius.cu
   dslash4_staggered.cu dslash4_improved_staggered.cu
   dslash4_wilson.cu dslash4_wilson_clover.cu dslash5_domain_wall.cu
-  dslash4_wilson_clover_preconditioned.cu 
+  dslash4_wilson_clover_preconditioned.cu
   dslash4_twisted_mass.cu dslash4_twisted_mass_preconditioned.cu
   dslash4_ndeg_twisted_mass.cu dslash4_ndeg_twisted_mass_preconditioned.cu
   dslash4_twisted_clover.cu dslash4_twisted_clover_preconditioned.cu
@@ -136,9 +136,9 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
     $<$<CONFIG:DEVEL>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVEL}>
     $<$<CONFIG:STRICT>:-Xcompiler ${CMAKE_CXX_FLAGS_STRICT}>
     $<$<CONFIG:RELEASE>:-Xcompiler ${CMAKE_CXX_FLAGS_RELEASE}>
-    $<$<CONFIG:DEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEBUG}>  
+    $<$<CONFIG:DEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEBUG}>
     $<$<CONFIG:HOSTDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_HOSTDEBUG}>
-    $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> 
+    $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}>
     >)
 endif()
 
@@ -190,7 +190,7 @@ endif()
 
 # malloc.cpp uses both the driver and runtime api
 # So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub version
-# for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake 
+# for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
 target_link_libraries(quda PUBLIC ${CUDA_cuda_LIBRARY})
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first

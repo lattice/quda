@@ -1,6 +1,7 @@
 #include <quda_internal.h>
 #include <invert_quda.h>
 #include <multigrid.h>
+#include <deflation.h>
 #include <cmath>
 
 namespace quda {
@@ -310,7 +311,7 @@ namespace quda {
 						  x = xProj;
 
 						  (*solver)(x, b);
-								
+
 								dirac.MdagM(r, x);
 						  blas::xpay(b, -1.0, r);
 

@@ -17,7 +17,6 @@
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
 #include <misc.h>
-#include <gtest.h>
 
 using std::endl;
 using std::cout;
@@ -312,9 +311,6 @@ void end() {
 extern void usage(char**);
 
 int main(int argc, char *argv[]) {
-
-  // initalize google test, includes command line options
-  ::testing::InitGoogleTest(&argc, argv);
 
   for (int i =1;i < argc; i++) {
     if(process_command_line_option(argc, argv, &i) == 0) continue;
