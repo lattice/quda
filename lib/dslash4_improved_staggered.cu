@@ -49,10 +49,7 @@ public:
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         Dslash<Float>::setParam(arg);
-        if (arg.xpay)
-          Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor, true>(tp, arg, stream);
-        else
-          Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor, false>(tp, arg, stream);
+        Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor>(tp, arg, stream);
       }
     }
 

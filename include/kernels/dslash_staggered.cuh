@@ -166,14 +166,14 @@ namespace quda {
 
     applyStaggered<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
 
-    if (dagger) { out = real(-1) * out; }
+    if (dagger) { out = -out; }
 
     if (xpay && kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
       out = arg.a * x - out;
     } else if (kernel_type != INTERIOR_KERNEL) {
       Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + (xpay ? real(-1) * out : out); // MWTODO: verify
+      out = x + (xpay ? -out : out);
     }
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
   }

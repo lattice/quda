@@ -50,6 +50,15 @@ namespace quda {
 	return *this;
       }
 
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns> operator-() const {
+        ColorSpinor<Float,Nc,Ns> a;
+#pragma unroll
+        for (int i=0; i<size; i++) {
+          a.data[i] = -data[i];
+        }
+	return a;
+      }
+
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator+=(const ColorSpinor<Float, Nc, Ns> &a) {
 #pragma unroll
         for (int i=0; i<size; i++) {
@@ -75,6 +84,7 @@ namespace quda {
         }
         return *this;
       }
+
       template<typename S>
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
 
