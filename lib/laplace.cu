@@ -52,10 +52,7 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
-      if (arg.xpay)
-	Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor, true>(tp, arg, stream);
-      else
-	Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor, false>(tp, arg, stream);
+      Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor>(tp, arg, stream);
     }
     
     TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
@@ -71,7 +68,7 @@ namespace quda {
 
       constexpr int nDim = 4;
       LaplaceArg<Float,nColor,recon> arg(out,in,U,dir,a,x,parity,dagger,comm_override);
-      Laplace<Float,nDim,nColor,LaplaceArg<Float,nColor,recon>>laplace(arg, out, in);
+      Laplace<Float,nDim,nColor,LaplaceArg<Float,nColor,recon>> laplace(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
       policy.apply(0);
@@ -98,10 +95,7 @@ namespace quda {
     // check all locations match
     checkLocation(out, in, U);
     
-    //instantiate<LaplaceApply,WilsonReconstruct>(out, in, U, dir, kappa, x, parity,
-    //dagger, comm_override, profile);
-    instantiate<LaplaceApply,StaggeredReconstruct>(out, in, U, dir, kappa, x, parity,
-						   dagger, comm_override, profile);
+    instantiate<LaplaceApply>(out, in, U, dir, kappa, x, parity, dagger, comm_override, profile);
   }
 } // namespace quda
 

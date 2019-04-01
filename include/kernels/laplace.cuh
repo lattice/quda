@@ -22,7 +22,7 @@ namespace quda {
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    typedef typename gauge_mapper<Float,reconstruct,18,QUDA_STAGGERED_PHASE_MILC,gauge_direct_load,ghost>::type G;
+    typedef typename gauge_mapper<Float,reconstruct,18,QUDA_STAGGERED_PHASE_NO,gauge_direct_load,ghost>::type G;
 
     typedef typename mapper<Float>::type real;
 
@@ -150,7 +150,7 @@ namespace quda {
       out = x + arg.a * out;
     } else if (kernel_type != INTERIOR_KERNEL) {
       Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + (xpay ? real(1) * out : out); // MWTODO: verify DMH check this...
+      out = x + (xpay ? arg.a * out : out);
     }
     
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
