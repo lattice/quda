@@ -150,7 +150,7 @@ namespace quda {
       out = x + arg.a * out;
     } else if (kernel_type != INTERIOR_KERNEL) {
       Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + (xpay ? real(1) * out : out); // MWTODO: verify DMH check
+      out = x + (xpay ? real(1) * out : out); // MWTODO: verify DMH check this...
     }
     
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;

@@ -74,9 +74,9 @@ GaugeCovDev* dirac;
 
 const int nColor = 3;
 
-void init()
+void init(int argc, char **argv)
 {    
-
+  
   initQuda(device);
 
   setVerbosity(QUDA_VERBOSE);
@@ -328,64 +328,6 @@ TEST(dslash, verify) {
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
-static int dslashTest()
-{
-  // return code for google test
-  int test_rc = 0;
-  init();
-  
-  int attempts = 2;
-  for (int i=0; i<attempts; i++) {
-
-    //Test forward directions, then backward
-    i == 0 ? dagger = QUDA_DAG_NO : dagger = QUDA_DAG_YES;
-    
-    for (int mu=0; mu<4; mu++) { // We test all directions in one go
-      int muCuda = mu + (dagger ? 4 : 0);
-      int muCpu  = mu*2 + (dagger ? 1 : 0);
-
-      { // warm-up run
-        printfQuda("Tuning...\n");
-        dslashCUDA(1,muCuda);
-      }
-      printfQuda("Executing %d kernel loop(s)...", niter);
-
-      double secs = dslashCUDA(niter, muCuda);
-
-      if (!transfer) *spinorOut = *cudaSpinorOut;
-
-      printfQuda("\n%fms per loop\n", 1000*secs);
-      covdevRef(muCpu);
-
-      unsigned long long flops = niter * 8*nColor*nColor*2*(long long)cudaSpinor->VolumeCB();
-      printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-      printfQuda("Effective halo bi-directional bandwidth = %f for aggregate message size %lu bytes\n",
-		 1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
-
-      double spinor_ref_norm2 = blas::norm2(*spinorRef);
-      blas::copy(*tmpCpu, *spinorOut);
-      double spinor_out_norm2 = blas::xmyNorm(*spinorOut, *tmpCpu);
-      
-      if (!transfer) {
-        double cuda_spinor_out_norm2 =  blas::norm2(*cudaSpinorOut);
-        printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%.6e\n", muCuda,
-		   spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
-      } else {
-        printfQuda("Result mu = %d: CPU=%f , CPU-CUDA=%f", mu, spinor_ref_norm2, spinor_out_norm2);
-      }
-      
-      if (verify_results) {
-        test_rc = RUN_ALL_TESTS();
-        if (test_rc != 0) warningQuda("Tests failed");
-      }
-    }  // Directions
-  }
-
-  end();
-
-  return test_rc;
-}
-
 
 void display_test_info()
 {
@@ -407,7 +349,7 @@ void display_test_info()
 }
 
 
-  void
+void
 usage_extra(char** argv )
 {
   return ;
@@ -417,8 +359,9 @@ int main(int argc, char **argv)
 {
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
-  for (int i=1 ;i < argc; i++){
-
+  // return code for google test
+  int test_rc = 0;
+  for (int i=1 ;i < argc; i++){    
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }    
@@ -430,12 +373,69 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
+
+  init(argc, argv);
+
+  int attempts = 1;
+  for (int i=0; i<attempts; i++) {
+    
+    //Test forward directions, then backward
+    for (int dag=0; dag<2; dag++) {
+     dag == 0 ? dagger = QUDA_DAG_NO : dagger = QUDA_DAG_YES;
+    
+     for (int mu=0; mu<4; mu++) { // We test all directions in one go
+       int muCuda = mu + (dagger ? 4 : 0);
+       int muCpu  = mu*2 + (dagger ? 1 : 0);
+       
+       //Reference computation
+       covdevRef(muCpu);
+       printfQuda("\n\nChecking muQuda = %d\n", muCuda);      
+       
+       { // warm-up run
+	 printfQuda("Tuning...\n");
+	 dslashCUDA(1,muCuda);
+       }
+       
+       printfQuda("Executing %d kernel loop(s)...", niter);
+       
+       double secs = dslashCUDA(niter, muCuda);
+       if (!transfer) *spinorOut = *cudaSpinorOut;
+       printfQuda("\n%fms per loop\n", 1000*secs);
+       
+       unsigned long long flops = niter * 8*nColor*nColor*2*(long long)cudaSpinor->VolumeCB();
+       printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
+       printfQuda("Effective halo bi-directional bandwidth = %f for aggregate message size %lu bytes\n",
+		  1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
+       
+       double spinor_ref_norm2 = blas::norm2(*spinorRef);
+       blas::copy(*tmpCpu, *spinorOut);
+       double spinor_out_norm2 = blas::xmyNorm(*spinorOut, *tmpCpu);
+       
+       if (!transfer) {
+	 double cuda_spinor_out_norm2 =  blas::norm2(*cudaSpinorOut);
+	 printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%.6e\n", muCuda,
+		    spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
+       } else {
+	 printfQuda("Result mu = %d: CPU=%f , CPU-CUDA=%f", mu, spinor_ref_norm2, spinor_out_norm2);
+       }
+       
+       if (verify_results) {
+	 ::testing::TestEventListeners& listeners =
+	   ::testing::UnitTest::GetInstance()->listeners();
+	 if (comm_rank() != 0) {
+	   delete listeners.Release(listeners.default_result_printer());
+	 }
+	 
+	 test_rc = RUN_ALL_TESTS();
+	 if (test_rc != 0) warningQuda("Tests failed");
+       }
+     }  // Directions
+    } // Dagger
+  }
   
-  // return result of RUN_ALL_TESTS
-  int test_rc = dslashTest();
+  end();
 
   finalizeComms();
-
   return test_rc;
 }
 

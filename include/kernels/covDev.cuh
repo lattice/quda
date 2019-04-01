@@ -36,7 +36,8 @@ namespace quda {
     CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
 	      int mu, double a, const ColorSpinorField &x, int parity, bool dagger,
 	      const int *comm_override) :
-      
+
+      //a != 0.0 ? true : false tests for xpay boolean
       DslashArg<Float>(in, U, parity, dagger, a != 0.0 ? true : false, 1, comm_override) ,
       out(out),
       in(in),
@@ -65,39 +66,42 @@ namespace quda {
   */
   
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
-  __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, int coord[nDim], int x_cb, int parity, int idx, int thread_dim, bool &active) {
+  __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, int coord[nDim], int x_cb,
+					      int parity, int idx, int thread_dim, bool &active) {
     
+
     typedef typename mapper<Float>::type real;
     typedef Matrix<complex<real>, nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
     const int mu = arg.mu;
     const int d = arg.mu%4;
-    
+        
     if (mu<4) {
       
       //Forward gather - compute fwd offset for vector fetch
       const int fwd_idx = linkIndexP1(coord, arg.dim, d);
       
-      const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+      const bool ghost = (coord[d] + 1 >= arg.dim[d]) &&
+    	isActive<kernel_type>(active, thread_dim, d, coord, arg);
+      
+      const Link U = arg.U(d, x_cb, parity);
       
       if (doHalo<kernel_type>(d) && ghost) {
 	
 	const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
-	const Link U = arg.U(d, x_cb, parity);
-	const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+    	const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);	
+    	out += U * in;
 	
-	out += U * in;
       } else if (doBulk<kernel_type>() && !ghost) {
 	
-	const Link U = arg.U(d, x_cb, parity);
-	const Vector in = arg.in(fwd_idx, their_spinor_parity);
+    	const Vector in = arg.in(fwd_idx, their_spinor_parity);	
+    	out += U * in;
 	
-	out += U * in;      
       }
       
     } else {
-	
+      
       //Backward gather - compute back offset for spinor and gauge fetch
       
       const int back_idx = linkIndexM1(coord, arg.dim, d);
@@ -107,18 +111,18 @@ namespace quda {
       
       if (doHalo<kernel_type>(d) && ghost) {
 	
-	const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+    	const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+
+    	const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
+    	const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
 	
-	const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
-	const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-	
-	out += conj(U) * in;
+    	out += conj(U) * in;
       } else if (doBulk<kernel_type>() && !ghost) {
 	
-	const Link U = arg.U(d, gauge_idx, 1-parity);
-	const Vector in = arg.in(back_idx, their_spinor_parity);
+    	const Link U = arg.U(d, gauge_idx, 1-parity);
+    	const Vector in = arg.in(back_idx, their_spinor_parity);
 	
-	out += conj(U) * in;
+    	out += conj(U) * in;
       }
     } // Forward/backward derivative    
   }
@@ -143,15 +147,16 @@ namespace quda {
     Vector out;
     
     applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
-    
+
+    //DMH: check this....
     if (xpay && kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
-      out = out + arg.a * x;
+      out = x + arg.a * out;
     } else if (kernel_type != INTERIOR_KERNEL) {
       Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + (xpay ? real(-1) * out : out); // MWTODO: verify
+      out = x + (xpay ? arg.a * out : out); 
     }
-    
+
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     
   }
@@ -167,8 +172,8 @@ namespace quda {
     int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
     
     switch (parity) {
-    case 0: covDev<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 0); break;
-    case 1: covDev<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 1); break;
+    case 0: covDev<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 0); break;
+    case 1: covDev<Float,nDim,nColor,nParity,dagger,xpay,kernel_type>(arg, x_cb, 1); break;
     }
   }
 }

@@ -78,9 +78,10 @@ void covdevReference(sFloat *res, gFloat **link, sFloat *spinorField,
 
 
 
-void covdev_dslash(void *res, void **link, void *spinorField, int oddBit, int daggerBit, int mu,
-		      QudaPrecision sPrecision, QudaPrecision gPrecision) {
-    
+void covdev_dslash(void *res, void **link, void *spinorField, int oddBit,
+		   int daggerBit, int mu, QudaPrecision sPrecision,
+		   QudaPrecision gPrecision) {
+  
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION){
       covdevReference((double*)res, (double**)link, (double*)spinorField, oddBit, daggerBit, mu);
@@ -186,9 +187,9 @@ void matdagmat(void *out, void **link, void *in, int dagger_bit, int mu,
 #ifdef MULTI_GPU
 
 template <typename sFloat, typename gFloat>
-void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, sFloat *spinorField,
-			    sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor,
-			    int oddBit, int daggerBit, int mu)
+void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink,
+			    sFloat *spinorField, sFloat **fwd_nbr_spinor,
+			    sFloat **back_nbr_spinor, int oddBit, int daggerBit, int mu)
 {
   for (int i=0; i<Vh*mySpinorSiteSize; i++) res[i] = 0.0;
 
