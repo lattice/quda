@@ -22,8 +22,12 @@ namespace quda {
   {
     checkSpinorAlias(in, out);
 
+#ifndef USE_LEGACY_DSLASH 
+    ApplyLaplace(out, in, *gauge, laplace3D, 1.0, in, parity, dagger, commDim, profile);
+#else 
     ApplyLaplace(out, in, *gauge, 1.0, nullptr, parity);
-
+#endif
+    
     flops += 1320ll*in.Volume(); // FIXME
   }
 
@@ -33,8 +37,12 @@ namespace quda {
   {
     checkSpinorAlias(in, out);
 
+#ifndef USE_LEGACY_DSLASH
+    ApplyLaplace(out, in, *gauge, laplace3D, k, x, parity, dagger, commDim, profile);
+#else
     ApplyLaplace(out, in, *gauge, k, &x, parity);
-
+#endif
+    
     flops += 1368ll*in.Volume(); // FIXME
   }
 
@@ -76,7 +84,7 @@ namespace quda {
   GaugeLaplacePC::GaugeLaplacePC(const DiracParam &param) : GaugeLaplace(param) { }
 
   GaugeLaplacePC::GaugeLaplacePC(const GaugeLaplacePC &dirac) : GaugeLaplace(dirac) { }
-
+  
   GaugeLaplacePC::~GaugeLaplacePC() { }
 
   GaugeLaplacePC& GaugeLaplacePC::operator=(const GaugeLaplacePC &laplace)
@@ -149,7 +157,6 @@ namespace quda {
     }				
 
     // create full solution
-
     checkFullSpinor(x, b);
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       // x_o = b_o + k D_oe x_e

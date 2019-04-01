@@ -100,6 +100,8 @@ module quda_fortran
      real(8) :: epsilon ! Twisted mass parameter
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
+     integer(4) :: laplace3D    ! direction to omit in Laplace
+     
      real(8) :: tol ! Requested L2 residual norm
      real(8) :: tol_restart ! Solver tolerance in the L2 residual norm (used to restart InitCG)
      real(8) :: tol_hq ! Requested heavy quark residual norm

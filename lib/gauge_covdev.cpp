@@ -21,9 +21,12 @@ namespace quda {
   void GaugeCovDev::DslashCD(ColorSpinorField &out, const ColorSpinorField &in,  const QudaParity parity, const int mu) const
   {
     checkSpinorAlias(in, out);
-    
+
+#ifndef USE_LEGACY_DSLASH    
     ApplyCovDev(out, in, *gauge, mu, 0., in, parity, dagger, commDim, profile);
-    //ApplyCovDev(out, in, *gauge, parity, commDim, profile, mu);
+#else
+    ApplyCovDev(out, in, *gauge, parity, commDim, profile, mu);
+#endif
     
     flops += 1320ll*in.Volume(); // FIXME
   }

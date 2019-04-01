@@ -1,3 +1,113 @@
+#ifndef USE_LEGACY_DSLASH
+
+#include <dslash.h>
+#include <worker.h>
+#include <dslash_helper.cuh>
+#include <color_spinor_field_order.h>
+#include <gauge_field_order.h>
+#include <color_spinor.h>
+#include <dslash_helper.cuh>
+#include <index_helper.cuh>
+#include <gauge_field.h>
+
+#include <dslash_policy.cuh>
+#include <kernels/laplace.cuh>
+
+/**
+   This is the laplacian derivative based on the basic gauged differential operator
+*/
+
+namespace quda {
+
+  /**
+     @brief This is a helper class that is used to instantiate the
+     correct templated kernel for the dslash.
+  */
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  struct LaplaceLaunch {
+    
+    // kernel name for jit compilation
+    static constexpr const char *kernel = "quda::laplaceGPU";
+    
+    template <typename Dslash>
+    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+      dslash.launch(laplaceGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+    }
+  };
+  
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class Laplace : public Dslash<Float> {
+
+  protected:
+    Arg &arg;
+    const ColorSpinorField &in;
+
+  public:
+    
+    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
+      : Dslash<Float>(arg, out, in, "kernels/laplace.cuh"), arg(arg), in(in) { }    
+    
+    virtual ~Laplace() { }
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Dslash<Float>::setParam(arg);
+      if (arg.xpay)
+	Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor, true>(tp, arg, stream);
+      else
+	Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor, false>(tp, arg, stream);
+    }
+    
+    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
+  };
+  
+  template <typename Float, int nColor, QudaReconstructType recon>
+  struct LaplaceApply {
+
+    inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in,
+			const GaugeField &U, int dir, double a,
+			const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+			TimeProfile &profile) {
+
+      constexpr int nDim = 4;
+      LaplaceArg<Float,nColor,recon> arg(out,in,U,dir,a,x,parity,dagger,comm_override);
+      Laplace<Float,nDim,nColor,LaplaceArg<Float,nColor,recon>>laplace(arg, out, in);
+
+      dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
+      policy.apply(0);
+      
+      checkCudaError();
+    }
+  };
+  
+  //Apply the Laplace operator
+  //out(x) = M*in = - kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
+  //Uses the kappa normalization for the Wilson operator.
+  //Omits direction 'dir' from the operator.
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in,
+		    const GaugeField &U, int dir, double kappa,
+		    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+		    TimeProfile &profile) {
+    
+    if (in.V() == out.V()) errorQuda("Aliasing pointers");
+    if (in.FieldOrder() != out.FieldOrder()) errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
+    
+    // check all precisions match
+    checkPrecision(out, in, U);
+    
+    // check all locations match
+    checkLocation(out, in, U);
+    
+    //instantiate<LaplaceApply,WilsonReconstruct>(out, in, U, dir, kappa, x, parity,
+    //dagger, comm_override, profile);
+    instantiate<LaplaceApply,StaggeredReconstruct>(out, in, U, dir, kappa, x, parity,
+						   dagger, comm_override, profile);
+  }
+} // namespace quda
+
+
+#else
+
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <color_spinor_field.h>
@@ -80,7 +190,7 @@ namespace quda {
 	const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
 
 	out += U * in;
-	} else {
+      } else {
 
 	const Link U = arg.U(d, x_cb, parity);
 	const Vector in = arg.in(fwd_idx, their_spinor_parity);
@@ -107,7 +217,6 @@ namespace quda {
 	out += conj(U) * in;
       }
     } //nDim
-
   }
 
 
@@ -289,6 +398,8 @@ namespace quda {
 
     in.bufferIndex = (1 - in.bufferIndex);
   }
-
-
 } // namespace quda
+
+#endif
+
+

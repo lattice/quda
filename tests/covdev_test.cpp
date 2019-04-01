@@ -338,7 +338,7 @@ static int dslashTest()
   for (int i=0; i<attempts; i++) {
 
     //Test forward directions, then backward
-    i == 0 ? dagger = QUDA_DAG_YES : dagger = QUDA_DAG_NO;
+    i == 0 ? dagger = QUDA_DAG_NO : dagger = QUDA_DAG_YES;
     
     for (int mu=0; mu<4; mu++) { // We test all directions in one go
       int muCuda = mu + (dagger ? 4 : 0);

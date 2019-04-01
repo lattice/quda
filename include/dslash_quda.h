@@ -62,7 +62,7 @@ namespace quda {
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    double kappa, const ColorSpinorField &x, int parity, bool dagger,
                    const int *comm_override, TimeProfile &profile);
-
+  
   /**
      @brief Driver for applying the Wilson-clover stencil
 
@@ -444,12 +444,18 @@ namespace quda {
      @param[out] out The output result field
      @param[in] in The input field
      @param[in] U The gauge field used for the gauge Laplace
+     @param[in] dir Direction of the derivative 0,1,2,3 to omit (-1 is full 4D)
      @param[in] kappa Scale factor applied
      @param[in] x Vector field we accumulate onto to
   */
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		    double kappa, const ColorSpinorField *x, int parity);
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in,
+		    const GaugeField &U, int dir, double kappa, const ColorSpinorField &x,
+		    int parity, bool dagger, const int *comm_override,
+		    TimeProfile &profile);
 
+  //void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+  //double kappa, const ColorSpinorField *x, int parity);
+  
   /**
      @brief Driver for applying the covariant derivative
 
@@ -464,6 +470,12 @@ namespace quda {
      @param[in] in The input field
      @param[in] U The gauge field used for the covariant derivative
      @param[in] mu Direction of the derivative. For mu > 3 it goes backwards
+     @param[in] a Scale factor applied
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in,
 		   const GaugeField &U, int mu, double a, const ColorSpinorField &x,
@@ -524,6 +536,10 @@ namespace quda {
 		      const double *b5, const double *c_5, const double &m5,
                       const int *commDim, const int DS_type, TimeProfile &profile);
 
+  
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+		    double kappa, const ColorSpinorField *x, int parity);
+  
 #endif
 
   /**
