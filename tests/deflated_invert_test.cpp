@@ -93,26 +93,26 @@ void
 display_test_info()
 {
   printfQuda("running the following test:\n");
-    
+
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
   printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
 	     get_prec_str(prec),get_prec_str(prec_sloppy),
-	     get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
+	     get_recon_str(link_recon),
+	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);
 
   printfQuda("Deflation parameters\n");
 //  printfQuda(" - number of levels %d\n", mg_levels);
   printfQuda(" - number of eigenvectors %d\n", nvec[0]);
 
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n",
 	     dimPartitioned(0),
 	     dimPartitioned(1),
 	     dimPartitioned(2),
-	     dimPartitioned(3)); 
-  
+	     dimPartitioned(3));
+
   return ;
-  
+
 }
 
 QudaPrecision &cpu_prec = prec;
@@ -131,7 +131,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
+
   gauge_param.cpu_prec = cpu_prec;
 
   gauge_param.cuda_prec = cuda_prec;
@@ -155,7 +155,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   int pad_size =std::max(x_face_size, y_face_size);
   pad_size = std::max(pad_size, z_face_size);
   pad_size = std::max(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
+  gauge_param.ga_pad = pad_size;
 #endif
 }
 
@@ -279,6 +279,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
 void setDeflationParam(QudaEigParam &df_param) {
 
+  df_param.is_complete    = QUDA_BOOLEAN_NO;
   df_param.import_vectors = QUDA_BOOLEAN_NO;
   df_param.run_verify     = QUDA_BOOLEAN_NO;
 
@@ -294,7 +295,7 @@ void setDeflationParam(QudaEigParam &df_param) {
   strcpy(df_param.vec_infile, vec_infile);
   strcpy(df_param.vec_outfile, vec_outfile);
 }
-  
+
 
 int main(int argc, char **argv)
 {
@@ -365,7 +366,7 @@ int main(int argc, char **argv)
     //construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
     //generate a unit SU(3) field
     construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
-    
+
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -418,23 +419,25 @@ int main(int argc, char **argv)
       for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
+    if(df_param.is_complete == QUDA_BOOLEAN_YES) inv_param.inv_type = QUDA_CG_INVERTER;
+
     invertQuda(spinorOut, spinorIn, &inv_param);
     printfQuda("\nDone for %d rhs.\n", inv_param.rhs_idx);
   }
 
-  destroyDeflationQuda(df_preconditioner);    
+  destroyDeflationQuda(df_preconditioner);
 
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-    
-  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+
+  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
   //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, 0.0);
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
-    
+
     if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
       wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
     } else {
@@ -450,11 +453,11 @@ int main(int argc, char **argv)
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
       ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     }
-    
+
   } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
-    
+
     if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-      wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
+      wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0,
 		inv_param.cpu_prec, gauge_param);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -467,7 +470,7 @@ int main(int argc, char **argv)
         }
       }
     }
-    
+
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
       ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
     }

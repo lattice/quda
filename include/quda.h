@@ -412,6 +412,9 @@ extern "C" {
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
 
+    /** Whether deflation space is complete */
+    QudaBoolean is_complete;
+
   } QudaEigParam;
 
 
@@ -544,9 +547,9 @@ extern "C" {
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
- 
+
     /** Whether to generate on all levels or just on level 0 */
-    QudaBoolean generate_all_levels; 
+    QudaBoolean generate_all_levels;
 
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
@@ -685,7 +688,7 @@ extern "C" {
   void endQuda(void);
 
 /**
- * @brief update the radius for halos. 
+ * @brief update the radius for halos.
  * @details This should only be needed for automated testing when
  * different partitioning is applied within a single run.
  */
@@ -1122,7 +1125,7 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
   /**
-   * Performs Wuppertal smearing on a given spinor using the gauge field 
+   * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1131,7 +1134,7 @@ extern "C" {
    * @param nSteps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, 
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param,
                              unsigned int nSteps, double alpha);
 
   /**

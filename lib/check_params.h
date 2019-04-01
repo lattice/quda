@@ -157,6 +157,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eigen_shift, 0.0);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
+  P(is_complete, QUDA_BOOLEAN_INVALID);
 #else
   P(NPoly, INVALID_INT);
   P(Stp_residual, INVALID_DOUBLE);
@@ -166,6 +167,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eigen_shift, INVALID_DOUBLE);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
+  P(is_complete, QUDA_BOOLEAN_INVALID);
 #endif
 
 #if defined INIT_PARAM

@@ -1201,8 +1201,6 @@ namespace quda {
     void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2);
     //EigCG solver:
     int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-    //InitCG solver:
-    int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //Incremental eigCG solver (for eigcg and initcg calls)
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
