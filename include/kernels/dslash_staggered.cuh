@@ -35,7 +35,6 @@ namespace quda {
     const GL L;   /** the long gauge field */
 
     const real a; /** xpay scale factor */
-    const real fat_link_max; // MWTODO: FIXME: This a workaround should probably be in the accessor ...
     const real tboundary;
     static constexpr bool improved = improved_;
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
@@ -45,7 +44,6 @@ namespace quda {
       in(in, improved_ ? 3 : 1),
       U(U),
       L(L),
-      fat_link_max(improved_ ? isFixed<Float>::value ? U.LinkMax() : 1.0 : 1.0),
       tboundary(U.TBoundary()),
       x(x),
       a(a)
@@ -82,13 +80,11 @@ namespace quda {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
           const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-          in *= arg.fat_link_max;
           out += (U * in);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
           const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in(fwd_idx, their_spinor_parity);
-          in *= arg.fat_link_max;
           out += (U * in);
         }
       }
@@ -118,9 +114,8 @@ namespace quda {
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity)
-                                      : arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
+            : arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
           Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-          in *= arg.fat_link_max;
           out -= (conj(U) * in);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back_idx = linkIndexM1(coord, arg.dim, d);
@@ -128,7 +123,6 @@ namespace quda {
           const Link U
               = arg.improved ? arg.U(d, gauge_idx, 1 - parity) : arg.U(d, gauge_idx, 1 - parity, StaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
           Vector in = arg.in(back_idx, their_spinor_parity);
-          in *= arg.fat_link_max;
           out -= (conj(U) * in);
         }
       }
