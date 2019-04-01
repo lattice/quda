@@ -362,15 +362,15 @@ namespace quda {
       }
 
 	    // Update x, r, z, w
-      axpy( +alpha, p[idx], x);
-      axpy( -alpha, s[idx], r);
+      axpy( +alpha, p[idx], xSloppy);
+      axpy( -alpha, s[idx], rSloppy);
       axpy( -alpha, q[idx], u);
       axpy( -alpha, z[idx], w);
 
 	    nu = ((k) % mmax)+1;
 
       commGlobalReductionSet(false);
-	    gamma = reDotProduct(r, u);
+	    gamma = reDotProduct(rSloppy, u);
       delta = reDotProduct(w, u);
 	    rnorm = norm2(rSloppy);
 
