@@ -276,6 +276,7 @@ namespace quda {
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
+
     return;
   }
 
@@ -428,7 +429,7 @@ namespace quda {
 
     EigCGArgs &args = *eigcg_args;
 
-    if(args.run_residual_correction && param.inv_type == QUDA_INC_EIGCG_INVERTER) {
+    if(args.run_residual_correction) {
       profile.TPSTOP(QUDA_PROFILE_INIT);
       (*K)(x, b);
       return Kparam.iter;
