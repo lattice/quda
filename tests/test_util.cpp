@@ -1661,7 +1661,7 @@ int tdim = 24;
 int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
-int laplace3D = -1;
+int laplace3D = 4;
 char latfile[256] = "";
 char gauge_outfile[256] = "";
 int Nsrc = 1;
@@ -1807,7 +1807,7 @@ void usage(char** argv )
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
-  printf("    --laplace3D <n>                           # Restrict laplace operator to omit nth dimension (x=0, y=1, z=2, t=3) (default -1, full 4D)\n");
+  printf("    --laplace3D <n>                           # Restrict laplace operator to omit nth dimension (x=0, y=1, z=2, t=3) (default 4, full 4D)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
@@ -2368,8 +2368,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     laplace3D = atoi(argv[i+1]);
-    if (laplace3D < -1 || laplace3D > 3){
-      printf("ERROR: invalid transverse dim %d given. Please use 0 1 2 3 -1 for x,y,z,t,none.\n", laplace3D);
+    if (laplace3D > 4){
+      printf("ERROR: invalid transverse dim %d given. Please use 0 1 2 3 4 for x,y,z,t,none.\n", laplace3D);
       usage(argv);
     }
     i++;

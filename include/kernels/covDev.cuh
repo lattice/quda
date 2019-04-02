@@ -34,7 +34,6 @@ namespace quda {
     CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
 	      int mu, int parity, bool dagger, const int *comm_override) :
 
-      //a != 0.0 ? true : false tests for xpay boolean
       DslashArg<Float>(in, U, parity, dagger, false, 1, spin_project, comm_override) ,
       out(out),
       in(in),
@@ -67,7 +66,6 @@ namespace quda {
     typedef Matrix<complex<real>, nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
-    //const int mu = arg.mu;
     const int d = mu%4;
 
     if (mu<4) { // Forward gather - compute fwd offset for vector fetch

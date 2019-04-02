@@ -64,7 +64,7 @@ namespace quda {
      
   */
   
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, int dir, typename Arg, typename Vector>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int coord[nDim], int x_cb, int parity, int idx, int thread_dim, bool &active) {
     
     typedef typename mapper<Float>::type real;
@@ -73,7 +73,7 @@ namespace quda {
     
 #pragma unroll
     for (int d = 0; d<nDim; d++) { // loop over dimension
-      if (d != arg.dir) {
+      if (d != dir) {
 	{
 	  //Forward gather - compute fwd offset for vector fetch	  
 	  const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
@@ -142,8 +142,17 @@ namespace quda {
     
     const int my_spinor_parity = nParity == 2 ? parity : 0;
     Vector out;
+
+    switch (arg.dir) {
+    case 4: applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type,-1>(out, arg, coord, x_cb, parity, idx, thread_dim, active); break;
+    case 0:  applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type,0>(out, arg, coord, x_cb, parity, idx, thread_dim, active); break;
+    case 1:  applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type,1>(out, arg, coord, x_cb, parity, idx, thread_dim, active); break;
+    case 2:  applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type,2>(out, arg, coord, x_cb, parity, idx, thread_dim, active); break;
+    case 3:  applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type,3>(out, arg, coord, x_cb, parity, idx, thread_dim, active); break; 
+      
+    }
     
-    applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+    //applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
     
     if (xpay && kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
