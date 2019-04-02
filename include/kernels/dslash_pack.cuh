@@ -7,7 +7,7 @@ namespace quda {
 
   static int commDim[QUDA_MAX_DIM];
 
-  template <typename Float_, int nColor_, int nSpin_>
+  template <typename Float_, int nColor_, int nSpin_, bool spin_project_=true>
   struct PackArg {
 
     typedef Float_ Float;
@@ -16,7 +16,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
 
-    static constexpr bool spin_project = (nSpin == 4 ? true : false);
+    static constexpr bool spin_project = (nSpin == 4 && spin_project_ ? true : false);
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float,nSpin,nColor,spin_project,spinor_direct_load>::type F;
 
@@ -121,7 +121,11 @@ namespace quda {
         if (s==0) f = arg.a * (f + arg.b*f.igamma(4) + arg.c*f1);
         else      f = arg.a * (f - arg.b*f.igamma(4) + arg.c*f1);
       }
-      in.Ghost(dim, 0, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+      if (arg.spin_project) {
+        in.Ghost(dim, 0, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+      } else {
+        in.Ghost(dim, 0, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      }
 
     } else { // forwards
 
@@ -135,7 +139,11 @@ namespace quda {
         if (s==0) f = arg.a * (f + arg.b*f.igamma(4) + arg.c*f1);
         else      f = arg.a * (f - arg.b*f.igamma(4) + arg.c*f1);
       }
-      in.Ghost(dim, 1, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+      if (arg.spin_project) {
+        in.Ghost(dim, 1, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+      } else {
+        in.Ghost(dim, 1, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      }
     }
   }
 

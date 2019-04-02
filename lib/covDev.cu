@@ -9,6 +9,7 @@
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
 #include <gauge_field.h>
+#include <uint_to_char.h>
 
 #include <dslash_policy.cuh>
 #include <kernels/covDev.cuh>
@@ -25,16 +26,18 @@ namespace quda {
   */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct CovDevLaunch {
-    
+
     // kernel name for jit compilation
     static constexpr const char *kernel = "quda::covDevGPU";
-    
+
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+      static_assert(xpay == false, "Covariant derivative operator only defined without xpay");
+      static_assert(nParity == 2, "Covariant derivative operator only defined for full field");
       dslash.launch(covDevGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
   };
-  
+
   template <typename Float, int nDim, int nColor, typename Arg>
   class CovDev : public Dslash<Float> {
 
@@ -43,40 +46,130 @@ namespace quda {
     const ColorSpinorField &in;
 
   public:
-    
+
     CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in, "kernels/covDev.cuh"), arg(arg), in(in) { }    
-    
+      : Dslash<Float>(arg, out, in, "kernels/covDev.cuh"), arg(arg), in(in) { }
+
     virtual ~CovDev() { }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
-      if (arg.xpay)
-	Dslash<Float>::template instantiate<CovDevLaunch, nDim, nColor, true>(tp, arg, stream);
-      else
-	Dslash<Float>::template instantiate<CovDevLaunch, nDim, nColor, false>(tp, arg, stream);
+      if (arg.xpay) errorQuda("Covariant derivative operator only defined without xpay");
+      if (arg.nParity != 2) errorQuda("Covariant derivative operator only defined for full field");
+
+      constexpr bool xpay = false;
+      constexpr int nParity = 2;
+      Dslash<Float>::template instantiate<CovDevLaunch, nDim, nColor, nParity, xpay>(tp, arg, stream);
     }
-    
-    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
+
+    long long flops() const
+    {
+      int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
+      int num_mv_multiply = in.Nspin();
+      int ghost_flops = num_mv_multiply * mv_flops;
+      int dim = arg.mu % 4;
+      long long flops_ = 0;
+
+      switch(arg.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+        if (arg.kernel_type != dim) break;
+        flops_ = (ghost_flops) * in.GhostFace()[dim];
+        break;
+      case EXTERIOR_KERNEL_ALL:
+        {
+          long long ghost_sites = in.GhostFace()[dim];
+          flops_ = ghost_flops * ghost_sites;
+          break;
+        }
+      case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
+        {
+          long long sites = in.Volume();
+          flops_ = num_mv_multiply*mv_flops * sites;         // SU(3) matrix-vector multiplies
+
+          if (arg.kernel_type == KERNEL_POLICY) break;
+          // now correct for flops done by exterior kernel
+          long long ghost_sites = arg.commDim[dim] ? in.GhostFace()[dim] : 0;
+          flops_ -= ghost_flops * ghost_sites;
+
+          break;
+        }
+      }
+
+      return flops_;
+    }
+
+    long long bytes() const
+    {
+      int gauge_bytes = arg.reconstruct * in.Precision();
+      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int ghost_bytes = gauge_bytes + 3*spinor_bytes; // 3 since we have to load the partial
+      int dim = arg.mu % 4;
+      long long bytes_ = 0;
+
+      switch(arg.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+        if (arg.kernel_type != dim) break;
+        bytes_ = ghost_bytes * in.GhostFace()[dim];
+        break;
+      case EXTERIOR_KERNEL_ALL:
+        {
+          long long ghost_sites = in.GhostFace()[dim];
+          bytes_ = ghost_bytes * ghost_sites;
+          break;
+        }
+      case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
+        {
+          long long sites = in.Volume();
+          bytes_ = (gauge_bytes + 2*spinor_bytes)*sites;
+
+          if (arg.kernel_type == KERNEL_POLICY) break;
+          // now correct for bytes done by exterior kernel
+          long long ghost_sites = arg.commDim[dim] ? in.GhostFace()[dim] : 0;
+          bytes_ -= ghost_bytes * ghost_sites;
+
+          break;
+        }
+      }
+      return bytes_;
+    }
+
+    TuneKey tuneKey() const
+    {
+      // add mu to the key
+      char aux[TuneKey::aux_n];
+      strcpy(aux,Dslash<Float>::aux[arg.kernel_type]);
+      strcat(aux,",mu=");
+      char mu[8];
+      u32toa(mu, arg.mu);
+      strcat(aux,mu);
+      return TuneKey(in.VolString(), typeid(*this).name(), aux);
+    }
   };
-  
+
   template <typename Float, int nColor, QudaReconstructType recon>
   struct CovDevApply {
 
-    inline CovDevApply(ColorSpinorField &out, const ColorSpinorField &in,
-		       const GaugeField &U, int mu, double a, const ColorSpinorField &x,
-		       int parity, bool dagger, const int *comm_override,
-		       TimeProfile &profile)
-      
+    inline CovDevApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                       int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+
     {
-      constexpr int nDim = 4; 
-      CovDevArg<Float,nColor,recon> arg(out,in,U,mu,a,x,parity,dagger,comm_override);
+      constexpr int nDim = 4;
+      CovDevArg<Float,nColor,recon> arg(out,in,U,mu,parity,dagger,comm_override);
       CovDev<Float,nDim,nColor,CovDevArg<Float,nColor,recon>>covDev(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
       policy.apply(0);
-      
+
       checkCudaError();
     }
   };
@@ -84,23 +177,25 @@ namespace quda {
   //Apply the covariant derivative operator
   //out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   //out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
-  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in,
-		   const GaugeField &U, int mu, double a, const ColorSpinorField &x,
-		   int parity, bool dagger, const int *comm_override,
-		   TimeProfile &profile)
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                   int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    
+
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder()) errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-    
+
     // check all precisions match
     checkPrecision(out, in, U);
 
     // check all locations match
     checkLocation(out, in, U);
-    
-    instantiate<CovDevApply,WilsonReconstruct>(out, in, U, mu, a, x, parity, dagger, comm_override, profile);
-  }  
+
+    pushKernelPackT(true); // non-spin projection requires kernel packing
+
+    instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
+
+    popKernelPackT();
+  }
 } // namespace quda
 
 #else
@@ -131,7 +226,7 @@ template <typename Float, int nSpin, int nColor, QudaReconstructType reconstruct
 struct CovDevArg {
   typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
   typedef typename gauge_mapper<Float,reconstruct>::type G;
-  
+
   F out;                // output vector field
   const F in;           // input vector field
   const G U;            // the gauge field
@@ -142,7 +237,7 @@ struct CovDevArg {
   const int commDim[4]; // whether a given dimension is partitioned or not
   const int volumeCB;   // checkerboarded volume
   const int mu;         // direction of the covariant derivative
-  
+
   CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const int parity, const int mu)
     : out(out), in(in), U(U), parity(parity), mu(mu), nParity(in.SiteSubset()), nFace(1),
       dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
@@ -156,7 +251,7 @@ struct CovDevArg {
 
 /**
    Applies the off-diagonal part of the Laplace operator
-   
+
    @param[out] out The out result field
      @param[in] U The gauge field
      @param[in] kappa Kappa value
@@ -206,7 +301,7 @@ struct CovDevArg {
 
 	out += conj(U) * in;
       } else {
-	
+
 	const Link U = arg.U(d, gauge_idx, 1-parity);
 	const Vector in = arg.in(back_idx, their_spinor_parity);
 
@@ -245,7 +340,7 @@ struct CovDevArg {
     for (int parity= 0; parity < arg.nParity; parity++) {
       // for full fields then set parity from loop else use arg setting
       parity = (arg.nParity == 2) ? parity : arg.parity;
-      
+
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
 	covDev<Float,nDim,nSpin,nColor>(arg, x_cb, parity);
       } // 4-d volumeCB
@@ -368,17 +463,17 @@ struct CovDevArg {
   }
 
 #endif // GPU_CONTRACT
-  
+
   //Apply the covariant derivative operator
   //out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   //out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
-  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)		    
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)
   {
 #ifdef GPU_CONTRACT
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-    
+
     // check all precision match
     checkPrecision(out, in, U);
 
@@ -403,7 +498,7 @@ struct CovDevArg {
     errorQuda("Contraction kernels have not been built");
 #endif
   }
-  
+
 } // namespace quda
 
 

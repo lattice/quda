@@ -470,17 +470,13 @@ namespace quda {
      @param[in] in The input field
      @param[in] U The gauge field used for the covariant derivative
      @param[in] mu Direction of the derivative. For mu > 3 it goes backwards
-     @param[in] a Scale factor applied
-     @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
-  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in,
-		   const GaugeField &U, int mu, double a, const ColorSpinorField &x,
-		   int parity, bool dagger, const int *comm_override,
-		   TimeProfile &profile);
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                   int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
   
 #else
 
@@ -655,6 +651,7 @@ namespace quda {
      @param[in] nFace Depth of halo
      @param[in] dagger Whether this is for the dagger operator
      @param[in] parity Field parity
+     @param[in] spin_project Whether to spin_project when packing
      @param[in] a Twisted mass scale factor (for preconditioned twisted-mass dagger operator)
      @param[in] b Twisted mass chiral twist factor (for preconditioned twisted-mass dagger operator)
      @param[in] c Twisted mass flavor twist factor (for preconditioned non degenerate twisted-mass dagger operator)
@@ -662,7 +659,8 @@ namespace quda {
   */
   void PackGhost(void *ghost[2*QUDA_MAX_DIM], const ColorSpinorField &field,
                  MemoryLocation location, int nFace, bool dagger, int parity,
-                 double a, double b, double c, const cudaStream_t &stream);
+                 bool spin_project, double a, double b, double c,
+                 const cudaStream_t &stream);
 #endif
 
   /**

@@ -149,7 +149,7 @@ void init(int argc, char **argv)
   csParam.pad = 0;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;	
-
+  csParam.pc_type = QUDA_4D_PC;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
@@ -402,10 +402,8 @@ int main(int argc, char **argv)
        if (!transfer) *spinorOut = *cudaSpinorOut;
        printfQuda("\n%fms per loop\n", 1000*secs);
        
-       unsigned long long flops = niter * 8*nColor*nColor*2*(long long)cudaSpinor->VolumeCB();
+       unsigned long long flops = niter * cudaSpinor->Nspin()*(8*nColor-2)*nColor*(long long)cudaSpinor->Volume();
        printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-       printfQuda("Effective halo bi-directional bandwidth = %f for aggregate message size %lu bytes\n",
-		  1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
        
        double spinor_ref_norm2 = blas::norm2(*spinorRef);
        blas::copy(*tmpCpu, *spinorOut);

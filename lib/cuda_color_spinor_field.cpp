@@ -729,7 +729,8 @@ namespace quda {
                                        const int dim, const QudaDirection dir,
 				       const int dagger, cudaStream_t *stream, 
 				       MemoryLocation location [2*QUDA_MAX_DIM],
-                                       MemoryLocation location_label, double a, double b, double c)
+                                       MemoryLocation location_label,
+                                       bool spin_project, double a, double b, double c)
   {
 #ifdef MULTI_GPU
     void *packBuffer[2*QUDA_MAX_DIM];
@@ -755,7 +756,7 @@ namespace quda {
     const int face_num = (dir == QUDA_BACKWARDS) ? 0 : (dir == QUDA_FORWARDS) ? 1 : 2;
     packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
 #else
-    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, a, b, c, *stream);
+    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, *stream);
 #endif
 
 #else
@@ -769,24 +770,18 @@ namespace quda {
 				       cudaStream_t *stream) {
 
 #ifdef MULTI_GPU
-    int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-    int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
-    int Npad = Nint / Nvec; // number Nvec buffers we have
-
     if (precision != ghost_precision) { pushKernelPackT(true); }
     
     if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
-      size_t bytes = nFace*Nint*ghostFace[dim]*ghost_precision;
-
-      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
-
       void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
-
-      qudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream);
+      qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], cudaMemcpyDeviceToHost, *stream);
 
     } else {
 
+      const int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
+      const int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
+      const int Npad = Nint / Nvec; // number Nvec buffers we have
       const int nParity = siteSubset;
       const int x4 = nDim==5 ? x[4] : 1;
       const int Nt_minus1_offset = (volumeCB - nFace*ghostFaceCB[3])/x4; // N_t-1 = Vh-Vsh
@@ -915,13 +910,14 @@ namespace quda {
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx,
 				  MemoryLocation location[2*QUDA_MAX_DIM], MemoryLocation location_label,
-                                  double a, double b, double c)
+                                  bool spin_project, double a, double b, double c)
   {
-    createComms(nFace); // must call this first
+    createComms(nFace,spin_project); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
 
-    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label, a, b, c);
+    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx],
+              location, location_label, spin_project, a, b, c);
   }
 
   void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, 
