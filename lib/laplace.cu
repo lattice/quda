@@ -55,61 +55,63 @@ namespace quda {
       Dslash<Float>::setParam(arg);
       Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor>(tp, arg, stream);
     }
-    
+
     long long flops() const
     {
-      // forward + backward SU(3) matrix-vector flops
-      int mv_flops = 2*(8 * in.Ncolor() - 2) * in.Ncolor();
-      int num_mv = (arg.dir == 4 ? 4 : 3); //3D or 4D operator
-      int op_flops = num_mv * mv_flops;
-      int xpay_flops = (arg.xpay ? 2*2*in.Ncolor() : 0);
- 
+      int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
+      int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
+      int ghost_flops = (num_mv_multiply * mv_flops + 2*in.Ncolor()*in.Nspin());
+      int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
+      int num_dir = (arg.dir == 4 ? 2*4 : 2*3);//3D or 4D operator
+      
       long long flops_ = 0;
+
+      // FIXME - should we count the xpay flops in the derived kernels
+      // since some kernels require the xpay in the exterior (preconditiond clover)
 
       switch(arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        flops_ = (op_flops) * 2 * in.GhostFace()[arg.kernel_type];
+        flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops/2)) * 2 * in.GhostFace()[arg.kernel_type];
         break;
       case EXTERIOR_KERNEL_ALL:
         {
-          long long ghost_sites = 2 * (in.GhostFace()[0]+
-				       in.GhostFace()[1]+
-				       in.GhostFace()[2]+
-				       in.GhostFace()[3]);
-	  
-          flops_ = op_flops * ghost_sites;
+          long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
+          flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops/2)) * ghost_sites;
           break;
         }
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
         {
           long long sites = in.Volume();
-          flops_ = op_flops * sites;         
-	  if (arg.xpay) flops_ += xpay_flops * sites; // axpy is always on interior
+          flops_ = (num_dir*(in.Nspin()/4)*in.Ncolor()*in.Nspin() +   // spin project (=0 for staggered)
+                    num_dir*num_mv_multiply*mv_flops +                // SU(3) matrix-vector multiplies
+                    ((num_dir-1)*2*in.Ncolor()*in.Nspin())) * sites;  // accumulation
+          if (arg.xpay) flops_ += xpay_flops * sites;
+
           if (arg.kernel_type == KERNEL_POLICY) break;
-	  // now correct for flops done by exterior kernel
-	  long long ghost_sites = 0;
-	  for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
-          flops_ -= op_flops * ghost_sites;
-	  
+          // now correct for flops done by exterior kernel
+          long long ghost_sites = 0;
+          for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+          flops_ -= ghost_flops * ghost_sites;
+
           break;
         }
       }
-
-      return flops_;
       
+      return flops_;
     }
-    long long bytes() const
+
+    virtual long long bytes() const
     {
-      int num_dir = (arg.dir == 4 ? 4 : 3); //3D or 4D operator
       int gauge_bytes = arg.reconstruct * in.Precision();
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      // forward + backward spinors
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
-      int ghost_bytes = (gauge_bytes + 3*spinor_bytes);
+      int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;
+      int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + 2*spinor_bytes; // 2 since we have to load the partial
+      int num_dir = (arg.dir == 4 ? 2*4 : 2*3);//3D or 4D operator
 
       long long bytes_ = 0;
 
@@ -118,14 +120,11 @@ namespace quda {
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        bytes_ = ghost_bytes * in.GhostFace()[arg.kernel_type];
+        bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type];
         break;
       case EXTERIOR_KERNEL_ALL:
         {
-	  long long ghost_sites = (in.GhostFace()[0]+
-				   in.GhostFace()[1]+
-				   in.GhostFace()[2]+
-				   in.GhostFace()[3]);
+          long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
           bytes_ = ghost_bytes * ghost_sites;
           break;
         }
@@ -133,24 +132,115 @@ namespace quda {
       case KERNEL_POLICY:
         {
           long long sites = in.Volume();
-          bytes_ = num_dir*(gauge_bytes  +         //gauge read
-			    2*spinor_bytes)*sites; //spinor read
-	  
-	  if (arg.xpay) bytes_ += spinor_bytes;
-	  
+          bytes_ = (num_dir*gauge_bytes + ((num_dir-2)*spinor_bytes + 2*proj_spinor_bytes) + spinor_bytes)*sites;
+          if (arg.xpay) bytes_ += spinor_bytes;
+
           if (arg.kernel_type == KERNEL_POLICY) break;
           // now correct for bytes done by exterior kernel
-	  long long ghost_sites = 0;
-	  for (int d=0; d<4; d++) if(arg.commDim[d]) ghost_sites += in.GhostFace()[d];
-	  
+          long long ghost_sites = 0;
+          for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
           bytes_ -= ghost_bytes * ghost_sites;
 
           break;
         }
       }
       return bytes_;
-
     }
+    // long long flops() const
+    // {
+    //   // forward + backward SU(3) matrix-vector flops
+    //   int mv_flops = 2*(8 * in.Ncolor() - 2) * in.Ncolor();
+    //   int num_mv = (arg.dir == 4 ? 4 : 3); //3D or 4D operator
+    //   int op_flops = num_mv * mv_flops;
+    //   int xpay_flops = (arg.xpay ? 2*2*in.Ncolor() : 0);
+ 
+    //   long long flops_ = 0;
+
+    //   switch(arg.kernel_type) {
+    //   case EXTERIOR_KERNEL_X:
+    //   case EXTERIOR_KERNEL_Y:
+    //   case EXTERIOR_KERNEL_Z:
+    //   case EXTERIOR_KERNEL_T:
+    //     flops_ = (op_flops) * 2 * in.GhostFace()[arg.kernel_type];
+    //     break;
+    //   case EXTERIOR_KERNEL_ALL:
+    //     {
+    //       long long ghost_sites = 2 * (in.GhostFace()[0]+
+    // 				       in.GhostFace()[1]+
+    // 				       in.GhostFace()[2]+
+    // 				       in.GhostFace()[3]);
+	  
+    //       flops_ = op_flops * ghost_sites;
+    //       break;
+    //     }
+    //   case INTERIOR_KERNEL:
+    //   case KERNEL_POLICY:
+    //     {
+    //       long long sites = in.Volume();
+    //       flops_ = op_flops * sites;         
+    // 	  if (arg.xpay) flops_ += xpay_flops * sites; // axpy is always on interior
+    //       if (arg.kernel_type == KERNEL_POLICY) break;
+    // 	  // now correct for flops done by exterior kernel
+    // 	  long long ghost_sites = 0;
+    // 	  for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+    //       flops_ -= op_flops * ghost_sites;
+	  
+    //       break;
+    //     }
+    //   }
+
+    //   return flops_;
+      
+    // }
+    // long long bytes() const
+    // {
+    //   int num_dir = (arg.dir == 4 ? 4 : 3); //3D or 4D operator
+    //   int gauge_bytes = arg.reconstruct * in.Precision();
+    //   bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
+    //   // forward + backward spinors
+    //   int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+    //   int ghost_bytes = (gauge_bytes + 3*spinor_bytes);
+
+    //   long long bytes_ = 0;
+
+    //   switch(arg.kernel_type) {
+    //   case EXTERIOR_KERNEL_X:
+    //   case EXTERIOR_KERNEL_Y:
+    //   case EXTERIOR_KERNEL_Z:
+    //   case EXTERIOR_KERNEL_T:
+    //     bytes_ = ghost_bytes * in.GhostFace()[arg.kernel_type];
+    //     break;
+    //   case EXTERIOR_KERNEL_ALL:
+    //     {
+    // 	  long long ghost_sites = (in.GhostFace()[0]+
+    // 				   in.GhostFace()[1]+
+    // 				   in.GhostFace()[2]+
+    // 				   in.GhostFace()[3]);
+    //       bytes_ = ghost_bytes * ghost_sites;
+    //       break;
+    //     }
+    //   case INTERIOR_KERNEL:
+    //   case KERNEL_POLICY:
+    //     {
+    //       long long sites = in.Volume();
+    //       bytes_ = num_dir*(gauge_bytes  +         //gauge read
+    // 			    2*spinor_bytes)*sites; //spinor read
+	  
+    // 	  if (arg.xpay) bytes_ += spinor_bytes;
+	  
+    //       if (arg.kernel_type == KERNEL_POLICY) break;
+    //       // now correct for bytes done by exterior kernel
+    // 	  long long ghost_sites = 0;
+    // 	  for (int d=0; d<4; d++) if(arg.commDim[d]) ghost_sites += in.GhostFace()[d];
+	  
+    //       bytes_ -= ghost_bytes * ghost_sites;
+
+    //       break;
+    //     }
+    //   }
+    //   return bytes_;
+    //
+    //}
     
     TuneKey tuneKey() const
     {
