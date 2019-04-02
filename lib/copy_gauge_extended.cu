@@ -174,14 +174,9 @@ namespace quda {
 
     if (out.isNative()) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  copyGaugeEx<short,FloatIn,length>
-	    (FloatNOrder<short,length,2,19>(out, (short*)Out), inOrder, out.X(), X, faceVolumeCB, out, location);
-	} else {
-	  typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO>::type G;
-	  copyGaugeEx<FloatOut,FloatIn,length>
-	    (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
-	}
+        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO>::type G;
+        copyGaugeEx<FloatOut,FloatIn,length>
+          (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_12>::type G;
@@ -258,13 +253,8 @@ namespace quda {
 
     if (in.isNative()) {
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(FloatIn)==typeid(short) && in.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  copyGaugeEx<FloatOut,short,length> (FloatNOrder<short,length,2,19>(in, (short*)In),
-					      in.X(), out, location, Out);
-	} else {
-	  typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
-	  copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
-	}
+        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
+        copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;

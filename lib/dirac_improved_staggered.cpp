@@ -48,7 +48,7 @@ namespace quda {
 
 
   void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			      const QudaParity parity) const
+                                      const QudaParity parity) const
   {
     checkParitySpinor(in, out);
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
@@ -67,8 +67,8 @@ namespace quda {
   }
 
   void DiracImprovedStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-				  const QudaParity parity, const ColorSpinorField &x,
-				  const double &k) const
+                                          const QudaParity parity, const ColorSpinorField &x,
+                                          const double &k) const
   {    
     checkParitySpinor(in, out);
 
