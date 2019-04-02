@@ -24,7 +24,7 @@ namespace quda {
 
 #ifndef USE_LEGACY_DSLASH
     int comm_dim[4] = { };
-    // only switch on comms needed for directions with a derivative (FIXME - only communicate in the given direction)
+    // only switch on comms needed for directions with a derivative
     for (int i=0; i<4; i++) {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
@@ -45,7 +45,7 @@ namespace quda {
 
 #ifndef USE_LEGACY_DSLASH
     int comm_dim[4] = { };
-    // only switch on comms needed for directions with a derivative (FIXME - only communicate in the given direction)
+    // only switch on comms needed for directions with a derivative
     for (int i=0; i<4; i++) {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
