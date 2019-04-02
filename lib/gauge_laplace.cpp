@@ -22,8 +22,14 @@ namespace quda {
   {
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH 
-    ApplyLaplace(out, in, *gauge, laplace3D, 1.0, in, parity, dagger, commDim, profile);
+#ifndef USE_LEGACY_DSLASH
+    int comm_dim[4] = { };
+    // only switch on comms needed for directions with a derivative (FIXME - only communicate in the given direction)
+    for (int i=0; i<4; i++) {
+      comm_dim[i] = comm_dim_partitioned(i);
+      if (laplace3D == i) comm_dim[i] = 0;
+    }
+    ApplyLaplace(out, in, *gauge, laplace3D, 1.0, in, parity, dagger, comm_dim, profile);
 #else 
     ApplyLaplace(out, in, *gauge, 1.0, nullptr, parity);
 #endif
@@ -38,7 +44,13 @@ namespace quda {
     checkSpinorAlias(in, out);
 
 #ifndef USE_LEGACY_DSLASH
-    ApplyLaplace(out, in, *gauge, laplace3D, k, x, parity, dagger, commDim, profile);
+    int comm_dim[4] = { };
+    // only switch on comms needed for directions with a derivative (FIXME - only communicate in the given direction)
+    for (int i=0; i<4; i++) {
+      comm_dim[i] = comm_dim_partitioned(i);
+      if (laplace3D == i) comm_dim[i] = 0;
+    }
+    ApplyLaplace(out, in, *gauge, laplace3D, k, x, parity, dagger, comm_dim, profile);
 #else
     ApplyLaplace(out, in, *gauge, k, &x, parity);
 #endif
