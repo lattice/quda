@@ -101,7 +101,6 @@ namespace quda {
 
   cpuGaugeField::~cpuGaugeField()
   {
-    
     int siteDim = 0;
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;

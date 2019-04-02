@@ -1129,51 +1129,36 @@ namespace quda {
       template <int N, typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase = QUDA_STAGGERED_PHASE_NO>
         struct Reconstruct {
         typedef typename mapper<Float>::type RegType;
-        Reconstruct(const GaugeField &u) {}
-        Reconstruct(const Reconstruct<N, Float, ghostExchange_> &recon) {}
+        RegType scale;
+        RegType scale_inv;
+        Reconstruct(const GaugeField &u) : scale(u.LinkMax()), scale_inv(1.0/scale) { }
+        Reconstruct(const Reconstruct<N, Float, ghostExchange_> &recon)
+        : scale(recon.scale), scale_inv(recon.scale_inv) {}
 
         __device__ __host__ inline void Pack(RegType out[N], const RegType in[N], int idx) const
         {
+          if (isFixed<Float>::value) {
 #pragma unroll
-	for (int i=0; i<N; i++) out[i] = in[i];
+            for (int i=0; i<N; i++) out[i] = scale_inv * in[i];
+          } else {
+#pragma unroll
+            for (int i=0; i<N; i++) out[i] = in[i];
+          }
         }
-      template<typename I>
-      __device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir,
+
+        template<typename I>
+        __device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir,
 					       const RegType phase, const I *X, const int *R) const {
+          if (isFixed<Float>::value) {
 #pragma unroll
-	for (int i=0; i<N; i++) out[i] = in[i];
-      }
-      __device__ __host__ inline RegType getPhase(const RegType in[N]) const { return 0; }
+            for (int i=0; i<N; i++) out[i] = scale * in[i];
+          } else {
+#pragma unroll
+            for (int i=0; i<N; i++) out[i] = in[i];
+          }
+        }
+        __device__ __host__ inline RegType getPhase(const RegType in[N]) const { return 0; }
       };
-
-  /**
-     @brief Helper for no reconstruction with scaling (19 = 18 +
-     1). This is used for half-precision non-unitary fields, e.g.,
-     staggered fat link Generic reconstruction helper with no
-     reconstruction
-     @tparam Float Storage format (e.g., double, float, short)
-     @tparam ghostExchange_ Optional template the ghostExchange type
-     to avoid the run-time overhead (dummy for trivial reconstruct type)
-  */
-  template <typename Float, QudaGhostExchange ghostExchange_>
-    struct Reconstruct<19,Float,ghostExchange_> {
-      typedef typename mapper<Float>::type RegType;
-      RegType scale;
-      Reconstruct(const GaugeField &u) : scale(u.LinkMax()) { }
-      Reconstruct(const Reconstruct<19,Float,ghostExchange_> &recon) : scale(recon.scale) { }
-
-      __device__ __host__ inline void Pack(RegType out[18], const RegType in[18], int idx) const {
-#pragma unroll
-	for (int i=0; i<18; i++) out[i] = in[i] / scale;
-      }
-      template<typename I>
-      __device__ __host__ inline void Unpack(RegType out[18], const RegType in[18], int idx, int dir,
-					     const RegType phase, const I *X, const int *R) const {
-#pragma unroll
-	for (int i=0; i<18; i++) out[i] = scale * in[i];
-      }
-      __device__ __host__ inline RegType getPhase(const RegType in[18]) const { return 0; }
-    };
 
     /**
        @brief timeBoundary Compute boundary condition correction
