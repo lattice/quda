@@ -1669,6 +1669,7 @@ int nvec[QUDA_MAX_MG_LEVEL] = { };
 char vec_infile[256] = "";
 char vec_outfile[256] = "";
 QudaInverterType inv_type;
+bool inv_deflate = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
@@ -1841,6 +1842,7 @@ void usage(char** argv )
   printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n");
   printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
+  printf("    --inv-deflate <true/false>                # Run the IRLM eigensolver to deflate low modes (default false)\n");
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
@@ -2516,6 +2518,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--inv-deflate") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    
+    if (strcmp(argv[i+1], "true") == 0){
+      inv_deflate = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      inv_deflate = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid inv_deflate type (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--precon-type") == 0){
     if (i+1 >= argc){
       usage(argv);

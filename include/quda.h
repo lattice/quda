@@ -94,7 +94,7 @@ extern "C" {
 
     QudaDslashType dslash_type; /**< The Dirac Dslash type that is being used */
     QudaInverterType inv_type; /**< Which linear solver to use */
-
+    
     double mass;  /**< Used for staggered only */
     double kappa; /**< Used for Wilson and Wilson-clover */
 
@@ -231,7 +231,7 @@ extern "C" {
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
 
-    QudaTune tune;                          /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
+    QudaTune tune;                         /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
 
 
     /** Number of steps in s-step algorithms */
@@ -257,6 +257,9 @@ extern "C" {
     /** Deflation instance */
     void *deflation_op;
 
+    /** defines deflation */
+    void *eig_param;
+    
     /**
       Dirac Dslash used in preconditioner
     */
@@ -378,9 +381,6 @@ extern "C" {
     /** Which part of the spectrum to solve **/
     QudaEigSpectrumType spectrum;
 
-    /** Whether or not this instance will be used to deflate an inverter */    
-    QudaBoolean deflate;
-    
     /** Size of the eigenvector search space **/
     int nEv;
     /** Total size of Krylov space **/
@@ -394,14 +394,15 @@ extern "C" {
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
     int max_restarts;
-    /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
-    char QUDA_logfile[512];
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;
     /** For Arpack cross check, name of the Arpack logfile **/
     char arpack_logfile[512];
-        
+
+    /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
+    char QUDA_logfile[512];
+    
     //-------------------------------------------------
     
     //EIG-CG PARAMS

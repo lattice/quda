@@ -246,7 +246,7 @@ namespace quda {
      */
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
-      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      residual_type(param.residual_type), deflate(false), use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO), delta(param.reliable_delta),
       use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
@@ -284,8 +284,7 @@ namespace quda {
 
     SolverParam(const SolverParam &param) : inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
-      residual_type(param.residual_type), eig_param(param.eig_param), use_init_guess(param.use_init_guess),
-					    //residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      residual_type(param.residual_type), deflate(false), eig_param(param.eig_param), use_init_guess(param.use_init_guess),
       compute_null_vector(param.compute_null_vector), delta(param.delta),
       use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
@@ -1144,21 +1143,6 @@ namespace quda {
 
     bool init;
 
-    //START ShitShow
-    /** projection matrix full (maximum) dimension (nev*deflation_grid) */
-    int tot_dim; 
-    
-    /** current dimension (must match rhs_idx: if(rhs_idx < deflation_grid) curr_nevs <= nev * rhs_idx) */           
-    int cur_dim;
-
-
-
-
-
-
-
-    //END ShitSHow
-    
   public:
 
     IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
@@ -1180,14 +1164,6 @@ namespace quda {
     int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //Incremental eigCG solver (for eigcg and initcg calls)
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    /**
-       @brief Test whether the deflation space is complete
-       and therefore cannot be further extended      
-     */
-    bool isDeflSpaceComplete() {
-      return (cur_dim == tot_dim);
-    }
     
   };
 

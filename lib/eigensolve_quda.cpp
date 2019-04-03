@@ -40,7 +40,7 @@ namespace quda {
   EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile) {
     
     EigenSolver *eig_solver = nullptr;
-
+    
     switch (eig_param->eig_type) {
     case QUDA_IMP_RST_LANCZOS:
       printfQuda("Creating IRLM eigensolver\n");

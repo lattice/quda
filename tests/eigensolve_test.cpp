@@ -184,9 +184,11 @@ void setInvertParam(QudaInvertParam &inv_param) {
   if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.kappa = 1.0/(8 + mass);
   } else {
     inv_param.kappa = kappa;
     inv_param.mass = 0.5/kappa - (1.0 + 3.0/anisotropy);
+    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.mass = 1.0/kappa - 8.0;
   }
   
   printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
@@ -354,7 +356,10 @@ int main(int argc, char **argv)
   // *** application-specific.
 
   setDims(gauge_param.X);
-  setSpinorSiteSize(24);
+  //set spinor site size
+  int sss = 24;
+  if (dslash_type == QUDA_LAPLACE_DSLASH) sss = 6;
+  setSpinorSiteSize(sss);
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ?
     sizeof(double) : sizeof(float);
@@ -418,24 +423,24 @@ int main(int argc, char **argv)
   //Memory allocation
   int vol = xdim*ydim*zdim*tdim;
   if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    host_evecs = (void*)malloc(vol*24*eig_param.nEv*sizeof(float));
-    host_evals = (void*)malloc(     2*eig_param.nEv*sizeof(float));
+    host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(float));
+    host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(float));
   } else {
-    host_evecs = (void*)malloc(vol*24*eig_param.nEv*sizeof(double));
-    host_evals = (void*)malloc(     2*eig_param.nEv*sizeof(double));
+    host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(double));
+    host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(double));
   }
   
   //Demonstrate how to use inital guess. The vector will be
   //normalised in the eigensolve function.
-  for(int i=0; i<vol*24; i++) {
+  for(int i=0; i<vol*sss; i++) {
     if(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
       
       ((double*)host_evecs)[i] = rand()/(double)RAND_MAX;
-      //if(i<24) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
+      //if(i<sss) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
     } else {
       
       ((float*)host_evecs)[i] = rand()/(float)RAND_MAX;      
-      //if(i<24) printfQuda("Host elem %d = %f\n", i, ((float*)host_evecs)[i]);
+      //if(i<sss) printfQuda("Host elem %d = %f\n", i, ((float*)host_evecs)[i]);
     }
   }
     
@@ -457,12 +462,12 @@ int main(int argc, char **argv)
       //Perform a cross-check using the ARPACK interface
       //Use a different initial guess and reallocate memory
       
-      host_evecs = (void*)malloc(vol*24*eig_param.nKr*sizeof(double));
-      host_evals = (void*)malloc(     2*eig_param.nKr*sizeof(double));
+      host_evecs = (void*)malloc(vol*sss*eig_param.nKr*sizeof(double));
+      host_evals = (void*)malloc(      2*eig_param.nKr*sizeof(double));
       
-      for(int i=0; i<vol*24; i++) {
+      for(int i=0; i<vol*sss; i++) {
 	((double*)host_evecs)[i] = rand()/(double)RAND_MAX;
-	if(i<24) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
+	if(i<sss) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
       }
       
       double timeARPACK = -((double)clock());

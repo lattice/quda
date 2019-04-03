@@ -146,33 +146,46 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
+  P(use_poly_acc, QUDA_BOOLEAN_NO);
   P(poly_deg, 0);
   P(a_min, 0.0);
   P(a_max, 0.0);
-  P(tol, 0.0);
-  P(nk, 0);
-  P(np, 0);
+  P(use_dagger, QUDA_BOOLEAN_NO);
+  P(use_norm_op, QUDA_BOOLEAN_NO);
+  P(compute_svd, QUDA_BOOLEAN_NO);
+  P(spectrum, QUDA_LR_EIG_SPECTRUM);
   P(nEv, 0);
   P(nKr, 0);
   P(nConv, 0);
-  P(deflate, QUDA_BOOLEAN_NO);
+  P(tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
+  P(arpack_check, QUDA_BOOLEAN_NO);  
+  P(nk, 0);
+  P(np, 0);
+  P(eig_type, QUDA_IMP_RST_LANCZOS);  
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
+  P(use_poly_acc, QUDA_BOOLEAN_INVALID);
   P(poly_deg, INVALID_INT);
   P(a_min, INVALID_DOUBLE);
   P(a_max, INVALID_DOUBLE);
-  P(tol, INVALID_DOUBLE);
-  P(nk, INVALID_INT);
-  P(np, INVALID_INT);
+  P(use_dagger, QUDA_BOOLEAN_INVALID);
+  P(use_norm_op, QUDA_BOOLEAN_INVALID);
+  P(compute_svd, QUDA_BOOLEAN_INVALID);
   P(nEv, INVALID_INT);
   P(nKr, INVALID_INT);
   P(nConv, INVALID_INT);
-  P(deflate, QUDA_BOOLEAN_INVALID);
+  P(tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
+  P(arpack_check, QUDA_BOOLEAN_INVALID);  
+  P(nk, INVALID_INT);
+  P(np, INVALID_INT);
+  P(check_interval, INVALID_INT);
+  P(max_restarts, INVALID_INT);
+  P(eig_type, QUDA_INVALID_EIG_TYPE);  
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif

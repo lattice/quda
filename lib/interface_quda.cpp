@@ -2363,7 +2363,6 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type,
 			    inv_param->input_location);
 
-
   cpuParam.v = host_evecs;
   ColorSpinorField *h_tmp = ColorSpinorField::Create(cpuParam);
   double norm = sqrt(blas::norm2(*h_tmp));
@@ -2376,6 +2375,10 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
     cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
 
+  if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) {
+    cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  }
+  
   std::vector<Complex> evals(eig_param->nEv, 0.0);
   std::vector<ColorSpinorField*> kSpace;
   for(int i=0; i<eig_param->nKr; i++) {
