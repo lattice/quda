@@ -419,9 +419,16 @@ int main(int argc, char **argv)
       for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
-    if(df_param.is_complete == QUDA_BOOLEAN_YES) inv_param.inv_type = QUDA_CG_INVERTER;
+    if(df_param.is_complete == QUDA_BOOLEAN_YES) {
+      printfQuda("Deflation space is complete. Running deflated CG solver.\n");
+      inv_param.inv_type = QUDA_CG_INVERTER;
+      inv_param.cuda_prec_sloppy = cuda_prec_precondition;
+    }
 
     invertQuda(spinorOut, spinorIn, &inv_param);
+
+    updateDeflationQuda(df_preconditioner, &df_param);
+    //
     printfQuda("\nDone for %d rhs.\n", inv_param.rhs_idx);
   }
 
