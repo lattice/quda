@@ -11,7 +11,7 @@ namespace quda {
 
     const int length = 18;
 
-    QudaFieldLocation location = 
+    QudaFieldLocation location =
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
     if (u.isNative()) {
@@ -31,19 +31,21 @@ namespace quda {
         if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
           typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
           extractGhost<Float, length>(G(u, 0, Ghost), u, location, extract, offset);
-        } else {
+        } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
           typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_9>::type G;
           extractGhost<Float, length>(G(u, 0, Ghost), u, location, extract, offset);
+        } else {
+          errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
         }
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
-      
+
 #ifdef BUILD_QDP_INTERFACE
       extractGhost<Float,length>(QDPOrder<Float,length>(u, 0, Ghost), u, location, extract, offset);
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
-      
+
     } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
