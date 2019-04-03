@@ -223,7 +223,9 @@ namespace quda {
     {
       const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
-      TensorCoreSharedMemory<half2> shared_memory_data;
+      TensorCoreSharedMemory<float> shared_memory_data;
+
+      static_assert(block_dim_x*Ls_/32<32);
 
       constexpr int M = 4 * Ls_;
       constexpr int N = 6 * block_dim_x;
@@ -234,7 +236,9 @@ namespace quda {
       constexpr int N_sm = N + sm_n_pad_size;
       constexpr int M_sm = M + sm_m_pad_size;
 
-      half2* sm_b = shared_memory_data;
+      float* smem_scale = shared_memory_data;
+
+      half2* sm_b = reinterpret_cast<half2*>(smem_scale+32);
       half* sm_c = reinterpret_cast<half*>(sm_b);
 
       half* sm_a = reload ? sm_c + M * N_sm : sm_c;
@@ -318,8 +322,8 @@ namespace quda {
         typedef typename mapper<storage_type>::type real;
         typedef ColorSpinor<real, 3, 4> Vector;
 
+        Vector in_vec;
         if (!idle) {
-          Vector in_vec;
           // the Wilson hopping terms
           if (type_ == 0) {
             apply_wilson_5d<storage_type, false, true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
@@ -334,15 +338,15 @@ namespace quda {
             in_vec = arg.in(sid_shift, explicit_parity);
           }
           // store result to shared memory
-          load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, arg.scale); // acc(accumulation) = false
         }
+        load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
 
         __syncthreads();
         wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
         __syncthreads();
 
         if (type_ == 1) {
-
+          Vector aux_in_vec;
           if (!idle) {
             constexpr int in_x_shift = 2;
             int back_x[4] = {x[0] - in_x_shift, x[1] - in_x_shift, x[2] - in_x_shift, x[3] - in_x_shift};
@@ -351,30 +355,34 @@ namespace quda {
                 && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
               int volume_4d_cb_back = back_dim[0] * back_dim[1] * back_dim[2] * back_dim[3] >> 1;
               int sid_back_shift = threadIdx.y * volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim);
-              Vector aux_in_vec = arg.x(sid_back_shift, explicit_parity);
-              load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, arg.scale * arg.m_scale); // acc = true
+              aux_in_vec = arg.x(sid_back_shift, explicit_parity);
             }
-            store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid, arg.scale * arg.m_scale);
+          }
+          load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
+          if (!idle){
+            store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid, smem_scale[0]);
           }
           __syncthreads();
           wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
           __syncthreads();
 
         } else if (type_ == 3) {
-
+          Vector aux_in_vec;
           if (!idle) {
-            Vector aux_in_vec = arg.x(sid, explicit_parity);
-            load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, arg.scale * arg.m_scale);
+            aux_in_vec = arg.x(sid, explicit_parity);
           }
+          load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
         }
 
         if (type_ == 3) {
           if (!idle) {
             int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
-            store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid_shift, arg.scale * arg.m_scale);
+            store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid_shift, smem_scale[0]);
           }
+        } else if(type_ == 1){
+          if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0]); }
         } else {
-          if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, arg.scale * arg.m_scale); }
+          if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0]*arg.m_scale); }
         }
 
         s4_shift_base += gridDim.x * blockDim.x;
@@ -441,15 +449,15 @@ namespace quda {
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
           if (arg.type == 1) {
             return ((param.block.y * 4) * (param.block.y * 4 + 0) * 2 + (param.block.y * 4) * (param.block.x * 6 + 16))
-                * sizeof(half);
+                * sizeof(half) + 128;
           } else {
             return ((param.block.y * 4) * (param.block.y * 4 + 0) + (param.block.y * 4) * (param.block.x * 6 + 16))
-                * sizeof(half);
+                * sizeof(half) + 128;
           }
         } else {
           int a_size = (param.block.y * 4) * (param.block.y * 4 + 0);
           int b_size = (param.block.y * 4) * (param.block.x * 6 + 16);
-          return (a_size > b_size ? a_size : b_size) * sizeof(half);
+          return (a_size > b_size ? a_size : b_size) * sizeof(half) + 128;
         }
       }
 

@@ -392,7 +392,7 @@ namespace quda {
     printfQuda("dslash test completed. ----->\n");
   }
 
-  void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in, const double scale ){
+  void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in, const double scale=1.0 ){
     int odd_bit = (mat_precondition->getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if(tc && (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION)){
@@ -437,8 +437,7 @@ namespace quda {
 
     for(int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++){
      
-      double ip2 = blas::norm2(*ip); 
-      inner_dslash(*immp, *ip, sqrt(ip2/ip->Volume()/24.)/loss_scale);
+      inner_dslash(*immp, *ip);
       
       Mpk2 = reDotProduct(*ip, *immp);
 

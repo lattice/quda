@@ -271,22 +271,22 @@ namespace quda {
   __device__ inline void __half_max_abs_half2__(half& max, half2& input){
     static_assert(sizeof(half2) == sizeof(uint32_t));
     // Just mask the exponent part
-    static constexpr uint32_t is_normal_mask_l = 0x83ffffffu;  // 10000011 11111111 11111111 11111111 
-    static constexpr uint32_t is_normal_mask_h = 0xffff83ffu;  // 11111111 11111111 10000011 11111111 
+    static constexpr uint32_t is_normal_mask_l = 0x83ffffffu;  // 1000 0011 1111 1111 1111 1111 1111 1111 
+    static constexpr uint32_t is_normal_mask_h = 0xffff83ffu;  // 1111 1111 1111 1111 1000 0011 1111 1111 
     
     uint32_t is_normal_masked_l = *reinterpret_cast<uint32_t*>(&input) | is_normal_mask_l;
     uint32_t is_normal_masked_h = *reinterpret_cast<uint32_t*>(&input) | is_normal_mask_h;
     
     // Check if the halves are normal
-    if(is_normal_masked_l == 0xffffffffu){                     // 10000011 11111111 11111111 11111111
+    if(is_normal_masked_l == 0xffffffffu){                     // 1111 1111 1111 1111 1111 1111 1111 1111
       *reinterpret_cast<uint32_t*>(&input) = *reinterpret_cast<uint32_t*>(&input) & is_normal_mask_l;
     }
-    if(is_normal_masked_h == 0xffffffffu){                     // 10000011 11111111 11111111 11111111
+    if(is_normal_masked_h == 0xffffffffu){                     // 1111 1111 1111 1111 1111 1111 1111 1111
       *reinterpret_cast<uint32_t*>(&input) = *reinterpret_cast<uint32_t*>(&input) & is_normal_mask_h;
     }
     
     // Set the fisrt bit of the halves to 0.
-    static constexpr uint32_t maximum_mask = 0x7fff7fffu;      // 01111111 11111111 01111111 11111111 
+    static constexpr uint32_t maximum_mask = 0x7fff7fffu;      // 0111 1111 1111 1111 0111 1111 1111 1111 
     
     uint32_t input_masked = *reinterpret_cast<uint32_t*>(&input) & maximum_mask;
     half2 lh = *reinterpret_cast<half2*>(&input_masked);
@@ -297,24 +297,97 @@ namespace quda {
       max = lh.y;
     }
   }
-  
-  // Actually does more than the function name suggests.
-  // will find the maximum absolute value among the vector, scale that, and store to sm_b
-  template<int N_sm_d2, bool acc, class Vector>
-  __device__ inline void load_matrix_b_vector(const Vector& v, half2* sm_b, const float scale){
-    // static constexpr float H_MAX = 65504.0f; // Prevent the creation of NaN.
+
+  __inline__ __device__ void __float_max_abs_floats__(float& max, const float& input){
+    static constexpr uint32_t maximum_mask = 0x7fffffffu; // 0111 1111 1111 1111 1111 1111 1111 1111
+    uint32_t input_masked = *reinterpret_cast<const uint32_t*>(&input) & maximum_mask;
+    if(*reinterpret_cast<float*>(&input_masked) > max){
+      max = *reinterpret_cast<float*>(&input_masked);
+    }
+  }
+ 
+  __device__ inline void warp_wise_reduce_float(float& f) {
+    #pragma unroll
+    for(int offset = 16; offset > 0; offset /= 2){
+      float other_f = __shfl_down_sync(0xffffffffu, f, offset);
+      if(other_f > f){
+        f = other_f;
+      }
+    }
+  }
+
+  constexpr float target_scale = 1e3;
+
+  template<class Vector>
+  __device__ inline void block_wise_reduce_vector(const Vector& v, float* smem_scale){
+    
+    __syncthreads();
+    
+    int lane_id = ((threadIdx.y*blockDim.x+threadIdx.x) & 31);
+    int warp_id = ((threadIdx.y*blockDim.x+threadIdx.x) >> 5);
+
+    // Find the maximum absolute value in a lane
+    float warp_max = 0.0f;
     #pragma unroll
     for(int spin = 0; spin < 4; spin++){
       #pragma unroll
       for(int color = 0; color < 3; color++){
-        float real = __fdividef(v(spin, color).real(), scale); // real = real>H_MAX?H_MAX:real;
-        float imag = __fdividef(v(spin, color).imag(), scale); // imag = imag>H_MAX?H_MAX:imag;
-        int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
-        if(acc){
-          sm_b[idx] = __hadd2(sm_b[idx], __floats2half2_rn(real, imag));
-        }else{
-          sm_b[idx] = __floats2half2_rn(real, imag);
+        __float_max_abs_floats__(warp_max, v(spin, color).real());
+        __float_max_abs_floats__(warp_max, v(spin, color).imag());
+      }
+    }
+    // Find the maximum absolute value in a warp across different lanes
+    warp_wise_reduce_float(warp_max);
+    // Now lane 0 of each warp holds the maximum value
+    if(lane_id == 0){
+      smem_scale[warp_id] = warp_max;
+    }
+    __syncthreads();
+    if(warp_id == 0){
+      warp_max = (lane_id < ((blockDim.x*blockDim.y)>>5)) ? smem_scale[lane_id] : 0.0f;
+      warp_wise_reduce_float(warp_max); 
+      if(lane_id == 0){
+        smem_scale[0] = warp_max / target_scale;
+      } 
+    }
+    __syncthreads();
+/*
+    if(warp_id == 0){
+      if(lane_id == 0){
+        smem_scale[0] = 2.0f;
+      } 
+    }
+    __syncthreads();
+*/
+  }
+
+  // Actually does more than the function name suggests.
+  // will find the maximum absolute value among the vector, scale that, and store to sm_b
+  template<int N_sm_d2, bool acc, class Vector>
+  __device__ inline void load_matrix_b_vector(Vector& v, half2* sm_b, float* smem_scale, float m_scale=1.0f){
+    if(acc){
+      float previous_scale = smem_scale[0]*m_scale;
+      half* B = reinterpret_cast<half*>(sm_b);
+      #pragma unroll
+      for(int spin = 0; spin < 4; spin++){
+        #pragma unroll
+        for(int color = 0; color < 3; color++){
+          int idx = (threadIdx.y*4+spin)*(N_sm_d2*2)+6*threadIdx.x+2*color;
+          v(spin, color) += complex<float>(__half2float(B[idx+0]), __half2float(B[idx+1]))*previous_scale;
         }
+      }
+    }
+    block_wise_reduce_vector(v, smem_scale);
+    // Now smem_scale[0] contains the maximum value
+    float current_scale = smem_scale[0];
+    #pragma unroll
+    for(int spin = 0; spin < 4; spin++){
+      #pragma unroll
+      for(int color = 0; color < 3; color++){
+        float real = v(spin, color).real() / current_scale;
+        float imag = v(spin, color).imag() / current_scale;
+        int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
+        sm_b[idx] = __floats2half2_rn(real, imag);
       }
     }
   }
