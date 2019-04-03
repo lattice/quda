@@ -8,7 +8,7 @@ namespace quda {
 
   /**
      This struct contains all the metadata required to define the
-     deflated solvers.  
+     deflated solvers.
    */
   struct DeflationParam {
 
@@ -16,11 +16,11 @@ namespace quda {
 	We use this to set (per-level) parameters */
     QudaEigParam  &eig_global;
 
-    /** Buffer for Ritz vectors 
+    /** Buffer for Ritz vectors
         For staggered: we need to reduce dimensionality of each component?
      */
-    ColorSpinorField *RV;  
-    
+    ColorSpinorField *RV;
+
     /** Inverse Ritz values*/
     double *invRitzVals;
 
@@ -28,18 +28,18 @@ namespace quda {
     DiracMatrix &matDeflation;
 
     /** Host  projection matrix (e.g. eigCG VH A V) */
-    Complex *matProj; 
+    Complex *matProj;
 
     /** projection matrix leading dimension */
-    int ld;                 
+    int ld;
 
     /** projection matrix full (maximum) dimension (nev*deflation_grid) */
-    int tot_dim; 
+    int tot_dim;
 
-    /** current dimension (must match rhs_idx: if(rhs_idx < deflation_grid) curr_nevs <= nev * rhs_idx) */           
+    /** current dimension (must match rhs_idx: if(rhs_idx < deflation_grid) curr_nevs <= nev * rhs_idx) */
     int cur_dim;
 
-    /** use inverse Ritz values for deflation (for the best performance) */            
+    /** use inverse Ritz values for deflation (for the best performance) */
     bool use_inv_ritz;
 
     /** Where to compute Ritz vectors */
@@ -48,7 +48,7 @@ namespace quda {
     /** Filename for where to load/store the deflation space */
     char filename[100];
 
-    DeflationParam(QudaEigParam &param, ColorSpinorField *RV,  DiracMatrix &matDeflation, int cur_dim = 0) : eig_global(param), RV(RV), matDeflation(matDeflation), 
+    DeflationParam(QudaEigParam &param, ColorSpinorField *RV,  DiracMatrix &matDeflation, int cur_dim = 0) : eig_global(param), RV(RV), matDeflation(matDeflation),
              cur_dim(cur_dim), use_inv_ritz(false), location(param.location) {
 
         if(param.nk == 0 || param.np == 0 || (param.np % param.nk != 0)) errorQuda("\nIncorrect deflation space parameters...\n");
@@ -98,7 +98,7 @@ namespace quda {
 
 
   public:
-    /** 
+    /**
       Constructor for Deflation class
       @param param DeflationParam struct that defines all meta data
       @param profile Timeprofile instance used to profile
@@ -114,7 +114,7 @@ namespace quda {
     /**
        This method verifies the correctness of the MG method.  It checks:
        1. eigen-vector accuracy
-       2. ... 
+       2. ...
      */
     void verify();
 
@@ -126,8 +126,8 @@ namespace quda {
     void increment(ColorSpinorField &V, int nev);
 
     /**
-       In the incremental eigcg: reduce deflation space 
-       based on the following criteria:    
+       In the incremental eigcg: reduce deflation space
+       based on the following criteria:
        @param tol : keep all eigenvectors with residual norm less then tol
        @param max_nev : keep the lowest max_nev eigenvectors (conservative)
      */
@@ -154,9 +154,15 @@ namespace quda {
 
     /**
        @brief Test whether the deflation space is complete
-       and therefore cannot be further extended      
+       and therefore cannot be further extended
      */
     bool is_complete() {return (param.cur_dim == param.tot_dim);}
+
+    /**
+       @brief Test whether the deflation space is complete
+       and therefore cannot be further extended
+     */
+    void reset_deflation_space() {param.tot_dim = param.cur_dim;}    
 
     /**
        @brief return deflation space size
@@ -172,7 +178,7 @@ namespace quda {
   };
 
   /**
-     Following the multigrid design, this is an object that captures an entire deflation operations.  
+     Following the multigrid design, this is an object that captures an entire deflation operations.
      A bit of a hack at the moment, this is used to allow us
      to store and reuse the deflation stuff between solves.  This is use by
      the newDeflationQuda and destroyDeflationQuda interface functions.
@@ -208,5 +214,3 @@ namespace quda {
   };
 
 } // namespace quda
-
-

@@ -572,7 +572,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_FREE);
     return k;
   }
- 
+
   void IncEigCG::operator()(ColorSpinorField &out, ColorSpinorField &in)
   {
      if(param.rhs_idx == 0) max_eigcg_cycles = param.eigcg_max_restarts;
@@ -676,8 +676,14 @@ namespace quda {
 
      param.rhs_idx += logical_rhs_id;
 
+					if(logical_rhs_id == 0) {
+						  warningQuda("Cannot expand the deflation space.\n");
+								defl.reset_deflation_space();
+								param.rhs_idx += 1; //we still solved the system
+					}
+
      if(defl.is_complete()) {
-       if(param.rhs_idx != param.deflation_grid) warningQuda("\nTotal rhs number (%d) does not match the deflation grid size (%d).\n", param.rhs_idx, param.deflation_grid);
+       if(param.rhs_idx != param.deflation_grid) warningQuda("\nTotal rhs number (%d) does not match the requested deflation grid size (%d).\n", param.rhs_idx, param.deflation_grid);
        if(Vm) delete Vm;//safe some space
        Vm = nullptr;
 

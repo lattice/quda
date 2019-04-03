@@ -13,7 +13,7 @@
 #include <Eigen/Dense>
 
 
-namespace quda {  
+namespace quda {
 
   using namespace blas;
 
@@ -64,7 +64,7 @@ namespace quda {
       r_sloppy  = r;
       Av_sloppy = Av;
     }
-    
+
 
     printfQuda("Deflation space setup completed\n");
     // now we can run through the verification if requested
@@ -88,7 +88,7 @@ namespace quda {
 
   double Deflation::flops() const {
     double flops = 0;//Do we need to report this?
-    
+
     //compute total flops for deflation application. Not sure we really need this.
     return flops;
   }
@@ -99,7 +99,7 @@ namespace quda {
 
   void Deflation::verify() {
     const int nevs_to_print = param.cur_dim;
-    if(nevs_to_print == 0) errorQuda("\nIncorrect size of current deflation space. \n"); 
+    if(nevs_to_print == 0) errorQuda("\nIncorrect size of current deflation space. \n");
 
     std::unique_ptr<Complex, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(Complex)), pinned_deleter);
 
@@ -150,7 +150,7 @@ namespace quda {
   }
 
   void Deflation::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER) 
+    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER)
        errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
 
     if(param.cur_dim == 0) return;//nothing to do
@@ -170,7 +170,7 @@ namespace quda {
 
     blas::cDotProduct(vec.get(), rv_, in_);//<i, b>
 
-    if(!param.use_inv_ritz) 
+    if(!param.use_inv_ritz)
     {
       if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
 #ifdef MAGMA_LIB
@@ -178,7 +178,7 @@ namespace quda {
 #else
         errorQuda("MAGMA library was not built.\n");
 #endif
-      } else if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) { 
+      } else if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
         Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
         Map<VectorXcd, Unaligned> vec_ (vec.get(), param.cur_dim);
 
@@ -205,14 +205,14 @@ namespace quda {
   }
 
   void Deflation::increment(ColorSpinorField &Vm, int nev) {
-    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER) 
+    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER)
        errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
 
     if( nev == 0 ) return; //nothing to do
 
     const int first_idx = param.cur_dim;
 
-    if(param.RV->CompositeDim() < (first_idx+nev) || param.tot_dim < (first_idx+nev)) { 
+    if(param.RV->CompositeDim() < (first_idx+nev) || param.tot_dim < (first_idx+nev)) {
       warningQuda("\nNot enough space to add %d vectors. Keep deflation space unchanged.\n", nev);
       return;
     }
@@ -234,7 +234,7 @@ namespace quda {
 
       int offset = 0;
       while (offset < i) {
-        
+
         const int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset);
 
         std::vector<ColorSpinorField*> vj_(param.RV->Components().begin()+offset, param.RV->Components().begin()+offset+local_length);
@@ -258,7 +258,7 @@ namespace quda {
 
       param.matDeflation(*Av_sloppy, param.RV->Component(i));//precision must match!
       //load diagonal:
-      *Av = *Av_sloppy; 
+      *Av = *Av_sloppy;
       param.matProj[i*param.ld+i] = cDotProduct(*accum, *Av);
 
       if (i>0) {
@@ -283,6 +283,9 @@ namespace quda {
 
 
   void Deflation::reduce(double tol, int max_nev) {
+
+     if(max_nev == 0 || param.cur_dim == 0) {printfQuda("Deflation space is empty.\n"); return;}
+
      if(param.cur_dim < max_nev)
      {
         printf("\nToo big number of eigenvectors was requested, switched to maximum available number %d\n", param.cur_dim);
@@ -338,7 +341,7 @@ namespace quda {
 
      int idx       = 0;
      double relerr = 0.0;
-     bool do_residual_check = (tol != 0.0); 
+     bool do_residual_check = (tol != 0.0);
 
      while ((relerr < tol) && (idx < max_nev))
      {
@@ -390,13 +393,13 @@ namespace quda {
 
     std::string vec_infile(param.eig_global.vec_infile);
 
-    std::vector<ColorSpinorField*> &B = RV->Components(); 
+    std::vector<ColorSpinorField*> &B = RV->Components();
 
     const int Nvec = B.size();
     printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
 
     void **V = new void*[Nvec];
-    for (int i=0; i<Nvec; i++) { 
+    for (int i=0; i<Nvec; i++) {
       V[i] = B[i]->V();
       if (V[i] == NULL) {
 	printfQuda("Could not allocate V[%d]\n", i);
