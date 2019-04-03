@@ -867,6 +867,14 @@ extern "C" {
   void dumpMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
+   * @brief Updates the deflation space information
+   * @param[in] mg_instance Pointer to the instance of deflated solver   
+   * @param param Contains all metadata regarding host and device
+   * storage etc.
+   */
+  void updateDeflationQuda(void *mg_instance, QudaEigParam *param);
+
+  /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field

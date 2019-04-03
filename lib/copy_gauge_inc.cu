@@ -13,13 +13,8 @@ namespace quda {
       // reads
       const bool override = true;
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-        if (typeid(FloatOut) == typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-          copyGauge<short, FloatIn, length>(
-              FloatNOrder<short, length, 2, 19>(out, (short *)Out, (short **)outGhost, override), inOrder, out, in, location, type);
-        } else {
-          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_NO>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
-        }
+        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_NO>::type G;
+        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
         typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_12>::type G;
@@ -148,14 +143,8 @@ namespace quda {
       // reads
       const bool override = true;
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(FloatIn)==typeid(short) && in.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  copyGauge<FloatOut,short,length> (FloatNOrder<short,length,2,19>
-					    (in,(short*)In,(short**)inGhost,override),
-					    out, in, location, Out, outGhost, type);
-	} else {
-	  typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
-	  copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
-	}
+        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
+        copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
