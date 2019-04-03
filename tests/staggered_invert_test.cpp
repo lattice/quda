@@ -613,6 +613,7 @@ invert_test(void)
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
     gaugeParam.ga_pad = link_pad;
+    gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
     gaugeParam.reconstruct= (link_recon == QUDA_RECONSTRUCT_12 || link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
     gaugeParam.reconstruct_sloppy = (link_recon_sloppy == QUDA_RECONSTRUCT_12 || link_recon_sloppy == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon_sloppy;
     gaugeParam.cuda_prec_precondition = gaugeParam.cuda_prec_sloppy;
