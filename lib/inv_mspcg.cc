@@ -815,9 +815,7 @@ namespace quda {
       linalg_timer[1].Stop(fname, cname, lname);
 
       k++;
-      if(k % 100 == 0){
-        printfQuda("MSPCG/iter.count/r2/target_r2/%%/target_%%: %05d %8.4e %8.4e %8.4e %8.4e\n", k, rr2, stop, std::sqrt(rr2/b2), param.tol);
-      }
+      printfQuda("MSPCG/iter.count/r2/target_r2/%%/target_%%: %05d %8.4e %8.4e %8.4e %8.4e\n", k, rr2, stop, std::sqrt(rr2/b2), param.tol);
     }
 
 // END of main loop 

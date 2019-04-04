@@ -338,6 +338,7 @@ namespace quda {
   __device__ inline void warp_wise_reduce_float(float& f) {
     #pragma unroll
     for(int offset = 16; offset > 0; offset /= 2){
+      // TODO: Only works for CUDA 9.2 or later
       float other_f = __shfl_down_sync(0xffffffffu, f, offset);
       if(other_f > f){
         f = other_f;
@@ -345,7 +346,7 @@ namespace quda {
     }
   }
 
-  constexpr float target_scale = 5e3;
+  constexpr float target_scale = 2e3;
 
   template<class Vector>
   __device__ inline void block_wise_reduce_vector(const Vector& v, float* smem_scale){
