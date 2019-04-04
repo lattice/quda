@@ -1347,79 +1347,6 @@ namespace quda {
       };
 
       /**
-     @brief Gauge reconstruct 13 helper where we reconstruct the
-     third row from the cross product of the first two rows, and
-     include a non-trivial phase factor
-     @tparam Float Storage format (e.g., double, float, short)
-     @tparam ghostExchange_ optional template the ghostExchange
-     type to avoid the run-time overhead
-  */
-      template <typename Float, QudaGhostExchange ghostExchange_>
-        struct Reconstruct<13, Float, ghostExchange_, QUDA_STAGGERED_PHASE_NO> {
-        typedef typename mapper<Float>::type RegType;
-        typedef complex<RegType> Complex;
-        const Reconstruct<12, Float, ghostExchange_> reconstruct_12;
-        const RegType scale;
-
-        Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()) {}
-        Reconstruct(const Reconstruct<13, Float, ghostExchange_> &recon) : reconstruct_12(recon.reconstruct_12), scale(recon.scale) {}
-
-        __device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const { reconstruct_12.Pack(out, in, idx); }
-
-        template <typename I>
-        __device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir, const RegType phase, const I *X, const int *R) const
-        {
-          const Complex *In = reinterpret_cast<const Complex *>(in);
-          Complex *Out = reinterpret_cast<Complex *>(out);
-          const RegType coeff = static_cast<RegType>(1.0) / scale;
-
-#pragma unroll
-          for (int i = 0; i < 6; ++i) Out[i] = In[i];
-
-          Out[6] = cmul(Out[2], Out[4]);
-          Out[6] = cmac(Out[1], Out[5], -Out[6]);
-          Out[6] = coeff * conj(Out[6]);
-
-          Out[7] = cmul(Out[0], Out[5]);
-          Out[7] = cmac(Out[2], Out[3], -Out[7]);
-          Out[7] = coeff * conj(Out[7]);
-
-          Out[8] = cmul(Out[1], Out[3]);
-          Out[8] = cmac(Out[0], Out[4], -Out[8]);
-          Out[8] = coeff * conj(Out[8]);
-
-          // Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
-          RegType cos_sin[2];
-          Trig<isFixed<RegType>::value, RegType>::SinCos(static_cast<RegType>(3. * phase), &cos_sin[1], &cos_sin[0]);
-          Complex A(cos_sin[0], cos_sin[1]);
-
-          Out[6] *= A;
-          Out[7] *= A;
-          Out[8] *= A;
-        }
-
-        __device__ __host__ inline RegType getPhase(const RegType in[18]) const
-        {
-#if 1 // phase from cross product
-        Complex In[9];
-  #pragma unroll
-          for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
-          // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-          Complex denom = conj(In[0] * In[4] - In[1] * In[3]) / scale;
-          Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-          RegType phase = arg(expI3Phase) / static_cast<RegType>(3.0);
-#else // phase from determinant
-          Matrix<Complex, 3> a;
-#pragma unroll
-          for (int i = 0; i < 9; i++) a(i) = Complex(in[2 * i] / scale, in[2 * i + 1] / scale);
-          const Complex det = getDeterminant(a);
-          RegType phase = arg(det) / 3;
-#endif
-          return phase;
-        }
-      };
-
-      /**
          @brief Gauge reconstruct 13 helper where we reconstruct the
          third row from the cross product of the first two rows, and
          include a non-trivial phase factor
@@ -1427,42 +1354,53 @@ namespace quda {
          @tparam ghostExchange_ optional template the ghostExchange
          type to avoid the run-time overhead
       */
-      template <typename Float, QudaGhostExchange ghostExchange_>
-        struct Reconstruct<13, Float, ghostExchange_, QUDA_STAGGERED_PHASE_MILC> {
+      template <typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase stag_phase>
+      struct Reconstruct<13, Float, ghostExchange_, stag_phase> {
         typedef typename mapper<Float>::type RegType;
         typedef complex<RegType> Complex;
 	const Reconstruct<12,Float,ghostExchange_> reconstruct_12;
 	const RegType scale;
+	const RegType scale_inv;
 
-      Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()) { }
-      Reconstruct(const Reconstruct<13, Float, ghostExchange_, QUDA_STAGGERED_PHASE_MILC> &recon) : reconstruct_12(recon.reconstruct_12), scale(recon.scale) {}
+      Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()), scale_inv(1.0/scale) { }
+      Reconstruct(const Reconstruct<13, Float, ghostExchange_, stag_phase> &recon) :
+        reconstruct_12(recon.reconstruct_12), scale(recon.scale), scale_inv(recon.scale_inv) {}
 
       __device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const { reconstruct_12.Pack(out, in, idx); }
 
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir,
-					     const RegType phase, const I *X, const int *R) const {
-	const RegType coeff = static_cast<RegType>(1.0)/scale;
-
+					     const RegType phase, const I *X, const int *R) const
+      {
         Complex Out[9];
 #pragma unroll
         for (int i=0; i<6; i++) Out[i] = Complex(in[2*i+0], in[2*i+1]);
 
         Out[6] = cmul(Out[2], Out[4]);
         Out[6] = cmac(Out[1], Out[5], -Out[6]);
-        Out[6] = coeff*conj(Out[6]);
+        Out[6] = scale_inv*conj(Out[6]);
 
         Out[7] = cmul(Out[0], Out[5]);
         Out[7] = cmac(Out[2], Out[3], -Out[7]);
-        Out[7] = coeff*conj(Out[7]);
+        Out[7] = scale_inv*conj(Out[7]);
 
         Out[8] = cmul(Out[1], Out[3]);
         Out[8] = cmac(Out[0], Out[4], -Out[8]);
-        Out[8] = coeff*conj(Out[8]);
+        Out[8] = scale_inv*conj(Out[8]);
 
-        Out[6] *= phase;
-        Out[7] *= phase;
-        Out[8] *= phase;
+        if (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
+          // Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
+          RegType cos_sin[2];
+          Trig<isFixed<RegType>::value, RegType>::SinCos(static_cast<RegType>(3. * phase), &cos_sin[1], &cos_sin[0]);
+          Complex A(cos_sin[0], cos_sin[1]);
+          Out[6] = cmul(A,Out[6]);
+          Out[7] = cmul(A,Out[7]);
+          Out[8] = cmul(A,Out[8]);
+        } else { // phase is +/- 1 so real multiply is sufficient
+          Out[6] *= phase;
+          Out[7] *= phase;
+          Out[8] *= phase;
+        }
 
 #pragma unroll
         for (int i=0; i<9; i++) {
@@ -1477,21 +1415,24 @@ namespace quda {
         Complex In[9];
 #pragma unroll
         for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
-	// denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) / scale;
-	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-  RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
+        // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
+        Complex denom = conj(In[0]*In[4] - In[1]*In[3]) * scale_inv;
+        Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
 
+        if (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
+          return arg(expI3Phase) / static_cast<RegType>(3.0);
+        } else {
+          return expI3Phase.real() > 0 ? 1 : -1;
+        }
 #else // phase from determinant
         Matrix<Complex, 3> a;
 #pragma unroll
-        for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
+        for (int i=0; i<9; i++) a(i) = Complex(in[2*i]*scale_inv, in[2*i+1]*scale_inv);
         const Complex det = getDeterminant( a );
-        RegType phase = arg(det)/3;
+        return phase = arg(det)/3;
 #endif
-        return phase;
       }
-      };
+  };
 
   /**
      @brief Gauge reconstruct 8 helper where we reconstruct the gauge
@@ -1625,77 +1566,6 @@ namespace quda {
   };
 
   /**
-   @brief Gauge reconstruct 9 helper where we reconstruct the gauge
-   matrix from 8 packed elements (maximal compression) and include a
-   non-trivial phase factor
-   @tparam Float Storage format (e.g., double, float, short)
-   @tparam ghostExchange_ optional template the ghostExchange type
-   to avoid the run-time overhead
-*/
-  template <typename Float, QudaGhostExchange ghostExchange_> struct Reconstruct<9, Float, ghostExchange_, QUDA_STAGGERED_PHASE_NO> {
-    typedef typename mapper<Float>::type RegType;
-    typedef complex<RegType> Complex;
-    const Reconstruct<8, Float, ghostExchange_> reconstruct_8;
-    const Complex scale; // imaginary value stores inverse
-
-    Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale(), 1.0 / u.Scale()) {}
-
-    Reconstruct(const Reconstruct<9, Float, ghostExchange_> &recon) : reconstruct_8(recon.reconstruct_8), scale(recon.scale) {}
-
-    __device__ __host__ inline RegType getPhase(const RegType in[18]) const
-    {
-#if 1 // phase from cross product
-      Complex In[9];
-      #pragma unroll
-      for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
-      // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-      Complex denom = conj(In[0] * In[4] - In[1] * In[3]) * scale.imag();
-      Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-      RegType phase = arg(expI3Phase) / static_cast<RegType>(3.0);
-#else // phase from determinant
-      Matrix<Complex, 3> a;
-#pragma unroll
-      for (int i = 0; i < 9; i++) a(i) = Complex(in[2*i], in[2*i+1])*scale.imag());
-      const Complex det = getDeterminant(a);
-      RegType phase = arg(det) / 3;
-#endif
-      return phase;
-    }
-
-    // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
-    __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const
-    {
-      RegType phase = getPhase(in);
-      RegType cos_sin[2];
-      Trig<isFixed<RegType>::value, RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
-      Complex z(cos_sin[0], cos_sin[1]);
-      z *= scale.imag();
-      Complex su3[9];
-#pragma unroll
-      for (int i = 0; i < 9; i++) su3[i] = z * Complex(in[2*i+0], in[2*i+1]);
-      reconstruct_8.Pack(out, reinterpret_cast<RegType *>(su3), idx);
-    }
-
-    template <typename I>
-    __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir, const RegType phase, const I *X, const int *R) const
-    {
-      reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)),
-          Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)));
-      // z *= scale.imag();
-      RegType cos_sin[2];
-      Trig<isFixed<RegType>::value, RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
-      Complex z(cos_sin[0], cos_sin[1]);
-      z *= scale.real();
-#pragma unroll
-      for (int i = 0; i < 9; i++) {
-        Complex Out = Complex(out[2*i+0],out[2*i+1]) * z;
-        out[2*i+0] = Out.real();
-        out[2*i+1] = Out.imag();
-      };
-    }
-  };
-
-  /**
      @brief Gauge reconstruct 9 helper where we reconstruct the gauge
      matrix from 8 packed elements (maximal compression) and include a
      non-trivial phase factor
@@ -1703,78 +1573,93 @@ namespace quda {
      @tparam ghostExchange_ optional template the ghostExchange type
      to avoid the run-time overhead
   */
-  template <typename Float, QudaGhostExchange ghostExchange_>
-    struct Reconstruct<9, Float, ghostExchange_, QUDA_STAGGERED_PHASE_MILC> {
+  template <typename Float, QudaGhostExchange ghostExchange_,QudaStaggeredPhase stag_phase>
+    struct Reconstruct<9, Float, ghostExchange_, stag_phase> {
     typedef typename mapper<Float>::type RegType;
     typedef complex<RegType> Complex;
     const Reconstruct<8, Float, ghostExchange_> reconstruct_8;
-    const Complex scale; // imaginary value stores inverse
+    const RegType scale;
+    const RegType scale_inv;
 
-    Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale(), 1.0 / u.Scale()) {}
+  Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()), scale_inv(1.0/scale) {}
 
-    Reconstruct(const Reconstruct<9,Float,ghostExchange_> &recon) : reconstruct_8(recon.reconstruct_8),
-      scale(recon.scale) { }
+    Reconstruct(const Reconstruct<9,Float,ghostExchange_,stag_phase> &recon) : reconstruct_8(recon.reconstruct_8),
+      scale(recon.scale), scale_inv(recon.scale_inv) { }
 
-      __device__ __host__ inline RegType getPhase(const RegType in[18]) const {
+      __device__ __host__ inline RegType getPhase(const RegType in[18]) const
+      {
 #if 1 // phase from cross product
         Complex In[9];
 #pragma unroll
         for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
         // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) * scale.imag();
+	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) * scale_inv;
 	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-  RegType phase = expI3Phase.real() > 0 ? 1 : -1; // arg(expI3Phase)/static_cast<RegType>(3.0);
+        if (stag_phase == QUDA_STAGGERED_PHASE_NO) {
+          return arg(expI3Phase) / static_cast<RegType>(3.0);
+        } else {
+          return expI3Phase.real() > 0 ? 1 : -1;
+        }
 #else // phase from determinant
 	Matrix<Complex,3> a;
 #pragma unroll
-	for (int i=0; i<9; i++) a(i) = Complex(in[2*i], in[2*i+1])*scale.imag());
+	for (int i=0; i<9; i++) a(i) = Complex(in[2*i], in[2*i+1])*scale_inv;
 	const Complex det = getDeterminant( a );
 	RegType phase = arg(det)/3;
-#endif
 	return phase;
-      }
-
-      __device__ __host__ inline RegType getPhase2(const RegType in[18]) const
-      {
-        Complex In[9];
-#if 1 // phase from cross product
-        for (int i=0; i<9; i++) In[i] = Complex(in[2*i+0], in[2*i+1]);
-        // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-        Complex denom = conj(In[0] * In[4] - In[1] * In[3]) * scale.imag();
-        Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-        RegType phase = arg(expI3Phase) / static_cast<RegType>(3.0);
-#else // phase from determinant
-        Matrix<Complex, 3> a;
-#pragma unroll
-        for (int i = 0; i < 9; i++) a(i) = Complex(in[2*i], in[2*i+1])*scale.imag());
-        const Complex det = getDeterminant(a);
-        RegType phase = arg(det) / 3;
 #endif
-        return phase;
       }
 
       // Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
       __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
 	RegType phase = getPhase(in);
+        RegType su3[18];
 
-	RegType su3[18];
+        if (stag_phase == QUDA_STAGGERED_PHASE_NO) {
+          RegType cos_sin[2];
+          Trig<isFixed<RegType>::value, RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
+          Complex z(cos_sin[0], cos_sin[1]);
+          z *= scale_inv;
 #pragma unroll
-	for (int i=0; i<18; i++) {
-          su3[i] = phase * in[i];
+          for (int i = 0; i < 9; i++) {
+            Complex su3_ = cmul(z, Complex(in[2*i+0], in[2*i+1]));
+            su3[2*i+0] = su3_.real();
+            su3[2*i+1] = su3_.imag();
+          }
+        } else {
+#pragma unroll
+          for (int i=0; i<18; i++) {
+            su3[i] = phase * in[i];
+          }
         }
-	reconstruct_8.Pack(out, su3, idx);
+        reconstruct_8.Pack(out, su3, idx);
       }
 
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir,
-					     const RegType phase, const I *X, const int *R) const {
+					     const RegType phase, const I *X, const int *R) const
+      {
         reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)),
-            Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)));
+                             Complex(static_cast<RegType>(1.0), static_cast<RegType>(1.0)));
+
+        if (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phase
+          RegType cos_sin[2];
+          Trig<isFixed<RegType>::value, RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
+          Complex z(cos_sin[0], cos_sin[1]);
+          z *= scale;
 #pragma unroll
-	for (int i=0; i<18; i++) {
-          out[i] *= phase;        
+          for (int i = 0; i < 9; i++) {
+            Complex Out = cmul(z, Complex(out[2*i+0],out[2*i+1]));
+            out[2*i+0] = Out.real();
+            out[2*i+1] = Out.imag();
+          };
+        } else { // stagic phase
+#pragma unroll
+          for (int i=0; i<18; i++) {
+            out[i] *= phase;
+          }
+        }
       }
-    }
   };
 
   __host__ __device__ inline constexpr int ct_sqrt(int n, int i = 1){
@@ -1791,8 +1676,19 @@ namespace quda {
   // we default to huge allocations for gauge field (for now)
   constexpr bool default_huge_alloc = true;
 
-  template <typename Float, int length, int N, int reconLenParam, QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO, bool huge_alloc = default_huge_alloc,
-      QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false>
+  template<QudaStaggeredPhase phase> __host__ __device__ inline bool static_phase() {
+    switch (phase) {
+    case QUDA_STAGGERED_PHASE_MILC:
+    case QUDA_STAGGERED_PHASE_CPS:
+    case QUDA_STAGGERED_PHASE_TIFR:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  template <typename Float, int length, int N, int reconLenParam, QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO,
+    bool huge_alloc = default_huge_alloc, QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false>
   struct FloatNOrder {
     using Accessor = FloatNOrder<Float,length,N,reconLenParam,stag_phase,huge_alloc,ghostExchange_,use_inphase>;
 
@@ -1897,8 +1793,8 @@ namespace quda {
         RegType phase = 0.; // TODO - add texture support for phases
 
         if (hasPhase) {
-          if (stag_phase == QUDA_STAGGERED_PHASE_MILC && (reconLen == 13 || use_inphase)) {
-            phase = inphase; // < static_cast<Float>(0) ? static_cast<Float>(-1./(2.*M_PI)) : static_cast<Float>(1./2.*M_PI);
+          if ( static_phase<stag_phase>() && (reconLen == 13 || use_inphase) ) {
+            phase = inphase;
           } else {
             copy(phase, (gauge + parity * offset)[phaseOffset / sizeof(Float) + stride * dir + x]);
             phase *= 2. * M_PI;
