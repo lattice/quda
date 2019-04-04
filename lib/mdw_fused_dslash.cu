@@ -106,6 +106,11 @@ namespace quda {
         b = b_5[0].real();
         c = c_5[0].real();
         kappa = -(c * (4. + m_5) - 1.) / (b * (4. + m_5) + 1.); // This is actually -kappa in my(Jiqun Tu) notes.
+       
+        if(kappa*kappa < 1e-12){
+          errorQuda("kappa(=%16.12e) too small.\n", kappa);
+        }
+        
         fac_inv = 0.5
             / (1. + std::pow(kappa, (int)Ls) * m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
         switch (type) {
@@ -371,14 +376,15 @@ namespace quda {
           if (!idle) {
             aux_in_vec = arg.x(sid, explicit_parity);
           }
-          load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
+          load_matrix_b_vector<N_sm/2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
+          if (!idle) {
+            int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
+            arg.out(sid_shift, explicit_parity) = aux_in_vec;
+          }
         }
 
         if (type_ == 3) {
-          if (!idle) {
-            int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
-            store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid_shift, smem_scale[0]);
-          }
+        
         } else if(type_ == 1){
           if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0]); }
         } else {

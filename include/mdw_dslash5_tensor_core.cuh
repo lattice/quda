@@ -96,7 +96,7 @@ namespace quda {
     int x = threadIdx.x;
     
     while(x < Ls_){
-      int offset_m = x*4;
+      int offset_m = x*2;
       float factorR, factorL;
     
       if(mp && mm){
@@ -126,9 +126,23 @@ namespace quda {
         }
       }
 
-      float RpL = factorR + factorL;
+      float RpL = x==threadIdx.y ? factorR + factorL + b : factorR + factorL;
       float RmL = factorR - factorL;
+
+      half2* A = reinterpret_cast<half2*>(sm_a);
+
+      A[ (offset_k+0)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(RpL, 0.0f);
+      A[ (offset_k+0)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(RmL, 0.0f);
       
+      A[ (offset_k+1)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(0.0f, RpL);
+      A[ (offset_k+1)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(0.0f, RmL);
+      
+      A[ (offset_k+2)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(RmL, 0.0f);
+      A[ (offset_k+2)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(RpL, 0.0f);
+      
+      A[ (offset_k+3)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(0.0f, RmL);
+      A[ (offset_k+3)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(0.0f, RpL);
+/*
       // exp = 0 means we are on the diagonal.
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = x==threadIdx.y ? RpL+b : RpL;
       sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = x==threadIdx.y ? RpL+b : RpL;
@@ -154,7 +168,7 @@ namespace quda {
       sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = RmL;
       sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
       // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
-    
+*/    
       x += block_dim_x;
     }
 
@@ -173,7 +187,7 @@ namespace quda {
     int x = threadIdx.x;
     
     while(x < Ls_){
-      int offset_m = x*4;
+      int offset_m = x*2;
       int exp = x-threadIdx.y;
       float factorR, factorL;
       
@@ -189,10 +203,24 @@ namespace quda {
         factorL = (exp==-1?1.f:(exp==+Ls_-1?-arg.m_f:0.f)); 
       }
       
-      float RpL = arg.alpha*(factorR + factorL);
-      float RmL = arg.alpha*(factorR - factorL);
-         
       // exp = 0 means we are on the diagonal.
+      float RpL = exp==0 ? arg.alpha*(factorR+factorL)+b : arg.alpha*(factorR+factorL);
+      float RmL = arg.alpha*(factorR - factorL);
+
+      half2* A = reinterpret_cast<half2*>(sm_a);
+      
+      A[ (offset_k+0)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(RpL, 0.0f);
+      A[ (offset_k+0)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(RmL, 0.0f);
+
+      A[ (offset_k+1)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(0.0f, RpL);
+      A[ (offset_k+1)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(0.0f, RmL);
+
+      A[ (offset_k+2)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(RmL, 0.0f);
+      A[ (offset_k+2)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(RpL, 0.0f);
+
+      A[ (offset_k+3)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(0.0f, RmL);
+      A[ (offset_k+3)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(0.0f, RpL);        
+/*      
       sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = exp==0 ? RpL+b : RpL;
       sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = exp==0 ? RpL+b : RpL;
       sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = exp==0 ? RpL+b : RpL;
@@ -217,7 +245,7 @@ namespace quda {
       sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = RmL;
       sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = 0.0f;
       // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
-    
+*/    
       x += block_dim_x;
     }
   } 
@@ -268,7 +296,8 @@ namespace quda {
     return c;
   }
   
-  __device__ inline void __half_max_abs_half2__(half& max, half2& input){
+  __device__ inline void __half_max_abs_half2__(half& max, const half2& input){
+/*    
     static_assert(sizeof(half2) == sizeof(uint32_t));
     // Just mask the exponent part
     static constexpr uint32_t is_normal_mask_l = 0x83ffffffu;  // 1000 0011 1111 1111 1111 1111 1111 1111 
@@ -284,11 +313,11 @@ namespace quda {
     if(is_normal_masked_h == 0xffffffffu){                     // 1111 1111 1111 1111 1111 1111 1111 1111
       *reinterpret_cast<uint32_t*>(&input) = *reinterpret_cast<uint32_t*>(&input) & is_normal_mask_h;
     }
-    
+*/    
     // Set the fisrt bit of the halves to 0.
     static constexpr uint32_t maximum_mask = 0x7fff7fffu;      // 0111 1111 1111 1111 0111 1111 1111 1111 
     
-    uint32_t input_masked = *reinterpret_cast<uint32_t*>(&input) & maximum_mask;
+    uint32_t input_masked = *reinterpret_cast<const uint32_t*>(&input) & maximum_mask;
     half2 lh = *reinterpret_cast<half2*>(&input_masked);
     if(__hgt(lh.x, max)){
       max = lh.x;
@@ -363,7 +392,7 @@ namespace quda {
 
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store to sm_b
-  template<int N_sm_d2, bool acc, class Vector>
+  template<int N_sm_d2, bool acc, bool store=true, class Vector>
   __device__ inline void load_matrix_b_vector(Vector& v, half2* sm_b, float* smem_scale, float m_scale=1.0f){
     if(acc){
       float previous_scale = smem_scale[0]*m_scale;
@@ -377,17 +406,19 @@ namespace quda {
         }
       }
     }
-    block_wise_reduce_vector(v, smem_scale);
-    // Now smem_scale[0] contains the maximum value
-    float current_scale = smem_scale[0];
-    #pragma unroll
-    for(int spin = 0; spin < 4; spin++){
+    if(store){
+      block_wise_reduce_vector(v, smem_scale);
+      // Now smem_scale[0] contains the maximum value
+      float current_scale = smem_scale[0];
       #pragma unroll
-      for(int color = 0; color < 3; color++){
-        float real = v(spin, color).real() / current_scale;
-        float imag = v(spin, color).imag() / current_scale;
-        int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
-        sm_b[idx] = __floats2half2_rn(real, imag);
+      for(int spin = 0; spin < 4; spin++){
+        #pragma unroll
+        for(int color = 0; color < 3; color++){
+          float real = v(spin, color).real() / current_scale;
+          float imag = v(spin, color).imag() / current_scale;
+          int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
+          sm_b[idx] = __floats2half2_rn(real, imag);
+        }
       }
     }
   }
