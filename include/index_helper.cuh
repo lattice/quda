@@ -832,7 +832,7 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, int pa
      @param[in] tboundary Boundary condition
    */
   template <QudaStaggeredPhase phase, typename Float, typename I>
-  __device__ __host__ inline int Phase(const int coords[], const I X[], int dim, int dir, Float tboundary)
+  __device__ __host__ inline Float StaggeredPhase(const int coords[], const I X[], int dim, int dir, Float tboundary)
   {
     static_assert(phase == QUDA_STAGGERED_PHASE_MILC || phase == QUDA_STAGGERED_PHASE_TIFR, "Unsupported staggered phase");
     Float sign;

@@ -80,14 +80,14 @@ namespace quda {
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
-          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, Phase<arg.phase>(coord, arg.dim, d, +1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += (U * in);
 
           if (x_cb == 0 && parity == 0 && d == 0) printLink(U);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, Phase<arg.phase>(coord, arg.dim, d, +1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in);
         }
@@ -118,14 +118,14 @@ namespace quda {
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity)
-            : arg.U.Ghost(d, ghost_idx2, 1 - parity, Phase<arg.phase>(coord, arg.dim, d, -1, arg.tboundary));
+            : arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, -1, arg.tboundary));
           Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
           out -= (conj(U) * in);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
           const Link U
-              = arg.improved ? arg.U(d, gauge_idx, 1 - parity) : arg.U(d, gauge_idx, 1 - parity, Phase<arg.phase>(coord, arg.dim, d, -1, arg.tboundary));
+            = arg.improved ? arg.U(d, gauge_idx, 1 - parity) : arg.U(d, gauge_idx, 1 - parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, -1, arg.tboundary));
           Vector in = arg.in(back_idx, their_spinor_parity);
           out -= (conj(U) * in);
         }
