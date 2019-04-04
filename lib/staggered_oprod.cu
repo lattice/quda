@@ -16,7 +16,7 @@ namespace quda {
 #include <texture.h>
   }
 
-  enum OprodKernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
+  enum OprodKernelType { OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL };
 
   template<typename Float, typename Output, typename InputA, typename InputB>
     struct StaggeredOprodArg {
@@ -35,21 +35,19 @@ namespace quda {
       Output outB;
       Float coeff[2];
 
-      StaggeredOprodArg(const unsigned int parity,
-			const unsigned int dir,
-			const unsigned int *ghostOffset,
-			const unsigned int displacement,
-			const OprodKernelType& kernelType,
-			const int nFace,
-			const double coeff[2],
-			InputA& inA,
-			InputB& inB,
-			Output& outA,
-			Output& outB,
-			GaugeField& meta) :
-	length(meta.VolumeCB()), parity(parity), dir(dir),
-	displacement(displacement), kernelType(kernelType), nFace(nFace),
-	inA(inA), inB(inB), outA(outA), outB(outB)
+      StaggeredOprodArg(const unsigned int parity, const unsigned int dir, const unsigned int *ghostOffset,
+          const unsigned int displacement, const OprodKernelType &kernelType, const int nFace, const double coeff[2],
+          InputA &inA, InputB &inB, Output &outA, Output &outB, GaugeField &meta) :
+          length(meta.VolumeCB()),
+          parity(parity),
+          dir(dir),
+          displacement(displacement),
+          kernelType(kernelType),
+          nFace(nFace),
+          inA(inA),
+          inB(inB),
+          outA(outA),
+          outB(outB)
       {
         this->coeff[0] = coeff[0];
         this->coeff[1] = coeff[1];

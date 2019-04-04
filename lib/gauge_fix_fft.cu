@@ -252,7 +252,7 @@ namespace quda {
     int parity = threadIdx.y;
 
     double2 data = make_double2(0.0,0.0);
-    while ( idx_cb < argQ.threads ) {
+    while (idx_cb < argQ.threads) {
       typedef complex<Float> Cmplx;
 
       int x[4];
@@ -262,11 +262,11 @@ namespace quda {
       //idx = linkIndex(x,X);
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
         Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float*)(U.data),idx_cb, mu, parity);
+        argQ.dataOr.load((Float *)(U.data), idx_cb, mu, parity);
         delta -= U;
       }
       //18*gauge_dir
-      data.x += -delta(0,0).x - delta(1,1).x - delta(2,2).x;
+      data.x += -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
       //2
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
         Matrix<Cmplx,3> U;
@@ -291,7 +291,7 @@ namespace quda {
       //35
       //T=36*gauge_dir+65
 
-      idx_cb += blockDim.x*gridDim.x;
+      idx_cb += blockDim.x * gridDim.x;
     }
 
     reduce2d<blockSize,2>(argQ, data);

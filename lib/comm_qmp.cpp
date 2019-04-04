@@ -254,7 +254,6 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
   return mh;
 }
 
-
 void comm_free(MsgHandle *&mh)
 {
   QMP_free_msghandle(mh->handle);

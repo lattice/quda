@@ -123,10 +123,10 @@ namespace quda {
 	longLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
         if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
-          typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
-          typedef LinkArg<double,L,G> Arg;
+          typedef typename gauge_mapper<double, QUDA_RECONSTRUCT_12, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
+          typedef LinkArg<double, L, G> Arg;
           Arg arg(L(lng), G(u), coeff, lng, u);
-          LongLink<double,Arg> longLink(arg,lng);
+          LongLink<double, Arg> longLink(arg, lng);
           longLink.apply(0);
         } else {
           errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
@@ -143,10 +143,10 @@ namespace quda {
 	longLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
         if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
-          typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
-          typedef LinkArg<float,L,G> Arg;
+          typedef typename gauge_mapper<float, QUDA_RECONSTRUCT_12, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
+          typedef LinkArg<float, L, G> Arg;
           Arg arg(L(lng), G(u), coeff, lng, u);
-          LongLink<float,Arg> longLink(arg,lng);
+          LongLink<float, Arg> longLink(arg, lng);
           longLink.apply(0);
         } else {
           errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());

@@ -130,10 +130,12 @@ namespace quda {
     first_active_p2p_policy = 0;
 
     // list of dslash policies that are enabled
-    policies = std::vector<QudaDslashPolicy>(static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+    policies = std::vector<QudaDslashPolicy>(
+        static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
 
     // list of p2p policies that are enabled
-    p2p_policies = std::vector<QudaP2PPolicy>(static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
+    p2p_policies = std::vector<QudaP2PPolicy>(
+        static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
     strcat(policy_string, ",pol=");
   }
@@ -177,9 +179,9 @@ namespace quda {
     const int nParity;    // number of parities we're working on
     bool doublet;         // whether we applying the operator to a doublet
     const int volumeCB;   // checkerboarded volume
-    RegType a; // scale factor
-    RegType b; // chiral twist
-    RegType c; // flavor twist
+    RegType a;            // scale factor
+    RegType b;            // chiral twist
+    RegType c;            // flavor twist
 
     GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
 	     RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
@@ -194,26 +196,26 @@ namespace quda {
 
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
 	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-	  b = 2.0 * kappa * mu;
-	  a = 1.0;
-	} else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-	  b = -2.0 * kappa * mu;
-	  a = 1.0 / (1.0 + a*a);
-	}
+          b = 2.0 * kappa * mu;
+          a = 1.0;
+        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
+          b = -2.0 * kappa * mu;
+          a = 1.0 / (1.0 + a * a);
+        }
 	c = 0.0;
-	if (dagger) b *= -1.0;
+        if (dagger) b *= -1.0;
       } else if (doublet) {
-	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+        if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
           b = 2.0 * kappa * mu;
           c = -2.0 * kappa * epsilon;
           a = 1.0;
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
           b = -2.0 * kappa * mu;
           c = 2.0 * kappa * epsilon;
-          a = 1.0 / (1.0 + b*b - c*c);
-          if (a<=0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
+          a = 1.0 / (1.0 + b * b - c * c);
+          if (a <= 0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
         }
-	if (dagger) b *= -1.0;
+        if (dagger) b *= -1.0;
       }
     }
   };
@@ -334,13 +336,13 @@ namespace quda {
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
 	if (!doublet) {
 	  ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-	  arg.out(x_cb, parity) = arg.a*(in + arg.b*in.igamma(arg.d));
-	} else {
+          arg.out(x_cb, parity) = arg.a * (in + arg.b * in.igamma(arg.d));
+        } else {
 	  ColorSpinor<RegType,nColor,4> in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
 	  ColorSpinor<RegType,nColor,4> in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
-	  arg.out(x_cb+0*arg.volumeCB, parity) = arg.a*(in_1 + arg.b*in_1.igamma(arg.d) + arg.c*in_2);
-	  arg.out(x_cb+1*arg.volumeCB, parity) = arg.a*(in_2 - arg.b*in_2.igamma(arg.d) + arg.c*in_1);
-	}
+          arg.out(x_cb + 0 * arg.volumeCB, parity) = arg.a * (in_1 + arg.b * in_1.igamma(arg.d) + arg.c * in_2);
+          arg.out(x_cb + 1 * arg.volumeCB, parity) = arg.a * (in_2 - arg.b * in_2.igamma(arg.d) + arg.c * in_1);
+        }
       } // 4-d volumeCB
     } // parity
 
@@ -357,12 +359,12 @@ namespace quda {
 
     if (!doublet) {
       ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-      arg.out(x_cb, parity) = arg.a*(in + arg.b*in.igamma(d));
+      arg.out(x_cb, parity) = arg.a * (in + arg.b * in.igamma(d));
     } else {
       ColorSpinor<RegType,nColor,4> in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
       ColorSpinor<RegType,nColor,4> in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
-      arg.out(x_cb+0*arg.volumeCB, parity) = arg.a*(in_1 + arg.b*in_1.igamma(d) + arg.c*in_2);
-      arg.out(x_cb+1*arg.volumeCB, parity) = arg.a*(in_2 - arg.b*in_2.igamma(d) + arg.c*in_1);
+      arg.out(x_cb + 0 * arg.volumeCB, parity) = arg.a * (in_1 + arg.b * in_1.igamma(d) + arg.c * in_2);
+      arg.out(x_cb + 1 * arg.volumeCB, parity) = arg.a * (in_2 - arg.b * in_2.igamma(d) + arg.c * in_1);
     }
   }
 
@@ -517,8 +519,8 @@ namespace quda {
   __device__ __host__ inline void cloverApply(Arg &arg, int x_cb, int parity) {
     using namespace linalg; // for Cholesky
     typedef typename mapper<Float>::type RegType;
-    typedef ColorSpinor<RegType,nColor,nSpin> Spinor;
-    typedef ColorSpinor<RegType,nColor,nSpin/2> HalfSpinor;
+    typedef ColorSpinor<RegType, nColor, nSpin> Spinor;
+    typedef ColorSpinor<RegType, nColor, nSpin / 2> HalfSpinor;
     int spinor_parity = arg.nParity == 2 ? parity : 0;
     Spinor in = arg.in(x_cb, spinor_parity);
     Spinor out;
@@ -532,8 +534,8 @@ namespace quda {
       HalfSpinor chi = in.chiral_project(chirality);
 
       if (arg.dynamic_clover) {
-        Cholesky<HMatrix,RegType,nColor*nSpin/2> cholesky(A);
-        chi = static_cast<RegType>(0.25)*cholesky.backward(cholesky.forward(chi));
+        Cholesky<HMatrix, RegType, nColor * nSpin / 2> cholesky(A);
+        chi = static_cast<RegType>(0.25) * cholesky.backward(cholesky.forward(chi));
       } else {
         chi = A * chi;
       }
@@ -610,13 +612,13 @@ namespace quda {
 #else
       constexpr bool dynamic_clover = false;
 #endif
-      CloverArg<Float,nSpin,nColor,dynamic_clover> arg(out, in, clover, inverse, parity);
-      Clover<Float,nSpin,nColor,CloverArg<Float,nSpin,nColor,dynamic_clover> > worker(arg, in);
-      worker.apply(streams[Nstream-1]);
+      CloverArg<Float, nSpin, nColor, dynamic_clover> arg(out, in, clover, inverse, parity);
+      Clover<Float, nSpin, nColor, CloverArg<Float, nSpin, nColor, dynamic_clover>> worker(arg, in);
+      worker.apply(streams[Nstream - 1]);
     } else {
-      CloverArg<Float,nSpin,nColor,false> arg(out, in, clover, inverse, parity);
-      Clover<Float,nSpin,nColor,CloverArg<Float,nSpin,nColor,false> > worker(arg, in);
-      worker.apply(streams[Nstream-1]);
+      CloverArg<Float, nSpin, nColor, false> arg(out, in, clover, inverse, parity);
+      Clover<Float, nSpin, nColor, CloverArg<Float, nSpin, nColor, false>> worker(arg, in);
+      worker.apply(streams[Nstream - 1]);
     }
 
     checkCudaError();

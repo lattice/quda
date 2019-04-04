@@ -714,7 +714,7 @@ namespace quda {
      @param[in] meta LatticeField used for querying field location
      @return String containing location and compilation type
    */
-  inline const char* compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION)
+  inline const char *compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION)
   {
     QudaFieldLocation location = (location_ == QUDA_INVALID_FIELD_LOCATION ? meta.Location() : location_);
 #ifdef JITIFY

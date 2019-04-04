@@ -19,15 +19,15 @@ namespace quda {
     int commDim[4]; // whether a given dimension is partitioned or not
     int_fastdiv nParity2dim_threads;
 
-    PackGhostArg(Field field, const ColorSpinorField &a, int parity, int nFace, int dagger)
-      : field(field),
-	volumeCB(a.VolumeCB()),
-	nDim(a.Ndim()),
-	nFace(nFace),
-	parity(parity),
-	nParity(a.SiteSubset()),
-	dagger(dagger),
-	pc_type(a.PCType())
+    PackGhostArg(Field field, const ColorSpinorField &a, int parity, int nFace, int dagger) :
+        field(field),
+        volumeCB(a.VolumeCB()),
+        nDim(a.Ndim()),
+        nFace(nFace),
+        parity(parity),
+        nParity(a.SiteSubset()),
+        dagger(dagger),
+        pc_type(a.PCType())
     {
       X[0] = ((nParity == 1) ? 2 : 1) * a.X(0); // set to full lattice dimensions
       for (int d=1; d<nDim; d++) X[d] = a.X(d);
@@ -112,8 +112,9 @@ namespace quda {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
-	    arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0,nDim>(x,arg.X,dim,arg.nFace), s, c, 0, max) = rhs(spinor_parity, x_cb, s, c);
-	  }
+            arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0, nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
+                = rhs(spinor_parity, x_cb, s, c);
+          }
 	}
       }
 
@@ -122,8 +123,9 @@ namespace quda {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
-	    arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1,nDim>(x,arg.X,dim,arg.nFace), s, c, 0, max) = rhs(spinor_parity, x_cb, s, c);
-	  }
+            arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1, nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
+                = rhs(spinor_parity, x_cb, s, c);
+          }
 	}
       }
     }

@@ -39,22 +39,23 @@ namespace quda {
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::cloverInvertKernel")
-          .instantiate((int)tp.block.x,Type<Float>(),Type<Arg>(),arg.computeTraceLog,arg.twist)
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+                           .instantiate((int)tp.block.x, Type<Float>(), Type<Arg>(), arg.computeTraceLog, arg.twist)
+                           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                           .launch(arg);
 #else
         if (arg.computeTraceLog) {
-	  if (arg.twist) {
+          if (arg.twist) {
 	    errorQuda("Not instantiated");
 	  } else {
 	    LAUNCH_KERNEL_LOCAL_PARITY(cloverInvertKernel, tp, stream, arg, Float, Arg, true, false);
 	  }
-	} else {
+        } else {
           if (arg.twist) {
-	    cloverInvertKernel<1,Float,Arg,false,true> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	  } else {
-	    cloverInvertKernel<1,Float,Arg,false,false> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	  }
-	}
+            cloverInvertKernel<1,Float,Arg,false,true> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          } else {
+            cloverInvertKernel<1,Float,Arg,false,false> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          }
+        }
 #endif
       } else {
 	if (arg.computeTraceLog) {

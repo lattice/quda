@@ -20,9 +20,8 @@ namespace quda {
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
   {
-    create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor,
-	   param.Precision(), param.pad, param.siteSubset, param.siteOrder,
-	   param.fieldOrder, param.gammaBasis, param.pc_type);
+    create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor, param.Precision(), param.pad,
+        param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
@@ -31,9 +30,8 @@ namespace quda {
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
-    create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor,
-	   field.Precision(), field.pad, field.siteSubset, field.siteOrder,
-	   field.fieldOrder, field.gammaBasis, field.pc_type);
+    create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor, field.Precision(), field.pad,
+        field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis, field.pc_type);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -93,7 +91,7 @@ namespace quda {
       if(GhostOffset(i,0)%FieldOrder()) errorQuda("ghostOffset(%d,0) %d is not a multiple of FloatN\n", i, GhostOffset(i,0));
       if(GhostOffset(i,1)%FieldOrder()) errorQuda("ghostOffset(%d,1) %d is not a multiple of FloatN\n", i, GhostOffset(i,1));
 
-      ghostFaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET ? ghostFace[i]/2 : ghostFace[i]);
+      ghostFaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET ? ghostFace[i] / 2 : ghostFace[i]);
     } // dim
 
     int ghostNormVolume = num_norm_faces * ghostVolume;
@@ -132,19 +130,19 @@ namespace quda {
       }
 
       dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
-      dslash_constant.ghostFace[0] = X[1]*X[2]*X[3];
-      dslash_constant.ghostFace[1] = X[0]*X[2]*X[3];
-      dslash_constant.ghostFace[2] = X[0]*X[1]*X[3];
-      dslash_constant.ghostFace[3] = X[0]*X[1]*X[2];
-      for (int d=0; d<4; d++) dslash_constant.ghostFaceCB[d] = dslash_constant.ghostFace[d]/2;
+      dslash_constant.ghostFace[0] = X[1] * X[2] * X[3];
+      dslash_constant.ghostFace[1] = X[0] * X[2] * X[3];
+      dslash_constant.ghostFace[2] = X[0] * X[1] * X[3];
+      dslash_constant.ghostFace[3] = X[0] * X[1] * X[2];
+      for (int d = 0; d < 4; d++) dslash_constant.ghostFaceCB[d] = dslash_constant.ghostFace[d] / 2;
 
       dslash_constant.X2X1 = X[1]*X[0];
       dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
-      dslash_constant.X4X3X2X1 = X[3]*X[2]*X[1]*X[0];
+      dslash_constant.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
       dslash_constant.X2X1mX1 = (X[1]-1)*X[0];
       dslash_constant.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
       dslash_constant.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
-      dslash_constant.X5X4X3X2X1mX4X3X2X1 = (X[4]-1)*X[3]*X[2]*X[1]*X[0];
+      dslash_constant.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
       dslash_constant.X4X3X2X1hmX3X2X1h = dslash_constant.X4X3X2X1mX3X2X1/2;
 
       // used by indexFromFaceIndexStaggered
@@ -169,9 +167,9 @@ namespace quda {
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
-				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset,
-				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
-				QudaGammaBasis gammaBasis, QudaPCType pc_type) {
+      QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
+      QudaGammaBasis gammaBasis, QudaPCType pc_type)
+  {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
@@ -304,9 +302,8 @@ namespace quda {
         //this->composite_descr.id           = 0;
       }
 
-      create(src.nDim, src.x, src.nColor, src.nSpin, src.nVec, src.twistFlavor,
-	     src.precision, src.pad, src.siteSubset,
-	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type);
+      create(src.nDim, src.x, src.nColor, src.nSpin, src.nVec, src.twistFlavor, src.precision, src.pad, src.siteSubset,
+          src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type);
     }
     return *this;
   }

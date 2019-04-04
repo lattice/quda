@@ -28,7 +28,7 @@ namespace quda
     {
       dslash.launch(staggeredGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
-};
+  };
 
   template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<Float>
   {
@@ -38,7 +38,12 @@ protected:
     const ColorSpinorField &in;
 
 public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"), arg(arg), in(in) {}
+    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+        Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
+        arg(arg),
+        in(in)
+    {
+    }
 
     virtual ~Staggered() {}
 
@@ -67,41 +72,39 @@ public:
     long long flops() const
     {
       int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
-      int ghost_flops = (3 + 1) * (mv_flops + 2*in.Ncolor()*in.Nspin());
+      int ghost_flops = (3 + 1) * (mv_flops + 2 * in.Ncolor() * in.Nspin());
       int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
-      int num_dir = 2 * 4; // hard code factor of 4 in direction since fields may be 5-d
+      int num_dir = 2 * 4;                               // hard code factor of 4 in direction since fields may be 5-d
 
       long long flops_ = 0;
 
-      switch(arg.kernel_type) {
+      switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-        flops_ = ghost_flops * 2 * in.GhostFace()[arg.kernel_type];
+      case EXTERIOR_KERNEL_T: flops_ = ghost_flops * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_ALL: {
+        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        flops_ = ghost_flops * ghost_sites;
         break;
-      case EXTERIOR_KERNEL_ALL:
-        {
-          long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-          flops_ = ghost_flops * ghost_sites;
-          break;
-        }
+      }
       case INTERIOR_KERNEL:
-      case KERNEL_POLICY:
-        {
-          long long sites = in.Volume();
-          flops_ = (2*num_dir*mv_flops +                              // SU(3) matrix-vector multiplies
-                    (2*num_dir-1)*2*in.Ncolor()*in.Nspin()) * sites;  // accumulation
-          if (arg.xpay) flops_ += xpay_flops * sites;                 // axpy is always on interior
+      case KERNEL_POLICY: {
+        long long sites = in.Volume();
+        flops_ = (2 * num_dir * mv_flops + // SU(3) matrix-vector multiplies
+                     (2 * num_dir - 1) * 2 * in.Ncolor() * in.Nspin())
+            * sites;                                // accumulation
+        if (arg.xpay) flops_ += xpay_flops * sites; // axpy is always on interior
 
-          if (arg.kernel_type == KERNEL_POLICY) break;
-          // now correct for flops done by exterior kernel
-          long long ghost_sites = 0;
-          for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
-          flops_ -= ghost_flops * ghost_sites;
+        if (arg.kernel_type == KERNEL_POLICY) break;
+        // now correct for flops done by exterior kernel
+        long long ghost_sites = 0;
+        for (int d = 0; d < 4; d++)
+          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+        flops_ -= ghost_flops * ghost_sites;
 
-          break;
-        }
+        break;
+      }
       }
       return flops_;
     }
@@ -112,55 +115,55 @@ public:
       int gauge_bytes_long = arg.reconstruct * in.Precision();
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
-      int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat) +
-        3 * 2 * spinor_bytes; // last term is the accumulator load/store through the face
-      int num_dir = 2 * 4; // set to 4-d since we take care of 5-d fermions in derived classes where necessary
+      int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat)
+          + 3 * 2 * spinor_bytes; // last term is the accumulator load/store through the face
+      int num_dir = 2 * 4;        // set to 4-d since we take care of 5-d fermions in derived classes where necessary
 
       long long bytes_ = 0;
 
-      switch(arg.kernel_type) {
+      switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-        bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type];
+      case EXTERIOR_KERNEL_T: bytes_ = ghost_bytes * 2 * in.GhostFace()[arg.kernel_type]; break;
+      case EXTERIOR_KERNEL_ALL: {
+        long long ghost_sites = 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        bytes_ = ghost_bytes * ghost_sites;
         break;
-      case EXTERIOR_KERNEL_ALL:
-        {
-          long long ghost_sites = 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-          bytes_ = ghost_bytes * ghost_sites;
-          break;
-        }
+      }
       case INTERIOR_KERNEL:
-      case KERNEL_POLICY:
-        {
-          long long sites = in.Volume();
-          bytes_ = (num_dir*(gauge_bytes_fat + gauge_bytes_long) + // gauge reads
-                    num_dir*2*spinor_bytes +                       // spinor reads
-                    spinor_bytes)*sites;                           // spinor write
-          if (arg.xpay) bytes_ += spinor_bytes;
+      case KERNEL_POLICY: {
+        long long sites = in.Volume();
+        bytes_ = (num_dir * (gauge_bytes_fat + gauge_bytes_long) + // gauge reads
+                     num_dir * 2 * spinor_bytes +                  // spinor reads
+                     spinor_bytes)
+            * sites; // spinor write
+        if (arg.xpay) bytes_ += spinor_bytes;
 
-          if (arg.kernel_type == KERNEL_POLICY) break;
-          // now correct for bytes done by exterior kernel
-          long long ghost_sites = 0;
-          for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
-          bytes_ -= ghost_bytes * ghost_sites;
+        if (arg.kernel_type == KERNEL_POLICY) break;
+        // now correct for bytes done by exterior kernel
+        long long ghost_sites = 0;
+        for (int d = 0; d < 4; d++)
+          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+        bytes_ -= ghost_bytes * ghost_sites;
 
-          break;
-        }
+        break;
+      }
       }
       return bytes_;
     }
 
-    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
+    TuneKey tuneKey() const
+    {
+      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+    }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon_l>
-  struct ImprovedStaggeredApply {
+  template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
 
-    inline ImprovedStaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &L, const GaugeField &U,
-                                  double a, const ColorSpinorField &x, int parity, bool dagger,
-                                  const int *comm_override, TimeProfile &profile)
+    inline ImprovedStaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &L,
+        const GaugeField &U, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+        TimeProfile &profile)
     {
       constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
       constexpr bool improved = true;
@@ -168,20 +171,23 @@ public:
       StaggeredArg<Float, nColor, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger, comm_override);
       Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered,
+          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
       policy.apply(0);
 
       checkCudaError();
     }
   };
 
-  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
-                              const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
+      double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 
 #ifdef GPU_STAGGERED_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder()) errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
+    if (in.FieldOrder() != out.FieldOrder())
+      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
 
     // check all precisions match
     checkPrecision(out, in, U, L);
@@ -189,14 +195,16 @@ public:
     // check all locations match
     checkLocation(out, in, U, L);
 
-    for (int i=0; i<4; i++) {
+    for (int i = 0; i < 4; i++) {
       if (comm_dim_partitioned(i) && (U.X()[i] < 6)) {
-        errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in improved staggered dslash\n");
+        errorQuda(
+            "ERROR: partitioned dimension with local size less than 6 is not supported in improved staggered dslash\n");
       }
     }
 
     // L must be first gauge field argument since we template on long reconstruct
-    instantiate<ImprovedStaggeredApply,StaggeredReconstruct>(out, in, L, U, a, x, parity, dagger, comm_override, profile);
+    instantiate<ImprovedStaggeredApply, StaggeredReconstruct>(
+        out, in, L, U, a, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Staggered dslash has not been built");
 #endif

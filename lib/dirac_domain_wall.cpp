@@ -4,11 +4,21 @@
 
 namespace quda {
 
-  DiracDomainWall::DiracDomainWall(const DiracParam &param) : 
-    DiracWilson(param, 5), m5(param.m5), kappa5(0.5/(5.0 + m5)), Ls(param.Ls) { }
+  DiracDomainWall::DiracDomainWall(const DiracParam &param) :
+      DiracWilson(param, 5),
+      m5(param.m5),
+      kappa5(0.5 / (5.0 + m5)),
+      Ls(param.Ls)
+  {
+  }
 
   DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) :
-    DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5.0 + m5)), Ls(dirac.Ls) { }
+      DiracWilson(dirac),
+      m5(dirac.m5),
+      kappa5(0.5 / (5.0 + m5)),
+      Ls(dirac.Ls)
+  {
+  }
 
   DiracDomainWall::~DiracDomainWall() { }
 
@@ -89,9 +99,9 @@ namespace quda {
 #ifndef USE_LEGACY_DSLASH
     ApplyDomainWall5D(out, in, *gauge, -kappa5, mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     long long Ls = in.X(4);
-    long long bulk = (Ls-2)*(in.Volume()/Ls);
-    long long wall = 2*in.Volume()/Ls;
-    flops += (1320LL+48LL)*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += (1320LL + 48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
 #else
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa5);
     DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa5);

@@ -101,7 +101,7 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, bool full, bool isPhase) {
 
-    if ( isNative() && geometry != QUDA_COARSE_GEOMETRY ) {
+    if (isNative() && geometry != QUDA_COARSE_GEOMETRY) {
       // create the texture for the field components
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
@@ -829,7 +829,8 @@ namespace quda {
     backed_up = true;
   }
 
-  void cudaGaugeField::restore() const {
+  void cudaGaugeField::restore() const
+  {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
     cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
     delete []backup_h;

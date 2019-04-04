@@ -11,13 +11,13 @@ namespace quda {
 
     const int length = 18;
 
-    QudaFieldLocation location =
-      (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
+    QudaFieldLocation location
+        = (typeid(u) == typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
     if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-        typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-        extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
+        typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type G;
+        extractGhost<Float, length>(G(u, 0, Ghost), u, location, extract, offset);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
@@ -116,9 +116,9 @@ namespace quda {
       } else if (u.Precision() == QUDA_HALF_PRECISION) {
 	extractGhost(u, (short**)ghost, extract, offset);
       } else if (u.Precision() == QUDA_QUARTER_PRECISION) {
-	extractGhost(u, (char**)ghost, extract, offset);
+        extractGhost(u, (char **)ghost, extract, offset);
       } else {
-	errorQuda("Unknown precision type %d", u.Precision());
+        errorQuda("Unknown precision type %d", u.Precision());
       }
     }
   }

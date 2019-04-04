@@ -22,7 +22,6 @@
 #include <mpi.h>
 #endif
 
-
 #include <gtest/gtest.h>
 
 using   namespace quda;

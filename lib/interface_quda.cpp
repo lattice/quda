@@ -1523,19 +1523,18 @@ namespace quda {
       if (sizeof(Complex) != sizeof(double _Complex)) {
         errorQuda("Irreconcilable difference between interface and internal complex number conventions");
       }
-      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex)*inv_param->Ls);
-      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex)*inv_param->Ls);
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-          {
-              printfQuda("Printing b_5 and c_5 values\n");
-              for(int i=0; i<diracParam.Ls; i++)
-                  {
-                      printfQuda("fromQUDA diracParam: b5[%d] = %f + i%f, c5[%d] = %f + i%f\n",
-                                 i, diracParam.b_5[i].real(), diracParam.b_5[i].imag(), i, diracParam.c_5[i].real(), diracParam.c_5[i].imag());
-                      //printfQuda("fromQUDA inv_param: b5[%d] = %f %f c5[%d] = %f %f\n", i, inv_param->b_5[i], i, inv_param->c_5[i] );
-                      //printfQuda("fromQUDA creal: b5[%d] = %f %f c5[%d] = %f %f \n", i, creal(inv_param->b_5[i]), cimag(inv_param->b_5[i]), i, creal(inv_param->c_5[i]), cimag(inv_param->c_5[i]) );
-                  }
-          }
+      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
+      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex) * inv_param->Ls);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("Printing b_5 and c_5 values\n");
+        for (int i = 0; i < diracParam.Ls; i++) {
+          printfQuda("fromQUDA diracParam: b5[%d] = %f + i%f, c5[%d] = %f + i%f\n", i, diracParam.b_5[i].real(),
+              diracParam.b_5[i].imag(), i, diracParam.c_5[i].real(), diracParam.c_5[i].imag());
+          // printfQuda("fromQUDA inv_param: b5[%d] = %f %f c5[%d] = %f %f\n", i, inv_param->b_5[i], i,
+          // inv_param->c_5[i] ); printfQuda("fromQUDA creal: b5[%d] = %f %f c5[%d] = %f %f \n", i,
+          // creal(inv_param->b_5[i]), cimag(inv_param->b_5[i]), i, creal(inv_param->c_5[i]), cimag(inv_param->c_5[i]) );
+        }
+      }
       break;
     case QUDA_STAGGERED_DSLASH:
       diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;

@@ -52,8 +52,12 @@ namespace quda {
          @param[in] x_cb checkerboarded space-time index we are accessing
          @param[in] parity Parity we are accessing
       */
-      __device__ __host__ inline colorspinor_wrapper<Float,T>(T &field, int x_cb, int parity)
-        : field(field), x_cb(x_cb), parity(parity) { }
+      __device__ __host__ inline colorspinor_wrapper<Float, T>(T &field, int x_cb, int parity) :
+          field(field),
+          x_cb(x_cb),
+          parity(parity)
+      {
+      }
 
       /**
          @brief Assignment operator with ColorSpinor instance as input
@@ -61,7 +65,7 @@ namespace quda {
       */
       template<typename C>
       __device__ __host__ inline void operator=(const C &a) {
-        field.save((Float*)a.data, x_cb, parity);
+        field.save((Float *)a.data, x_cb, parity);
       }
     };
 
@@ -129,8 +133,15 @@ namespace quda {
          @param[in] ghost_idx Checkerboarded space-time ghost index we are accessing
          @param[in] parity Parity we are accessing
       */
-      __device__ __host__ inline colorspinor_ghost_wrapper<Float,T>(T &field, int dim, int dir, int ghost_idx, int parity)
-        : field(field), dim(dim), dir(dir), ghost_idx(ghost_idx), parity(parity) { }
+      __device__ __host__ inline colorspinor_ghost_wrapper<Float, T>(
+          T &field, int dim, int dir, int ghost_idx, int parity) :
+          field(field),
+          dim(dim),
+          dir(dir),
+          ghost_idx(ghost_idx),
+          parity(parity)
+      {
+      }
 
       /**
          @brief Assignment operator with Matrix instance as input
@@ -138,7 +149,7 @@ namespace quda {
       */
       template<typename C>
       __device__ __host__ inline void operator=(const C &a) {
-        field.saveGhost((Float*)a.data, ghost_idx, dim, dir, parity);
+        field.saveGhost((Float *)a.data, ghost_idx, dim, dir, parity);
       }
     };
 
@@ -155,15 +166,17 @@ namespace quda {
   }
 
   template <typename T, int Nc>
-    template <typename S>
-    __device__ __host__ inline void ColorSpinor<T,Nc,2>::operator=(const colorspinor_ghost_wrapper<T,S> &a) {
-    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
+  template <typename S>
+  __device__ __host__ inline void ColorSpinor<T, Nc, 2>::operator=(const colorspinor_ghost_wrapper<T, S> &a)
+  {
+    a.field.loadGhost((T *)data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
   template <typename T, int Nc>
-    template <typename S>
-    __device__ __host__ inline ColorSpinor<T,Nc,2>::ColorSpinor(const colorspinor_ghost_wrapper<T,S> &a) {
-    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
+  template <typename S>
+  __device__ __host__ inline ColorSpinor<T, Nc, 2>::ColorSpinor(const colorspinor_ghost_wrapper<T, S> &a)
+  {
+    a.field.loadGhost((T *)data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
   template <typename T, int Nc>
@@ -450,7 +463,8 @@ namespace quda {
       class FieldOrderCB {
 
       typedef float norm_type;
-    protected:
+
+  protected:
       complex<storeFloat> *v;
     const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
       // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
@@ -508,8 +522,8 @@ namespace quda {
 
         if (block_float) {
           // only if we have block_float format do we set these (only block_orthogonalize.cu at present)
-          norm = static_cast<norm_type*>(const_cast<void*>(field.Norm()));
-          norm_offset = field.NormBytes()/(2*sizeof(norm_type));
+          norm = static_cast<norm_type *>(const_cast<void *>(field.Norm()));
+          norm_offset = field.NormBytes() / (2 * sizeof(norm_type));
         }
       }
 
@@ -524,9 +538,8 @@ namespace quda {
         for (int dim=0; dim<4; dim++) {
           for (int dir=0; dir<2; dir++) {
           ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
-          ghost_norm[2*dim+dir] = reinterpret_cast<norm_type*>
-            (static_cast<char*>(ghost_[2*dim+dir]) + a.GhostNormOffset(dim,dir)*sizeof(norm_type)
-             - a.GhostOffset(dim,dir)*sizeof(ghostFloat));
+          ghost_norm[2 * dim + dir] = reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
+              + a.GhostNormOffset(dim, dir) * sizeof(norm_type) - a.GhostOffset(dim, dir) * sizeof(ghostFloat));
           }
         }
       }
@@ -781,53 +794,62 @@ namespace quda {
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <typename Float, int Ns, int Nc, int N, bool spin_project=false, bool huge_alloc=false>
-      struct FloatNOrder {
-        using Accessor = FloatNOrder<Float,Ns,Nc,N,spin_project,huge_alloc>;
-        typedef typename mapper<Float>::type RegType;
-        typedef typename VectorType<Float,N>::type Vector;
-        typedef typename VectorType<RegType,N>::type RegVector;
-        typedef typename AllocType<huge_alloc>::type AllocInt;
-        typedef float norm_type;
-        static constexpr int length = 2 * Ns * Nc;
-        static constexpr int length_ghost = spin_project ? length/2 : length;
-        static constexpr int M = length / N;
-        static constexpr int M_ghost = spin_project ? M/2 : M;
-        Float *field;
-        norm_type *norm;
-        const AllocInt offset; // offset can be 32-bit or 64-bit
-        const AllocInt norm_offset;
+    template <typename Float, int Ns, int Nc, int N, bool spin_project = false, bool huge_alloc = false>
+    struct FloatNOrder {
+      using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
+      typedef typename mapper<Float>::type RegType;
+      typedef typename VectorType<Float, N>::type Vector;
+      typedef typename VectorType<RegType, N>::type RegVector;
+      typedef typename AllocType<huge_alloc>::type AllocInt;
+      typedef float norm_type;
+      static constexpr int length = 2 * Ns * Nc;
+      static constexpr int length_ghost = spin_project ? length / 2 : length;
+      static constexpr int M = length / N;
+      static constexpr int M_ghost = spin_project ? M / 2 : M;
+      Float *field;
+      norm_type *norm;
+      const AllocInt offset; // offset can be 32-bit or 64-bit
+      const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
-        typedef typename TexVectorType<RegType,N>::type TexVector;
-        cudaTextureObject_t tex;
-        cudaTextureObject_t texNorm;
-        const int tex_offset;
+      typedef typename TexVectorType<RegType, N>::type TexVector;
+      cudaTextureObject_t tex;
+      cudaTextureObject_t texNorm;
+      const int tex_offset;
 #if 0 // unused at present
         cudaTextureObject_t ghostTex;
         cudaTextureObject_t ghostTexNorm;
 #endif
 #endif
-        int volumeCB;
-        int faceVolumeCB[4];
-        int stride;
-        mutable Float *ghost[8];
-        mutable norm_type *ghost_norm[8];
-        int nParity;
-        void *backup_h; //! host memory for backing up the field when tuning
-        size_t bytes;
+      int volumeCB;
+      int faceVolumeCB[4];
+      int stride;
+      mutable Float *ghost[8];
+      mutable norm_type *ghost_norm[8];
+      int nParity;
+      void *backup_h; //! host memory for backing up the field when tuning
+      size_t bytes;
 
-      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, norm_type *norm_=0, Float **ghost_=0, bool override=false)
-      : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
-    norm(norm_ ? norm_ : (norm_type*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(norm_type))),
+      FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, norm_type *norm_ = 0, Float **ghost_ = 0,
+          bool override = false) :
+          field(field_ ? field_ : (Float *)a.V()),
+          offset(a.Bytes() / (2 * sizeof(Float))),
+          norm(norm_ ? norm_ : (norm_type *)a.Norm()),
+          norm_offset(a.NormBytes() / (2 * sizeof(norm_type))),
 #ifdef USE_TEXTURE_OBJECTS
-    tex(0), texNorm(0), tex_offset(offset/N),
+          tex(0),
+          texNorm(0),
+          tex_offset(offset / N),
 #endif
-    volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset()), backup_h(nullptr), bytes(a.Bytes())
+          volumeCB(a.VolumeCB()),
+          stride(a.Stride()),
+          nParity(a.SiteSubset()),
+          backup_h(nullptr),
+          bytes(a.Bytes())
   {
     for (int i=0; i<4; i++) {
       faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
     }
-    resetGhost(a, ghost_ ? (void**)ghost_ : a.Ghost());
+    resetGhost(a, ghost_ ? (void **)ghost_ : a.Ghost());
 #ifdef USE_TEXTURE_OBJECTS
     if (a.Location() == QUDA_CUDA_FIELD_LOCATION) {
       tex = static_cast<const cudaColorSpinorField&>(a).Tex();
@@ -840,13 +862,13 @@ namespace quda {
   }
   virtual ~FloatNOrder() { ; }
 
-  void resetGhost(const ColorSpinorField &a, void * const *ghost_) const
+  void resetGhost(const ColorSpinorField &a, void *const *ghost_) const
   {
-    for (int dim=0; dim<4; dim++) {
-      for (int dir=0; dir<2; dir++) {
-        ghost[2*dim+dir] = static_cast<Float*>(ghost_[2*dim+dir]);
-        ghost_norm[2*dim+dir] =
-        reinterpret_cast<norm_type*>(static_cast<char*>(ghost_[2*dim+dir]) + nParity*length_ghost*faceVolumeCB[dim]*sizeof(Float));
+    for (int dim = 0; dim < 4; dim++) {
+      for (int dir = 0; dir < 2; dir++) {
+        ghost[2 * dim + dir] = static_cast<Float *>(ghost_[2 * dim + dir]);
+        ghost_norm[2 * dim + dir] = reinterpret_cast<norm_type *>(
+            static_cast<char *>(ghost_[2 * dim + dir]) + nParity * length_ghost * faceVolumeCB[dim] * sizeof(Float));
       }
     }
   }
@@ -854,12 +876,12 @@ namespace quda {
   __device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
 
     norm_type nrm;
-    if ( isFixed<Float>::value ) {
+    if (isFixed<Float>::value) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
       // use textures unless we have a large alloc
-      nrm = !huge_alloc ? tex1Dfetch<float>(texNorm,x+parity*norm_offset) : norm[x+parity*norm_offset];
+      nrm = !huge_alloc ? tex1Dfetch<float>(texNorm, x + parity * norm_offset) : norm[x + parity * norm_offset];
 #else
-      nrm = norm[x+parity*norm_offset];
+      nrm = norm[x + parity * norm_offset];
 #endif
     }
 
@@ -871,10 +893,10 @@ namespace quda {
         TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*i + x);
         // now insert into output array
 #pragma unroll
-        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
-        if ( isFixed<Float>::value ) {
+        for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<RegType *>(&vecTmp)[j]);
+        if (isFixed<Float>::value) {
 #pragma unroll
-          for (int j=0; j<N; j++) v[i*N+j] *= nrm;
+          for (int j = 0; j < N; j++) v[i * N + j] *= nrm;
         }
       } else
 #endif
@@ -883,7 +905,7 @@ namespace quda {
         Vector vecTmp = vector_load<Vector>(field + parity*offset, x + stride*i);
         // now copy into output and scale
 #pragma unroll
-        for (int j=0; j<N; j++) copy_and_scale(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j], nrm);
+        for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
       }
     }
 
@@ -892,14 +914,14 @@ namespace quda {
   __device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
     RegType tmp[length];
 
-    if ( isFixed<Float>::value ) {
-      norm_type max_[length/2];
+    if (isFixed<Float>::value) {
+      norm_type max_[length / 2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-      for (int i=0; i<length/2; i++) max_[i] = fmaxf(fabsf((norm_type)v[i]),fabsf((norm_type)v[i+length/2]));
+      for (int i = 0; i < length / 2; i++) max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
       norm_type scale = 0.0;
 #pragma unroll
-      for (int i=0; i<length/2; i++) scale = fmaxf(max_[i], scale);
+      for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
 
 #ifdef __CUDA_ARCH__
@@ -919,7 +941,7 @@ namespace quda {
       Vector vecTmp;
       // first do scalar copy converting into storage type
 #pragma unroll
-      for (int j=0; j<N; j++) copy_scaled(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+      for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[i * N + j]);
       // second do vectorized copy into memory
       vector_store(field + parity*offset, x + stride*i, vecTmp);
     }
@@ -934,9 +956,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<RegType,Accessor> operator()(int x_cb, int parity)
+  __device__ __host__ inline colorspinor_wrapper<RegType, Accessor> operator()(int x_cb, int parity)
   {
-    return colorspinor_wrapper<RegType,Accessor>(*this, x_cb, parity);
+    return colorspinor_wrapper<RegType, Accessor>(*this, x_cb, parity);
   }
 
   /**
@@ -948,55 +970,54 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_wrapper<RegType,Accessor> operator()(int x_cb, int parity) const
+  __device__ __host__ inline const colorspinor_wrapper<RegType, Accessor> operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<RegType,Accessor>(const_cast<Accessor&>(*this), x_cb, parity);
+    return colorspinor_wrapper<RegType, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
-
-  __device__ __host__ inline void loadGhost(RegType v[length_ghost], int x, int dim, int dir, int parity=0) const {
+  __device__ __host__ inline void loadGhost(RegType v[length_ghost], int x, int dim, int dir, int parity = 0) const
+  {
 
     norm_type nrm;
-    if ( isFixed<Float>::value ) {
-      nrm = ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x];
-    }
+    if (isFixed<Float>::value) { nrm = ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x]; }
 
 #pragma unroll
-    for (int i=0; i<M_ghost; i++) { // to do - add texture support
-      // first do vectorized copy from memory into registers
+    for (int i = 0; i < M_ghost; i++) {                         // to do - add texture support
+                                                                // first do vectorized copy from memory into registers
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__) && 0 // buggy - need to account for dim/dir offset
-      if (!huge_alloc) { // use textures unless we have a huge alloc
-        TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity*tex_offset + stride*i + x);
+      if (!huge_alloc) {                                        // use textures unless we have a huge alloc
+        TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity * tex_offset + stride * i + x);
 #pragma unroll
-        for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
-        if (isFixed<Float>::value ) {
+        for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<RegType *>(&vecTmp)[j]);
+        if (isFixed<Float>::value) {
 #pragma unroll
-          for (int i=0; i<N; i++) v[i*N+j] *= nrm;
+          for (int i = 0; i < N; i++) v[i * N + j] *= nrm;
         }
       } else
 #endif
       {
-        Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N,
-                                            i*faceVolumeCB[dim]+x);
+        Vector vecTmp = vector_load<Vector>(
+            ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N, i * faceVolumeCB[dim] + x);
 #pragma unroll
-        for (int j=0; j<N; j++) copy_and_scale(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j], nrm);
+        for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
       }
     }
-
   }
 
-  __device__ __host__ inline void saveGhost(RegType v[length_ghost], int x, int dim, int dir, int parity=0) const {
+  __device__ __host__ inline void saveGhost(RegType v[length_ghost], int x, int dim, int dir, int parity = 0) const
+  {
     RegType tmp[length_ghost];
 
-    if ( isFixed<Float>::value ) {
-      norm_type max_[length_ghost/2];
+    if (isFixed<Float>::value) {
+      norm_type max_[length_ghost / 2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-      for (int i=0; i<length_ghost/2; i++) max_[i] = fmaxf((norm_type)fabsf(v[i]),(norm_type)fabsf(v[i+length_ghost/2]));
+      for (int i = 0; i < length_ghost / 2; i++)
+        max_[i] = fmaxf((norm_type)fabsf(v[i]), (norm_type)fabsf(v[i + length_ghost / 2]));
       norm_type scale = 0.0;
 #pragma unroll
-      for (int i=0; i<length_ghost/2; i++) scale = fmaxf(max_[i], scale);
-      ghost_norm[2*dim+dir][parity*faceVolumeCB[dim]+x] = scale;
+      for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
+      ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale;
 
 #ifdef __CUDA_ARCH__
       RegType scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
@@ -1004,20 +1025,20 @@ namespace quda {
       RegType scale_inv = fixedMaxValue<Float>::value / scale;
 #endif
 #pragma unroll
-      for (int i=0; i<length_ghost; i++) tmp[i] = v[i] * scale_inv;
+      for (int i = 0; i < length_ghost; i++) tmp[i] = v[i] * scale_inv;
     } else {
 #pragma unroll
-      for (int i=0; i<length_ghost; i++) tmp[i] = v[i];
+      for (int i = 0; i < length_ghost; i++) tmp[i] = v[i];
     }
 
 #pragma unroll
-    for (int i=0; i<M_ghost; i++) {
+    for (int i = 0; i < M_ghost; i++) {
       Vector vecTmp;
       // first do scalar copy converting into storage type
 #pragma unroll
-      for (int j=0; j<N; j++) copy_scaled(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+      for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[i * N + j]);
       // second do vectorized copy into memory
-      vector_store(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M_ghost*N, i*faceVolumeCB[dim]+x, vecTmp);
+      vector_store(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N, i * faceVolumeCB[dim] + x, vecTmp);
     }
   }
 
@@ -1031,9 +1052,10 @@ namespace quda {
      @return Instance of a colorspinor_ghost_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_ghost_wrapper<RegType,Accessor> Ghost(int dim, int dir, int ghost_idx, int parity)
+  __device__ __host__ inline colorspinor_ghost_wrapper<RegType, Accessor> Ghost(
+      int dim, int dir, int ghost_idx, int parity)
   {
-    return colorspinor_ghost_wrapper<RegType,Accessor>(*this, dim, dir, ghost_idx, parity);
+    return colorspinor_ghost_wrapper<RegType, Accessor>(*this, dim, dir, ghost_idx, parity);
   }
 
   /**
@@ -1047,9 +1069,10 @@ namespace quda {
      @return Instance of a colorspinor_ghost+wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_ghost_wrapper<RegType,Accessor> Ghost(int dim, int dir, int ghost_idx, int parity) const
+  __device__ __host__ inline const colorspinor_ghost_wrapper<RegType, Accessor> Ghost(
+      int dim, int dir, int ghost_idx, int parity) const
   {
-    return colorspinor_ghost_wrapper<RegType,Accessor>(const_cast<Accessor&>(*this), dim, dir, ghost_idx, parity);
+    return colorspinor_ghost_wrapper<RegType, Accessor>(const_cast<Accessor &>(*this), dim, dir, ghost_idx, parity);
   }
 
   /**
@@ -1072,10 +1095,11 @@ namespace quda {
     checkCudaError();
   }
 
-  size_t Bytes() const {
-    return nParity * volumeCB * (Nc* Ns * 2 * sizeof(Float) + (isFixed<Float>::value ? sizeof(norm_type) : 0));
+  size_t Bytes() const
+  {
+    return nParity * volumeCB * (Nc * Ns * 2 * sizeof(Float) + (isFixed<Float>::value ? sizeof(norm_type) : 0));
   }
-  };
+    };
 
     /**
        @brief This is just a dummy structure we use for trove to define the
@@ -1575,32 +1599,64 @@ namespace quda {
   }
 
   // Use traits to reduce the template explosion
-  template<typename T,int Ns, int Nc, bool project=false, bool huge_alloc=false> struct colorspinor_mapper { };
-  
+  template <typename T, int Ns, int Nc, bool project = false, bool huge_alloc = false> struct colorspinor_mapper {
+  };
+
   // double precision
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<double,4,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<double, 4, Nc, 2, false, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<double,4,Nc, true,huge_alloc> { typedef colorspinor::FloatNOrder<double, 4, Nc, 2,  true, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<double,2,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<double, 2, Nc, 2, false, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<double,1,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<double, 1, Nc, 2, false, huge_alloc> type; };
-  
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<double, 4, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<double, 4, Nc, 2, false, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<double, 4, Nc, true, huge_alloc> {
+    typedef colorspinor::FloatNOrder<double, 4, Nc, 2, true, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<double, 2, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<double, 2, Nc, 2, false, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<double, 1, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<double, 1, Nc, 2, false, huge_alloc> type;
+  };
+
   // single precision
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<float,4,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<float, 4, Nc, 4, false, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<float,4,Nc, true,huge_alloc> { typedef colorspinor::FloatNOrder<float, 4, Nc, 4,  true, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<float,2,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<float, 2, Nc, 2, false, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<float,1,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<float, 1, Nc, 2, false, huge_alloc> type; };
-  
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<float, 4, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<float, 4, Nc, 4, false, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<float, 4, Nc, true, huge_alloc> {
+    typedef colorspinor::FloatNOrder<float, 4, Nc, 4, true, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<float, 2, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<float, 2, Nc, 2, false, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<float, 1, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<float, 1, Nc, 2, false, huge_alloc> type;
+  };
+
   // half precision
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<short,4,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<short, 4, Nc, 4, false, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<short,4,Nc, true,huge_alloc> { typedef colorspinor::FloatNOrder<short, 4, Nc, 4,  true, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<short,2,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<short, 2, Nc, 2, false, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<short,1,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<short, 1, Nc, 2, false, huge_alloc> type; };
-    
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 4, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<short, 4, Nc, 4, false, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 4, Nc, true, huge_alloc> {
+    typedef colorspinor::FloatNOrder<short, 4, Nc, 4, true, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 2, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<short, 2, Nc, 2, false, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 1, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<short, 1, Nc, 2, false, huge_alloc> type;
+  };
+
   // quarter precision
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<char,4,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<char, 4, Nc, 4, false, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<char,4,Nc, true,huge_alloc> { typedef colorspinor::FloatNOrder<char, 4, Nc, 4,  true, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<char,2,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<char, 2, Nc, 2, false, huge_alloc> type; };
-  template<int Nc,bool huge_alloc> struct colorspinor_mapper<char,1,Nc,false,huge_alloc> { typedef colorspinor::FloatNOrder<char, 1, Nc, 2, false, huge_alloc> type; };
-    
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 4, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<char, 4, Nc, 4, false, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 4, Nc, true, huge_alloc> {
+    typedef colorspinor::FloatNOrder<char, 4, Nc, 4, true, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 2, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<char, 2, Nc, 2, false, huge_alloc> type;
+  };
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 1, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<char, 1, Nc, 2, false, huge_alloc> type;
+  };
 
   template<typename T, QudaFieldOrder order, int Ns, int Nc> struct colorspinor_order_mapper { };
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,Ns,Nc> { typedef colorspinor::SpaceColorSpinorOrder<T, Ns, Nc> type; };
