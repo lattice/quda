@@ -426,8 +426,6 @@ namespace quda {
   {
     commGlobalReductionSet(false);
 
-    constexpr double loss_scale = 1.0;
-
     blas::zero(ix);
 
     double rk2 = blas::norm2(ib);
@@ -660,9 +658,10 @@ namespace quda {
     double r2_max = r2;
     int num_reliable_updates = 0;
 // reliable update
-    
-    const double u = param.precision_sloppy==8?std::numeric_limits<double>::epsilon()/2.:((param.precision_sloppy==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
-    const double uhigh = param.precision==8?std::numeric_limits<double>::epsilon()/2.:((param.precision==4)?std::numeric_limits<float>::epsilon()/2.:pow(2.,-13));
+   
+    constexpr double fp16_eps = std::pow(2.,-18);
+    const double u = param.precision_sloppy==8?std::numeric_limits<double>::epsilon()/2.:((param.precision_sloppy==4)?std::numeric_limits<float>::epsilon()/2.:fp16_eps);
+    const double uhigh = param.precision==8?std::numeric_limits<double>::epsilon()/2.:((param.precision==4)?std::numeric_limits<float>::epsilon()/2.:fp16_eps);
     const double deps = sqrt(u);
     const double dfac = 1.1;
     double d_new = 0.;

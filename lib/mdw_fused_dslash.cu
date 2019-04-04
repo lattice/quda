@@ -111,14 +111,16 @@ namespace quda {
           errorQuda("kappa(=%16.12e) too small.\n", kappa);
         }
         
-        fac_inv = 0.5
-            / (1. + std::pow(kappa, (int)Ls) * m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
+        fac_inv = 0.5/(1.+std::pow(kappa,(int)Ls)*m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
         switch (type) {
         case dslash4_dslash5pre_dslash5inv:
         case dslash4dag_dslash5predag_dslash5invdag:
-          m_scale = b;
-          alpha = 1. + c / (kappa * b); // b-c/kappa = b(1-c/(b*kappa))
-          beta = -c / (kappa * b);
+          // m_scale = b;
+          // alpha = 1. + c / (kappa * b); // b-c/kappa = b(1-c/(b*kappa))
+          // beta = -c / (kappa * b);
+          m_scale = b+c/kappa;
+          alpha = 1.;
+          beta = -1./(1.+(kappa*b)/c);
           break;
         case dslash4_dslash5inv_dslash5invdag:
           m_scale = -0.25 / ((b * (4. + m_5) + 1.) * (b * (4. + m_5) + 1.)); // -kappa_b^2

@@ -345,7 +345,7 @@ namespace quda {
     }
   }
 
-  constexpr float target_scale = 1e3;
+  constexpr float target_scale = 5e3;
 
   template<class Vector>
   __device__ inline void block_wise_reduce_vector(const Vector& v, float* smem_scale){
