@@ -1797,7 +1797,7 @@ namespace quda {
             phase = inphase;
           } else {
             copy(phase, (gauge + parity * offset)[phaseOffset / sizeof(Float) + stride * dir + x]);
-            phase *= 2. * M_PI;
+            phase *= static_cast<RegType>(2.0) * static_cast<RegType>(M_PI);
           }
         }
 
@@ -1880,10 +1880,9 @@ namespace quda {
             //   phase = inphase < static_cast<Float>(0) ? static_cast<Float>(-1./(2.*M_PI)) : static_cast<Float>(1./2.*M_PI);
             // } else {
             copy(phase, ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x]);
-            phase *= 2. * M_PI;
+            phase *= static_cast<RegType>(2.0) * static_cast<RegType>(M_PI);
             // }
           }
-          // printf("loadGhost else %i %i %i %f\n", x, dir, parity, phase);
           reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
         }
       }
