@@ -261,87 +261,85 @@ namespace quda {
     return true;
   }
 
-		void PreconditionedSolver::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-				setOutputPrefix(prefix);
+  void PreconditionedSolver::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+    setOutputPrefix(prefix);
 
-				QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
+    ColorSpinorField *out=nullptr;
+    ColorSpinorField *in=nullptr;
 
-				ColorSpinorField *out=nullptr;
-				ColorSpinorField *in=nullptr;
+    if (!apply_deflation) { //regular preconditioned solver
+      QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
 
-				dirac.prepare(in, out, x, b, solution_type);
+      dirac.prepare(in, out, x, b, solution_type);
+      (*solver)(*out, *in);
+      dirac.reconstruct(x, b, solution_type);
 
-				if (!apply_deflation) {
-						(*solver)(*out, *in);
-				} else {
+    } else {
 
-				  deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
-				  Deflation &defl         = *(defl_p->defl);
+      deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
+      Deflation &defl         = *(defl_p->defl);
 
-				  /**
-					  Setup restart tolerance
-				  */
-				  const double full_tol = param.tol;
-				  double tot_time = 0.0, tot_flops =0.0;
-				  param.tol     = param.tol_restart;
+      /**
+      Setup restart tolerance
+      */
+      const double full_tol = param.tol;
+      double tot_time = 0.0, tot_flops =0.0;
+      param.tol     = param.tol_restart;
 
-				  ColorSpinorParam csParam(x);
-				  csParam.create = QUDA_COPY_FIELD_CREATE;
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
 
-				  ColorSpinorField *rp    = ColorSpinorField::Create(b, csParam);//full precision residual
-				  ColorSpinorField &r     = *rp;
+      ColorSpinorField *rp    = ColorSpinorField::Create(b, csParam);//full precision residual
+      ColorSpinorField &r     = *rp;
 
-				  csParam.setPrecision(param.precision_ritz);
-						csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.setPrecision(param.precision_ritz);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-				  ColorSpinorField *xp_proj =  ( param.precision_ritz == param.precision ) ? &x : ColorSpinorField::Create(csParam);
-			  	ColorSpinorField *rp_proj =  ( param.precision_ritz == param.precision ) ? rp : ColorSpinorField::Create(csParam);
-				  ColorSpinorField &xProj   = *xp_proj;
-				  ColorSpinorField &rProj   = *rp_proj;
+      out =  ( param.precision_ritz == param.precision ) ? &x : ColorSpinorField::Create(csParam);
+      in  =  ( param.precision_ritz == param.precision ) ? rp : ColorSpinorField::Create(csParam);
 
-				  int restart_idx  = 0;
+      int restart_idx  = 0;
 
-				  //launch a solver with deflated init/restarts :
-				  while((param.tol >= full_tol) && (restart_idx < param.max_restart_num)) {
-						  restart_idx += 1;
+      //launch a solver with deflated init/restarts :
+      while((param.tol >= full_tol) && (restart_idx < param.max_restart_num)) {
+        restart_idx += 1;
 
-        rProj = r;
-			     xProj = x;
-						  defl(xProj, rProj);
-						  x = xProj;
+        *in  = r;
+        *out = x;
+        defl(*out, *in);
+        x = *out;
 
-						  (*solver)(x, b);
+        (*solver)(x, b);
 
-								dirac.MdagM(r, x);
-						  blas::xpay(b, -1.0, r);
+        dirac.MdagM(r, x);
+        blas::xpay(b, -1.0, r);
 
-						  if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\nDeflated solver stat: %i iter / %g secs = %g Gflops. \n", param.iter, param.secs, param.gflops);
+        if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\nDeflated solver stat: %i iter / %g secs = %g Gflops. \n", param.iter, param.secs, param.gflops);
 
-						  param.tol *= param.inc_tol;
+        param.tol *= param.inc_tol;
 
-						  if(restart_idx == (param.max_restart_num-1)) param.tol = full_tol;//do the last solve in the next cycle to full tolerance
+        if(restart_idx == (param.max_restart_num-1)) param.tol = full_tol;//do the last solve in the next cycle to full tolerance
 
-						  tot_time   += param.secs;
-						  tot_flops  += param.gflops;
-				  }
+        tot_time   += param.secs;
+        tot_flops  += param.gflops;
+      }
 
-				  if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\nDeflated solver stat: %i iter / %g secs = %g Gflops. \n", param.iter, param.secs, param.gflops);
-				  //
-				  param.secs   += tot_time;
-				  param.gflops += tot_flops;
+      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\nDeflated solver stat: %i iter / %g secs = %g Gflops. \n", param.iter, param.secs, param.gflops);
+      //
+      param.secs   += tot_time;
+      param.gflops += tot_flops;
 
-				  delete rp;
+      delete rp;
 
-				  if( param.precision_ritz != param.precision ) {
-						  delete xp_proj;
-						  delete rp_proj;
-				  }
-			 }
+      if( param.precision_ritz != param.precision ) {
+        delete out;
+        delete in;
+      }
+    }
 
-			 dirac.reconstruct(x, b, solution_type);
-			 setOutputPrefix("");
+    setOutputPrefix("");
 
-			 return;
-		}
+    return;
+  }
 
 } // namespace quda
