@@ -659,7 +659,7 @@ namespace quda {
     int num_reliable_updates = 0;
 // reliable update
    
-    constexpr double fp16_eps = std::pow(2.,-18);
+    constexpr double fp16_eps = std::pow(2.,-13);
     const double u = param.precision_sloppy==8?std::numeric_limits<double>::epsilon()/2.:((param.precision_sloppy==4)?std::numeric_limits<float>::epsilon()/2.:fp16_eps);
     const double uhigh = param.precision==8?std::numeric_limits<double>::epsilon()/2.:((param.precision==4)?std::numeric_limits<float>::epsilon()/2.:fp16_eps);
     const double deps = sqrt(u);
@@ -815,7 +815,9 @@ namespace quda {
       linalg_timer[1].Stop(fname, cname, lname);
 
       k++;
-      printfQuda("MSPCG/iter.count/r2/target_r2/%%/target_%%: %05d %8.4e %8.4e %8.4e %8.4e\n", k, rr2, stop, std::sqrt(rr2/b2), param.tol);
+      if(k % 100 == 0){
+        printfQuda("MSPCG/iter.count/r2/target_r2/%%/target_%%: %05d %8.4e %8.4e %8.4e %8.4e\n", k, rr2, stop, std::sqrt(rr2/b2), param.tol);
+      }
     }
 
 // END of main loop 
@@ -842,7 +844,7 @@ namespace quda {
     double prec_time = preconditioner_timer.time; 
 //    reduceMaxDouble(prec_time);
 
-    if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
+    if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d.\n", param.maxiter);
 
     // compute the true residual 
 
