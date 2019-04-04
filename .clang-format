@@ -7,12 +7,14 @@ AllowShortCaseLabelsOnASingleLine : true
 AllowShortIfStatementsOnASingleLine: true
 AllowShortLoopsOnASingleLine: true
 BreakBeforeBraces: Linux
+BreakBeforeTernaryOperators: false
 BreakConstructorInitializers: AfterColon
-ColumnLimit: 160
+ColumnLimit: 120
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 Cpp11BracedListStyle: true
 FixNamespaceComments: true
 NamespaceIndentation: All
+PenaltyExcessCharacter: 10
 PointerAlignment: Right
 SortIncludes: false
 SpaceBeforeAssignmentOperators: true
