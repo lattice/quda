@@ -42,6 +42,13 @@ namespace quda {
         if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
           typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
           copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+        } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+#ifdef BUILD_TIFR_INTERFACE
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_TIFR>::type G;
+          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+#else
+          errorQuda("TIFR interface has not been built so TIFR phase type not enabled\n");
+#endif
         } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
           typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9>::type G;
           copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
