@@ -2770,6 +2770,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
   bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
     (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool deflated_solve = param->deflation_op != nullptr && (param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER) ? true : false;
+
 
   param->secs = 0;
   param->gflops = 0;
@@ -2927,10 +2929,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
+    if(!deflated_solve) {
+      (*solve)(*out, *in);
+      delete solve;      
+    } else {
+      Solver *dsolve = new PreconditionedSolver(*solve, dirac, solverParam, profileInvert, "", deflated_solve);
+      (*dsolve)(*out, *in);
+      delete dsolve;
+    }
     blas::copy(*in, *out);
     solverParam.updateInvertParam(*param);
-    delete solve;
   }
 
   if (direct_solve) {
@@ -2977,9 +2985,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
+    if(!deflated_solve) {
+      (*solve)(*out, *in);
+      delete solve;
+    } else {
+      Solver *dsolve = new PreconditionedSolver(*solve, dirac, solverParam, profileInvert, "", deflated_solve);
+      (*dsolve)(*out, *in);
+      delete dsolve;
+    }
     solverParam.updateInvertParam(*param);
-    delete solve;
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
@@ -3025,18 +3039,30 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
+    if(!deflated_solve) {
+      (*solve)(*out, *in);
+      delete solve;
+    } else {
+      Solver *dsolve = new PreconditionedSolver(*solve, dirac, solverParam, profileInvert, "", deflated_solve);
+      (*dsolve)(*out, *in);
+      delete dsolve;
+    }
     solverParam.updateInvertParam(*param);
-    delete solve;
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     cudaColorSpinorField tmp(*out);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(tmp, *in); // y = (M M^\dag) b
+    if(!deflated_solve) {
+      (*solve)(*out, *in); // y = (M M^\dag) b
+      delete solve;
+    } else {
+      Solver *dsolve = new PreconditionedSolver(*solve, dirac, solverParam, profileInvert, "", deflated_solve);
+      (*dsolve)(*out, *in);
+      delete dsolve;
+    }
     dirac.Mdag(*out, tmp);  // x = M^dag y
     solverParam.updateInvertParam(*param);
-    delete solve;
   }
 
   if (getVerbosity() >= QUDA_VERBOSE){

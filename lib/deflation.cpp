@@ -150,8 +150,8 @@ namespace quda {
   }
 
   void Deflation::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER)
-       errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
+//    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_CG_INVERTER) 
+//       errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
 
     if(param.cur_dim == 0) return;//nothing to do
 
