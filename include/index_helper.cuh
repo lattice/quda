@@ -831,16 +831,28 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, int pa
      @param[in] dir Direction of the unit hop (+1 or -1)
      @param[in] tboundary Boundary condition
    */
-  template <typename Float, typename I>
-  __device__ __host__ inline int StaggeredPhase(const int coords[], const I X[], int dim, int dir, Float tboundary)
+  template <QudaStaggeredPhase phase, typename Float, typename I>
+  __device__ __host__ inline int Phase(const int coords[], const I X[], int dim, int dir, Float tboundary)
   {
+    static_assert(phase == QUDA_STAGGERED_PHASE_MILC || phase == QUDA_STAGGERED_PHASE_TIFR, "Unsupported staggered phase");
     Float sign;
-    switch (dim) {
-    case 0: sign = (coords[3]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
-    case 1: sign = (coords[3] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
-    case 2: sign = (coords[3] + coords[1] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
-    case 3: sign = (coords[3] + dir >= X[3] || coords[3] + dir < 0) ? tboundary : static_cast<Float>(1.0); break;
-    default: sign = static_cast<Float>(1.0);
+
+    if (phase == QUDA_STAGGERED_PHASE_MILC) {
+      switch (dim) {
+      case 0: sign = (coords[3]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
+      case 1: sign = (coords[3] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
+      case 2: sign = (coords[3] + coords[1] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
+      case 3: sign = (coords[3] + dir >= X[3] || coords[3] + dir < 0) ? tboundary : static_cast<Float>(1.0); break;
+      default: sign = static_cast<Float>(1.0);
+      }
+    } else if (phase == QUDA_STAGGERED_PHASE_TIFR) {
+      switch(dim) {
+      case 0: sign = (coords[3]+coords[2]+coords[1])%2 == 0 ? -1 : 1; break;
+      case 1: sign = ((coords[3]+coords[2])%2 == 1) ? -1 : 1; break;
+      case 2: sign = (coords[3]%2 == 0) ? -1 : 1; break;
+      case 3: sign = (coords[3] + dir >= X[3] || coords[3] + dir < 0) ? tboundary : static_cast<Float>(1.0); break;
+      default: sign = static_cast<Float>(1.0);
+      }
     }
     return sign;
   }

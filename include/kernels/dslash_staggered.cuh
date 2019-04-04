@@ -12,7 +12,8 @@ namespace quda {
   /**
      @brief Parameter structure for driving the Staggered Dslash operator
   */
-  template <typename Float, int nColor, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_, bool improved_>
+  template <typename Float, int nColor, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_,
+            bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
   struct StaggeredArg : DslashArg<Float> {
     typedef typename mapper<Float>::type real;
     static constexpr int nSpin = 1;
@@ -25,7 +26,8 @@ namespace quda {
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     static constexpr bool use_inphase = improved_ ? false : true;
-    using GU = typename gauge_mapper<Float, reconstruct_u, 18, QUDA_STAGGERED_PHASE_MILC, gauge_direct_load, ghost, use_inphase>::type;
+    static constexpr QudaStaggeredPhase phase = phase_;
+    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase>::type;
     using GL = typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, use_inphase>::type;
 
     F out;        /** output vector field */
@@ -78,12 +80,14 @@ namespace quda {
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
-          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, Phase<arg.phase>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += (U * in);
+
+          if (x_cb == 0 && parity == 0 && d == 0) printLink(U);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase<Float>(coord, arg.dim, d, +1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, Phase<arg.phase>(coord, arg.dim, d, +1, arg.tboundary));
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in);
         }
@@ -114,14 +118,14 @@ namespace quda {
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity)
-            : arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
+            : arg.U.Ghost(d, ghost_idx2, 1 - parity, Phase<arg.phase>(coord, arg.dim, d, -1, arg.tboundary));
           Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
           out -= (conj(U) * in);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
           const Link U
-              = arg.improved ? arg.U(d, gauge_idx, 1 - parity) : arg.U(d, gauge_idx, 1 - parity, StaggeredPhase<Float>(coord, arg.dim, d, -1, arg.tboundary));
+              = arg.improved ? arg.U(d, gauge_idx, 1 - parity) : arg.U(d, gauge_idx, 1 - parity, Phase<arg.phase>(coord, arg.dim, d, -1, arg.tboundary));
           Vector in = arg.in(back_idx, their_spinor_parity);
           out -= (conj(U) * in);
         }
