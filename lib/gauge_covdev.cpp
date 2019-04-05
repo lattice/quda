@@ -28,7 +28,7 @@ namespace quda {
     comm_dim[mu%4] = comm_dim_partitioned(mu%4);
     ApplyCovDev(out, in, *gauge, mu, parity, dagger, comm_dim, profile);
 #else
-    ApplyCovDev(out, in, *gauge, parity, commDim, profile, mu);
+    ApplyCovDev(out, in, *gauge, parity, mu);
 #endif
     
     flops += 1320ll*in.Volume(); // FIXME

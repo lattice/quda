@@ -446,9 +446,6 @@ namespace quda {
 		    int parity, bool dagger, const int *comm_override,
 		    TimeProfile &profile);
 
-  //void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-  //double kappa, const ColorSpinorField *x, int parity);
-  
   /**
      @brief Driver for applying the covariant derivative
 
@@ -528,6 +525,9 @@ namespace quda {
   
   void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
 		    double kappa, const ColorSpinorField *x, int parity);
+
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+		   int parity, int mu);
   
 #endif
 

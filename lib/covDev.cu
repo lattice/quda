@@ -20,6 +20,8 @@
 
 namespace quda {
 
+#ifdef GPU_COVDEV
+  
   /**
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
@@ -174,13 +176,15 @@ namespace quda {
     }
   };
 
+#endif
+  
   //Apply the covariant derivative operator
   //out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   //out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                    int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-
+#ifdef GPU_COVDEV
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder()) errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
 
@@ -195,11 +199,17 @@ namespace quda {
     instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
 
     popKernelPackT();
+#else
+    errorQuda("Covariant derivative kernels have not been built");
+#endif    
   }
 } // namespace quda
 
-#else
+    // END #ifndef USE_LEGACY_DSLASH
+#else 
 
+    // BEGIN USE_LEGACY_DSLASH
+    
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <color_spinor_field.h>
@@ -216,7 +226,7 @@ namespace quda {
 
 namespace quda {
 
-#ifdef GPU_CONTRACT
+#ifdef GPU_COVDEV
 
   /**
      @brief Parameter structure for driving the covariant derivative
@@ -462,14 +472,14 @@ struct CovDevArg {
     extern Worker* aux_worker;
   }
 
-#endif // GPU_CONTRACT
+#endif // GPU_COVDEV
 
   //Apply the covariant derivative operator
   //out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   //out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)
   {
-#ifdef GPU_CONTRACT
+#ifdef GPU_COVDEV
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
@@ -495,11 +505,11 @@ struct CovDevArg {
 
     in.bufferIndex = (1 - in.bufferIndex);
 #else
-    errorQuda("Contraction kernels have not been built");
+    errorQuda("Covariant derivative kernels have not been built");
 #endif
   }
 
 } // namespace quda
 
 
-#endif
+#endif //END USE_LEGACY_DSLASH
