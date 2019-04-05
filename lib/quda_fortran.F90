@@ -76,7 +76,7 @@ module quda_fortran
      integer(8) :: mom_offset   ! Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
      integer(8) :: site_size    ! Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
 
- end type quda_gauge_param
+  end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
   type quda_invert_param
@@ -93,8 +93,8 @@ module quda_fortran
      real(8) :: m5    ! Domain wall height
      integer(4) :: Ls       ! Extent of the 5th dimension (for domain wall)
 
-     real(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
-     real(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! will be used only for the mobius type of Fermion
+     complex(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
+     complex(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! MDWF coefficients
 
      real(8) :: mu    ! Twisted mass parameter
      real(8) :: epsilon ! Twisted mass parameter
@@ -227,6 +227,15 @@ module quda_fortran
 
      ! Relaxation parameter used in GCR-DD (default = 1.0)
      real(8) :: omega
+
+     ! Basis for CA algorithms
+     QudaCABasis :: ca_basis
+
+     ! Minimum eigenvalue for Chebyshev CA basis
+     real(8) :: ca_lambda_min
+
+     ! Maximum eigenvalue for Chebyshev CA basis
+     real(8) :: ca_lambda_max
 
      ! Number of preconditioner cycles to perform per iteration
      integer(4) :: precondition_cycle

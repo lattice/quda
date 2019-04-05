@@ -1,7 +1,10 @@
+#ifdef USE_LEGACY_DSLASH
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <typeinfo>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -18,10 +21,12 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
 
@@ -48,9 +53,6 @@ namespace quda {
 
 #include <dslash_quda.cuh>
   }
-
-  // declare the dslash events
-#include <dslash_events.cuh>
 
   using namespace domainwall4d;
 
@@ -239,9 +241,6 @@ namespace quda {
   };
 #endif // GPU_DOMAIN_WALL_DIRAC
 
-#include <dslash_policy.cuh>
-
-
   //-----------------------------------------------------
   // Modification for 4D preconditioned DWF operator
   // Additional Arg. is added to give a function name.
@@ -258,6 +257,7 @@ namespace quda {
 			    const int *commOverride, const int DS_type, TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
+    using namespace dslash;
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     DslashCuda *dslash = nullptr;
@@ -274,13 +274,14 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyImp* dslashImp = nullptr;
+    DslashPolicyImp<DslashCuda> *dslashImp = nullptr;
     if (DS_type != 0) {
-      dslashImp = DslashFactory::create(QudaDslashPolicy::QUDA_DSLASH_NC);
+      dslashImp = DslashFactory<DslashCuda>::create(QudaDslashPolicy::QUDA_DSLASH_NC);
       (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
       delete dslashImp;
     } else {
-      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
+      DslashPolicyTune<DslashCuda> dslash_policy(
+          *dslash, const_cast<cudaColorSpinorField *>(in), in->Volume() / in->X(4), ghostFace, profile);
       dslash_policy.apply(0);
     }
 
@@ -291,3 +292,5 @@ namespace quda {
   }
 
 }
+
+#endif

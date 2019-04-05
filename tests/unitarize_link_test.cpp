@@ -22,7 +22,7 @@
 #endif
 
 // google test frame work
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 

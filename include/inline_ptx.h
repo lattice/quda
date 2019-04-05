@@ -32,6 +32,42 @@ namespace quda {
     a.x = x; a.y = y; a.z = z; a.w = w;
   }
 
+  __device__ inline void load_cached_short4(short4 &a, const short4 *addr)
+  {
+    short x, y, z, w;
+    asm("ld.ca.global.v4.s16 {%0, %1, %2, %3}, [%4+0];" : "=h"(x), "=h"(y), "=h"(z), "=h"(w) : __PTR(addr));
+    a.x = x;
+    a.y = y;
+    a.z = z;
+    a.w = w;
+  }
+
+  __device__ inline void load_cached_short2(short2 &a, const short2 *addr)
+  {
+    short x, y;
+    asm("ld.ca.global.v2.s16 {%0, %1}, [%2+0];" : "=h"(x), "=h"(y) : __PTR(addr));
+    a.x = x;
+    a.y = y;
+  }
+
+  __device__ inline void load_global_short4(short4 &a, const short4 *addr)
+  {
+    short x, y, z, w;
+    asm("ld.cg.global.v4.s16 {%0, %1, %2, %3}, [%4+0];" : "=h"(x), "=h"(y), "=h"(z), "=h"(w) : __PTR(addr));
+    a.x = x;
+    a.y = y;
+    a.z = z;
+    a.w = w;
+  }
+
+  __device__ inline void load_global_short2(short2 &a, const short2 *addr)
+  {
+    short x, y;
+    asm("ld.cg.global.v2.s16 {%0, %1}, [%2+0];" : "=h"(x), "=h"(y) : __PTR(addr));
+    a.x = x;
+    a.y = y;
+  }
+
   __device__ inline void load_global_float4(float4 &a, const float4* addr)
   {
     float x, y, z, w;

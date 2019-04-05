@@ -226,7 +226,7 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Yhat field\n");
 #else
-    errorQuda("Multigrid has not been enabled");
+    errorQuda("Multigrid has not been built");
 #endif
   }
 

@@ -34,11 +34,11 @@ namespace quda {
   template<typename Float, int n, typename Arg>
   inline __device__ __host__ void computeYhat(Arg &arg, int d, int x_cb, int parity, int i, int j) {
 
-    int coord[5];
+    constexpr int nDim = 4;
+    int coord[nDim];
     getCoords(coord, x_cb, arg.dim, parity);
-    coord[4] = 0;
 
-    const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+    const int ghost_idx = ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace);
 
     // first do the backwards links Y^{+\mu} * X^{-\dagger}
     if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {

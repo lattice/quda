@@ -2,16 +2,6 @@
 #include <fast_intdiv.h>
 #include <convert.h>
 
-enum KernelType {
-  INTERIOR_KERNEL = 5,
-  EXTERIOR_KERNEL_ALL = 6,
-  EXTERIOR_KERNEL_X = 0,
-  EXTERIOR_KERNEL_Y = 1,
-  EXTERIOR_KERNEL_Z = 2,
-  EXTERIOR_KERNEL_T = 3,
-  KERNEL_POLICY = 7
-};
-
   struct DslashParam {
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
@@ -127,6 +117,7 @@ enum KernelType {
 
     double twist_a;
     double twist_b;
+    double twist_c;
 
     int Vsh; // used by contraction kernels
 
@@ -198,5 +189,6 @@ enum KernelType {
       printfQuda("tProjScale = %e\n", tProjScale);
       printfQuda("twist_a = %e\n", twist_a);
       printfQuda("twist_b = %e\n", twist_b);
+      printfQuda("twist_c = %e\n", twist_c);
     }
   };

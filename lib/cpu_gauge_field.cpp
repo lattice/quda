@@ -101,7 +101,6 @@ namespace quda {
 
   cpuGaugeField::~cpuGaugeField()
   {
-    
     int siteDim = 0;
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
@@ -360,7 +359,8 @@ namespace quda {
     backed_up = true;
   }
 
-  void cpuGaugeField::restore() {
+  void cpuGaugeField::restore() const
+  {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
 
     if (order == QUDA_QDP_GAUGE_ORDER) {

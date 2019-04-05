@@ -41,7 +41,7 @@ extern QudaVerbosity verbosity;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-QudaPrecision &cpu_prec = prec;
+QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 
@@ -105,8 +105,7 @@ void SU3test(int argc, char **argv) {
 
   setGaugeParam(gauge_param);
   setDims(gauge_param.X);
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? 
-    sizeof(double) : sizeof(float);
+  size_t gSize = gauge_param.cpu_prec;
 
   void *gauge[4], *new_gauge[4];
 

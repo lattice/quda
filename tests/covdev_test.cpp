@@ -18,7 +18,7 @@
 #include <gauge_field.h>
 
 #include <assert.h>
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 using namespace quda;
 
@@ -65,8 +65,6 @@ extern int device;
 extern bool verify_results;
 extern int niter;
 
-extern bool kernel_pack_t;
-
 extern double mass; // the mass of the Dirac operator
 
 int X[4];
@@ -80,8 +78,6 @@ void init()
 {    
 
   initQuda(device);
-
-  setKernelPackT(kernel_pack_t);
 
   setVerbosity(QUDA_VERBOSE);
 

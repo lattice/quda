@@ -1,7 +1,10 @@
+#ifdef USE_LEGACY_DSLASH
+
 #include <cstdlib>
 #include <cstdio>
 #include <string>
 #include <iostream>
+#include <typeinfo>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -18,10 +21,12 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
+#include <dslash.h>
 #include <sys/time.h>
 #include <blas_quda.h>
 
 #include <inline_ptx.h>
+#include <dslash_policy.cuh>
 
 namespace quda {
 
@@ -46,9 +51,6 @@ namespace quda {
 
 #include <dslash_quda.cuh>
   }
-
-  // declare the dslash events
-#include <dslash_events.cuh>
 
   using namespace domainwall;
 
@@ -201,14 +203,15 @@ namespace quda {
   };
 #endif // GPU_DOMAIN_WALL_DIRAC
 
-#include <dslash_policy.cuh>
-
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			    const cudaColorSpinorField *in, const int parity, const int dagger, 
 			    const cudaColorSpinorField *x, const double &m_f, const double &k2, 
 			    const int *commOverride, TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
+    // with 5-d checkerboarding we must use kernel packing
+    pushKernelPackT(true);
+
     const_cast<cudaColorSpinorField*>(in)->createComms(1);
 
     DslashCuda *dslash = 0;
@@ -225,13 +228,18 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume()/in->X(4), ghostFace, profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(
+        *dslash, const_cast<cudaColorSpinorField *>(in), in->Volume() / in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 
     delete dslash;
+
+    popKernelPackT();
 #else
     errorQuda("Domain wall dslash has not been built");
 #endif
   }
 
 }
+
+#endif

@@ -1,0 +1,23 @@
+---
+BasedOnStyle: Webkit
+IndentWidth: 2
+AlignTrailingComments: true
+AllowShortBlocksOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine : true
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+BreakBeforeBraces: Linux
+BreakBeforeTernaryOperators: false
+BreakConstructorInitializers: AfterColon
+ColumnLimit: 120
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+Cpp11BracedListStyle: true
+FixNamespaceComments: true
+NamespaceIndentation: All
+PenaltyExcessCharacter: 10
+PointerAlignment: Right
+SortIncludes: false
+SpaceBeforeAssignmentOperators: true
+CommentPragmas:  '^\\.+'
+UseTab: Never
+...

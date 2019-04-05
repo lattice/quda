@@ -334,6 +334,19 @@ namespace quda {
 	return result;
       }
 
+      /**
+         @brief Compute the absolute max element of the Hermitian matrix
+         @return Abosolue Max element
+      */
+      __device__ __host__ inline T max() const
+      {
+        HMatrix<T, N> result;
+        T max = static_cast<T>(0.0);
+#pragma unroll
+        for (int i = 0; i < N * N; i++) max = (abs(data[i]) > max ? abs(data[i]) : max);
+        return max;
+      }
+
       __device__ __host__ void print() const {
 	for (int i=0; i<N; i++) {
 	  printf("i=%d ", i);

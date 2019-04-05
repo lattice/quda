@@ -48,12 +48,12 @@ namespace quda {
       errorQuda("Anisotropy only supported for Wilson links");
     if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
       errorQuda("Temporal gauge fixing only supported for Wilson links");
-
+#ifdef USE_LEGACY_DSLASH
     if(link_type != QUDA_ASQTAD_LONG_LINKS && (reconstruct ==  QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9))
       errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
-       
-    if (link_type == QUDA_ASQTAD_MOM_LINKS) scale = 1.0;
-
+    if (link_type == QUDA_ASQTAD_LONG_LINKS && reconstruct == QUDA_RECONSTRUCT_9)
+      errorQuda("reconstruct %d not supported for staggered long links with QUDA_LEGACY_DSLASH\n", reconstruct);
+#endif
     if(geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*nInternal;
       length = 2*stride*nInternal; // two comes from being full lattice
@@ -158,8 +158,8 @@ namespace quda {
   bool GaugeField::isNative() const {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || 
-	       precision == QUDA_HALF_PRECISION) {
+    } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
+        || precision == QUDA_QUARTER_PRECISION) {
       if (reconstruct == QUDA_RECONSTRUCT_NO) {
 	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
       } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
@@ -264,7 +264,6 @@ namespace quda {
       if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
       if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, g.anisotropy);
       if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, g.tadpole);
-      //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale);
     }
     catch(std::bad_cast &e) {
       errorQuda("Failed to cast reference to GaugeField");
@@ -300,8 +299,8 @@ namespace quda {
     if (a.LinkType() == QUDA_COARSE_LINKS) errorQuda("Not implemented for coarse-link type");
     if (a.Ncolor() != 3) errorQuda("Not implemented for Ncolor = %d", a.Ncolor());
 
-    if (a.Precision() == QUDA_HALF_PRECISION)
-      errorQuda("Casting a GaugeField into ColorSpinorField not possible in half precision");
+    if (a.Precision() == QUDA_HALF_PRECISION || a.Precision() == QUDA_QUARTER_PRECISION)
+      errorQuda("Casting a GaugeField into ColorSpinorField not possible in half or quarter precision");
 
     ColorSpinorParam spinor_param;
     spinor_param.nColor = (a.Geometry()*a.Reconstruct())/2;
