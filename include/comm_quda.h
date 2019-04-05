@@ -138,7 +138,7 @@ extern "C" {
      policies).
      @return String specifying comm config
   */
-  const char* comm_config_string();
+  const char *comm_config_string();
 
   /* implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp */
 
@@ -250,8 +250,8 @@ extern "C" {
      @param nblocks Number of blocks
      @param stride Stride between blocks in bytes
   */
-  MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
-						 size_t blksize, int nblocks, size_t stride);
+  MsgHandle *comm_declare_strided_send_displaced(
+      void *buffer, const int displacement[], size_t blksize, int nblocks, size_t stride);
 
   /**
      Create a persistent strided message handler for a displaced receive

@@ -36,8 +36,9 @@ namespace quda {
 #ifdef JITIFY
           using namespace jitify::reflection;
           jitify_error = program->kernel("quda::computeFmunuKernel")
-            .instantiate(Type<Float>(),Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+                             .instantiate(Type<Float>(), Type<Arg>())
+                             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                             .launch(arg);
 #else
           computeFmunuKernel<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif

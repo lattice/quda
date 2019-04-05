@@ -174,12 +174,11 @@ namespace quda {
 
     if (out.isNative()) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO>::type G;
-        copyGaugeEx<FloatOut,FloatIn,length>
-          (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
+        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_NO>::type G;
+        copyGaugeEx<FloatOut, FloatIn, length>(G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
-	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_12>::type G;
+        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_12>::type G;
 	copyGaugeEx<FloatOut,FloatIn,length>
 	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
 #else
@@ -187,7 +186,7 @@ namespace quda {
 #endif
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 #if QUDA_RECONSTRUCT & 1
-	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_8>::type G;
+        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_8>::type G;
 	copyGaugeEx<FloatOut,FloatIn,length>
 	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
 #else
@@ -196,7 +195,7 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 #if QUDA_RECONSTRUCT & 2
-	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
+        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
         copyGaugeEx<FloatOut,FloatIn,length>
 	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
 #else
@@ -204,7 +203,7 @@ namespace quda {
 #endif
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
 #if QUDA_RECONSTRUCT & 1
-	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_9>::type G;
+        typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_9>::type G;
         copyGaugeEx<FloatOut,FloatIn,length>
 	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
 #else
@@ -253,18 +252,18 @@ namespace quda {
 
     if (in.isNative()) {
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
-        copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
+        typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_NO>::type G;
+        copyGaugeEx<FloatOut, FloatIn, length>(G(in, In), in.X(), out, location, Out);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
-	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
+        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
 	copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
 #endif
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 #if QUDA_RECONSTRUCT & 1
-	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
+        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
 	copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
@@ -272,14 +271,14 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 #if QUDA_RECONSTRUCT & 2
-	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
+        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
 	copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
 #endif
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
 #if QUDA_RECONSTRUCT & 1
-	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_9>::type G;
+        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_9>::type G;
 	copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
@@ -354,7 +353,7 @@ namespace quda {
 	copyGaugeEx(out, in, location, (double*)Out, (double*)In);
       } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
-	copyGaugeEx(out, in, location, (double*)Out, (float*)In);
+        copyGaugeEx(out, in, location, (double*)Out, (float*)In);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
@@ -364,7 +363,7 @@ namespace quda {
 	copyGaugeEx(out, in, location, (float*)Out, (double*)In);
       } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
-	copyGaugeEx(out, in, location, (float*)Out, (float*)In);
+        copyGaugeEx(out, in, location, (float*)Out, (float*)In);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif

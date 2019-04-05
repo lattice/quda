@@ -49,7 +49,8 @@ extern float fat_link_max;
  */
 int gridsize_from_cmdline[4] = {1,1,1,1};
 
-void get_gridsize_from_env(int * const dims) {
+void get_gridsize_from_env(int *const dims)
+{
   char *grid_size_env = getenv("QUDA_TEST_GRID_SIZE");
   if (grid_size_env) {
     std::stringstream grid_list(grid_size_env);
@@ -57,7 +58,7 @@ void get_gridsize_from_env(int * const dims) {
     int dim;
     int i = 0;
     while (grid_list >> dim) {
-      if (i>=4) errorQuda("Unexpected grid size array length");
+      if (i >= 4) errorQuda("Unexpected grid size array length");
       dims[i] = dim;
       if (grid_list.peek() == ',') grid_list.ignore();
       i++;
@@ -85,7 +86,7 @@ static int lex_rank_from_coords_x(const int *coords, void *fdata)
 
 static int rank_order = 0;
 
-void initComms(int argc, char **argv, int * const commDims)
+void initComms(int argc, char **argv, int *const commDims)
 {
   if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
 
@@ -1093,7 +1094,8 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
 
 }
 
-void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, QudaPrecision precision, QudaGaugeParam *param, QudaDslashType dslash_type)
+void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, QudaPrecision precision,
+    QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1826,7 +1828,8 @@ void usage(char** argv )
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
   printf("    --mu                                      # Twisted-Mass chiral twist of Dirac operator (default 0.1)\n");
-  printf("    --epsilon                                 # Twisted-Mass flavor twist of Dirac operator (default 0.01)\n");
+  printf(
+      "    --epsilon                                 # Twisted-Mass flavor twist of Dirac operator (default 0.01)\n");
   printf("    --tadpole-coeff                           # Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)\n");
   printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
@@ -2463,11 +2466,9 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--epsilon") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    epsilon = atof(argv[i+1]);
+  if (strcmp(argv[i], "--epsilon") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    epsilon = atof(argv[i + 1]);
     i++;
     ret = 0;
     goto out;

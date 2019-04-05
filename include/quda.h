@@ -107,8 +107,8 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
-    double_complex b_5[QUDA_MAX_DWF_LS];  /**< Mobius coefficients - only real part used if regular Mobius */
-    double_complex c_5[QUDA_MAX_DWF_LS];  /**< Mobius coefficients - only real part used if regular Mobius */
+    double_complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
+    double_complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
 
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */

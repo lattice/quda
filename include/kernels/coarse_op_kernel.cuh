@@ -274,59 +274,57 @@ namespace quda {
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x)
      Where: s = fine spin, c' = coarse color, c = fine color
   */
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ inline void computeAV(Arg &arg, int parity, int x_cb, int ic_c) {
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __device__ __host__ inline void computeAV(Arg &arg, int parity, int x_cb, int ic_c)
+  {
 
-    constexpr int N = fineSpin*fineColor/2;
-    typedef HMatrix<Float,N> Mat;
+    constexpr int N = fineSpin * fineColor / 2;
+    typedef HMatrix<Float, N> Mat;
 
 #pragma unroll
     for (int ch = 0; ch < 2; ch++) { // Loop over chiral blocks
       Mat A;
 
 #pragma unroll
-      for (int i=0; i<N; i++) {
+      for (int i = 0; i < N; i++) {
 #pragma unroll
-	for (int j=0; j<=i; j++) {
-          A(i,j) = arg.C(0, parity, x_cb, 2*ch+i/fineColor, 2*ch+j/fineColor, i%fineColor, j%fineColor);
+        for (int j = 0; j <= i; j++) {
+          A(i, j) = arg.C(0, parity, x_cb, 2 * ch + i / fineColor, 2 * ch + j / fineColor, i % fineColor, j % fineColor);
         }
       }
 
       // invert the matrix (could replace with back/forward substitution?)
-      linalg::Cholesky<HMatrix,Float,N> cholesky(A);
+      linalg::Cholesky<HMatrix, Float, N> cholesky(A);
       const Mat Ainv = cholesky.invert();
 
-      complex<Float> AV[fineSpin/2][fineColor];
+      complex<Float> AV[fineSpin / 2][fineColor];
 #pragma unroll
-      for (int s = 0; s < fineSpin/2; s++) {
+      for (int s = 0; s < fineSpin / 2; s++) {
 #pragma unroll
-        for (int c = 0; c < fineColor; c++) {
-          AV[s][c] = static_cast<Float>(0.0);
-        }
+        for (int c = 0; c < fineColor; c++) { AV[s][c] = static_cast<Float>(0.0); }
       }
 
 #pragma unroll
-      for (int s = 0; s<fineSpin/2; s++) {  // Fine Spin
+      for (int s = 0; s < fineSpin / 2; s++) {               // Fine Spin
 
 #pragma unroll
-        for (int s_col = 0; s_col<fineSpin/2; s_col++) { // hard coded for chiral structure and spin_bs = 2
+        for (int s_col = 0; s_col < fineSpin / 2; s_col++) { // hard coded for chiral structure and spin_bs = 2
 
 #pragma unroll
-          for (int ic = 0; ic<fineColor; ic++) { //Fine Color rows of gauge field
+          for (int ic = 0; ic < fineColor; ic++) {           // Fine Color rows of gauge field
 #pragma unroll
-            for (int jc = 0; jc<fineColor; jc++) {  //Fine Color columns of gauge field
-              caxpy(Ainv(s*fineColor + ic, s_col*fineColor+jc), arg.V(parity, x_cb, 2*ch+s_col, jc, ic_c), AV[s][ic]);
-            }  //Fine color columns
-          }  //Fine color rows
+            for (int jc = 0; jc < fineColor; jc++) {         // Fine Color columns of gauge field
+              caxpy(Ainv(s * fineColor + ic, s_col * fineColor + jc), arg.V(parity, x_cb, 2 * ch + s_col, jc, ic_c),
+                  AV[s][ic]);
+            } // Fine color columns
+          }   // Fine color rows
         }
-      } //Fine Spin
+      } // Fine Spin
 
 #pragma unroll
-      for (int s=0; s<fineSpin/2; s++) {
+      for (int s = 0; s < fineSpin / 2; s++) {
 #pragma unroll
-        for (int ic=0; ic<fineColor; ic++) {
-          arg.AV(parity, x_cb, 2*ch+s, ic, ic_c) = AV[s][ic];
-        }
+        for (int ic = 0; ic < fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV[s][ic]; }
       }
 
     } // chirality
@@ -410,35 +408,36 @@ namespace quda {
      @brief Computes the clover field maximum, which is needed for
      setting the scale when using fixed point
    */
-  template<typename Float, bool twist, typename Arg>
-  __device__ __host__ inline Float computeCloverInvMax(Arg &arg, int parity, int x_cb) {
+  template <typename Float, bool twist, typename Arg>
+  __device__ __host__ inline Float computeCloverInvMax(Arg &arg, int parity, int x_cb)
+  {
 
     Float max = 0.0;
 
     constexpr int nColor = 3;
     constexpr int nSpin = 4;
-    constexpr int N = nColor*nSpin/2;
-    typedef HMatrix<Float,N> Mat;
+    constexpr int N = nColor * nSpin / 2;
+    typedef HMatrix<Float, N> Mat;
 
 #pragma unroll
-    for (int ch = 0; ch < 2; ch++) { 	/* Loop over chiral blocks */
+    for (int ch = 0; ch < 2; ch++) { /* Loop over chiral blocks */
       Mat A;
 
 #pragma unroll
-      for (int i=0; i<N; i++) {
+      for (int i = 0; i < N; i++) {
 #pragma unroll
-	for (int j=0; j<=i; j++) {
-          A(i,j) = arg.C(0, parity, x_cb, 2*ch+i/nColor, 2*ch+j/nColor, i%nColor, j%nColor);
+        for (int j = 0; j <= i; j++) {
+          A(i, j) = arg.C(0, parity, x_cb, 2 * ch + i / nColor, 2 * ch + j / nColor, i % nColor, j % nColor);
         }
       }
 
       if (twist) {
         A = A.square();
-        A += arg.mu*arg.mu;
+        A += arg.mu * arg.mu;
       }
 
       // compute the Colesky decomposition
-      linalg::Cholesky<HMatrix,Float,N> cholesky(A);
+      linalg::Cholesky<HMatrix, Float, N> cholesky(A);
 
       Mat Ainv = cholesky.invert();
 
@@ -450,26 +449,26 @@ namespace quda {
     return max;
   }
 
-  template<typename Float, bool twist, typename Arg>
-  void ComputeCloverInvMaxCPU(Arg &arg) {
+  template <typename Float, bool twist, typename Arg> void ComputeCloverInvMaxCPU(Arg &arg)
+  {
     Float max = 0.0;
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for reduction(max:max)
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-	Float max_x = computeCloverInvMax<Float,twist,Arg>(arg, parity, x_cb);
-	max = max > max_x ? max : max_x;
+        Float max_x = computeCloverInvMax<Float, twist, Arg>(arg, parity, x_cb);
+        max = max > max_x ? max : max_x;
       } // c/b volume
     }   // parity
     arg.max_h = max;
   }
 
-  template<typename Float, bool twist, typename Arg>
-  __global__ void ComputeCloverInvMaxGPU(Arg arg) {
+  template <typename Float, bool twist, typename Arg> __global__ void ComputeCloverInvMaxGPU(Arg arg)
+  {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    arg.max_d[parity+2*x_cb] = computeCloverInvMax<Float,twist,Arg>(arg, parity, x_cb);
+    arg.max_d[parity + 2 * x_cb] = computeCloverInvMax<Float, twist, Arg>(arg, parity, x_cb);
   }
 
 #endif // DYNAMIC_CLOVER
@@ -554,64 +553,62 @@ namespace quda {
 	for (int v = 0; v < coarseColor; v++)
 	  arg.AV(parity, x_cb, s, c, v) = AV[s][c][v];
 #else
-    constexpr int N = fineSpin*fineColor/2;
-    typedef HMatrix<Float,N> Mat;
+    constexpr int N = fineSpin * fineColor / 2;
+    typedef HMatrix<Float, N> Mat;
 
 #pragma unroll
     for (int ch = 0; ch < 2; ch++) { // Loop over chiral blocks
       Mat A;
 
 #pragma unroll
-      for (int i=0; i<N; i++) {
+      for (int i = 0; i < N; i++) {
 #pragma unroll
-	for (int j=0; j<=i; j++) {
-          A(i,j) = arg.C(0, parity, x_cb, 2*ch+i/fineColor, 2*ch+j/fineColor, i%fineColor, j%fineColor);
+        for (int j = 0; j <= i; j++) {
+          A(i, j) = arg.C(0, parity, x_cb, 2 * ch + i / fineColor, 2 * ch + j / fineColor, i % fineColor, j % fineColor);
         }
       }
 
       A = A.square();
-      A += arg.mu*arg.mu;
+      A += arg.mu * arg.mu;
 
       // invert the matrix (could replace with direct back/forward substitution?)
-      linalg::Cholesky<HMatrix,Float,N> cholesky(A);
+      linalg::Cholesky<HMatrix, Float, N> cholesky(A);
       const Mat Ainv = cholesky.invert();
 
-      complex<Float> AV[fineSpin/2][fineColor][coarseColor];
+      complex<Float> AV[fineSpin / 2][fineColor][coarseColor];
 #pragma unroll
-      for (int s = 0; s < fineSpin/2; s++) {
+      for (int s = 0; s < fineSpin / 2; s++) {
 #pragma unroll
         for (int c = 0; c < fineColor; c++) {
 #pragma unroll
-          for (int v = 0; v < coarseColor; c++) {
-            AV[s][c][v] = static_cast<Float>(0.0);
-          }
+          for (int v = 0; v < coarseColor; c++) { AV[s][c][v] = static_cast<Float>(0.0); }
         }
       }
 
 #pragma unroll
-      for (int s = 0; s<fineSpin/2; s++) {  // Fine Spin
+      for (int s = 0; s < fineSpin / 2; s++) {               // Fine Spin
 #pragma unroll
-        for (int s_col = 0; s_col<fineSpin/2; s_col++) { // hard coded for chiral structure and spin_bs = 2
+        for (int s_col = 0; s_col < fineSpin / 2; s_col++) { // hard coded for chiral structure and spin_bs = 2
 #pragma unroll
-          for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
+          for (int ic_c = 0; ic_c < coarseColor; ic_c++) {   // Coarse Color
 #pragma unroll
-            for (int ic = 0; ic<fineColor; ic++) { //Fine Color rows of gauge field
+            for (int ic = 0; ic < fineColor; ic++) {         // Fine Color rows of gauge field
 #pragma unroll
-              for (int jc = 0; jc<fineColor; jc++) {  //Fine Color columns of gauge field
-                caxpy(Ainv(s*fineColor + ic, s_col*fineColor+jc), UV[s_col][jc][ic_c], AV[s][ic][ic_c]);
-              }  //Fine color columns
-            }  //Fine color rows
-          } // coarse color
+              for (int jc = 0; jc < fineColor; jc++) {       // Fine Color columns of gauge field
+                caxpy(Ainv(s * fineColor + ic, s_col * fineColor + jc), UV[s_col][jc][ic_c], AV[s][ic][ic_c]);
+              } // Fine color columns
+            }   // Fine color rows
+          }     // coarse color
         }
-      } //Fine Spin
+      } // Fine Spin
 
 #pragma unroll
-      for (int s=0; s<fineSpin/2; s++) {
+      for (int s = 0; s < fineSpin / 2; s++) {
 #pragma unroll
-        for (int ic=0; ic<fineColor; ic++) {
+        for (int ic = 0; ic < fineColor; ic++) {
 #pragma unroll
-          for(int v = 0; v<coarseColor; v++) {  //Coarse Color
-            arg.AV(parity, x_cb, 2*ch+s, ic, v) = AV[s][ic][v];
+          for (int v = 0; v < coarseColor; v++) { // Coarse Color
+            arg.AV(parity, x_cb, 2 * ch + s, ic, v) = AV[s][ic][v];
           }
         }
       }

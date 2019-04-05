@@ -278,7 +278,6 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
   return mh;
 }
 
-
 void comm_free(MsgHandle *&mh)
 {
   MPI_CHECK(MPI_Request_free(&(mh->request)));

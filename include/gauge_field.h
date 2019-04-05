@@ -540,7 +540,6 @@ namespace quda {
        @brief Restores the cudaGaugeField to CUDA memory
     */
     void restore() const;
-
   };
 
   class cpuGaugeField : public GaugeField {
@@ -624,7 +623,6 @@ namespace quda {
        @brief Restores the cpuGaugeField
     */
     void restore() const;
-
   };
 
   /**

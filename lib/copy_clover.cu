@@ -188,7 +188,8 @@ namespace quda {
       } else if (in.Precision() == QUDA_HALF_PRECISION) {
 	copyClover<double,short,72>(out, in, inverse, location, (double*)Out, (short*)In, (float*)outNorm, (float*)inNorm);
       } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
-	copyClover<double,char,72>(out, in, inverse, location, (double*)Out, (char*)In, (float*)outNorm, (float*)inNorm);
+        copyClover<double, char, 72>(
+            out, in, inverse, location, (double *)Out, (char *)In, (float *)outNorm, (float *)inNorm);
       } else {
         errorQuda("Unknown precision %d", in.Precision());
       }
@@ -200,7 +201,8 @@ namespace quda {
       } else if (in.Precision() == QUDA_HALF_PRECISION) {
 	copyClover<float,short,72>(out, in, inverse, location, (float*)Out, (short*)In, (float*)outNorm, (float*)inNorm);
       } else if (in.Precision() == QUDA_HALF_PRECISION) {
-	copyClover<float,char,72>(out, in, inverse, location, (float*)Out, (char*)In, (float*)outNorm, (float*)inNorm);
+        copyClover<float, char, 72>(
+            out, in, inverse, location, (float *)Out, (char *)In, (float *)outNorm, (float *)inNorm);
       } else {
         errorQuda("Unknown precision %d", in.Precision());
       }
@@ -212,19 +214,24 @@ namespace quda {
       } else if (in.Precision() == QUDA_HALF_PRECISION) {
 	copyClover<short,short,72>(out, in, inverse, location, (short*)Out, (short*)In, (float*)outNorm, (float*)inNorm);
       } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
-	copyClover<short,char,72>(out, in, inverse, location, (short*)Out, (char*)In, (float*)outNorm, (float*)inNorm);
+        copyClover<short, char, 72>(
+            out, in, inverse, location, (short *)Out, (char *)In, (float *)outNorm, (float *)inNorm);
       } else {
         errorQuda("Unknown precision %d", in.Precision());
       }
     } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
-      if (in.Precision() == QUDA_DOUBLE_PRECISION){
-	copyClover<char,double,72>(out, in, inverse, location, (char*)Out, (double*)In, (float*)outNorm, (float*)inNorm);
+      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+        copyClover<char, double, 72>(
+            out, in, inverse, location, (char *)Out, (double *)In, (float *)outNorm, (float *)inNorm);
       } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-	copyClover<char,float,72>(out, in, inverse, location, (char*)Out, (float*)In, (float*)outNorm, (float*)inNorm);
+        copyClover<char, float, 72>(
+            out, in, inverse, location, (char *)Out, (float *)In, (float *)outNorm, (float *)inNorm);
       } else if (in.Precision() == QUDA_HALF_PRECISION) {
-	copyClover<char,short,72>(out, in, inverse, location, (char*)Out, (short*)In, (float*)outNorm, (float*)inNorm);
+        copyClover<char, short, 72>(
+            out, in, inverse, location, (char *)Out, (short *)In, (float *)outNorm, (float *)inNorm);
       } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
-	copyClover<char,char,72>(out, in, inverse, location, (char*)Out, (char*)In, (float*)outNorm, (float*)inNorm);
+        copyClover<char, char, 72>(
+            out, in, inverse, location, (char *)Out, (char *)In, (float *)outNorm, (float *)inNorm);
       } else {
         errorQuda("Unknown precision %d", in.Precision());
       }

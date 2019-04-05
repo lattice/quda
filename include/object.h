@@ -1,7 +1,7 @@
 /**
    @file object.h
 
-   @section DESCRIPTION 
+   @section DESCRIPTION
 
    Abstract parent class for all classes in QUDA.  This parent class
    defines the new/delete methods to use QUDA's memory allocators.

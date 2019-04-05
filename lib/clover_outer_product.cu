@@ -57,7 +57,7 @@ namespace quda {
     return;
   }
 
-  enum OprodKernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
+  enum OprodKernelType { OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL };
 
   template<typename Float, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
     struct CloverForceArg {
@@ -77,23 +77,21 @@ namespace quda {
       Output force;
       Float coeff;
 
-    CloverForceArg(const unsigned int parity,
-		   const unsigned int dir,
-		   const unsigned int *ghostOffset,
-		   const unsigned int displacement,
-		   const OprodKernelType kernelType,
-		   const double coeff,
-		   InputA& inA,
-		   InputB& inB_shift,
-		   InputC& inC,
-		   InputD& inD_shift,
-		   Gauge& gauge,
-		   Output& force,
-		   GaugeField &meta) : length(meta.VolumeCB()), parity(parity), dir(5),
-				       displacement(displacement), kernelType(kernelType),
-				       coeff(coeff), inA(inA), inB_shift(inB_shift),
-				       inC(inC), inD_shift(inD_shift),
-				       gauge(gauge), force(force)
+      CloverForceArg(const unsigned int parity, const unsigned int dir, const unsigned int *ghostOffset,
+          const unsigned int displacement, const OprodKernelType kernelType, const double coeff, InputA &inA,
+          InputB &inB_shift, InputC &inC, InputD &inD_shift, Gauge &gauge, Output &force, GaugeField &meta) :
+          length(meta.VolumeCB()),
+          parity(parity),
+          dir(5),
+          displacement(displacement),
+          kernelType(kernelType),
+          coeff(coeff),
+          inA(inA),
+          inB_shift(inB_shift),
+          inC(inC),
+          inD_shift(inD_shift),
+          gauge(gauge),
+          force(force)
       {
         for(int i=0; i<4; ++i) this->X[i] = meta.X()[i];
         for(int i=0; i<4; ++i) this->ghostOffset[i] = ghostOffset[i];
@@ -109,101 +107,100 @@ namespace quda {
   };
 
   template <IndexType idxType>
-  __device__ inline void coordsFromIndex(int& idx, int c[4], const unsigned int cb_idx,
-                                         const unsigned int parity, const int X[4])
-    {
-      const int &LX = X[0];
-      const int &LY = X[1];
-      const int &LZ = X[2];
-      const int XYZ = X[2]*X[1]*X[0];
-      const int XY = X[1]*X[0];
+  __device__ inline void coordsFromIndex(
+      int &idx, int c[4], const unsigned int cb_idx, const unsigned int parity, const int X[4])
+  {
+    const int &LX = X[0];
+    const int &LY = X[1];
+    const int &LZ = X[2];
+    const int XYZ = X[2] * X[1] * X[0];
+    const int XY = X[1] * X[0];
 
-      idx = 2*cb_idx;
+    idx = 2 * cb_idx;
 
-      int x, y, z, t;
+    int x, y, z, t;
 
-      if (idxType == EVEN_X /*!(LX & 1)*/) { // X even
-        //   t = idx / XYZ;
-        //   z = (idx / XY) % Z;
-        //   y = (idx / X) % Y;
-        //   idx += (parity + t + z + y) & 1;
-        //   x = idx % X;
-        // equivalent to the above, but with fewer divisions/mods:
-        int aux1 = idx / LX;
-        x = idx - aux1 * LX;
-        int aux2 = aux1 / LY;
-        y = aux1 - aux2 * LY;
-        t = aux2 / LZ;
-        z = aux2 - t * LZ;
-        aux1 = (parity + t + z + y) & 1;
-        x += aux1;
-        idx += aux1;
-      } else if (idxType == EVEN_Y /*!(LY & 1)*/) { // Y even
-        t = idx / XYZ;
-        z = (idx / XY) % LZ;
-        idx += (parity + t + z) & 1;
-        y = (idx / LX) % LY;
-        x = idx % LX;
-      } else if (idxType == EVEN_Z /*!(LZ & 1)*/) { // Z even
-        t = idx / XYZ;
-        idx += (parity + t) & 1;
-        z = (idx / XY) % LZ;
-        y = (idx / LX) % LY;
-        x = idx % LX;
-      } else {
-        idx += parity;
-        t = idx / XYZ;
-        z = (idx / XY) % LZ;
-        y = (idx / LX) % LY;
-        x = idx % LX;
-      }
+    if (idxType == EVEN_X /*!(LX & 1)*/) { // X even
+      //   t = idx / XYZ;
+      //   z = (idx / XY) % Z;
+      //   y = (idx / X) % Y;
+      //   idx += (parity + t + z + y) & 1;
+      //   x = idx % X;
+      // equivalent to the above, but with fewer divisions/mods:
+      int aux1 = idx / LX;
+      x = idx - aux1 * LX;
+      int aux2 = aux1 / LY;
+      y = aux1 - aux2 * LY;
+      t = aux2 / LZ;
+      z = aux2 - t * LZ;
+      aux1 = (parity + t + z + y) & 1;
+      x += aux1;
+      idx += aux1;
+    } else if (idxType == EVEN_Y /*!(LY & 1)*/) { // Y even
+      t = idx / XYZ;
+      z = (idx / XY) % LZ;
+      idx += (parity + t + z) & 1;
+      y = (idx / LX) % LY;
+      x = idx % LX;
+    } else if (idxType == EVEN_Z /*!(LZ & 1)*/) { // Z even
+      t = idx / XYZ;
+      idx += (parity + t) & 1;
+      z = (idx / XY) % LZ;
+      y = (idx / LX) % LY;
+      x = idx % LX;
+    } else {
+      idx += parity;
+      t = idx / XYZ;
+      z = (idx / XY) % LZ;
+      y = (idx / LX) % LY;
+      x = idx % LX;
+    }
 
-      c[0] = x;
-      c[1] = y;
-      c[2] = z;
-      c[3] = t;
+    c[0] = x;
+    c[1] = y;
+    c[2] = z;
+    c[3] = t;
     }
 
   // Get the  coordinates for the exterior kernels
-  __device__ inline void coordsFromIndexExterior(int x[4], const unsigned int cb_idx, const int X[4],
-                                                 const unsigned int dir, const int displacement,
-                                                 const unsigned int parity)
-  {
-    int Xh[2] = {X[0]/2, X[1]/2};
-    switch(dir){
-    case 0:
-      x[2] = cb_idx/Xh[1] % X[2];
-      x[3] = cb_idx/(Xh[1]*X[2]) % X[3];
-      x[0] = cb_idx/(Xh[1]*X[2]*X[3]);
-      x[0] += (X[0] - displacement);
-      x[1] = 2*(cb_idx % Xh[1]) + ((x[0]+x[2]+x[3]+parity)&1);
-      break;
+    __device__ inline void coordsFromIndexExterior(int x[4], const unsigned int cb_idx, const int X[4],
+        const unsigned int dir, const int displacement, const unsigned int parity)
+    {
+      int Xh[2] = {X[0] / 2, X[1] / 2};
+      switch (dir) {
+      case 0:
+        x[2] = cb_idx / Xh[1] % X[2];
+        x[3] = cb_idx / (Xh[1] * X[2]) % X[3];
+        x[0] = cb_idx / (Xh[1] * X[2] * X[3]);
+        x[0] += (X[0] - displacement);
+        x[1] = 2 * (cb_idx % Xh[1]) + ((x[0] + x[2] + x[3] + parity) & 1);
+        break;
 
-    case 1:
-      x[2] = cb_idx/Xh[0] % X[2];
-      x[3] = cb_idx/(Xh[0]*X[2]) % X[3];
-      x[1] = cb_idx/(Xh[0]*X[2]*X[3]);
-      x[1] += (X[1] - displacement);
-      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
-      break;
+      case 1:
+        x[2] = cb_idx / Xh[0] % X[2];
+        x[3] = cb_idx / (Xh[0] * X[2]) % X[3];
+        x[1] = cb_idx / (Xh[0] * X[2] * X[3]);
+        x[1] += (X[1] - displacement);
+        x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+        break;
 
-    case 2:
-      x[1] = cb_idx/Xh[0] % X[1];
-      x[3] = cb_idx/(Xh[0]*X[1]) % X[3];
-      x[2] = cb_idx/(Xh[0]*X[1]*X[3]);
-      x[2] += (X[2] - displacement);
-      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
-      break;
+      case 2:
+        x[1] = cb_idx / Xh[0] % X[1];
+        x[3] = cb_idx / (Xh[0] * X[1]) % X[3];
+        x[2] = cb_idx / (Xh[0] * X[1] * X[3]);
+        x[2] += (X[2] - displacement);
+        x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+        break;
 
-    case 3:
-      x[1] = cb_idx/Xh[0] % X[1];
-      x[2] = cb_idx/(Xh[0]*X[1]) % X[2];
-      x[3] = cb_idx/(Xh[0]*X[1]*X[2]);
-      x[3] += (X[3] - displacement);
-      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
-      break;
-    }
-    return;
+      case 3:
+        x[1] = cb_idx / Xh[0] % X[1];
+        x[2] = cb_idx / (Xh[0] * X[1]) % X[2];
+        x[3] = cb_idx / (Xh[0] * X[1] * X[2]);
+        x[3] += (X[3] - displacement);
+        x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+        break;
+      }
+      return;
   }
 
 
@@ -335,14 +332,15 @@ namespace quda {
 
 	if(arg.kernelType == OPROD_INTERIOR_KERNEL){
 	  interiorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	} else if (arg.kernelType == OPROD_EXTERIOR_KERNEL) {
-	       if (arg.dir == 0) exteriorOprodKernel<0><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+        } else if (arg.kernelType == OPROD_EXTERIOR_KERNEL) {
+          if (arg.dir == 0)
+            exteriorOprodKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  else if (arg.dir == 1) exteriorOprodKernel<1><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
 	  else if (arg.dir == 2) exteriorOprodKernel<2><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
 	  else if (arg.dir == 3) exteriorOprodKernel<3><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
-	} else {
-	  errorQuda("Kernel type not supported\n");
-	}
+        } else {
+          errorQuda("Kernel type not supported\n");
+        }
       }else{ // run the CPU code
 	errorQuda("No CPU support for staggered outer-product calculation\n");
       }
@@ -464,12 +462,9 @@ namespace quda {
 
 #endif // GPU_CLOVER_DIRAC
 
-  void computeCloverForce(GaugeField& force,
-			  const GaugeField& U,
-			  std::vector<ColorSpinorField*> &x,
-			  std::vector<ColorSpinorField*> &p,
-			  std::vector<double> &coeff)
-  {
+    void computeCloverForce(GaugeField &force, const GaugeField &U, std::vector<ColorSpinorField *> &x,
+        std::vector<ColorSpinorField *> &p, std::vector<double> &coeff)
+    {
 
 #ifdef GPU_CLOVER_DIRAC
     if(force.Order() != QUDA_FLOAT2_GAUGE_ORDER)
