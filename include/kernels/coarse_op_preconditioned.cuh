@@ -38,7 +38,7 @@ namespace quda {
     int coord[nDim];
     getCoords(coord, x_cb, arg.dim, parity);
 
-    const int ghost_idx = ghostFaceIndex<0,nDim>(coord, arg.dim, d, arg.nFace);
+    const int ghost_idx = ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace);
 
     // first do the backwards links Y^{+\mu} * X^{-\dagger}
     if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {

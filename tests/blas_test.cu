@@ -72,7 +72,7 @@ void display_test_info()
 int Nprec = 4;
 
 bool skip_kernel(int precision, int kernel) {
-  if ( (QUDA_PRECISION & getPrecision(precision)) == 0 ) return true;
+  if ((QUDA_PRECISION & getPrecision(precision)) == 0) return true;
 
   // if we've selected a given kernel then make sure we only run that
   if (test_type != -1 && kernel != test_type) return true;
@@ -739,7 +739,8 @@ double test(int kernel) {
     *yD = *yH;
     { double3 d = blas::cDotProductNormA(*xD, *yD);
       double3 h = blas::cDotProductNormA(*xH, *yH);
-      error = abs(Complex(d.x-h.x, d.y-h.y)) / abs(Complex(h.x, h.y)) + fabs(d.z - h.z) / fabs(h.z); }
+      error = abs(Complex(d.x - h.x, d.y - h.y)) / abs(Complex(h.x, h.y)) + fabs(d.z - h.z) / fabs(h.z);
+    }
     break;
 
   case 27:
@@ -747,7 +748,8 @@ double test(int kernel) {
     *yD = *yH;
     { double3 d = blas::cDotProductNormB(*xD, *yD);
       double3 h = blas::cDotProductNormB(*xH, *yH);
-      error = abs(Complex(d.x-h.x, d.y-h.y)) / abs(Complex(h.x, h.y)) + fabs(d.z - h.z) / fabs(h.z); }
+      error = abs(Complex(d.x - h.x, d.y - h.y)) / abs(Complex(h.x, h.y)) + fabs(d.z - h.z) / fabs(h.z);
+    }
     break;
 
   case 28:
@@ -758,8 +760,9 @@ double test(int kernel) {
     *vD = *vH;
     { double3 d = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zD, *wD, *vD);
       double3 h = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xH, b2, *yH, *zH, *wH, *vH);
-      error = ERROR(z) + ERROR(y) + abs(Complex(d.x-h.x, d.y-h.y)) / abs(Complex(h.x, h.y))
-        + fabs(d.z - h.z) / fabs(h.z); }
+      error = ERROR(z) + ERROR(y) + abs(Complex(d.x - h.x, d.y - h.y)) / abs(Complex(h.x, h.y))
+          + fabs(d.z - h.z) / fabs(h.z);
+    }
     break;
 
   case 29:
@@ -992,11 +995,8 @@ int main(int argc, char** argv)
 
   // lastly check for correctness
   if (verify_results) {
-    ::testing::TestEventListeners& listeners =
-      ::testing::UnitTest::GetInstance()->listeners();
-    if (comm_rank() != 0) {
-      delete listeners.Release(listeners.default_result_printer());
-    }
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   }
 
@@ -1032,13 +1032,13 @@ public:
 TEST_P(BlasTest, verify) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
-  if (skip_kernel(prec,kernel)) GTEST_SKIP();
+  if (skip_kernel(prec, kernel)) GTEST_SKIP();
 
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
   double deviation = test(kernel);
   // printfQuda("%-35s error = %e\n", names[kernel], deviation);
-  double tol = (prec == 3 ? 1e-12 : (prec == 2 ? 1e-6 : (prec == 1 ? 1e-4 : 1e-2 )));
+  double tol = (prec == 3 ? 1e-12 : (prec == 2 ? 1e-6 : (prec == 1 ? 1e-4 : 1e-2)));
   tol = (kernel < 4) ? 5e-2 : tol; // use different tolerance for copy
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
@@ -1046,7 +1046,7 @@ TEST_P(BlasTest, verify) {
 TEST_P(BlasTest, benchmark) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
-  if (skip_kernel(prec,kernel)) GTEST_SKIP();
+  if (skip_kernel(prec, kernel)) GTEST_SKIP();
 
   // do the initial tune
   benchmark(kernel, 1);
@@ -1070,8 +1070,8 @@ std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int>> param
   std::string str(names[kernel]);
   str += std::string("_");
   str += std::string(prec_str[prec]);
-  return str;//names[kernel] + "_" + prec_str[prec];
+  return str; // names[kernel] + "_" + prec_str[prec];
 }
 
 // instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine( Range(0,4), Range(0, Nkernels) ), getblasname);
+INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, 4), Range(0, Nkernels)), getblasname);

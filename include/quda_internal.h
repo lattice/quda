@@ -58,13 +58,27 @@ namespace quda {
   template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
   template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
 
-  template< typename T > struct fixedInvMaxValue{ static constexpr float value = 3.402823e+38f; };
-  template<> struct fixedInvMaxValue<short>{ static constexpr float value = 3.0518509476e-5f; };
-  template<> struct fixedInvMaxValue<short2>{ static constexpr float value = 3.0518509476e-5f; };
-  template<> struct fixedInvMaxValue<short4>{ static constexpr float value = 3.0518509476e-5f; };
-  template<> struct fixedInvMaxValue<char>{ static constexpr float value = 7.874015748031e-3f; };
-  template<> struct fixedInvMaxValue<char2>{ static constexpr float value = 7.874015748031e-3f; };
-  template<> struct fixedInvMaxValue<char4>{ static constexpr float value = 7.874015748031e-3f; };
+  template <typename T> struct fixedInvMaxValue {
+    static constexpr float value = 3.402823e+38f;
+  };
+  template <> struct fixedInvMaxValue<short> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<short2> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<short4> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<char> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+  template <> struct fixedInvMaxValue<char2> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+  template <> struct fixedInvMaxValue<char4> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
 
   const int Nstream = 9;
 

@@ -13,10 +13,10 @@ namespace quda {
 
 #ifdef GPU_CLOVER_DIRAC
 
-  template<typename Float, typename Arg>
-  class CloverSigmaOprod : public TunableVectorYZ {
+  template <typename Float, typename Arg> class CloverSigmaOprod : public TunableVectorYZ
+  {
 
-  private:
+private:
     Arg &arg;
     const GaugeField &meta;
 
@@ -27,65 +27,69 @@ namespace quda {
     bool tuneGridDim() const { return false; }
 
   public:
-    CloverSigmaOprod(Arg &arg, const GaugeField &meta)
-      : TunableVectorYZ(2,6), arg(arg), meta(meta) {
-      writeAuxString("prec=%lu,stride=%d,nvector=%d", sizeof(Float), arg.inA[0].Stride(), arg.nvector);
-      // this sets the communications pattern for the packing kernel
+      CloverSigmaOprod(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2, 6), arg(arg), meta(meta)
+      {
+        writeAuxString("prec=%lu,stride=%d,nvector=%d", sizeof(Float), arg.inA[0].Stride(), arg.nvector);
+        // this sets the communications pattern for the packing kernel
 #ifdef JITIFY
-      create_jitify_program("kernels/clover_sigma_outer_product.cuh");
+        create_jitify_program("kernels/clover_sigma_outer_product.cuh");
 #endif
-    }
-
-    virtual ~CloverSigmaOprod() {}
-
-    void apply(const cudaStream_t &stream){
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	TuneParam tp = tuneLaunch(*this,getTuning(),getVerbosity());
-#ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel("quda::sigmaOprodKernel")
-          .instantiate(arg.nvector,Type<Float>(),Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-	switch(arg.nvector) {
-	case 1: sigmaOprodKernel<1,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	case 2: sigmaOprodKernel<2,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	case 3: sigmaOprodKernel<3,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	case 4: sigmaOprodKernel<4,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	case 5: sigmaOprodKernel<5,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	case 6: sigmaOprodKernel<6,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	case 7: sigmaOprodKernel<7,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	case 8: sigmaOprodKernel<8,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	case 9: sigmaOprodKernel<9,Float><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
-	}
-#endif
-      } else { // run the CPU code
-	errorQuda("No CPU support for staggered outer-product calculation\n");
       }
-    } // apply
 
-    void preTune() { this->arg.oprod.save(); }
-    void postTune() { this->arg.oprod.load(); }
+      virtual ~CloverSigmaOprod() {}
 
-    long long flops() const {
-      return (2*(long long)arg.length)*6*((0 + 144 + 18)*arg.nvector + 18); // spin_mu_nu + spin trace + multiply-add
-    }
-    long long bytes() const {
-      return (2*(long long)arg.length)*6*((arg.inA[0].Bytes() + arg.inB[0].Bytes())*arg.nvector + 2*arg.oprod.Bytes());
-    }
+      void apply(const cudaStream_t &stream)
+      {
+        if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+#ifdef JITIFY
+          using namespace jitify::reflection;
+          jitify_error = program->kernel("quda::sigmaOprodKernel")
+                             .instantiate(arg.nvector, Type<Float>(), Type<Arg>())
+                             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                             .launch(arg);
+#else
+          switch (arg.nvector) {
+          case 1: sigmaOprodKernel<1, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 2: sigmaOprodKernel<2, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 3: sigmaOprodKernel<3, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 4: sigmaOprodKernel<4, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 5: sigmaOprodKernel<5, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 6: sigmaOprodKernel<6, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 7: sigmaOprodKernel<7, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 8: sigmaOprodKernel<8, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 9: sigmaOprodKernel<9, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          }
+#endif
+        } else { // run the CPU code
+          errorQuda("No CPU support for staggered outer-product calculation\n");
+        }
+      } // apply
 
-    TuneKey tuneKey() const {
-      return TuneKey(meta.VolString(), "CloverSigmaOprod", aux);
-    }
+      void preTune() { this->arg.oprod.save(); }
+      void postTune() { this->arg.oprod.load(); }
+
+      long long flops() const
+      {
+        return (2 * (long long)arg.length) * 6
+            * ((0 + 144 + 18) * arg.nvector + 18); // spin_mu_nu + spin trace + multiply-add
+      }
+      long long bytes() const
+      {
+        return (2 * (long long)arg.length) * 6
+            * ((arg.inA[0].Bytes() + arg.inB[0].Bytes()) * arg.nvector + 2 * arg.oprod.Bytes());
+      }
+
+      TuneKey tuneKey() const { return TuneKey(meta.VolString(), "CloverSigmaOprod", aux); }
   }; // CloverSigmaOprod
 
   template<typename Float, typename Output, typename InputA, typename InputB>
   void computeCloverSigmaOprod(Output oprod, const GaugeField& out, InputA *inA, InputB *inB,
 			       std::vector<std::vector<double> > &coeff, int nvector) {
     // Create the arguments
-    typedef CloverSigmaOprodArg<Float,Output,InputA,InputB> Arg;
+    typedef CloverSigmaOprodArg<Float, Output, InputA, InputB> Arg;
     Arg arg(oprod, inA, inB, coeff, out, nvector);
-    CloverSigmaOprod<Float,Arg> sigma_oprod(arg, out);
+    CloverSigmaOprod<Float, Arg> sigma_oprod(arg, out);
     sigma_oprod.apply(0);
   } // computeCloverSigmaOprod
 
@@ -119,8 +123,7 @@ namespace quda {
       return;
     }
 
-    if(oprod.Order() != QUDA_FLOAT2_GAUGE_ORDER)
-      errorQuda("Unsupported output ordering: %d\n", oprod.Order());
+    if (oprod.Order() != QUDA_FLOAT2_GAUGE_ORDER) errorQuda("Unsupported output ordering: %d\n", oprod.Order());
 
     if(x[0]->Precision() != oprod.Precision())
       errorQuda("Mixed precision not supported: %d %d\n", x[0]->Precision(), oprod.Precision());

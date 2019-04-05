@@ -32,7 +32,7 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, T &dslashParam)
 #endif
 }
 
-void unbindGaugeTex(const cudaGaugeField &gauge) { }
+void unbindGaugeTex(const cudaGaugeField &gauge) {}
 
 template <typename T>
 void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, T &dslashParam)
@@ -51,7 +51,7 @@ void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, T &dslashPar
 #endif // USE_TEXTURE_OBJECTS
 }
 
-void unbindFatGaugeTex(const cudaGaugeField &gauge) { }
+void unbindFatGaugeTex(const cudaGaugeField &gauge) {}
 
 template <typename T>
 void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, T &dslashParam)
@@ -78,7 +78,7 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, T &dslashPa
 #endif // USE_TEXTURE_OBJECTS
 }
 
-void unbindLongGaugeTex(const cudaGaugeField &gauge) { }
+void unbindLongGaugeTex(const cudaGaugeField &gauge) {}
 
 template <typename spinorFloat>
 int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *out=0,
@@ -90,8 +90,10 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
 }
 
 template <typename spinorFloat>
-void unbindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *out=0,
-		     const cudaColorSpinorField *x=0) { }
+void unbindSpinorTex(
+    const cudaColorSpinorField *in, const cudaColorSpinorField *out = 0, const cudaColorSpinorField *x = 0)
+{
+}
 
 template <typename T>
 QudaPrecision bindCloverTex(const FullClover &clover, const int oddBit, T &dslashParam)
@@ -112,7 +114,7 @@ QudaPrecision bindCloverTex(const FullClover &clover, const int oddBit, T &dslas
   return clover.precision;
 }
 
-void unbindCloverTex(const FullClover clover) { }
+void unbindCloverTex(const FullClover clover) {}
 
 template <typename T>
 QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover cloverInv, const int oddBit, T &dslashParam)
@@ -145,7 +147,7 @@ QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover clo
   return clover.precision;
 }
 
-void unbindTwistedCloverTex(const FullClover clover) { }
+void unbindTwistedCloverTex(const FullClover clover) {}
 
 // define some function if we're not using textures (direct access)
 #if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \

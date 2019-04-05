@@ -181,12 +181,15 @@ void printQudaEigParam(QudaEigParam *param) {
 
 // define the appropriate function for clover subset from InvertParam
 #if defined INIT_PARAM
-void newQudaCloverParam(QudaInvertParam *param) {
+void newQudaCloverParam(QudaInvertParam *param)
+{
   QudaInvertParam &ret = *param;
 #elif defined CHECK_PARAM
-static void checkCloverParam(QudaInvertParam *param) {
+static void checkCloverParam(QudaInvertParam *param)
+{
 #else
-void printQudaCloverParam(QudaInvertParam *param) {
+void printQudaCloverParam(QudaInvertParam *param)
+{
 #endif
 
 #if defined INIT_PARAM
@@ -196,8 +199,7 @@ void printQudaCloverParam(QudaInvertParam *param) {
 #endif
 
 #ifndef INIT_PARAM
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
-      param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
 #endif
     P(clover_cpu_prec, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec, QUDA_INVALID_PRECISION);
@@ -207,12 +209,12 @@ void printQudaCloverParam(QudaInvertParam *param) {
     P(clover_cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
 #else
-    if (param->clover_cuda_prec_sloppy == QUDA_INVALID_PRECISION)
-      param->clover_cuda_prec_sloppy = param->clover_cuda_prec;
-    if (param->clover_cuda_prec_refinement_sloppy == QUDA_INVALID_PRECISION)
-      param->clover_cuda_prec_refinement_sloppy = param->clover_cuda_prec_sloppy;
-    if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
-      param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
+  if (param->clover_cuda_prec_sloppy == QUDA_INVALID_PRECISION)
+    param->clover_cuda_prec_sloppy = param->clover_cuda_prec;
+  if (param->clover_cuda_prec_refinement_sloppy == QUDA_INVALID_PRECISION)
+    param->clover_cuda_prec_refinement_sloppy = param->clover_cuda_prec_sloppy;
+  if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
+    param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
 #endif
 
 #ifdef INIT_PARAM
@@ -223,12 +225,12 @@ void printQudaCloverParam(QudaInvertParam *param) {
     P(return_clover_inverse, 0);
     P(clover_rho, 0.0);
 #else
-    P(compute_clover_trlog, QUDA_INVALID_PRECISION);
-    P(compute_clover, QUDA_INVALID_PRECISION);
-    P(compute_clover_inverse, QUDA_INVALID_PRECISION);
-    P(return_clover, QUDA_INVALID_PRECISION);
-    P(return_clover_inverse, QUDA_INVALID_PRECISION);
-    P(clover_rho, INVALID_DOUBLE);
+  P(compute_clover_trlog, QUDA_INVALID_PRECISION);
+  P(compute_clover, QUDA_INVALID_PRECISION);
+  P(compute_clover_inverse, QUDA_INVALID_PRECISION);
+  P(return_clover, QUDA_INVALID_PRECISION);
+  P(return_clover_inverse, QUDA_INVALID_PRECISION);
+  P(clover_rho, INVALID_DOUBLE);
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
     P(cl_pad, INVALID_INT);
@@ -265,11 +267,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(laplace3D, INVALID_INT);
 #else
   // asqtad and domain wall use mass parameterization
-  if (param->dslash_type == QUDA_STAGGERED_DSLASH ||
-      param->dslash_type == QUDA_ASQTAD_DSLASH ||
-      param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+  if (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH
+      || param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     P(mass, INVALID_DOUBLE);
   } else { // Wilson and clover use kappa parameterization
     P(kappa, INVALID_DOUBLE);
@@ -439,9 +439,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(schwarz_type, QUDA_ADDITIVE_SCHWARZ); // defaults match previous interface behaviour
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
-  if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER ||
-      param->inv_type_precondition == QUDA_CG_INVERTER ||
-      param->inv_type_precondition == QUDA_MR_INVERTER) {
+  if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
+      || param->inv_type_precondition == QUDA_MR_INVERTER) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
@@ -468,7 +467,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #else
   printQudaCloverParam(param);
 #endif
-
 
 #ifdef INIT_PARAM
   P(ca_basis, QUDA_POWER_BASIS);

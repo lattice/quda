@@ -1,6 +1,5 @@
 #ifndef USE_LEGACY_DSLASH
 
-
 #include <dslash.h>
 #include <worker.h>
 #include <dslash_helper.cuh>
@@ -39,7 +38,12 @@ protected:
     const ColorSpinorField &in;
 
 public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"), arg(arg), in(in) {}
+    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+        Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
+        arg(arg),
+        in(in)
+    {
+    }
 
     virtual ~Staggered() {}
 
@@ -54,34 +58,62 @@ public:
       }
     }
 
-    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
+    TuneKey tuneKey() const
+    {
+      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+    }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon_u>
-  struct StaggeredApply {
+  template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
 
-    inline StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,  const ColorSpinorField &x,
-                          int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+    inline StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
       constexpr bool improved = false;
-      StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved> arg(out, in, U, U, a, x, parity, dagger, comm_override);
-      Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(), in.GhostFaceCB(), profile);
-      policy.apply(0);
+      if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
+#ifdef BUILD_MILC_INTERFACE
+        StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
+            out, in, U, U, a, x, parity, dagger, comm_override);
+        Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
+
+        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered,
+            const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+            in.GhostFaceCB(), profile);
+        policy.apply(0);
+#else
+        errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
+#endif
+      } else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+#ifdef BUILD_TIFR_INTERFACE
+        StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
+            out, in, U, U, a, x, parity, dagger, comm_override);
+        Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
+
+        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered,
+            const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+            in.GhostFaceCB(), profile);
+        policy.apply(0);
+#else
+        errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
+#endif
+      } else {
+        errorQuda("Unsupported staggered phase type %d", U.StaggeredPhase());
+      }
 
       checkCudaError();
     }
   };
 
-  void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, const ColorSpinorField &x,
-                      int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 
 #ifdef GPU_STAGGERED_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder()) errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
+    if (in.FieldOrder() != out.FieldOrder())
+      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
 
     // check all precisions match
     checkPrecision(out, in, U);
@@ -89,7 +121,7 @@ public:
     // check all locations match
     checkLocation(out, in, U);
 
-    instantiate<StaggeredApply,StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
+    instantiate<StaggeredApply, StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Staggered dslash has not been built");
 #endif

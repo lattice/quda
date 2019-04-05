@@ -189,7 +189,8 @@ namespace quda {
       dslash = new CloverDslashCuda<short4, short4, short4>(out, gauge, cloverInv, in, x, a, parity, dagger, commOverride);
     }
 
-    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(
+        *dslash, const_cast<cudaColorSpinorField *>(in), in->Volume(), in->GhostFace(), profile);
     dslash_policy.apply(0);
 
     delete dslash;

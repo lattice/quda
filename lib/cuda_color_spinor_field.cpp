@@ -12,10 +12,14 @@ int zeroCopy = 0;
 
 namespace quda {
 
-  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
-    ColorSpinorField(param), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
+  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) :
+      ColorSpinorField(param),
+      alloc(false),
+      init(true),
+      texInit(false),
+      ghostTexInit(false),
+      ghost_precision_tex(QUDA_INVALID_PRECISION),
+      ghost_field_tex {nullptr, nullptr, nullptr, nullptr}
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -36,21 +40,28 @@ namespace quda {
     }
   }
 
-  cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
-    ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
+  cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) :
+      ColorSpinorField(src),
+      alloc(false),
+      init(true),
+      texInit(false),
+      ghostTexInit(false),
+      ghost_precision_tex(QUDA_INVALID_PRECISION),
+      ghost_field_tex {nullptr, nullptr, nullptr, nullptr}
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
   }
 
   // creates a copy of src, any differences defined in param
-  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
-					     const ColorSpinorParam &param) :
-    ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-    ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
+  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
+      ColorSpinorField(src),
+      alloc(false),
+      init(true),
+      texInit(false),
+      ghostTexInit(false),
+      ghost_precision_tex(QUDA_INVALID_PRECISION),
+      ghost_field_tex {nullptr, nullptr, nullptr, nullptr}
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -96,10 +107,14 @@ namespace quda {
 
   }
 
-  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
-    : ColorSpinorField(src), alloc(false), init(true), texInit(false),
-      ghostTexInit(false), ghost_precision_tex(QUDA_INVALID_PRECISION),
-      ghost_field_tex{nullptr,nullptr,nullptr,nullptr}
+  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) :
+      ColorSpinorField(src),
+      alloc(false),
+      init(true),
+      texInit(false),
+      ghostTexInit(false),
+      ghost_precision_tex(QUDA_INVALID_PRECISION),
+      ghost_field_tex {nullptr, nullptr, nullptr, nullptr}
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -514,7 +529,8 @@ namespace quda {
     backed_up = true;
   }
 
-  void cudaColorSpinorField::restore() const {
+  void cudaColorSpinorField::restore() const
+  {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
     cudaMemcpy(v, backup_h, bytes, cudaMemcpyHostToDevice);
     delete []backup_h;
@@ -676,7 +692,7 @@ namespace quda {
         if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dest_d, v);
       } else {
-        void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr;
+        void *dst = nullptr, *dstNorm = nullptr, *buffer = nullptr;
         if (!zeroCopy) {
           buffer = pool_device_malloc(dest.Bytes()+dest.NormBytes());
           dst = buffer;
@@ -714,11 +730,9 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
     // ghost texture is per object
-    if (ghost_field_tex[0] != ghost_recv_buffer_d[0] ||
-        ghost_field_tex[1] != ghost_recv_buffer_d[1] ||
-        ghost_field_tex[2] != ghost_pinned_recv_buffer_hd[0] ||
-        ghost_field_tex[3] != ghost_pinned_recv_buffer_hd[1] ||
-        ghost_precision_reset)
+    if (ghost_field_tex[0] != ghost_recv_buffer_d[0] || ghost_field_tex[1] != ghost_recv_buffer_d[1]
+        || ghost_field_tex[2] != ghost_pinned_recv_buffer_hd[0] || ghost_field_tex[3] != ghost_pinned_recv_buffer_hd[1]
+        || ghost_precision_reset)
       destroyGhostTexObject();
     if (!ghostTexInit) createGhostTexObject();
 #endif
@@ -784,7 +798,7 @@ namespace quda {
       const int Npad = Nint / Nvec; // number Nvec buffers we have
       const int nParity = siteSubset;
       const int x4 = nDim==5 ? x[4] : 1;
-      const int Nt_minus1_offset = (volumeCB - nFace*ghostFaceCB[3])/x4; // N_t-1 = Vh-Vsh
+      const int Nt_minus1_offset = (volumeCB - nFace * ghostFaceCB[3]) / x4; // N_t-1 = Vh-Vsh
 
       int offset = 0;
       if (nSpin == 1) {
@@ -798,8 +812,8 @@ namespace quda {
 	if (upper) offset = (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
 	else offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
       }
-    
-      size_t len = nFace*(ghostFaceCB[3]/x4)*Nvec*ghost_precision;
+
+      size_t len = nFace * (ghostFaceCB[3] / x4) * Nvec * ghost_precision;
       size_t dpitch = x4*len;
       size_t spitch = stride*Nvec*ghost_precision;
 
@@ -808,24 +822,23 @@ namespace quda {
       //  -- Each Pad has size Nvec*Vsh Floats. 
       //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
 
-      for (int parity = 0; parity<nParity; parity++) {
-        for (int s=0; s<x4; s++) { // loop over multiple 4-d volumes (if they exist)
-          void *dst = (char*)ghost_spinor + s*len + parity*nFace*Nint*ghostFaceCB[3]*ghost_precision;
-          void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*ghost_precision + parity*bytes/2;
+      for (int parity = 0; parity < nParity; parity++) {
+        for (int s = 0; s < x4; s++) { // loop over multiple 4-d volumes (if they exist)
+          void *dst = (char *)ghost_spinor + s * len + parity * nFace * Nint * ghostFaceCB[3] * ghost_precision;
+          void *src = (char *)v + (offset + s * (volumeCB / x4)) * Nvec * ghost_precision + parity * bytes / 2;
           qudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
           // we can probably issue this as a single cudaMemcpy2d along the fifth dimension
           if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-            size_t len = nFace*(ghostFaceCB[3]/x4)*sizeof(float);
-            int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
-            void *dst = (char*)ghost_spinor + nParity*nFace*Nint*ghostFaceCB[3]*ghost_precision
-              + s*len + parity*nFace*ghostFaceCB[3]*sizeof(float);
-            void *src = (char*)norm + norm_offset + s*(volumeCB/x4)*sizeof(float) + parity*norm_bytes/2;
+            size_t len = nFace * (ghostFaceCB[3] / x4) * sizeof(float);
+            int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset * sizeof(float);
+            void *dst = (char *)ghost_spinor + nParity * nFace * Nint * ghostFaceCB[3] * ghost_precision + s * len
+                + parity * nFace * ghostFaceCB[3] * sizeof(float);
+            void *src = (char *)norm + norm_offset + s * (volumeCB / x4) * sizeof(float) + parity * norm_bytes / 2;
             qudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
           }
         } // fifth dimension
-      } // parity
-
+      }   // parity
     }
 
     if (precision != ghost_precision) { popKernelPackT(); }
@@ -876,11 +889,11 @@ namespace quda {
 
     // ascertain if this instance needs its comms buffers to be updated
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
-      (my_face_h[0] != ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != ghost_pinned_send_buffer_h[1]) ||
-      (from_face_h[0] != ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != ghost_pinned_recv_buffer_h[1]) ||
-      (my_face_d[0] != ghost_send_buffer_d[0]) || (my_face_d[1] != ghost_send_buffer_d[1]) ||     // send buffers
-      (from_face_d[0] != ghost_recv_buffer_d[0]) || (from_face_d[1] != ghost_recv_buffer_d[1]) || // receive buffers
-      ghost_precision_reset; // ghost_precision has changed
+        (my_face_h[0] != ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != ghost_pinned_send_buffer_h[1])
+        || (from_face_h[0] != ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != ghost_pinned_recv_buffer_h[1])
+        || (my_face_d[0] != ghost_send_buffer_d[0]) || (my_face_d[1] != ghost_send_buffer_d[1]) ||  // send buffers
+        (from_face_d[0] != ghost_recv_buffer_d[0]) || (from_face_d[1] != ghost_recv_buffer_d[1]) || // receive buffers
+        ghost_precision_reset; // ghost_precision has changed
 
     if (!initComms || comms_reset) {
 
@@ -1032,7 +1045,7 @@ namespace quda {
 
           const int nParity = siteSubset;
           const int x4 = nDim==5 ? x[4] : 1;
-          const int Nt_minus_offset = (volumeCB - nFace*ghostFaceCB[3])/x4;
+          const int Nt_minus_offset = (volumeCB - nFace * ghostFaceCB[3]) / x4;
 
           int offset = 0;
           if (nSpin == 1) {
@@ -1043,32 +1056,34 @@ namespace quda {
             bool upper = dagger ? true : false;
             if (dir == 1) upper = !upper;
             int lower_spin_offset = Npad*stride;
-            if (upper) offset = (dir == 0 ? 0 : Nt_minus_offset);
-            else offset = lower_spin_offset + (dir == 0 ? 0 : Nt_minus_offset);
+            if (upper)
+              offset = (dir == 0 ? 0 : Nt_minus_offset);
+            else
+              offset = lower_spin_offset + (dir == 0 ? 0 : Nt_minus_offset);
           }
 
-          size_t len = nFace*(ghostFaceCB[3]/x4)*Nvec*ghost_precision;
+          size_t len = nFace * (ghostFaceCB[3] / x4) * Nvec * ghost_precision;
           size_t dpitch = x4*len;
           size_t spitch = stride*Nvec*ghost_precision;
 
-          for (int parity = 0; parity<nParity; parity++) {
-            for (int s=0; s<x4; s++) {
-              void *dst = (char*)ghost_dst + s*len + parity*nFace*Nint*ghostFaceCB[3]*ghost_precision;
-              void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*ghost_precision + parity*bytes/2;
+          for (int parity = 0; parity < nParity; parity++) {
+            for (int s = 0; s < x4; s++) {
+              void *dst = (char *)ghost_dst + s * len + parity * nFace * Nint * ghostFaceCB[3] * ghost_precision;
+              void *src = (char *)v + (offset + s * (volumeCB / x4)) * Nvec * ghost_precision + parity * bytes / 2;
               // start the copy
               cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
               // we can probably issue this as a single cudaMemcpy2d along the fifth dimension
               if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-                size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
-                int norm_offset = (dir == 0) ? 0 : Nt_minus_offset*sizeof(float);
-                void *dst = (char*)ghost_norm_dst + s*len + parity*nFace*ghostFaceCB[3]*sizeof(float);
-                void *src = (char*)norm + norm_offset + s*(volumeCB/x4)*sizeof(float) + parity*norm_bytes/2;
+                size_t len = nFace * (ghostFace[3] / x4) * sizeof(float);
+                int norm_offset = (dir == 0) ? 0 : Nt_minus_offset * sizeof(float);
+                void *dst = (char *)ghost_norm_dst + s * len + parity * nFace * ghostFaceCB[3] * sizeof(float);
+                void *src = (char *)norm + norm_offset + s * (volumeCB / x4) * sizeof(float) + parity * norm_bytes / 2;
                 cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
               }
             }
           } // fifth dimension
-        } // parity
+        }   // parity
       } // remote_write
 
       if (ghost_precision != precision) popKernelPackT();
@@ -1513,6 +1528,6 @@ namespace quda {
     *this = tmp;
   }
 
-  void cudaColorSpinorField::PrintVector(unsigned int i) const { genericCudaPrintVector(*this,i); }
+  void cudaColorSpinorField::PrintVector(unsigned int i) const { genericCudaPrintVector(*this, i); }
 
 } // namespace quda

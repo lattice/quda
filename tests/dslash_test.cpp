@@ -78,13 +78,14 @@ extern double epsilon;
 
 extern QudaVerbosity verbosity;
 
-double getTolerance(QudaPrecision prec) {
+double getTolerance(QudaPrecision prec)
+{
   switch (prec) {
-    case QUDA_QUARTER_PRECISION: return 5e-2;
-    case QUDA_HALF_PRECISION: return 1e-3;
-    case QUDA_SINGLE_PRECISION: return 1e-4;
-    case QUDA_DOUBLE_PRECISION: return 1e-11;
-    case QUDA_INVALID_PRECISION: return 1.0;
+  case QUDA_QUARTER_PRECISION: return 5e-2;
+  case QUDA_HALF_PRECISION: return 1e-3;
+  case QUDA_SINGLE_PRECISION: return 1e-4;
+  case QUDA_DOUBLE_PRECISION: return 1e-11;
+  case QUDA_INVALID_PRECISION: return 1.0;
   }
   return 1.0;
 }
@@ -141,8 +142,8 @@ void init(int argc, char **argv) {
     {
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 1.50;// + 0.5*k;
-      inv_param.c_5[k] = 0.50;// - 0.5*k;
+      inv_param.b_5[k] = 1.50; // + 0.5*k;
+      inv_param.c_5[k] = 0.50; // - 0.5*k;
     }
   }
 
@@ -193,15 +194,9 @@ void init(int argc, char **argv) {
       case 3:
         inv_param.solution_type = QUDA_MATPC_SOLUTION;
         break;
-      case 4:
-        inv_param.solution_type = QUDA_MAT_SOLUTION;
-        break;
-      case 5:
-        inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-        break;
-      case 6:
-        inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
-        break;
+      case 4: inv_param.solution_type = QUDA_MAT_SOLUTION; break;
+      case 5: inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; break;
+      case 6: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
       default:
         errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4D_DSLASH\n", test_type);
     }
@@ -214,15 +209,9 @@ void init(int argc, char **argv) {
       case 4:
         inv_param.solution_type = QUDA_MATPC_SOLUTION;
         break;
-      case 5:
-        inv_param.solution_type = QUDA_MAT_SOLUTION;
-        break;
-      case 6:
-        inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-        break;
-      case 7:
-        inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
-        break;
+      case 5: inv_param.solution_type = QUDA_MAT_SOLUTION; break;
+      case 6: inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; break;
+      case 7: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
       default:
         errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_DSLASH\n", test_type);
     }
@@ -290,8 +279,7 @@ void init(int argc, char **argv) {
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
 
-  if (inv_param.solution_type == QUDA_MAT_SOLUTION ||
-      inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+  if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
     csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   } else {
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -361,9 +349,8 @@ void init(int argc, char **argv) {
       /* Single and half */
       csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
     }
- 
-    if (inv_param.solution_type == QUDA_MAT_SOLUTION ||
-        inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+
+    if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
       csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     } else {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -377,8 +364,7 @@ void init(int argc, char **argv) {
 
     tmp1 = new cudaColorSpinorField(csParam);
 
-    if (inv_param.solution_type == QUDA_MAT_SOLUTION ||
-        inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+    if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
       csParam.x[0] /= 2;
     }
 
@@ -394,7 +380,7 @@ void init(int argc, char **argv) {
 
     bool pc;
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH)
-      pc = (test_type != 4 && test_type !=6);
+      pc = (test_type != 4 && test_type != 6);
     else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH)
       pc = (test_type != 5 && test_type != 7);
     else
@@ -473,21 +459,21 @@ DslashTime dslashCUDA(int niter) {
           if (transfer) {
             dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
           } else {
-            static_cast<DiracDomainWall4DPC*>(dirac)->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
+            static_cast<DiracDomainWall4DPC *>(dirac)->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
           }
           break;
         case 1:
           if (transfer) {
             dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
           } else {
-            static_cast<DiracDomainWall4DPC*>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+            static_cast<DiracDomainWall4DPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
           }
           break;
         case 2:
           if (transfer) {
             dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
           } else {
-            static_cast<DiracDomainWall4DPC*>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity, kappa5);
+            static_cast<DiracDomainWall4DPC *>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity, kappa5);
           }
           break;
         case 3:
@@ -513,28 +499,28 @@ DslashTime dslashCUDA(int niter) {
           if (transfer) {
             dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
           } else {
-            static_cast<DiracMobiusPC*>(dirac)->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
+            static_cast<DiracMobiusPC *>(dirac)->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
           }
           break;
         case 1:
           if (transfer) {
             dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
           } else {
-            static_cast<DiracMobiusPC*>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+            static_cast<DiracMobiusPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
           }
           break;
         case 2:
           if (transfer) {
             dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
           } else {
-            static_cast<DiracMobiusPC*>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+            static_cast<DiracMobiusPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
           }
           break;
         case 3:
           if (transfer) {
             dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
           } else {
-            static_cast<DiracMobiusPC*>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity);
+            static_cast<DiracMobiusPC *>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity);
           }
           break;
         case 4:
@@ -683,8 +669,8 @@ void dslashRef() {
     switch (test_type) {
     case 0:
       if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)
-	tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity,
-                  inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+        tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity,
+            inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
         int tm_offset = 12*spinorRef->Volume();
@@ -863,17 +849,18 @@ void dslashRef() {
       dw_4d_matpc(spinorRef->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
       break;
     case 4:
-      dw_4d_mat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param,inv_param.mass);
+      dw_4d_mat(
+          spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
       break;
     case 5:
       dw_4d_matpc(spinorTmp->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
       dw_4d_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), kappa5, inv_param.matpc_type, not_dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
       break;
     case 6:
-      dw_4d_mat(spinorTmp->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param,
-                inv_param.mass);
+      dw_4d_mat(
+          spinorTmp->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
       dw_4d_mat(spinorRef->V(), hostGauge, spinorTmp->V(), kappa5, not_dagger, gauge_param.cpu_prec, gauge_param,
-                inv_param.mass);
+          inv_param.mass);
       break;
     default:
       printf("Test type not supported for domain wall\n");
@@ -881,10 +868,10 @@ void dslashRef() {
     }
     free(kappa_5);
   } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH){
-    double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-    double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-    double _Complex *kappa_5 = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-    double _Complex *kappa_mdwf = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+    double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_5 = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_mdwf = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
     for(int xs = 0 ; xs < Lsdim ; xs++)
     {
       kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
@@ -903,24 +890,25 @@ void dslashRef() {
       mdw_dslash_4_pre(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5, true);
       break;
     case 3:
-      mdw_dslash_5_inv(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_mdwf);
+      mdw_dslash_5_inv(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param,
+          inv_param.mass, kappa_mdwf);
       break;
     case 4:    
       mdw_matpc(spinorRef->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
       break;
     case 5:
       mdw_mat(spinorRef->V(), hostGauge, spinor->V(), kappa_b, kappa_c, dagger, gauge_param.cpu_prec, gauge_param,
-              inv_param.mass, inv_param.b_5, inv_param.c_5);
+          inv_param.mass, inv_param.b_5, inv_param.c_5);
       break;
     case 6:
       mdw_matpc(spinorTmp->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
       mdw_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), kappa_b, kappa_c, inv_param.matpc_type, not_dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
       break;
     case 7:
-      mdw_mat(spinorTmp->V(), hostGauge, spinor->V(), kappa_b, kappa_c, dagger, gauge_param.cpu_prec,
-              gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+      mdw_mat(spinorTmp->V(), hostGauge, spinor->V(), kappa_b, kappa_c, dagger, gauge_param.cpu_prec, gauge_param,
+          inv_param.mass, inv_param.b_5, inv_param.c_5);
       mdw_mat(spinorRef->V(), hostGauge, spinorTmp->V(), kappa_b, kappa_c, not_dagger, gauge_param.cpu_prec,
-              gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+          gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
       break;
     default:
       printf("Test type not supported for domain wall\n");
@@ -1011,8 +999,8 @@ int main(int argc, char **argv)
     //FIXME No flops count for twisted-clover yet
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
-    printfQuda("%llu flops per kernel call, %llu flops per site\n",
-               flops / niter, (flops / niter) / cudaSpinor->Volume());
+    printfQuda(
+        "%llu flops per kernel call, %llu flops per site\n", flops / niter, (flops / niter) / cudaSpinor->Volume());
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
 
     printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
@@ -1030,11 +1018,8 @@ int main(int argc, char **argv)
     }
 
     if (verify_results) {
-      ::testing::TestEventListeners& listeners =
-          ::testing::UnitTest::GetInstance()->listeners();
-      if (comm_rank() != 0) {
-        delete listeners.Release(listeners.default_result_printer());
-      }
+      ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+      if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0) warningQuda("Tests failed");

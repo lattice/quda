@@ -50,9 +50,9 @@ namespace quda {
       errorQuda("Temporal gauge fixing only supported for Wilson links");
 #ifdef USE_LEGACY_DSLASH
     if(link_type != QUDA_ASQTAD_LONG_LINKS && (reconstruct ==  QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9))
-        errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
-    if(link_type == QUDA_ASQTAD_LONG_LINKS &&  reconstruct == QUDA_RECONSTRUCT_9)
-        errorQuda("reconstruct %d not supported for staggered long links with QUDA_LEGACY_DSLASH\n", reconstruct);
+      errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
+    if (link_type == QUDA_ASQTAD_LONG_LINKS && reconstruct == QUDA_RECONSTRUCT_9)
+      errorQuda("reconstruct %d not supported for staggered long links with QUDA_LEGACY_DSLASH\n", reconstruct);
 #endif
     if(geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*nInternal;
@@ -158,9 +158,8 @@ namespace quda {
   bool GaugeField::isNative() const {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || 
-	       precision == QUDA_HALF_PRECISION ||
-	       precision == QUDA_QUARTER_PRECISION) {
+    } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
+        || precision == QUDA_QUARTER_PRECISION) {
       if (reconstruct == QUDA_RECONSTRUCT_NO) {
 	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
       } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {

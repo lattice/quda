@@ -206,68 +206,85 @@ namespace quda {
   }
 
   // specialized variants of the copy function that assumes fixed-point scaling already done
-  template<typename T1, typename T2> __host__ __device__ inline void copy_scaled (T1 &a, const T2 &b) {
-    copy(a,b);
+  template <typename T1, typename T2> __host__ __device__ inline void copy_scaled(T1 &a, const T2 &b) { copy(a, b); }
+
+  template <> __host__ __device__ inline void copy_scaled(short4 &a, const float4 &b)
+  {
+    a.x = f2i(b.x);
+    a.y = f2i(b.y);
+    a.z = f2i(b.z);
+    a.w = f2i(b.w);
   }
 
-  template<> __host__ __device__ inline void copy_scaled(short4 &a, const float4 &b) {
-    a.x = f2i(b.x); a.y = f2i(b.y); a.z = f2i(b.z); a.w = f2i(b.w);
+  template <> __host__ __device__ inline void copy_scaled(char4 &a, const float4 &b)
+  {
+    a.x = f2i(b.x);
+    a.y = f2i(b.y);
+    a.z = f2i(b.z);
+    a.w = f2i(b.w);
   }
 
-  template<> __host__ __device__ inline void copy_scaled(char4 &a, const float4 &b) {
-    a.x = f2i(b.x); a.y = f2i(b.y); a.z = f2i(b.z); a.w = f2i(b.w);
+  template <> __host__ __device__ inline void copy_scaled(short2 &a, const float2 &b)
+  {
+    a.x = f2i(b.x);
+    a.y = f2i(b.y);
   }
 
-  template<> __host__ __device__ inline void copy_scaled(short2 &a, const float2 &b) {
-    a.x = f2i(b.x); a.y = f2i(b.y);
+  template <> __host__ __device__ inline void copy_scaled(char2 &a, const float2 &b)
+  {
+    a.x = f2i(b.x);
+    a.y = f2i(b.y);
   }
 
-  template<> __host__ __device__ inline void copy_scaled(char2 &a, const float2 &b) {
-    a.x = f2i(b.x); a.y = f2i(b.y);
-  }
+  template <> __host__ __device__ inline void copy_scaled(short &a, const float &b) { a = f2i(b); }
 
-  template<> __host__ __device__ inline void copy_scaled(short &a, const float &b) {
-    a = f2i(b);
-  }
-
-  template<> __host__ __device__ inline void copy_scaled(char &a, const float &b) {
-    a = f2i(b);
-  }
+  template <> __host__ __device__ inline void copy_scaled(char &a, const float &b) { a = f2i(b); }
 
   /**
      @brief Specialized variants of the copy function that include an
      additional scale factor.  Note the scale factor is ignored unless
      the input type (b) is either a short or char vector.
   */
-  template<typename T1, typename T2, typename T3>
-    __host__ __device__ inline void copy_and_scale(T1 &a, const T2 &b, const T3 &c) {
-    copy(a,b);
+  template <typename T1, typename T2, typename T3>
+  __host__ __device__ inline void copy_and_scale(T1 &a, const T2 &b, const T3 &c)
+  {
+    copy(a, b);
   }
 
-  template<> __host__ __device__ inline void copy_and_scale(float4 &a, const short4 &b, const float &c) {
-    a.x = s2f(b.x,c); a.y = s2f(b.y,c); a.z = s2f(b.z,c); a.w = s2f(b.w,c);
+  template <> __host__ __device__ inline void copy_and_scale(float4 &a, const short4 &b, const float &c)
+  {
+    a.x = s2f(b.x, c);
+    a.y = s2f(b.y, c);
+    a.z = s2f(b.z, c);
+    a.w = s2f(b.w, c);
   }
 
-  template<> __host__ __device__ inline void copy_and_scale(float4 &a, const char4 &b, const float &c) {
-    a.x = c2f(b.x,c); a.y = c2f(b.y,c); a.z = c2f(b.z,c); a.w = c2f(b.w,c);
+  template <> __host__ __device__ inline void copy_and_scale(float4 &a, const char4 &b, const float &c)
+  {
+    a.x = c2f(b.x, c);
+    a.y = c2f(b.y, c);
+    a.z = c2f(b.z, c);
+    a.w = c2f(b.w, c);
   }
 
-  template<> __host__ __device__ inline void copy_and_scale(float2 &a, const short2 &b, const float &c) {
-    a.x = s2f(b.x,c); a.y = s2f(b.y,c);
+  template <> __host__ __device__ inline void copy_and_scale(float2 &a, const short2 &b, const float &c)
+  {
+    a.x = s2f(b.x, c);
+    a.y = s2f(b.y, c);
   }
 
-  template<> __host__ __device__ inline void copy_and_scale(float2 &a, const char2 &b, const float&c) {
-    a.x = c2f(b.x,c); a.y = c2f(b.y,c);
+  template <> __host__ __device__ inline void copy_and_scale(float2 &a, const char2 &b, const float &c)
+  {
+    a.x = c2f(b.x, c);
+    a.y = c2f(b.y, c);
   }
 
-  template<> __host__ __device__ inline void copy_and_scale(float &a, const short &b, const float &c) {
-    a = s2f(b,c);
+  template <> __host__ __device__ inline void copy_and_scale(float &a, const short &b, const float &c)
+  {
+    a = s2f(b, c);
   }
 
-  template<> __host__ __device__ inline void copy_and_scale(float &a, const char &b, const float &c) {
-    a = c2f(b,c);
-  }
-
+  template <> __host__ __device__ inline void copy_and_scale(float &a, const char &b, const float &c) { a = c2f(b, c); }
 
   /**
      Generic wrapper for Trig functions
@@ -277,7 +294,7 @@ namespace quda {
       __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b); }
       __device__ __host__ static T Sin( const T &a ) { return sin(a); }
       __device__ __host__ static T Cos( const T &a ) { return cos(a); }
-      __device__ __host__ static void SinCos(const T& a, T *s, T *c) { sincos(a, s, c); }
+      __device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos(a, s, c); }
     };
   
   /**
@@ -286,14 +303,16 @@ namespace quda {
   template <>
     struct Trig<false,float> {
     __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b); }
-    __device__ __host__ static float Sin( const float &a ) {
+    __device__ __host__ static float Sin(const float &a)
+    {
 #ifdef __CUDA_ARCH__
       return __sinf(a); 
 #else
       return sinf(a);
 #endif
     }
-    __device__ __host__ static float Cos( const float &a ) {
+    __device__ __host__ static float Cos(const float &a)
+    {
 #ifdef __CUDA_ARCH__
       return __cosf(a); 
 #else
@@ -301,14 +320,14 @@ namespace quda {
 #endif
     }
 
-    __device__ __host__ static void SinCos(const float& a, float *s, float *c) {
+    __device__ __host__ static void SinCos(const float &a, float *s, float *c)
+    {
 #ifdef __CUDA_ARCH__
        __sincosf(a, s, c);
 #else
        sincosf(a, s, c);
 #endif
     }
-
   };
 
   /**
@@ -317,29 +336,31 @@ namespace quda {
   template <>
     struct Trig<true,float> {
     __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b)/M_PI; }
-    __device__ __host__ static float Sin( const float &a ) {
+    __device__ __host__ static float Sin(const float &a)
+    {
 #ifdef __CUDA_ARCH__
-      return __sinf(a*static_cast<float>(M_PI));
+      return __sinf(a * static_cast<float>(M_PI));
 #else
-      return sinf(a*static_cast<float>(M_PI));
+      return sinf(a * static_cast<float>(M_PI));
 #endif
     }
-    __device__ __host__ static float Cos( const float &a ) {
+    __device__ __host__ static float Cos(const float &a)
+    {
 #ifdef __CUDA_ARCH__
-      return __cosf(a*static_cast<float>(M_PI));
+      return __cosf(a * static_cast<float>(M_PI));
 #else
-      return cosf(a*static_cast<float>(M_PI));
-#endif
-    }
-
-    __device__ __host__ static void SinCos(const float& a, float *s, float *c) {
-#ifdef __CUDA_ARCH__
-       __sincosf(a*static_cast<float>(M_PI), s, c);
-#else
-       sincosf(a*static_cast<float>(M_PI), s, c);
+      return cosf(a * static_cast<float>(M_PI));
 #endif
     }
 
+    __device__ __host__ static void SinCos(const float &a, float *s, float *c)
+    {
+#ifdef __CUDA_ARCH__
+      __sincosf(a * static_cast<float>(M_PI), s, c);
+#else
+      sincosf(a * static_cast<float>(M_PI), s, c);
+#endif
+    }
   };
 
   

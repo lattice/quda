@@ -50,17 +50,17 @@ namespace quda {
 
       std::vector<std::string> options = {"-std=c++11", "-ftz=true", "-prec-div=false", "-prec-sqrt=false"};
       options.push_back( std::string("-D__COMPUTE_CAPABILITY__=") + std::to_string(__COMPUTE_CAPABILITY__) );
-      options.push_back( std::string("-DMAX_MULTI_BLAS_N=") + std::to_string(MAX_MULTI_BLAS_N) );
+      options.push_back(std::string("-DMAX_MULTI_BLAS_N=") + std::to_string(MAX_MULTI_BLAS_N));
 
 #ifdef USE_TEXTURE_OBJECTS
-      options.push_back( std::string("-DUSE_TEXTURE_OBJECTS") );
+      options.push_back(std::string("-DUSE_TEXTURE_OBJECTS"));
 #endif
 #ifdef DYNAMIC_CLOVER
-      options.push_back( std::string("-DDYNAMIC_CLOVER") );
+      options.push_back(std::string("-DDYNAMIC_CLOVER"));
 #endif
 
 #ifdef DEVICE_DEBUG
-      options.push_back( std::string("-G") );
+      options.push_back(std::string("-G"));
 #endif
 
       // add an extra compilation options specific to this instance

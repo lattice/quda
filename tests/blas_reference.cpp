@@ -61,10 +61,11 @@ void xpay(void *x, double a, void *y, int length, QudaPrecision precision) {
   else xpay((float*)x, (float)a, (float*)y, length);
 }
 
-void cxpay(void *x, double _Complex a, void *y, int length, QudaPrecision precision) {
+void cxpay(void *x, double _Complex a, void *y, int length, QudaPrecision precision)
+{
   if (precision == QUDA_DOUBLE_PRECISION) {
-    xpay((double _Complex*)x, (double _Complex)a, (double _Complex*)y, length/2);
+    xpay((double _Complex *)x, (double _Complex)a, (double _Complex *)y, length / 2);
   } else {
-    xpay((float _Complex*)x, (float _Complex)a, (float _Complex*)y, length/2);
+    xpay((float _Complex *)x, (float _Complex)a, (float _Complex *)y, length / 2);
   }
 }

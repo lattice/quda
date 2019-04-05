@@ -17,12 +17,32 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaPrecision null_precision, TimeProfile &profile)
-    : B(B), Nvec(Nvec), null_precision(null_precision), V_h(nullptr), V_d(nullptr),
-      fine_tmp_h(nullptr), fine_tmp_d(nullptr), coarse_tmp_h(nullptr), coarse_tmp_d(nullptr), geo_bs(nullptr),
-      fine_to_coarse_h(nullptr), coarse_to_fine_h(nullptr), fine_to_coarse_d(nullptr), coarse_to_fine_d(nullptr),
-      spin_bs(spin_bs), spin_map(0), nspin_fine(B[0]->Nspin()), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
-      enable_gpu(false), enable_cpu(false), use_gpu(true), flops_(0), profile(profile)
+  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int *geo_bs, int spin_bs,
+      QudaPrecision null_precision, TimeProfile &profile) :
+      B(B),
+      Nvec(Nvec),
+      null_precision(null_precision),
+      V_h(nullptr),
+      V_d(nullptr),
+      fine_tmp_h(nullptr),
+      fine_tmp_d(nullptr),
+      coarse_tmp_h(nullptr),
+      coarse_tmp_d(nullptr),
+      geo_bs(nullptr),
+      fine_to_coarse_h(nullptr),
+      coarse_to_fine_h(nullptr),
+      fine_to_coarse_d(nullptr),
+      coarse_to_fine_d(nullptr),
+      spin_bs(spin_bs),
+      spin_map(0),
+      nspin_fine(B[0]->Nspin()),
+      site_subset(QUDA_FULL_SITE_SUBSET),
+      parity(QUDA_INVALID_PARITY),
+      enable_gpu(false),
+      enable_cpu(false),
+      use_gpu(true),
+      flops_(0),
+      profile(profile)
   {
     postTrace();
     int ndim = B[0]->Ndim();

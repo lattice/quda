@@ -7,7 +7,8 @@
    sharing data between threads in a thread block.
  */
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Class which wraps around a shared memory cache for a
@@ -17,31 +18,32 @@ namespace quda {
      ColorSpinor class, but we could extend this to apply to the
      Matrix class as well.
    */
-  template <typename real, typename Vector>
-  class VectorCache {
+  template <typename real, typename Vector> class VectorCache
+  {
 
     /**
        @brief This is the handle to the shared memory
        @return Shared memory pointer
      */
-    __device__ inline real* cache() {
+    __device__ inline real *cache()
+    {
       extern __shared__ int cache_[];
-      return reinterpret_cast<real*>(cache_);
+      return reinterpret_cast<real *>(cache_);
     }
 
-  public:
-
+public:
     /**
        @brief Save the vector into the 3-d shared memory cache.
        Implicitly store the vector at coordinates given by threadIdx.
        @param[in] a The vector to store in the shared memory cache
      */
-    __device__ inline void save(const Vector &a) {
-      int j = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
+    __device__ inline void save(const Vector &a)
+    {
+      int j = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
 #pragma unroll
-      for (int i=0; i<2*a.size; i++) {
-        cache()[j] = *(reinterpret_cast<const real*>(a.data) + i);
-        j += blockDim.z*blockDim.y*blockDim.x;
+      for (int i = 0; i < 2 * a.size; i++) {
+        cache()[j] = *(reinterpret_cast<const real *>(a.data) + i);
+        j += blockDim.z * blockDim.y * blockDim.x;
       }
     }
 
@@ -52,13 +54,14 @@ namespace quda {
        @param[in] z The z index to use
        @return The Vector at coordinates (x,y,z)
      */
-    __device__ inline Vector load(int x, int y, int z) {
+    __device__ inline Vector load(int x, int y, int z)
+    {
       Vector a;
-      int j = (z*blockDim.y + y)*blockDim.x + x;
+      int j = (z * blockDim.y + y) * blockDim.x + x;
 #pragma unroll
-      for (int i=0; i<2*a.size; i++) {
-        *(reinterpret_cast<real*>(a.data) + i) = cache()[j];
-        j += blockDim.z*blockDim.y*blockDim.x;
+      for (int i = 0; i < 2 * a.size; i++) {
+        *(reinterpret_cast<real *>(a.data) + i) = cache()[j];
+        j += blockDim.z * blockDim.y * blockDim.x;
       }
       return a;
     }
@@ -66,10 +69,7 @@ namespace quda {
     /**
        @brief Synchronize the cache
     */
-    __device__ inline void sync() {
-      __syncthreads();
-    }
-
+    __device__ inline void sync() { __syncthreads(); }
   };
 
-}
+} // namespace quda

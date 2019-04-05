@@ -29,7 +29,7 @@
   
   extern int mySpinorSiteSize;
 
-  void initComms(int argc, char **argv, int * const commDims);
+  void initComms(int argc, char **argv, int *const commDims);
   void finalizeComms();
   void initRand();
 
@@ -121,29 +121,27 @@
   }
 #endif
 
-inline QudaPrecision getPrecision(int i) {
-  switch (i) {
-  case 0: return QUDA_QUARTER_PRECISION;
-  case 1: return QUDA_HALF_PRECISION;
-  case 2: return QUDA_SINGLE_PRECISION;
-  case 3: return QUDA_DOUBLE_PRECISION;
+  inline QudaPrecision getPrecision(int i)
+  {
+    switch (i) {
+    case 0: return QUDA_QUARTER_PRECISION;
+    case 1: return QUDA_HALF_PRECISION;
+    case 2: return QUDA_SINGLE_PRECISION;
+    case 3: return QUDA_DOUBLE_PRECISION;
+    }
+    return QUDA_INVALID_PRECISION;
   }
-  return QUDA_INVALID_PRECISION;
-}
 
-inline int getReconstructNibble(QudaReconstructType recon) {
-  switch (recon) {
-  case QUDA_RECONSTRUCT_NO:
-    return 4;
-  case QUDA_RECONSTRUCT_13:
-  case QUDA_RECONSTRUCT_12:
-    return 2;
-  case QUDA_RECONSTRUCT_9:
-  case QUDA_RECONSTRUCT_8:
-    return 1;
-  default:
-    return 0;
+  inline int getReconstructNibble(QudaReconstructType recon)
+  {
+    switch (recon) {
+    case QUDA_RECONSTRUCT_NO: return 4;
+    case QUDA_RECONSTRUCT_13:
+    case QUDA_RECONSTRUCT_12: return 2;
+    case QUDA_RECONSTRUCT_9:
+    case QUDA_RECONSTRUCT_8: return 1;
+    default: return 0;
+    }
   }
-}
 
 #endif // _TEST_UTIL_H

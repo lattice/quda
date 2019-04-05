@@ -78,8 +78,8 @@ namespace quda {
     {
       if (tuneGridDim()) {
 	const unsigned int max_blocks = maxGridSize();
-	const int step = gridStep();
-	param.grid.x += step;
+        const int step = gridStep();
+        param.grid.x += step;
 	if (param.grid.x > max_blocks) {
 	  param.grid.x = minGridSize();
 	  return false;
@@ -129,12 +129,12 @@ namespace quda {
 
       param.block.x += blockStep();
       int nthreads = param.block.x*param.block.y*param.block.z;
-      if (param.block.x > max_threads || sharedBytesPerThread()*nthreads > max_shared ||
-          sharedBytesPerBlock(param) > max_shared) {
-	resetBlockDim(param);
+      if (param.block.x > max_threads || sharedBytesPerThread() * nthreads > max_shared
+          || sharedBytesPerBlock(param) > max_shared) {
+        resetBlockDim(param);
 	ret = false;
       } else {
-	ret = true;
+        ret = true;
       }
 
       if (!tuneGridDim()) 
@@ -158,16 +158,13 @@ namespace quda {
       case 3:
 	return 16;
       case 5:
-      case 6:
-	return 32;
+      case 6: return 32;
       case 7:
-	switch (deviceProp.minor) {
-	case 0: return 32;
-	case 5: return 16;
-	}
-      default:
-	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
-	return 0;
+        switch (deviceProp.minor) {
+        case 0: return 32;
+        case 5: return 16;
+        }
+      default: errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor); return 0;
       }
     }
 
@@ -177,13 +174,13 @@ namespace quda {
      * @param[in] func Function pointer to the kernel we want to
      * enable max shared memory per block for
      */
-    template <typename F>
-    inline void setMaxDynamicSharedBytesPerBlock(F *func) const {
+    template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func) const
+    {
 #if CUDA_VERSION >= 9000
-      qudaFuncSetAttribute((const void*)func, cudaFuncAttributePreferredSharedMemoryCarveout,
-			   (int)cudaSharedmemCarveoutMaxShared);
-      qudaFuncSetAttribute((const void*)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-			   maxDynamicSharedBytesPerBlock());
+      qudaFuncSetAttribute(
+          (const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
+      qudaFuncSetAttribute(
+          (const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize, maxDynamicSharedBytesPerBlock());
 #endif
     }
 
@@ -194,18 +191,18 @@ namespace quda {
      * Compute Capability).
      * @return The maximum dynamic shared memory to CUDA thread block
      */
-    unsigned int maxDynamicSharedBytesPerBlock() const {
+    unsigned int maxDynamicSharedBytesPerBlock() const
+    {
       switch (deviceProp.major) {
       case 2:
       case 3:
       case 5:
-      case 6:
-	return 48*1024;
+      case 6: return 48 * 1024;
       case 7:
-	switch (deviceProp.minor) {
-	case 0: return 96*1024;
-	case 5: return 64*1024;
-	}
+        switch (deviceProp.minor) {
+        case 0: return 96 * 1024;
+        case 5: return 64 * 1024;
+        }
       default:
 	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
 	return 0;
@@ -235,8 +232,8 @@ namespace quda {
     virtual bool advanceSharedBytes(TuneParam &param) const
     {
       if (tuneSharedBytes()) {
-	const int max_shared = maxSharedBytesPerBlock();
-	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), maxBlocksPerSM());
+        const int max_shared = maxSharedBytesPerBlock();
+        const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), maxBlocksPerSM());
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
@@ -245,9 +242,10 @@ namespace quda {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
 	  int nthreads = next.block.x * next.block.y * next.block.z;
-	  param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(next) ?
-	    sharedBytesPerThread()*nthreads : sharedBytesPerBlock(next);
-	  return false;
+          param.shared_bytes = sharedBytesPerThread() * nthreads > sharedBytesPerBlock(next) ?
+              sharedBytesPerThread() * nthreads :
+              sharedBytesPerBlock(next);
+          return false;
 	} else {
 	  return true;
 	}
@@ -565,7 +563,7 @@ namespace quda {
    * @brief Returns a reference to the tunecache map
    * @return tunecache reference
    */
-  const std::map<TuneKey,TuneParam>& getTuneCache();
+  const std::map<TuneKey, TuneParam> &getTuneCache();
 
   /**
    * @brief Enable the profile kernel counting

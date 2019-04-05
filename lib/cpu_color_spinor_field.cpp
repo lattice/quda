@@ -225,7 +225,8 @@ namespace quda {
     backed_up = true;
   }
 
-  void cpuColorSpinorField::restore() const {
+  void cpuColorSpinorField::restore() const
+  {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
 
     memcpy(v, backup_h, bytes);
