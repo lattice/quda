@@ -447,7 +447,7 @@ namespace quda {
 
     delete [] recvbuff;
 
-    printfQuda("Finish PipeFCG: %d iterations, total restarst: %d \n", k, totResUpdates);
+    printfQuda("Finish PipePCG: %d iterations, total restarst: %d \n", k, totResUpdates);
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
