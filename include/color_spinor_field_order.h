@@ -23,6 +23,7 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <color_spinor.h>
+#include <color_spinor_sextet.h>
 #include <thrust_helper.cuh>
 #include <color_spinor_field.h>
 
@@ -102,6 +103,18 @@ namespace quda {
   template <typename T, int Nc>
     template <typename S>
     __device__ __host__ inline ColorSpinor<T,Nc,4>::ColorSpinor(const colorspinor_wrapper<T,S> &a) {
+    a.field.load((T*)data, a.x_cb, a.parity);
+  }
+
+  template <typename T, int Nc, int Ns>
+    template <typename S>
+    __device__ __host__ inline void ColorSpinorSextet<T,Nc,Ns>::operator=(const colorspinor_wrapper<T,S> &a) {
+    a.field.load((T*)data, a.x_cb, a.parity);
+  }
+
+  template <typename T, int Nc, int Ns>
+    template <typename S>
+    __device__ __host__ inline ColorSpinorSextet<T,Nc,Ns>::ColorSpinorSextet(const colorspinor_wrapper<T,S> &a) {
     a.field.load((T*)data, a.x_cb, a.parity);
   }
 
@@ -188,6 +201,18 @@ namespace quda {
   template <typename T, int Nc>
     template <typename S>
     __device__ __host__ inline ColorSpinor<T,Nc,4>::ColorSpinor(const colorspinor_ghost_wrapper<T,S> &a) {
+    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
+  }
+
+  template <typename T, int Nc, int Ns>
+    template <typename S>
+    __device__ __host__ inline void ColorSpinorSextet<T,Nc,Ns>::operator=(const colorspinor_ghost_wrapper<T,S> &a) {
+    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
+  }
+
+  template <typename T, int Nc, int Ns>
+    template <typename S>
+    __device__ __host__ inline ColorSpinorSextet<T,Nc,Ns>::ColorSpinorSextet(const colorspinor_ghost_wrapper<T,S> &a) {
     a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 

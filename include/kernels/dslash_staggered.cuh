@@ -4,20 +4,32 @@
 #include <color_spinor_field_order.h>
 #include <gauge_field_order.h>
 #include <color_spinor.h>
+#include <color_spinor_sextet.h>
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
 
 namespace quda
 {
 
+  template <typename real, int nColor, bool sextet> struct QuarkType { };
+
+  template <typename real, int nColor> struct QuarkType<real,nColor,false> {
+    typedef ColorSpinor<real,nColor,1> Vector;
+  };
+
+  template <typename real, int nColor> struct QuarkType<real,nColor,true> {
+    typedef ColorSpinorSextet<real,nColor,1> Vector;
+  };
+
   /**
      @brief Parameter structure for driving the Staggered Dslash operator
   */
   template <typename Float, int nColor, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_,
-      bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
+            bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC, bool sextet_ = false>
   struct StaggeredArg : DslashArg<Float> {
     typedef typename mapper<Float>::type real;
-    static constexpr int nSpin = 1;
+    static constexpr bool sextet = sextet_;
+    static constexpr int nSpin = sextet ? 2 : 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
     using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type;
@@ -165,7 +177,7 @@ namespace quda
   __device__ __host__ inline void staggered(Arg &arg, int idx, int parity)
   {
     using real = typename mapper<Float>::type;
-    using Vector = ColorSpinor<real, nColor, 1>;
+    using Vector = typename QuarkType<real, nColor, Arg::sextet>::Vector;
 
     bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
