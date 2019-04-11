@@ -169,130 +169,23 @@ namespace quda {
     ColorSpinor<Float,Nc,Ns> operator*(const Matrix<complex<Float>,Nc> &A, const ColorSpinorSextet<Float,Nc,Ns> &x) {
 
     ColorSpinorSextet<Float,Nc,Ns> y;
-//to change
-if ((Nc==3)&&(Ns==1)){
-       complex<Float> a[3];
-	a[0] = x.data[s*Nc + 0]*A(0,0)+x.data[s*Nc + 1]*A(1,0)+x.data[s*Nc + 2]*A(2,0);
-	a[1] = x.data[s*Nc + 1]*A(0,0)+x.data[s*Nc + 3]*A(1,0)+x.data[s*Nc + 4]*A(2,0);
-	a[2] = x.data[s*Nc + 2]*A(0,0)+x.data[s*Nc + 4]*A(1,0)+x.data[s*Nc + 5]*A(2,0);
 
-//element 0
-	y.data[s*Nc + 0].x = A(0,0).real() * a[0].real();
-	y.data[s*Nc + 0].x -= A(0,0).imag() * a[0].imag();
-	y.data[s*Nc + 0].y = A(0,0).real() * a[0].imag();
-	y.data[s*Nc + 0].y += A(0,0).imag() * a[0].real();
+    complex<Float> a[Nc*Nc];
 
+    for (int l=0;l<Nc;l++){
+       for (int k=0;k<Nc;k++){
 
-      for (int j=1; j<Nc; j++) {
-	y.data[s*Nc + 0].x = A(0,j).real() * a[j].real();
-	y.data[s*Nc + 0].x -= A(0,j).imag() * a[j].imag();
-	y.data[s*Nc + 0].y = A(0,j).real() * a[j].imag();
-	y.data[s*Nc + 0].y += A(0,j).imag() * a[j].real();
-      }
-//element 2
-	y.data[s*Nc + 2].x = A(2,0).real() * a[0].real();
-	y.data[s*Nc + 2].x -= A(2,0).imag() * a[0].imag();
-	y.data[s*Nc + 2].y = A(2,0).real() * a[0].imag();
-	y.data[s*Nc + 2].y += A(2,0).imag() * a[0].real();
+          for (int i=0;i<Nc*Nc;i++) a[i] = 0;
 
-
-      for (int j=1; j<Nc; j++) {
-	y.data[s*Nc + 2].x = A(2,j).real() * a[j].real();
-	y.data[s*Nc + 2].x -= A(2,j).imag() * a[j].imag();
-	y.data[s*Nc + 2].y = A(2,j).real() * a[j].imag();
-	y.data[s*Nc + 2].y += A(2,j).imag() * a[j].real();
-      }
-//element 1
-	y.data[s*Nc + 1].x = A(1,0).real() * a[0].real();
-	y.data[s*Nc + 1].x -= A(1,0).imag() * a[0].imag();
-	y.data[s*Nc + 1].y = A(1,0).real() * a[0].imag();
-	y.data[s*Nc + 1].y += A(1,0).imag() * a[0].real();
-
-
-      for (int j=1; j<Nc; j++) {
-	y.data[s*Nc + 1].x = A(1,j).real() * a[j].real();
-	y.data[s*Nc + 1].x -= A(1,j).imag() * a[j].imag();
-	y.data[s*Nc + 1].y = A(1,j).real() * a[j].imag();
-	y.data[s*Nc + 1].y += A(1,j).imag() * a[j].real();
-      }
-
-
-	a[0] = x.data[s*Nc + 0]*A(0,1)+x.data[s*Nc + 1]*A(1,1)+x.data[s*Nc + 2]*A(2,1);
-	a[1] = x.data[s*Nc + 1]*A(0,1)+x.data[s*Nc + 3]*A(1,1)+x.data[s*Nc + 4]*A(2,1);
-	a[2] = x.data[s*Nc + 2]*A(0,1)+x.data[s*Nc + 4]*A(1,1)+x.data[s*Nc + 5]*A(2,1);
-//element 3
-	y.data[s*Nc + 3].x = A(1,0).real() * a[0].real();
-	y.data[s*Nc + 3].x -= A(1,0).imag() * a[0].imag();
-	y.data[s*Nc + 3].y = A(1,0).real() * a[0].imag();
-	y.data[s*Nc + 3].y += A(1,0).imag() * a[0].real();
-
-
-      for (int j=1; j<Nc; j++) {
-	y.data[s*Nc + 3].x = A(1,j).real() * a[j].real();
-	y.data[s*Nc + 3].x -= A(1,j).imag() * a[j].imag();
-	y.data[s*Nc + 3].y = A(1,j).real() * a[j].imag();
-	y.data[s*Nc + 3].y += A(1,j).imag() * a[j].real();
-      }
-//element 4
-	y.data[s*Nc + 4].x = A(2,0).real() * a[0].real();
-	y.data[s*Nc + 4].x -= A(2,0).imag() * a[0].imag();
-	y.data[s*Nc + 4].y = A(2,0).real() * a[0].imag();
-	y.data[s*Nc + 4].y += A(2,0).imag() * a[0].real();
-
-
-      for (int j=1; j<Nc; j++) {
-	y.data[s*Nc + 4].x = A(2,j).real() * a[j].real();
-	y.data[s*Nc + 4].x -= A(2,j).imag() * a[j].imag();
-	y.data[s*Nc + 4].y = A(2,j).real() * a[j].imag();
-	y.data[s*Nc + 4].y += A(2,j).imag() * a[j].real();
-      }
-
-	a[0] = x.data[s*Nc + 0]*A(0,2)+x.data[s*Nc + 1]*A(1,2)+x.data[s*Nc + 2]*A(2,2);
-	a[1] = x.data[s*Nc + 1]*A(0,2)+x.data[s*Nc + 3]*A(1,2)+x.data[s*Nc + 4]*A(2,2);
-	a[2] = x.data[s*Nc + 2]*A(0,2)+x.data[s*Nc + 4]*A(1,2)+x.data[s*Nc + 5]*A(2,2);
-//element 5
-	y.data[s*Nc + 5].x = A(2,0).real() * a[0].real();
-	y.data[s*Nc + 5].x -= A(2,0).imag() * a[0].imag();
-	y.data[s*Nc + 5].y = A(2,0).real() * a[0].imag();
-	y.data[s*Nc + 5].y += A(2,0).imag() * a[0].real();
-
-
-      for (int j=1; j<Nc; j++) {
-	y.data[s*Nc + 5].x = A(2,j).real() * a[j].real();
-	y.data[s*Nc + 5].x -= A(2,j).imag() * a[j].imag();
-	y.data[s*Nc + 5].y = A(2,j).real() * a[j].imag();
-	y.data[s*Nc + 5].y += A(2,j).imag() * a[j].real();
-      }
-
-}else{
-
-//not implemente yet
-}
-
-
-
-
-#pragma unroll
-    for (int i=0; i<Nc; i++) {
-#pragma unroll
-      for (int s=0; s<Ns; s++) {
-
-	y.data[s*Nc + i].x  = A(i,0).real() * x.data[s*Nc + 0].real();
-	y.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
-	y.data[s*Nc + i].y  = A(i,0).real() * x.data[s*Nc + 0].imag();
-	y.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
-      }
-#pragma unroll
-      for (int j=1; j<Nc; j++) {
-#pragma unroll
-	for (int s=0; s<Ns; s++) {
-	  y.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
-	  y.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
-	  y.data[s*Nc + i].y += A(i,j).real() * x.data[s*Nc + j].imag();
-	  y.data[s*Nc + i].y += A(i,j).imag() * x.data[s*Nc + j].real();
-	}
-      }
+	  for (int i=0;i<Nc;i++){
+             for (int j=0;j<Nc;j++){
+               a[i*Nc+l] += x(i,j)*A(j,l);
+             }
+ 	     y(k,l) = A(k,i) * a[i*Nc+l];
+	  }
+       }
     }
+	
 
     return y;
   }
