@@ -66,13 +66,13 @@ namespace quda {
       real alpha = 1.;
       real beta = 0.;
 
-      const float scale; // scale factor for the input color spin field
+      const float hasenbusch_factor; // hasenbusch_shift factor for the input color spin field
       real m_scale = 1.; // scale factor for the matrix
 
       MdwfFusedDslashType type;
       FusedDslashArg(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U, ColorSpinorField& y,
           const ColorSpinorField& x, double m_f_, double m_5_, const Complex* b_5, const Complex* c_5, bool dagger_,
-          int parity, int shift_[4], int halo_shift_[4], const double scale_, MdwfFusedDslashType type_)
+          int parity, int shift_[4], int halo_shift_[4], const double hasenbusch_shift_, MdwfFusedDslashType type_)
           : out(out)
           , in(in)
           , U(U)
@@ -94,7 +94,7 @@ namespace quda {
                 in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)}
           , shrinked_dim{dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]}
           , volume_4d_cb_shift(shrinked_dim[0] * shrinked_dim[1] * shrinked_dim[2] * shrinked_dim[3] / 2)
-          , scale(scale_)
+          , hasenbusch_factor(1.+hasenbusch_shift_)
           , type(type_) {
         if (in.Nspin() != 4) { errorQuda("nSpin = %d NOT supported.\n", in.Nspin()); }
 
@@ -363,6 +363,7 @@ namespace quda {
               int volume_4d_cb_back = back_dim[0] * back_dim[1] * back_dim[2] * back_dim[3] >> 1;
               int sid_back_shift = threadIdx.y * volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim);
               aux_in_vec = arg.x(sid_back_shift, explicit_parity);
+              aux_in_vec *= arg.hasenbusch_factor;
             }
           }
           load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
@@ -377,6 +378,7 @@ namespace quda {
           Vector aux_in_vec;
           if (!idle) {
             aux_in_vec = arg.x(sid, explicit_parity);
+            aux_in_vec *= arg.hasenbusch_factor;
           }
           load_matrix_b_vector<N_sm/2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
           if (!idle) {
@@ -632,47 +634,51 @@ namespace quda {
     template <class storage_type>
     void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U, ColorSpinorField& y,
         const ColorSpinorField& x, double m_f, double m_5, const Complex* b_5, const Complex* c_5, bool dagger,
-        int parity, int shift[4], int halo_shift[4], const double scale, MdwfFusedDslashType type) {
+        int parity, int shift[4], int halo_shift[4], const double hasenbusch_shift, MdwfFusedDslashType type) {
       // switch for Ls
       switch (in.X(4)) {
-      //      case  8:
-      //        {
-      //          FusedDslashArg<storage_type,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-      //          halo_shift, scale, type);
-      //          FusedDslash<storage_type,  8, FusedDslashArg<storage_type,  8> > dslash(arg, in);
-      //          dslash.apply(streams[Nstream-1]);
-      //        }
-      //      break;
+        /**
+        case  8:
+          {
+            FusedDslashArg<storage_type,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+            halo_shift, hasenbusch_shift, type);
+            FusedDslash<storage_type,  8, FusedDslashArg<storage_type,  8> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        */
         case 12: {
           FusedDslashArg<storage_type, 12> arg(
-              out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+              out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, hasenbusch_shift, type);
           FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-      //      case 16:
-      //        {
-      //          FusedDslashArg<storage_type, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-      //          halo_shift, scale, type);
-      //          FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16> > dslash(arg, in);
-      //          dslash.apply(streams[Nstream-1]);
-      //        }
-      //      break;
-      //      case 20:
-      //        {
-      //          FusedDslashArg<storage_type, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-      //          halo_shift, scale, type);
-      //          FusedDslash<storage_type, 20, FusedDslashArg<storage_type, 20> > dslash(arg, in);
-      //          dslash.apply(streams[Nstream-1]);
-      //        }
-      //      break;
-      //      case 24:
-      //        {
-      //          FusedDslashArg<storage_type, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-      //          halo_shift, scale, type);
-      //          FusedDslash<storage_type, 24, FusedDslashArg<storage_type, 24> > dslash(arg, in);
-      //          dslash.apply(streams[Nstream-1]);
-      //        }
-      //      break;
+        /**
+        case 16:
+          {
+            FusedDslashArg<storage_type, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+            halo_shift, hasenbusch_shift, type);
+            FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 20:
+          {
+            FusedDslashArg<storage_type, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+            halo_shift, hasenbusch_shift, type);
+            FusedDslash<storage_type, 20, FusedDslashArg<storage_type, 20> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 24:
+          {
+            FusedDslashArg<storage_type, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+            halo_shift, hasenbusch_shift, type);
+            FusedDslash<storage_type, 24, FusedDslashArg<storage_type, 24> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        */
       default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
       }
     }
@@ -680,14 +686,14 @@ namespace quda {
 
     void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U, ColorSpinorField& y,
         const ColorSpinorField& x, double m_f, double m_5, const Complex* b_5, const Complex* c_5, bool dagger,
-        int parity, int shift[4], int halo_shift[4], const double scale, MdwfFusedDslashType type) {
+        int parity, int shift[4], int halo_shift[4], const double hasenbusch_shift, MdwfFusedDslashType type) {
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
       checkLocation(out, in); // check all locations match
 
       if (checkPrecision(out, in) == QUDA_HALF_PRECISION && in.Ncolor() == 3) {
-        apply_fused_dslash<short>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+        apply_fused_dslash<short>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, hasenbusch_shift, type);
       } else if (checkPrecision(out, in) == QUDA_QUARTER_PRECISION && in.Ncolor() == 3) {
-        apply_fused_dslash<char>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+        apply_fused_dslash<char>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, hasenbusch_shift, type);
       } else {
         errorQuda("Tensor core implemtation ONLY supports HALF/QUARTER precision and n_color = 3.\n");
       }

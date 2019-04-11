@@ -142,33 +142,7 @@ namespace quda {
       
       A[ (offset_k+3)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(0.0f, RmL);
       A[ (offset_k+3)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(0.0f, RpL);
-/*
-      // exp = 0 means we are on the diagonal.
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = x==threadIdx.y ? RpL+b : RpL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = x==threadIdx.y ? RpL+b : RpL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = x==threadIdx.y ? RpL+b : RpL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = x==threadIdx.y ? RpL+b : RpL;
-        
-      // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = RmL;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
-      
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
-      // sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+3) ] = RmL;
-      
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+0) ] = RmL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
-      // sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
-      
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = RmL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
-      // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
-*/    
+    
       x += block_dim_x;
     }
 
@@ -220,32 +194,7 @@ namespace quda {
 
       A[ (offset_k+3)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(0.0f, RmL);
       A[ (offset_k+3)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(0.0f, RpL);        
-/*      
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = exp==0 ? RpL+b : RpL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = exp==0 ? RpL+b : RpL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = exp==0 ? RpL+b : RpL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = exp==0 ? RpL+b : RpL;
-      
-      // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = 0.0f;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = RmL;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+3) ] = 0.0f;
-      
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+0) ] = 0.0f;
-      // sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+2) ] = 0.0f;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+3) ] = RmL;
-      
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+0) ] = RmL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+1) ] = 0.0f;
-      // sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+3) ] = 0.0f;
-      
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+0) ] = 0.0f;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = RmL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = 0.0f;
-      // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
-*/    
+    
       x += block_dim_x;
     }
   } 
@@ -297,6 +246,7 @@ namespace quda {
   }
   
   __device__ inline void __half_max_abs_half2__(half& max, const half2& input){
+// The following code checks if the two halves stored in input is normal
 /*    
     static_assert(sizeof(half2) == sizeof(uint32_t));
     // Just mask the exponent part
@@ -381,14 +331,7 @@ namespace quda {
       } 
     }
     __syncthreads();
-/*
-    if(warp_id == 0){
-      if(lane_id == 0){
-        smem_scale[0] = 2.0f;
-      } 
-    }
-    __syncthreads();
-*/
+
   }
 
   // Actually does more than the function name suggests.

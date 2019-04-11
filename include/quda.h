@@ -109,7 +109,9 @@ extern "C" {
 
     double _Complex b_5[QUDA_MAX_DWF_LS];  /**< Mobius coefficients - only real part used if regular Mobius */
     double _Complex c_5[QUDA_MAX_DWF_LS];  /**< Mobius coefficients - only real part used if regular Mobius */
-    
+   
+    double hasenbusch_shift = 0.;
+
     /**<
      * The following specifies the EOFA parameters. Notation follows arXiv:1706.05843
      * eofa_shift: the "\beta" in the paper, or the "shift" in Grid implementation

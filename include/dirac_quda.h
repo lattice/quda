@@ -26,7 +26,9 @@ namespace quda {
     int Ls;    // used by domain wall and twisted mass
     Complex b_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
     Complex c_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
-    
+  
+    double hasenbusch_shift = 0.;
+
     // The EOFA parameters. See the description in InvertParam
     double eofa_shift;
     int eofa_pm;
@@ -497,6 +499,12 @@ namespace quda {
     double kappa_c;
     double m5inv_fac = 0.;
     std::vector<double> m5inv_plus, m5inv_minus;
+
+    // The constant shift added for the even-odd preconditioned dslash, 
+    // primarily for the Hasenbusch during evolution.
+    // It adds a constant shift to the preconditioned dslash(::M).
+    double hasenbusch_shift = 0.;
+
   private:
   public:
     DiracMobiusPC(const DiracParam &param);
@@ -532,17 +540,23 @@ namespace quda {
 			    const double scale, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
     
     void fused_f0(ColorSpinorField &out, const ColorSpinorField &in,
-         const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
-	  void fused_f2(ColorSpinorField &out, const ColorSpinorField &in,
-         const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
+          const QudaParity parity, int shift[4], int halo_shift[4]) const;
+	  
+    
+    void fused_f2(ColorSpinorField &out, const ColorSpinorField &in,
+          const QudaParity parity, int shift[4], int halo_shift[4]) const;
+    
+    
     void fused_f1(ColorSpinorField &out, const ColorSpinorField &in,
           ColorSpinorField& aux_out, const ColorSpinorField& aux_in,
-          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
+          const QudaParity parity, int shift[4], int halo_shift[4]) const;
+    
     void fused_f3(ColorSpinorField &out, const ColorSpinorField &in,
           const ColorSpinorField& aux_in,
-          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
+          const QudaParity parity, int shift[4], int halo_shift[4]) const;
+    
     void fused_f4(ColorSpinorField &out, const ColorSpinorField &in,
-          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
+          const QudaParity parity, int shift[4], int halo_shift[4]) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;

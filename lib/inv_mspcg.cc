@@ -85,6 +85,8 @@ namespace quda {
     diracParam.mu = inv_param->mu;
 
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
+    
+    diracParam.hasenbusch_shift = inv_param->hasenbusch_shift;
   }
 
 
@@ -284,101 +286,14 @@ namespace quda {
 
     // double fx2 = norm2(*fx);
     for(double s = 1.526624328e-5; s < 65504.1; s *= 1.189207115){ // 2^-8 ~ 2^+8
-      inner_dslash(*cx, *cb, s*sqrt(b2/cb->Volume()/24.));
+      inner_dslash( *cx, *cb );
       blas::copy( *tt, *cx );
       
       double x2_ = blas::norm2(*tt);
       double dd = xmyNorm(*tx, *tt);
       printfQuda(" loss scale, | a |^2, |a-b|^2, |a-b|^2/|b|^2: %8.4e %16.12e %16.12e %16.12e\n", s, x2_, dd, dd/x2);
     }
-
-#ifdef USE_LAGECY_DSLASH
-    if(tc && (fb->Precision() == QUDA_HALF_PRECISION || false)){
-      blas::zero(*fy);
-      printfQuda("Detailed test of fused kernels with tensor cores. \n"
-        "Since the legacy kernel does NOT support quarter precision, This test is ONLY available for half precision\n");
-      double ft2, mdd;
-// f0
-      {
-      blas::zero(*fx); blas::zero(*ft);
-      mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1, true, {2,2,2,2});
-      mat_precondition->fused_f0(*fx, *fb, 1., static_cast<QudaParity>(0), shift1, shift2);
-      printfQuda("f0: <------\n");
-      ft2 = blas::norm2(*ft);
-      printfQuda("           ft2 = %16.12e.\n", ft2);
-      fx2 = blas::norm2(*fx);
-      printfQuda("           fx2 = %16.12e.\n", fx2);
-      mdd = xmyNorm(*ft, *fx);
-      printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-      printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/ft2);
-      printfQuda("f0: ------>\n");
-      }
-// f1
-      {
-      blas::zero(*fx); blas::zero(*ft);
-      mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*fx, *fb, static_cast<QudaParity>(0), *fb, -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1});
-      mat_precondition->Dagger(QUDA_DAG_YES);
-      mat_precondition->Dslash5inv(*ft, *fx, static_cast<QudaParity>(0));
-      mat_precondition->Dagger(QUDA_DAG_NO);
-      mat_precondition->fused_f1(*fx, *fb, *fy, *cb, 1., static_cast<QudaParity>(0), shift0, shift1);
-      printfQuda("f1: <------\n");
-      ft2 = blas::norm2(*ft);
-      printfQuda("           ft2 = %16.12e.\n", ft2);
-      fx2 = blas::norm2(*fx);
-      printfQuda("           fx2 = %16.12e.\n", fx2);
-      mdd = xmyNorm(*ft, *fx);
-      printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-      printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/ft2);
-      printfQuda("f1: ------>\n");
-      }
-// f2
-      {
-      blas::zero(*fx); blas::zero(*ft);
-      mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1);
-      mat_precondition->fused_f2(*fx, *fb, 1., static_cast<QudaParity>(0), shift1, shift1);
-      printfQuda("f2: <------\n");
-      ft2 = blas::norm2(*ft);
-      printfQuda("           ft2 = %16.12e.\n", ft2);
-      fx2 = blas::norm2(*fx);
-      printfQuda("           fx2 = %16.12e.\n", fx2);
-      mdd = xmyNorm(*ft, *fx);
-      printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-      printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/ft2);
-      printfQuda("f2: ------>\n");
-      }
-// f3
-      {
-      blas::zero(*fx); blas::zero(*ft);
-      mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(*ft, *fb, static_cast<QudaParity>(0), *fy, -1.0, sp_len0, RR0, Xs0);   
-      mat_precondition->fused_f3(*cx, *fb, *fy, 1., static_cast<QudaParity>(0), shift2, shift1);
-      copyExtendedColorSpinor(*fx, *cx, QUDA_CUDA_FIELD_LOCATION, 0, nullptr, nullptr, nullptr, nullptr); // parity = 0
-      printfQuda("f3: <------\n");
-      ft2 = blas::norm2(*ft);
-      printfQuda("           ft2 = %16.12e.\n", ft2);
-      fx2 = blas::norm2(*fx);
-      printfQuda("           fx2 = %16.12e.\n", fx2);
-      mdd = xmyNorm(*ft, *fx);
-      printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-      printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/ft2);
-      printfQuda("f3: ------>\n");
-      } 
-// f4
-      {
-      blas::zero(*fx); blas::zero(*ft);
-      mat_precondition->Dslash4prePartial(*ft, *fb, static_cast<QudaParity>(0), sp_len0, RR0, Xs0); 
-      mat_precondition->fused_f4(*fx, *cb, 1., static_cast<QudaParity>(0), shift2, shift1);
-      printfQuda("f4: <------\n");
-      ft2 = blas::norm2(*ft);
-      printfQuda("           ft2 = %16.12e.\n", ft2);
-      fx2 = blas::norm2(*fx);
-      printfQuda("           fx2 = %16.12e.\n", fx2);
-      mdd = xmyNorm(*ft, *fx);
-      printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-      printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd/ft2);
-      printfQuda("f4: ------>\n");
-      } 
-    }
-#endif
+    
     delete tx;
     delete tt;
     delete tb;
@@ -392,16 +307,16 @@ namespace quda {
     printfQuda("dslash test completed. ----->\n");
   }
 
-  void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in, const double scale ){
+  void MSPCG::inner_dslash( ColorSpinorField& out, const ColorSpinorField& in ){
     int odd_bit = (mat_precondition->getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if(tc && (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION)){
       if(R[0] == 2){
-        mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift2, shift2);
-        mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift1, shift2);
-        mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift0, shift1);
-        mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift1, shift1);
-        mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift2, shift2);
+        mat_precondition->fused_f4(*iftmp, in, parity[1], shift2, shift2);
+        mat_precondition->fused_f0(*ifset, *iftmp, parity[0], shift1, shift2);
+        mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, parity[1], shift0, shift1);
+        mat_precondition->fused_f2(*ifset, *ifmmp, parity[0], shift1, shift1);
+        mat_precondition->fused_f3(out, *ifset, *iftmp, parity[1], shift2, shift2);
       }else{
         errorQuda("Padding can only be 2\n");
       }

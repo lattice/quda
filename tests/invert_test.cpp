@@ -217,6 +217,7 @@ int main(int argc, char **argv)
     inv_param.eofa_shift = 0.12345;
     inv_param.mq2 = 0.12345;
     inv_param.mq3 = 1.12345;
+    inv_param.hasenbusch_shift = 2.0;
   }
 
   // offsets used only by multi-shift solver

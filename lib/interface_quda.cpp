@@ -1538,8 +1538,9 @@ namespace quda {
       diracParam.mq3 = inv_param->mq3;
       break;
     case QUDA_MOBIUS_DWF_DSLASH:
-      if (inv_param->Ls > QUDA_MAX_DWF_LS)
-	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
+      if (inv_param->Ls > QUDA_MAX_DWF_LS){
+	      errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
+      }
       diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_DIRAC;
       diracParam.Ls = inv_param->Ls;
       if (sizeof(Complex) != sizeof(double _Complex)) {
@@ -1547,6 +1548,10 @@ namespace quda {
       }
       memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex)*inv_param->Ls);
       memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex)*inv_param->Ls);
+      if(!pc and inv_param->hasenbusch_shift != 0.0){
+        errorQuda("The constant Hasenbusch shift ONLY works for the preconditioned dslash.\n");
+      }
+      diracParam.hasenbusch_shift = inv_param->hasenbusch_shift;
       break;
     case QUDA_STAGGERED_DSLASH:
       diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
@@ -2909,6 +2914,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
   checkInvertParam(param, hp_x, hp_b);
+
+  if(param->solution_type != QUDA_MATDAG_MAT_SOLUTION && param->hasenbusch_shift != 0.0){
+    errorQuda("The constant Hasenbusch shift ONLY works with QUDA_MATDAG_MAT_SOLUTION.\n");
+  }
 
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
