@@ -83,7 +83,7 @@ namespace quda {
     QudaFieldLocation location; // where are we storing the field (CUDA or CPU)?
 
     int nColor; // Number of colors of the field
-    int nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
+    int nSpin; // =1 for staggered, =2 for coarse Dslash or staggered sextet, =4 for 4d spinor
     int nVec;  // number of packed vectors (for multigrid transfer operator)
 
     QudaTwistFlavorType twistFlavor; // used by twisted mass
@@ -133,10 +133,10 @@ namespace quda {
         LatticeFieldParam(4, X, 0, inv_param.cpu_prec),
         location(location),
         nColor(3),
-        nSpin((inv_param.dslash_type == QUDA_ASQTAD_DSLASH || inv_param.dslash_type == QUDA_STAGGERED_DSLASH
-                  || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
-                1 :
-                4),
+        nSpin( (inv_param.dslash_type == QUDA_ASQTAD_DSLASH ||
+                inv_param.dslash_type == QUDA_STAGGERED_DSLASH ||
+                inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ? 1 :
+               (inv_param.dslash_type == QUDA_STAGGERED_SEXTET_DSLASH ? 2 : 4) ),
         nVec(1),
         twistFlavor(inv_param.twist_flavor),
         siteOrder(QUDA_INVALID_SITE_ORDER),

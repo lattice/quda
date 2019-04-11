@@ -176,6 +176,12 @@ namespace quda {
     } else if (param.type == QUDA_STAGGEREDPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
       return new DiracStaggeredPC(param);
+    } else if (param.type == QUDA_STAGGERED_SEXTET_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggeredSextet operator\n");
+      return new DiracStaggeredSextet(param);
+    } else if (param.type == QUDA_STAGGERED_SEXTETPC_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggeredSextetPC operator\n");
+      return new DiracStaggeredSextetPC(param);
     } else if (param.type == QUDA_ASQTAD_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggered operator\n");
       return new DiracImprovedStaggered(param);

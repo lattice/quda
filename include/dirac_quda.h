@@ -787,6 +787,68 @@ public:
 			     const QudaSolutionType) const;
   };
 
+  // Full staggered
+  class DiracStaggeredSextet : public Dirac {
+
+  protected:
+
+  public:
+    DiracStaggeredSextet(const DiracParam &param);
+    DiracStaggeredSextet(const DiracStaggeredSextet &dirac);
+    virtual ~DiracStaggeredSextet();
+    DiracStaggeredSextet& operator=(const DiracStaggeredSextet &dirac);
+
+    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+  
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+			const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse staggered operator.  Unlike the Wilson operator,
+     *        we assume a mass normalization, not a kappa normalization. Thus kappa
+     *        gets ignored. 
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+      double kappa, double mass, double mu=0., double mu_factor=0.) const;
+  };
+
+  // Even-odd preconditioned staggered
+  class DiracStaggeredSextetPC : public DiracStaggeredSextet {
+
+  protected:
+
+  public:
+    DiracStaggeredSextetPC(const DiracParam &param);
+    DiracStaggeredSextetPC(const DiracStaggeredSextetPC &dirac);
+    virtual ~DiracStaggeredSextetPC();
+    DiracStaggeredSextetPC& operator=(const DiracStaggeredSextetPC &dirac);
+
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+  };
+
   /**
      This class serves as a front-end to the coarse Dslash operator,
      similar to the other dslash operators.
@@ -1112,6 +1174,8 @@ public:
     bool isStaggered() const {
       return (Type() == typeid(DiracStaggeredPC).name() ||
 	      Type() == typeid(DiracStaggered).name()   ||
+              Type() == typeid(DiracStaggeredSextetPC).name() ||
+	      Type() == typeid(DiracStaggeredSextet).name()   ||
 	      Type() == typeid(DiracImprovedStaggeredPC).name() ||
 	      Type() == typeid(DiracImprovedStaggered).name()) ? true : false;
     }
