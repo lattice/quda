@@ -237,9 +237,6 @@ namespace quda {
     matSloppy(w, u, tmpSloppy);
     zero(xSloppy);
 
-    double stop = rnorm*rnorm*param.tol*param.tol;
-    double heavy_quark_res = 0.0;
-
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -269,6 +266,9 @@ namespace quda {
 
     rnorm = sqrt(rnorm);
     printfQuda(" PipeFCG: Initial (relative) residual %le \n", rnorm / norm2b);
+    //
+    double stop = rnorm*rnorm*param.tol*param.tol;
+    double heavy_quark_res = 0.0;    
 
     eta[0]   = delta; alpha  = gamma / delta;
 
@@ -320,26 +320,26 @@ namespace quda {
 
     // Iteration control params:
     int k = 1;
-    bool converged = false;
+    bool is_converged = false;
 
     //Truncation length (Notay version):
-	  int nu = 1;
+    int nu = 1;
 
-    while (k < param.maxiter && converged == false) {
+    while (k < param.maxiter && is_converged == false) {
 
       int idx = k % (mmax + 1);
       // must finish all global comms here
       // eta[idx] = delta -sum beta[j]*beta[j]*eta[k]
-	    eta[idx] = 0.0;
+      eta[idx] = 0.0;
 
       for (int i = std::max(0,k-nu), j = beta_buffer_offset; i < k; i++, j++) {
         int kdx = (i % (mmax+1));
-		    beta[j] /= -eta[kdx];
-	      eta[idx] -= ((beta[j])*(beta[j])) * eta[kdx];
+        beta[j] /= -eta[kdx];
+	eta[idx] -= ((beta[j])*(beta[j])) * eta[kdx];
       }
-	    // additional check
-	    eta[idx] += delta;
-	    if(eta[idx] <= 0.) {
+      // additional check
+      eta[idx] += delta;
+      if(eta[idx] <= 0.) {
         printfQuda("Restart due to square root breakdown or exact zero of eta at it = %d ", k);
         break;
       } else {
@@ -361,18 +361,18 @@ namespace quda {
         axpy( beta[j], z[kdx], z[idx]);
       }
 
-	    // Update x, r, z, w
+      // Update x, r, z, w
       axpy( +alpha, p[idx], xSloppy);
       axpy( -alpha, s[idx], rSloppy);
       axpy( -alpha, q[idx], u);
       axpy( -alpha, z[idx], w);
 
-	    nu = ((k) % mmax)+1;
+      nu = ((k) % mmax)+1;
 
       commGlobalReductionSet(false);
-	    gamma = reDotProduct(rSloppy, u);
+      gamma = reDotProduct(rSloppy, u);
       delta = reDotProduct(w, u);
-	    rnorm = norm2(rSloppy);
+      rnorm = norm2(rSloppy);
 
       for (int i = std::max(0,k-nu+1), j = beta_buffer_offset; i <= k; i++, j++) {
         int kdx = (i % (mmax+1));
@@ -406,7 +406,9 @@ namespace quda {
       if (comm_size() > 1) memcpy(beta.get(), recvbuff.get(), buffer_size*sizeof(double));
 
       rnorm = sqrt(rnorm);
-      // Check for convergence
+      // Check for convergence:
+      is_converged = ((rnorm*rnorm) < stop);
+
       printfQuda("PipeFCG(%d:%d): %d iteration, iter residual: %1.15e \n", mmax, nu, k, rnorm/norm2b);
 
       k += 1;

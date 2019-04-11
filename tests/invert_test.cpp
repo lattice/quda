@@ -245,7 +245,7 @@ int main(int argc, char **argv)
 
   inv_param.pipeline = pipeline;
 
-  inv_param.Nsteps = 2;
+  inv_param.Nsteps = 1;
   inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.ca_basis = ca_basis;
   inv_param.ca_lambda_min = ca_lambda_min;
@@ -281,7 +281,7 @@ int main(int argc, char **argv)
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 10;
+  inv_param.maxiter_precondition = 8;
   inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
