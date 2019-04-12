@@ -17,8 +17,9 @@ set (QUDA_OBJS
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
-  dirac_improved_staggered.cpp dirac_domain_wall.cpp
-  dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
+  dirac_improved_staggered.cpp dirac_staggered_sextet.cpp
+  dirac_domain_wall.cpp dirac_domain_wall_4d.cpp
+  dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
   field_strength_tensor.cu clover_quda.cu dslash_quda.cu
