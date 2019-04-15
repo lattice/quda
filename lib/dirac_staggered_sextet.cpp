@@ -54,7 +54,7 @@ namespace quda {
       errorQuda("Not supported");
     }
 
-    flops += 570ll*in.Volume();
+    flops += 4794ll*in.Volume(); // 594 flops per gauge * sextet multiplication
   }
 
   void DiracStaggeredSextet::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -68,7 +68,7 @@ namespace quda {
       errorQuda("Not supported");
     }  
 
-    flops += 582ll*in.Volume();
+    flops += (4794ll + 12ll)*in.Volume();
   }
 
   // Full staggered operator

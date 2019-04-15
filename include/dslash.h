@@ -294,6 +294,9 @@ public:
       if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.restore();
     }
 
+    // SU(N) matrix-vector flops
+    virtual long long mv_flops() const { return (8 * in.Ncolor() - 2) * in.Ncolor(); }
+
     /*
       per direction / dimension flops
       spin project flops = Nc * Ns
@@ -312,9 +315,8 @@ public:
     */
     virtual long long flops() const
     {
-      int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
       int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
-      int ghost_flops = (num_mv_multiply * mv_flops + 2 * in.Ncolor() * in.Nspin());
+      int ghost_flops = (num_mv_multiply * mv_flops() + 2 * in.Ncolor() * in.Nspin());
       int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
       int num_dir = 2 * 4; // set to 4-d since we take care of 5-d fermions in derived classes where necessary
 
@@ -339,8 +341,8 @@ public:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
-                     num_dir * num_mv_multiply * mv_flops +               // SU(3) matrix-vector multiplies
-                     ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
+                  num_dir * num_mv_multiply * mv_flops() +               // SU(3) matrix-vector multiplies
+                  ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
             * sites; // accumulation
         if (arg.xpay) flops_ += xpay_flops * sites;
 

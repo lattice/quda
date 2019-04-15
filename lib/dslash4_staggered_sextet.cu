@@ -58,6 +58,9 @@ public:
       }
     }
 
+    // SU(N) times sextet fermion flops = N^2 matrix-vector multiplications
+    virtual long long mv_flops() const { return in.Ncolor() * in.Ncolor() * Dslash<Float>::mv_flops(); }
+
     TuneKey tuneKey() const
     {
       return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
