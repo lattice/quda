@@ -83,6 +83,9 @@ void inline qudamilc_called(const char * func){
   qudamilc_called<start>(func, getVerbosity());
 }
 
+void qudaSetMPICommHandle(void *mycomm){
+  setMPICommHandleQuda(mycomm);
+}
 
 void qudaInit(QudaInitArgs_t input)
 {
@@ -1550,6 +1553,7 @@ void qudaLoadCloverField(int external_precision,
     void* milc_clover_inv,
     QudaSolutionType solution_type,
     QudaSolveType solve_type,
+    QudaInverterType inverter,
     double clover_coeff,
     int compute_trlog,
     double *trlog) {
@@ -1558,9 +1562,19 @@ void qudaLoadCloverField(int external_precision,
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, 0.0, 0.0);
   invertParam.solution_type = solution_type;
   invertParam.solve_type = solve_type;
+  invertParam.inv_type = inverter;
   invertParam.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
   invertParam.compute_clover_trlog = compute_trlog;
   invertParam.clover_coeff = clover_coeff;
+
+  // Hacks to mollify checkInvertParams which is called from
+  // loadCloverQuda. These "required" parameters are irrelevant here.
+  // Better procedure: invertParam should be defined in
+  // qudaCloverInvert and qudaEigCGCloverInvert and passed here
+  // instead of redefining a partial version here
+  invertParam.tol = 0.;
+  invertParam.tol_hq = 0.;
+  invertParam.residual_type = static_cast<QudaResidualType_s>(0);
 
   if(invertParam.dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     if (clover_alloc == 0) {
@@ -1618,7 +1632,7 @@ void qudaCloverInvert(int external_precision,
 
   if (clover || cloverInverse) {
     qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
-			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
+			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, QUDA_BICGSTAB_INVERTER, clover_coeff, 0, 0);
   }
 
   double reliable_delta = 1e-1;
@@ -1682,7 +1696,7 @@ void qudaEigCGCloverInvert(int external_precision,
 
   if ( (clover || cloverInverse) && (rhs_idx == 0)) {
     qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
-			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
+			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, QUDA_INC_EIGCG_INVERTER, clover_coeff, 0, 0);
   }
 
   double reliable_delta = 1e-1;
