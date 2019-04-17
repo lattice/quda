@@ -222,137 +222,91 @@ namespace quda {
       computeUV<from_coarse,Float,dim,dir,fineSpin,fineColor,coarseSpin,coarseColor>(arg, arg.AV, parity, x_cb, ic_c);
   }
 
-#ifndef DYNAMIC_CLOVER
-  /**
-     Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x)
-     Where: s = fine spin, c' = coarse color, c = fine color
-  */
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ inline void computeAV(Arg &arg, int parity, int x_cb, int ic_c) {
-
-    complex<Float> AV[fineSpin][fineColor];
-
-#pragma unroll
-    for (int s = 0; s < fineSpin; s++) {
-#pragma unroll
-      for (int c = 0; c < fineColor; c++) {
-	AV[s][c] = static_cast<Float>(0.0);
-      }
-    }
-
-#pragma unroll
-    for (int s = 0; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = arg.spin_map(s,parity); // Coarse spin
-
-      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
-      //in the same chiral block.
-      for (int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
-
-#pragma unroll
-	for (int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-#pragma unroll
-	  for (int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	    caxpy(arg.Cinv(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, ic_c), AV[s][ic]);
-	  }  //Fine color columns
-	}  //Fine color rows
-      }
-    } //Fine Spin
-
-#pragma unroll
-    for (int s=0; s<fineSpin; s++) {
-#pragma unroll
-      for (int ic=0; ic<fineColor; ic++) {
-	arg.AV(parity, x_cb, s, ic, ic_c) = AV[s][ic];
-      }
-    }
-
-  } // computeAV
-
-#else
-
   /**
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x)
      Where: s = fine spin, c' = coarse color, c = fine color
   */
   template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ inline void computeAV(Arg &arg, int parity, int x_cb, int ic_c)
+  __device__ __host__ inline void computeAV(Arg &arg, int parity, int x_cb, int ch, int ic_c)
   {
-
     constexpr int N = fineSpin * fineColor / 2;
-    typedef HMatrix<Float, N> Mat;
+    HMatrix<Float, N> A;
 
 #pragma unroll
-    for (int ch = 0; ch < 2; ch++) { // Loop over chiral blocks
-      Mat A;
-
+    for (int i = 0; i < N; i++) {
+      int s_i = 2 * ch + i / fineColor;
+      int c_i = i % fineColor;
 #pragma unroll
-      for (int i = 0; i < N; i++) {
-#pragma unroll
-        for (int j = 0; j <= i; j++) {
-          A(i, j) = arg.C(0, parity, x_cb, 2 * ch + i / fineColor, 2 * ch + j / fineColor, i % fineColor, j % fineColor);
-        }
+      for (int j = 0; j <= i; j++) {
+        int s_j = 2 * ch + j / fineColor;
+        int c_j = j % fineColor;
+#ifndef DYNAMIC_CLOVER
+        A(i, j) = arg.Cinv(0, parity, x_cb, s_i, s_j, c_i, c_j);
+#else
+        A(i, j) = arg.C(0, parity, x_cb, s_i, s_j, c_i, c_j);
+#endif
       }
+    }
 
-      // invert the matrix (could replace with back/forward substitution?)
-      linalg::Cholesky<HMatrix, Float, N> cholesky(A);
-      const Mat Ainv = cholesky.invert();
-
-      complex<Float> AV[fineSpin / 2][fineColor];
-#pragma unroll
-      for (int s = 0; s < fineSpin / 2; s++) {
-#pragma unroll
-        for (int c = 0; c < fineColor; c++) { AV[s][c] = static_cast<Float>(0.0); }
+    ColorSpinor<Float,fineColor,fineSpin/2> V;
+    for (int s = 0; s < fineSpin/2; s++) {
+      for (int c = 0; c < fineColor; c++) {
+        V(s,c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c);
       }
+    }
+
+#ifndef DYNAMIC_CLOVER
+    auto AV = A * V;
+#else
+
+    // invert the matrix (could replace with back/forward substitution?)
+    linalg::Cholesky<HMatrix, Float, N> cholesky(A);
+    const auto Ainv = cholesky.invert();
+    auto AV = Ainv * V;
+#endif
 
 #pragma unroll
-      for (int s = 0; s < fineSpin / 2; s++) {               // Fine Spin
-
+    for (int s=0; s<fineSpin/2; s++) {
 #pragma unroll
-        for (int s_col = 0; s_col < fineSpin / 2; s_col++) { // hard coded for chiral structure and spin_bs = 2
-
-#pragma unroll
-          for (int ic = 0; ic < fineColor; ic++) {           // Fine Color rows of gauge field
-#pragma unroll
-            for (int jc = 0; jc < fineColor; jc++) {         // Fine Color columns of gauge field
-              caxpy(Ainv(s * fineColor + ic, s_col * fineColor + jc), arg.V(parity, x_cb, 2 * ch + s_col, jc, ic_c),
-                  AV[s][ic]);
-            } // Fine color columns
-          }   // Fine color rows
-        }
-      } // Fine Spin
-
-#pragma unroll
-      for (int s = 0; s < fineSpin / 2; s++) {
-#pragma unroll
-        for (int ic = 0; ic < fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV[s][ic]; }
+      for (int ic=0; ic<fineColor; ic++) {
+	arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic);
       }
-
-    } // chirality
+    }
 
   } // computeAV
 
-#endif
-
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  void ComputeAVCPU(Arg &arg) {
+  void ComputeAVCPU(Arg &arg)
+  {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-	for (int ic_c=0; ic_c < coarseColor; ic_c++) // coarse color
-	  computeAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, ic_c);
+        for (int ch = 0; ch < 2; ch++) { // Loop over chiral blocks
+
+          for (int ic_c=0; ic_c < coarseColor; ic_c++) { // coarse color
+            computeAV<Float,fineSpin,fineColor,coarseColor>(arg, parity, x_cb, ch, ic_c);
+          }
+        }
       } // c/b volume
     }   // parity
   }
 
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __global__ void ComputeAVGPU(Arg arg) {
+  __global__ void ComputeAVGPU(Arg arg)
+  {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+    int ch_parity = blockDim.y*blockIdx.y + threadIdx.y;
+    if (ch_parity >= 4) return;
+    int ch = ch_parity % 2;
+    int parity = ch_parity / 2;
+
     int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
     if (ic_c >= coarseColor) return;
-    computeAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, ic_c);
+
+    if (ch == 0) computeAV<Float,fineSpin,fineColor,coarseColor>(arg, parity, x_cb, 0, ic_c);
+    else         computeAV<Float,fineSpin,fineColor,coarseColor>(arg, parity, x_cb, 1, ic_c);
   }
 
   /**
@@ -478,144 +432,68 @@ namespace quda {
      Where: s = fine spin, c' = coarse color, c = fine color
   */
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ inline void computeTMCAV(Arg &arg, int parity, int x_cb) {
+  __device__ __host__ inline void computeTMCAV(Arg &arg, int parity, int x_cb, int ch, int ic_c)
+  {
+    constexpr int N = fineSpin * fineColor / 2;
+    HMatrix<Float, N> A;
 
-    complex<Float> mu(0.,arg.mu);
-    complex<Float> UV[fineSpin][fineColor][coarseColor];
-
-    for (int s = 0; s < fineSpin; s++)
-      for (int c = 0; c < fineColor; c++)
-	for (int v = 0; v < coarseColor; v++)
-	  UV[s][c][v] = static_cast<Float>(0.0);
-
-    //First we store in UV the product [(Clover -/+ i mu)·Vector]
-    for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = arg.spin_map(s,parity); // Coarse Spin
-
-      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
-      //in the same chiral block.
-      for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
-
-	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	      caxpy(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, ic_c), UV[s][ic][ic_c]);
-	    }  //Fine color columns
-	  }  //Fine color rows
-	} //Coarse color
+#pragma unroll
+    for (int i = 0; i < N; i++) {
+      int s_i = 2 * ch + i / fineColor;
+      int c_i = i % fineColor;
+#pragma unroll
+      for (int j = 0; j <= i; j++) {
+        int s_j = 2 * ch + j / fineColor;
+        int c_j = j % fineColor;
+        A(i, j) = arg.C(0, parity, x_cb, s_i, s_j, c_i, c_j);
       }
-    } //Fine Spin
+    }
 
-    for(int s = 0; s < fineSpin/2; s++) {  //Fine Spin
-      for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	for(int ic = 0; ic < fineColor; ic++) { //Fine Color
-	  UV[s][ic][ic_c] -= mu * arg.V(parity, x_cb, s, ic, ic_c);
-	}  //Fine color
-      } //Coarse color
-    } //Fine Spin
+    complex<Float> mu(0., arg.mu);
+    if (ch == 0) mu *= static_cast<Float>(-1.0);
 
-    for(int s = fineSpin/2; s < fineSpin; s++) {  //Fine Spin
-      for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	for(int ic = 0; ic < fineColor; ic++) { //Fine Color
-	  UV[s][ic][ic_c] += mu * arg.V(parity, x_cb, s, ic, ic_c);
-	}  //Fine color
-      } //Coarse color
-    } //Fine Spin
+    ColorSpinor<Float,fineColor,fineSpin/2> V;
 
-    complex<Float> AV[fineSpin][fineColor][coarseColor];
-    for (int s = 0; s < fineSpin; s++)
-      for (int c = 0; c < fineColor; c++)
-	for (int v = 0; v < coarseColor; v++)
-	  AV[s][c][v] = static_cast<Float>(0.0);
+    for (int s = 0; s < fineSpin/2; s++) {
+      for (int c = 0; c < fineColor; c++) {
+        V(s,c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c);
+      }
+    }
 
-#ifndef	DYNAMIC_CLOVER
+    // first apply the clover matrix directly, including mu
+    auto UV = A * V;
+    UV += mu * V;
+
     //Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
     //for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
-    for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = arg.spin_map(s,parity); // Coarse Spin
 
-      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
-      //in the same chiral block.
-      for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
-
-	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-              caxpy(arg.Cinv(0, parity, x_cb, s, s_col, ic, jc), UV[s_col][jc][ic_c], AV[s][ic][ic_c]);
-	    }  //Fine color columns
-	  }  //Fine color rows
-	} //Coarse color
+#ifndef	DYNAMIC_CLOVER
+    // load in the clover inverse matrix
+    HMatrix<Float, N> Ainv;
+#pragma unroll
+    for (int i = 0; i < N; i++) {
+      int s_i = 2 * ch + i / fineColor;
+      int c_i = i % fineColor;
+#pragma unroll
+      for (int j = 0; j <= i; j++) {
+        int s_j = 2 * ch + j / fineColor;
+        int c_j = j % fineColor;
+        Ainv(i, j) = arg.Cinv(0, parity, x_cb, s_i, s_j, c_i, c_j);
       }
-    } //Fine Spin
-
-    for (int s = 0; s < fineSpin; s++)
-      for (int c = 0; c < fineColor; c++)
-	for (int v = 0; v < coarseColor; v++)
-	  arg.AV(parity, x_cb, s, c, v) = AV[s][c][v];
+    }
 #else
-    constexpr int N = fineSpin * fineColor / 2;
-    typedef HMatrix<Float, N> Mat;
+    // compute the clover inverse matrix with the already loaded clover matrix
+    A = A.square();
+    A += arg.mu * arg.mu;
 
-#pragma unroll
-    for (int ch = 0; ch < 2; ch++) { // Loop over chiral blocks
-      Mat A;
-
-#pragma unroll
-      for (int i = 0; i < N; i++) {
-#pragma unroll
-        for (int j = 0; j <= i; j++) {
-          A(i, j) = arg.C(0, parity, x_cb, 2 * ch + i / fineColor, 2 * ch + j / fineColor, i % fineColor, j % fineColor);
-        }
-      }
-
-      A = A.square();
-      A += arg.mu * arg.mu;
-
-      // invert the matrix (could replace with direct back/forward substitution?)
-      linalg::Cholesky<HMatrix, Float, N> cholesky(A);
-      const Mat Ainv = cholesky.invert();
-
-      complex<Float> AV[fineSpin / 2][fineColor][coarseColor];
-#pragma unroll
-      for (int s = 0; s < fineSpin / 2; s++) {
-#pragma unroll
-        for (int c = 0; c < fineColor; c++) {
-#pragma unroll
-          for (int v = 0; v < coarseColor; c++) { AV[s][c][v] = static_cast<Float>(0.0); }
-        }
-      }
-
-#pragma unroll
-      for (int s = 0; s < fineSpin / 2; s++) {               // Fine Spin
-#pragma unroll
-        for (int s_col = 0; s_col < fineSpin / 2; s_col++) { // hard coded for chiral structure and spin_bs = 2
-#pragma unroll
-          for (int ic_c = 0; ic_c < coarseColor; ic_c++) {   // Coarse Color
-#pragma unroll
-            for (int ic = 0; ic < fineColor; ic++) {         // Fine Color rows of gauge field
-#pragma unroll
-              for (int jc = 0; jc < fineColor; jc++) {       // Fine Color columns of gauge field
-                caxpy(Ainv(s * fineColor + ic, s_col * fineColor + jc), UV[s_col][jc][ic_c], AV[s][ic][ic_c]);
-              } // Fine color columns
-            }   // Fine color rows
-          }     // coarse color
-        }
-      } // Fine Spin
-
-#pragma unroll
-      for (int s = 0; s < fineSpin / 2; s++) {
-#pragma unroll
-        for (int ic = 0; ic < fineColor; ic++) {
-#pragma unroll
-          for (int v = 0; v < coarseColor; v++) { // Coarse Color
-            arg.AV(parity, x_cb, 2 * ch + s, ic, v) = AV[s][ic][v];
-          }
-        }
-      }
-
-    } // chirality
-
+    linalg::Cholesky<HMatrix, Float, N> cholesky(A);
+    const auto Ainv = cholesky.invert();
 #endif
+    auto AV = Ainv * UV;
+
+    for (int s = 0; s < fineSpin/2; s++)
+      for (int c = 0; c < fineColor; c++)
+        arg.AV(parity, x_cb, 2*ch + s, c, ic_c) = AV(s,c);
   } // computeTMCAV
 
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
@@ -623,7 +501,11 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-	computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
+        for (int ch=0; ch < 2; ch++) {
+          for (int ic_c=0; ic_c < coarseColor; ic_c++) { // coarse color
+            computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, ch, ic_c);
+          }
+        }
       } // c/b volume
     }   // parity
   }
@@ -633,8 +515,16 @@ namespace quda {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
+    int ch_parity = blockDim.y*blockIdx.y + threadIdx.y;
+    if (ch_parity >= 4) return;
+    int ch = ch_parity % 2;
+    int parity = ch_parity / 2;
+
+    int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
+    if (ic_c >= coarseColor) return;
+
+    if (ch == 0) computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, 0, ic_c);
+    else         computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, 1, ic_c);
   }
 
   /**

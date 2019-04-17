@@ -624,7 +624,10 @@ namespace quda {
         break;
       case COMPUTE_UV:
       case COMPUTE_TMAV:
-      case COMPUTE_AV: resizeVector(2, coarseColor); break;
+        resizeVector(2, coarseColor); break;
+      case COMPUTE_AV:
+      case COMPUTE_TMCAV:
+        resizeVector(4, coarseColor); break; // y dimension is chirality and parity
       default:
 	resizeVector(2,1);
 	break;
@@ -748,7 +751,7 @@ namespace quda {
 #ifdef DYNAMIC_CLOVER
       if (type == COMPUTE_AV || type == COMPUTE_CLOVER_INV_MAX || // ensure separate tuning for dynamic
           type == COMPUTE_TMCAV || type == COMPUTE_TWISTED_CLOVER_INV_MAX)
-        strcat(Aux, "Dynamic");
+        strcat(Aux, ",Dynamic");
 #endif
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
