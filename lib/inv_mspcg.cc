@@ -190,7 +190,7 @@ namespace quda {
     precise_timer.Reset("woo", "hoo", 0);
     sloppy_timer.Reset("woo", "hoo", 0);
     preconditioner_timer.Reset("woo", "hoo", 0);
-    for(int i = 0; i < 6; i++) linalg_timer[i].Reset("Woo", "Hoo", 0);
+    for(int i = 0; i < 2; i++) linalg_timer[i].Reset("Woo", "Hoo", 0);
   }
 
   MSPCG::~MSPCG(){
@@ -859,11 +859,9 @@ namespace quda {
       sloppy_tflops/sloppy_timer.time, sloppy_timer.time, int(sloppy_timer.time/param.secs*100.), sloppy_timer.count);
     printfQuda("Performance preconditioner: %8.2f TFLOPS in %8.2f secs(%02d%%) with %05d calls.\n", 
       preconditioner_tflops/prec_time, prec_time, int(prec_time/param.secs*100.), preconditioner_timer.count);
-    printfQuda("Performance copier:                         in %8.2f secs with %05d calls.\n",
-      copier_timer.time, copier_timer.count);
     for(int i = 0; i < 2; i++){
-    printfQuda("Performance linear algebra [%d]:             in %8.2f secs with %05d calls.\n",
-      i, linalg_timer[i].time, linalg_timer[i].count);
+    printfQuda("Performance linear algebra [%d]:             in %8.2f secs(%02d%%) with %05d calls.\n",
+      i, linalg_timer[i].time, int(linalg_timer[i].time/param.secs*100.), linalg_timer[i].count);
     }
     printfQuda("Total time %8.2f secs.\n", param.secs); 
     // printf("preconditioner desync #%03d: %8.4f msecs.\n", comm_rank(), preconditioner_timer.last*1e3);
