@@ -7,10 +7,10 @@
 
 namespace quda {
 
-  DiracTwistedClover::DiracTwistedClover(const DiracParam &param, const int nDim) 
+  DiracTwistedClover::DiracTwistedClover(const DiracParam &param, const int nDim)
     : DiracWilson(param, nDim), mu(param.mu), epsilon(param.epsilon), clover(*(param.clover)) { }
 
-  DiracTwistedClover::DiracTwistedClover(const DiracTwistedClover &dirac) 
+  DiracTwistedClover::DiracTwistedClover(const DiracTwistedClover &dirac)
     : DiracWilson(dirac), mu(dirac.mu), epsilon(dirac.epsilon), clover(dirac.clover) { }
 
   DiracTwistedClover::~DiracTwistedClover() { }
@@ -86,7 +86,7 @@ namespace quda {
   void DiracTwistedClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    if (in.TwistFlavor() != out.TwistFlavor()) 
+    if (in.TwistFlavor() != out.TwistFlavor())
       errorQuda("Twist flavors %d %d don't match", in.TwistFlavor(), out.TwistFlavor());
 
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID) {
@@ -101,7 +101,7 @@ namespace quda {
     FullClover *cI = new FullClover(clover, true);
 
     if(in.TwistFlavor() == QUDA_TWIST_SINGLET){
-      double a = 2.0 * kappa * mu;//for direct twist (must be daggered separately)  
+      double a = 2.0 * kappa * mu;//for direct twist (must be daggered separately)
       twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out.Odd()),
 			      *gauge, cs, cI, &static_cast<const cudaColorSpinorField&>(in.Even()),
 			      QUDA_ODD_PARITY, dagger, &static_cast<const cudaColorSpinorField&>(in.Odd()),
@@ -131,7 +131,7 @@ namespace quda {
   }
 
   void DiracTwistedClover::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-				   ColorSpinorField &x, ColorSpinorField &b, 
+				   ColorSpinorField &x, ColorSpinorField &b,
 				   const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
@@ -192,7 +192,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (in.TwistFlavor() != out.TwistFlavor()) 
+    if (in.TwistFlavor() != out.TwistFlavor())
       errorQuda("Twist flavors %d %d don't match", in.TwistFlavor(), out.TwistFlavor());
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
@@ -215,7 +215,7 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       double a = -2.0 * kappa * mu;  //for invert twist (not daggered)
-      double b = 1.;// / (1.0 + a*a);                     //for invert twist 
+      double b = 1.;// / (1.0 + a*a);                     //for invert twist
       if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 	twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, cI,
 				&static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0,
@@ -245,7 +245,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-    if (in.TwistFlavor() != out.TwistFlavor()) 
+    if (in.TwistFlavor() != out.TwistFlavor())
       errorQuda("Twist flavors %d %d don't match", in.TwistFlavor(), out.TwistFlavor());
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
@@ -338,7 +338,7 @@ namespace quda {
   }
 
   void DiracTwistedCloverPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-				     ColorSpinorField &x, ColorSpinorField &b, 
+				     ColorSpinorField &x, ColorSpinorField &b,
 				     const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
@@ -359,28 +359,20 @@ namespace quda {
     TwistCloverInv(symmetric ? *src : *tmp1, odd_bit ? b.Even() : b.Odd(), odd_bit ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY);
 
     // we desire solution to full system
-    if(b.TwistFlavor() == QUDA_TWIST_SINGLET) {
+    if (b.TwistFlavor() == QUDA_TWIST_SINGLET) {
 
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
         // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
-        src = &(x.Odd());
         DiracWilson::DslashXpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), kappa);
-        sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD) {
         // src = A_oo^-1 (b_o + k D_oe A_ee^-1 b_e)
-        src = &(x.Even());
         DiracWilson::DslashXpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), kappa);
-        sol = &(x.Odd());
       } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // src = b_e + k D_eo A_oo^-1 b_o
-        src = &(x.Odd());
         DiracWilson::DslashXpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), kappa);
-        sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // src = b_o + k D_oe A_ee^-1 b_e
-        src = &(x.Even());
         DiracWilson::DslashXpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa);
-        sol = &(x.Odd());
       } else {
         errorQuda("MatPCType %d not valid for DiracTwistedCloverPC", matpcType);
       }
@@ -396,33 +388,32 @@ namespace quda {
 
     deleteTmp(&tmp1, reset);
   }
-  
+
   void DiracTwistedCloverPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 					 const QudaSolutionType solType) const
   {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      return;
-    }				
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) { return; }
 
     checkFullSpinor(x, b);
     bool reset = newTmp(&tmp1, b.Even());
+    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
 
     // create full solution
-    if(b.TwistFlavor() == QUDA_TWIST_SINGLET) {    
+    if (b.TwistFlavor() == QUDA_TWIST_SINGLET) {
       if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // x_o = A_oo^-1 (b_o + k D_oe x_e)
         DiracWilson::DslashXpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-        TwistCloverInv(x.Odd(), *tmp1, QUDA_ODD_PARITY);
       } else if (matpcType == QUDA_MATPC_ODD_ODD ||   matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // x_e = A_ee^-1 (b_e + k D_eo x_o)
         DiracWilson::DslashXpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-        TwistCloverInv(x.Even(), *tmp1, QUDA_EVEN_PARITY);
       } else {
         errorQuda("MatPCType %d not valid for DiracTwistedCloverPC", matpcType);
       }
     } else { //twist doublet:
       errorQuda("Non-degenerate operator is not implemented");
     }//end of twist doublet...
+
+    TwistCloverInv(odd_bit ? x.Even() : x.Odd(), *tmp1, odd_bit ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY);
     deleteTmp(&tmp1, reset);
   }
 

@@ -337,7 +337,7 @@ namespace quda {
   }
 
   void DiracTwistedMassPC::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
-      ColorSpinorField &b, const QudaSolutionType solType) const
+                                   ColorSpinorField &b, const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
