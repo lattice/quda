@@ -385,7 +385,7 @@ static void initQMPComms(void){
     setMPICommHandleQuda(mycomm);
   }
 }
-#else
+#elif defined(MPI_COMMS)
 static void initMPIComms(void){
   // Default comm handle is MPI_COMM_WORLD
   if(!user_set_comm_handle){
@@ -406,7 +406,7 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
 
 #if QMP_COMMS
   initQMPComms();
-#else
+#elif defined(MPI_COMMS)
   initMPIComms();
 #endif
 
