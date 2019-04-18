@@ -880,9 +880,11 @@ void qudaMultishiftInvert(int external_precision,
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
   }
 
-  gaugeParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
-  invertParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
-  invertParam.reliable_delta_refinement = 0.1;
+  if (inv_args.mixed_precision == 1) {
+    gaugeParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
+    invertParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
+    invertParam.reliable_delta_refinement = 0.1;
+  }
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
