@@ -56,7 +56,13 @@ namespace quda {
 
       cudaColorSpinorField* immp;
       cudaColorSpinorField* ip;
-      
+
+#ifdef PIPELINED_PRECONDITIONER      
+      cudaColorSpinorField* iz;
+      cudaColorSpinorField* is;
+      cudaColorSpinorField* iw;
+      cudaColorSpinorField* iq;
+#endif 
       cudaColorSpinorField* ifmmp;
       cudaColorSpinorField* ifp;
       cudaColorSpinorField* iftmp;
@@ -98,6 +104,9 @@ namespace quda {
 
       void operator()(ColorSpinorField& out, ColorSpinorField& in);
       void reliable_update(ColorSpinorField& dx, ColorSpinorField& db);
+     
+      void pipelined_inner_cg(ColorSpinorField& ix, ColorSpinorField& ib);
+      void Minv(ColorSpinorField& out, const ColorSpinorField& in); 
       
       void inner_dslash( ColorSpinorField& out, const ColorSpinorField& in, const double scale = 1. );
       void inner_cg( ColorSpinorField& ix, ColorSpinorField& ib );

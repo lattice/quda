@@ -116,6 +116,12 @@ namespace quda {
     vct_dr(nullptr), vct_dp(nullptr), vct_dmmp(nullptr), vct_dtmp(nullptr), vct_dtmp2(nullptr),
     r(nullptr), p(nullptr), z(nullptr), mmp(nullptr), tmp(nullptr), tmp2(nullptr), 
     fr(nullptr), fz(nullptr),
+#ifdef PIPELINED_PRECONDITIONER
+    iz(nullptr),
+    is(nullptr),
+    iw(nullptr),
+    iq(nullptr),
+#endif    
     immp(nullptr), ip(nullptr), 
     ifmmp(nullptr), ifp(nullptr), iftmp(nullptr), ifset(nullptr), 
     inner_iterations(ic), reliable_update_delta(inv_param->reliable_delta)
@@ -449,7 +455,7 @@ namespace quda {
       axpyZpbx(alpha, *ip, ix, ib, beta);
       
       // Want to leave this debug code here since this might be useful.
-      /*
+      /**
       printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e p2 = %8.4e\n",
         local_loop_count, rk2, alpha, beta, Mpk2, sqrt(ip2/ip->Volume()/24.));
       */
@@ -459,6 +465,61 @@ namespace quda {
     
     return;
   }
+  
+#ifdef PIPELINED_PRECONDITIONER  
+  void MSPCG::pipelined_inner_cg(ColorSpinorField& ix, ColorSpinorField& ib)
+  {
+    commGlobalReductionSet(false);
+
+    blas::zero(ix);
+    inner_dslash(*iw, ib);
+
+    double gamma, gamma_old, delta, beta, alpha, alpha_old;
+
+    for(int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++){
+      inner_dslash(*iq, *iw);
+      
+      double3 aaab = cDotProductNormA(ib, *iw);
+
+      gamma_old = gamma; 
+      gamma = aaab.z;
+      delta = aaab.x;
+
+      if(local_loop_count == 0){
+        beta = 0.;
+        alpha = gamma/delta;
+        
+        blas::copy(*is, *iw);
+        blas::copy(*ip,  ib);
+        
+        blas::copy(*iz, *iq);
+      }else{
+        beta = gamma/gamma_old;
+        alpha_old = alpha;
+        alpha = 1./(delta/gamma-beta/alpha_old);
+        
+        xpay(*iw, beta, *is);
+        xpay( ib, beta, *ip);
+       
+        xpay(*iq, beta, *iz);
+      }
+
+      axpy(+alpha, *ip,  ix);
+      axpy(-alpha, *is,  ib);
+      axpy(-alpha, *iz, *iw);
+
+      // Want to leave this debug code here since this might be useful.
+      /**
+      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e\n",
+        local_loop_count, gamma, alpha, beta);
+      */
+    }
+
+    commGlobalReductionSet(true);
+    
+    return;
+  }
+#endif
 
   int MSPCG::outer_cg( ColorSpinorField& dx, ColorSpinorField& db, double quit )
   {
@@ -498,7 +559,31 @@ namespace quda {
 
     return loop_count;
   }
-
+  
+  void MSPCG::Minv(ColorSpinorField& out, const ColorSpinorField& in){
+    preconditioner_timer.Start("woo", "hoo", 0);
+    if(inner_iterations <= 0){
+      blas::copy(out, in);
+    }else{
+      blas::copy(*fr, in);
+      if(dirac_param_sloppy.gauge->Precision() == dirac_param_precondition.gauge->Precision()){
+#ifdef PIPELINED_PRECONDITIONER      
+        pipelined_inner_cg(out, *fr);
+#else
+        inner_cg(out, *fr);
+#endif
+      }else{
+#ifdef PIPELINED_PRECONDITIONER      
+        pipelined_inner_cg(*fz, *fr);
+#else
+        inner_cg(*fz, *fr);
+#endif
+        blas::copy(out, *fz);
+      }
+    }
+    preconditioner_timer.Stop("woo", "hoo", 0);
+  }
+  
   void MSPCG::allocate(ColorSpinorField& db){
  
 // initializing the fermion vectors.
@@ -534,7 +619,14 @@ namespace quda {
 // i* means inner preconditioning
     immp=  new cudaColorSpinorField(csParam);
     ip  =  new cudaColorSpinorField(csParam);
-    
+
+#ifdef PIPELINED_PRECONDITIONER
+    iz = new cudaColorSpinorField(csParam);
+    is = new cudaColorSpinorField(csParam);
+    iw = new cudaColorSpinorField(csParam);
+    iq = new cudaColorSpinorField(csParam);
+#endif
+
     csParam.x[0] += 2*R[0]/2; // x direction is checkerboarded
     for(int i=1; i<4; ++i){
       csParam.x[i] += 2*R[i];
@@ -590,7 +682,14 @@ namespace quda {
     
     delete immp;
     delete ip;
- 
+    
+#ifdef PIPELINED_PRECONDITIONER
+    delete iz;
+    delete is;
+    delete iw;
+    delete iq;
+#endif
+
     delete ifmmp;
     delete ifp;
     delete iftmp;
@@ -687,22 +786,9 @@ namespace quda {
     blas::copy(*r, *vct_dr); // throw true residual into the sloppy solver.
     blas::zero(*x);
 
-    blas::copy(*fr, *r);
-
     double rr2 = r2;
 
-    preconditioner_timer.Start("woo", "hoo", 0);
-    if(inner_iterations <= 0){
-      blas::copy(*z, *fr);
-    }else{
-      if(dirac_param_sloppy.gauge->Precision() == dirac_param_precondition.gauge->Precision()){
-        inner_cg(*z, *fr);
-      }else{
-        inner_cg(*fz, *fr);
-        blas::copy(*z, *fz);
-      }
-    }
-    preconditioner_timer.Stop("woo", "hoo", 0);
+    Minv(*z, *r);
 
     blas::copy(*p, *z);
 
@@ -787,21 +873,7 @@ namespace quda {
 
       linalg_timer[0].Stop(fname, cname, lname);
       
-      preconditioner_timer.Start(fname, cname, 0);
-      if(inner_iterations <= 0){
-        blas::copy(*z, *r);
-      }else{
-        // z = M^-1 r
-        blas::copy(*fr, *r);
-        if(dirac_param_sloppy.gauge->Precision() == dirac_param_precondition.gauge->Precision()){
-          inner_cg(*z, *fr);
-        }else{
-          inner_cg(*fz, *fr);
-          blas::copy(*z, *fz);
-        }
-      }
-     
-      preconditioner_timer.Stop(fname, cname, 0);
+      Minv(*z, *r);
 
       linalg_timer[1].Start(fname, cname, lname);      
       // replace with fused kernel?
