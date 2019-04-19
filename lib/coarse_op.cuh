@@ -623,14 +623,10 @@ namespace quda {
 	resizeVector(2*coarseColor,coarseColor);
         break;
       case COMPUTE_UV:
-      case COMPUTE_TMAV:
-        resizeVector(2, coarseColor); break;
+      case COMPUTE_TMAV: resizeVector(2, coarseColor); break;
       case COMPUTE_AV:
-      case COMPUTE_TMCAV:
-        resizeVector(4, coarseColor); break; // y dimension is chirality and parity
-      default:
-	resizeVector(2,1);
-	break;
+      case COMPUTE_TMCAV: resizeVector(4, coarseColor); break; // y dimension is chirality and parity
+      default: resizeVector(2, 1); break;
       }
 
       resizeStep(1,1);
@@ -755,10 +751,10 @@ namespace quda {
 #endif
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
-	if      (dim == 0) strcat(Aux,",dim=0");
-	else if (dim == 1) strcat(Aux,",dim=1");
-	else if (dim == 2) strcat(Aux,",dim=2");
-	else if (dim == 3) strcat(Aux,",dim=3");
+        if      (dim == 0) strcat(Aux, ",dim=0");
+        else if (dim == 1) strcat(Aux, ",dim=1");
+        else if (dim == 2) strcat(Aux, ",dim=2");
+        else if (dim == 3) strcat(Aux, ",dim=3");
 
 	if (dir == QUDA_BACKWARDS) strcat(Aux,",dir=back");
 	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");

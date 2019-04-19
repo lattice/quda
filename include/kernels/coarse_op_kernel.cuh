@@ -248,11 +248,9 @@ namespace quda {
       }
     }
 
-    ColorSpinor<Float,fineColor,fineSpin/2> V;
-    for (int s = 0; s < fineSpin/2; s++) {
-      for (int c = 0; c < fineColor; c++) {
-        V(s,c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c);
-      }
+    ColorSpinor<Float, fineColor, fineSpin / 2> V;
+    for (int s = 0; s < fineSpin / 2; s++) {
+      for (int c = 0; c < fineColor; c++) { V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c); }
     }
 
 #ifndef DYNAMIC_CLOVER
@@ -266,47 +264,46 @@ namespace quda {
 #endif
 
 #pragma unroll
-    for (int s=0; s<fineSpin/2; s++) {
+    for (int s = 0; s < fineSpin / 2; s++) {
 #pragma unroll
-      for (int ic=0; ic<fineColor; ic++) {
-	arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic);
-      }
+      for (int ic = 0; ic < fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic); }
     }
 
   } // computeAV
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  void ComputeAVCPU(Arg &arg)
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg> void ComputeAVCPU(Arg &arg)
   {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
         for (int ch = 0; ch < 2; ch++) { // Loop over chiral blocks
 
-          for (int ic_c=0; ic_c < coarseColor; ic_c++) { // coarse color
-            computeAV<Float,fineSpin,fineColor,coarseColor>(arg, parity, x_cb, ch, ic_c);
+          for (int ic_c = 0; ic_c < coarseColor; ic_c++) { // coarse color
+            computeAV<Float, fineSpin, fineColor, coarseColor>(arg, parity, x_cb, ch, ic_c);
           }
         }
       } // c/b volume
     }   // parity
   }
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   __global__ void ComputeAVGPU(Arg arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
-    int ch_parity = blockDim.y*blockIdx.y + threadIdx.y;
+    int ch_parity = blockDim.y * blockIdx.y + threadIdx.y;
     if (ch_parity >= 4) return;
     int ch = ch_parity % 2;
     int parity = ch_parity / 2;
 
-    int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
+    int ic_c = blockDim.z * blockIdx.z + threadIdx.z; // coarse color
     if (ic_c >= coarseColor) return;
 
-    if (ch == 0) computeAV<Float,fineSpin,fineColor,coarseColor>(arg, parity, x_cb, 0, ic_c);
-    else         computeAV<Float,fineSpin,fineColor,coarseColor>(arg, parity, x_cb, 1, ic_c);
+    if (ch == 0)
+      computeAV<Float, fineSpin, fineColor, coarseColor>(arg, parity, x_cb, 0, ic_c);
+    else
+      computeAV<Float, fineSpin, fineColor, coarseColor>(arg, parity, x_cb, 1, ic_c);
   }
 
   /**
@@ -431,7 +428,7 @@ namespace quda {
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x) for twisted-clover fermions
      Where: s = fine spin, c' = coarse color, c = fine color
   */
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   __device__ __host__ inline void computeTMCAV(Arg &arg, int parity, int x_cb, int ch, int ic_c)
   {
     constexpr int N = fineSpin * fineColor / 2;
@@ -452,22 +449,20 @@ namespace quda {
     complex<Float> mu(0., arg.mu);
     if (ch == 0) mu *= static_cast<Float>(-1.0);
 
-    ColorSpinor<Float,fineColor,fineSpin/2> V;
+    ColorSpinor<Float, fineColor, fineSpin / 2> V;
 
-    for (int s = 0; s < fineSpin/2; s++) {
-      for (int c = 0; c < fineColor; c++) {
-        V(s,c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c);
-      }
+    for (int s = 0; s < fineSpin / 2; s++) {
+      for (int c = 0; c < fineColor; c++) { V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c); }
     }
 
     // first apply the clover matrix directly, including mu
     auto UV = A * V;
     UV += mu * V;
 
-    //Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
-    //for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
+    // Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
+    // for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
 
-#ifndef	DYNAMIC_CLOVER
+#ifndef DYNAMIC_CLOVER
     // load in the clover inverse matrix
     HMatrix<Float, N> Ainv;
 #pragma unroll
@@ -491,40 +486,42 @@ namespace quda {
 #endif
     auto AV = Ainv * UV;
 
-    for (int s = 0; s < fineSpin/2; s++)
-      for (int c = 0; c < fineColor; c++)
-        arg.AV(parity, x_cb, 2*ch + s, c, ic_c) = AV(s,c);
+    for (int s = 0; s < fineSpin / 2; s++)
+      for (int c = 0; c < fineColor; c++) arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
   } // computeTMCAV
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  void ComputeTMCAVCPU(Arg &arg) {
-    for (int parity=0; parity<2; parity++) {
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg> void ComputeTMCAVCPU(Arg &arg)
+  {
+    for (int parity = 0; parity < 2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-        for (int ch=0; ch < 2; ch++) {
-          for (int ic_c=0; ic_c < coarseColor; ic_c++) { // coarse color
-            computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, ch, ic_c);
+        for (int ch = 0; ch < 2; ch++) {
+          for (int ic_c = 0; ic_c < coarseColor; ic_c++) { // coarse color
+            computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, ch, ic_c);
           }
         }
       } // c/b volume
     }   // parity
   }
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __global__ void ComputeTMCAVGPU(Arg arg) {
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __global__ void ComputeTMCAVGPU(Arg arg)
+  {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
-    int ch_parity = blockDim.y*blockIdx.y + threadIdx.y;
+    int ch_parity = blockDim.y * blockIdx.y + threadIdx.y;
     if (ch_parity >= 4) return;
     int ch = ch_parity % 2;
     int parity = ch_parity / 2;
 
-    int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
+    int ic_c = blockDim.z * blockIdx.z + threadIdx.z; // coarse color
     if (ic_c >= coarseColor) return;
 
-    if (ch == 0) computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, 0, ic_c);
-    else         computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, 1, ic_c);
+    if (ch == 0)
+      computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, 0, ic_c);
+    else
+      computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, 1, ic_c);
   }
 
   /**

@@ -359,7 +359,6 @@ static int qmp_rank_from_coords(const int *coords, void *fdata)
 }
 #endif
 
-
 // Provision for user control over MPI comm handle
 // Assumes an MPI implementation of QMP
 
@@ -367,26 +366,29 @@ static int qmp_rank_from_coords(const int *coords, void *fdata)
 MPI_Comm MPI_COMM_HANDLE;
 static int user_set_comm_handle = 0;
 
-void setMPICommHandleQuda(void *mycomm){
+void setMPICommHandleQuda(void *mycomm)
+{
   MPI_COMM_HANDLE = *((MPI_Comm *)mycomm);
   user_set_comm_handle = 1;
 }
 #endif
 
 #ifdef QMP_COMMS
-static void initQMPComms(void){
+static void initQMPComms(void)
+{
   // Default comm handle is taken from QMP
   // WARNING: Assumes an MPI implementation of QMP
-  if(!user_set_comm_handle){
+  if (!user_set_comm_handle) {
     void *mycomm;
     QMP_get_mpi_comm(QMP_comm_get_default(), &mycomm);
     setMPICommHandleQuda(mycomm);
   }
 }
 #elif defined(MPI_COMMS)
-static void initMPIComms(void){
+static void initMPIComms(void)
+{
   // Default comm handle is MPI_COMM_WORLD
-  if(!user_set_comm_handle){
+  if (!user_set_comm_handle) {
     static MPI_Comm mycomm;
     MPI_Comm_dup(MPI_COMM_WORLD, &mycomm);
     setMPICommHandleQuda((void *)&mycomm);
@@ -394,13 +396,11 @@ static void initMPIComms(void){
 }
 #endif
 
-
 static bool comms_initialized = false;
 
 void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata)
 {
   if (comms_initialized) return;
-
 
 #if QMP_COMMS
   initQMPComms();
@@ -868,8 +868,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param.reconstruct = param->reconstruct_refinement_sloppy;
   gauge_param.setPrecision(param->cuda_prec_refinement_sloppy, true);
   cudaGaugeField *refinement = nullptr;
-  if (param->cuda_prec_sloppy != param->cuda_prec_refinement_sloppy ||
-      param->reconstruct_sloppy != param->reconstruct_refinement_sloppy) {
+  if (param->cuda_prec_sloppy != param->cuda_prec_refinement_sloppy
+      || param->reconstruct_sloppy != param->reconstruct_refinement_sloppy) {
     refinement = new cudaGaugeField(gauge_param);
     refinement->copy(*sloppy);
   } else {
@@ -979,13 +979,10 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGauge->saveCPUField(cpuGauge);
   profileGauge.TPSTOP(QUDA_PROFILE_D2H);
 
-  if(param->type == QUDA_SMEARED_LINKS) {
-    delete cudaGauge;
-  }
+  if (param->type == QUDA_SMEARED_LINKS) { delete cudaGauge; }
 
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-
 
 void loadSloppyCloverQuda(const QudaPrecision prec[]);
 void freeSloppyCloverQuda();
@@ -1124,12 +1121,12 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   cloverPrecise->setRho(inv_param->clover_rho);
 
-  QudaPrecision prec[] =
-    {inv_param->clover_cuda_prec_sloppy, inv_param->clover_cuda_prec_precondition, inv_param->clover_cuda_prec_refinement_sloppy};
+  QudaPrecision prec[] = {inv_param->clover_cuda_prec_sloppy, inv_param->clover_cuda_prec_precondition,
+                          inv_param->clover_cuda_prec_refinement_sloppy};
   loadSloppyCloverQuda(prec);
 
   // if requested, copy back the clover / inverse field
-  if ( inv_param->return_clover || inv_param->return_clover_inverse ) {
+  if (inv_param->return_clover || inv_param->return_clover_inverse) {
     if (!h_clover && !h_clovinv) errorQuda("Requested clover field return but no clover host pointers set");
 
     // copy the inverted clover term into host application order on the device
@@ -1297,7 +1294,6 @@ void freeGaugeQuda(void)
   }
 }
 
-
 void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *recon)
 {
   // first do SU3 links (if they exist)
@@ -1310,8 +1306,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeSloppy) errorQuda("gaugeSloppy already exists");
 
-    if (gauge_param.Precision() != gaugePrecise->Precision() ||
-	gauge_param.reconstruct != gaugePrecise->Reconstruct()) {
+    if (gauge_param.Precision() != gaugePrecise->Precision() || gauge_param.reconstruct != gaugePrecise->Reconstruct()) {
       gaugeSloppy = new cudaGaugeField(gauge_param);
       gaugeSloppy->copy(*gaugePrecise);
     } else {
@@ -1324,8 +1319,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugePrecondition) errorQuda("gaugePrecondition already exists");
 
-    if (gauge_param.Precision() != gaugeSloppy->Precision() ||
-	gauge_param.reconstruct != gaugeSloppy->Reconstruct()) {
+    if (gauge_param.Precision() != gaugeSloppy->Precision() || gauge_param.reconstruct != gaugeSloppy->Reconstruct()) {
       gaugePrecondition = new cudaGaugeField(gauge_param);
       gaugePrecondition->copy(*gaugeSloppy);
     } else {
@@ -1338,8 +1332,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeRefinement) errorQuda("gaugeRefinement already exists");
 
-    if (gauge_param.Precision() != gaugeSloppy->Precision() ||
-	gauge_param.reconstruct != gaugeSloppy->Reconstruct()) {
+    if (gauge_param.Precision() != gaugeSloppy->Precision() || gauge_param.reconstruct != gaugeSloppy->Reconstruct()) {
       gaugeRefinement = new cudaGaugeField(gauge_param);
       gaugeRefinement->copy(*gaugeSloppy);
     } else {
@@ -1358,12 +1351,12 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
       if (gaugeFatSloppy) errorQuda("gaugeFatSloppy already exists");
       if (gaugeFatSloppy != gaugeFatPrecise) delete gaugeFatSloppy;
 
-      if (gauge_param.Precision() != gaugeFatPrecise->Precision() ||
-	  gauge_param.reconstruct != gaugeFatPrecise->Reconstruct()) {
-	gaugeFatSloppy = new cudaGaugeField(gauge_param);
-	gaugeFatSloppy->copy(*gaugeFatPrecise);
+      if (gauge_param.Precision() != gaugeFatPrecise->Precision()
+          || gauge_param.reconstruct != gaugeFatPrecise->Reconstruct()) {
+        gaugeFatSloppy = new cudaGaugeField(gauge_param);
+        gaugeFatSloppy->copy(*gaugeFatPrecise);
       } else {
-	gaugeFatSloppy = gaugeFatPrecise;
+        gaugeFatSloppy = gaugeFatPrecise;
       }
     }
 
@@ -1373,12 +1366,12 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
       if (gaugeFatPrecondition) errorQuda("gaugeFatPrecondition already exists\n");
 
-      if (gauge_param.Precision() != gaugeFatSloppy->Precision() ||
-	  gauge_param.reconstruct != gaugeFatSloppy->Reconstruct()) {
-	gaugeFatPrecondition = new cudaGaugeField(gauge_param);
-	gaugeFatPrecondition->copy(*gaugeFatSloppy);
+      if (gauge_param.Precision() != gaugeFatSloppy->Precision()
+          || gauge_param.reconstruct != gaugeFatSloppy->Reconstruct()) {
+        gaugeFatPrecondition = new cudaGaugeField(gauge_param);
+        gaugeFatPrecondition->copy(*gaugeFatSloppy);
       } else {
-	gaugeFatPrecondition = gaugeFatSloppy;
+        gaugeFatPrecondition = gaugeFatSloppy;
       }
     }
 
@@ -1388,12 +1381,12 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
       if (gaugeFatRefinement) errorQuda("gaugeFatRefinement already exists\n");
 
-      if (gauge_param.Precision() != gaugeFatSloppy->Precision() ||
-	  gauge_param.reconstruct != gaugeFatSloppy->Reconstruct()) {
-	gaugeFatRefinement = new cudaGaugeField(gauge_param);
-	gaugeFatRefinement->copy(*gaugeFatSloppy);
+      if (gauge_param.Precision() != gaugeFatSloppy->Precision()
+          || gauge_param.reconstruct != gaugeFatSloppy->Reconstruct()) {
+        gaugeFatRefinement = new cudaGaugeField(gauge_param);
+        gaugeFatRefinement->copy(*gaugeFatSloppy);
       } else {
-	gaugeFatRefinement = gaugeFatSloppy;
+        gaugeFatRefinement = gaugeFatSloppy;
       }
     }
   }
@@ -1407,8 +1400,8 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeLongSloppy) errorQuda("gaugeLongSloppy already exists");
 
-    if (gauge_param.Precision() != gaugeLongPrecise->Precision() ||
-	gauge_param.reconstruct != gaugeLongPrecise->Reconstruct()) {
+    if (gauge_param.Precision() != gaugeLongPrecise->Precision()
+        || gauge_param.reconstruct != gaugeLongPrecise->Reconstruct()) {
       gaugeLongSloppy = new cudaGaugeField(gauge_param);
       gaugeLongSloppy->copy(*gaugeLongPrecise);
     } else {
@@ -1421,8 +1414,8 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeLongPrecondition) errorQuda("gaugeLongPrecondition already exists\n");
 
-    if (gauge_param.Precision() != gaugeLongSloppy->Precision() ||
-	gauge_param.reconstruct != gaugeLongSloppy->Reconstruct()) {
+    if (gauge_param.Precision() != gaugeLongSloppy->Precision()
+        || gauge_param.reconstruct != gaugeLongSloppy->Reconstruct()) {
       gaugeLongPrecondition = new cudaGaugeField(gauge_param);
       gaugeLongPrecondition->copy(*gaugeLongSloppy);
     } else {
@@ -1435,8 +1428,8 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeLongRefinement) errorQuda("gaugeLongRefinement already exists\n");
 
-    if (gauge_param.Precision() != gaugeLongSloppy->Precision() ||
-        gauge_param.reconstruct != gaugeLongSloppy->Reconstruct()) {
+    if (gauge_param.Precision() != gaugeLongSloppy->Precision()
+        || gauge_param.reconstruct != gaugeLongSloppy->Reconstruct()) {
       gaugeLongRefinement = new cudaGaugeField(gauge_param);
       gaugeLongRefinement->copy(*gaugeLongSloppy);
     } else {
@@ -2255,7 +2248,7 @@ void checkClover(QudaInvertParam *param) {
   if (cloverRefinement == nullptr) errorQuda("Refinement clover field doesn't exist");
 }
 
-quda::cudaGaugeField* checkGauge(QudaInvertParam *param)
+quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
 {
   if (param->cuda_prec != gaugePrecise->Precision()) {
     errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, gaugePrecise->Precision());
@@ -2263,11 +2256,13 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param)
 
   quda::cudaGaugeField *cudaGauge = nullptr;
   if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
-    if (param->cuda_prec_sloppy != gaugeSloppy->Precision() ||
-	param->cuda_prec_precondition != gaugePrecondition->Precision() ||
-        param->cuda_prec_refinement_sloppy != gaugeRefinement->Precision()) {
-      QudaPrecision precision[3] = {param->cuda_prec_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy};
-      QudaReconstructType recon[3] = {gaugeSloppy->Reconstruct(), gaugePrecondition->Reconstruct(), gaugeRefinement->Reconstruct()};
+    if (param->cuda_prec_sloppy != gaugeSloppy->Precision()
+        || param->cuda_prec_precondition != gaugePrecondition->Precision()
+        || param->cuda_prec_refinement_sloppy != gaugeRefinement->Precision()) {
+      QudaPrecision precision[3]
+          = {param->cuda_prec_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy};
+      QudaReconstructType recon[3]
+          = {gaugeSloppy->Reconstruct(), gaugePrecondition->Reconstruct(), gaugeRefinement->Reconstruct()};
       freeSloppyGaugeQuda();
       loadSloppyGaugeQuda(precision, recon);
     }
@@ -2281,16 +2276,18 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param)
     }
     cudaGauge = gaugePrecise;
   } else {
-    if (param->cuda_prec_sloppy != gaugeFatSloppy->Precision() ||
-	param->cuda_prec_precondition != gaugeFatPrecondition->Precision() ||
-        param->cuda_prec_refinement_sloppy != gaugeFatRefinement->Precision() ||
-	param->cuda_prec_sloppy != gaugeLongSloppy->Precision() ||
-	param->cuda_prec_precondition != gaugeLongPrecondition->Precision() ||
-	param->cuda_prec_refinement_sloppy != gaugeLongRefinement->Precision()) {
+    if (param->cuda_prec_sloppy != gaugeFatSloppy->Precision()
+        || param->cuda_prec_precondition != gaugeFatPrecondition->Precision()
+        || param->cuda_prec_refinement_sloppy != gaugeFatRefinement->Precision()
+        || param->cuda_prec_sloppy != gaugeLongSloppy->Precision()
+        || param->cuda_prec_precondition != gaugeLongPrecondition->Precision()
+        || param->cuda_prec_refinement_sloppy != gaugeLongRefinement->Precision()) {
 
-      QudaPrecision precision[3] = {param->cuda_prec_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy};
+      QudaPrecision precision[3]
+        = {param->cuda_prec_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy};
       // recon is always no for fat links, so just use long reconstructs here
-      QudaReconstructType recon[3] = {gaugeLongSloppy->Reconstruct(), gaugeLongPrecondition->Reconstruct(), gaugeLongRefinement->Reconstruct()};
+      QudaReconstructType recon[3]
+        = {gaugeLongSloppy->Reconstruct(), gaugeLongPrecondition->Reconstruct(), gaugeLongRefinement->Reconstruct()};
       freeSloppyGaugeQuda();
       loadSloppyGaugeQuda(precision, recon);
     }
@@ -2739,7 +2736,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
   QudaInvertParam *param = eig_param.invert_param;
 
-  if(param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER)  return;
+  if (param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER) return;
 
   profile.TPSTART(QUDA_PROFILE_INIT);
 
@@ -2782,12 +2779,13 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   int ritzVolume = 1;
   for(int d = 0; d < ritzParam.nDim; d++) ritzVolume *= ritzParam.x[d];
 
-  if( getVerbosity() == QUDA_DEBUG_VERBOSE ) {
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
 
     size_t byte_estimate = (size_t)ritzParam.composite_dim*(size_t)ritzVolume*(ritzParam.nColor*ritzParam.nSpin*ritzParam.Precision());
-    printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)" , byte_estimate, ritzVolume, ritzParam.Precision());
+    printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)", byte_estimate, ritzVolume, ritzParam.Precision());
     if(ritzParam.mem_type == QUDA_MEMORY_DEVICE) printfQuda("Using device memory type.\n");
-    else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED) printfQuda("Using mapped memory type.\n");
+    else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED)
+      printfQuda("Using mapped memory type.\n");
   }
 
   RV = ColorSpinorField::Create(ritzParam);
@@ -3048,7 +3046,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       mre(*out, *tmp, basis, Ap);
 
       for (auto ap: Ap) {
-        if (ap) delete(ap);
+        if (ap) delete (ap);
       }
       delete tmp;
       if (tmp2 != out) delete tmp2;
@@ -3554,8 +3552,6 @@ for(int i=0; i < param->num_src; i++) {
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-
-
 
 /*!
  * Generic version of the multi-shift solver. Should work for
@@ -5468,8 +5464,7 @@ void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
   return;
 }
 
-void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
-                           unsigned int nSteps, double alpha)
+void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int nSteps, double alpha)
 {
   profileWuppertal.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5481,8 +5476,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
   cudaGaugeField *precise = nullptr;
 
   if (gaugeSmeared != nullptr) {
-    if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("Wuppertal smearing done with gaugeSmeared\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Wuppertal smearing done with gaugeSmeared\n");
     GaugeFieldParam gParam(*gaugePrecise);
     gParam.create = QUDA_NULL_FIELD_CREATE;
     precise = new cudaGaugeField(gParam);
