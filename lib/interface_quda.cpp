@@ -28,6 +28,7 @@
 #include <ks_improved_force.h>
 #include <ks_force_quda.h>
 #include <random_quda.h>
+#include <mpi_comm_handle.h>
 
 #include <multigrid.h>
 
@@ -359,11 +360,53 @@ static int qmp_rank_from_coords(const int *coords, void *fdata)
 #endif
 
 
+// Provision for user control over MPI comm handle
+// Assumes an MPI implementation of QMP
+
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
+MPI_Comm MPI_COMM_HANDLE;
+static int user_set_comm_handle = 0;
+
+void setMPICommHandleQuda(void *mycomm){
+  MPI_COMM_HANDLE = *((MPI_Comm *)mycomm);
+  user_set_comm_handle = 1;
+}
+#endif
+
+#ifdef QMP_COMMS
+static void initQMPComms(void){
+  // Default comm handle is taken from QMP
+  // WARNING: Assumes an MPI implementation of QMP
+  if(!user_set_comm_handle){
+    void *mycomm;
+    QMP_get_mpi_comm(QMP_comm_get_default(), &mycomm);
+    setMPICommHandleQuda(mycomm);
+  }
+}
+#elif defined(MPI_COMMS)
+static void initMPIComms(void){
+  // Default comm handle is MPI_COMM_WORLD
+  if(!user_set_comm_handle){
+    static MPI_Comm mycomm;
+    MPI_Comm_dup(MPI_COMM_WORLD, &mycomm);
+    setMPICommHandleQuda((void *)&mycomm);
+  }
+}
+#endif
+
+
 static bool comms_initialized = false;
 
 void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata)
 {
   if (comms_initialized) return;
+
+
+#if QMP_COMMS
+  initQMPComms();
+#elif defined(MPI_COMMS)
+  initMPIComms();
+#endif
 
   if (nDim != 4) {
     errorQuda("Number of communication grid dimensions must be 4");

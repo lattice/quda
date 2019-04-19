@@ -3,6 +3,7 @@
 
 #if (defined (QMP_COMMS) || defined (MPI_COMMS))
 #include <mpi.h>
+#include <mpi_comm_handle.h>
 #endif
 
 
@@ -272,7 +273,7 @@ namespace quda{
   {
     int *fcomm = nullptr;
 #ifdef MULTI_GPU
-    MPI_Fint mpi_comm_fort = MPI_Comm_c2f(MPI_COMM_WORLD);
+    MPI_Fint mpi_comm_fort = MPI_Comm_c2f(MPI_COMM_HANDLE);
     fcomm = static_cast<int*>(&mpi_comm_fort);
 #endif
 
