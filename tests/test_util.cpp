@@ -10,6 +10,9 @@
 #include <mpi.h>
 #endif
 
+// This contains the appropriate ifdef guards already
+#include <mpi_comm_handle.h>
+
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
 

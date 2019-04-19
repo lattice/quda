@@ -1,12 +1,13 @@
 #include <pthread.h>
 #include <nvToolsExt.h>
 #include <nvToolsExtCudaRt.h>
+#include <mpi_comm_handle.h>
 // Setup event category name
 {{fn name MPI_Init}}
   nvtxNameCategoryA(999, "MPI");
   {{callfn}}
   int rank;
-  PMPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  PMPI_Comm_rank(MPI_COMM_HANDLE, &rank);
   char name[256];
   sprintf( name, "MPI Rank %d", rank );
  
