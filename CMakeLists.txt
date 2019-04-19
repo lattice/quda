@@ -415,9 +415,6 @@ if(QUDA_ARPACK)
 endif(QUDA_ARPACK)
 
 
-# MAX_MULTI_BLAS_N
-add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})
-
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
 
@@ -506,10 +503,6 @@ if(QUDA_GAUGE_ALG)
   LIST(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
-if(QUDA_DYNAMIC_CLOVER)
-  add_definitions(-DDYNAMIC_CLOVER)
-endif(QUDA_DYNAMIC_CLOVER)
-
 if(QUDA_MPI_NVTX)
   LIST(APPEND COMM_OBJS nvtx_pmpi.c)
   set(QUDA_NVTX ON)
@@ -527,10 +520,6 @@ endif(QUDA_NVTX)
 if(QUDA_LEGACY_DSLASH)
   add_definitions(-DUSE_LEGACY_DSLASH)
 endif(QUDA_LEGACY_DSLASH)
-
-if(QUDA_TEX)
-  add_definitions(-DUSE_TEXTURE_OBJECTS)
-endif(QUDA_TEX)
 
 if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
@@ -620,9 +609,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
 include_directories(include)
 include_directories(lib)
-if(QUDA_JITIFY)
+#if(QUDA_JITIFY)
   include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
-endif()
+#endif()
 
 # QUDA_HASH for tunecache
 if(NOT GITVERSION)
@@ -653,7 +642,6 @@ endif()
 set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 SET(COMP_CAP "${COMP_CAP}0")
-add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by default )
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
@@ -678,6 +666,8 @@ mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 
 mark_as_advanced(CMAKE_F_FLAGS)
+
+configure_file(include/quda_define.h.in include/quda_define.h @ONLY)
 
 set(BUILDNAME ${HASH})
 include( CTest )
