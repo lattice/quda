@@ -96,13 +96,17 @@ namespace quda {
 	bytes_ = arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes()*coarseColor;
 	break;
       case COMPUTE_AV:
-	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes();
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor;
 	break;
       case COMPUTE_TMAV:
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes();
 	break;
       case COMPUTE_TMCAV:
-	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + arg.UV.Bytes() + 4*arg.C.Bytes(); // Two clover terms and more temporary storage
+#ifdef DYNAMIC_CLOVER
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor; // A single clover field
+#else
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 4*arg.C.Bytes()*coarseColor; // Both clover and its inverse
+#endif
 	break;
       case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_TWISTED_CLOVER_INV_MAX:

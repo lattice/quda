@@ -256,11 +256,9 @@ namespace quda {
 #ifndef DYNAMIC_CLOVER
     auto AV = A * V;
 #else
-
-    // invert the matrix (could replace with back/forward substitution?)
+    // solve for the matrix
     linalg::Cholesky<HMatrix, Float, N> cholesky(A);
-    const auto Ainv = cholesky.invert();
-    auto AV = Ainv * V;
+    auto AV = cholesky.backward(cholesky.forward(V));
 #endif
 
 #pragma unroll
@@ -476,15 +474,15 @@ namespace quda {
         Ainv(i, j) = arg.Cinv(0, parity, x_cb, s_i, s_j, c_i, c_j);
       }
     }
+    auto AV = Ainv * UV;
 #else
     // compute the clover inverse matrix with the already loaded clover matrix
     A = A.square();
     A += arg.mu * arg.mu;
 
     linalg::Cholesky<HMatrix, Float, N> cholesky(A);
-    const auto Ainv = cholesky.invert();
+    const auto AV = cholesky.backward(cholesky.forward(UV));
 #endif
-    auto AV = Ainv * UV;
 
     for (int s = 0; s < fineSpin / 2; s++)
       for (int c = 0; c < fineColor; c++) arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
