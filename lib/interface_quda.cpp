@@ -2410,14 +2410,14 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
 
   //If you use polynomial acceleration on a non-symmetric matrix,
   //the solver will fail.
-  if(eig_param->use_poly_acc && !eig_param->use_norm_op) {
+  if(eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
     errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
   }
 
   //DMH solver param here 
   EigenSolver *eig_solve = EigenSolver::create(eig_param, dirac, profileEigensolve);
   (*eig_solve)(kSpace, evals);
-  
+
   profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);  
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);  
   delete d;
@@ -2463,8 +2463,10 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
   checkEigParam(eig_param);
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
 
-  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool pc_solve =
+    (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   inv_param->secs = 0;
   inv_param->gflops = 0;
@@ -2478,7 +2480,6 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
 
   // create the dirac operator
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
-
   Dirac &dirac = *d;
   //------------------------------------------------------
 
@@ -2489,7 +2490,7 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
 
   //The Arnoldi can solve any problem. However, if you use poly acc on a
   //non-symmetric matrix, this routine will fail.
-  if (eig_param->use_poly_acc && !eig_param->use_norm_op) {
+  if(eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
     errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
   }
 

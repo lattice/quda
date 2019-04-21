@@ -1747,7 +1747,7 @@ QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 //Parameters for the stand alone eigensolver
 int eig_nEv = 24;
 int eig_nKr = 32;
-int eig_nConv = 24;
+int eig_nConv = -1; //If unchanged, will be set to nEv
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
 double eig_tol = 1e-6;

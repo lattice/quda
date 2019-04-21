@@ -385,11 +385,12 @@ extern "C" {
     int nEv;
     /** Total size of Krylov space **/
     int nKr;
-    /** Number of converged eigenvectors requested **/
+    /** Max number of locked eigenpairs (deduced at runtime) **/
+    int nLockedMax;
+    /** Number of requested converged eigenvectors **/
     int nConv;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
-    /** For Lanczos/Arnoldi, check every nth step **/
     /** For IRLM/IRAM, check every nth restart **/
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/

@@ -43,6 +43,7 @@ extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
 extern double kappa; // kappa of Dirac operator
+double kappa5;       //Derived, not given. Used in matVec checks.
 extern double mu;
 extern double anisotropy;
 extern double tol; // tolerance for inverter
@@ -222,19 +223,29 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || 
       dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+
     inv_param.mu = mu;
+    inv_param.epsilon = 0.1385;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 
       2 : 1;
-
-    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-      printfQuda("Twisted-mass doublet non supported (yet)\n");
-      exit(0);
-    }
+    
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+	     dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+	     dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+    inv_param.m5 = -1.8;
+    kappa5 = 0.5/(5 + inv_param.m5);  
+    inv_param.Ls = Lsdim;
+    for(int k = 0; k < Lsdim; k++) {// for mobius only
+      // b5[k], c[k] values are chosen for arbitrary values,
+      // but the difference of them are same as 1.0
+      inv_param.b_5[k] = 1.452;
+      inv_param.c_5[k] = 0.452;
+    }    
   }
-
+  
   inv_param.clover_coeff = clover_coeff;
-
+  
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
@@ -243,12 +254,9 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.solve_type = (inv_param.solution_type == QUDA_MAT_SOLUTION ?
 			  QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
   
-  inv_param.matpc_type = matpc_type;
-  
-  inv_param.inv_type = QUDA_GCR_INVERTER;
-  
-  inv_param.verbosity = QUDA_VERBOSE;
-  
+  inv_param.matpc_type = matpc_type;  
+  inv_param.inv_type = QUDA_GCR_INVERTER;  
+  inv_param.verbosity = QUDA_VERBOSE;  
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.tol = tol;
   
@@ -282,8 +290,14 @@ void setEigParam(QudaEigParam &eig_param) {
 
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
+
+  //The solver will exit when nConv extremal eigenpairs have converged
+  if (eig_nConv < 0) {
+    eig_param.nConv = eig_nEv;
+    eig_nConv = eig_nEv;
+  }
+  else eig_param.nConv = eig_nConv;
   
-  eig_param.nConv   = eig_nConv;
   eig_param.nEv     = eig_nEv;
   eig_param.nKr     = eig_nKr;
   eig_param.tol     = eig_tol;
@@ -334,10 +348,8 @@ int main(int argc, char **argv)
   // call srand() with a rank-dependent seed
   initRand();
 
-  display_test_info();
-
-  // *** QUDA parameters begin here.
-
+  // QUDA parameters begin here.
+  //------------------------------------------------------------------------------
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
 
@@ -351,11 +363,19 @@ int main(int argc, char **argv)
   setInvertParam(eig_inv_param);
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
-  
-  // *** Everything between here and the call to initQuda() is
-  // *** application-specific.
 
-  setDims(gauge_param.X);
+  // All user inputs now defined
+  display_test_info();
+    
+  // set parameters for the reference Dslash, and prepare fields to be loaded
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+    dw_setDims(gauge_param.X, eig_inv_param.Ls);
+  } else {
+    setDims(gauge_param.X);
+  }
+
   //set spinor site size
   int sss = 24;
   if (dslash_type == QUDA_LAPLACE_DSLASH) sss = 6;
@@ -416,80 +436,104 @@ int main(int argc, char **argv)
   // QUDA eigensolver test 
   //----------------------------------------------------------------------------
 
-  //Host side arrays to store the eigenvalues and vectors
-  void *host_evecs;
-  void *host_evals;
-
-  //Memory allocation
-  int vol = xdim*ydim*zdim*tdim;
+  //An initial guess
+  void *init_guess;
+  int vol = xdim*ydim*zdim*tdim*eig_inv_param.Ls;  
   if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(float));
-    host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(float));
+    init_guess = (void*)malloc(vol*sss*sizeof(float));
   } else {
-    host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(double));
-    host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(double));
+    init_guess = (void*)malloc(vol*sss*sizeof(double));
   }
   
-  //Demonstrate how to use inital guess. The vector will be
-  //normalised in the eigensolve function.
+  //Host side arrays to store the eigenpairs computed by QUDA
+  void *QUDA_host_evecs;
+  void *QUDA_host_evals;
+
+  //Memory allocation
+  if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+    QUDA_host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(float));
+    QUDA_host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(float));
+  } else {
+    QUDA_host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(double));
+    QUDA_host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(double));
+  }
+  
+  //Populate guess and copy to first vector in host array
   for(int i=0; i<vol*sss; i++) {
-    if(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-      
-      ((double*)host_evecs)[i] = rand()/(double)RAND_MAX;
-      //if(i<sss) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
-    } else {
-      
-      ((float*)host_evecs)[i] = rand()/(float)RAND_MAX;      
-      //if(i<sss) printfQuda("Host elem %d = %f\n", i, ((float*)host_evecs)[i]);
+    if(eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {	
+      ((float*)init_guess)[i] = rand()/(float)RAND_MAX;
+      ((float*)QUDA_host_evecs)[i] = ((float*)init_guess)[i];
+    } else {	
+      ((double*)init_guess)[i] = rand()/(double)RAND_MAX;
+      ((double*)QUDA_host_evecs)[i] = ((double*)init_guess)[i];
     }
   }
-    
+  
   //This function returns the host_evecs and host_evals pointers, populated with the
   //requested data, at the requested prec. All the information needed to perfom the
   //solve is in the eig_param container.
   double timeQUDA = -((double)clock());
-  eigensolveQuda(host_evecs, host_evals, &eig_param);
+  eigensolveQuda(QUDA_host_evecs, QUDA_host_evals, &eig_param);
   timeQUDA += (double)clock();
   printfQuda("Time for QUDA solution = %f\n", timeQUDA/CLOCKS_PER_SEC);
 
-  //Deallocate host memory
-  free(host_evecs);
-  free(host_evals);
-  
-  if(eig_param.arpack_check) {
-#ifdef ARPACK_LIB
-    if(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-      //Perform a cross-check using the ARPACK interface
-      //Use a different initial guess and reallocate memory
-      
-      host_evecs = (void*)malloc(vol*sss*eig_param.nKr*sizeof(double));
-      host_evals = (void*)malloc(      2*eig_param.nKr*sizeof(double));
-      
-      for(int i=0; i<vol*sss; i++) {
-	((double*)host_evecs)[i] = rand()/(double)RAND_MAX;
-	if(i<sss) printfQuda("Host elem %d = %f\n", i, ((double*)host_evecs)[i]);
-      }
-      
-      double timeARPACK = -((double)clock());
-      eigensolveARPACK(host_evecs, host_evals, &eig_param);
-      timeARPACK += (double)clock();
-      //Deallocate host memory
-      free(host_evecs);
-      free(host_evals);
-      
-      printfQuda("Time for ARPACK solution = %f\n\n", timeARPACK/CLOCKS_PER_SEC);
-      printfQuda("************************************************\n");
-      printfQuda("     Speed-up for QUDA Vs ARPACK is x%.1f       \n",
-		 (timeARPACK/CLOCKS_PER_SEC)/(timeQUDA/CLOCKS_PER_SEC));
-      printfQuda("************************************************\n\n");
+  if(eig_param.arpack_check && eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+
+    //Host side arrays to store the eigenpairs computed by ARPACK
+    void *ARPACK_host_evecs;
+    void *ARPACK_host_evals;
+    int vol = xdim*ydim*zdim*tdim*eig_inv_param.Ls;  
+    //Memory allocation
+    if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      ARPACK_host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(float));
+      ARPACK_host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(float));
     } else {
-      errorQuda("Single prec ARPACK solves not supported. Rerun with double prec");
+      ARPACK_host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(double));
+      ARPACK_host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(double));
     }
-#else
-    errorQuda("ARPACK interface not built.");
-#endif
+    
+    //Perform a cross-check using the ARPACK interface
+    //Use the same initial guess
+    for(int i=0; i<vol*sss; i++) {
+      ((double*)ARPACK_host_evecs)[i] = ((double*)init_guess)[i];
+    }
+    
+    double timeARPACK = -((double)clock());
+    eigensolveARPACK(ARPACK_host_evecs, ARPACK_host_evals, &eig_param);
+    timeARPACK += (double)clock();
+    
+    printfQuda("Time for ARPACK solution = %f\n\n", timeARPACK/CLOCKS_PER_SEC);
+    printfQuda("************************************************\n");
+    printfQuda("     Speed-up for QUDA Vs ARPACK is x%.1f       \n",
+	       (timeARPACK/CLOCKS_PER_SEC)/(timeQUDA/CLOCKS_PER_SEC));
+    printfQuda("************************************************\n\n");
+
+    /*
+    printfQuda("Eigenpair comparison:\n");
+    for(int i=0; i<eig_param.nEv; i++) {
+      double delta_val = abs(((double*)ARPACK_host_evals)[i] - ((double*)QUDA_host_evals)[i]);
+      double delta_vec = 0.0;
+      for(int j=0; j<vol*sss; j++) {
+	delta_vec += pow(((double*)ARPACK_host_evecs)[i*vol*sss + j] - ((double*)QUDA_host_evecs)[i*vol*sss + j],2);
+      }
+      delta_vec = sqrt(delta_vec);
+      
+      printfQuda("[%d] Eigenvalue diff = %f, Eigenvector diff = %f\n",
+		 i, delta_val, delta_vec);
+    }
+    */
+    
+    //Deallocate host memory
+    free(ARPACK_host_evecs);
+    free(ARPACK_host_evals);
+    
+  } else {
+    errorQuda("Double prec ARPACK cross check omitted");
   }
-  
+
+  //Deallocate host memory
+  free(QUDA_host_evecs);
+  free(QUDA_host_evals);
   
   freeGaugeQuda();  
   if(dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
