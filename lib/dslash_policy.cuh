@@ -1758,7 +1758,6 @@ namespace quda
     cudaColorSpinorField *in;
     const int volume;
     const int *ghostFace;
-    int config;
     TimeProfile &profile;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -1774,7 +1773,6 @@ public:
         in(in),
         volume(volume),
         ghostFace(ghostFace),
-        config(0),
         profile(profile)
     {
       in->streamInit(streams);
@@ -2070,7 +2068,7 @@ public:
      KernelType kernel_type = dslashParam.kernel_type;
      dslashParam.kernel_type = KERNEL_POLICY;
      TuneKey key = dslash.tuneKey();
-     strcat(key.aux,comm_dim_topology_string());
+     strcat(key.aux, comm_dim_topology_string());
      strcat(key.aux, comm_config_string()); // any change in P2P/GDR will be stored as a separate tunecache entry
      strcat(key.aux, policy_string);        // any change in policies enabled will be stored as a separate entry
      dslashParam.kernel_type = kernel_type;
