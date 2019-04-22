@@ -83,9 +83,7 @@ void inline qudamilc_called(const char * func){
   qudamilc_called<start>(func, getVerbosity());
 }
 
-void qudaSetMPICommHandle(void *mycomm){
-  setMPICommHandleQuda(mycomm);
-}
+void qudaSetMPICommHandle(void *mycomm) { setMPICommHandleQuda(mycomm); }
 
 void qudaInit(QudaInitArgs_t input)
 {
@@ -880,9 +878,11 @@ void qudaMultishiftInvert(int external_precision,
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
   }
 
-  gaugeParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
-  invertParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
-  invertParam.reliable_delta_refinement = 0.1;
+  if (inv_args.mixed_precision == 1) {
+    gaugeParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
+    invertParam.cuda_prec_refinement_sloppy = QUDA_HALF_PRECISION;
+    invertParam.reliable_delta_refinement = 0.1;
+  }
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
@@ -1545,18 +1545,10 @@ void qudaFreeGaugeField() {
     qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
 
-
-void qudaLoadCloverField(int external_precision,
-    int quda_precision,
-    QudaInvertArgs_t inv_args,
-    void* milc_clover,
-    void* milc_clover_inv,
-    QudaSolutionType solution_type,
-    QudaSolveType solve_type,
-    QudaInverterType inverter,
-    double clover_coeff,
-    int compute_trlog,
-    double *trlog) {
+void qudaLoadCloverField(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, void *milc_clover,
+                         void *milc_clover_inv, QudaSolutionType solution_type, QudaSolveType solve_type, QudaInverterType inverter,
+                         double clover_coeff, int compute_trlog, double *trlog)
+{
   qudamilc_called<true>(__func__);
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, 0.0, 0.0);
@@ -1591,8 +1583,6 @@ void qudaLoadCloverField(int external_precision,
   }
   qudamilc_called<false>(__func__);
 } // qudaLoadCoverField
-
-
 
 void qudaFreeCloverField() {
   qudamilc_called<true>(__func__);
@@ -1631,8 +1621,8 @@ void qudaCloverInvert(int external_precision,
   if (link) qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
 
   if (clover || cloverInverse) {
-    qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
-			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, QUDA_BICGSTAB_INVERTER, clover_coeff, 0, 0);
+    qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse, QUDA_MAT_SOLUTION,
+                        QUDA_DIRECT_PC_SOLVE, QUDA_BICGSTAB_INVERTER, clover_coeff, 0, 0);
   }
 
   double reliable_delta = 1e-1;
@@ -1695,8 +1685,8 @@ void qudaEigCGCloverInvert(int external_precision,
   if (link && (rhs_idx == 0)) qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
 
   if ( (clover || cloverInverse) && (rhs_idx == 0)) {
-    qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
-			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, QUDA_INC_EIGCG_INVERTER, clover_coeff, 0, 0);
+    qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse, QUDA_MAT_SOLUTION,
+                        QUDA_DIRECT_PC_SOLVE, QUDA_INC_EIGCG_INVERTER, clover_coeff, 0, 0);
   }
 
   double reliable_delta = 1e-1;

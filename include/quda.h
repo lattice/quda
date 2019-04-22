@@ -12,6 +12,7 @@
 
 #include <enum_quda.h>
 #include <stdio.h> /* for FILE */
+#include <quda_define.h>
 #include <quda_constants.h>
 
 #ifndef __CUDACC_RTC__

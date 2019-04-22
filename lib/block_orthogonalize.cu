@@ -302,9 +302,17 @@ namespace quda {
     } else if (V.Precision() == QUDA_SINGLE_PRECISION && B[0]->Precision() == QUDA_SINGLE_PRECISION) {
       BlockOrthogonalize<float,float>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
     } else if (V.Precision() == QUDA_HALF_PRECISION && B[0]->Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 2
       BlockOrthogonalize<short,float>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else if (V.Precision() == QUDA_HALF_PRECISION && B[0]->Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       BlockOrthogonalize<short,short>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else {
       errorQuda("Unsupported precision combination V=%d B=%d\n", V.Precision(), B[0]->Precision());
     }
