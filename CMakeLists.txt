@@ -442,6 +442,7 @@ if(QUDA_JITIFY)
   LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
   LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
   configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
 endif()
 
 if(QUDA_USE_EIGEN)
@@ -668,6 +669,7 @@ mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_F_FLAGS)
 
 configure_file(include/quda_define.h.in include/quda_define.h @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 
 set(BUILDNAME ${HASH})
 include( CTest )
