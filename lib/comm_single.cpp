@@ -81,6 +81,6 @@ const char* comm_dim_partitioned_string() {
   return partition_string;
 }
 
-const char* comm_dim_topology_string() {
+const char* comm_dim_topology_string(const int *comm_dim_override) {
   return topology_string;
 }

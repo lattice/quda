@@ -340,8 +340,23 @@ void comm_abort(int status)
   QMP_abort(status);
 }
 
-const char* comm_dim_partitioned_string() {
-  return partition_string;
+static char partition_override_string[16];
+
+const char* comm_dim_partitioned_string(const int *comm_dim_override)
+{
+  if (comm_dim_override) {
+    char comm[5] = {
+      (!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
+      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
+      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
+      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'),
+      '\0'};
+    strcpy(partition_override_string, ",comm=");
+    strcat(partition_override_string, comm);
+    return partition_override_string;
+  } else {
+    return partition_string;
+  }
 }
 
 const char* comm_dim_topology_string() {
