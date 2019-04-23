@@ -8,7 +8,7 @@
 #include <blas_quda.h>
 #include <dslash_quda.h>
 
-int zeroCopy = 0;
+static bool zeroCopy = false;
 
 namespace quda {
 
@@ -710,6 +710,7 @@ namespace quda {
           qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
           qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
         } else {
+          qudaDeviceSynchronize();
           memcpy(dest.V(), buffer, dest.Bytes());
           memcpy(dest.Norm(), static_cast<char*>(buffer) + dest.Bytes(), dest.NormBytes());
         }
