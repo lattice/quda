@@ -485,10 +485,10 @@ int main(int argc, char **argv)
     int vol = xdim*ydim*zdim*tdim*eig_inv_param.Ls;  
     //Memory allocation
     if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      ARPACK_host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(float));
+      ARPACK_host_evecs = (void*)malloc(vol*sss*eig_param.nKr*sizeof(float));
       ARPACK_host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(float));
     } else {
-      ARPACK_host_evecs = (void*)malloc(vol*sss*eig_param.nEv*sizeof(double));
+      ARPACK_host_evecs = (void*)malloc(vol*sss*eig_param.nKr*sizeof(double));
       ARPACK_host_evals = (void*)malloc(      2*eig_param.nEv*sizeof(double));
     }
     
@@ -528,10 +528,11 @@ int main(int argc, char **argv)
     free(ARPACK_host_evals);
     
   } else {
-    errorQuda("Double prec ARPACK cross check omitted");
+    printfQuda("Double prec ARPACK cross check omitted\n");
   }
 
   //Deallocate host memory
+  free(init_guess);
   free(QUDA_host_evecs);
   free(QUDA_host_evals);
   

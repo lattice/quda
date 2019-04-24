@@ -44,6 +44,9 @@ namespace quda {
 
     //Quda MultiBLAS friendly rotation array.
     Complex *Qmat;
+
+    //QUDA logfile name
+    char *QUDA_logfile;
     
   public:
     EigenSolver(QudaEigParam *eig_param, TimeProfile &profile);
@@ -200,7 +203,7 @@ namespace quda {
 		     int j);
 
     /**
-       @brief Rotate eigenvectors by dense matrix dervied
+       @brief Rotate eigenvectors by dense matrix derived
               from the tridiagonal matrix in Lanczos
        @param[in] kSpace the vectors to be rotated
        @param[in] tmp Workspace vectors
@@ -234,6 +237,9 @@ namespace quda {
 
   private:
     const Dirac &mat;
+
+    //Upper Hessenberg matrix
+    Complex *upperHess;
     
   public:
     IRAM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
@@ -253,38 +259,26 @@ namespace quda {
        @param[in] v Vector space
        @param[in] r Current vector to add
        @param[in] evecs List of eigenvectors
-       @param[in] locked List of converged eigenvectors
-       @param[in] alpha Diagonal of tridiagonal
-       @param[in] beta Subdiagonal of tridiagonal
        @param[in] j Index of last vector added       
     */
     void arnoldiStep(std::vector<ColorSpinorField*> v,
 		     std::vector<ColorSpinorField*> r,
 		     std::vector<ColorSpinorField*> evecs,
-		     bool *locked,
-		     double *alpha, double *beta, int j);
+		     int j);
 
     /**
-       @brief Rotate eigenvectors by dense matrix dervied
-       from the tridiagonal matrix in Lanczos
-       @param[in] alpha Leading diagonal part of Lanczos tridiagonal matrix
-       @param[in] beta Sub-leading diagonal part of Lanczos tridiagonal matrix
-       @param[in] nEv The number of vectors to be rotated
+       @brief Rotate eigenvectors by dense matrix derived
+       from the upper Hessenberg matrix in Arnoldi
        @param[in] kSpace the vectors to be rotated
        @param[in] tmp Workspace vectors
     */            
-    void basisRotateUpperHess(double *alpha, double *beta, int nEv,
-			      std::vector<ColorSpinorField*> &kSpace,
+    void basisRotateUpperHess(std::vector<ColorSpinorField*> &kSpace,
 			      std::vector<ColorSpinorField*> &tmp);
         
     /**
-       @brief Computes QR factorisation from the Lanczos tridiagonal matrix
-       @param[in] Qmat Complex array for Q part of QR
-       @param[in] alpha Leading diagonal part of Lanczos tridiagonal matrix
-       @param[in] beta Sub-leading diagonal part of Lanczos tridiagonal matrix
-       @param[in] inverse Project out the largest/smallest eigenvalues
-    */    
-    void computeQRfromUpperHess(Complex *Qmat, double *alpha, double *beta, bool inverse);
+       @brief Computes QR factorisation from the Upper Hessenberg
+    */
+    void computeQRfromUpperHess();
     
   };
   
