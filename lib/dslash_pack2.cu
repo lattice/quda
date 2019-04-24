@@ -20,7 +20,7 @@ namespace quda
   }
 
   template <typename Float, int nSpin, int nColor, bool spin_project>
-  std::ostream& operator<<(std::ostream& out, const PackArg<Float,nSpin,nColor,spin_project> &arg)
+  std::ostream &operator<<(std::ostream &out, const PackArg<Float, nSpin, nColor, spin_project> &arg)
   {
     out << "parity = " << arg.parity << std::endl;
     out << "nParity = " << arg.nParity << std::endl;
@@ -44,8 +44,8 @@ namespace quda
 
   // FIXME - add CPU variant
 
-  template <typename Float, int nColor, bool spin_project>
-  class Pack : TunableVectorYZ {
+  template <typename Float, int nColor, bool spin_project> class Pack : TunableVectorYZ
+  {
 
 protected:
     void **ghost;
@@ -206,8 +206,8 @@ public:
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (in.Nspin() == 4) {
-        using Arg = PackArg<Float,nColor,4,spin_project>;
-	Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c);
+        using Arg = PackArg<Float, nColor, 4, spin_project>;
+        Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c);
         arg.swizzle = tp.aux.x;
         arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
         arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
@@ -272,8 +272,8 @@ public:
         }
 #endif
       } else if (in.Nspin() == 1) {
-        using Arg = PackArg<Float,nColor,1,false>;
-	Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c);
+        using Arg = PackArg<Float, nColor, 1, false>;
+        Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c);
         arg.swizzle = tp.aux.x;
         arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
         arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
@@ -286,7 +286,6 @@ public:
       } else {
         errorQuda("Unsupported nSpin = %d\n", in.Nspin());
       }
-
     }
 
     bool tuneSharedBytes() const { return false; }
@@ -342,37 +341,33 @@ public:
   };
 
   template <typename Float, int nColor>
-  void PackGhost(void *ghost[], const ColorSpinorField &in,
-                 MemoryLocation location, int nFace, bool dagger, int parity,
+  void PackGhost(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity,
                  bool spin_project, double a, double b, double c, const cudaStream_t &stream)
   {
     if (spin_project) {
-      Pack<Float,nColor,true> pack(ghost, in, location, nFace, dagger, parity, a, b, c);
+      Pack<Float, nColor, true> pack(ghost, in, location, nFace, dagger, parity, a, b, c);
       pack.apply(stream);
     } else {
-      Pack<Float,nColor,false> pack(ghost, in, location, nFace, dagger, parity, a, b, c);
+      Pack<Float, nColor, false> pack(ghost, in, location, nFace, dagger, parity, a, b, c);
       pack.apply(stream);
     }
   }
 
   // template on the number of colors
   template <typename Float>
-  void PackGhost(void *ghost[], const ColorSpinorField &in,
-                 MemoryLocation location, int nFace, bool dagger, int parity,
+  void PackGhost(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity,
                  bool spin_project, double a, double b, double c, const cudaStream_t &stream)
   {
     if (in.Ncolor() == 3) {
-      PackGhost<Float,3>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
+      PackGhost<Float, 3>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
     } else {
       errorQuda("Unsupported number of colors %d\n", in.Ncolor());
     }
   }
 
   // Pack the ghost for the Dslash operator
-  void PackGhost(void *ghost[2*QUDA_MAX_DIM], const ColorSpinorField &in,
-                 MemoryLocation location, int nFace, bool dagger, int parity,
-                 bool spin_project, double a, double b, double c,
-                 const cudaStream_t &stream)
+  void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &in, MemoryLocation location, int nFace,
+                 bool dagger, int parity, bool spin_project, double a, double b, double c, const cudaStream_t &stream)
   {
     int nDimPack = 0;
     for (int d = 0; d < 4; d++) {

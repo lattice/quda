@@ -197,7 +197,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->mass = mass;
   inv_param->kappa = kappa = 1.0/(8.0 + mass); // for Laplace operator
   inv_param->laplace3D = laplace3D;            // for Laplace operator
-  
+
   // outer solver parameters
   inv_param->inv_type = inv_type;
   inv_param->tol = tol;

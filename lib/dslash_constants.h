@@ -30,10 +30,10 @@
 #ifdef GPU_STAGGERED_DIRAC
     int long_gauge_stride;
     float fat_link_max;
-#endif 
+#endif
 
     bool spin_project; // If using covDev, turn off spin projection.
-    
+
     int gauge_fixed; // whether the gauge field is fixed to axial gauge
 
     double t_boundary;

@@ -75,8 +75,8 @@ GaugeCovDev* dirac;
 const int nColor = 3;
 
 void init(int argc, char **argv)
-{    
-  
+{
+
   initQuda(device);
 
   setVerbosity(QUDA_VERBOSE);
@@ -148,7 +148,7 @@ void init(int argc, char **argv)
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
-  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;	
+  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.pc_type = QUDA_4D_PC;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -302,7 +302,7 @@ double dslashCUDA(int niter, int mu) {
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
-  
+
   return secs;
 }
 
@@ -348,12 +348,7 @@ void display_test_info()
 
 }
 
-
-void
-usage_extra(char** argv )
-{
-  return ;
-}
+void usage_extra(char **argv) { return; }
 
 int main(int argc, char **argv) 
 {
@@ -361,7 +356,7 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
   // return code for google test
   int test_rc = 0;
-  for (int i=1 ;i < argc; i++){    
+  for (int i = 1; i < argc; i++) {
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }    
@@ -377,60 +372,58 @@ int main(int argc, char **argv)
   init(argc, argv);
 
   int attempts = 1;
-  for (int i=0; i<attempts; i++) {
-    
-    //Test forward directions, then backward
-    for (int dag=0; dag<2; dag++) {
-     dag == 0 ? dagger = QUDA_DAG_NO : dagger = QUDA_DAG_YES;
-    
-     for (int mu=0; mu<4; mu++) { // We test all directions in one go
-       int muCuda = mu + (dagger ? 4 : 0);
-       int muCpu  = mu*2 + (dagger ? 1 : 0);
-       
-       //Reference computation
-       covdevRef(muCpu);
-       printfQuda("\n\nChecking muQuda = %d\n", muCuda);      
-       
-       { // warm-up run
-	 printfQuda("Tuning...\n");
-	 dslashCUDA(1,muCuda);
-       }
-       
-       printfQuda("Executing %d kernel loop(s)...", niter);
-       
-       double secs = dslashCUDA(niter, muCuda);
-       if (!transfer) *spinorOut = *cudaSpinorOut;
-       printfQuda("\n%fms per loop\n", 1000*secs);
-       
-       unsigned long long flops = niter * cudaSpinor->Nspin()*(8*nColor-2)*nColor*(long long)cudaSpinor->Volume();
-       printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-       
-       double spinor_ref_norm2 = blas::norm2(*spinorRef);
-       blas::copy(*tmpCpu, *spinorOut);
-       double spinor_out_norm2 = blas::xmyNorm(*spinorOut, *tmpCpu);
-       
-       if (!transfer) {
-	 double cuda_spinor_out_norm2 =  blas::norm2(*cudaSpinorOut);
-	 printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%.6e\n", muCuda,
-		    spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
-       } else {
-	 printfQuda("Result mu = %d: CPU=%f , CPU-CUDA=%f", mu, spinor_ref_norm2, spinor_out_norm2);
-       }
-       
-       if (verify_results) {
-	 ::testing::TestEventListeners& listeners =
-	   ::testing::UnitTest::GetInstance()->listeners();
-	 if (comm_rank() != 0) {
-	   delete listeners.Release(listeners.default_result_printer());
-	 }
-	 
-	 test_rc = RUN_ALL_TESTS();
-	 if (test_rc != 0) warningQuda("Tests failed");
-       }
-     }  // Directions
-    } // Dagger
+  for (int i = 0; i < attempts; i++) {
+
+    // Test forward directions, then backward
+    for (int dag = 0; dag < 2; dag++) {
+      dag == 0 ? dagger = QUDA_DAG_NO : dagger = QUDA_DAG_YES;
+
+      for (int mu = 0; mu < 4; mu++) { // We test all directions in one go
+        int muCuda = mu + (dagger ? 4 : 0);
+        int muCpu = mu * 2 + (dagger ? 1 : 0);
+
+        // Reference computation
+        covdevRef(muCpu);
+        printfQuda("\n\nChecking muQuda = %d\n", muCuda);
+
+        { // warm-up run
+          printfQuda("Tuning...\n");
+          dslashCUDA(1, muCuda);
+        }
+
+        printfQuda("Executing %d kernel loop(s)...", niter);
+
+        double secs = dslashCUDA(niter, muCuda);
+        if (!transfer) *spinorOut = *cudaSpinorOut;
+        printfQuda("\n%fms per loop\n", 1000 * secs);
+
+        unsigned long long flops
+          = niter * cudaSpinor->Nspin() * (8 * nColor - 2) * nColor * (long long)cudaSpinor->Volume();
+        printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / secs);
+
+        double spinor_ref_norm2 = blas::norm2(*spinorRef);
+        blas::copy(*tmpCpu, *spinorOut);
+        double spinor_out_norm2 = blas::xmyNorm(*spinorOut, *tmpCpu);
+
+        if (!transfer) {
+          double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
+          printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%.6e\n", muCuda, spinor_ref_norm2,
+                     cuda_spinor_out_norm2, spinor_out_norm2);
+        } else {
+          printfQuda("Result mu = %d: CPU=%f , CPU-CUDA=%f", mu, spinor_ref_norm2, spinor_out_norm2);
+        }
+
+        if (verify_results) {
+          ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+          if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+
+          test_rc = RUN_ALL_TESTS();
+          if (test_rc != 0) warningQuda("Tests failed");
+        }
+      } // Directions
+    }   // Dagger
   }
-  
+
   end();
 
   finalizeComms();

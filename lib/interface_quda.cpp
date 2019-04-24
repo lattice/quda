@@ -1661,7 +1661,7 @@ namespace quda {
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
-    
+
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
     if (gaugePrecise->Precision() != inv_param->cuda_prec)

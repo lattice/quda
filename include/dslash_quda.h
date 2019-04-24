@@ -59,9 +59,8 @@ namespace quda {
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
-  void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                   double kappa, const ColorSpinorField &x, int parity, bool dagger,
-                   const int *comm_override, TimeProfile &profile);
+  void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double kappa,
+                   const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Driver for applying the Wilson-clover stencil
@@ -392,18 +391,11 @@ namespace quda {
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
-  void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                         double a, double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
-                         int parity, bool dagger, const int *comm_override, TimeProfile &profile);
-  
-  enum Dslash5Type {
-    DSLASH5_DWF,
-    DSLASH5_MOBIUS_PRE,
-    DSLASH5_MOBIUS,
-    M5_INV_DWF,
-    M5_INV_MOBIUS,
-    M5_INV_ZMOBIUS
-  };
+  void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
+                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override, TimeProfile &profile);
+
+  enum Dslash5Type { DSLASH5_DWF, DSLASH5_MOBIUS_PRE, DSLASH5_MOBIUS, M5_INV_DWF, M5_INV_MOBIUS, M5_INV_ZMOBIUS };
 
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or
@@ -441,10 +433,8 @@ namespace quda {
      @param[in] kappa Scale factor applied
      @param[in] x Vector field we accumulate onto to
   */
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in,
-		    const GaugeField &U, int dir, double kappa, const ColorSpinorField &x,
-		    int parity, bool dagger, const int *comm_override,
-		    TimeProfile &profile);
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double kappa,
+                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Driver for applying the covariant derivative
@@ -465,9 +455,9 @@ namespace quda {
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
-  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                   int mu, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
-  
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
+                   bool dagger, const int *comm_override, TimeProfile &profile);
+
 #else
 
   // plain Wilson Dslash
@@ -522,13 +512,11 @@ namespace quda {
 		      const double *b5, const double *c_5, const double &m5,
                       const int *commDim, const int DS_type, TimeProfile &profile);
 
-  
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		    double kappa, const ColorSpinorField *x, int parity);
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double kappa,
+                    const ColorSpinorField *x, int parity);
 
-  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		   int parity, int mu);
-  
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu);
+
 #endif
 
   /**
@@ -649,10 +637,8 @@ namespace quda {
      @param[in] c Twisted mass flavor twist factor (for preconditioned non degenerate twisted-mass dagger operator)
      @param[in] stream Which stream are we executing in
   */
-  void PackGhost(void *ghost[2*QUDA_MAX_DIM], const ColorSpinorField &field,
-                 MemoryLocation location, int nFace, bool dagger, int parity,
-                 bool spin_project, double a, double b, double c,
-                 const cudaStream_t &stream);
+  void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &field, MemoryLocation location, int nFace,
+                 bool dagger, int parity, bool spin_project, double a, double b, double c, const cudaStream_t &stream);
 #endif
 
   /**

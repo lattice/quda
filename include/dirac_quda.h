@@ -31,7 +31,7 @@ namespace quda {
     cudaGaugeField *gauge;
     cudaGaugeField *fatGauge;  // used by staggered only
     cudaGaugeField *longGauge; // used by staggered only
-    int laplace3D;             
+    int laplace3D;
     cudaCloverField *clover;
   
     double mu; // used by twisted mass only
