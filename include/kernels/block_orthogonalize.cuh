@@ -45,7 +45,7 @@ namespace quda {
     {
       const Vector Btmp[nVec]{*B...};
       if (sizeof(Btmp) > MAX_MATRIX_SIZE) errorQuda("B array size (%lu) is larger than maximum allowed (%d)\n", sizeof(Btmp), MAX_MATRIX_SIZE);
-      memcpy(B_array_h, Btmp, sizeof(Btmp));
+      memcpy(B_array_h, (void *)Btmp, sizeof(Btmp));
       int geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
       geoBlockSizeCB = geoBlockSize/2;

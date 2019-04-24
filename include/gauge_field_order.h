@@ -2386,14 +2386,27 @@ namespace quda {
     const int geometry;
     const size_t offset;
     const size_t size;
-  MILCSiteOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) :
-    LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-      volumeCB(u.VolumeCB()), geometry(u.Geometry()),
-      offset(u.SiteOffset()), size(u.SiteSize()) { ; }
-  MILCSiteOrder(const MILCSiteOrder &order) : LegacyOrder<Float,length>(order),
-      gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry),
-      offset(order.offset), size(order.size)
-      { ; }
+    MILCSiteOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+      LegacyOrder<Float, length>(u, ghost_),
+      gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+      volumeCB(u.VolumeCB()),
+      geometry(u.Geometry()),
+      offset(u.SiteOffset()),
+      size(u.SiteSize())
+    {
+      if ((uintptr_t)((char *)gauge + offset) % 16 != 0) { errorQuda("MILC structure has misaligned offset"); }
+    }
+
+    MILCSiteOrder(const MILCSiteOrder &order) :
+      LegacyOrder<Float, length>(order),
+      gauge(order.gauge),
+      volumeCB(order.volumeCB),
+      geometry(order.geometry),
+      offset(order.offset),
+      size(order.size)
+    {
+    }
+
     virtual ~MILCSiteOrder() { ; }
 
     __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const

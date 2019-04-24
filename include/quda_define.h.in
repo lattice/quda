@@ -1,0 +1,41 @@
+/**
+   @file quda_define.h
+   @brief Macros defined set by the cmake build system.  This file
+   should not be edited manually.
+ */
+
+/**
+ * @def   __COMPUTE_CAPABILITY__
+ * @brief This macro sets the target GPU architecture.  Unlike
+ * __CUDA_ARCH__, this is defined on host and device.
+ */
+#define __COMPUTE_CAPABILITY__ @COMP_CAP@
+
+/**
+ * @def   MAX_MULTI_BLAS_N
+ * @brief This macro sets the limit of blas fusion in the multi-blas
+ * and multi-reduce kernels
+ */
+#define MAX_MULTI_BLAS_N @QUDA_MAX_MULTI_BLAS_N@
+
+#cmakedefine QUDA_TEX
+#ifdef QUDA_TEX
+/**
+ * @def   USE_TEXTURE_OBJECTS
+ * @brief This macro sets whether we are compiling QUDA with texture
+ * support enabled or not
+ */
+#define USE_TEXTURE_OBJECTS
+#undef QUDA_TEX
+#endif
+
+#cmakedefine QUDA_DYNAMIC_CLOVER
+#ifdef QUDA_DYNAMIC_CLOVER
+/**
+ * @def   DYNAMIC_CLOVER
+ * @brief This macro sets whether we are compiling QUDA with dynamic
+ * clover inversion support enabled or not
+ */
+#define DYNAMIC_CLOVER
+#undef QUDA_DYNAMIC_CLOVER
+#endif
