@@ -123,13 +123,11 @@ cudaGaugeField *gaugePrecondition = nullptr;
 cudaGaugeField *gaugeRefinement = nullptr;
 cudaGaugeField *gaugeExtended = nullptr;
 
-// It's important that these alias the above so that constants are set correctly in Dirac::Dirac()
-cudaGaugeField *&gaugeFatPrecise = gaugePrecise;
-cudaGaugeField *&gaugeFatSloppy = gaugeSloppy;
-cudaGaugeField *&gaugeFatPrecondition = gaugePrecondition;
-cudaGaugeField *&gaugeFatRefinement = gaugeRefinement;
-cudaGaugeField *&gaugeFatExtended = gaugeExtended;
-
+cudaGaugeField *gaugeFatPrecise = nullptr;
+cudaGaugeField *gaugeFatSloppy = nullptr;
+cudaGaugeField *gaugeFatPrecondition = nullptr;
+cudaGaugeField *gaugeFatRefinement = nullptr;
+cudaGaugeField *gaugeFatExtended = nullptr;
 
 cudaGaugeField *gaugeLongExtended = nullptr;
 cudaGaugeField *gaugeLongPrecise = nullptr;
@@ -1344,50 +1342,40 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
   if (gaugeFatPrecise) {
     GaugeFieldParam gauge_param(*gaugeFatPrecise);
 
-    if (gaugeFatSloppy != gaugeSloppy) {
+    gauge_param.setPrecision(prec[0], true);
 
-      gauge_param.setPrecision(prec[0], true);
+    if (gaugeFatSloppy) errorQuda("gaugeFatSloppy already exists");
 
-      if (gaugeFatSloppy) errorQuda("gaugeFatSloppy already exists");
-      if (gaugeFatSloppy != gaugeFatPrecise) delete gaugeFatSloppy;
-
-      if (gauge_param.Precision() != gaugeFatPrecise->Precision()
-          || gauge_param.reconstruct != gaugeFatPrecise->Reconstruct()) {
-        gaugeFatSloppy = new cudaGaugeField(gauge_param);
-        gaugeFatSloppy->copy(*gaugeFatPrecise);
-      } else {
-        gaugeFatSloppy = gaugeFatPrecise;
-      }
+    if (gauge_param.Precision() != gaugeFatPrecise->Precision() || gauge_param.reconstruct != gaugeFatPrecise->Reconstruct()) {
+      gaugeFatSloppy = new cudaGaugeField(gauge_param);
+      gaugeFatSloppy->copy(*gaugeFatPrecise);
+    } else {
+      gaugeFatSloppy = gaugeFatPrecise;
     }
 
-    if (gaugeFatPrecondition != gaugePrecondition) {
-      // switch the parameters for creating the mirror preconditioner cuda gauge field
-      gauge_param.setPrecision(prec[1], true);
+    // switch the parameters for creating the mirror preconditioner cuda gauge field
+    gauge_param.setPrecision(prec[1], true);
 
-      if (gaugeFatPrecondition) errorQuda("gaugeFatPrecondition already exists\n");
+    if (gaugeFatPrecondition) errorQuda("gaugeFatPrecondition already exists\n");
 
-      if (gauge_param.Precision() != gaugeFatSloppy->Precision()
-          || gauge_param.reconstruct != gaugeFatSloppy->Reconstruct()) {
-        gaugeFatPrecondition = new cudaGaugeField(gauge_param);
-        gaugeFatPrecondition->copy(*gaugeFatSloppy);
-      } else {
-        gaugeFatPrecondition = gaugeFatSloppy;
-      }
+    if (gauge_param.Precision() != gaugeFatSloppy->Precision()
+	|| gauge_param.reconstruct != gaugeFatSloppy->Reconstruct()) {
+      gaugeFatPrecondition = new cudaGaugeField(gauge_param);
+      gaugeFatPrecondition->copy(*gaugeFatSloppy);
+    } else {
+      gaugeFatPrecondition = gaugeFatSloppy;
     }
 
-    if (gaugeFatRefinement != gaugeRefinement) {
-      // switch the parameters for creating the mirror refinement cuda gauge field
-      gauge_param.setPrecision(prec[2], true);
+    // switch the parameters for creating the mirror refinement cuda gauge field
+    gauge_param.setPrecision(prec[2], true);
 
-      if (gaugeFatRefinement) errorQuda("gaugeFatRefinement already exists\n");
+    if (gaugeFatRefinement) errorQuda("gaugeFatRefinement already exists\n");
 
-      if (gauge_param.Precision() != gaugeFatSloppy->Precision()
-          || gauge_param.reconstruct != gaugeFatSloppy->Reconstruct()) {
-        gaugeFatRefinement = new cudaGaugeField(gauge_param);
-        gaugeFatRefinement->copy(*gaugeFatSloppy);
-      } else {
-        gaugeFatRefinement = gaugeFatSloppy;
-      }
+    if (gauge_param.Precision() != gaugeFatSloppy->Precision() || gauge_param.reconstruct != gaugeFatSloppy->Reconstruct()) {
+      gaugeFatRefinement = new cudaGaugeField(gauge_param);
+      gaugeFatRefinement->copy(*gaugeFatSloppy);
+    } else {
+      gaugeFatRefinement = gaugeFatSloppy;
     }
   }
 
@@ -1400,8 +1388,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeLongSloppy) errorQuda("gaugeLongSloppy already exists");
 
-    if (gauge_param.Precision() != gaugeLongPrecise->Precision()
-        || gauge_param.reconstruct != gaugeLongPrecise->Reconstruct()) {
+    if (gauge_param.Precision() != gaugeLongPrecise->Precision() || gauge_param.reconstruct != gaugeLongPrecise->Reconstruct()) {
       gaugeLongSloppy = new cudaGaugeField(gauge_param);
       gaugeLongSloppy->copy(*gaugeLongPrecise);
     } else {
@@ -1414,8 +1401,7 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
 
     if (gaugeLongPrecondition) errorQuda("gaugeLongPrecondition already exists\n");
 
-    if (gauge_param.Precision() != gaugeLongSloppy->Precision()
-        || gauge_param.reconstruct != gaugeLongSloppy->Reconstruct()) {
+    if (gauge_param.Precision() != gaugeLongSloppy->Precision() || gauge_param.reconstruct != gaugeLongSloppy->Reconstruct()) {
       gaugeLongPrecondition = new cudaGaugeField(gauge_param);
       gaugeLongPrecondition->copy(*gaugeLongSloppy);
     } else {
@@ -1436,7 +1422,6 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
       gaugeLongRefinement = gaugeLongSloppy;
     }
   }
-
 }
 
 void freeSloppyCloverQuda()
@@ -1653,7 +1638,7 @@ namespace quda {
 
     diracParam.matpcType = inv_param->matpc_type;
     diracParam.dagger = inv_param->dagger;
-    diracParam.gauge = gaugePrecise;
+    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatPrecise : gaugePrecise;
     diracParam.fatGauge = gaugeFatPrecise;
     diracParam.longGauge = gaugeLongPrecise;
     diracParam.clover = cloverPrecise;
@@ -1664,8 +1649,8 @@ namespace quda {
 
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
-    if (gaugePrecise->Precision() != inv_param->cuda_prec)
-      errorQuda("Gauge precision %d does not match requested precision %d\n", gaugePrecise->Precision(), inv_param->cuda_prec);
+    if (diracParam.gauge->Precision() != inv_param->cuda_prec)
+      errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(), inv_param->cuda_prec);
 
   }
 
@@ -1674,7 +1659,7 @@ namespace quda {
   {
     setDiracParam(diracParam, inv_param, pc);
 
-    diracParam.gauge = gaugeSloppy;
+    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatSloppy : gaugeSloppy;
     diracParam.fatGauge = gaugeFatSloppy;
     diracParam.longGauge = gaugeLongSloppy;
     diracParam.clover = cloverSloppy;
@@ -1683,15 +1668,15 @@ namespace quda {
       diracParam.commDim[i] = 1;   // comms are always on
     }
 
-    if (gaugeSloppy->Precision() != inv_param->cuda_prec_sloppy)
-      errorQuda("Gauge precision %d does not match requested precision %d\n", gaugeSloppy->Precision(), inv_param->cuda_prec_sloppy);
+    if (diracParam.gauge->Precision() != inv_param->cuda_prec_sloppy)
+      errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(), inv_param->cuda_prec_sloppy);
   }
 
   void setDiracRefineParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
   {
     setDiracParam(diracParam, inv_param, pc);
 
-    diracParam.gauge = gaugeRefinement;
+    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatRefinement : gaugeRefinement;
     diracParam.fatGauge = gaugeFatRefinement;
     diracParam.longGauge = gaugeLongRefinement;
     diracParam.clover = cloverRefinement;
@@ -1700,8 +1685,8 @@ namespace quda {
       diracParam.commDim[i] = 1;   // comms are always on
     }
 
-    if (gaugeRefinement->Precision() != inv_param->cuda_prec_refinement_sloppy)
-      errorQuda("Gauge precision %d does not match requested precision %d\n", gaugeRefinement->Precision(), inv_param->cuda_prec_refinement_sloppy);
+    if (diracParam.gauge->Precision() != inv_param->cuda_prec_refinement_sloppy)
+      errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(), inv_param->cuda_prec_refinement_sloppy);
   }
 
   // The preconditioner currently mimicks the sloppy operator with no comms
@@ -1709,12 +1694,12 @@ namespace quda {
   {
     setDiracParam(diracParam, inv_param, pc);
 
-    if(inv_param->overlap){
-      diracParam.gauge = gaugeExtended;
+    if (inv_param->overlap) {
+      diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatExtended : gaugeExtended;
       diracParam.fatGauge = gaugeFatExtended;
       diracParam.longGauge = gaugeLongExtended;
-    }else{
-      diracParam.gauge = gaugePrecondition;
+    } else {
+      diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatPrecondition : gaugePrecondition;
       diracParam.fatGauge = gaugeFatPrecondition;
       diracParam.longGauge = gaugeLongPrecondition;
     }
@@ -1731,9 +1716,9 @@ namespace quda {
        diracParam.gauge = gaugeFatPrecondition;
     }
 
-    if (gaugePrecondition->Precision() != inv_param->cuda_prec_precondition)
+    if (diracParam.gauge->Precision() != inv_param->cuda_prec_precondition)
       errorQuda("Gauge precision %d does not match requested precision %d\n",
-		gaugePrecondition->Precision(), inv_param->cuda_prec_precondition);
+		diracParam.gauge->Precision(), inv_param->cuda_prec_precondition);
   }
 
 
@@ -1863,17 +1848,20 @@ namespace quda {
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
   profileDslash.TPSTART(QUDA_PROFILE_TOTAL);
-
   profileDslash.TPSTART(QUDA_PROFILE_INIT);
 
-  if (gaugePrecise == nullptr) errorQuda("Gauge field not allocated");
+  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  if ( (!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
+       || ( (!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH ) )
+    errorQuda("Gauge field not allocated");
   if (cloverPrecise == nullptr && ((inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)))
     errorQuda("Clover field not allocated");
 
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), true, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
@@ -1914,7 +1902,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     } else {
       parity = QUDA_EVEN_PARITY;
     }
-    blas::ax(gaugePrecise->Anisotropy(), in);
+    blas::ax(gauge.Anisotropy(), in);
   }
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
@@ -1951,12 +1939,16 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
 {
-  if (gaugePrecise == nullptr) errorQuda("Gauge field not allocated");
+  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  if ( (!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
+       || ( (!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH ) )
+    errorQuda("Gauge field not allocated");
 
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), true, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
@@ -1977,7 +1969,7 @@ void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
     } else {
       parity = QUDA_EVEN_PARITY;
     }
-    blas::ax(gaugePrecise->Anisotropy(), in);
+    blas::ax(gauge.Anisotropy(), in);
   }
   bool pc = true;
 
@@ -2017,12 +2009,16 @@ void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
 
 void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
 {
-  if (gaugePrecise == nullptr) errorQuda("Gauge field not allocated");
+  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  if ( (!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
+       || ( (!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH ) )
+    errorQuda("Gauge field not allocated");
 
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), true, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
@@ -2043,7 +2039,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
     } else {
       parity = QUDA_EVEN_PARITY;
     }
-    blas::ax(gaugePrecise->Anisotropy(), in);
+    blas::ax(gauge.Anisotropy(), in);
   }
   bool pc = true;
 
@@ -2088,7 +2084,11 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
 
-  if (gaugePrecise == nullptr) errorQuda("Gauge field not allocated");
+  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  if ( (!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
+       || ( (!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH ) )
+    errorQuda("Gauge field not allocated");
   if (cloverPrecise == nullptr && ((inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)))
     errorQuda("Clover field not allocated");
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
@@ -2096,7 +2096,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
       inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), pc, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), pc, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
@@ -2154,8 +2154,11 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
 
-  if (!initialized) errorQuda("QUDA not initialized");
-  if (gaugePrecise == nullptr) errorQuda("Gauge field not allocated");
+  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  if ( (!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
+       || ( (!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH ) )
+    errorQuda("Gauge field not allocated");
   if (cloverPrecise == nullptr && ((inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)))
     errorQuda("Clover field not allocated");
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
@@ -2163,7 +2166,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
       inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), pc, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), pc, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
@@ -2251,12 +2254,12 @@ void checkClover(QudaInvertParam *param) {
 
 quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
 {
-  if (param->cuda_prec != gaugePrecise->Precision()) {
-    errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, gaugePrecise->Precision());
-  }
-
   quda::cudaGaugeField *cudaGauge = nullptr;
   if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+    if (param->cuda_prec != gaugePrecise->Precision()) {
+      errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, gaugePrecise->Precision());
+    }
+
     if (param->cuda_prec_sloppy != gaugeSloppy->Precision()
         || param->cuda_prec_precondition != gaugePrecondition->Precision()
         || param->cuda_prec_refinement_sloppy != gaugeRefinement->Precision()) {
@@ -2277,6 +2280,10 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
     }
     cudaGauge = gaugePrecise;
   } else {
+    if (param->cuda_prec != gaugeFatPrecise->Precision()) {
+      errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, gaugeFatPrecise->Precision());
+    }
+
     if (param->cuda_prec_sloppy != gaugeFatSloppy->Precision()
         || param->cuda_prec_precondition != gaugeFatPrecondition->Precision()
         || param->cuda_prec_refinement_sloppy != gaugeFatRefinement->Precision()
