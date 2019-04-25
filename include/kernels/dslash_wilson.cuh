@@ -26,14 +26,14 @@ namespace quda
 
     typedef typename mapper<Float>::type real;
 
-    F out;                /** output vector field */
-    const F in;           /** input vector field */
-    const F x;            /** input vector when doing xpay */
-    const G U;            /** the gauge field */
-    const real a;         /** xpay scale facotor - can be -kappa or -kappa^2 */
+    F out;        /** output vector field */
+    const F in;   /** input vector field */
+    const F x;    /** input vector when doing xpay */
+    const G U;    /** the gauge field */
+    const real a; /** xpay scale facotor - can be -kappa or -kappa^2 */
 
-    WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-              double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+    WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+              const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float>(in, U, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
       out(out),
       in(in),

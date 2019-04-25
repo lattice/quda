@@ -96,13 +96,17 @@ namespace quda {
 	bytes_ = arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes()*coarseColor;
 	break;
       case COMPUTE_AV:
-	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes();
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor;
 	break;
       case COMPUTE_TMAV:
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes();
 	break;
       case COMPUTE_TMCAV:
-	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + arg.UV.Bytes() + 4*arg.C.Bytes(); // Two clover terms and more temporary storage
+#ifdef DYNAMIC_CLOVER
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor; // A single clover field
+#else
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 4*arg.C.Bytes()*coarseColor; // Both clover and its inverse
+#endif
 	break;
       case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_TWISTED_CLOVER_INV_MAX:
@@ -623,11 +627,10 @@ namespace quda {
 	resizeVector(2*coarseColor,coarseColor);
         break;
       case COMPUTE_UV:
-      case COMPUTE_TMAV:
-      case COMPUTE_AV: resizeVector(2, coarseColor); break;
-      default:
-	resizeVector(2,1);
-	break;
+      case COMPUTE_TMAV: resizeVector(2, coarseColor); break;
+      case COMPUTE_AV:
+      case COMPUTE_TMCAV: resizeVector(4, coarseColor); break; // y dimension is chirality and parity
+      default: resizeVector(2, 1); break;
       }
 
       resizeStep(1,1);
@@ -748,14 +751,14 @@ namespace quda {
 #ifdef DYNAMIC_CLOVER
       if (type == COMPUTE_AV || type == COMPUTE_CLOVER_INV_MAX || // ensure separate tuning for dynamic
           type == COMPUTE_TMCAV || type == COMPUTE_TWISTED_CLOVER_INV_MAX)
-        strcat(Aux, "Dynamic");
+        strcat(Aux, ",Dynamic");
 #endif
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
-	if      (dim == 0) strcat(Aux,",dim=0");
-	else if (dim == 1) strcat(Aux,",dim=1");
-	else if (dim == 2) strcat(Aux,",dim=2");
-	else if (dim == 3) strcat(Aux,",dim=3");
+        if      (dim == 0) strcat(Aux, ",dim=0");
+        else if (dim == 1) strcat(Aux, ",dim=1");
+        else if (dim == 2) strcat(Aux, ",dim=2");
+        else if (dim == 3) strcat(Aux, ",dim=3");
 
 	if (dir == QUDA_BACKWARDS) strcat(Aux,",dir=back");
 	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");

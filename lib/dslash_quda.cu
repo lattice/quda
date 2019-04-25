@@ -200,7 +200,7 @@ namespace quda {
           a = 1.0;
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
           b = -2.0 * kappa * mu;
-          a = 1.0 / (1.0 + a * a);
+          a = 1.0 / (1.0 + b * b);
         }
 	c = 0.0;
         if (dagger) b *= -1.0;

@@ -23,17 +23,17 @@ namespace quda {
     checkSpinorAlias(in, out);
 
 #ifndef USE_LEGACY_DSLASH
-    int comm_dim[4] = { };
+    int comm_dim[4] = {};
     // only switch on comms needed for directions with a derivative
-    for (int i=0; i<4; i++) {
+    for (int i = 0; i < 4; i++) {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
     }
     ApplyLaplace(out, in, *gauge, laplace3D, 1.0, in, parity, dagger, comm_dim, profile);
-#else 
+#else
     ApplyLaplace(out, in, *gauge, 1.0, nullptr, parity);
 #endif
-    
+
     flops += 1320ll*in.Volume(); // FIXME
   }
 
@@ -44,9 +44,9 @@ namespace quda {
     checkSpinorAlias(in, out);
 
 #ifndef USE_LEGACY_DSLASH
-    int comm_dim[4] = { };
+    int comm_dim[4] = {};
     // only switch on comms needed for directions with a derivative
-    for (int i=0; i<4; i++) {
+    for (int i = 0; i < 4; i++) {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
     }
@@ -54,7 +54,7 @@ namespace quda {
 #else
     ApplyLaplace(out, in, *gauge, k, &x, parity);
 #endif
-    
+
     flops += 1368ll*in.Volume(); // FIXME
   }
 
@@ -96,7 +96,7 @@ namespace quda {
   GaugeLaplacePC::GaugeLaplacePC(const DiracParam &param) : GaugeLaplace(param) { }
 
   GaugeLaplacePC::GaugeLaplacePC(const GaugeLaplacePC &dirac) : GaugeLaplace(dirac) { }
-  
+
   GaugeLaplacePC::~GaugeLaplacePC() { }
 
   GaugeLaplacePC& GaugeLaplacePC::operator=(const GaugeLaplacePC &laplace)

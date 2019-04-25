@@ -668,8 +668,8 @@ namespace quda {
        @param[in] c Twisted mass parameter (chiral twist factor, default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-		   cudaStream_t* stream, MemoryLocation location[2*QUDA_MAX_DIM], MemoryLocation location_label,
-                   bool spin_project, double a=0, double b=0, double c=0);
+                   cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
+                   bool spin_project, double a = 0, double b = 0, double c = 0);
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
 			   const int dagger,cudaStream_t* stream, bool zero_copy=false);
@@ -731,9 +731,8 @@ namespace quda {
        @param[in] b Used for twisted mass (chiral twist factor)
        @param[in] c Used for twisted mass (flavor twist factor)
     */
-    void pack(int nFace, int parity, int dagger, int stream_idx,
-	      MemoryLocation location[], MemoryLocation location_label,
-              bool spin_project=true, double a=0, double b=0, double c=0);
+    void pack(int nFace, int parity, int dagger, int stream_idx, MemoryLocation location[],
+              MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0);
 
     void packExtended(const int nFace, const int R[], const int parity, const int dagger,
         const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);

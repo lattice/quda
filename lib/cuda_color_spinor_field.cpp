@@ -739,12 +739,9 @@ namespace quda {
   }
 
   // pack the ghost zone into a contiguous buffer for communications
-  void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, 
-                                       const int dim, const QudaDirection dir,
-				       const int dagger, cudaStream_t *stream, 
-				       MemoryLocation location [2*QUDA_MAX_DIM],
-                                       MemoryLocation location_label,
-                                       bool spin_project, double a, double b, double c)
+  void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir,
+                                       const int dagger, cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM],
+                                       MemoryLocation location_label, bool spin_project, double a, double b, double c)
   {
 #ifdef MULTI_GPU
     void *packBuffer[2*QUDA_MAX_DIM];
@@ -794,8 +791,8 @@ namespace quda {
     } else {
 
       const int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-      const int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
-      const int Npad = Nint / Nvec; // number Nvec buffers we have
+      const int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
+      const int Npad = Nint / Nvec;                                 // number Nvec buffers we have
       const int nParity = siteSubset;
       const int x4 = nDim==5 ? x[4] : 1;
       const int Nt_minus1_offset = (volumeCB - nFace * ghostFaceCB[3]) / x4; // N_t-1 = Vh-Vsh
@@ -922,15 +919,15 @@ namespace quda {
   }
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx,
-				  MemoryLocation location[2*QUDA_MAX_DIM], MemoryLocation location_label,
+                                  MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
                                   bool spin_project, double a, double b, double c)
   {
-    createComms(nFace,spin_project); // must call this first
+    createComms(nFace, spin_project); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
 
-    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx],
-              location, location_label, spin_project, a, b, c);
+    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label,
+              spin_project, a, b, c);
   }
 
   void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, 

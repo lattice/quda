@@ -10,6 +10,9 @@
 #include <mpi.h>
 #endif
 
+// This contains the appropriate ifdef guards already
+#include <mpi_comm_handle.h>
+
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
 
@@ -1809,7 +1812,8 @@ void usage(char** argv )
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
-  printf("    --laplace3D <n>                           # Restrict laplace operator to omit nth dimension (x=0, y=1, z=2, t=3) (default 4, full 4D)\n");
+  printf("    --laplace3D <n>                           # Restrict laplace operator to omit nth dimension (x=0, y=1, "
+         "z=2, t=3) (default 4, full 4D)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
@@ -2366,12 +2370,10 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--laplace3D") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    laplace3D = atoi(argv[i+1]);
-    if (laplace3D > 4){
+  if (strcmp(argv[i], "--laplace3D") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    laplace3D = atoi(argv[i + 1]);
+    if (laplace3D > 4) {
       printf("ERROR: invalid transverse dim %d given. Please use 0 1 2 3 4 for x,y,z,t,none.\n", laplace3D);
       usage(argv);
     }
@@ -2379,7 +2381,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--flavor") == 0){
     if (i+1 >= argc){
       usage(argv);

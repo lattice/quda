@@ -263,13 +263,25 @@ namespace quda
     real twist_c; // flavor twist
 
     // constructor needed for staggered to set xpay from derived class
-    DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace, int spin_project, const int *comm_override)
-      : parity(parity), nParity(in.SiteSubset()), nFace(nFace), reconstruct(U.Reconstruct()),
-        X0h(nParity == 2 ? in.X(0)/2 : in.X(0)),
-        dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1 },
-        volumeCB(in.VolumeCB()), dagger(dagger), xpay(xpay),
-        kernel_type(INTERIOR_KERNEL), threads(in.VolumeCB()), threadDimMapLower{ }, threadDimMapUpper{ },
-        spin_project(spin_project), twist_a(0.0), twist_b(0.0), twist_c(0.0)
+    DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
+              int spin_project, const int *comm_override) :
+      parity(parity),
+      nParity(in.SiteSubset()),
+      nFace(nFace),
+      reconstruct(U.Reconstruct()),
+      X0h(nParity == 2 ? in.X(0) / 2 : in.X(0)),
+      dim {(3 - nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1},
+      volumeCB(in.VolumeCB()),
+      dagger(dagger),
+      xpay(xpay),
+      kernel_type(INTERIOR_KERNEL),
+      threads(in.VolumeCB()),
+      threadDimMapLower {},
+      threadDimMapUpper {},
+      spin_project(spin_project),
+      twist_a(0.0),
+      twist_b(0.0),
+      twist_c(0.0)
     {
       for (int d = 0; d < 4; d++) {
         ghostDim[d] = comm_dim_partitioned(d);
@@ -278,8 +290,8 @@ namespace quda
 
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
         // create comms buffers - need to do this before we grab the dslash constants
-        ColorSpinorField *in_ = const_cast<ColorSpinorField*>(&in);
-        static_cast<cudaColorSpinorField*>(in_)->createComms(nFace,spin_project);
+        ColorSpinorField *in_ = const_cast<ColorSpinorField *>(&in);
+        static_cast<cudaColorSpinorField *>(in_)->createComms(nFace, spin_project);
       }
       dc = in.getDslashConstant();
     }

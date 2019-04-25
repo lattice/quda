@@ -8,8 +8,7 @@ namespace quda
 
   static int commDim[QUDA_MAX_DIM];
 
-  template <typename Float_, int nColor_, int nSpin_, bool spin_project_=true>
-  struct PackArg {
+  template <typename Float_, int nColor_, int nSpin_, bool spin_project_ = true> struct PackArg {
 
     typedef Float_ Float;
     typedef typename mapper<Float>::type real;
@@ -125,9 +124,9 @@ namespace quda
           f = arg.a * (f - arg.b * f.igamma(4) + arg.c * f1);
       }
       if (arg.spin_project) {
-        in.Ghost(dim, 0, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
       } else {
-        in.Ghost(dim, 0, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     } else { // forwards
 
@@ -144,9 +143,9 @@ namespace quda
           f = arg.a * (f - arg.b * f.igamma(4) + arg.c * f1);
       }
       if (arg.spin_project) {
-        in.Ghost(dim, 1, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
       } else {
-        in.Ghost(dim, 1, ghost_idx+s*arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     }
   }
