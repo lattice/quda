@@ -1812,8 +1812,7 @@ void usage(char** argv )
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
-  printf("    --laplace3D <n>                           # Restrict laplace operator to omit nth dimension (x=0, y=1, "
-         "z=2, t=3) (default 4, full 4D)\n");
+  printf("    --laplace3D <n>                           # Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
@@ -1831,7 +1830,7 @@ void usage(char** argv )
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
   printf("    --mu                                      # Twisted-Mass chiral twist of Dirac operator (default 0.1)\n");
   printf(
-      "    --epsilon                                 # Twisted-Mass flavor twist of Dirac operator (default 0.01)\n");
+	 "    --epsilon                                 # Twisted-Mass flavor twist of Dirac operator (default 0.01)\n");
   printf("    --tadpole-coeff                           # Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)\n");
   printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
@@ -2373,8 +2372,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
   if (strcmp(argv[i], "--laplace3D") == 0) {
     if (i + 1 >= argc) { usage(argv); }
     laplace3D = atoi(argv[i + 1]);
-    if (laplace3D > 4) {
-      printf("ERROR: invalid transverse dim %d given. Please use 0 1 2 3 4 for x,y,z,t,none.\n", laplace3D);
+    if (laplace3D > 4 || laplace3D < 3) {
+      printf("ERROR: invalid transverse dim %d given. Please use 3 or 4 for t,none.\n", laplace3D);
       usage(argv);
     }
     i++;

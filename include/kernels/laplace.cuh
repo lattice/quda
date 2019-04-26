@@ -146,30 +146,19 @@ namespace quda
     const int my_spinor_parity = nParity == 2 ? parity : 0;
     Vector out;
 
+    //We instantiate two kernel types:
+    //case 4 is an operator in all x,y,z,t dimensions
+    //case 3 is a spatial operator only, the t dimension is omitted.
     switch (arg.dir) {
     case 4:
       applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx,
                                                                           thread_dim, active);
-      break;
-    case 0:
-      applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 0>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                         active);
-      break;
-    case 1:
-      applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 1>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                         active);
-      break;
-    case 2:
-      applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 2>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                         active);
       break;
     case 3:
       applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
                                                                          active);
       break;
     }
-
-    // applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
 
     if (xpay && kernel_type == INTERIOR_KERNEL) {
       Vector x = arg.x(x_cb, my_spinor_parity);
