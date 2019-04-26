@@ -9,18 +9,35 @@ namespace quda {
   // FIXME: At the moment, it's unsafe for more than one Dirac operator to be active unless
   // they all have the same volume, etc. (used to initialize the various CUDA constants).
 
-  Dirac::Dirac(const DiracParam &param) 
-    : gauge(param.gauge), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
-      dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), type(param.type), 
-      halo_precision(param.halo_precision), profile("Dirac", false)
+  Dirac::Dirac(const DiracParam &param) :
+    gauge(param.gauge),
+    kappa(param.kappa),
+    mass(param.mass),
+    laplace3D(param.laplace3D),
+    matpcType(param.matpcType),
+    dagger(param.dagger),
+    flops(0),
+    tmp1(param.tmp1),
+    tmp2(param.tmp2),
+    type(param.type),
+    halo_precision(param.halo_precision),
+    profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
   }
 
-  Dirac::Dirac(const Dirac &dirac) 
-    : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
-      dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), type(dirac.type), 
-      halo_precision(dirac.halo_precision), profile("Dirac", false)
+  Dirac::Dirac(const Dirac &dirac) :
+    gauge(dirac.gauge),
+    kappa(dirac.kappa),
+    laplace3D(dirac.laplace3D),
+    matpcType(dirac.matpcType),
+    dagger(dirac.dagger),
+    flops(0),
+    tmp1(dirac.tmp1),
+    tmp2(dirac.tmp2),
+    type(dirac.type),
+    halo_precision(dirac.halo_precision),
+    profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
@@ -34,6 +51,7 @@ namespace quda {
     if (&dirac != this) {
       gauge = dirac.gauge;
       kappa = dirac.kappa;
+      laplace3D = dirac.laplace3D;
       matpcType = dirac.matpcType;
       dagger = dirac.dagger;
       flops = 0;

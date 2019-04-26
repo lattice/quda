@@ -77,6 +77,7 @@ extern int niter;
 
 extern double mass; // the mass of the Dirac operator
 extern double kappa; // will get overriden
+extern int laplace3D;
 
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
 
@@ -263,6 +264,7 @@ void init()
   inv_param.mass = mass;
   inv_param.kappa = kappa = 1.0/(8.0+mass); // for laplace
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+  inv_param.laplace3D = laplace3D; // for laplace
 
   /*if (test_type < 2) {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;

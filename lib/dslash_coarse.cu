@@ -7,10 +7,6 @@
 #include <jitify_helper.cuh>
 #include <kernels/dslash_coarse.cuh>
 
-// ESW HACK
-//#define ESW_HACK_HALF_EXCHANGE
-//#define ESW_HACK_QUARTER_EXCHANGE
-
 namespace quda {
 
 #ifdef GPU_MULTIGRID
@@ -561,15 +557,23 @@ namespace quda {
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
           }
         } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
           if (halo_precision == QUDA_HALF_PRECISION) {
             ApplyCoarse<float,short,short>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                            dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
             ApplyCoarse<float,short,char>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                           dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
           } else {
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
           }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
         } else {
           errorQuda("Unsupported precision %d\n", Y.Precision());
         }

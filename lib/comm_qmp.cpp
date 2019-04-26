@@ -2,6 +2,7 @@
 #include <csignal>
 #include <quda_internal.h>
 #include <comm_quda.h>
+#include <mpi_comm_handle.h>
 
 #define QMP_CHECK(qmp_call) do {                     \
   QMP_status_t status = qmp_call;                    \
@@ -36,7 +37,7 @@ void comm_gather_hostname(char *hostname_recv_buf) {
   char *hostname = comm_hostname();
 
 #ifdef USE_MPI_GATHER
-  MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD);
+  MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE);
 #else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local hostname to all other nodes
@@ -60,7 +61,7 @@ void comm_gather_hostname(char *hostname_recv_buf) {
 void comm_gather_gpuid(int *gpuid_recv_buf) {
 
 #ifdef USE_MPI_GATHER
-  MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_WORLD);
+  MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_HANDLE);
 #else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local gpu to all other nodes
@@ -305,9 +306,7 @@ void comm_allreduce_array(double* data, size_t size)
 
 void comm_allreduce_max_array(double* data, size_t size)
 {
-  for (int i=0; i<size; i++) {
-    QMP_CHECK( QMP_max_double(data+i) );
-  }
+  for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_max_double(data + i)); }
 }
 
 void comm_allreduce_int(int* data)
