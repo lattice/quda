@@ -961,6 +961,7 @@ int main(int argc, char **argv)
 {
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
+
   // return code for google test
   int test_rc = 0;
   for (int i =1;i < argc; i++) {

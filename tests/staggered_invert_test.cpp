@@ -79,6 +79,7 @@ QudaSolutionType solution_type; // solution type
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
 extern double kappa;
+extern int laplace3D;
 
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
 
@@ -195,6 +196,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->verbosity = QUDA_VERBOSE;
   inv_param->mass = mass;
   inv_param->kappa = kappa = 1.0/(8.0 + mass); // for Laplace operator
+  inv_param->laplace3D = laplace3D;            // for Laplace operator
 
   // outer solver parameters
   inv_param->inv_type = inv_type;
