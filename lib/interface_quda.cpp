@@ -363,13 +363,15 @@ static int qmp_rank_from_coords(const int *coords, void *fdata)
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
 MPI_Comm MPI_COMM_HANDLE;
 static int user_set_comm_handle = 0;
+#endif
 
 void setMPICommHandleQuda(void *mycomm)
 {
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
   MPI_COMM_HANDLE = *((MPI_Comm *)mycomm);
   user_set_comm_handle = 1;
-}
 #endif
+}
 
 #ifdef QMP_COMMS
 static void initQMPComms(void)
