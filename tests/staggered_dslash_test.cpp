@@ -224,8 +224,9 @@ void init()
 
     // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH &&
-    dslash_type != QUDA_ASQTAD_DSLASH &&
-    dslash_type != QUDA_LAPLACE_DSLASH) {
+      dslash_type != QUDA_ASQTAD_DSLASH &&
+      dslash_type != QUDA_STAGGERED_SEXTET_DSLASH &&
+      dslash_type != QUDA_LAPLACE_DSLASH) {
     dslash_type = QUDA_ASQTAD_DSLASH;
   }
 
@@ -325,13 +326,14 @@ void init()
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       construct_gauge_field(qdp_inlink, 1, gaugeParam.cpu_prec, &gaugeParam);
     } else {
-      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam,compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
+      auto dslash_type_ = (compute_fatlong || dslash_type == QUDA_STAGGERED_SEXTET_DSLASH) ? QUDA_STAGGERED_DSLASH : dslash_type;
+      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gaugeParam.cpu_prec,&gaugeParam, dslash_type_);
     }
   }
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
   // "compute" the fat/long links or not.
-  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_STAGGERED_SEXTET_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     for (int dir = 0; dir < 4; dir++) {
       memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
       memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
@@ -503,7 +505,7 @@ void init()
 #endif
 
   gaugeParam.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
-  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_STAGGERED_SEXTET_DSLASH) {
 #ifdef USE_LEGACY_DSLASH
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
 #else
@@ -538,7 +540,8 @@ void init()
 
   ColorSpinorParam csParam;
   csParam.nColor = 3;
-  csParam.nSpin = 1;
+  // with sextet fermions we use an nSpin=2 container for convenience
+  csParam.nSpin = dslash_type == QUDA_STAGGERED_SEXTET_DSLASH ? 2 : 1;
   csParam.nDim = 5;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gaugeParam.X[d]; }
   csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
@@ -718,7 +721,6 @@ DslashTime dslashCUDA(int niter) {
 
 void staggeredDslashRef()
 {
-
   // compare to dslash reference implementation
   // printfQuda("Calculating reference implementation...");
   fflush(stdout);
@@ -881,6 +883,7 @@ int main(int argc, char **argv)
   // Ensure a reasonable default
     // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH &&
+      dslash_type != QUDA_STAGGERED_SEXTET_DSLASH &&
       dslash_type != QUDA_ASQTAD_DSLASH &&
       dslash_type != QUDA_LAPLACE_DSLASH) {
     warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
@@ -920,9 +923,6 @@ int main(int argc, char **argv)
     if (prec == QUDA_HALF_PRECISION /* half */) {
       errorQuda("Half precision unsupported in fat/long compute");
     }
-  }
-  if (dslash_type == QUDA_LAPLACE_DSLASH && prec == QUDA_HALF_PRECISION) {
-    errorQuda("Half precision unsupported for Laplace operator.\n");
   }
 
   display_test_info();

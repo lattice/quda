@@ -221,26 +221,70 @@ namespace quda {
 
 #pragma unroll
     for (int s=0; s<Ns; s++) {
-      complex<Float> a[Nc*Nc];
+
+#if 1
+
+      // first do xA = x * A multiplication
+      Matrix <complex<Float>,Nc> xA;
+#pragma unroll
+      for (int i=0; i<Nc; i++) {
+#pragma unroll
+        for (int l=0; l<Nc; l++) {
+          xA(i,l).x =  x(s,i,0).real() * A(0,l).real();
+          xA(i,l).x = -x(s,i,0).imag() * A(0,l).imag();
+          xA(i,l).y += x(s,i,0).real() * A(0,l).imag();
+          xA(i,l).y += x(s,i,0).imag() * A(0,l).real();
+#pragma unroll
+          for (int j=1; j<Nc; j++) {
+            xA(i,l).x  = x(s,i,j).real() * A(j,l).real();
+            xA(i,l).x -= x(s,i,j).imag() * A(j,l).imag();
+            xA(i,l).y += x(s,i,j).real() * A(j,l).imag();
+            xA(i,l).y += x(s,i,j).imag() * A(j,l).real();
+          }
+        }
+      }
+
+      // second do y = A * xA multiplication
+#pragma unroll
+      for (int k=0; k<Nc; k++) {
+#pragma unroll
+        for (int l=0; l<Nc; l++) {
+          y(s,k,l).x =  A(k,0).real() * xA(0,l).real();
+          y(s,k,l).x = -A(k,0).imag() * xA(0,l).imag();
+          y(s,k,l).y += A(k,0).real() * xA(0,l).imag();
+          y(s,k,l).y += A(k,0).imag() * xA(0,l).real();
+#pragma unroll
+          for (int i=1; i<Nc; i++) {
+            y(s,k,l).x  = A(k,i).real() * xA(i,l).real();
+            y(s,k,l).x -= A(k,i).imag() * xA(i,l).imag();
+            y(s,k,l).y += A(k,i).real() * xA(i,l).imag();
+            y(s,k,l).y += A(k,i).imag() * xA(i,l).real();
+          }
+        }
+      }
+
+#else
+ 
 
 #pragma unroll
       for (int l=0; l<Nc; l++) {
 #pragma unroll
         for (int k=0; k<Nc; k++) {
 
-#pragma unroll
-          for (int i=0;i<Nc*Nc;i++) a[i] = 0;
+          Matrix<complex<Float,Nc> a;
 
 #pragma unroll
           for (int i=0; i<Nc; i++) {
 #pragma unroll
             for (int j=0; j<Nc; j++) {
-              a[i*Nc+l] += x(s,i,j)*A(j,l);
+              a(i,l) += x(s,i,j) * A(j,l);
             }
-            y(s,k,l) = A(k,i) * a[i*Nc+l];
+            y(s,k,l) += A(k,i) * a(i,l);
           }
         }
       }
+
+#endif
     }
 
     return y;

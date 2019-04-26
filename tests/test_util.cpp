@@ -1154,6 +1154,7 @@ void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, Q
 
     if (type == 3) return;
 
+    /*
     // set all links to zero to emulate the 1-link operator (needed for host comparison)
     if (dslash_type == QUDA_STAGGERED_DSLASH) {
       for (int dir = 0; dir < 4; ++dir) {
@@ -1170,6 +1171,7 @@ void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, Q
         }
       }
     }
+    */
   }
 }
 
@@ -1811,7 +1813,7 @@ void usage(char** argv )
   printf("    --rank-order <col/row>                    # Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
-         "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
+         "                                                  /asqtad/staggered-sexted/domain-wall/domain-wall-4d/mobius/laplace\n");
   printf("    --laplace3D <n>                           # Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");

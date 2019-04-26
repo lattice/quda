@@ -21,7 +21,7 @@ namespace quda
 {
 
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct StaggeredLaunch {
+  struct StaggeredSextetLaunch {
     static constexpr const char *kernel = "quda::staggeredGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
@@ -30,7 +30,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<Float>
+  template <typename Float, int nDim, int nColor, typename Arg> class StaggeredSextet : public Dslash<Float>
   {
 
 protected:
@@ -38,14 +38,14 @@ protected:
     const ColorSpinorField &in;
 
 public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+    StaggeredSextet(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
         Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
         arg(arg),
         in(in)
     {
     }
 
-    virtual ~Staggered() {}
+    virtual ~StaggeredSextet() {}
 
     void apply(const cudaStream_t &stream)
     {
@@ -54,7 +54,7 @@ public:
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         Dslash<Float>::setParam(arg);
-        Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor>(tp, arg, stream);
+        Dslash<Float>::template instantiate<StaggeredSextetLaunch, nDim, nColor>(tp, arg, stream);
       }
     }
 
@@ -67,9 +67,9 @@ public:
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
+  template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredSextetApply {
 
-    inline StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+    inline StaggeredSextetApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
         const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
@@ -79,7 +79,7 @@ public:
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
         StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC, sextet> arg(
             out, in, U, U, a, x, parity, dagger, comm_override);
-        Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
+        StaggeredSextet<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(staggered)> policy(staggered,
             const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
@@ -107,7 +107,7 @@ public:
     // check all locations match
     checkLocation(out, in, U);
 
-    instantiate<StaggeredApply, StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
+    instantiate<StaggeredSextetApply, StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Staggered dslash has not been built");
 #endif

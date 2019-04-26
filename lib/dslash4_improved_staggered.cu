@@ -21,7 +21,7 @@ namespace quda
 {
 
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct StaggeredLaunch {
+  struct ImprovedStaggeredLaunch {
     static constexpr const char *kernel = "quda::staggeredGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
@@ -30,7 +30,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<Float>
+  template <typename Float, int nDim, int nColor, typename Arg> class ImprovedStaggered : public Dslash<Float>
   {
 
 protected:
@@ -38,14 +38,14 @@ protected:
     const ColorSpinorField &in;
 
 public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+    ImprovedStaggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
         Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
         arg(arg),
         in(in)
     {
     }
 
-    virtual ~Staggered() {}
+    virtual ~ImprovedStaggered() {}
 
     void apply(const cudaStream_t &stream)
     {
@@ -54,7 +54,7 @@ public:
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         Dslash<Float>::setParam(arg);
-        Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor>(tp, arg, stream);
+        Dslash<Float>::template instantiate<ImprovedStaggeredLaunch, nDim, nColor>(tp, arg, stream);
       }
     }
 
@@ -169,7 +169,7 @@ public:
       constexpr bool improved = true;
       constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
       StaggeredArg<Float, nColor, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger, comm_override);
-      Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
+      ImprovedStaggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(staggered)> policy(staggered,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
