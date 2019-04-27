@@ -77,10 +77,10 @@ void comm_abort(int status) {
   exit(status);
 }
 
-const char* comm_dim_partitioned_string() {
+const char* comm_dim_partitioned_string(const int *comm_dim_override) {
   return partition_string;
 }
 
-const char* comm_dim_topology_string(const int *comm_dim_override) {
+const char* comm_dim_topology_string() {
   return topology_string;
 }
