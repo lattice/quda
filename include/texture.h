@@ -126,10 +126,8 @@ __device__ inline float store_norm(float *norm, FloatN x[M], int i)
    @param InterType Intermediate format - RegType precision with StoreType ordering
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
-   @param tex_id Which texture reference are we using.  A default of
-   -1 disables textures on architectures that don't support texture objects.
 */
-template <typename RegType, typename StoreType, int N, int tex_id=-1>
+template <typename RegType, typename StoreType, int N>
   class SpinorTexture {
 
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
@@ -281,15 +279,13 @@ template <typename RegType, typename StoreType, int N, int tex_id=-1>
    @param InterType Intermediate format - RegType precision with StoreType ordering
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
-   @param tex_id Which texture reference are we using.  A default of
-   -1 disables textures on architectures that don't support texture objects.
 */
-template <typename RegType, typename StoreType, int N, int write, int tex_id = -1>
-class Spinor : public SpinorTexture<RegType, StoreType, N, tex_id>
+template <typename RegType, typename StoreType, int N, int write>
+class Spinor : public SpinorTexture<RegType, StoreType, N>
 {
 
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
-  typedef SpinorTexture<RegType,StoreType,N,tex_id> ST;
+  typedef SpinorTexture<RegType,StoreType,N> ST;
 
   private:
   StoreType *spinor;

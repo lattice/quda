@@ -130,8 +130,8 @@ private:
 
     if(oprod.Precision() == QUDA_DOUBLE_PRECISION){
 
-      Spinor<double2, double2, 12, 0, 0> spinorA[MAX_NVECTOR];
-      Spinor<double2, double2, 12, 0, 1> spinorB[MAX_NVECTOR];
+      Spinor<double2, double2, 12, 0> spinorA[MAX_NVECTOR];
+      Spinor<double2, double2, 12, 0> spinorB[MAX_NVECTOR];
 
       for (unsigned int i=0; i<x.size(); i++) {
 	spinorA[i].set(*dynamic_cast<cudaColorSpinorField*>(x[i]));

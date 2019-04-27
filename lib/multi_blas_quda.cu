@@ -255,10 +255,10 @@ namespace quda {
       typedef typename vector<Float, 2>::type Float2;
       typedef vector<Float, 2> vec2;
 
-      SpinorTexture<RegType, StoreType, M, 0> X[NXZ];
-      Spinor<RegType, yType, M, write::Y, 1> Y[MAX_MULTI_BLAS_N];
-      SpinorTexture<RegType, StoreType, M, 2> Z[NXZ];
-      Spinor<RegType, StoreType, M, write::W, 3> W[MAX_MULTI_BLAS_N];
+      SpinorTexture<RegType, StoreType, M> X[NXZ];
+      Spinor<RegType, yType, M, write::Y> Y[MAX_MULTI_BLAS_N];
+      SpinorTexture<RegType, StoreType, M> Z[NXZ];
+      Spinor<RegType, StoreType, M, write::W> W[MAX_MULTI_BLAS_N];
 
       for (int i = 0; i < NXZ; i++) {
         X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
@@ -273,8 +273,8 @@ namespace quda {
 
       Functor<NXZ, Float2, RegType> f(a, b, c, NYW);
 
-      MultiBlas<NXZ, RegType, M, SpinorTexture<RegType, StoreType, M, 0>, Spinor<RegType, yType, M, write::Y, 1>,
-          SpinorTexture<RegType, StoreType, M, 2>, Spinor<RegType, StoreType, M, write::W, 3>, decltype(f), T>
+      MultiBlas<NXZ, RegType, M, SpinorTexture<RegType, StoreType, M>, Spinor<RegType, yType, M, write::Y>,
+          SpinorTexture<RegType, StoreType, M>, Spinor<RegType, StoreType, M, write::W>, decltype(f), T>
           blas(X, Y, Z, W, f, a, b, c, x, y, z, w, NYW, length);
       blas.apply(*getStream());
 

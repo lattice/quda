@@ -155,11 +155,11 @@ namespace quda {
       checkLength(x, w);
       checkLength(x, v);
 
-      Spinor<RegType, StoreType, M, writeX, 0> X(x);
-      Spinor<RegType, yType, M, writeY, 1> Y(y);
-      Spinor<RegType, StoreType, M, writeZ, 2> Z(z);
-      Spinor<RegType, StoreType, M, writeW, 3> W(w);
-      Spinor<RegType, yType, M, writeV, 4> V(v);
+      Spinor<RegType, StoreType, M, writeX> X(x);
+      Spinor<RegType,     yType, M, writeY> Y(y);
+      Spinor<RegType, StoreType, M, writeZ> Z(z);
+      Spinor<RegType, StoreType, M, writeW> W(w);
+      Spinor<RegType,     yType, M, writeV> V(v);
 
       typedef typename scalar<RegType>::type Float;
       typedef typename vector<Float, 2>::type Float2;

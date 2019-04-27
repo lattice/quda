@@ -491,14 +491,14 @@ namespace quda {
 	ColorSpinorField& inD = (parity&1) ? p[i]->Even(): p[i]->Odd();
 
 	if (x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
-	  Spinor<double2, double2, 12, 0, 0> spinorA(inA);
+	  Spinor<double2, double2, 12, 0> spinorA(inA);
 
-	  Spinor<double2, double2, 12, 0, 1> spinorB(inB);
+	  Spinor<double2, double2, 12, 0> spinorB(inB);
 	  exchangeGhost(static_cast<cudaColorSpinorField&>(inB), parity, dag);
 
-	  Spinor<double2, double2, 12, 0, 2> spinorC(inC);
+	  Spinor<double2, double2, 12, 0> spinorC(inC);
 
-	  Spinor<double2, double2, 12, 0, 3> spinorD(inD);
+	  Spinor<double2, double2, 12, 0> spinorD(inD);
 	  exchangeGhost(static_cast<cudaColorSpinorField&>(inD), parity, 1-dag);
 
 	  if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
