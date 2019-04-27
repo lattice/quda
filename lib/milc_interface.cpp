@@ -223,8 +223,10 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
 }
 
 static  void invalidateGaugeQuda() {
+  qudamilc_called<true>(__func__);
   freeGaugeQuda();
   invalidate_quda_gauge = true;
+  qudamilc_called<false>(__func__);
 }
 
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
