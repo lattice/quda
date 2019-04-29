@@ -38,7 +38,7 @@ QudaInvertParam inv_param;
 
 cpuGaugeField *cpuLink = NULL;
 
-cpuColorSpinorField *spinor, *spinorOut, *spinorRef, *tmpCpu;
+cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
 
 cudaColorSpinorField* tmp;
@@ -158,7 +158,6 @@ void init(int argc, char **argv)
   spinor = new cpuColorSpinorField(csParam);
   spinorOut = new cpuColorSpinorField(csParam);
   spinorRef = new cpuColorSpinorField(csParam);
-  tmpCpu = new cpuColorSpinorField(csParam);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.x[0] = gaugeParam.X[0];
@@ -266,7 +265,6 @@ void end(void)
   delete spinor;
   delete spinorOut;
   delete spinorRef;
-  delete tmpCpu;
 
   if (cpuLink) delete cpuLink;
 
@@ -402,12 +400,11 @@ int main(int argc, char **argv)
         printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / secs);
 
         double spinor_ref_norm2 = blas::norm2(*spinorRef);
-        blas::copy(*tmpCpu, *spinorOut);
-        double spinor_out_norm2 = blas::xmyNorm(*spinorOut, *tmpCpu);
+        double spinor_out_norm2 = blas::norm2(*spinorOut);
 
         if (!transfer) {
           double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
-          printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%.6e\n", muCuda, spinor_ref_norm2,
+          printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, spinor_ref_norm2,
                      cuda_spinor_out_norm2, spinor_out_norm2);
         } else {
           printfQuda("Result mu = %d: CPU=%f , CPU-CUDA=%f", mu, spinor_ref_norm2, spinor_out_norm2);
