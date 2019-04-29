@@ -60,7 +60,7 @@ namespace quda {
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double kappa,
-      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+                   const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Driver for applying the Wilson-clover stencil
@@ -392,8 +392,8 @@ namespace quda {
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
-      const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
-      const int *comm_override, TimeProfile &profile);
+                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override, TimeProfile &profile);
 
   enum Dslash5Type { DSLASH5_DWF, DSLASH5_MOBIUS_PRE, DSLASH5_MOBIUS, M5_INV_DWF, M5_INV_MOBIUS, M5_INV_ZMOBIUS };
 
@@ -414,6 +414,49 @@ namespace quda {
   */
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
       double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
+
+  /**
+     @brief Driver for applying the Laplace stencil
+
+     out = - kappa * A * in
+
+     where A is the gauge laplace linear operator.
+
+     If x is defined, the operation is given by out = x - kappa * A in.
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the gauge Laplace
+     @param[in] dir Direction of the derivative 0,1,2,3 to omit (-1 is full 4D)
+     @param[in] kappa Scale factor applied
+     @param[in] x Vector field we accumulate onto to
+  */
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double kappa,
+                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the covariant derivative
+
+     out = U * in
+
+     where U is the gauge field in a particular direction.
+
+     This operator can be applied to both single parity
+     (checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the covariant derivative
+     @param[in] mu Direction of the derivative. For mu > 3 it goes backwards
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
+                   bool dagger, const int *comm_override, TimeProfile &profile);
 
 #else
 
@@ -468,6 +511,11 @@ namespace quda {
 		      const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k,
 		      const double *b5, const double *c_5, const double &m5,
                       const int *commDim, const int DS_type, TimeProfile &profile);
+
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double kappa,
+                    const ColorSpinorField *x, int parity);
+
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu);
 
 #endif
 
@@ -583,13 +631,14 @@ namespace quda {
      @param[in] nFace Depth of halo
      @param[in] dagger Whether this is for the dagger operator
      @param[in] parity Field parity
+     @param[in] spin_project Whether to spin_project when packing
      @param[in] a Twisted mass scale factor (for preconditioned twisted-mass dagger operator)
      @param[in] b Twisted mass chiral twist factor (for preconditioned twisted-mass dagger operator)
      @param[in] c Twisted mass flavor twist factor (for preconditioned non degenerate twisted-mass dagger operator)
      @param[in] stream Which stream are we executing in
   */
   void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &field, MemoryLocation location, int nFace,
-      bool dagger, int parity, double a, double b, double c, const cudaStream_t &stream);
+                 bool dagger, int parity, bool spin_project, double a, double b, double c, const cudaStream_t &stream);
 #endif
 
   /**

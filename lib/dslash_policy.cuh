@@ -139,12 +139,15 @@ namespace quda
   inline void issuePack(cudaColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location, int packIndex)
   {
 
+    auto &arg = dslash.dslashParam;
     if ( (location & Device) & Host) errorQuda("MemoryLocation cannot be both Device and Host");
 
     bool pack = false;
     for (int i=3; i>=0; i--)
-      if (dslash.dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
-        { pack = true; break; }
+      if (arg.commDim[i] && (i != 3 || getKernelPackT())) {
+        pack = true;
+        break;
+      }
 
     MemoryLocation pack_dest[2*QUDA_MAX_DIM];
     for (int dim=0; dim<4; dim++) {
@@ -160,8 +163,8 @@ namespace quda
     }
     if (pack) {
       PROFILE(if (dslash_pack_compute) in.pack(dslash.Nface() / 2, parity, dslash.Dagger(), packIndex, pack_dest,
-                  location, dslash.dslashParam.twist_a, dslash.dslashParam.twist_b, dslash.dslashParam.twist_c),
-          profile, QUDA_PROFILE_PACK_KERNEL);
+                                               location, arg.spin_project, arg.twist_a, arg.twist_b, arg.twist_c),
+              profile, QUDA_PROFILE_PACK_KERNEL);
 
       // Record the end of the packing
       PROFILE(if (location != Host) qudaEventRecord(packEnd[in.bufferIndex], streams[packIndex]), profile, QUDA_PROFILE_EVENT_RECORD);

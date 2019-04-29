@@ -31,6 +31,7 @@ namespace quda {
     cudaGaugeField *gauge;
     cudaGaugeField *fatGauge;  // used by staggered only
     cudaGaugeField *longGauge; // used by staggered only
+    int laplace3D;
     cudaCloverField *clover;
   
     double mu; // used by twisted mass only
@@ -61,6 +62,7 @@ namespace quda {
       printfQuda("type = %d\n", type);
       printfQuda("kappa = %g\n", kappa);
       printfQuda("mass = %g\n", mass);
+      printfQuda("laplace3D = %d\n", laplace3D);
       printfQuda("m5 = %g\n", m5);
       printfQuda("Ls = %d\n", Ls);
       printfQuda("matpcType = %d\n", matpcType);
@@ -101,6 +103,7 @@ namespace quda {
     cudaGaugeField *gauge;
     double kappa;
     double mass;
+    int laplace3D;
     QudaMatPCType matpcType;
     mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
     mutable unsigned long long flops;

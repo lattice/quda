@@ -662,20 +662,17 @@ namespace quda {
        @param[in] location Are we packing directly into local device memory, zero-copy memory or remote memory
        @param[in] location_label Consistent label used for labeling
        the packing tunekey since location can be difference for each process
+       @param[in] spin_project Whether we are spin projecting when face packing
        @param[in] a Twisted mass parameter (scale factor, default=0)
        @param[in] b Twisted mass parameter (flavor twist factor, default=0)
        @param[in] c Twisted mass parameter (chiral twist factor, default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-        cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label, double a = 0,
-        double b = 0, double c = 0);
+                   cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
+                   bool spin_project, double a = 0, double b = 0, double c = 0);
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
 			   const int dagger,cudaStream_t* stream, bool zero_copy=false);
-
-
-    void packGhost(FullClover &clov, FullClover &clovInv, const int nFace, const QudaParity parity, const int dim,
-		   const QudaDirection dir, const int dagger, cudaStream_t* stream, void *buffer=0, double a=0);
 
     /**
       Initiate the gpu to cpu send of the ghost zone (halo)
@@ -729,12 +726,13 @@ namespace quda {
        @param[in] location_label Consistent label used for labeling
        the packing tunekey since location can be difference for each
        process
+       @param[in] spin_project Whether we are spin projecting when face packing
        @param[in] a Used for twisted mass (scale factor)
        @param[in] b Used for twisted mass (chiral twist factor)
        @param[in] c Used for twisted mass (flavor twist factor)
     */
     void pack(int nFace, int parity, int dagger, int stream_idx, MemoryLocation location[],
-        MemoryLocation location_label, double a = 0, double b = 0, double c = 0);
+              MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0);
 
     void packExtended(const int nFace, const int R[], const int parity, const int dagger,
         const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);
