@@ -164,16 +164,7 @@ namespace quda {
     }
   }
 
-  void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
-  {
-    switch (src.Precision()) {
-    case QUDA_DOUBLE_PRECISION: spinorNoise<double>(src, randstates, type); break;
-    case QUDA_SINGLE_PRECISION: spinorNoise<float>(src, randstates, type); break;
-    default: errorQuda("Precision %d not implemented", src.Precision());
-    }
-  }
-
-  void spinorNoise(ColorSpinorField &src_, int seed, QudaNoiseType type)
+  void spinorNoise(ColorSpinorField &src_, RNG& randstates, QudaNoiseType type)
   {
     // if src is a CPU field then create GPU field
     ColorSpinorField *src = &src_;
@@ -185,16 +176,25 @@ namespace quda {
       src = ColorSpinorField::Create(param);
     }
 
-    RNG* randstates = new RNG(src->Volume(), seed, src->X());
-    randstates->Init();
-    spinorNoise(*src, *randstates, type);
-    randstates->Release();
-    delete randstates;
+    switch (src->Precision()) {
+    case QUDA_DOUBLE_PRECISION: spinorNoise<double>(*src, randstates, type); break;
+    case QUDA_SINGLE_PRECISION: spinorNoise<float>(*src, randstates, type); break;
+    default: errorQuda("Precision %d not implemented", src->Precision());
+    }
 
     if (src != &src_) {
       src_ = *src; // upload result
       delete src;
     }
+  }
+
+  void spinorNoise(ColorSpinorField &src, int seed, QudaNoiseType type)
+  {
+    RNG* randstates = new RNG(src.Volume(), seed, src.X());
+    randstates->Init();
+    spinorNoise(src, *randstates, type);
+    randstates->Release();
+    delete randstates;
   }
 
 } // namespace quda
