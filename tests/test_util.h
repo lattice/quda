@@ -2,6 +2,7 @@
 #define _TEST_UTIL_H
 
 #include <quda.h>
+#include <random_quda.h>
 
 #define gaugeSiteSize 18 // real numbers per link
 #define spinorSiteSize 24 // real numbers per spinor
@@ -61,14 +62,14 @@
   void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
 				    QudaPrecision precision, QudaGaugeParam*, 
 				    QudaDslashType dslash_type);
+
+  /** Create random spinor source field using QUDA's internal hypercubic GPU RNG */
+  void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int * const x, quda::RNG &rng);
   void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
-  void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, QudaPrecision precision);
   void createSiteLinkCPU(void** link,  QudaPrecision precision, int phase) ;
 
   void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
   void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision, QudaGaugeParam *param);
-  //void su3_construct_8_half(float *mat, short *mat_half);
-  //void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx, QudaGaugeParam *param);
 
   void compare_spinor(void *spinor_cpu, void *spinor_gpu, int len, QudaPrecision precision);
   void strong_check(void *spinor, void *spinorGPU, int len, QudaPrecision precision);
