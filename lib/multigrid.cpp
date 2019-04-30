@@ -60,12 +60,12 @@ namespace quda {
       }
     }
 
+    rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
+    rng->Init();
+
     if (param.level < param.Nlevel-1) {
       if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
         if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) {
-
-          rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
-          rng->Init();
 
           // Initializing to random vectors
           for(int i=0; i<(int)param.B.size(); i++) {
@@ -438,9 +438,10 @@ namespace quda {
   }
 
   MG::~MG() {
+    if (rng) rng->Release();
+    delete rng;
+
     if (param.level < param.Nlevel-1) {
-      if (rng) rng->Release();
-      delete rng;
 
       if (param.level == param.Nlevel-1 || param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
 	if (coarse_solver) delete coarse_solver;
@@ -564,9 +565,7 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P^\\dagger P) eta_c\n");
 
-    RNG *rng_coarse = new RNG(x_coarse->Volume(), 1234, x_coarse->X());
-    rng_coarse->Init();
-    spinorNoise(*x_coarse, *rng_coarse, QUDA_NOISE_UNIFORM);
+    spinorNoise(*x_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
 
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
@@ -581,10 +580,7 @@ namespace quda {
     zero(*tmp_coarse);
     zero(*r_coarse);
 
-    spinorNoise(*tmp_coarse, *rng_coarse, QUDA_NOISE_UNIFORM);
-
-    rng_coarse->Release();
-    delete rng_coarse;
+    spinorNoise(*tmp_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
 
     //tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp1, *tmp_coarse);
