@@ -1,5 +1,7 @@
 #include <qmp.h>
 #include <csignal>
+#include <algorithm>
+#include <numeric>
 #include <quda_internal.h>
 #include <comm_quda.h>
 #include <mpi_comm_handle.h>
@@ -8,6 +10,17 @@
   QMP_status_t status = qmp_call;                    \
   if (status != QMP_SUCCESS)                         \
     errorQuda("(QMP) %s", QMP_error_string(status)); \
+} while (0)
+
+#define MPI_CHECK(mpi_call) do {                    \
+  int status = mpi_call;                            \
+  if (status != MPI_SUCCESS) {                      \
+    char err_string[128];                           \
+    int err_len;                                    \
+    MPI_Error_string(status, err_string, &err_len); \
+    err_string[127] = '\0';                         \
+    errorQuda("(MPI) %s", err_string);              \
+  }                                                 \
 } while (0)
 
 struct MsgHandle_s {
@@ -37,7 +50,7 @@ void comm_gather_hostname(char *hostname_recv_buf) {
   char *hostname = comm_hostname();
 
 #ifdef USE_MPI_GATHER
-  MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE);
+  MPI_CHECK(MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE));
 #else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local hostname to all other nodes
@@ -61,7 +74,7 @@ void comm_gather_hostname(char *hostname_recv_buf) {
 void comm_gather_gpuid(int *gpuid_recv_buf) {
 
 #ifdef USE_MPI_GATHER
-  MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_HANDLE);
+  MPI_CHECK(MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_HANDLE));
 #else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local gpu to all other nodes
@@ -322,13 +335,13 @@ void comm_allreduce_array(double* data, size_t size)
   MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
 
   double *recv_trans = new double[size * n];
-  for (int i=0; i<n; i++) {
-    for (int j=0; j<size; j++) {
+  for (size_t i=0; i<n; i++) {
+    for (size_t j=0; j<size; j++) {
       recv_trans[j*n + i] = recv_buf[i*size + j];
     }
   }
 
-  for (int i=0; i<size; i++) {
+  for (size_t i=0; i<size; i++) {
     std::sort(recv_trans+i*n, recv_trans+i*n+n); // sort reduction into ascending order for deterministic reduction
     data[i] = std::accumulate(recv_trans+i*n, recv_trans+i*n+n, 0.0);
   }

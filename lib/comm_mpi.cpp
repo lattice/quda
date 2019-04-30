@@ -355,13 +355,13 @@ void comm_allreduce_array(double* data, size_t size)
   MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
 
   double *recv_trans = new double[size * n];
-  for (int i=0; i<n; i++) {
-    for (int j=0; j<size; j++) {
+  for (size_t i=0; i<n; i++) {
+    for (size_t j=0; j<size; j++) {
       recv_trans[j*n + i] = recv_buf[i*size + j];
     }
   }
 
-  for (int i=0; i<size; i++) {
+  for (size_t i=0; i<size; i++) {
     std::sort(recv_trans+i*n, recv_trans+i*n+n); // sort reduction into ascending order for deterministic reduction
     data[i] = std::accumulate(recv_trans+i*n, recv_trans+i*n+n, 0.0);
   }
