@@ -67,7 +67,8 @@ namespace quda {
      @param rng_size size of the CURAND RNG state array
      @param X array of lattice dimensions
   */
-  void launch_kernel_random(cuRNGState *state, int seed, int rng_size, int X[4]) {
+  void launch_kernel_random(cuRNGState *state, int seed, int rng_size, int X[4])
+  {
     dim3 nthreads(128,1,1);
     dim3 nblocks = GetBlockDim(nthreads.x, rng_size);
     rngArg arg(X);
@@ -75,9 +76,9 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  RNG::RNG(int rng_sizes, int seedin, const int XX[4]) {
-    rng_size = rng_sizes;
-    seed = seedin;
+  RNG::RNG(int rng_sizes, int seedin, const int XX[4]) :
+    seed(seedin), rng_size(rng_sizes)
+  {
     state = NULL;
     node_offset = 0;
     for(int i=0; i<4;i++) X[i]=XX[i];
