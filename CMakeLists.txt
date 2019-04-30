@@ -141,6 +141,8 @@ set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to initialize templat
 set(QUDA_PRECISION "14" CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
 set(QUDA_RECONSTRUCT "7" CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
+set(QUDA_DETERMINISTIC_REDUCE OFF CACHE BOOL "use rank-order independent floating point inter-process reductions")
+
 # Set CTest options
 set(QUDA_CTEST_SEP_DSLASH_POLICIES OFF CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
@@ -176,6 +178,7 @@ mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
+mark_as_advanced(QUDA_DETERMINISTIC_REDUCE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -421,6 +424,10 @@ add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
 
 # set which precisions to enable
 add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
+
+if (QUDA_DETERMINISTIC_REDUCE)
+   add_definitions(-DQUDA_DETERMINISTIC_REDUCE)
+endif()
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)

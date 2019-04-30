@@ -1,6 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <algorithm>
+#include <numeric>
 #include <mpi.h>
 #include <csignal>
 #include <quda_internal.h>
@@ -309,9 +311,20 @@ int comm_query(MsgHandle *mh)
 
 void comm_allreduce(double* data)
 {
+#ifndef QUDA_DETERMINISTIC_REDUCE
   double recvbuf;
   MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
   *data = recvbuf;
+#else
+  const size_t n = comm_size();
+  double *recv_buf = (double*)safe_malloc(n * sizeof(double));
+  MPI_CHECK(MPI_Allgather(data, 1, MPI_DOUBLE, recv_buf, 1, MPI_DOUBLE, MPI_COMM_HANDLE));
+
+  std::sort(recv_buf, recv_buf+n); // sort reduction into ascending order for deterministic reduction
+  *data = std::accumulate(recv_buf, recv_buf+n, 0.0);
+
+  host_free(recv_buf);
+#endif
 }
 
 
@@ -331,10 +344,31 @@ void comm_allreduce_min(double* data)
 
 void comm_allreduce_array(double* data, size_t size)
 {
+#ifndef QUDA_DETERMINISTIC_REDUCE
   double *recvbuf = new double[size];
   MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
   memcpy(data, recvbuf, size*sizeof(double));
   delete []recvbuf;
+#else
+  size_t n = comm_size();
+  double *recv_buf = new double[size * n];
+  MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
+
+  double *recv_trans = new double[size * n];
+  for (int i=0; i<n; i++) {
+    for (int j=0; j<size; j++) {
+      recv_trans[j*n + i] = recv_buf[i*size + j];
+    }
+  }
+
+  for (int i=0; i<size; i++) {
+    std::sort(recv_trans+i*n, recv_trans+i*n+n); // sort reduction into ascending order for deterministic reduction
+    data[i] = std::accumulate(recv_trans+i*n, recv_trans+i*n+n, 0.0);
+  }
+
+  delete []recv_buf;
+  delete []recv_trans;
+#endif
 }
 
 void comm_allreduce_max_array(double* data, size_t size)
