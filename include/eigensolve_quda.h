@@ -13,40 +13,44 @@ namespace quda {
     QudaEigParam *eig_param;
     TimeProfile profile;
 
-    //Timings for various components of eigensolver
+    //Timings for components of the eigensolver
+    //-----------------------------------------
     double time_;
-    double time_e;   //time in Eigen
-    double time_mv;  //time in matVec
-    double time_mb;  //time in multiblas
-    double time_svd; //time to compute SVD
+    double time_e;    //time in Eigen
+    double time_mv;   //time in matVec
+    double time_mb;   //time in multiblas
+    double time_svd;  //time to compute SVD
 
-    int nEv;      //Size of initial factorisation
-    int nKr;      //Size of Krylov space.
-    int nConv;    //Number of converged eigenvalues requested
-    double tol;   //Tolerance on eigenvalues
-    bool inverse; //True if using polynomial accelration
+    //Problem parameters
+    //------------------
+    int nEv;         //Size of initial factorisation
+    int nKr;         //Size of Krylov space after extension
+    int nConv;       //Number of converged eigenvalues requested
+    double tol;      //Tolerance on eigenvalues
+    bool reverse;    //True if using polynomial acceleration
+    char *spectrum;  //Part of the spectrum to be computed.
 
+    //Algorithm parameters
+    //--------------------
     bool converged;
     int num_converged;
     int restart_iter;
     int max_restarts;
     int check_interval;
     
-    //Tracks the residuals from one restart to the next
     double *residua;
     double *residua_old;
-    
     //Tracks if an eigenpair is locked
     bool *locked;
+    
+    //Device side vector workspace
+    std::vector<ColorSpinorField*> r;
+    std::vector<ColorSpinorField*> d_vecs_tmp;
 
-    //Part of the spectrum to be computed.
-    char *spectrum;
-
-    //Quda MultiBLAS friendly rotation array.
     Complex *Qmat;
 
-    //QUDA logfile name
-    char *QUDA_logfile;
+    Complex sigma_k;
+    double beta_m;
     
   public:
     EigenSolver(QudaEigParam *eig_param, TimeProfile &profile);
@@ -83,25 +87,26 @@ namespace quda {
     /**
        @brief Orthogonalise input vector r against
        vector space v
+       @param[out] Sum of inner products
        @param[in] v Vector space
        @param[in] r Vector to be orthogonalised
        @param[in] j Number of vectors in v to orthogonalise against
     */
-    void orthogonalise(std::vector<ColorSpinorField*> v,
-		       std::vector<ColorSpinorField*> r,
-		       int j);
+    Complex orthogonalise(std::vector<ColorSpinorField*> v,
+			  std::vector<ColorSpinorField*> r,
+			  int j);
 
     /**
        @brief Orthogonalise input vector r against
        vector space v using block-BLAS
-       Returns the real part of the sum of inner products.
+       @param[out] Sum of inner products
        @param[in] v Vector space
        @param[in] r Vector to be orthogonalised
-       @param[in] j Number of vectors in v to orthogonalise against       
+       @param[in] j Number of vectors in v to orthogonalise against
     */
-    double blockOrthogonalise(std::vector<ColorSpinorField*> v,
-			      std::vector<ColorSpinorField*> r,
-			      int j);
+    Complex blockOrthogonalise(std::vector<ColorSpinorField*> v,
+			       std::vector<ColorSpinorField*> r,
+			       int j);
 
     /**
        @brief Deflate vector with Eigenvectors
@@ -119,21 +124,16 @@ namespace quda {
        @brief Compute eigenvalues and their residiua
        @param[in] mat Matrix operator
        @param[in] evals The eigenvalues
-       @param[in] evecs The eigenvectors
-       @param[in] tmp A workspace vector
+       @param[in] k The number to compute 
     */        
     void computeEvals(const Dirac &mat,
-		      std::vector<Complex> &evals,
-		      std::vector<ColorSpinorField*> evecs,
-		      std::vector<ColorSpinorField*> tmp);
+		      std::vector<Complex> &evals, int k);
 
     /**
        @brief Rotate eigenvectors by dense matrix
        @param[in] kSpace the vectors to be rotated
-       @param[in] tmp Workspace vectors
     */            
-    void basisRotateQ(std::vector<ColorSpinorField*> &kSpace,
-		      std::vector<ColorSpinorField*> &tmp);
+    void basisRotateQ(std::vector<ColorSpinorField*> &kSpace, int k);
     
     /**
        @brief Load vectors from file
@@ -160,7 +160,7 @@ namespace quda {
     void loadFromFile(const Dirac &mat,
 		      std::vector<ColorSpinorField*> &eig_vecs,
 		      std::vector<Complex> &evals);
-      
+    
   };
   
   
@@ -193,28 +193,27 @@ namespace quda {
     /**
        @brief Lanczos step: extends the Kylov space.
        @param[in] v Vector space
-       @param[in] r Current vector to add
-       @param[in] evecs List of eigenvectors
-       @param[in] j Index of last vector added       
+       @param[in] j Index of vector being computed
     */
-    void lanczosStep(std::vector<ColorSpinorField*> v,
-		     std::vector<ColorSpinorField*> r,
-		     std::vector<ColorSpinorField*> evecs,
-		     int j);
+    void lanczosStep(std::vector<ColorSpinorField*> v, int j);
 
     /**
-       @brief Rotate eigenvectors by dense matrix derived
-              from the tridiagonal matrix in Lanczos
-       @param[in] kSpace the vectors to be rotated
-       @param[in] tmp Workspace vectors
+       @brief Rotate eigenvectors by dense matrix dervied
+       from the tridiagonal matrix in Lanczos
+       @param[in] kSpace The vectors to be rotated
+       @param[in] size The number of vectors to be rotated
     */            
-    void basisRotateTriDiag(std::vector<ColorSpinorField*> &kSpace,
-			    std::vector<ColorSpinorField*> &tmp);
+    void basisRotateTriDiag(std::vector<ColorSpinorField*> &kSpace, int size);
         
     /**
        @brief Computes QR factorisation from the Lanczos tridiagonal matrix
-    */    
-    void computeQRfromTriDiag();
+       @param[in] k size of current factorisation
+    */
+    void computeQRfromTridiag(int k);
+
+    void shiftAndCompressFromTriDiag(std::vector<ColorSpinorField*> &kSpace, int k);
+    
+    void schurDecompTriDiag();
     
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left 
@@ -223,14 +222,16 @@ namespace quda {
        @param[in] kSpace
        @param[in] evecs Computed eigenvectors of NormOp
        @param[in] evals Computed eigenvalues of NormOp
+       @param[in] inverse Inverse sort if using PolyAcc       
     */
     void computeSVD(std::vector<ColorSpinorField*> &kSpace,
 		    std::vector<ColorSpinorField*> &evecs,
-		    std::vector<Complex> &evals);
+		    std::vector<Complex> &evals,
+		    bool inverse);
     
   };
 
-  /**
+    /**
      @brief Implicily Restarted Arnoldi Method.
   */
   class IRAM : public EigenSolver {
@@ -258,30 +259,32 @@ namespace quda {
        @brief Arnoldi step: extends the Kylov space.
        @param[in] v Vector space
        @param[in] r Current vector to add
-       @param[in] evecs List of eigenvectors
        @param[in] j Index of last vector added       
     */
     void arnoldiStep(std::vector<ColorSpinorField*> v,
-		     std::vector<ColorSpinorField*> r,
-		     std::vector<ColorSpinorField*> evecs,
 		     int j);
 
     /**
        @brief Rotate eigenvectors by dense matrix derived
        from the upper Hessenberg matrix in Arnoldi
-       @param[in] kSpace the vectors to be rotated
-       @param[in] tmp Workspace vectors
+
     */            
-    void basisRotateUpperHess(std::vector<ColorSpinorField*> &kSpace,
-			      std::vector<ColorSpinorField*> &tmp);
+    void basisRotateUpperHess(std::vector<ColorSpinorField*> &kSpace, int k);
         
     /**
-       @brief Computes QR factorisation from the Upper Hessenberg
+       @brief Computes p implicit shifts, Q product, updates the Upper Hessenberg 
+       and compresses the entire Krylov vectors into k vectors.
+       @param[in] kSpace the vectors to be rotated
+       @param[in] tmp Workspace vectors
+       @param[in] k Size of the restarted Arnoldi factorisation
     */
-    void computeQRfromUpperHess();
-    
+    void shiftAndCompressFromUpperHess(std::vector<ColorSpinorField*> &kSpace,
+				       int k);
+
+    void eigensolveUpperHess();
+    void schurDecompUpperHess();
+    void computeQRfromUpperHess(int k);
   };
-  
   
   void arpack_solve(void *h_evecs, void *h_evals,
 		    const Dirac &mat,

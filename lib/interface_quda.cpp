@@ -2379,7 +2379,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   }
   
-  std::vector<Complex> evals(eig_param->nEv, 0.0);
+  std::vector<Complex> evals(eig_param->nKr, 0.0);
   std::vector<ColorSpinorField*> kSpace;
   for(int i=0; i<eig_param->nKr; i++) {
     kSpace.push_back(ColorSpinorField::Create(*cudaParam));
