@@ -43,24 +43,6 @@ namespace quda {
     arg.v(parity, x_cb, s, c) = complex<real>(x, y);
   }
 
-  /** CPU function to reorder spinor fields.  */
-  template <typename real, int Ns, int Nc, QudaNoiseType type, typename Arg>
-  void SpinorNoiseCPU(Arg &arg) {
-
-    for (int parity=0; parity<arg.nParity; parity++) {
-      for (int x_cb=0; x_cb<arg.volumeCB; x_cb++) {
-        for (int s=0; s<Ns; s++) {
-          for (int c=0; c<Nc; c++) {
-            cuRNGState localState = arg.rng.State()[parity+2*x_cb];
-            if (type == QUDA_NOISE_GAUSS) genGauss<real>(arg, localState, parity, x_cb, s, c);
-            else if (type == QUDA_NOISE_UNIFORM) genUniform<real>(arg, localState, parity, x_cb, s, c);
-            arg.rng.State()[parity+2*x_cb] = localState;
-          }
-        }
-      }
-    }
-  }
-
   /** CUDA kernel to reorder spinor fields.  Adopts a similar form as the CPU version, using the same inlined functions. */
   template <typename real, int Ns, int Nc, QudaNoiseType type, typename Arg>
     __global__ void SpinorNoiseGPU(Arg arg) {
@@ -101,11 +83,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	errorQuda("Not implemented");
-      } else {
-	SpinorNoiseGPU<real, Ns, Nc, type> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-      }
+      SpinorNoiseGPU<real, Ns, Nc, type> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
     bool advanceTuneParam(TuneParam &param) const {
@@ -195,13 +173,28 @@ namespace quda {
     }
   }
 
-  void spinorNoise(ColorSpinorField &src, int seed, QudaNoiseType type)
+  void spinorNoise(ColorSpinorField &src_, int seed, QudaNoiseType type)
   {
-    RNG* randstates = new RNG(src.Volume(), seed, src.X());
+    // if src is a CPU field then create GPU field
+    ColorSpinorField *src = &src_;
+    if (src_.Location() == QUDA_CPU_FIELD_LOCATION) {
+      ColorSpinorParam param(src_);
+      param.setPrecision(param.Precision(),param.Precision(),true); // change to native field order
+      param.create = QUDA_NULL_FIELD_CREATE;
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      src = ColorSpinorField::Create(param);
+    }
+
+    RNG* randstates = new RNG(src->Volume(), seed, src->X());
     randstates->Init();
-    spinorNoise(src, *randstates, type);
+    spinorNoise(*src, *randstates, type);
     randstates->Release();
     delete randstates;
+
+    if (src != &src_) {
+      src_ = *src; // upload result
+      delete src;
+    }
   }
 
 } // namespace quda
