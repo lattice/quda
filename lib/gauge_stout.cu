@@ -153,7 +153,7 @@ public:
     }
     return;
 #else
-  errorQuda("Gauge tools are not build");
+  errorQuda("Gauge tools are not built");
 #endif
   }
 
@@ -202,7 +202,7 @@ public:
 
     long long flops() const { return 4*(18+2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
     long long bytes() const { return 4*((1+2*12)*arg.origin.Bytes()+arg.dest.Bytes())*arg.threads; }
-  }; // GaugeSTOUT
+  }; // GaugeOvrImpSTOUT
 
   template<typename Float,typename GaugeOr, typename GaugeDs>
   void OvrImpSTOUTStep(GaugeOr origin, GaugeDs dest, const GaugeField& dataOr, Float rho, Float epsilon) {
@@ -293,7 +293,7 @@ public:
     }
     return;
 #else
-  errorQuda("Gauge tools are not build");
+  errorQuda("Gauge tools are not built");
 #endif
   }
 }
