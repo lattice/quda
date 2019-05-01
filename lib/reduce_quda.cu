@@ -355,7 +355,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 8
           if (x.Nspin() == 4 || x.Nspin() == 2) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID) || defined(GPU_COVDEV)
             const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
             if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
             value = nativeReduce<doubleN, ReduceType, double2, double2, double2, M, Reducer, writeX, writeY, writeZ,
@@ -382,7 +382,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
             const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
             value = nativeReduce<doubleN, ReduceType, float4, float4, float4, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (4 * M));
@@ -409,7 +409,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 2
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
             const int M = 6; // determines how much work per thread to do
             value = nativeReduce<doubleN, ReduceType, float4, short4, short4, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, y.Volume());
@@ -444,7 +444,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 1
           if (x.Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
             const int M = 6; // determines how much work per thread to do
             value
                 = nativeReduce<doubleN, ReduceType, float4, char4, char4, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(

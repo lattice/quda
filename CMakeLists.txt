@@ -89,6 +89,7 @@ set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
 set(QUDA_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
 set(QUDA_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
+set(QUDA_COVDEV OFF CACHE BOOL "build code for covariant derivative")
 # Dynamic inversion saves memory but decreases the flops
 set(QUDA_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for twisted-clover")
 set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
@@ -260,7 +261,7 @@ endif()
 
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 #define CXX FLAGS
-set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -g -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
 "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
 "Flags used by the C++ compiler during strict jenkins builds.")
@@ -278,7 +279,7 @@ enable_language(CXX)
 
 
 #define C FLAGS
-set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
+set(CMAKE_C_FLAGS_DEVEL "-Wall -g -O3"  CACHE STRING
     "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT "-Wall -O3 -Werror -Wno-error=unused-private-field"  CACHE STRING
     "Flags used by the C compiler during strict jenkins builds.")
@@ -557,6 +558,10 @@ if(QUDA_CONTRACT)
   add_definitions(-DGPU_CONTRACT)
 endif(QUDA_CONTRACT)
 
+if(QUDA_COVDEV)
+  add_definitions(-DGPU_COVDEV)
+endif(QUDA_COVDEV)
+
 
 #define FORTRAN FLAGS
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
@@ -585,7 +590,7 @@ endif(QUDA_VERBOSE_BUILD)
 
 ## define CUDA flags when CMake >= 3.8
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
-set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -lineinfo -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}" CACHE STRING
+set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -lineinfo -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}" CACHE STRING
   "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT "${CMAKE_CUDA_FLAGS_DEVEL}" CACHE STRING
   "Flags used by the CUDA compiler during strict jenkins builds.")

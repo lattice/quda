@@ -154,8 +154,7 @@ namespace quda {
     int align = posix_memalign(&ptr, page_size, a.base_size);
     if (!ptr || align != 0) {
 #endif
-      printfQuda("ERROR: Failed to allocate aligned host memory of size %zu (%s:%d in %s())\n", size, a.file.c_str(), a.line, a.func.c_str());
-      errorQuda("Aborting");
+      errorQuda("Failed to allocate aligned host memory of size %zu (%s:%d in %s())\n", size, a.file.c_str(), a.line, a.func.c_str());
     }
     return ptr;
   }
@@ -176,8 +175,7 @@ namespace quda {
 
     cudaError_t err = cudaMalloc(&ptr, size);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
@@ -209,8 +207,7 @@ namespace quda {
 
     CUresult err = cuMemAlloc((CUdeviceptr*)&ptr, size);
     if (err != CUDA_SUCCESS) {
-      printfQuda("ERROR: Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
@@ -232,8 +229,7 @@ namespace quda {
 
     void *ptr = malloc(size);
     if (!ptr) {
-      printfQuda("ERROR: Failed to allocate host memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Failed to allocate host memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(HOST, a, ptr);
 #ifdef HOST_DEBUG
@@ -259,8 +255,7 @@ namespace quda {
     
     cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterDefault);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(PINNED, a, ptr);
 #ifdef HOST_DEBUG
@@ -284,15 +279,13 @@ namespace quda {
     void *ptr;
     cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostRegisterMapped | cudaHostRegisterPortable);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func);
-      errorQuda("Aborting");
+      errorQuda("cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
 #else
     void *ptr = aligned_malloc(a, size);
     cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
 #endif
     track_malloc(MAPPED, a, ptr);
@@ -312,17 +305,14 @@ namespace quda {
   {
 #ifndef QDP_USE_CUDA_MANAGED_MEMORY
     if (!ptr) {
-      printfQuda("ERROR: Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func);
     }
     if (!alloc[DEVICE].count(ptr)) {
-      printfQuda("ERROR: Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
     cudaError_t err = cudaFree(ptr);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: Failed to free device memory (%s:%d in %s())\n", file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func);
     }
     track_free(DEVICE, ptr);
 #else
@@ -344,17 +334,14 @@ namespace quda {
     }
 
     if (!ptr) {
-      printfQuda("ERROR: Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func);
     }
     if (!alloc[DEVICE_PINNED].count(ptr)) {
-      printfQuda("ERROR: Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
     CUresult err = cuMemFree((CUdeviceptr)ptr);
     if (err != CUDA_SUCCESS) {
-      printfQuda("ERROR: Failed to free device memory (%s:%d in %s())\n", file, line, func);
-      errorQuda("Aborting");
+      printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func);
     }
     track_free(DEVICE_PINNED, ptr);
   }
@@ -368,8 +355,7 @@ namespace quda {
   void host_free_(const char *func, const char *file, int line, void *ptr)
   {
     if (!ptr) {
-      printfQuda("ERROR: Attempt to free NULL host pointer (%s:%d in %s())\n", file, line, func);
-      errorQuda("Aborting");
+      errorQuda("Attempt to free NULL host pointer (%s:%d in %s())\n", file, line, func);
     }
     if (alloc[HOST].count(ptr)) {
       track_free(HOST, ptr);
@@ -377,8 +363,7 @@ namespace quda {
     } else if (alloc[PINNED].count(ptr)) {
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) {
-	printfQuda("ERROR: Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func);
-	errorQuda("Aborting");
+	errorQuda("Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func);
       }
       track_free(PINNED, ptr);
       free(ptr);
@@ -386,14 +371,12 @@ namespace quda {
 #ifdef HOST_ALLOC
       cudaError_t err = cudaFreeHost(ptr);
       if (err != cudaSuccess) {
-	printfQuda("ERROR: Failed to free host memory (%s:%d in %s())\n", file, line, func);
-	errorQuda("Aborting");
+	errorQuda("Failed to free host memory (%s:%d in %s())\n", file, line, func);
       }
 #else
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) {
-	printfQuda("ERROR: Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
-	errorQuda("Aborting");
+	errorQuda("Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
       }
       free(ptr);
 #endif

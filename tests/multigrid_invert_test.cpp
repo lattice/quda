@@ -12,13 +12,8 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
-
 #include <qio_field.h>
+#include <color_spinor_field.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -676,22 +671,16 @@ int main(int argc, char **argv)
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
 
+  auto *rng = new quda::RNG(V, 1234, gauge_param.X);
+  rng->Init();
+
   for (int i=0; i<Nsrc; i++) {
-    // create a point source at 0 (in each subvolume...  FIXME)
-    memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-    memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-    memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-
-    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      //((float*)spinorIn)[i] = 1.0;
-      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
-    } else {
-      //((double*)spinorIn)[i] = 1.0;
-      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
-    }
-
+    construct_spinor_source(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
     invertQuda(spinorOut, spinorIn, &inv_param);
   }
+
+  rng->Release();
+  delete rng;
 
   // free the multigrid solver
   destroyMultigridQuda(mg_preconditioner);

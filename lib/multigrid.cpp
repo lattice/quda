@@ -4,7 +4,7 @@
 
 #include <quda_arpack_interface.h>
 
-namespace quda {  
+namespace quda {
 
   using namespace blas;
 
@@ -60,19 +60,16 @@ namespace quda {
       }
     }
 
+    rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
+    rng->Init();
+
     if (param.level < param.Nlevel-1) {
       if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
         if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) {
 
-          if (param.B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-            rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
-            rng->Init();
-          }
-
           // Initializing to random vectors
           for(int i=0; i<(int)param.B.size(); i++) {
-            if (param.B[i]->Location() == QUDA_CPU_FIELD_LOCATION) r->Source(QUDA_RANDOM_SOURCE);
-            else spinorNoise(*r, *rng, QUDA_NOISE_UNIFORM);
+            spinorNoise(*r, *rng, QUDA_NOISE_UNIFORM);
             *param.B[i] = *r;
           }
 
@@ -441,9 +438,10 @@ namespace quda {
   }
 
   MG::~MG() {
+    if (rng) rng->Release();
+    delete rng;
+
     if (param.level < param.Nlevel-1) {
-      if (rng) rng->Release();
-      delete rng;
 
       if (param.level == param.Nlevel-1 || param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
 	if (coarse_solver) delete coarse_solver;
@@ -566,7 +564,9 @@ namespace quda {
 #endif
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P^\\dagger P) eta_c\n");
-    x_coarse->Source(QUDA_RANDOM_SOURCE);
+
+    spinorNoise(*x_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
+
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(*tmp2));
@@ -580,7 +580,9 @@ namespace quda {
     zero(*tmp_coarse);
     zero(*r_coarse);
 
-    tmp_coarse->Source(QUDA_RANDOM_SOURCE);
+    spinorNoise(*tmp_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
+
+    //tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp1, *tmp_coarse);
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
@@ -625,7 +627,7 @@ namespace quda {
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
-    
+
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
@@ -668,9 +670,9 @@ namespace quda {
     cpuParam.location = QUDA_CPU_FIELD_LOCATION;
     cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
-    if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) { 
-      cpuParam.x[0] /= 2; 
-      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
+    if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      cpuParam.x[0] /= 2;
+      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     }
 
     std::vector<ColorSpinorField*> evecsBuffer;
@@ -680,7 +682,7 @@ namespace quda {
 
     QudaPrecision matPrecision = QUDA_SINGLE_PRECISION;//manually ajusted?
     QudaPrecision arpPrecision = QUDA_DOUBLE_PRECISION;//precision used in ARPACK routines, may not coincide with matvec precision
-    
+
     void *evalsBuffer =  arpPrecision == QUDA_DOUBLE_PRECISION ? static_cast<void*>(new std::complex<double>[nmodes+1]) : static_cast<void*>( new std::complex<float>[nmodes+1]);
     //
     arpackSolve( evecsBuffer, evalsBuffer, *param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
@@ -703,7 +705,7 @@ namespace quda {
 
     if( arpPrecision == QUDA_DOUBLE_PRECISION )  delete static_cast<std::complex<double>* >(evalsBuffer);
     else                                         delete static_cast<std::complex<float>* > (evalsBuffer);
- 
+
     free(which);
 #else
     warningQuda("\nThis test requires ARPACK.\n");
@@ -735,7 +737,7 @@ namespace quda {
 
     if (param.level < param.Nlevel-1) {
       //transfer->setTransferGPU(false); // use this to force location of transfer (need to check if still works for multi-level)
-      
+
       // do the pre smoothing
       if ( debug ) printfQuda("pre-smoothing b2=%e\n", norm2(b));
 
@@ -796,7 +798,7 @@ namespace quda {
 
         if ( debug ) {
           printfQuda("Prolongated coarse solution y2 = %e\n", norm2(*r));
-          printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
+          printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n",
                      norm2(x), norm2(*r));
         }
       }
@@ -882,32 +884,26 @@ namespace quda {
       }
 
 #else
-      errorQuda("\nQIO library was not built.\n");      
+      errorQuda("\nQIO library was not built.\n");
 #endif
     } else {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using %d constant nullvectors\n", Nvec);
 
       for (int i = 0; i < (Nvec < 2 ? Nvec : 2); i++) {
 	zero(*B[i]);
-#if 1
 	ColorSpinorParam csParam(*B[i]);
 	csParam.create = QUDA_ZERO_FIELD_CREATE;
 	ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
 	for (int s=i; s<4; s+=2) {
 	  for (int c=0; c<B[i]->Ncolor(); c++) {
             tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
-	    //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, s, 2); // sin in dim 3, mode s, offset = 2
 	    xpy(*tmp,*B[i]);
 	  }
 	}
 	delete tmp;
-#else
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using random source for nullvector = %d\n",i);
-	B[i]->Source(QUDA_RANDOM_SOURCE);
-#endif
       }
 
-      for (int i=2; i<Nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
+      for (int i=2; i<Nvec; i++) spinorNoise(*B[i], *rng, QUDA_NOISE_UNIFORM);
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done loading vectors\n");
@@ -1175,12 +1171,12 @@ namespace quda {
         // There needs to be 6 null vectors -> 12 after chirality.
         if (Nvec != 6)
           errorQuda("\nError in MG::buildFreeVectors: Wilson-type fermions require Nvec = 6");
-        
+
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Wilson-type fermions\n", Nvec);
 
         // Zero the null vectors.
         for (int i = 0; i < Nvec ;i++) zero(*B[i]);
-        
+
         // Create a temporary vector.
         ColorSpinorParam csParam(*B[0]);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -1206,13 +1202,13 @@ namespace quda {
         // There needs to be 24 null vectors -> 48 after chirality.
         if (Nvec != 24)
           errorQuda("\nError in MG::buildFreeVectors: Staggered-type fermions require Nvec = 24\n");
-        
+
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Staggered-type fermions\n", Nvec);
 
         // Zero the null vectors.
         for (int i = 0; i < Nvec ;i++)
           zero(*B[i]);
-        
+
         // Create a temporary vector.
         ColorSpinorParam csParam(*B[0]);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -1287,12 +1283,12 @@ namespace quda {
         // There needs to be Ncolor null vectors.
         if (Nvec != Ncolor)
           errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
-        
+
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
 
         // Zero the null vectors.
         for (int i = 0; i < Nvec; i++) zero(*B[i]);
-        
+
         // Create a temporary vector.
         ColorSpinorParam csParam(*B[0]);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -1313,12 +1309,12 @@ namespace quda {
         // There needs to be Ncolor null vectors.
         if (Nvec != Ncolor)
           errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
-        
+
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
 
         // Zero the null vectors.
         for (int i = 0; i < Nvec; i++) zero(*B[i]);
-        
+
         // Create a temporary vector.
         ColorSpinorParam csParam(*B[0]);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
