@@ -122,7 +122,8 @@ namespace quda {
       dslash = new WilsonDslashCuda<short4, short4>(out, gauge, in, x, k, parity, dagger, commOverride);
     }
 
-    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), in->Volume(), in->GhostFace(), profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(
+        *dslash, const_cast<cudaColorSpinorField *>(in), in->Volume(), in->GhostFace(), profile);
     dslash_policy.apply(0);
 
     delete dslash;

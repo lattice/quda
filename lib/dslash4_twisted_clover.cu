@@ -13,7 +13,8 @@
    This is the basic gauged twisted-clover operator
 */
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief This is a helper class that is used to instantiate the
@@ -23,127 +24,106 @@ namespace quda {
   struct TwistedCloverLaunch {
     static constexpr const char *kernel = "quda::wilsonCloverGPU"; // kernel name for jit compilation
     template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    {
       static_assert(xpay == true, "Twisted-clover operator only defined for xpay");
-      dslash.launch(wilsonCloverGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+      dslash.launch(wilsonCloverGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
   };
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class TwistedClover : public Dslash<Float> {
+  template <typename Float, int nDim, int nColor, typename Arg> class TwistedClover : public Dslash<Float>
+  {
 
-  protected:
+protected:
     Arg &arg;
     const ColorSpinorField &in;
 
-  public:
-
-    TwistedClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover.cuh"), arg(arg), in(in) {  }
-
-    virtual ~TwistedClover() { }
-
-    void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
-      if (arg.xpay) Dslash<Float>::template instantiate<TwistedCloverLaunch,nDim,nColor,true>(tp, arg, stream);
-      else errorQuda("Twisted-clover operator only defined for xpay=true");
+public:
+    TwistedClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+        Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover.cuh"),
+        arg(arg),
+        in(in)
+    {
     }
 
-    long long flops() const {
+    virtual ~TwistedClover() {}
+
+    void apply(const cudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Dslash<Float>::setParam(arg);
+      if (arg.xpay)
+        Dslash<Float>::template instantiate<TwistedCloverLaunch, nDim, nColor, true>(tp, arg, stream);
+      else
+        errorQuda("Twisted-clover operator only defined for xpay=true");
+    }
+
+    long long flops() const
+    {
       int clover_flops = 504 + 48;
       long long flops = Dslash<Float>::flops();
-      switch(arg.kernel_type) {
+      switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL:
-	break; // all clover flops are in the interior kernel
+      case EXTERIOR_KERNEL_ALL: break; // all clover flops are in the interior kernel
       case INTERIOR_KERNEL:
-      case KERNEL_POLICY:
-	flops += clover_flops * in.Volume();
-	break;
+      case KERNEL_POLICY: flops += clover_flops * in.Volume(); break;
       }
       return flops;
     }
 
-    long long bytes() const {
+    long long bytes() const
+    {
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int clover_bytes = 72 * in.Precision() + (isFixed ? 2*sizeof(float) : 0);
+      int clover_bytes = 72 * in.Precision() + (isFixed ? 2 * sizeof(float) : 0);
 
       long long bytes = Dslash<Float>::bytes();
-      switch(arg.kernel_type) {
+      switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL:
-	break;
+      case EXTERIOR_KERNEL_ALL: break;
       case INTERIOR_KERNEL:
-      case KERNEL_POLICY:
-	bytes += clover_bytes*in.Volume();
-	break;
+      case KERNEL_POLICY: bytes += clover_bytes * in.Volume(); break;
       }
 
       return bytes;
     }
 
-    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
+    TuneKey tuneKey() const
+    {
+      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+    }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                          const int *comm_override, TimeProfile &profile)
-  {
-    constexpr int nDim = 4;
-    WilsonCloverArg<Float,nColor,recon,true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
-    TwistedClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,true> > twisted(arg, out, in);
+  template <typename Float, int nColor, QudaReconstructType recon> struct TwistedCloverApply {
 
-    dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-                                               in.VolumeCB(), in.GhostFaceCB(), profile);
-    policy.apply(0);
+    inline TwistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+        const CloverField &C, double a, double b, const ColorSpinorField &x, int parity, bool dagger,
+        const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+      WilsonCloverArg<Float, nColor, recon, true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
+      TwistedClover<Float, nDim, nColor, WilsonCloverArg<Float, nColor, recon, true>> twisted(arg, out, in);
 
-    checkCudaError();
-  }
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
+          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+      policy.apply(0);
 
-  // template on the gauge reconstruction
-  template <typename Float, int nColor>
-  void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                          const int *comm_override, TimeProfile &profile)
-  {
-    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyTwistedClover<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyTwistedClover<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyTwistedClover<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+      checkCudaError();
     }
-  }
+  };
 
-  // template on the number of colors
-  template <typename Float>
+  // Apply the twisted-mass Dslash operator
+  // out(x) = M*in = (A + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
+  // Uses the kappa normalization for the Wilson operator, with a = -kappa.
   void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                          const int *comm_override, TimeProfile &profile)
-  {
-    if (in.Ncolor() == 3) {
-      ApplyTwistedClover<Float,3>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
-
-  //Apply the twisted-mass Dslash operator
-  //out(x) = M*in = (A + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
-  //Uses the kappa normalization for the Wilson operator, with a = -kappa.
-  void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                          const int *comm_override, TimeProfile &profile)
+      double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+      TimeProfile &profile)
   {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
@@ -156,22 +136,11 @@ namespace quda {
     // check all locations match
     checkLocation(out, in, U, C);
 
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyTwistedClover<double>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyTwistedClover<float>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-      ApplyTwistedClover<short>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      ApplyTwistedClover<char>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
+    instantiate<TwistedCloverApply>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Twisted-clover dslash has not been built");
 #endif // GPU_TWISTED_CLOVEr_DIRAC
   }
-
 
 } // namespace quda
 

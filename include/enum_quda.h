@@ -228,12 +228,12 @@ extern "C" {
   } QudaPreserveSource;
 
   typedef enum QudaDiracFieldOrder_s {
-    QUDA_INTERNAL_DIRAC_ORDER,   // internal dirac order used, varies on precision and dslash type
-    QUDA_DIRAC_ORDER,            // even-odd, color inside spin
-    QUDA_QDP_DIRAC_ORDER,        // even-odd, spin inside color
-    QUDA_QDPJIT_DIRAC_ORDER,     // even-odd, complex-color-spin-spacetime
-    QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, color inside spin
-    QUDA_LEX_DIRAC_ORDER,        // lexicographical order, color inside spin
+    QUDA_INTERNAL_DIRAC_ORDER,    // internal dirac order used, varies on precision and dslash type
+    QUDA_DIRAC_ORDER,             // even-odd, color inside spin
+    QUDA_QDP_DIRAC_ORDER,         // even-odd, spin inside color
+    QUDA_QDPJIT_DIRAC_ORDER,      // even-odd, complex-color-spin-spacetime
+    QUDA_CPS_WILSON_DIRAC_ORDER,  // odd-even, color inside spin
+    QUDA_LEX_DIRAC_ORDER,         // lexicographical order, color inside spin
     QUDA_TIFR_PADDED_DIRAC_ORDER, // padded z dimension for TIFR RHMC code
     QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
   } QudaDiracFieldOrder;
@@ -383,17 +383,13 @@ extern "C" {
   } QudaProjectionType;
 
   // used to select checkerboard preconditioning method
-  typedef enum QudaPCType_s {
-    QUDA_4D_PC = 4,
-    QUDA_5D_PC = 5,
-    QUDA_PC_INVALID = QUDA_INVALID_ENUM
-  } QudaPCType;
+  typedef enum QudaPCType_s { QUDA_4D_PC = 4, QUDA_5D_PC = 5, QUDA_PC_INVALID = QUDA_INVALID_ENUM } QudaPCType;
 
   typedef enum QudaTwistFlavorType_s {
     QUDA_TWIST_SINGLET = 1,
     QUDA_TWIST_NONDEG_DOUBLET = +2,
     QUDA_TWIST_DEG_DOUBLET = -2,
-    QUDA_TWIST_NO  = 0,
+    QUDA_TWIST_NO = 0,
     QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
   } QudaTwistFlavorType;
 

@@ -9,18 +9,35 @@ namespace quda {
   // FIXME: At the moment, it's unsafe for more than one Dirac operator to be active unless
   // they all have the same volume, etc. (used to initialize the various CUDA constants).
 
-  Dirac::Dirac(const DiracParam &param) 
-    : gauge(param.gauge), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
-      dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), type(param.type), 
-      halo_precision(param.halo_precision), profile("Dirac", false)
+  Dirac::Dirac(const DiracParam &param) :
+    gauge(param.gauge),
+    kappa(param.kappa),
+    mass(param.mass),
+    laplace3D(param.laplace3D),
+    matpcType(param.matpcType),
+    dagger(param.dagger),
+    flops(0),
+    tmp1(param.tmp1),
+    tmp2(param.tmp2),
+    type(param.type),
+    halo_precision(param.halo_precision),
+    profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
   }
 
-  Dirac::Dirac(const Dirac &dirac) 
-    : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
-      dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), type(dirac.type), 
-      halo_precision(dirac.halo_precision), profile("Dirac", false)
+  Dirac::Dirac(const Dirac &dirac) :
+    gauge(dirac.gauge),
+    kappa(dirac.kappa),
+    laplace3D(dirac.laplace3D),
+    matpcType(dirac.matpcType),
+    dagger(dirac.dagger),
+    flops(0),
+    tmp1(dirac.tmp1),
+    tmp2(dirac.tmp2),
+    type(dirac.type),
+    halo_precision(dirac.halo_precision),
+    profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
@@ -34,6 +51,7 @@ namespace quda {
     if (&dirac != this) {
       gauge = dirac.gauge;
       kappa = dirac.kappa;
+      laplace3D = dirac.laplace3D;
       matpcType = dirac.matpcType;
       dagger = dirac.dagger;
       flops = 0;
@@ -179,13 +197,13 @@ namespace quda {
       return new DiracStaggered(param);
     } else if (param.type == QUDA_STAGGEREDPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
-      return new DiracStaggeredPC(param);    
+      return new DiracStaggeredPC(param);
     } else if (param.type == QUDA_ASQTAD_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggered operator\n");
       return new DiracImprovedStaggered(param);
     } else if (param.type == QUDA_ASQTADPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredPC operator\n");
-      return new DiracImprovedStaggeredPC(param);    
+      return new DiracImprovedStaggeredPC(param);
     } else if (param.type == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedClover operator (%d flavor(s))\n", param.Ls);
       if (param.Ls == 1) {
@@ -205,9 +223,12 @@ namespace quda {
         if (param.Ls == 1) return new DiracTwistedMass(param, 4);
         else return new DiracTwistedMass(param, 5);
     } else if (param.type == QUDA_TWISTED_MASSPC_DIRAC) {
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedMassPC operator (%d flavor(s))\n", param.Ls);
-        if (param.Ls == 1) return new DiracTwistedMassPC(param, 4);
-        else return new DiracTwistedMassPC(param, 5);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+        printfQuda("Creating a DiracTwistedMassPC operator (%d flavor(s))\n", param.Ls);
+      if (param.Ls == 1)
+        return new DiracTwistedMassPC(param, 4);
+      else
+        return new DiracTwistedMassPC(param, 5);
     } else if (param.type == QUDA_COARSE_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarse operator\n");
       return new DiracCoarse(param);

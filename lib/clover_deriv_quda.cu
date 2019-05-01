@@ -75,10 +75,11 @@ namespace quda {
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::cloverDerivativeKernel")
-            .instantiate(Type<Float>(),Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+      using namespace jitify::reflection;
+      jitify_error = program->kernel("quda::cloverDerivativeKernel")
+                         .instantiate(Type<Float>(), Type<Arg>())
+                         .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                         .launch(arg);
 #else
       cloverDerivativeKernel<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
@@ -117,7 +118,7 @@ namespace quda {
 
     // The force field is updated so we must preserve its initial state
     void preTune() { arg.force.save(); }
-    void postTune(){ arg.force.load(); }
+    void postTune() { arg.force.load(); }
 
     long long flops() const { return 16 * 198 * 3 * 4 * 2 * (long long)arg.volumeCB; }
     long long bytes() const { return ((8*arg.gauge.Bytes() + 4*arg.oprod.Bytes())*3 + 2*arg.force.Bytes()) * 4 * 2 * arg.volumeCB; }
@@ -125,21 +126,17 @@ namespace quda {
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
   };
 
-
   template<typename Float>
   void cloverDerivative(cudaGaugeField &force,
 			cudaGaugeField &gauge,
 			cudaGaugeField &oprod,
 			double coeff, int parity) {
 
-    if (oprod.Reconstruct() != QUDA_RECONSTRUCT_NO)
-      errorQuda("Force field does not support reconstruction");
+    if (oprod.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
 
-    if (force.Order() != oprod.Order())
-      errorQuda("Force and Oprod orders must match");
+    if (force.Order() != oprod.Order()) errorQuda("Force and Oprod orders must match");
 
-    if (force.Reconstruct() != QUDA_RECONSTRUCT_NO)
-      errorQuda("Force field does not support reconstruction");
+    if (force.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
 
     if (force.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       typedef gauge::FloatNOrder<Float, 18, 2, 18> F;
@@ -174,11 +171,9 @@ namespace quda {
   }
 #endif // GPU_CLOVER
 
-void cloverDerivative(cudaGaugeField &force,
-		      cudaGaugeField &gauge,
-		      cudaGaugeField &oprod,
-		      double coeff, QudaParity parity)
-{
+  void cloverDerivative(
+      cudaGaugeField &force, cudaGaugeField &gauge, cudaGaugeField &oprod, double coeff, QudaParity parity)
+  {
 #ifdef GPU_CLOVER_DIRAC
   assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
   assert(force.Geometry() == QUDA_VECTOR_GEOMETRY);
@@ -204,7 +199,6 @@ void cloverDerivative(cudaGaugeField &force,
 #else
   errorQuda("Clover has not been built");
 #endif
-}
-
+  }
 
 } // namespace quda

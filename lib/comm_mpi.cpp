@@ -5,7 +5,7 @@
 #include <csignal>
 #include <quda_internal.h>
 #include <comm_quda.h>
-
+#include <mpi_comm_handle.h>
 
 #define MPI_CHECK(mpi_call) do {                    \
   int status = mpi_call;                            \
@@ -50,13 +50,12 @@ static char topology_string[128];
 void comm_gather_hostname(char *hostname_recv_buf) {
   // determine which GPU this rank will use
   char *hostname = comm_hostname();
-  MPI_CHECK( MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD) );
+  MPI_CHECK(MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE));
 }
 
 void comm_gather_gpuid(int *gpuid_recv_buf) {
-  MPI_CHECK(MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_WORLD));
+  MPI_CHECK(MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_HANDLE));
 }
-
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
@@ -67,8 +66,8 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
     errorQuda("MPI has not been initialized");
   }
 
-  MPI_CHECK( MPI_Comm_rank(MPI_COMM_WORLD, &rank) );
-  MPI_CHECK( MPI_Comm_size(MPI_COMM_WORLD, &size) );
+  MPI_CHECK(MPI_Comm_rank(MPI_COMM_HANDLE, &rank));
+  MPI_CHECK(MPI_Comm_size(MPI_COMM_HANDLE, &size));
 
   int grid_size = 1;
   for (int i = 0; i < ndim; i++) {
@@ -191,7 +190,7 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
   tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
 
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
-  MPI_CHECK( MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+  MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
   mh->custom = false;
 
   return mh;
@@ -214,7 +213,7 @@ MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[]
   tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
 
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
-  MPI_CHECK( MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+  MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
   mh->custom = false;
 
   return mh;
@@ -244,7 +243,7 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacem
   MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
   mh->custom = true;
 
-  MPI_CHECK( MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+  MPI_CHECK(MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
 
   return mh;
 }
@@ -273,11 +272,10 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
   MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
   mh->custom = true;
 
-  MPI_CHECK( MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+  MPI_CHECK(MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
 
   return mh;
 }
-
 
 void comm_free(MsgHandle *&mh)
 {
@@ -312,7 +310,7 @@ int comm_query(MsgHandle *mh)
 void comm_allreduce(double* data)
 {
   double recvbuf;
-  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
+  MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
   *data = recvbuf;
 }
 
@@ -320,21 +318,21 @@ void comm_allreduce(double* data)
 void comm_allreduce_max(double* data)
 {
   double recvbuf;
-  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD) );
+  MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
   *data = recvbuf;
 }
 
 void comm_allreduce_min(double* data)
 {
   double recvbuf;
-  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD) );
+  MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_HANDLE));
   *data = recvbuf;
 }
 
 void comm_allreduce_array(double* data, size_t size)
 {
   double *recvbuf = new double[size];
-  MPI_CHECK( MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
+  MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
   memcpy(data, recvbuf, size*sizeof(double));
   delete []recvbuf;
 }
@@ -342,7 +340,7 @@ void comm_allreduce_array(double* data, size_t size)
 void comm_allreduce_max_array(double* data, size_t size)
 {
   double *recvbuf = new double[size];
-  MPI_CHECK( MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD) );
+  MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
   memcpy(data, recvbuf, size*sizeof(double));
   delete []recvbuf;
 }
@@ -350,7 +348,7 @@ void comm_allreduce_max_array(double* data, size_t size)
 void comm_allreduce_int(int* data)
 {
   int recvbuf;
-  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD) );
+  MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_HANDLE));
   *data = recvbuf;
 }
 
@@ -358,7 +356,7 @@ void comm_allreduce_xor(uint64_t *data)
 {
   if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
   uint64_t recvbuf;
-  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_UNSIGNED_LONG, MPI_BXOR, MPI_COMM_WORLD) );
+  MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_UNSIGNED_LONG, MPI_BXOR, MPI_COMM_HANDLE));
   *data = recvbuf;
 }
 
@@ -366,28 +364,19 @@ void comm_allreduce_xor(uint64_t *data)
 /**  broadcast from rank 0 */
 void comm_broadcast(void *data, size_t nbytes)
 {
-  MPI_CHECK( MPI_Bcast(data, (int)nbytes, MPI_BYTE, 0, MPI_COMM_WORLD) );
+  MPI_CHECK(MPI_Bcast(data, (int)nbytes, MPI_BYTE, 0, MPI_COMM_HANDLE));
 }
 
-
-void comm_barrier(void)
-{
-  MPI_CHECK( MPI_Barrier(MPI_COMM_WORLD) );
-}
-
+void comm_barrier(void) { MPI_CHECK(MPI_Barrier(MPI_COMM_HANDLE)); }
 
 void comm_abort(int status)
 {
 #ifdef HOST_DEBUG
   raise(SIGINT);
 #endif
-  MPI_Abort(MPI_COMM_WORLD, status) ;
+  MPI_Abort(MPI_COMM_HANDLE, status);
 }
 
-const char* comm_dim_partitioned_string() {
-  return partition_string;
-}
+const char *comm_dim_partitioned_string() { return partition_string; }
 
-const char* comm_dim_topology_string() {
-  return topology_string;
-}
+const char *comm_dim_topology_string() { return topology_string; }

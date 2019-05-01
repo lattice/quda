@@ -45,7 +45,7 @@ namespace quda {
     {
       const Vector Btmp[nVec]{*B...};
       if (sizeof(Btmp) > MAX_MATRIX_SIZE) errorQuda("B array size (%lu) is larger than maximum allowed (%d)\n", sizeof(Btmp), MAX_MATRIX_SIZE);
-      memcpy(B_array_h, Btmp, sizeof(Btmp));
+      memcpy(B_array_h, (void *)Btmp, sizeof(Btmp));
       int geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
       geoBlockSizeCB = geoBlockSize/2;
@@ -55,27 +55,41 @@ namespace quda {
     }
   };
 
-
-  template<typename sumType, typename real, int nColor, typename Arg>
-  inline __device__ __host__ complex<sumType> colorInnerProduct(int i, complex<real> v[nColor], int parity, int x_cb, int s, const Arg &arg) {
-    complex<sumType> dot = 0.0;
+  template <int nColor, typename sumType, typename real, typename Arg>
+  inline __device__ __host__ void colorInnerProduct(
+      complex<sumType> &dot, int i, complex<real> v[nColor], int parity, int x_cb, int s, const Arg &arg)
+  {
 #pragma unroll
-    for (int c=0; c<nColor; c++) dot += static_cast<complex<real> >(conj(arg.V(parity,x_cb,s,c,i)) * v[c]);
-    return dot;
+    for (int c = 0; c < nColor; c++) {
+      complex<real> a = arg.V(parity, x_cb, s, c, i);
+      dot.x += a.real() * v[c].real();
+      dot.x += a.imag() * v[c].imag();
+      dot.y += a.real() * v[c].imag();
+      dot.y -= a.imag() * v[c].real();
+    }
   }
 
-  template<typename sumType, typename real, int nColor, typename Arg>
-  inline __device__ __host__ sumType colorNorm(complex<real> v[nColor], int parity, int x_cb, int s, const Arg &arg) {
-    sumType  nrm(0.0);
+  template <int nColor, typename sumType, typename real, typename Arg>
+  inline __device__ __host__ void colorNorm(
+      sumType &nrm, complex<real> v[nColor], int parity, int x_cb, int s, const Arg &arg)
+  {
 #pragma unroll
-    for (int c=0; c<nColor; c++) nrm += norm(v[c]);
-    return nrm;
+    for (int c = 0; c < nColor; c++) {
+      nrm += v[c].real() * v[c].real();
+      nrm += v[c].imag() * v[c].imag();
+    }
   }
 
   template<typename real, int nColor, typename Arg>
   inline __device__ __host__ void colorScaleSubtract(complex<real> v[nColor], complex<real> a, int i, int parity, int x_cb, int s, const Arg &arg) {
 #pragma unroll
-    for (int c=0; c<nColor; c++) v[c] -= a * arg.V(parity,x_cb,s,c,i);
+    for (int c = 0; c < nColor; c++) {
+      complex<real> b = arg.V(parity, x_cb, s, c, i);
+      v[c].x -= a.real() * b.real();
+      v[c].x += a.imag() * b.imag();
+      v[c].y -= a.real() * b.imag();
+      v[c].y -= a.imag() * b.real();
+    }
   }
 
   template<typename real, int nColor, typename Arg>
@@ -111,8 +125,8 @@ namespace quda {
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
 
 	      for (int s=0; s<nSpin; s++) {
-		dot[arg.spin_map(s,parity)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
-	      }
+                colorInnerProduct<nColor>(dot[arg.spin_map(s, parity)], i, v[s], parity, x_cb, s, arg);
+              }
 	    }
 	  }
 
@@ -153,8 +167,8 @@ namespace quda {
 	    else for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	    for (int s=0; s<nSpin; s++) {
-	      nrm[arg.spin_map(s,parity)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
-	    }
+              colorNorm<nColor>(nrm[arg.spin_map(s, parity)], v[s], parity, x_cb, s, arg);
+            }
 	  }
 	}
 
@@ -242,8 +256,8 @@ namespace quda {
 	// compute (j,i) block inner products
 #pragma unroll
 	for (int s=0; s<nSpin; s++) {
-	  dot[arg.spin_map(s,parity)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
-	}
+          colorInnerProduct<nColor>(dot[arg.spin_map(s, parity)], i, v[s], parity, x_cb, s, arg);
+        }
 
 	__syncthreads();
 	dot = dotReduce(dot_storage).Sum(dot);
@@ -265,9 +279,7 @@ namespace quda {
       for (int s=0; s<coarseSpin; s++) nrm[s] = static_cast<sumFloat>(0.0);
 
 #pragma unroll
-      for (int s=0; s<nSpin; s++) {
-	nrm[arg.spin_map(s,parity)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
-      }
+      for (int s = 0; s < nSpin; s++) { colorNorm<nColor>(nrm[arg.spin_map(s, parity)], v[s], parity, x_cb, s, arg); }
 
       __syncthreads();
       nrm = normReduce(*norm_storage).Sum(nrm);

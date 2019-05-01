@@ -613,8 +613,7 @@ void comm_dim_partitioned_set(int dim)
 }
 
 void comm_dim_partitioned_reset(){
-  for (int i=0; i<QUDA_MAX_DIM; i++)
-    manual_set_partition[i] = 0;
+  for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;
 }
 
 int comm_dim_partitioned(int dim)
@@ -680,7 +679,8 @@ bool comm_gdr_blacklist() {
   return blacklist;
 }
 
-const char* comm_config_string() {
+const char *comm_config_string()
+{
   static char config_string[16];
   static bool config_init = false;
 
@@ -694,7 +694,6 @@ const char* comm_config_string() {
 
   return config_string;
 }
-
 
 static bool globalReduce = true;
 static bool asyncReduce = false;

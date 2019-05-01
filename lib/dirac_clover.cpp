@@ -7,13 +7,9 @@
 
 namespace quda {
 
-  DiracClover::DiracClover(const DiracParam &param)
-    : DiracWilson(param), clover(*(param.clover))
-  { }
+  DiracClover::DiracClover(const DiracParam &param) : DiracWilson(param), clover(*(param.clover)) {}
 
-  DiracClover::DiracClover(const DiracClover &dirac) 
-    : DiracWilson(dirac), clover(dirac.clover)
-  { }
+  DiracClover::DiracClover(const DiracClover &dirac) : DiracWilson(dirac), clover(dirac.clover) {}
 
   DiracClover::~DiracClover() { }
 
@@ -43,7 +39,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-      
+
 #ifndef USE_LEGACY_DSLASH
     ApplyWilsonClover(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
 #else
@@ -72,7 +68,7 @@ namespace quda {
   {
 #ifndef USE_LEGACY_DSLASH
     ApplyWilsonClover(out, in, *gauge, clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-    flops += 1872ll*in.Volume();
+    flops += 1872ll * in.Volume();
 #else
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
     DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);

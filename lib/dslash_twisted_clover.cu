@@ -236,7 +236,8 @@ namespace quda {
     int bulk_threads = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->Volume() : in->Volume() / 2;
     for (int i=0;i<4;i++) ghost_threads[i] = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->GhostFace()[i] : in->GhostFace()[i] / 2;
 
-    dslash::DslashPolicyTune<DslashCuda> dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), bulk_threads, ghost_threads, profile);
+    dslash::DslashPolicyTune<DslashCuda> dslash_policy(
+        *dslash, const_cast<cudaColorSpinorField *>(in), bulk_threads, ghost_threads, profile);
     dslash_policy.apply(0);
 
     delete dslash;

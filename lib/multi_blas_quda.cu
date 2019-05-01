@@ -26,33 +26,34 @@ namespace quda {
 
     namespace detail
     {
-      template<unsigned... digits>
-      struct to_chars { static const char value[]; };
+      template <unsigned... digits> struct to_chars {
+        static const char value[];
+      };
 
-      template<unsigned... digits>
-      const char to_chars<digits...>::value[] = {('0' + digits)..., 0};
+      template <unsigned... digits> const char to_chars<digits...>::value[] = {('0' + digits)..., 0};
 
-      template<unsigned rem, unsigned... digits>
-      struct explode : explode<rem / 10, rem % 10, digits...> {};
+      template <unsigned rem, unsigned... digits> struct explode : explode<rem / 10, rem % 10, digits...> {
+      };
 
-      template<unsigned... digits>
-      struct explode<0, digits...> : to_chars<digits...> {};
-    }
+      template <unsigned... digits> struct explode<0, digits...> : to_chars<digits...> {
+      };
+    } // namespace detail
 
-    template<unsigned num>
-    struct num_to_string : detail::explode<num / 10, num % 10> {};
+    template <unsigned num> struct num_to_string : detail::explode<num / 10, num % 10> {
+    };
 
-    template <int NXZ, typename FloatN, int M, typename SpinorX, typename SpinorY,
-              typename SpinorZ, typename SpinorW, typename Functor, typename T>
-    class MultiBlas : public TunableVectorY {
+    template <int NXZ, typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
+        typename Functor, typename T>
+    class MultiBlas : public TunableVectorY
+    {
 
-    private:
+  private:
       const int NYW;
       const int nParity;
-      mutable MultiBlasArg<NXZ,SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg;
+      mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
       const coeff_array<T> &a, &b, &c;
 
-      std::vector<ColorSpinorField*> &x, &y, &z, &w;
+      std::vector<ColorSpinorField *> &x, &y, &z, &w;
 
       // host pointers used for backing up fields when tuning
       // don't curry into the Spinors to minimize parameter size
@@ -60,19 +61,30 @@ namespace quda {
 
       bool tuneSharedBytes() const { return false; }
 
-    public:
-      MultiBlas(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f,
-                const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
-                std::vector<ColorSpinorField*> &z, std::vector<ColorSpinorField*> &w,
-                int NYW, int length)
-        : TunableVectorY(NYW), NYW(NYW), nParity(x[0]->SiteSubset()),
-          arg(X, Y, Z, W, f, NYW, length/nParity), a(a), b(b), c(c),
-          x(x), y(y), z(z), w(w), Y_h(), W_h(), Ynorm_h(), Wnorm_h()
+  public:
+      MultiBlas(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f, const coeff_array<T> &a,
+          const coeff_array<T> &b, const coeff_array<T> &c, std::vector<ColorSpinorField *> &x,
+          std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
+          int NYW, int length) :
+          TunableVectorY(NYW),
+          NYW(NYW),
+          nParity(x[0]->SiteSubset()),
+          arg(X, Y, Z, W, f, NYW, length / nParity),
+          a(a),
+          b(b),
+          c(c),
+          x(x),
+          y(y),
+          z(z),
+          w(w),
+          Y_h(),
+          W_h(),
+          Ynorm_h(),
+          Wnorm_h()
       {
-        Amatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(a.data));
-        Bmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(b.data));
-        Cmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(c.data));
+        Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
+        Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
+        Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
 
         strcpy(aux, x[0]->AuxString());
         if (x[0]->Precision() != y[0]->Precision()) {
@@ -85,9 +97,10 @@ namespace quda {
 #endif
       }
 
-      virtual ~MultiBlas() { }
+      virtual ~MultiBlas() {}
 
-      inline TuneKey tuneKey() const {
+      inline TuneKey tuneKey() const
+      {
         char name[TuneKey::name_n];
         strcpy(name, num_to_string<NXZ>::value);
         strcat(name, std::to_string(NYW).c_str());
@@ -95,167 +108,174 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      inline void apply(const cudaStream_t &stream) {
+      inline void apply(const cudaStream_t &stream)
+      {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         typedef typename scalar<FloatN>::type Float;
-        typedef typename vector<Float,2>::type Float2;
+        typedef typename vector<Float, 2>::type Float2;
 #ifdef JITIFY
         using namespace jitify::reflection;
-        auto instance = program->kernel("quda::blas::multiBlasKernel")
-          .instantiate(Type<FloatN>(),M,NXZ,Type<decltype(arg)>());
+        auto instance
+            = program->kernel("quda::blas::multiBlasKernel").instantiate(Type<FloatN>(), M, NXZ, Type<decltype(arg)>());
 
         // FIXME - if NXZ=1 no need to copy entire array
         // FIXME - do we really need strided access here?
         if (a.data && a.use_const) {
-          Float2 A[MAX_MATRIX_SIZE/sizeof(Float2)];
+          Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
           // since the kernel doesn't know the width of them matrix at compile
           // time we stride it and copy the padded matrix to GPU
-          for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
-            A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+          for (int i = 0; i < NXZ; i++)
+            for (int j = 0; j < NYW; j++)
+              A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
           auto Amatrix_d = instance.get_constant_ptr("quda::blas::Amatrix_d");
           cuMemcpyHtoDAsync(Amatrix_d, A, MAX_MATRIX_SIZE, *getStream());
         }
 
         if (b.data && b.use_const) {
-          Float2 B[MAX_MATRIX_SIZE/sizeof(Float2)];
+          Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
           // since the kernel doesn't know the width of them matrix at compile
           // time we stride it and copy the padded matrix to GPU
-          for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
-            B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+          for (int i = 0; i < NXZ; i++)
+            for (int j = 0; j < NYW; j++)
+              B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
           auto Bmatrix_d = instance.get_constant_ptr("quda::blas::Bmatrix_d");
           cuMemcpyHtoDAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, *getStream());
         }
 
         if (c.data && c.use_const) {
-          Float2 C[MAX_MATRIX_SIZE/sizeof(Float2)];
+          Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
           // since the kernel doesn't know the width of them matrix at compile
           // time we stride it and copy the padded matrix to GPU
-          for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
-            C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+          for (int i = 0; i < NXZ; i++)
+            for (int j = 0; j < NYW; j++)
+              C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
 
           auto Cmatrix_d = instance.get_constant_ptr("quda::blas::Cmatrix_d");
           cuMemcpyHtoDAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, *getStream());
         }
 
-        jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+        jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
         // FIXME - if NXZ=1 no need to copy entire array
         // FIXME - do we really need strided access here?
         if (a.data && a.use_const) {
-          Float2 A[MAX_MATRIX_SIZE/sizeof(Float2)];
+          Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
           // since the kernel doesn't know the width of them matrix at compile
           // time we stride it and copy the padded matrix to GPU
-          for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
-            A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+          for (int i = 0; i < NXZ; i++)
+            for (int j = 0; j < NYW; j++)
+              A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
           cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
         }
 
         if (b.data && b.use_const) {
-          Float2 B[MAX_MATRIX_SIZE/sizeof(Float2)];
+          Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
           // since the kernel doesn't know the width of them matrix at compile
           // time we stride it and copy the padded matrix to GPU
-          for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
-            B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+          for (int i = 0; i < NXZ; i++)
+            for (int j = 0; j < NYW; j++)
+              B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
           cudaMemcpyToSymbolAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
         }
 
         if (c.data && c.use_const) {
-          Float2 C[MAX_MATRIX_SIZE/sizeof(Float2)];
+          Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
           // since the kernel doesn't know the width of them matrix at compile
           // time we stride it and copy the padded matrix to GPU
-          for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
-            C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+          for (int i = 0; i < NXZ; i++)
+            for (int j = 0; j < NYW; j++)
+              C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
 
           cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
         }
 
-        multiBlasKernel<FloatN,M,NXZ> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        multiBlasKernel<FloatN, M, NXZ><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #endif
       }
 
-      void preTune() {
-        for(int i=0; i<NYW; ++i){
+      void preTune()
+      {
+        for (int i = 0; i < NYW; ++i) {
           arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
           arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
         }
       }
 
-      void postTune() {
-        for(int i=0; i<NYW; ++i){
+      void postTune()
+      {
+        for (int i = 0; i < NYW; ++i) {
           arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
           arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
         }
       }
 
-      void initTuneParam(TuneParam &param) const {
+      void initTuneParam(TuneParam &param) const
+      {
         TunableVectorY::initTuneParam(param);
         param.grid.z = nParity;
       }
 
-      void defaultTuneParam(TuneParam &param) const {
+      void defaultTuneParam(TuneParam &param) const
+      {
         TunableVectorY::defaultTuneParam(param);
         param.grid.z = nParity;
       }
 
-      long long flops() const
-      {
-        return arg.f.flops()*vec_length<FloatN>::value*(long)arg.length*nParity*M;
-      }
+      long long flops() const { return arg.f.flops() * vec_length<FloatN>::value * (long)arg.length * nParity * M; }
 
       long long bytes() const
       {
         // the factor two here assumes we are reading and writing to the high precision vector
-        return ((arg.f.streams()-2)*x[0]->Bytes() + 2*y[0]->Bytes());
+        return ((arg.f.streams() - 2) * x[0]->Bytes() + 2 * y[0]->Bytes());
       }
 
       int tuningIter() const { return 3; }
     };
 
-
     template <int NXZ, typename RegType, typename StoreType, typename yType, int M,
-              template <int,typename,typename> class Functor,
-              typename write, typename T>
+        template <int, typename, typename> class Functor, typename write, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                   std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
-                   std::vector<ColorSpinorField*> &z, std::vector<ColorSpinorField*> &w,
-                   int length)
+        std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z,
+        std::vector<ColorSpinorField *> &w, int length)
     {
       const int NYW = y.size();
 
       const int N = NXZ > NYW ? NXZ : NYW;
       if (N > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N, MAX_MULTI_BLAS_N);
 
-      if (NXZ*NYW*sizeof(Complex) > MAX_MATRIX_SIZE)
-        errorQuda("A matrix exceeds max size (%lu > %d)", NXZ*NYW*sizeof(Complex), MAX_MATRIX_SIZE);
+      if (NXZ * NYW * sizeof(Complex) > MAX_MATRIX_SIZE)
+        errorQuda("A matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Complex), MAX_MATRIX_SIZE);
 
       typedef typename scalar<RegType>::type Float;
-      typedef typename vector<Float,2>::type Float2;
-      typedef vector<Float,2> vec2;
+      typedef typename vector<Float, 2>::type Float2;
+      typedef vector<Float, 2> vec2;
 
-      SpinorTexture<RegType,StoreType,M,0> X[NXZ];
-      Spinor<RegType,    yType,M,write::Y,1> Y[MAX_MULTI_BLAS_N];
-      SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
-      Spinor<RegType,StoreType,M,write::W,3> W[MAX_MULTI_BLAS_N];
+      SpinorTexture<RegType, StoreType, M, 0> X[NXZ];
+      Spinor<RegType, yType, M, write::Y, 1> Y[MAX_MULTI_BLAS_N];
+      SpinorTexture<RegType, StoreType, M, 2> Z[NXZ];
+      Spinor<RegType, StoreType, M, write::W, 3> W[MAX_MULTI_BLAS_N];
 
-      for (int i=0; i<NXZ; i++) { X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i])); Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));}
-      for (int i=0; i<NYW; i++) { Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i])); W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));}
+      for (int i = 0; i < NXZ; i++) {
+        X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
+        Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));
+      }
+      for (int i = 0; i < NYW; i++) {
+        Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i]));
+        W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
+      }
 
       // if block caxpy is an 'outer product of caxpy' where 'x'
 
-      Functor<NXZ,Float2, RegType> f(a, b, c, NYW);
+      Functor<NXZ, Float2, RegType> f(a, b, c, NYW);
 
-      MultiBlas<NXZ,RegType,M,
-                SpinorTexture<RegType,StoreType,M,0>,
-                Spinor<RegType,    yType,M,write::Y,1>,
-                SpinorTexture<RegType,StoreType,M,2>,
-                Spinor<RegType,StoreType,M,write::W,3>,
-                decltype(f),T>
-        blas(X, Y, Z, W, f, a, b, c, x, y, z, w, NYW, length);
+      MultiBlas<NXZ, RegType, M, SpinorTexture<RegType, StoreType, M, 0>, Spinor<RegType, yType, M, write::Y, 1>,
+          SpinorTexture<RegType, StoreType, M, 2>, Spinor<RegType, StoreType, M, write::W, 3>, decltype(f), T>
+          blas(X, Y, Z, W, f, a, b, c, x, y, z, w, NYW, length);
       blas.apply(*getStream());
 
       blas::bytes += blas.bytes();
@@ -267,170 +287,218 @@ namespace quda {
     /**
        Driver for generic blas routine with four loads and two store.
     */
-    template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Functor,
-              typename write, typename T>
+    template <int NXZ, template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                   CompositeColorSpinorField &x, CompositeColorSpinorField &y,
-                   CompositeColorSpinorField &z, CompositeColorSpinorField &w) {
+        CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+        CompositeColorSpinorField &w)
+    {
 
       if (checkLocation(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
 
         if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 
+#if QUDA_PRECISION & 8
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
           const int M = 1;
-          multiBlas<NXZ,double2,double2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Length()/(2*M));
+          multiBlas<NXZ, double2, double2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
 #else
           errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
 #endif
 
         } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
 
+#if QUDA_PRECISION & 4
           if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 1;
-            multiBlas<NXZ,float4,float4,float4,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Length()/(4*M));
+            multiBlas<NXZ, float4, float4, float4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
 
-          } else if (x[0]->Nspin()==2 || x[0]->Nspin()==1) {
+          } else if (x[0]->Nspin() == 2 || x[0]->Nspin() == 1) {
 
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
             const int M = 1;
-            multiBlas<NXZ,float2,float2,float2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Length()/(2*M));
+            multiBlas<NXZ, float2, float2, float2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+          } else {
+            errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
 
         } else if (y[0]->Precision() == QUDA_HALF_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
 
+#if QUDA_PRECISION & 2
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
-          if (x[0]->Nspin() == 4) { //wilson
+          if (x[0]->Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 6;
-            multiBlas<NXZ,float4,short4,short4,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+            multiBlas<NXZ, float4, short4, short4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          } else if (x[0]->Nspin() == 1) {//staggered
+          } else if (x[0]->Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
             const int M = 3;
-            multiBlas<NXZ,float2,short2,short2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+            multiBlas<NXZ, float2, short2, short2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
           } else {
             errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
           }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
 
         } else if (y[0]->Precision() == QUDA_QUARTER_PRECISION && x[0]->Precision() == QUDA_QUARTER_PRECISION) {
 
+#if QUDA_PRECISION & 1
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
-          if (x[0]->Nspin() == 4) { //wilson
+          if (x[0]->Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 6;
-            multiBlas<NXZ,float4,char4,char4,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+            multiBlas<NXZ, float4, char4, char4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          } else if (x[0]->Nspin() == 1) {//staggered
+          } else if (x[0]->Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
             const int M = 3;
-            multiBlas<NXZ,float2,char2,char2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+            multiBlas<NXZ, float2, char2, char2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
           } else {
             errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
           }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
 
         } else {
 
-      errorQuda("Precision combination x=%d not supported\n", x[0]->Precision());
-
+          errorQuda("Precision combination x=%d not supported\n", x[0]->Precision());
         }
       } else { // fields on the cpu
         errorQuda("Not implemented");
       }
-
     }
 
     /**
        Driver for generic blas routine with four loads and two store.
     */
-    template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Functor,
-              typename write, typename T>
+    template <int NXZ, template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
     void mixedMultiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                        CompositeColorSpinorField &x, CompositeColorSpinorField &y,
-                        CompositeColorSpinorField &z, CompositeColorSpinorField &w)
+        CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+        CompositeColorSpinorField &w)
     {
       if (checkLocation(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+        if (y[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 
-          if (x[0]->Nspin() == 4) {
+#if QUDA_PRECISION & 8
+          if (x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
+            if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 12;
-            multiBlas<NXZ,double2,float4,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 12;
+              multiBlas<NXZ, double2, float4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          } else if (x[0]->Nspin() == 1) {
+            } else if (x[0]->Nspin() == 1) {
 #if defined(GPU_STAGGERED_DIRAC)
-            const int M = 3;
-            multiBlas<NXZ,double2,float2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 3;
+              multiBlas<NXZ, double2, float2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          }
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
 
-        } else if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
+          } else if (x[0]->Precision() == QUDA_HALF_PRECISION) {
 
-          if (x[0]->Nspin() == 4) {
+#if QUDA_PRECISION & 2
+            if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 12;
-            multiBlas<NXZ,double2,short4,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 12;
+              multiBlas<NXZ, double2, short4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          } else if (x[0]->Nspin() == 1) {
+            } else if (x[0]->Nspin() == 1) {
 #if defined(GPU_STAGGERED_DIRAC)
-            const int M = 3;
-            multiBlas<NXZ,double2,short2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 3;
+              multiBlas<NXZ, double2, short2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
+
+          } else {
+            errorQuda("Not implemented for this precision combination %d %d", x[0]->Precision(), y[0]->Precision());
           }
-
-        } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
-
-          if (x[0]->Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 6;
-            multiBlas<NXZ,float4,short4,float4,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
 #endif
 
-          } else if (x[0]->Nspin()==2 || x[0]->Nspin()==1) {
+        } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION) {
+
+#if (QUDA_PRECISION & 4)
+          if (x[0]->Precision() == QUDA_HALF_PRECISION) {
+
+#if (QUDA_PRECISION & 2)
+            if (x[0]->Nspin() == 4) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+              const int M = 6;
+              multiBlas<NXZ, float4, short4, float4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+
+            } else if (x[0]->Nspin() == 2 || x[0]->Nspin() == 1) {
 
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
-            const int M = 3;
-            multiBlas<NXZ,float2,short2,float2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
+              const int M = 3;
+              multiBlas<NXZ, float2, short2, float2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-          } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
+            } else {
+              errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
+            }
 
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
+#endif
+
+          } else {
+            errorQuda("Precision combination x=%d y=%d not supported\n", x[0]->Precision(), y[0]->Precision());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
         } else {
           errorQuda("Precision combination x=%d y=%d not supported\n", x[0]->Precision(), y[0]->Precision());
         }
       } else { // fields on the cpu
         errorQuda("Not implemented");
       }
-
     }
 
     void caxpy_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
@@ -479,70 +547,38 @@ namespace quda {
         if (x[0]->Precision() == y[0]->Precision())
         {
           switch (x.size()) {
-            case 1:
-              multiBlas<1,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 2
-            case 2:
-              multiBlas<2,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 3
-            case 3:
-              multiBlas<3,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 4
-            case 4:
-              multiBlas<4,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 5
-            case 5:
-              multiBlas<5,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 6
-            case 6:
-              multiBlas<6,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 7
-            case 7:
-              multiBlas<7,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 8
-            case 8:
-              multiBlas<8,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 9
-            case 9:
-              multiBlas<9,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 10
-            case 10:
-              multiBlas<10,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 11
-            case 11:
-              multiBlas<11,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 12
-            case 12:
-              multiBlas<12,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 13
-            case 13:
-              multiBlas<13,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 14
-            case 14:
-              multiBlas<14,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 15
-            case 15:
-              multiBlas<15,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 16
-            case 16:
-              multiBlas<16,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #endif // 16
+          case 1: multiBlas<1, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 2
+          case 2: multiBlas<2, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 3
+          case 3: multiBlas<3, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 4
+          case 4: multiBlas<4, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 5
+          case 5: multiBlas<5, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 6
+          case 6: multiBlas<6, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 7
+          case 7: multiBlas<7, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 8
+          case 8: multiBlas<8, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 9
+          case 9: multiBlas<9, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 10
+          case 10: multiBlas<10, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 11
+          case 11: multiBlas<11, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 12
+          case 12: multiBlas<12, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 13
+          case 13: multiBlas<13, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 14
+          case 14: multiBlas<14, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 15
+          case 15: multiBlas<15, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 16
+          case 16: multiBlas<16, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#endif // 16
   #endif // 15
   #endif // 14
   #endif // 13
@@ -573,70 +609,38 @@ namespace quda {
         else // precisions don't agree.
         {
           switch (x.size()) {
-            case 1:
-              mixedMultiBlas<1,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 2
-            case 2:
-              mixedMultiBlas<2,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 3
-            case 3:
-              mixedMultiBlas<3,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 4
-            case 4:
-              mixedMultiBlas<4,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 5
-            case 5:
-              mixedMultiBlas<5,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 6
-            case 6:
-              mixedMultiBlas<6,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 7
-            case 7:
-              mixedMultiBlas<7,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 8
-            case 8:
-              mixedMultiBlas<8,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 9
-            case 9:
-              mixedMultiBlas<9,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 10
-            case 10:
-              mixedMultiBlas<10,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 11
-            case 11:
-              mixedMultiBlas<11,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 12
-            case 12:
-              mixedMultiBlas<12,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 13
-            case 13:
-              mixedMultiBlas<13,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 14
-            case 14:
-              mixedMultiBlas<14,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 15
-            case 15:
-              mixedMultiBlas<15,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #if MAX_MULTI_BLAS_N >= 16
-            case 16:
-              mixedMultiBlas<16,multicaxpy_,write<0,1,0,0> >(a, b, c, x, y, x, y);
-              break;
-  #endif // 16
+          case 1: mixedMultiBlas<1, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 2
+          case 2: mixedMultiBlas<2, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 3
+          case 3: mixedMultiBlas<3, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 4
+          case 4: mixedMultiBlas<4, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 5
+          case 5: mixedMultiBlas<5, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 6
+          case 6: mixedMultiBlas<6, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 7
+          case 7: mixedMultiBlas<7, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 8
+          case 8: mixedMultiBlas<8, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 9
+          case 9: mixedMultiBlas<9, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 10
+          case 10: mixedMultiBlas<10, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 11
+          case 11: mixedMultiBlas<11, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 12
+          case 12: mixedMultiBlas<12, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 13
+          case 13: mixedMultiBlas<13, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 14
+          case 14: mixedMultiBlas<14, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 15
+          case 15: mixedMultiBlas<15, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#if MAX_MULTI_BLAS_N >= 16
+          case 16: mixedMultiBlas<16, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+#endif // 16
   #endif // 15
   #endif // 14
   #endif // 13
@@ -760,70 +764,38 @@ namespace quda {
         if (x[0]->Precision() == y[0]->Precision())
         {
           switch (x.size()) {
-            case 1:
-              multiBlas<1,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 2
-            case 2:
-              multiBlas<2,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 3
-            case 3:
-              multiBlas<3,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 4
-            case 4:
-              multiBlas<4,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 5
-            case 5:
-              multiBlas<5,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 6
-            case 6:
-              multiBlas<6,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 7
-            case 7:
-              multiBlas<7,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 8
-            case 8:
-              multiBlas<8,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 9
-            case 9:
-              multiBlas<9,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 10
-            case 10:
-              multiBlas<10,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 11
-            case 11:
-              multiBlas<11,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 12
-            case 12:
-              multiBlas<12,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 13
-            case 13:
-              multiBlas<13,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 14
-            case 14:
-              multiBlas<14,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 15
-            case 15:
-              multiBlas<15,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 16
-            case 16:
-              multiBlas<16,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #endif // 16
+          case 1: multiBlas<1, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 2
+          case 2: multiBlas<2, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 3
+          case 3: multiBlas<3, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 4
+          case 4: multiBlas<4, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 5
+          case 5: multiBlas<5, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 6
+          case 6: multiBlas<6, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 7
+          case 7: multiBlas<7, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 8
+          case 8: multiBlas<8, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 9
+          case 9: multiBlas<9, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 10
+          case 10: multiBlas<10, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 11
+          case 11: multiBlas<11, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 12
+          case 12: multiBlas<12, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 13
+          case 13: multiBlas<13, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 14
+          case 14: multiBlas<14, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 15
+          case 15: multiBlas<15, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 16
+          case 16: multiBlas<16, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#endif // 16
   #endif // 15
   #endif // 14
   #endif // 13
@@ -854,70 +826,38 @@ namespace quda {
         else // precisions don't agree.
         {
           switch (x.size()) {
-            case 1:
-              mixedMultiBlas<1,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 2
-            case 2:
-              mixedMultiBlas<2,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 3
-            case 3:
-              mixedMultiBlas<3,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 4
-            case 4:
-              mixedMultiBlas<4,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 5
-            case 5:
-              mixedMultiBlas<5,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 6
-            case 6:
-              mixedMultiBlas<6,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 7
-            case 7:
-              mixedMultiBlas<7,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 8
-            case 8:
-              mixedMultiBlas<8,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 9
-            case 9:
-              mixedMultiBlas<9,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 10
-            case 10:
-              mixedMultiBlas<10,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 11
-            case 11:
-              mixedMultiBlas<11,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 12
-            case 12:
-              mixedMultiBlas<12,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 13
-            case 13:
-              mixedMultiBlas<13,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 14
-            case 14:
-              mixedMultiBlas<14,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 15
-            case 15:
-              mixedMultiBlas<15,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 16
-            case 16:
-              mixedMultiBlas<16,multicaxpyz_,write<0,0,0,1> >(a, b, c, x, y, x, z);
-              break;
-  #endif // 16
+          case 1: mixedMultiBlas<1, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 2
+          case 2: mixedMultiBlas<2, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 3
+          case 3: mixedMultiBlas<3, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 4
+          case 4: mixedMultiBlas<4, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 5
+          case 5: mixedMultiBlas<5, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 6
+          case 6: mixedMultiBlas<6, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 7
+          case 7: mixedMultiBlas<7, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 8
+          case 8: mixedMultiBlas<8, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 9
+          case 9: mixedMultiBlas<9, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 10
+          case 10: mixedMultiBlas<10, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 11
+          case 11: mixedMultiBlas<11, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 12
+          case 12: mixedMultiBlas<12, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 13
+          case 13: mixedMultiBlas<13, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 14
+          case 14: mixedMultiBlas<14, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 15
+          case 15: mixedMultiBlas<15, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#if MAX_MULTI_BLAS_N >= 16
+          case 16: mixedMultiBlas<16, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
+#endif // 16
   #endif // 15
   #endif // 14
   #endif // 13
@@ -1002,10 +942,10 @@ namespace quda {
 	coeff_array<double> a(a_,false), b(b_,false), c(c_,false);
 
 	if (x[0]->Precision() != y[0]->Precision() ) {
-	  mixedMultiBlas<1,multi_axpyBzpcx_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-	} else {
-	  multiBlas<1,multi_axpyBzpcx_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-	}
+          mixedMultiBlas<1, multi_axpyBzpcx_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
+        } else {
+          multiBlas<1, multi_axpyBzpcx_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
+        }
       } else {
 	// split the problem in half and recurse
 	const double *a0 = &a_[0];
@@ -1054,69 +994,37 @@ namespace quda {
         {
           switch(xsize)
           {
-            case 1:
-              mixedMultiBlas<1,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 1: mixedMultiBlas<1, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 2
-            case 2:
-              mixedMultiBlas<2,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 2: mixedMultiBlas<2, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 3
-            case 3:
-              mixedMultiBlas<3,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 3: mixedMultiBlas<3, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 4
-            case 4:
-              mixedMultiBlas<4,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 4: mixedMultiBlas<4, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 5
-            case 5:
-              mixedMultiBlas<5,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 5: mixedMultiBlas<5, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 6
-            case 6:
-              mixedMultiBlas<6,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 6: mixedMultiBlas<6, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 7
-            case 7:
-              mixedMultiBlas<7,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 7: mixedMultiBlas<7, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 8
-            case 8:
-              mixedMultiBlas<8,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 8: mixedMultiBlas<8, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 9
-            case 9:
-              mixedMultiBlas<9,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 9: mixedMultiBlas<9, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 10
-            case 10:
-              mixedMultiBlas<10,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 10: mixedMultiBlas<10, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 11
-            case 11:
-              mixedMultiBlas<11,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 11: mixedMultiBlas<11, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 12
-            case 12:
-              mixedMultiBlas<12,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 12: mixedMultiBlas<12, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 13
-            case 13:
-              mixedMultiBlas<13,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 13: mixedMultiBlas<13, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 14
-            case 14:
-              mixedMultiBlas<14,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 14: mixedMultiBlas<14, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 15
-            case 15:
-              mixedMultiBlas<15,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 15: mixedMultiBlas<15, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 16
-            case 16:
-              mixedMultiBlas<16,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 16: mixedMultiBlas<16, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #endif // 16
 #endif // 15
 #endif // 14
@@ -1141,69 +1049,37 @@ namespace quda {
         {
           switch(xsize)
           {
-            case 1:
-              multiBlas<1,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 1: multiBlas<1, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 2
-            case 2:
-              multiBlas<2,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 2: multiBlas<2, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 3
-            case 3:
-              multiBlas<3,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 3: multiBlas<3, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 4
-            case 4:
-              multiBlas<4,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 4: multiBlas<4, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 5
-            case 5:
-              multiBlas<5,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 5: multiBlas<5, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 6
-            case 6:
-              multiBlas<6,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 6: multiBlas<6, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 7
-            case 7:
-              multiBlas<7,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 7: multiBlas<7, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 8
-            case 8:
-              multiBlas<8,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 8: multiBlas<8, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 9
-            case 9:
-              multiBlas<9,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 9: multiBlas<9, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 10
-            case 10:
-              multiBlas<10,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 10: multiBlas<10, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 11
-            case 11:
-              multiBlas<11,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 11: multiBlas<11, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 12
-            case 12:
-              multiBlas<12,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 12: multiBlas<12, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 13
-            case 13:
-              multiBlas<13,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 13: multiBlas<13, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 14
-            case 14:
-              multiBlas<14,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 14: multiBlas<14, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 15
-            case 15:
-              multiBlas<15,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 15: multiBlas<15, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 16
-            case 16:
-              multiBlas<16,multi_caxpyBxpz_,write<0,1,0,1> >(a, b, c, x, y, x, w);
-              break;
+          case 16: multiBlas<16, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
 #endif // 16
 #endif // 15
 #endif // 14
@@ -1222,11 +1098,9 @@ namespace quda {
             default:
               // we can't hit the default, it ends up in the else below.
               break;
-          }
+            }
         }
-      }
-      else
-      {
+      } else {
         // split the problem in half and recurse
         const Complex *a0 = &a_[0];
         const Complex *b0 = &b_[0];

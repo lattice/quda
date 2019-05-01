@@ -41,20 +41,20 @@ void display_link_internal(Float* link)
   return;
 }
 
-
 template <typename sFloat, typename gFloat>
-void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink,
-                     gFloat** ghostFatlink, gFloat** ghostLonglink,
-                     sFloat *spinorField, sFloat** fwd_nbr_spinor,
-                     sFloat** back_nbr_spinor, int oddBit, int daggerBit,
-                     int nSrc, QudaDslashType dslash_type)
+void dslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **ghostFatlink, gFloat **ghostLonglink,
+    sFloat *spinorField, sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor, int oddBit, int daggerBit, int nSrc,
+    QudaDslashType dslash_type)
 {
   for (int i=0; i<Vh*mySpinorSiteSize*nSrc; i++) res[i] = 0.0;
 
   gFloat *fatlinkEven[4], *fatlinkOdd[4];
   gFloat *longlinkEven[4], *longlinkOdd[4];
+
+#ifdef MULTI_GPU
   gFloat *ghostFatlinkEven[4], *ghostFatlinkOdd[4];
   gFloat *ghostLonglinkEven[4], *ghostLonglinkOdd[4];
+#endif
 
   for (int dir = 0; dir < 4; dir++) {
     fatlinkEven[dir] = fatlink[dir];
@@ -62,10 +62,12 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink,
     longlinkEven[dir] =longlink[dir];
     longlinkOdd[dir] = longlink[dir] + Vh*gaugeSiteSize;
 
+#ifdef MULTI_GPU
     ghostFatlinkEven[dir] = ghostFatlink[dir];
     ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir]/2)*gaugeSiteSize;
     ghostLonglinkEven[dir] = ghostLonglink[dir];
     ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3*(faceVolume[dir]/2)*gaugeSiteSize;
+#endif
   }
 
   for (int xs=0; xs<nSrc; xs++) {
@@ -78,14 +80,23 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink,
 #ifdef MULTI_GPU
         const int nFace = dslash_type == QUDA_ASQTAD_DSLASH ? 3 : 1;
         gFloat* fatlnk = gaugeLink_mg4dir(i, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
-        gFloat* longlnk = dslash_type == QUDA_ASQTAD_DSLASH ? gaugeLink_mg4dir(i, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) : nullptr;
-        sFloat *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, nFace, mySpinorSiteSize);
-        sFloat *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ? spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace, mySpinorSiteSize) : nullptr;
+        gFloat *longlnk = dslash_type == QUDA_ASQTAD_DSLASH ?
+            gaugeLink_mg4dir(i, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3) :
+            nullptr;
+        sFloat *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(
+            sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, nFace, mySpinorSiteSize);
+        sFloat *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
+            spinorNeighbor_5d_mgpu<QUDA_4D_PC>(
+                sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, nFace, mySpinorSiteSize) :
+            nullptr;
 #else
-        gFloat* fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
-        gFloat* longlnk = dslash_type == QUDA_ASQTAD_DSLASH ? gaugeLink(i, dir, oddBit, longlinkEven, longlinkOdd, 3) : nullptr;
+        gFloat *fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
+        gFloat *longlnk
+            = dslash_type == QUDA_ASQTAD_DSLASH ? gaugeLink(i, dir, oddBit, longlinkEven, longlinkOdd, 3) : nullptr;
         sFloat *first_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 1, mySpinorSiteSize);
-        sFloat *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ? spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 3, mySpinorSiteSize) : nullptr;
+        sFloat *third_neighbor_spinor = dslash_type == QUDA_ASQTAD_DSLASH ?
+            spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 3, mySpinorSiteSize) :
+            nullptr;
 #endif
         sFloat gaugedSpinor[mySpinorSiteSize];
 
@@ -118,11 +129,9 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink,
 
 }
 
-
-
-void staggered_dslash(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink,
-                      void** ghost_longlink, cpuColorSpinorField* in, int oddBit, int daggerBit,
-                      QudaPrecision sPrecision, QudaPrecision gPrecision, QudaDslashType dslash_type)
+void staggered_dslash(cpuColorSpinorField *out, void **fatlink, void **longlink, void **ghost_fatlink,
+    void **ghost_longlink, cpuColorSpinorField *in, int oddBit, int daggerBit, QudaPrecision sPrecision,
+    QudaPrecision gPrecision, QudaDslashType dslash_type)
 {
   const int nSrc = in->X(4);
 
@@ -143,27 +152,30 @@ void staggered_dslash(cpuColorSpinorField* out, void **fatlink, void** longlink,
 
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      dslashReference((double*)out->V(), (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
-                      (double*)in->V(), (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit, nSrc, dslash_type);
+      dslashReference((double *)out->V(), (double **)fatlink, (double **)longlink, (double **)ghost_fatlink,
+          (double **)ghost_longlink, (double *)in->V(), (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, oddBit,
+          daggerBit, nSrc, dslash_type);
     } else {
-      dslashReference((double*)out->V(), (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
-                      (double*)in->V(), (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit, nSrc, dslash_type);
+      dslashReference((double *)out->V(), (float **)fatlink, (float **)longlink, (float **)ghost_fatlink,
+          (float **)ghost_longlink, (double *)in->V(), (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, oddBit,
+          daggerBit, nSrc, dslash_type);
       }
   } else {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      dslashReference((float*)out->V(), (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
-                      (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit, nSrc, dslash_type);
+      dslashReference((float *)out->V(), (double **)fatlink, (double **)longlink, (double **)ghost_fatlink,
+          (double **)ghost_longlink, (float *)in->V(), (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, oddBit,
+          daggerBit, nSrc, dslash_type);
     } else {
-      dslashReference((float*)out->V(), (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
-                      (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit, nSrc, dslash_type);
+      dslashReference((float *)out->V(), (float **)fatlink, (float **)longlink, (float **)ghost_fatlink,
+          (float **)ghost_longlink, (float *)in->V(), (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, oddBit,
+          daggerBit, nSrc, dslash_type);
     }
   }
-
 }
 
-void matdagmat(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink, void** ghost_longlink,
-               cpuColorSpinorField* in, double mass, int dagger_bit,
-               QudaPrecision sPrecision, QudaPrecision gPrecision, cpuColorSpinorField* tmp, QudaParity parity, QudaDslashType dslash_type)
+void matdagmat(cpuColorSpinorField *out, void **fatlink, void **longlink, void **ghost_fatlink, void **ghost_longlink,
+    cpuColorSpinorField *in, double mass, int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision,
+    cpuColorSpinorField *tmp, QudaParity parity, QudaDslashType dslash_type)
 {
   //assert sPrecision and gPrecision must be the same
   if (sPrecision != gPrecision){
@@ -179,11 +191,11 @@ void matdagmat(cpuColorSpinorField* out, void **fatlink, void** longlink, void**
     errorQuda("ERROR: full parity not supported in function %s\n", __FUNCTION__);
   }
 
-  staggered_dslash(tmp, fatlink, longlink, ghost_fatlink, ghost_longlink,
-                   in, otherparity, dagger_bit, sPrecision, gPrecision, dslash_type);
+  staggered_dslash(tmp, fatlink, longlink, ghost_fatlink, ghost_longlink, in, otherparity, dagger_bit, sPrecision,
+      gPrecision, dslash_type);
 
-  staggered_dslash(out, fatlink, longlink, ghost_fatlink, ghost_longlink,
-                   tmp, parity, dagger_bit, sPrecision, gPrecision, dslash_type);
+  staggered_dslash(out, fatlink, longlink, ghost_fatlink, ghost_longlink, tmp, parity, dagger_bit, sPrecision,
+      gPrecision, dslash_type);
 
   double msq_x4 = mass*mass*4;
   if (sPrecision == QUDA_DOUBLE_PRECISION){

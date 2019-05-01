@@ -237,7 +237,7 @@ namespace quda {
           complex<Float> *ptr = reinterpret_cast<complex<Float>*>(a);
           result = thrust::transform_reduce(thrust::seq, ptr, ptr+offset_cb, h, result, r);
         }
-        return 2.0*result; // factor of two is normalization
+        return 2.0 * result; // factor of two is normalization
       }
 
     };
@@ -302,7 +302,7 @@ namespace quda {
           complex<Float> *ptr = reinterpret_cast<complex<Float>*>(a);
           result = thrust::transform_reduce(thrust::seq, ptr, ptr+offset_cb, h, result, r);
         }
-        return 2.0*result; // factor of two is normalization
+        return 2.0 * result; // factor of two is normalization
       }
 
     };
@@ -345,9 +345,10 @@ namespace quda {
 	}
       }
 
-      template<typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const {
-	errorQuda("Not implemented");
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const
+      {
+        errorQuda("Not implemented");
 	return 0.0;
       }
     };
@@ -510,16 +511,17 @@ namespace quda {
     */
     template <typename Float, int length, int N, bool huge_alloc=false>
       struct FloatNOrder {
-	typedef typename mapper<Float>::type RegType;
-	typedef typename VectorType<Float,N>::type Vector;
-	typedef typename AllocType<huge_alloc>::type AllocInt;
-        typedef float norm_type;
-	static const int M=length/(N*2); // number of short vectors per chiral block
-	static const int block=length/2; // chiral block size
-	Float *clover;
-	norm_type *norm;
-	const AllocInt offset; // offset can be 32-bit or 64-bit
-	const AllocInt norm_offset;
+      using Accessor = FloatNOrder<Float, length, N, huge_alloc>;
+      typedef typename mapper<Float>::type RegType;
+      typedef typename VectorType<Float, N>::type Vector;
+      typedef typename AllocType<huge_alloc>::type AllocInt;
+      typedef float norm_type;
+      static const int M = length / (N * 2); // number of short vectors per chiral block
+      static const int block = length / 2;   // chiral block size
+      Float *clover;
+      norm_type *norm;
+      const AllocInt offset; // offset can be 32-bit or 64-bit
+      const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
 	typedef typename TexVectorType<RegType,N>::type TexVector;
 	cudaTextureObject_t tex;
@@ -537,17 +539,26 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 	void *backup_norm_h; //! host memory for backing up norm when tuning
 
-      FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_=0, norm_type *norm_=0, bool override=false)
-	: offset(clover.Bytes()/(2*sizeof(Float))), norm_offset(clover.NormBytes()/(2*sizeof(norm_type))),
+        FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = 0, norm_type *norm_ = 0,
+            bool override = false) :
+            offset(clover.Bytes() / (2 * sizeof(Float))),
+            norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
 #ifdef USE_TEXTURE_OBJECTS
-	  tex(0), normTex(0), tex_offset(offset/N),
+            tex(0),
+            normTex(0),
+            tex_offset(offset / N),
 #endif
-	  volumeCB(clover.VolumeCB()), stride(clover.Stride()),
-	  twisted(clover.Twisted()), mu2(clover.Mu2()), bytes(clover.Bytes()),
-	  norm_bytes(clover.NormBytes()), backup_h(nullptr), backup_norm_h(nullptr)
+            volumeCB(clover.VolumeCB()),
+            stride(clover.Stride()),
+            twisted(clover.Twisted()),
+            mu2(clover.Mu2()),
+            bytes(clover.Bytes()),
+            norm_bytes(clover.NormBytes()),
+            backup_h(nullptr),
+            backup_norm_h(nullptr)
 	{
 	  this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
-	  this->norm = norm_ ? norm_ : (norm_type*)(clover.Norm(is_inverse));
+          this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
 #ifdef USE_TEXTURE_OBJECTS
 	  if (clover.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	    if (is_inverse) {
@@ -578,12 +589,12 @@ namespace quda {
 	   @return Instance of a colorspinor_wrapper that curries in access to
 	   this field at the above coordinates.
 	*/
-	__device__ __host__ inline clover_wrapper<RegType,FloatNOrder<Float,length,N> >
-	  operator()(int x_cb, int parity, int chirality) {
-	  return clover_wrapper<RegType,FloatNOrder<Float,length,N> >(*this, x_cb, parity, chirality);
-	}
+        __device__ __host__ inline clover_wrapper<RegType, Accessor> operator()(int x_cb, int parity, int chirality)
+        {
+          return clover_wrapper<RegType, Accessor>(*this, x_cb, parity, chirality);
+        }
 
-	/**
+        /**
 	   @brief This accessor routine returns a const colorspinor_wrapper to this object,
 	   allowing us to overload various operators for manipulating at
 	   the site level interms of matrix operations.
@@ -593,13 +604,13 @@ namespace quda {
 	   @return Instance of a colorspinor_wrapper that curries in access to
 	   this field at the above coordinates.
 	*/
-	__device__ __host__ inline const clover_wrapper<RegType,FloatNOrder<Float,length,N> >
-	  operator()(int x_cb, int parity, int chirality) const {
-	  return clover_wrapper<RegType,FloatNOrder<Float,length,N> >
-	    (const_cast<FloatNOrder<Float,length,N>&>(*this), x_cb, parity, chirality);
-	}
+        __device__ __host__ inline const clover_wrapper<RegType, Accessor> operator()(
+            int x_cb, int parity, int chirality) const
+        {
+          return clover_wrapper<RegType, Accessor>(const_cast<Accessor &>(*this), x_cb, parity, chirality);
+        }
 
-	/**
+        /**
 	   @brief Load accessor for a single chiral block
 	   @param[out] v Vector of loaded elements
 	   @param[in] x Checkerboarded site index
@@ -609,12 +620,12 @@ namespace quda {
 	__device__ __host__ inline void load(RegType v[block], int x, int parity, int chirality) const {
 
           norm_type nrm;
-	  if ( isFixed<Float>::value ) {
+          if (isFixed<Float>::value) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-	    nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity*norm_offset + chirality*stride + x) :
-            norm[parity*norm_offset + chirality*stride + x];
+            nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity * norm_offset + chirality * stride + x) :
+                                norm[parity * norm_offset + chirality * stride + x];
 #else
-            nrm = norm[parity*norm_offset + chirality*stride + x];
+            nrm = norm[parity * norm_offset + chirality * stride + x];
 #endif
           }
 
@@ -622,25 +633,23 @@ namespace quda {
 	  for (int i=0; i<M; i++) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	    if (!huge_alloc) { // use textures unless we have a huge alloc
-              // first do texture load from memory
-	      TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*(chirality*M+i) + x);
-	      // now insert into output array
+                               // first do texture load from memory
+              TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*(chirality*M+i) + x);
+              // now insert into output array
 #pragma unroll
-	      for (int j=0; j<N; j++) {
-                copy(v[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
-                if ( isFixed<Float>::value ) v[i*N+j] *= nrm;
+              for (int j = 0; j < N; j++) {
+                copy(v[i * N + j], reinterpret_cast<RegType *>(&vecTmp)[j]);
+                if (isFixed<Float>::value) v[i * N + j] *= nrm;
               }
-	    } else
+            } else
 #endif
 	    {
               // first load from memory
-	      Vector vecTmp = vector_load<Vector>(clover + parity*offset, x + stride*(chirality*M+i));
+              Vector vecTmp = vector_load<Vector>(clover + parity*offset, x + stride*(chirality*M+i));
 	      // second do scalar copy converting into register type
 #pragma unroll
-	      for (int j=0; j<N; j++) {
-                copy_and_scale(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j], nrm);
-              }
-	    }
+              for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+            }
 	  }
 
 	}
@@ -656,12 +665,12 @@ namespace quda {
 
           RegType tmp[block];
 
-	  // find the norm of each chiral block
-	  if ( isFixed<Float>::value ) {
+          // find the norm of each chiral block
+          if (isFixed<Float>::value) {
             norm_type scale = 0.0;
 #pragma unroll
-	    for (int i=0; i<block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
-	    norm[parity*norm_offset + chirality*stride + x] = scale;
+            for (int i = 0; i < block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
+            norm[parity*norm_offset + chirality*stride + x] = scale;
 
 #ifdef __CUDA_ARCH__
             RegType scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
@@ -669,21 +678,21 @@ namespace quda {
             RegType scale_inv = fixedMaxValue<Float>::value / scale;
 #endif
 #pragma unroll
-            for (int i=0; i<block; i++) tmp[i] = v[i] * scale_inv;
+            for (int i = 0; i < block; i++) tmp[i] = v[i] * scale_inv;
           } else {
 #pragma unroll
-            for (int i=0; i<block; i++) tmp[i] = v[i];
+            for (int i = 0; i < block; i++) tmp[i] = v[i];
           }
 
 #pragma unroll
-	  for (int i=0; i<M; i++) {
-	    Vector vecTmp;
-	    // first do scalar copy converting into storage type
-            for (int j=0; j<N; j++) copy_scaled(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
-	    // second do vectorized copy into memory
+          for (int i = 0; i < M; i++) {
+            Vector vecTmp;
+            // first do scalar copy converting into storage type
+            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[i * N + j]);
+            // second do vectorized copy into memory
 	    vector_store(clover + parity*offset, x + stride*(chirality*M+i), vecTmp);
-	  }
-	}
+          }
+        }
 
 	/**
 	   @brief Load accessor for the clover matrix
@@ -694,8 +703,8 @@ namespace quda {
 	 */
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 #pragma unroll
-	  for (int chirality=0; chirality<2; chirality++) load(&v[chirality*block], x, parity, chirality);
-	}
+          for (int chirality = 0; chirality < 2; chirality++) load(&v[chirality * block], x, parity, chirality);
+        }
 
 	/**
 	   @brief Store accessor for the clover matrix
@@ -706,8 +715,8 @@ namespace quda {
 	 */
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
 #pragma unroll
-	  for (int chirality=0; chirality<2; chirality++) save(&v[chirality*block], x, parity, chirality);
-	}
+          for (int chirality = 0; chirality < 2; chirality++) save(&v[chirality * block], x, parity, chirality);
+        }
 
 	/**
 	   @brief Backup the field to the host when tuning
@@ -740,8 +749,8 @@ namespace quda {
 
 	size_t Bytes() const {
 	  size_t bytes = length*sizeof(Float);
-	  if ( isFixed<Float>::value ) bytes += 2*sizeof(norm_type);
-	  return bytes;
+          if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
+          return bytes;
 	}
       };
 

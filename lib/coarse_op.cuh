@@ -74,8 +74,8 @@ namespace quda {
       case COMPUTE_RESCALE:
       case COMPUTE_CLOVER_INV_MAX: // FIXME
       case COMPUTE_TWISTED_CLOVER_INV_MAX: // FIXME
-	// no floating point operations
-	flops_ = 0;
+        // no floating point operations
+        flops_ = 0;
 	break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
@@ -96,17 +96,21 @@ namespace quda {
 	bytes_ = arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes()*coarseColor;
 	break;
       case COMPUTE_AV:
-	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes();
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor;
 	break;
       case COMPUTE_TMAV:
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes();
 	break;
       case COMPUTE_TMCAV:
-	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + arg.UV.Bytes() + 4*arg.C.Bytes(); // Two clover terms and more temporary storage
+#ifdef DYNAMIC_CLOVER
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor; // A single clover field
+#else
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 4*arg.C.Bytes()*coarseColor; // Both clover and its inverse
+#endif
 	break;
       case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_TWISTED_CLOVER_INV_MAX:
-	bytes_ = 2*arg.C.Bytes(); // read both parities of the clover field
+        bytes_ = 2*arg.C.Bytes(); // read both parities of the clover field
 	break;
       case COMPUTE_VUV:
         {
@@ -214,7 +218,7 @@ namespace quda {
 
 	  if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
 #if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
-	  ComputeAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
+          ComputeAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
           errorQuda("Clover dslash has not been built");
 #endif
@@ -223,7 +227,7 @@ namespace quda {
 
 	  if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
 #if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
-	  ComputeTMAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
+          ComputeTMAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
           errorQuda("Twisted mass dslash has not been built");
 #endif
@@ -232,7 +236,7 @@ namespace quda {
 
 	  if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
 #if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
-	  ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
+          ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 #else
           errorQuda("Twisted clover dslash has not been built");
 #endif
@@ -241,21 +245,21 @@ namespace quda {
 
 	  if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
 #if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-	  ComputeCloverInvMaxCPU<Float,false>(arg);
+          ComputeCloverInvMaxCPU<Float, false>(arg);
 #else
-	  errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
+          errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
 #endif
 
-	} else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
+        } else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
 
-	  if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
+          if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
 #if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-	  ComputeCloverInvMaxCPU<Float,true>(arg);
+          ComputeCloverInvMaxCPU<Float, true>(arg);
 #else
 	  errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
 #endif
 
-	} else if (type == COMPUTE_VUV) {
+        } else if (type == COMPUTE_VUV) {
 
           arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
@@ -273,35 +277,35 @@ namespace quda {
 	    errorQuda("Undefined direction %d", dir);
 	  }
 
-	} else if (type == COMPUTE_COARSE_CLOVER) {
+        } else if (type == COMPUTE_COARSE_CLOVER) {
 
-	  ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg);
+          ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg);
 
-	} else if (type == COMPUTE_REVERSE_Y) {
+        } else if (type == COMPUTE_REVERSE_Y) {
 
-	  ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
+          ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
 
-	} else if (type == COMPUTE_DIAGONAL) {
+        } else if (type == COMPUTE_DIAGONAL) {
 
-	  AddCoarseDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
+          AddCoarseDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
 
-	} else if (type == COMPUTE_TMDIAGONAL) {
+        } else if (type == COMPUTE_TMDIAGONAL) {
 
           AddCoarseTmDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
 
-	} else if (type == COMPUTE_CONVERT) {
+        } else if (type == COMPUTE_CONVERT) {
 
           arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 	  ConvertCPU<Float,coarseSpin,coarseColor>(arg);
 
-	} else if (type == COMPUTE_RESCALE) {
+        } else if (type == COMPUTE_RESCALE) {
 
           arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 	  RescaleYCPU<Float,coarseSpin,coarseColor>(arg);
 
-	} else {
-	  errorQuda("Undefined compute type %d", type);
-	}
+        } else {
+          errorQuda("Undefined compute type %d", type);
+        }
       } else {
 
 	if (type == COMPUTE_UV) {
@@ -336,7 +340,7 @@ namespace quda {
             .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
-	  ComputeAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          ComputeAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #else
           errorQuda("Clover dslash has not been built");
 #endif
@@ -352,7 +356,7 @@ namespace quda {
             .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
-	  ComputeTMAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          ComputeTMAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #else
           errorQuda("Twisted mass dslash has not been built");
 #endif
@@ -368,7 +372,7 @@ namespace quda {
             .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
 #if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
-	  ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #else
           errorQuda("Twisted clover dslash has not been built");
 #endif
@@ -382,36 +386,39 @@ namespace quda {
 #ifdef JITIFY
           using namespace jitify::reflection;
           jitify_error = program->kernel("quda::ComputeCloverInvMaxGPU")
-            .instantiate(Type<Float>(),false,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+                             .instantiate(Type<Float>(), false, Type<Arg>())
+                             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                             .launch(arg);
 #else
 #if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-	  ComputeCloverInvMaxGPU<Float,false><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          ComputeCloverInvMaxGPU<Float, false><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #else
-	  errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
+          errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
 #endif
 #endif
 
           if (!activeTuning()) { // only do reduction once tuning is done else thrust will catch tuning failures
             thrust_allocator alloc;
             thrust::device_ptr<Float> ptr(arg.max_d);
-            arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr+2*arg.fineVolumeCB, static_cast<Float>(0.0), thrust::maximum<Float>());
+            arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr + 2 * arg.fineVolumeCB,
+                static_cast<Float>(0.0), thrust::maximum<Float>());
           }
           pool_device_free(arg.max_d);
 
-	} else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
+        } else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
 
-	  if (from_coarse) errorQuda("ComputeCloverInvMax should only be called from the fine grid");
-	  arg.max_d = static_cast<Float*>(pool_device_malloc(2 * arg.fineVolumeCB *sizeof(Float)));
+          if (from_coarse) errorQuda("ComputeCloverInvMax should only be called from the fine grid");
+          arg.max_d = static_cast<Float *>(pool_device_malloc(2 * arg.fineVolumeCB * sizeof(Float)));
 
 #ifdef JITIFY
           using namespace jitify::reflection;
           jitify_error = program->kernel("quda::ComputeCloverInvMaxGPU")
-            .instantiate(Type<Float>(),true,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+                             .instantiate(Type<Float>(), true, Type<Arg>())
+                             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                             .launch(arg);
 #else
 #if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-	  ComputeCloverInvMaxGPU<Float,true><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          ComputeCloverInvMaxGPU<Float, true><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #else
 	  errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
 #endif
@@ -424,7 +431,7 @@ namespace quda {
           }
           pool_device_free(arg.max_d);
 
-	} else if (type == COMPUTE_VUV) {
+        } else if (type == COMPUTE_VUV) {
 
           arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
@@ -516,7 +523,7 @@ namespace quda {
             tp.grid.x *= tp.aux.x;
           }
 
-	} else if (type == COMPUTE_COARSE_CLOVER) {
+        } else if (type == COMPUTE_COARSE_CLOVER) {
 
 #ifdef JITIFY
           using namespace jitify::reflection;
@@ -528,7 +535,7 @@ namespace quda {
 	    <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
 
-	} else if (type == COMPUTE_REVERSE_Y) {
+        } else if (type == COMPUTE_REVERSE_Y) {
 
 #ifdef JITIFY
           using namespace jitify::reflection;
@@ -538,7 +545,7 @@ namespace quda {
 #else
 	  ComputeYReverseGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
-	} else if (type == COMPUTE_DIAGONAL) {
+        } else if (type == COMPUTE_DIAGONAL) {
 
 #ifdef JITIFY
           using namespace jitify::reflection;
@@ -548,7 +555,7 @@ namespace quda {
 #else
 	  AddCoarseDiagonalGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
-	} else if (type == COMPUTE_TMDIAGONAL) {
+        } else if (type == COMPUTE_TMDIAGONAL) {
 
 #ifdef JITIFY
           using namespace jitify::reflection;
@@ -558,7 +565,7 @@ namespace quda {
 #else
           AddCoarseTmDiagonalGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
-	} else if (type == COMPUTE_CONVERT) {
+        } else if (type == COMPUTE_CONVERT) {
 
           arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 #ifdef JITIFY
@@ -569,7 +576,7 @@ namespace quda {
 #else
 	  ConvertGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
-	} else if (type == COMPUTE_RESCALE) {
+        } else if (type == COMPUTE_RESCALE) {
 
           arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 #ifdef JITIFY
@@ -581,9 +588,9 @@ namespace quda {
 	  RescaleYGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
 
-	} else {
-	  errorQuda("Undefined compute type %d", type);
-	}
+        } else {
+          errorQuda("Undefined compute type %d", type);
+        }
       }
     }
 
@@ -620,13 +627,10 @@ namespace quda {
 	resizeVector(2*coarseColor,coarseColor);
         break;
       case COMPUTE_UV:
-      case COMPUTE_TMAV:
+      case COMPUTE_TMAV: resizeVector(2, coarseColor); break;
       case COMPUTE_AV:
-        resizeVector(2,coarseColor);
-	break;
-      default:
-	resizeVector(2,1);
-	break;
+      case COMPUTE_TMCAV: resizeVector(4, coarseColor); break; // y dimension is chirality and parity
+      default: resizeVector(2, 1); break;
       }
 
       resizeStep(1,1);
@@ -731,8 +735,10 @@ namespace quda {
       else if (type == COMPUTE_AV)                 strcat(Aux,",computeAV");
       else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");
       else if (type == COMPUTE_TMCAV)              strcat(Aux,",computeTmcAV");
-      else if (type == COMPUTE_CLOVER_INV_MAX)    strcat(Aux,",computeCloverInverseMax");
-      else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) strcat(Aux,",computeTwistedCloverInverseMax");
+      else if (type == COMPUTE_CLOVER_INV_MAX)
+        strcat(Aux, ",computeCloverInverseMax");
+      else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX)
+        strcat(Aux, ",computeTwistedCloverInverseMax");
       else if (type == COMPUTE_VUV)                strcat(Aux,",computeVUV");
       else if (type == COMPUTE_COARSE_CLOVER)      strcat(Aux,",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
@@ -745,14 +751,14 @@ namespace quda {
 #ifdef DYNAMIC_CLOVER
       if (type == COMPUTE_AV || type == COMPUTE_CLOVER_INV_MAX || // ensure separate tuning for dynamic
           type == COMPUTE_TMCAV || type == COMPUTE_TWISTED_CLOVER_INV_MAX)
-        strcat(Aux,"Dynamic");
+        strcat(Aux, ",Dynamic");
 #endif
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
-	if      (dim == 0) strcat(Aux,",dim=0");
-	else if (dim == 1) strcat(Aux,",dim=1");
-	else if (dim == 2) strcat(Aux,",dim=2");
-	else if (dim == 3) strcat(Aux,",dim=3");
+        if      (dim == 0) strcat(Aux, ",dim=0");
+        else if (dim == 1) strcat(Aux, ",dim=1");
+        else if (dim == 2) strcat(Aux, ",dim=2");
+        else if (dim == 3) strcat(Aux, ",dim=3");
 
 	if (dir == QUDA_BACKWARDS) strcat(Aux,",dir=back");
 	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
@@ -930,13 +936,13 @@ namespace quda {
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
 #ifdef DYNAMIC_CLOVER
-	y.setComputeType(COMPUTE_CLOVER_INV_MAX);
-	y.apply(0);
-	double max = 6*arg.max_h;
+        y.setComputeType(COMPUTE_CLOVER_INV_MAX);
+        y.apply(0);
+        double max = 6 * arg.max_h;
 #else
-	double max = 6*arg.Cinv.abs_max(0);
+        double max = 6*arg.Cinv.abs_max(0);
 #endif
-	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("clover max %e\n", max);
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("clover max %e\n", max);
 	av.Scale(max);
 	arg.AV.resetScale(max);
       }
@@ -978,8 +984,8 @@ namespace quda {
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
 #ifdef DYNAMIC_CLOVER
-	y.setComputeType(COMPUTE_TWISTED_CLOVER_INV_MAX);
-	y.apply(0);
+        y.setComputeType(COMPUTE_TWISTED_CLOVER_INV_MAX);
+        y.apply(0);
 	double max = 6*sqrt(arg.max_h);
 #else
 	double max = 6*sqrt(arg.Cinv.abs_max(0));

@@ -16,6 +16,8 @@
 
 #include <mpi.h>
 
+#include <gauge_tools.h>
+
 extern quda::cudaGaugeField* gaugePrecondition;
 extern quda::cudaGaugeField* gaugePrecise;
 extern quda::cudaGaugeField* gaugeSloppy;
@@ -41,6 +43,8 @@ namespace quda {
     gParamEx.tadpole = in.Tadpole();
     for (int d=0; d<4; d++) gParamEx.r[d] = R[d];
 
+    gParamEx.setPrecision(in.Precision(), true);
+
     cudaGaugeField *out = new cudaGaugeField(gParamEx);
 
     // copy input field into the extended device gauge field
@@ -51,6 +55,7 @@ namespace quda {
     out->exchangeExtendedGhost(R,redundant_comms);
     profile.TPSTOP(QUDA_PROFILE_COMMS);
 
+   
     return out;
   } 
 

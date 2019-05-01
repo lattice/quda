@@ -93,11 +93,11 @@ namespace quda {
     // ( -D_oe   2m    ) (x_o) = (b_o)
 
 #ifdef USE_LEGACY_DSLASH
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 0*mass);  
+    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 0 * mass);
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
 #else
     checkFullSpinor(out, in);
-    ApplyStaggered(out, in, *gauge, 2.*mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    ApplyStaggered(out, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
 #endif
   }
 

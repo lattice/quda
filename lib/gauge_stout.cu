@@ -12,59 +12,62 @@ namespace quda {
 
 #ifdef GPU_GAUGE_TOOLS
 
-  template<typename Float, typename Arg>
-  class GaugeSTOUT : TunableVectorYZ {
+  template <typename Float, typename Arg> class GaugeSTOUT : TunableVectorYZ
+  {
     Arg &arg;
     const GaugeField &meta;
 
-  private:
+private:
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
 
-  public:
+public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeSTOUT(Arg &arg, const GaugeField &meta)
-      : TunableVectorYZ(2,3), arg(arg), meta(meta) {
+    GaugeSTOUT(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2, 3), arg(arg), meta(meta)
+    {
 #ifdef JITIFY
       create_jitify_program("kernels/gauge_stout.cuh");
 #endif
     }
-    virtual ~GaugeSTOUT () {}
+    virtual ~GaugeSTOUT() {}
 
-      void apply(const cudaStream_t &stream){
-        if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+    void apply(const cudaStream_t &stream)
+    {
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::computeSTOUTStep")
-            .instantiate(Type<Float>(),Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+        using namespace jitify::reflection;
+        jitify_error = program->kernel("quda::computeSTOUTStep")
+                           .instantiate(Type<Float>(), Type<Arg>())
+                           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                           .launch(arg);
 #else
-          computeSTOUTStep<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        computeSTOUTStep<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
-        } else {
-          errorQuda("CPU not supported yet\n");
-          //computeSTOUTStepCPU(arg);
-        }
+      } else {
+        errorQuda("CPU not supported yet\n");
+        // computeSTOUTStepCPU(arg);
       }
+    }
 
-      TuneKey tuneKey() const {
-        std::stringstream aux;
-        aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
-        return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
-      }
+    TuneKey tuneKey() const
+    {
+      std::stringstream aux;
+      aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+    }
 
-      void preTune() { arg.dest.save(); } // defensive measure in case they alias
-      void postTune() { arg.dest.load(); }
+    void preTune() { arg.dest.save(); } // defensive measure in case they alias
+    void postTune() { arg.dest.load(); }
 
-      long long flops() const { return 3*(2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
-      long long bytes() const { return 3*((1+2*6)*arg.origin.Bytes()+arg.dest.Bytes())*arg.threads; }
-    }; // GaugeSTOUT
+    long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
+    long long bytes() const { return 3 * ((1 + 2 * 6) * arg.origin.Bytes() + arg.dest.Bytes()) * arg.threads; }
+  }; // GaugeSTOUT
 
   template<typename Float,typename GaugeOr, typename GaugeDs>
   void STOUTStep(GaugeOr origin, GaugeDs dest, const GaugeField& dataOr, Float rho) {
     GaugeSTOUTArg<Float,GaugeOr,GaugeDs> arg(origin, dest, dataOr, rho, dataOr.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL);
-    GaugeSTOUT<Float,GaugeSTOUTArg<Float,GaugeOr,GaugeDs>> gaugeSTOUT(arg,dataOr);
+    GaugeSTOUT<Float, GaugeSTOUTArg<Float, GaugeOr, GaugeDs>> gaugeSTOUT(arg, dataOr);
     gaugeSTOUT.apply(0);
     qudaDeviceSynchronize();
   }
@@ -154,42 +157,43 @@ namespace quda {
 #endif
   }
 
-
-  template<typename Float, typename Arg>
-  class GaugeOvrImpSTOUT : TunableVectorYZ {
+  template <typename Float, typename Arg> class GaugeOvrImpSTOUT : TunableVectorYZ
+  {
     Arg &arg;
     const GaugeField &meta;
 
-  private:
+private:
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
 
-  public:
+public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeOvrImpSTOUT(Arg &arg, const GaugeField &meta)
-      : TunableVectorYZ(2,3), arg(arg), meta(meta) {}
-    virtual ~GaugeOvrImpSTOUT () {}
+    GaugeOvrImpSTOUT(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2, 3), arg(arg), meta(meta) {}
+    virtual ~GaugeOvrImpSTOUT() {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const cudaStream_t &stream)
+    {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::computeOvrImpSTOUTStep")
-          .instantiate(Type<Float>(),Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+                           .instantiate(Type<Float>(), Type<Arg>())
+                           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                           .launch(arg);
 #else
-        computeOvrImpSTOUTStep<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        computeOvrImpSTOUTStep<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
       } else {
         errorQuda("CPU not supported yet\n");
-        //computeOvrImpSTOUTStepCPU(arg);
+        // computeOvrImpSTOUTStepCPU(arg);
       }
     }
 
-    TuneKey tuneKey() const {
+    TuneKey tuneKey() const
+    {
       std::stringstream aux;
-      aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
+      aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
       return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
     }
 
@@ -202,9 +206,9 @@ namespace quda {
 
   template<typename Float,typename GaugeOr, typename GaugeDs>
   void OvrImpSTOUTStep(GaugeOr origin, GaugeDs dest, const GaugeField& dataOr, Float rho, Float epsilon) {
-    GaugeOvrImpSTOUTArg<Float,GaugeOr,GaugeDs> arg(origin, dest, dataOr, rho, epsilon,
-						   dataOr.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL);
-    GaugeOvrImpSTOUT<Float,GaugeOvrImpSTOUTArg<Float,GaugeOr,GaugeDs>> gaugeOvrImpSTOUT(arg,dataOr);
+    GaugeOvrImpSTOUTArg<Float, GaugeOr, GaugeDs> arg(
+        origin, dest, dataOr, rho, epsilon, dataOr.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL);
+    GaugeOvrImpSTOUT<Float, GaugeOvrImpSTOUTArg<Float, GaugeOr, GaugeDs>> gaugeOvrImpSTOUT(arg, dataOr);
     gaugeOvrImpSTOUT.apply(0);
     qudaDeviceSynchronize();
   }

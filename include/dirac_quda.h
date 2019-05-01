@@ -39,6 +39,7 @@ namespace quda {
     cudaGaugeField *gauge;
     cudaGaugeField *fatGauge;  // used by staggered only
     cudaGaugeField *longGauge; // used by staggered only
+    int laplace3D;
     cudaCloverField *clover;
   
     double mu; // used by twisted mass only
@@ -69,6 +70,7 @@ namespace quda {
       printfQuda("type = %d\n", type);
       printfQuda("kappa = %g\n", kappa);
       printfQuda("mass = %g\n", mass);
+      printfQuda("laplace3D = %d\n", laplace3D);
       printfQuda("m5 = %g\n", m5);
       printfQuda("Ls = %d\n", Ls);
       printfQuda("matpcType = %d\n", matpcType);
@@ -77,8 +79,9 @@ namespace quda {
       printfQuda("epsilon = %g\n", epsilon);
       printfQuda("halo_precision = %d\n", halo_precision);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
-      for (int i=0; i<Ls; i++) printfQuda("b_5[%d] = %e %e \t c_5[%d] = %e %e\n",
-                                          i,b_5[i].real(),b_5[i].imag(),i,c_5[i].real(),c_5[i].imag());
+      for (int i = 0; i < Ls; i++)
+        printfQuda(
+            "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
     }
 
   };
@@ -108,6 +111,7 @@ namespace quda {
     cudaGaugeField *gauge;
     double kappa;
     double mass;
+    int laplace3D;
     QudaMatPCType matpcType;
     mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
     mutable unsigned long long flops;
@@ -343,7 +347,7 @@ namespace quda {
     int Ls; // length of the fifth dimension
     void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
 
-  public:
+public:
     DiracDomainWall(const DiracParam &param);
     DiracDomainWall(const DiracDomainWall &dirac);
     virtual ~DiracDomainWall();
@@ -386,15 +390,15 @@ namespace quda {
   };
 
   // Full domain wall, but with 4-d parity ordered fields
-  class DiracDomainWall4D : public DiracDomainWall {
+  class DiracDomainWall4D : public DiracDomainWall
+  {
 
-  private:
-
-  public:
+private:
+public:
     DiracDomainWall4D(const DiracParam &param);
     DiracDomainWall4D(const DiracDomainWall4D &dirac);
     virtual ~DiracDomainWall4D();
-    DiracDomainWall4D& operator=(const DiracDomainWall4D &dirac);
+    DiracDomainWall4D &operator=(const DiracDomainWall4D &dirac);
 
     void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
@@ -406,25 +410,24 @@ namespace quda {
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b,
-		 const QudaSolutionType) const;
-    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-		     const QudaSolutionType) const;
+    void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+        const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
 
   // 4d Even-odd preconditioned domain wall
-  class DiracDomainWall4DPC : public DiracDomainWall4D {
+  class DiracDomainWall4DPC : public DiracDomainWall4D
+  {
 
-  private:
-
-  public:
+private:
+public:
     DiracDomainWall4DPC(const DiracParam &param);
     DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac);
     virtual ~DiracDomainWall4DPC();
-    DiracDomainWall4DPC& operator=(const DiracDomainWall4DPC &dirac);
+    DiracDomainWall4DPC &operator=(const DiracDomainWall4DPC &dirac);
 
-    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &kappa5) const;
+    void Dslash5inv(
+        ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &kappa5) const;
     void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity, const double &kappa5, const ColorSpinorField &x, const double &k) const;
 
@@ -443,15 +446,15 @@ namespace quda {
 
   protected:
     //Mobius coefficients
-    Complex b_5[QUDA_MAX_DWF_LS];
-    Complex c_5[QUDA_MAX_DWF_LS];
+      Complex b_5[QUDA_MAX_DWF_LS];
+      Complex c_5[QUDA_MAX_DWF_LS];
 
-    /**
-       Whether we are using classical Mobius with constant real-valued
-       b and c coefficients, or zMobius with complex-valued variable
-       coefficients
-    */
-    bool zMobius;
+      /**
+         Whether we are using classical Mobius with constant real-valued
+         b and c coefficients, or zMobius with complex-valued variable
+         coefficients
+      */
+      bool zMobius;
 
   public:
     DiracMobius(const DiracParam &param);
@@ -592,13 +595,12 @@ namespace quda {
   class DiracTwistedMass : public DiracWilson {
 
   protected:
-    mutable double mu;
-    mutable double epsilon;
-    void twistedApply(ColorSpinorField &out, const ColorSpinorField &in, 
-		      const QudaTwistGamma5Type twistType) const;
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-                            QudaParity parity, const ColorSpinorField &x, const double &k) const;
+      mutable double mu;
+      mutable double epsilon;
+      void twistedApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType) const;
+      virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
+      virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
+          const ColorSpinorField &x, const double &k) const;
 
   public:
     DiracTwistedMass(const DiracTwistedMass &dirac);
@@ -692,10 +694,9 @@ namespace quda {
 
     void TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
-                        const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-                            const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+        const ColorSpinorField &x, const double &k) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -728,7 +729,7 @@ namespace quda {
 
     mutable bool reverse; /** swap the order of the derivative D and the diagonal inverse A^{-1} */
 
-  public:
+public:
     DiracTwistedCloverPC(const DiracTwistedCloverPC &dirac);
     DiracTwistedCloverPC(const DiracParam &param, const int nDim);
 
@@ -737,10 +738,9 @@ namespace quda {
 
     void TwistCloverInv(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-                        const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-                            const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+        const ColorSpinorField &x, const double &k) const;
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 

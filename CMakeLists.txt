@@ -89,6 +89,7 @@ set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
 set(QUDA_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
 set(QUDA_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
+set(QUDA_COVDEV OFF CACHE BOOL "build code for covariant derivative")
 # Dynamic inversion saves memory but decreases the flops
 set(QUDA_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for twisted-clover")
 set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
@@ -137,6 +138,9 @@ set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
 
+set(QUDA_PRECISION "14" CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
+set(QUDA_RECONSTRUCT "7" CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+
 # Set CTest options
 set(QUDA_CTEST_SEP_DSLASH_POLICIES OFF CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
@@ -170,6 +174,8 @@ mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
+mark_as_advanced(QUDA_PRECISION)
+mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -410,8 +416,11 @@ if(QUDA_ARPACK)
 endif(QUDA_ARPACK)
 
 
-# MAX_MULTI_BLAS_N
-add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})
+# set which precisions to enable
+add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
+
+# set which precisions to enable
+add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
@@ -434,6 +443,7 @@ if(QUDA_JITIFY)
   LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
   LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
   configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
 endif()
 
 if(QUDA_USE_EIGEN)
@@ -495,10 +505,6 @@ if(QUDA_GAUGE_ALG)
   LIST(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
-if(QUDA_DYNAMIC_CLOVER)
-  add_definitions(-DDYNAMIC_CLOVER)
-endif(QUDA_DYNAMIC_CLOVER)
-
 if(QUDA_MPI_NVTX)
   LIST(APPEND COMM_OBJS nvtx_pmpi.c)
   set(QUDA_NVTX ON)
@@ -516,10 +522,6 @@ endif(QUDA_NVTX)
 if(QUDA_LEGACY_DSLASH)
   add_definitions(-DUSE_LEGACY_DSLASH)
 endif(QUDA_LEGACY_DSLASH)
-
-if(QUDA_TEX)
-  add_definitions(-DUSE_TEXTURE_OBJECTS)
-endif(QUDA_TEX)
 
 if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
@@ -543,9 +545,6 @@ endif(QUDA_INTERFACE_BQCD)
 
 if(QUDA_INTERFACE_TIFR)
   add_definitions(-DBUILD_TIFR_INTERFACE)
-  if(NOT QUDA_LEGACY_DSLASH)
-    message(FATAL_ERROR "QUDA_INTERFACE_TIFR currently only supported with QUDA_LEGACY_DSLASH.")
-  endif()
 endif(QUDA_INTERFACE_TIFR)
 
 if(QUDA_NUMA_NVML)
@@ -558,6 +557,10 @@ endif(QUDA_NUMA_NVML)
 if(QUDA_CONTRACT)
   add_definitions(-DGPU_CONTRACT)
 endif(QUDA_CONTRACT)
+
+if(QUDA_COVDEV)
+  add_definitions(-DGPU_COVDEV)
+endif(QUDA_COVDEV)
 
 
 #define FORTRAN FLAGS
@@ -612,9 +615,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
 include_directories(include)
 include_directories(lib)
-if(QUDA_JITIFY)
+#if(QUDA_JITIFY)
   include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
-endif()
+#endif()
 
 # QUDA_HASH for tunecache
 if(NOT GITVERSION)
@@ -645,7 +648,6 @@ endif()
 set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 SET(COMP_CAP "${COMP_CAP}0")
-add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by default )
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
@@ -670,6 +672,9 @@ mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 
 mark_as_advanced(CMAKE_F_FLAGS)
+
+configure_file(include/quda_define.h.in include/quda_define.h @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 
 set(BUILDNAME ${HASH})
 include( CTest )

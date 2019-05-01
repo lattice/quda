@@ -103,37 +103,37 @@ namespace quda {
        Generic reduction kernel launcher
     */
     template <typename doubleN, typename ReduceType, typename FloatN, int M, typename Arg>
-    doubleN reduceLaunch(Arg &arg, const TuneParam &tp, const cudaStream_t &stream,
-                         Tunable &tunable)
+    doubleN reduceLaunch(Arg &arg, const TuneParam &tp, const cudaStream_t &stream, Tunable &tunable)
     {
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
       if (getFastReduce() && !commAsyncReduction()) {
         // initialize the reduction values in 32-bit increments to INT_MIN
-        constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
-        for (unsigned int i=0; i<tp.grid.y*words; i++) {
-          reinterpret_cast<int32_t*>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
+        constexpr int32_t words = sizeof(ReduceType) / sizeof(int32_t);
+        for (unsigned int i = 0; i < tp.grid.y * words; i++) {
+          reinterpret_cast<int32_t *>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
         }
       }
 
 #ifdef JITIFY
       using namespace jitify::reflection;
       tunable.jitifyError() = program->kernel("quda::blas::reduceKernel")
-        .instantiate((int)tp.block.x,Type<ReduceType>(),Type<FloatN>(),M,Type<Arg>())
-        .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+                                  .instantiate((int)tp.block.x, Type<ReduceType>(), Type<FloatN>(), M, Type<Arg>())
+                                  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                                  .launch(arg);
 #else
-      LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,FloatN,M);
+      LAUNCH_KERNEL(reduceKernel, tp, stream, arg, ReduceType, FloatN, M);
 #endif
 
       if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
         if (deviceProp.canMapHostMemory) {
           if (getFastReduce()) {
-            constexpr int32_t words = sizeof(ReduceType)/sizeof(int32_t);
-            volatile int32_t *check = reinterpret_cast<int32_t*>(h_reduce);
+            constexpr int32_t words = sizeof(ReduceType) / sizeof(int32_t);
+            volatile int32_t *check = reinterpret_cast<int32_t *>(h_reduce);
             int count = 0;
-            for (unsigned int i=0; i<tp.grid.y*words; i++) {
+            for (unsigned int i = 0; i < tp.grid.y * words; i++) {
               // spin-wait until all values have been updated
               while (check[i] == std::numeric_limits<int32_t>::min()) {
                 if (count++ % 10000 == 0) { // check error every 10000 iterations
@@ -148,21 +148,23 @@ namespace quda {
           }
         } else
 #endif
-          { qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
+        {
+          qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost);
+        }
       }
-      doubleN cpu_sum = set(((ReduceType*)h_reduce)[0]);
-      if (tp.grid.y==2) sum(cpu_sum, ((ReduceType*)h_reduce)[1]); // add other parity if needed
+      doubleN cpu_sum = set(((ReduceType *)h_reduce)[0]);
+      if (tp.grid.y == 2) sum(cpu_sum, ((ReduceType *)h_reduce)[1]); // add other parity if needed
       return cpu_sum;
     }
 
+    template <typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX, typename SpinorY,
+        typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+    class ReduceCuda : public Tunable
+    {
 
-    template <typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
-              typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
-    class ReduceCuda : public Tunable {
-
-    private:
+  private:
       const int nParity; // for composite fields this includes the number of composites
-      mutable ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg;
+      mutable ReductionArg<ReduceType, SpinorX, SpinorY, SpinorZ, SpinorW, SpinorV, Reducer> arg;
       doubleN &result;
 
       const ColorSpinorField &x, &y, &z, &w, &v;
@@ -180,20 +182,34 @@ namespace quda {
         TuneParam next(param);
         advanceBlockDim(next); // to get next blockDim
         int nthreads = next.block.x * next.block.y * next.block.z;
-        param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-          sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+        param.shared_bytes = sharedBytesPerThread() * nthreads > sharedBytesPerBlock(param) ?
+            sharedBytesPerThread() * nthreads :
+            sharedBytesPerBlock(param);
         return false;
       }
 
-    public:
-      ReduceCuda(doubleN &result, SpinorX &X, SpinorY &Y, SpinorZ &Z,
-                 SpinorW &W, SpinorV &V, Reducer &r, ColorSpinorField &x,
-                 ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
-                 ColorSpinorField &v, int length) :
-        nParity( (x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
-        arg(X, Y, Z, W, V, r, length/nParity), x(x), y(y), z(z), w(w), v(v),
-        result(result), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0),
-        Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0)
+  public:
+      ReduceCuda(doubleN &result, SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Reducer &r,
+          ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v,
+          int length) :
+          nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
+          arg(X, Y, Z, W, V, r, length / nParity),
+          x(x),
+          y(y),
+          z(z),
+          w(w),
+          v(v),
+          result(result),
+          X_h(0),
+          Y_h(0),
+          Z_h(0),
+          W_h(0),
+          V_h(0),
+          Xnorm_h(0),
+          Ynorm_h(0),
+          Znorm_h(0),
+          Wnorm_h(0),
+          Vnorm_h(0)
       {
         strcpy(aux, x.AuxString());
         if (x.Precision() != z.Precision()) {
@@ -205,18 +221,18 @@ namespace quda {
         ::quda::create_jitify_program("kernels/reduce_core.cuh");
 #endif
       }
-      virtual ~ReduceCuda() { }
+      virtual ~ReduceCuda() {}
 
-      inline TuneKey tuneKey() const {
-        return TuneKey(x.VolString(), typeid(arg.r).name(), aux);
-      }
+      inline TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(arg.r).name(), aux); }
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const cudaStream_t &stream)
+      {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        result = reduceLaunch<doubleN,ReduceType,FloatN,M>(arg, tp, stream, *this);
+        result = reduceLaunch<doubleN, ReduceType, FloatN, M>(arg, tp, stream, *this);
       }
 
-      void preTune() {
+      void preTune()
+      {
         arg.X.backup(&X_h, &Xnorm_h, x.Bytes(), x.NormBytes());
         arg.Y.backup(&Y_h, &Ynorm_h, y.Bytes(), y.NormBytes());
         arg.Z.backup(&Z_h, &Znorm_h, z.Bytes(), z.NormBytes());
@@ -224,7 +240,8 @@ namespace quda {
         arg.V.backup(&V_h, &Vnorm_h, v.Bytes(), v.NormBytes());
       }
 
-      void postTune() {
+      void postTune()
+      {
         arg.X.restore(&X_h, &Xnorm_h, x.Bytes(), x.NormBytes());
         arg.Y.restore(&Y_h, &Ynorm_h, y.Bytes(), y.NormBytes());
         arg.Z.restore(&Z_h, &Znorm_h, z.Bytes(), z.NormBytes());
@@ -232,55 +249,57 @@ namespace quda {
         arg.V.restore(&V_h, &Vnorm_h, v.Bytes(), v.NormBytes());
       }
 
-      void initTuneParam(TuneParam &param) const {
+      void initTuneParam(TuneParam &param) const
+      {
         Tunable::initTuneParam(param);
         param.grid.y = nParity;
       }
 
-      void defaultTuneParam(TuneParam &param) const {
+      void defaultTuneParam(TuneParam &param) const
+      {
         Tunable::defaultTuneParam(param);
         param.grid.y = nParity;
       }
 
-      long long flops() const { return arg.r.flops()*vec_length<FloatN>::value*arg.length*nParity*M; }
+      long long flops() const { return arg.r.flops() * vec_length<FloatN>::value * arg.length * nParity * M; }
 
       long long bytes() const
       {
         // the factor two here assumes we are reading and writing to the high precision vector
         // this will evaluate correctly for non-mixed kernels since the +2/-2 will cancel out
-        return (arg.r.streams()-2)*x.Bytes()+ 2*z.Bytes();
+        return (arg.r.streams() - 2) * x.Bytes() + 2 * z.Bytes();
       }
 
       int tuningIter() const { return 3; }
     };
 
+    template <typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename zType, int M,
+        template <typename ReducerType, typename Float, typename FloatN> class Reducer, int writeX, int writeY,
+        int writeZ, int writeW, int writeV>
+    doubleN nativeReduce(const double2 &a, const double2 &b, ColorSpinorField &x, ColorSpinorField &y,
+        ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length)
+    {
 
-    template <typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename zType,
-              int M, template <typename ReducerType, typename Float, typename FloatN> class Reducer,
-              int writeX, int writeY, int writeZ, int writeW, int writeV>
-    doubleN nativeReduce(const double2 &a, const double2 &b,
-                         ColorSpinorField &x, ColorSpinorField &y,
-                         ColorSpinorField &z, ColorSpinorField &w,
-                         ColorSpinorField &v, int length) {
+      checkLength(x, y);
+      checkLength(x, z);
+      checkLength(x, w);
+      checkLength(x, v);
 
-      checkLength(x, y); checkLength(x, z); checkLength(x, w); checkLength(x, v);
-
-      Spinor<RegType,StoreType,M,writeX,0> X(x);
-      Spinor<RegType,StoreType,M,writeY,1> Y(y);
-      Spinor<RegType,    zType,M,writeZ,2> Z(z);
-      Spinor<RegType,StoreType,M,writeW,3> W(w);
-      Spinor<RegType,StoreType,M,writeV,4> V(v);
+      Spinor<RegType, StoreType, M, writeX, 0> X(x);
+      Spinor<RegType, StoreType, M, writeY, 1> Y(y);
+      Spinor<RegType, zType, M, writeZ, 2> Z(z);
+      Spinor<RegType, StoreType, M, writeW, 3> W(w);
+      Spinor<RegType, StoreType, M, writeV, 4> V(v);
 
       doubleN value;
       typedef typename scalar<RegType>::type Float;
-      typedef typename vector<Float,2>::type Float2;
-      typedef vector<Float,2> vec2;
+      typedef typename vector<Float, 2>::type Float2;
+      typedef vector<Float, 2> vec2;
 
       Reducer<ReduceType, Float2, RegType> r((Float2)vec2(a), (Float2)vec2(b));
-      ReduceCuda<doubleN,ReduceType,RegType,M,
-                 decltype(X),decltype(Y),decltype(Z),decltype(W),decltype(V),
-                 Reducer<ReduceType,Float2,RegType> >
-        reduce(value, X, Y, Z, W, V, r, x, y, z, w, v, length);
+      ReduceCuda<doubleN, ReduceType, RegType, M, decltype(X), decltype(Y), decltype(Z), decltype(W), decltype(V),
+          Reducer<ReduceType, Float2, RegType>>
+          reduce(value, X, Y, Z, W, V, r, x, y, z, w, v, length);
       reduce.apply(*(blas::getStream()));
 
       blas::bytes += reduce.bytes();
@@ -289,7 +308,6 @@ namespace quda {
       checkCudaError();
       return value;
     }
-
 
     /*
       Wilson
@@ -308,21 +326,20 @@ namespace quda {
        @param ReduceType
        @param siteUnroll - if this is true, then one site corresponds to exactly one thread
     */
-    template <typename doubleN, typename ReduceType,
-              template <typename ReducerType, typename Float, typename FloatN> class Reducer,
-              int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll>
-    doubleN uni_reduce(const double2 &a, const double2 &b, ColorSpinorField &x,
-                       ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
-                       ColorSpinorField &v) {
+    template <typename doubleN, typename ReduceType, template <typename ReducerType, typename Float, typename FloatN> class Reducer,
+        int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll>
+    doubleN uni_reduce(const double2 &a, const double2 &b, ColorSpinorField &x, ColorSpinorField &y,
+        ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
+    {
 
-      checkPrecision(x,y,z,w,v);
+      checkPrecision(x, y, z, w, v);
 
       doubleN value;
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative() &&
-            !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION ||
-              x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_HALF_PRECISION) ) {
+        if (!x.isNative()
+            && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION
+                || x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_HALF_PRECISION)) {
           warningQuda("Device reductions on non-native fields is not supported\n");
           doubleN value;
           ::quda::zero(value);
@@ -330,101 +347,127 @@ namespace quda {
         }
 
         // cannot do site unrolling for arbitrary color (needs JIT)
-        if (siteUnroll && x.Ncolor()!=3) errorQuda("Not supported");
+        if (siteUnroll && x.Ncolor() != 3) errorQuda("Not supported");
 
         int reduce_length = siteUnroll ? x.RealLength() : x.Length();
 
         if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-          if (x.Nspin() == 4 || x.Nspin() == 2) { //wilson
+
+#if QUDA_PRECISION & 8
+          if (x.Nspin() == 4 || x.Nspin() == 2) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
             const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
             if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
-            value = nativeReduce<doubleN,ReduceType,double2,double2,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, reduce_length/(2*M));
+            value = nativeReduce<doubleN, ReduceType, double2, double2, double2, M, Reducer, writeX, writeY, writeZ,
+                writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1) { //staggered
+          } else if (x.Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
             const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,double2,double2,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, reduce_length/(2*M));
+            value = nativeReduce<doubleN, ReduceType, double2, double2, double2, M, Reducer, writeX, writeY, writeZ,
+                writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+          } else {
+            errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
         } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { //wilson
+
+#if QUDA_PRECISION & 4
+          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,float4,float4,float4,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, reduce_length/(4*M));
+            value = nativeReduce<doubleN, ReduceType, float4, float4, float4, M, Reducer, writeX, writeY, writeZ,
+                writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (4 * M));
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin()==4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) ) {
+          } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
 #if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
             const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
             if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
-            value = nativeReduce<doubleN,ReduceType,float2,float2,float2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, reduce_length/(2*M));
+            value = nativeReduce<doubleN, ReduceType, float2, float2, float2, M, Reducer, writeX, writeY, writeZ,
+                writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+          } else {
+            errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
         } else if (x.Precision() == QUDA_HALF_PRECISION) { // half precision
-          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { //wilson
+
+#if QUDA_PRECISION & 2
+          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 6; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,float4,short4,short4,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, y.Volume());
+            value = nativeReduce<doubleN, ReduceType, float4, short4, short4, M, Reducer, writeX, writeY, writeZ,
+                writeW, writeV>(a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { //wilson
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
 #if defined(GPU_MULTIGRID)
             const int M = 12; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,float2,char2,char2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, y.Volume());
+            value
+                = nativeReduce<doubleN, ReduceType, float2, char2, char2, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
+                    a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1) {//staggered
+          } else if (x.Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
             const int M = 3; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,float2,short2,short2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, y.Volume());
+            value = nativeReduce<doubleN, ReduceType, float2, short2, short2, M, Reducer, writeX, writeY, writeZ,
+                writeW, writeV>(a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+          } else {
+            errorQuda("nSpin=%d is not supported\n", x.Nspin());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
         } else if (x.Precision() == QUDA_QUARTER_PRECISION) { // quarter precision
-          if (x.Nspin() == 4) { //wilson
+
+#if QUDA_PRECISION & 1
+          if (x.Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 6; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,float4,char4,char4,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, y.Volume());
+            value
+                = nativeReduce<doubleN, ReduceType, float4, char4, char4, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
+                    a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1) {//staggered
+          } else if (x.Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
             const int M = 3; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,float2,char2,char2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, y.Volume());
+            value
+                = nativeReduce<doubleN, ReduceType, float2, char2, char2, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
+                    a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+          } else {
+            errorQuda("nSpin=%d is not supported\n", x.Nspin());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
         } else {
           errorQuda("precision=%d is not supported\n", x.Precision());
         }
@@ -432,17 +475,19 @@ namespace quda {
         // we don't have quad precision support on the GPU so use doubleN instead of ReduceType
         if (x.Precision() == QUDA_DOUBLE_PRECISION) {
           Reducer<doubleN, double2, double2> r(a, b);
-          value = genericReduce<doubleN,doubleN,double,double,writeX,writeY,writeZ,writeW,writeV,Reducer<doubleN,double2,double2> >(x,y,z,w,v,r);
+          value = genericReduce<doubleN, doubleN, double, double, writeX, writeY, writeZ, writeW, writeV,
+              Reducer<doubleN, double2, double2>>(x, y, z, w, v, r);
         } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
           Reducer<doubleN, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-          value = genericReduce<doubleN,doubleN,float,float,writeX,writeY,writeZ,writeW,writeV,Reducer<doubleN,float2,float2> >(x,y,z,w,v,r);
+          value = genericReduce<doubleN, doubleN, float, float, writeX, writeY, writeZ, writeW, writeV,
+              Reducer<doubleN, float2, float2>>(x, y, z, w, v, r);
         } else {
           errorQuda("Precision %d not implemented", x.Precision());
         }
       }
 
       const int Nreduce = sizeof(doubleN) / sizeof(double);
-      reduceDoubleArray((double*)&value, Nreduce);
+      reduceDoubleArray((double *)&value, Nreduce);
 
       return value;
     }
@@ -452,19 +497,19 @@ namespace quda {
        @param ReduceType
        @param siteUnroll - if this is true, then one site corresponds to exactly one thread
     */
-    template <typename doubleN, typename ReduceType,
-              template <typename ReducerType, typename Float, typename FloatN> class Reducer,
-              int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll>
-    doubleN mixed_reduce(const double2 &a, const double2 &b, ColorSpinorField &x,
-                         ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
-                         ColorSpinorField &v) {
+    template <typename doubleN, typename ReduceType, template <typename ReducerType, typename Float, typename FloatN> class Reducer,
+        int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll>
+    doubleN mixed_reduce(const double2 &a, const double2 &b, ColorSpinorField &x, ColorSpinorField &y,
+        ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
+    {
 
-      checkPrecision(x,y,w,v);
+      checkPrecision(x, y, w, v);
 
       doubleN value;
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative() && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION) ) {
+        if (!x.isNative()
+            && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION)) {
           warningQuda("Device reductions on non-native fields is not supported\n");
           doubleN value;
           ::quda::zero(value);
@@ -472,148 +517,196 @@ namespace quda {
         }
 
         // cannot do site unrolling for arbitrary color (needs JIT)
-        if (x.Ncolor()!=3) errorQuda("Not supported");
+        if (x.Ncolor() != 3) errorQuda("Not supported");
 
-        if (x.Precision() == QUDA_SINGLE_PRECISION && z.Precision() == QUDA_DOUBLE_PRECISION) {
-          if (x.Nspin() == 4){ //wilson
+        if (z.Precision() == QUDA_DOUBLE_PRECISION) {
+
+#if QUDA_PRECISION & 8
+          if (x.Precision() == QUDA_SINGLE_PRECISION) {
+
+#if QUDA_PRECISION & 4
+            if (x.Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 12; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,double2,float4,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 12; // determines how much work per thread to do
+              value = nativeReduce<doubleN, ReduceType, double2, float4, double2, M, Reducer, writeX, writeY, writeZ,
+                  writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1) { //staggered
+            } else if (x.Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
-            const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-            const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
-            value = nativeReduce<doubleN,ReduceType,double2,float2,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, reduce_length/(2*M));
+              const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+              const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
+              value = nativeReduce<doubleN, ReduceType, double2, float2, double2, M, Reducer, writeX, writeY, writeZ,
+                  writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-        } else if (x.Precision() == QUDA_HALF_PRECISION && z.Precision() == QUDA_DOUBLE_PRECISION) {
-          if (x.Nspin() == 4) { //wilson
+            } else {
+              errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
+          } else if (x.Precision() == QUDA_HALF_PRECISION) {
+
+#if QUDA_PRECISION & 2
+            if (x.Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 12; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,double2,short4,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 12; // determines how much work per thread to do
+              value = nativeReduce<doubleN, ReduceType, double2, short4, double2, M, Reducer, writeX, writeY, writeZ,
+                  writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1) { //staggered
+            } else if (x.Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
-            const int M = 3; // determines how much work per thread to do
-            value = nativeReduce<doubleN,ReduceType,double2,short2,double2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 3; // determines how much work per thread to do
+              value = nativeReduce<doubleN, ReduceType, double2, short2, double2, M, Reducer, writeX, writeY, writeZ,
+                  writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+            } else {
+              errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
+          } else {
+            errorQuda("Not implemented for this precision combination %d %d", x.Precision(), z.Precision());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, z.Precision());
+#endif
+
         } else if (z.Precision() == QUDA_SINGLE_PRECISION) {
-          if (x.Nspin() == 4) { //wilson
+
+#if QUDA_PRECISION & 4
+          if (x.Precision() == QUDA_HALF_PRECISION) {
+
+#if QUDA_PRECISION & 2
+            if (x.Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-            const int M = 6;
-            value = nativeReduce<doubleN,ReduceType,float4,short4,float4,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 6;
+              value = nativeReduce<doubleN, ReduceType, float4, short4, float4, M, Reducer, writeX, writeY, writeZ,
+                  writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 1) {//staggered
+            } else if (x.Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
-            const int M = 3;
-            value = nativeReduce<doubleN,ReduceType,float2,short2,float2,M,Reducer,
-                                 writeX,writeY,writeZ,writeW,writeV>
-              (a, b, x, y, z, w, v, x.Volume());
+              const int M = 3;
+              value = nativeReduce<doubleN, ReduceType, float2, short2, float2, M, Reducer, writeX, writeY, writeZ,
+                  writeW, writeV>(a, b, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+              errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-          blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
+            } else {
+              errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
+            }
+            blas::bytes
+                += Reducer<ReduceType, double2, double2>::streams() * (unsigned long long)x.Volume() * sizeof(float);
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+          } else {
+            errorQuda("Not implemented for this precision combination %d %d", x.Precision(), z.Precision());
+          }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
+#endif
+
+        } else {
+          errorQuda("Not implemented for this precision combination %d %d", x.Precision(), z.Precision());
         }
+
       } else {
         // we don't have quad precision support on the GPU so use doubleN instead of ReduceType
         if (x.Precision() == QUDA_SINGLE_PRECISION && z.Precision() == QUDA_DOUBLE_PRECISION) {
           Reducer<doubleN, double2, double2> r(a, b);
-          value = genericReduce<doubleN,doubleN,float,double,writeX,writeY,writeZ,writeW,writeV,Reducer<doubleN,double2,double2> >(x,y,z,w,v,r);
+          value = genericReduce<doubleN, doubleN, float, double, writeX, writeY, writeZ, writeW, writeV,
+              Reducer<doubleN, double2, double2>>(x, y, z, w, v, r);
         } else {
           errorQuda("Precision %d not implemented", x.Precision());
         }
       }
 
       const int Nreduce = sizeof(doubleN) / sizeof(double);
-      reduceDoubleArray((double*)&value, Nreduce);
+      reduceDoubleArray((double *)&value, Nreduce);
 
       return value;
     }
 
-
-    double norm1(const ColorSpinorField &x) {
-      ColorSpinorField &y = const_cast<ColorSpinorField&>(x); // FIXME
-      return uni_reduce<double,QudaSumFloat,Norm1,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
+    double norm1(const ColorSpinorField &x)
+    {
+      ColorSpinorField &y = const_cast<ColorSpinorField &>(x); // FIXME
+      return uni_reduce<double, QudaSumFloat, Norm1, 0, 0, 0, 0, 0, false>(
+          make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
     }
 
-    double norm2(const ColorSpinorField &x) {
-      ColorSpinorField &y = const_cast<ColorSpinorField&>(x);
-      return uni_reduce<double,QudaSumFloat,Norm2,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
+    double norm2(const ColorSpinorField &x)
+    {
+      ColorSpinorField &y = const_cast<ColorSpinorField &>(x);
+      return uni_reduce<double, QudaSumFloat, Norm2, 0, 0, 0, 0, 0, false>(
+          make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
     }
 
-    double reDotProduct(ColorSpinorField &x, ColorSpinorField &y) {
-      return uni_reduce<double,QudaSumFloat,Dot,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    double reDotProduct(ColorSpinorField &x, ColorSpinorField &y)
+    {
+      return uni_reduce<double, QudaSumFloat, Dot, 0, 0, 0, 0, 0, false>(
+          make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
-    double axpbyzNorm(double a, ColorSpinorField &x, double b, ColorSpinorField &y,
-                      ColorSpinorField &z) {
-      return uni_reduce<double,QudaSumFloat,axpbyzNorm2,0,0,1,0,0,false>
-	(make_double2(a, 0.0), make_double2(b, 0.0), x, y, z, x, x);
+    double axpbyzNorm(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z)
+    {
+      return uni_reduce<double, QudaSumFloat, axpbyzNorm2, 0, 0, 1, 0, 0, false>(
+          make_double2(a, 0.0), make_double2(b, 0.0), x, y, z, x, x);
     }
 
-    double axpyReDot(double a, ColorSpinorField &x, ColorSpinorField &y) {
-      return uni_reduce<double,QudaSumFloat,AxpyReDot,0,1,0,0,0,false>
-	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    double axpyReDot(double a, ColorSpinorField &x, ColorSpinorField &y)
+    {
+      return uni_reduce<double, QudaSumFloat, AxpyReDot, 0, 1, 0, 0, 0, false>(
+          make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
-    double caxpyNorm(const Complex &a, ColorSpinorField &x, ColorSpinorField &y) {
-      return uni_reduce<double,QudaSumFloat,caxpyNorm2,0,1,0,0,0,false>
-	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, x, x, x);
+    double caxpyNorm(const Complex &a, ColorSpinorField &x, ColorSpinorField &y)
+    {
+      return uni_reduce<double, QudaSumFloat, caxpyNorm2, 0, 1, 0, 0, 0, false>(
+          make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
-    double caxpyXmazNormX(const Complex &a, ColorSpinorField &x,
-			  ColorSpinorField &y, ColorSpinorField &z) {
-      return uni_reduce<double,QudaSumFloat,caxpyxmaznormx,1,1,0,0,0,false>
-	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
+    double caxpyXmazNormX(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    {
+      return uni_reduce<double, QudaSumFloat, caxpyxmaznormx, 1, 1, 0, 0, 0, false>(
+          make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
-    double cabxpyzAxNorm(double a, const Complex &b,
-			ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return uni_reduce<double,QudaSumFloat,cabxpyzaxnorm,1,0,1,0,0,false>
-	(make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, z, x, x);
+    double cabxpyzAxNorm(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    {
+      return uni_reduce<double, QudaSumFloat, cabxpyzaxnorm, 1, 0, 1, 0, 0, false>(
+          make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, z, x, x);
     }
 
-    Complex cDotProduct(ColorSpinorField &x, ColorSpinorField &y) {
-      double2 cdot = uni_reduce<double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    Complex cDotProduct(ColorSpinorField &x, ColorSpinorField &y)
+    {
+      double2 cdot = uni_reduce<double2, QudaSumFloat2, Cdot, 0, 0, 0, 0, 0, false>(
+          make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
       return Complex(cdot.x, cdot.y);
     }
 
-    Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      double2 cdot = uni_reduce<double2,QudaSumFloat2,caxpydotzy,0,1,0,0,0,false>
-	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
+    Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    {
+      double2 cdot = uni_reduce<double2, QudaSumFloat2, caxpydotzy, 0, 1, 0, 0, 0, false>(
+          make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
       return Complex(cdot.x, cdot.y);
     }
 
     double3 cDotProductNormA(ColorSpinorField &x, ColorSpinorField &y) {
-      return uni_reduce<double3,QudaSumFloat3,CdotNormA,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+      return uni_reduce<double3, QudaSumFloat3, CdotNormA, 0, 0, 0, 0, 0, false>(
+          make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
     double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x,
@@ -621,11 +714,11 @@ namespace quda {
 					   ColorSpinorField &z, ColorSpinorField &w,
 					   ColorSpinorField &u) {
       if (x.Precision() != z.Precision()) {
-	return mixed_reduce<double3,QudaSumFloat3,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
-	  (make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
+        return mixed_reduce<double3, QudaSumFloat3, caxpbypzYmbwcDotProductUYNormY_, 0, 1, 1, 0, 0, false>(
+            make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
       } else {
-	return uni_reduce<double3,QudaSumFloat3,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
-	  (make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
+        return uni_reduce<double3, QudaSumFloat3, caxpbypzYmbwcDotProductUYNormY_, 0, 1, 1, 0, 0, false>(
+            make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
       }
     }
 
@@ -633,11 +726,11 @@ namespace quda {
       // swizzle since mixed is on z
       double2 cg_norm ;
       if (x.Precision() != y.Precision()) {
-	cg_norm = mixed_reduce<double2,QudaSumFloat2,axpyCGNorm2,0,0,1,0,0,false>
-	  (make_double2(a, 0.0), make_double2(0.0, 0.0), x, x, y, x, x);
+        cg_norm = mixed_reduce<double2, QudaSumFloat2, axpyCGNorm2, 0, 0, 1, 0, 0, false>(
+            make_double2(a, 0.0), make_double2(0.0, 0.0), x, x, y, x, x);
       } else {
-	cg_norm = uni_reduce<double2,QudaSumFloat2,axpyCGNorm2,0,0,1,0,0,false>
-	  (make_double2(a, 0.0), make_double2(0.0, 0.0), x, x, y, x, x);
+        cg_norm = uni_reduce<double2, QudaSumFloat2, axpyCGNorm2, 0, 0, 1, 0, 0, false>(
+            make_double2(a, 0.0), make_double2(0.0, 0.0), x, x, y, x, x);
       }
       return Complex(cg_norm.x, cg_norm.y);
     }
@@ -645,8 +738,8 @@ namespace quda {
     double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r) {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
-      double3 rtn = uni_reduce<double3,QudaSumFloat3,HeavyQuarkResidualNorm_,0,0,0,0,0,true>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
+      double3 rtn = uni_reduce<double3, QudaSumFloat3, HeavyQuarkResidualNorm_, 0, 0, 0, 0, 0, true>(
+          make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
       return rtn;
     }
@@ -655,40 +748,40 @@ namespace quda {
 				      ColorSpinorField &r) {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
-      double3 rtn = uni_reduce<double3,QudaSumFloat3,xpyHeavyQuarkResidualNorm_,0,0,0,0,0,true>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, r, r, r);
+      double3 rtn = uni_reduce<double3, QudaSumFloat3, xpyHeavyQuarkResidualNorm_, 0, 0, 0, 0, 0, true>(
+          make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
       return rtn;
     }
 
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return uni_reduce<double3,QudaSumFloat3,tripleCGReduction_,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
+      return uni_reduce<double3, QudaSumFloat3, tripleCGReduction_, 0, 0, 0, 0, 0, false>(
+          make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return uni_reduce<double4,QudaSumFloat4,quadrupleCGReduction_,0,0,0,0,0,false>
-        (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
+      return uni_reduce<double4, QudaSumFloat4, quadrupleCGReduction_, 0, 0, 0, 0, 0, false>(
+          make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
-      return uni_reduce<double,QudaSumFloat,quadrupleCG3InitNorm_,1,1,1,1,0,false>
-	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, w, v);
+      return uni_reduce<double, QudaSumFloat, quadrupleCG3InitNorm_, 1, 1, 1, 1, 0, false>(
+          make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, w, v);
     }
 
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
-      return uni_reduce<double,QudaSumFloat,quadrupleCG3UpdateNorm_,1,1,1,1,0,false>
-	(make_double2(a, 0.0), make_double2(b, 1.-b), x, y, z, w, v);
+      return uni_reduce<double, QudaSumFloat, quadrupleCG3UpdateNorm_, 1, 1, 1, 1, 0, false>(
+          make_double2(a, 0.0), make_double2(b, 1. - b), x, y, z, w, v);
     }
 
     double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return uni_reduce<double,QudaSumFloat,doubleCG3InitNorm_,1,1,0,0,0,false>
-        (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, z, z);
+      return uni_reduce<double, QudaSumFloat, doubleCG3InitNorm_, 1, 1, 0, 0, 0, false>(
+          make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, z, z);
     }
 
     double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return uni_reduce<double,QudaSumFloat,doubleCG3UpdateNorm_,1,1,0,0,0,false>
-        (make_double2(a, 0.0), make_double2(b, 1.0-b), x, y, z, z, z);
+      return uni_reduce<double, QudaSumFloat, doubleCG3UpdateNorm_, 1, 1, 0, 0, 0, false>(
+          make_double2(a, 0.0), make_double2(b, 1.0 - b), x, y, z, z, z);
     }
 
    } // namespace blas

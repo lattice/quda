@@ -5,12 +5,12 @@
 #include <vector>
 #include <assert.h>
 
-// ensure compatibilty with C++11 
+// ensure compatibilty with C++11
 #if __cplusplus >= 201402L
 #include <utility>
 #else
 #include <integer_sequence.hpp> // C++11 version of this C++14 feature
-#endif 
+#endif
 
 #include <launch_kernel.cuh>
 
@@ -61,11 +61,15 @@ namespace quda {
       strcat(aux, V.AuxString());
       strcat(aux,",block_size=");
 
-      char size[8];
       geoBlockSize = 1;
-      for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
-      i32toa(size, geoBlockSize);
-      strcat(aux,size);
+      char geo_str[16];
+      for (int d = 0; d < V.Ndim(); d++) {
+        geoBlockSize *= geo_bs[d];
+        i32toa(geo_str, geo_bs[d]);
+        strcat(aux, geo_str);
+        if (d < V.Ndim() - 1) strcat(aux, "x");
+      }
+
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
 
       int chiralBlocks = (nSpin==1) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
@@ -171,8 +175,13 @@ namespace quda {
       param.aux.x = 1; // swizzle factor
     }
 
-    long long flops() const { return nBlock * (geoBlockSize/2) * (spinBlockSize == 0 ? 1 : 2*spinBlockSize) / 2 * nColor * (nVec * ((nVec-1) * (8l + 8l)) + 6l); }
-    long long bytes() const { return (((nVec+1)*nVec)/2) * (V.Bytes()/nVec) + V.Bytes(); } // load + store
+    long long flops() const
+    {
+      return nBlock * (geoBlockSize / 2) * (spinBlockSize == 0 ? 1 : 2 * spinBlockSize) / 2 * nColor
+          * (nVec * ((nVec - 1) * (8l + 8l)) + 6l);
+    }
+
+    long long bytes() const { return nVec * B[0]->Bytes() + (nVec - 1) * nVec / 2 * V.Bytes() / nVec + V.Bytes(); }
 
     char *saveOut, *saveOutNorm;
 
@@ -231,7 +240,7 @@ namespace quda {
       } else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
       }
-    
+
     } else if (V.Ncolor()/Nvec == 24) {
 
       constexpr int nColor = 24;
@@ -293,9 +302,17 @@ namespace quda {
     } else if (V.Precision() == QUDA_SINGLE_PRECISION && B[0]->Precision() == QUDA_SINGLE_PRECISION) {
       BlockOrthogonalize<float,float>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
     } else if (V.Precision() == QUDA_HALF_PRECISION && B[0]->Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 2
       BlockOrthogonalize<short,float>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else if (V.Precision() == QUDA_HALF_PRECISION && B[0]->Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       BlockOrthogonalize<short,short>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else {
       errorQuda("Unsupported precision combination V=%d B=%d\n", V.Precision(), B[0]->Precision());
     }
