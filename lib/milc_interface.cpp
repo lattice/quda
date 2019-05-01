@@ -242,7 +242,6 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
   param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
 
   computeKSLinkQuda(fatlink, longlink, nullptr, inlink, const_cast<double*>(act_path_coeff), &param);
-  qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver
   invalidateGaugeQuda();

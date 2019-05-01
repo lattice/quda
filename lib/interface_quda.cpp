@@ -1907,6 +1907,11 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     blas::ax(gauge.Anisotropy(), in);
   }
 
+  if (diracParam.fatGauge != nullptr)
+    printfQuda("%s Fat gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, diracParam.fatGauge->norm1(),diracParam.fatGauge->norm2(),diracParam.fatGauge->abs_max());
+  if (diracParam.longGauge != nullptr)
+    printfQuda("%s Long gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, diracParam.longGauge->norm1(),diracParam.longGauge->norm2(),diracParam.longGauge->abs_max());
+
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
