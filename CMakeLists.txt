@@ -141,8 +141,6 @@ set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to initialize templat
 set(QUDA_PRECISION "14" CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
 set(QUDA_RECONSTRUCT "7" CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
-set(QUDA_DETERMINISTIC_REDUCE OFF CACHE BOOL "use rank-order independent floating point inter-process reductions")
-
 # Set CTest options
 set(QUDA_CTEST_SEP_DSLASH_POLICIES OFF CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
@@ -178,7 +176,6 @@ mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
-mark_as_advanced(QUDA_DETERMINISTIC_REDUCE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -264,7 +261,7 @@ endif()
 
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 #define CXX FLAGS
-set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -g -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
 "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
 "Flags used by the C++ compiler during strict jenkins builds.")
@@ -282,7 +279,7 @@ enable_language(CXX)
 
 
 #define C FLAGS
-set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
+set(CMAKE_C_FLAGS_DEVEL "-Wall -g -O3"  CACHE STRING
     "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT "-Wall -O3 -Werror -Wno-error=unused-private-field"  CACHE STRING
     "Flags used by the C compiler during strict jenkins builds.")
@@ -424,10 +421,6 @@ add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
 
 # set which precisions to enable
 add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
-
-if (QUDA_DETERMINISTIC_REDUCE)
-   add_definitions(-DQUDA_DETERMINISTIC_REDUCE)
-endif()
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
@@ -597,7 +590,7 @@ endif(QUDA_VERBOSE_BUILD)
 
 ## define CUDA flags when CMake >= 3.8
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
-set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -lineinfo -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}" CACHE STRING
+set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -lineinfo -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}" CACHE STRING
   "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT "${CMAKE_CUDA_FLAGS_DEVEL}" CACHE STRING
   "Flags used by the CUDA compiler during strict jenkins builds.")

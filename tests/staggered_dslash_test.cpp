@@ -848,8 +848,7 @@ void display_test_info()
 }
 
 
-  void
-usage_extra(char** argv )
+void usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
   printfQuda("    --test <0/1/2>                              # Test method\n");

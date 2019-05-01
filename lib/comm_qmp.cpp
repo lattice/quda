@@ -33,6 +33,8 @@ static int gpuid = -1;
 static char partition_string[16];
 static char topology_string[128];
 
+static bool deterministic_reduce = false;
+
 // While we can emulate an all-gather using QMP reductions, this
 // scales horribly as the number of nodes increases, so for
 // performance we just call MPI directly
@@ -167,6 +169,11 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
     snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
   }
 
+  char *enable_reduce_env = getenv("QUDA_DETERMINISTIC_REDUCE");
+  if (enable_reduce_env && strcmp(enable_reduce_env, "1") == 0) {
+    deterministic_reduce = true;
+  }
+
 }
 
 int comm_rank(void)
@@ -297,19 +304,19 @@ int comm_query(MsgHandle *mh)
 
 void comm_allreduce(double* data)
 {
-#ifndef QUDA_DETERMINISTIC_REDUCE
-  QMP_CHECK( QMP_sum_double(data) );
-#else
-  // we need to break out of QMP for the deterministic floating point reductions
-  const size_t n = comm_size();
-  double *recv_buf = (double*)safe_malloc(n * sizeof(double));
-  MPI_CHECK(MPI_Allgather(data, 1, MPI_DOUBLE, recv_buf, 1, MPI_DOUBLE, MPI_COMM_HANDLE));
+  if (!deterministic_reduce) {
+    QMP_CHECK( QMP_sum_double(data) );
+  } else {
+    // we need to break out of QMP for the deterministic floating point reductions
+    const size_t n = comm_size();
+    double *recv_buf = (double*)safe_malloc(n * sizeof(double));
+    MPI_CHECK(MPI_Allgather(data, 1, MPI_DOUBLE, recv_buf, 1, MPI_DOUBLE, MPI_COMM_HANDLE));
 
-  std::sort(recv_buf, recv_buf+n); // sort reduction into ascending order for deterministic reduction
-  *data = std::accumulate(recv_buf, recv_buf+n, 0.0);
+    std::sort(recv_buf, recv_buf+n); // sort reduction into ascending order for deterministic reduction
+    *data = std::accumulate(recv_buf, recv_buf+n, 0.0);
 
-  host_free(recv_buf);
-#endif
+    host_free(recv_buf);
+  }
 }
 
 
@@ -326,29 +333,29 @@ void comm_allreduce_min(double* data)
 
 void comm_allreduce_array(double* data, size_t size)
 {
-#ifndef QUDA_DETERMINISTIC_REDUCE
-  QMP_CHECK( QMP_sum_double_array(data, size) );
-#else
-  // we need to break out of QMP for the deterministic floating point reductions
-  size_t n = comm_size();
-  double *recv_buf = new double[size * n];
-  MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
+  if (!deterministic_reduce) {
+    QMP_CHECK( QMP_sum_double_array(data, size) );
+  } else {
+    // we need to break out of QMP for the deterministic floating point reductions
+    size_t n = comm_size();
+    double *recv_buf = new double[size * n];
+    MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
 
-  double *recv_trans = new double[size * n];
-  for (size_t i=0; i<n; i++) {
-    for (size_t j=0; j<size; j++) {
-      recv_trans[j*n + i] = recv_buf[i*size + j];
+    double *recv_trans = new double[size * n];
+    for (size_t i=0; i<n; i++) {
+      for (size_t j=0; j<size; j++) {
+        recv_trans[j*n + i] = recv_buf[i*size + j];
+      }
     }
-  }
 
-  for (size_t i=0; i<size; i++) {
-    std::sort(recv_trans+i*n, recv_trans+i*n+n); // sort reduction into ascending order for deterministic reduction
-    data[i] = std::accumulate(recv_trans+i*n, recv_trans+i*n+n, 0.0);
-  }
+    for (size_t i=0; i<size; i++) {
+      std::sort(recv_trans+i*n, recv_trans+i*n+n); // sort reduction into ascending order for deterministic reduction
+      data[i] = std::accumulate(recv_trans+i*n, recv_trans+i*n+n, 0.0);
+    }
 
-  delete []recv_buf;
-  delete []recv_trans;
-#endif
+    delete []recv_buf;
+    delete []recv_trans;
+  }
 }
 
 void comm_allreduce_max_array(double* data, size_t size)
