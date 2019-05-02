@@ -51,6 +51,7 @@ namespace quda {
 
     Complex sigma_k;
     double beta_m;
+    double max_eig; //Used as an estimate for the Lanczos matrix norm. 
     
   public:
     EigenSolver(QudaEigParam *eig_param, TimeProfile &profile);
@@ -169,17 +170,15 @@ namespace quda {
      @brief Implicily Restarted Lanczos Method.
   */
   class IRLM : public EigenSolver {
-
-  private:
+        
+  public:
     const Dirac &mat;
+    IRLM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
+    virtual ~IRLM();
 
     //Tridiagonal matrix
     double *alpha;
     double  *beta;
-    
-  public:
-    IRLM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
-    virtual ~IRLM();
 
     /**
        @brief Compute eigenpairs
@@ -231,7 +230,29 @@ namespace quda {
     
   };
 
+  /**
+     @brief Thick Restarted LAnczos Method.
+  */
+  class TRLM : public IRLM {
+    
+  public:
+    TRLM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
+    virtual ~TRLM();
+
     /**
+       @brief Compute eigenpairs
+       @param[in] kSpace Krylov vector space
+       @param[in] evals Computed eigenvalues
+       
+    */
+    void operator()(std::vector<ColorSpinorField*> &kSpace,
+		    std::vector<Complex> &evals);
+
+
+    void eigensolveFromArrowMat(int nLocked, int arror_pos);
+  };
+  
+  /**
      @brief Implicily Restarted Arnoldi Method.
   */
   class IRAM : public EigenSolver {
@@ -282,7 +303,7 @@ namespace quda {
 				       int k);
 
     void eigensolveUpperHess();
-    void schurDecompUpperHess();
+    void schurDecompUpperHess(std::vector<Complex> &evals);
     void computeQRfromUpperHess(int k);
   };
   
