@@ -2943,10 +2943,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = blas::norm2(*h_b);
-    double nh_x = blas::norm2(*h_x);
-    double nx = blas::norm2(*x);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
-    printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      double nh_x = blas::norm2(*h_x);
+      double nx = blas::norm2(*x);
+      printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
+    }
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
