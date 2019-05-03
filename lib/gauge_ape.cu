@@ -38,9 +38,9 @@ public:
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::computeAPEStep")
-                           .instantiate(Type<Float>(), Type<Arg>())
-                           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                           .launch(arg);
+                         .instantiate(Type<Float>(), Type<Arg>())
+                         .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                         .launch(arg);
 #else
         computeAPEStep<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
@@ -72,8 +72,8 @@ public:
     qudaDeviceSynchronize();
   }
 
-  template<typename Float>
-  void APEStep(GaugeField &dataDs, const GaugeField& dataOr, Float alpha) {
+  template <typename Float> void APEStep(GaugeField &dataDs, const GaugeField &dataOr, Float alpha)
+  {
 
     if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GDs;
@@ -121,7 +121,6 @@ public:
     } else {
       errorQuda("Reconstruction type %d of destination gauge field not supported", dataDs.Reconstruct());
     }
-
   }
 
 #endif
@@ -153,7 +152,7 @@ public:
     }
     return;
 #else
-  errorQuda("Gauge tools are not built");
+    errorQuda("Gauge tools are not built");
 #endif
   }
 }

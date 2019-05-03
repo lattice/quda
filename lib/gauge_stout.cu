@@ -153,7 +153,7 @@ public:
     }
     return;
 #else
-  errorQuda("Gauge tools are not built");
+    errorQuda("Gauge tools are not built");
 #endif
   }
 
@@ -293,7 +293,7 @@ public:
     }
     return;
 #else
-  errorQuda("Gauge tools are not built");
+    errorQuda("Gauge tools are not built");
 #endif
   }
 }

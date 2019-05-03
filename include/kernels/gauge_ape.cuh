@@ -17,11 +17,11 @@ namespace quda
     GaugeDs dest;
 
     GaugeAPEArg(GaugeOr &origin, GaugeDs &dest, const GaugeField &data, const Float alpha, const Float tolerance) :
-        threads(1),
-        origin(origin),
-        dest(dest),
-        alpha(alpha),
-        tolerance(tolerance)
+      threads(1),
+      origin(origin),
+      dest(dest),
+      alpha(alpha),
+      tolerance(tolerance)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = data.R()[dir];
@@ -126,20 +126,20 @@ namespace quda
       // |     |              /     /                /- < -
       //         + |     |  +         +  /     /  +         +  - > -/
       //           v     ^              v     ^                    v
-      //           |- > -|             /- > -/                - < -/      
-      
+      //           |- > -|             /- > -/                - < -/
+
       // Get link U
-      U = arg.origin(dir, linkIndexShift(x,dx,X), parity);
-      
-      S = S * (arg.alpha/((Float) (2.*(3. - 1.))));
+      U = arg.origin(dir, linkIndexShift(x, dx, X), parity);
+
+      S = S * (arg.alpha / ((Float)(2. * (3. - 1.))));
       setIdentity(&I);
-      
-      TestU  = I*(1.-arg.alpha) + S*conj(U);
+
+      TestU = I * (1. - arg.alpha) + S * conj(U);
       polarSu3<Float>(TestU, arg.tolerance);
-      U = TestU*U;
-      
-      arg.dest(dir, linkIndexShift(x,dx,X), parity) = U;
+      U = TestU * U;
+
+      arg.dest(dir, linkIndexShift(x, dx, X), parity) = U;
     }
   }
-  
+
 } // namespace quda
