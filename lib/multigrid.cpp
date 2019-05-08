@@ -577,10 +577,10 @@ namespace quda {
 
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(*tmp2));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(*tmp2));
 
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n", deviation);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("relative deviation = %e\n", deviation);
     if (deviation > tol ) errorQuda("L2 relative deviation = %e > %e failed", deviation, tol);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
 
@@ -644,8 +644,7 @@ namespace quda {
     if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
 
     // check the preconditioned operator construction if applicable
-    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE
-        && diracResidual->Mu() == 0.0 && diracSmoother->Mu() == 0.0) { // FIMXE support mu shifts here
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
       // check eo
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking Doe of preconditioned operator 0 = \\hat{D}_c - A^{-1} D_c\n");
       static_cast<DiracCoarse*>(diracCoarseResidual)->Dslash(r_coarse->Even(), tmp_coarse->Odd(), QUDA_EVEN_PARITY);
