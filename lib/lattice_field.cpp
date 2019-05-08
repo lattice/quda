@@ -418,8 +418,8 @@ namespace quda {
 							  sizeof(ipcRemoteGhostDestHandle[b][1-dir][dim]));
 	  }
 	  // now send
+          cudaIpcMemHandle_t ipcLocalGhostDestHandle;
 	  if (comm_peer2peer_enabled(dir,dim)) {
-	    cudaIpcMemHandle_t ipcLocalGhostDestHandle;
 	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_recv_buffer_d[b]);
 	    sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
 						    dim, disp,
@@ -476,9 +476,9 @@ namespace quda {
 	  }
 
 	  // now send
+          cudaIpcEventHandle_t ipcLocalEventHandle;
 	  if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaEventCreate(&ipcCopyEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
-	    cudaIpcEventHandle_t ipcLocalEventHandle;
 	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 
 	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
