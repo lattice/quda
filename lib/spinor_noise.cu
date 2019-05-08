@@ -127,8 +127,6 @@ namespace quda {
       spinorNoise<real,Ns,Nc,QUDA_FLOAT2_FIELD_ORDER>(in, rngstate, type);
     } else if (in.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
       spinorNoise<real,Ns,Nc,QUDA_FLOAT4_FIELD_ORDER>(in, rngstate, type);
-    } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      spinorNoise<real,Ns,Nc,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(in, rngstate, type);
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);
     }
