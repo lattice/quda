@@ -285,6 +285,18 @@ namespace quda {
     */
     void saveVectors(std::vector<ColorSpinorField*> &B) const;
 
+    /**
+       @brief Helper function called on entry to each MG function
+       @param[in] level The level we working on
+    */
+    void pushLevel(int level) const;
+
+    /**
+       @brief Helper function called on exit to each MG member function
+       @param[in] level The level we working on
+    */
+    void popLevel(int level) const;
+
   public:
     /** 
       Constructor for MG class
