@@ -13,11 +13,11 @@ set (QUDA_OBJS
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
   color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
-  cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
+  cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
-  cpu_gauge_field.cpp cuda_gauge_field.cu extract_gauge_ghost.cu
+  cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
-  dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
+  max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp tune.cpp
@@ -26,10 +26,17 @@ set (QUDA_OBJS
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
   dslash_twisted_clover.cu dslash_domain_wall.cu
-  dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu
-  dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
-  multi_blas_quda.cu copy_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu
+  dslash_domain_wall_4d.cu dslash_mobius.cu
+  dslash4_staggered.cu dslash4_improved_staggered.cu
+  dslash4_wilson.cu dslash4_wilson_clover.cu dslash5_domain_wall.cu
+  dslash4_wilson_clover_preconditioned.cu 
+  dslash4_twisted_mass.cu dslash4_twisted_mass_preconditioned.cu
+  dslash4_ndeg_twisted_mass.cu dslash4_ndeg_twisted_mass_preconditioned.cu
+  dslash4_twisted_clover.cu dslash4_twisted_clover_preconditioned.cu
+  dslash4_domain_wall_4d.cu  dslash4_domain_wall_5d.cu
+  dslash_pack.cu dslash_pack2.cu
+  blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
+  multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu
@@ -48,7 +55,8 @@ set (QUDA_OBJS
   copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
   copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   copy_gauge_double.cu copy_gauge_single.cu
-  copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
+  copy_gauge_half.cu copy_gauge_quarter.cu
+  copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
@@ -60,6 +68,10 @@ set (QUDA_OBJS
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
   quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp )
+
+if(QUDA_LEGACY_DSLASH)
+LIST(APPEND QUDA_OBJS dslash_improved_staggered.cu dslash_staggered.cu)
+endif()
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})

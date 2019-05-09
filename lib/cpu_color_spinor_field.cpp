@@ -225,7 +225,8 @@ namespace quda {
     backed_up = true;
   }
 
-  void cpuColorSpinorField::restore() {
+  void cpuColorSpinorField::restore() const
+  {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
 
     memcpy(v, backup_h, bytes);
@@ -254,7 +255,7 @@ namespace quda {
   }
 
   // print out the vector at volume point x
-  void cpuColorSpinorField::PrintVector(unsigned int x) { genericPrintVector(*this, x); }
+  void cpuColorSpinorField::PrintVector(unsigned int x) const { genericPrintVector(*this, x); }
 
   void cpuColorSpinorField::allocateGhostBuffer(int nFace) const
   {

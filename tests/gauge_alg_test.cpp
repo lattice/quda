@@ -22,8 +22,7 @@
 #include <mpi.h>
 #endif
 
-
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 using   namespace quda;
 
@@ -310,11 +309,6 @@ TEST_F(GaugeAlgTest,Coulomb_FFT){
     ASSERT_TRUE(comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)));
   }
 }
-
-
-
-
-
 
 
 int main(int argc, char **argv){

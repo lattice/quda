@@ -11,18 +11,13 @@ namespace quda {
 
     const int length = 18;
 
-    QudaFieldLocation location = 
-      (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
+    QudaFieldLocation location
+        = (typeid(u) == typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
     if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhost<short,length>(FloatNOrder<short,length,2,19>
-				     (u, 0, (short**)Ghost), u, location, extract, offset);
-	} else {
-	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	  extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
-	}
+        typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type G;
+        extractGhost<Float, length>(G(u, 0, Ghost), u, location, extract, offset);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
@@ -33,17 +28,24 @@ namespace quda {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
 	extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type G;
-	extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
+        if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
+          typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
+          extractGhost<Float, length>(G(u, 0, Ghost), u, location, extract, offset);
+        } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
+          typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_9>::type G;
+          extractGhost<Float, length>(G(u, 0, Ghost), u, location, extract, offset);
+        } else {
+          errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
+        }
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
-      
+
 #ifdef BUILD_QDP_INTERFACE
       extractGhost<Float,length>(QDPOrder<Float,length>(u, 0, Ghost), u, location, extract, offset);
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
-      
+
     } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
@@ -113,8 +115,10 @@ namespace quda {
 	extractGhost(u, (float**)ghost, extract, offset);
       } else if (u.Precision() == QUDA_HALF_PRECISION) {
 	extractGhost(u, (short**)ghost, extract, offset);
+      } else if (u.Precision() == QUDA_QUARTER_PRECISION) {
+        extractGhost(u, (char **)ghost, extract, offset);
       } else {
-	errorQuda("Unknown precision type %d", u.Precision());
+        errorQuda("Unknown precision type %d", u.Precision());
       }
     }
   }

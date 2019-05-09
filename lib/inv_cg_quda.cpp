@@ -57,7 +57,7 @@ namespace quda {
   }
 
   CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(mat.Expose()),
+    CG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()),
     xp(nullptr), yp(nullptr), init(false) {
   }
 
@@ -139,7 +139,7 @@ namespace quda {
   }
 
   CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(mat.Expose()),
+    CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()),
     bp(nullptr), init(false) {
     
   }
@@ -354,7 +354,7 @@ namespace quda {
       //DMH start
       //Just replace any initial guess with a deflated RHS
       if (param.deflate == true) {
-
+	
 	//Deflate the exact part from the RHS
 	std::vector<ColorSpinorField*> rhs;
 	rhs.push_back(&b);
@@ -363,7 +363,7 @@ namespace quda {
 	//Compute r_defl  = b - A * x_defl
 	mat(r, *defl_tmp1[0], y, tmp3);
 	r2 = blas::xmyNorm(b, r);
-
+	
 	//Place the initial residiual in r. defl_tmp1 must be added
 	//to the solution at the end.
 	blas::copy(y, *defl_tmp1[0]);
@@ -389,11 +389,11 @@ namespace quda {
       p.resize(Np);
       ColorSpinorParam csParam(rSloppy);
       csParam.create = QUDA_COPY_FIELD_CREATE;
-        for (auto &pi : p) pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);      
+      for (auto &pi : p) pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);      
     } else {
-        for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
+      for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
     }
-
+    
     double r2_old=0.0;
     if (r2_old_init != 0.0 and p_init) {
       r2_old = r2_old_init;

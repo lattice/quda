@@ -54,6 +54,14 @@ namespace quda {
       report("CA-CG");
       solver = new CACG(mat, matSloppy, param, profile);
       break;
+    case QUDA_CA_CGNE_INVERTER:
+      report("CA-CGNE");
+      solver = new CACGNE(mat, matSloppy, param, profile);
+      break;
+    case QUDA_CA_CGNR_INVERTER:
+      report("CA-CGNR");
+      solver = new CACGNR(mat, matSloppy, param, profile);
+      break;
     case QUDA_CA_GCR_INVERTER:
       report("CA-GCR");
       solver = new CAGCR(mat, matSloppy, param, profile);

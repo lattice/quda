@@ -210,10 +210,6 @@ namespace quda {
     */
     void computeQRfromTridiag(int k);
 
-    void shiftAndCompressFromTriDiag(std::vector<ColorSpinorField*> &kSpace, int k);
-    
-    void schurDecompTriDiag();
-    
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left 
        @param[in] v Vector space
@@ -228,83 +224,6 @@ namespace quda {
 		    std::vector<Complex> &evals,
 		    bool inverse);
     
-  };
-
-  /**
-     @brief Thick Restarted LAnczos Method.
-  */
-  class TRLM : public IRLM {
-    
-  public:
-    TRLM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
-    virtual ~TRLM();
-
-    /**
-       @brief Compute eigenpairs
-       @param[in] kSpace Krylov vector space
-       @param[in] evals Computed eigenvalues
-       
-    */
-    void operator()(std::vector<ColorSpinorField*> &kSpace,
-		    std::vector<Complex> &evals);
-
-
-    void eigensolveFromArrowMat(int nLocked, int arror_pos);
-  };
-  
-  /**
-     @brief Implicily Restarted Arnoldi Method.
-  */
-  class IRAM : public EigenSolver {
-
-  private:
-    const Dirac &mat;
-
-    //Upper Hessenberg matrix
-    Complex *upperHess;
-    
-  public:
-    IRAM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
-    virtual ~IRAM();
-
-    /**
-       @brief Compute eigenpairs
-       @param[in] kSpace Krylov vector space
-       @param[in] evals Computed eigenvalues
-       
-    */
-    void operator()(std::vector<ColorSpinorField*> &kSpace,
-		    std::vector<Complex> &evals);
-    
-    /**
-       @brief Arnoldi step: extends the Kylov space.
-       @param[in] v Vector space
-       @param[in] r Current vector to add
-       @param[in] j Index of last vector added       
-    */
-    void arnoldiStep(std::vector<ColorSpinorField*> v,
-		     int j);
-
-    /**
-       @brief Rotate eigenvectors by dense matrix derived
-       from the upper Hessenberg matrix in Arnoldi
-
-    */            
-    void basisRotateUpperHess(std::vector<ColorSpinorField*> &kSpace, int k);
-        
-    /**
-       @brief Computes p implicit shifts, Q product, updates the Upper Hessenberg 
-       and compresses the entire Krylov vectors into k vectors.
-       @param[in] kSpace the vectors to be rotated
-       @param[in] tmp Workspace vectors
-       @param[in] k Size of the restarted Arnoldi factorisation
-    */
-    void shiftAndCompressFromUpperHess(std::vector<ColorSpinorField*> &kSpace,
-				       int k);
-
-    void eigensolveUpperHess();
-    void schurDecompUpperHess(std::vector<Complex> &evals);
-    void computeQRfromUpperHess(int k);
   };
   
   void arpack_solve(void *h_evecs, void *h_evals,

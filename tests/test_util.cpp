@@ -10,6 +10,9 @@
 #include <mpi.h>
 #endif
 
+// This contains the appropriate ifdef guards already
+#include <mpi_comm_handle.h>
+
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
 
@@ -49,6 +52,23 @@ extern float fat_link_max;
  */
 int gridsize_from_cmdline[4] = {1,1,1,1};
 
+void get_gridsize_from_env(int *const dims)
+{
+  char *grid_size_env = getenv("QUDA_TEST_GRID_SIZE");
+  if (grid_size_env) {
+    std::stringstream grid_list(grid_size_env);
+
+    int dim;
+    int i = 0;
+    while (grid_list >> dim) {
+      if (i >= 4) errorQuda("Unexpected grid size array length");
+      dims[i] = dim;
+      if (grid_list.peek() == ',') grid_list.ignore();
+      i++;
+    }
+  }
+}
+
 static int lex_rank_from_coords_t(const int *coords, void *fdata)
 {
   int rank = coords[0];
@@ -69,8 +89,10 @@ static int lex_rank_from_coords_x(const int *coords, void *fdata)
 
 static int rank_order = 0;
 
-void initComms(int argc, char **argv, const int *commDims)
+void initComms(int argc, char **argv, int *const commDims)
 {
+  if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
+
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
@@ -83,16 +105,10 @@ void initComms(int argc, char **argv, const int *commDims)
     int map[] = { 0, 1, 2, 3 };
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   }
-
 #elif defined(MPI_COMMS)
-#ifdef PTHREADS
-  int provided;
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-#else
   MPI_Init(&argc, &argv);
 #endif
 
-#endif
   QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
 
   initCommsGridQuda(4, commDims, func, NULL);
@@ -1081,10 +1097,8 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
 
 }
 
-void
-construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
-			       QudaPrecision precision, QudaGaugeParam* param,
-			       QudaDslashType dslash_type)
+void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, QudaPrecision precision,
+    QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1118,49 +1132,46 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
         else applyStaggeredScaling((float**)longlink, param, type);
       }
     }
-  }
 
-  if (param->reconstruct == QUDA_RECONSTRUCT_9 || param->reconstruct == QUDA_RECONSTRUCT_13) {
-    // incorporate non-trivial phase into long links
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      // incorporate non-trivial phase into long links
+      const double phase = (M_PI * rand()) / RAND_MAX;
+      const complex<double> z = polar(1.0, phase);
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              complex<double> *l = (complex<double> *)(&(((double *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            } else {
+              complex<float> *l = (complex<float> *)(&(((float *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            }
+          }
+        }
+      }
+    }
 
-    const double phase = (M_PI * rand())/RAND_MAX;
-    const complex<double> z = polar(1.0, phase);
-    for (int dir=0; dir<4; ++dir) {
-      for (int i=0; i<V; ++i) {
-        for (int j=0; j<gaugeSiteSize; j+=2) {
-          if (precision == QUDA_DOUBLE_PRECISION) {
-            complex<double> *l = (complex<double>*)( &(((double*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
-          } else {
-            complex<float> *l = (complex<float>*)( &(((float*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
+    if (type == 3) return;
+
+    // set all links to zero to emulate the 1-link operator (needed for host comparison)
+    if (dslash_type == QUDA_STAGGERED_DSLASH) {
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              ((double *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((double *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            } else {
+              ((float *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((float *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            }
           }
         }
       }
     }
   }
-
-  if (type==3) return;
-
-  // set all links to zero to emulate the 1-link operator (needed for host comparison)
-  if (dslash_type == QUDA_STAGGERED_DSLASH) {
-    for(int dir=0; dir<4; ++dir){
-      for(int i=0; i<V; ++i){
-	for(int j=0; j<gaugeSiteSize; j+=2){
-	  if(precision == QUDA_DOUBLE_PRECISION){
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }else{
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }
-	}
-      }
-    }
-  }
-
 }
-
 
 template <typename Float>
 static void constructCloverField(Float *res, double norm, double diag) {
@@ -1655,6 +1666,7 @@ int tdim = 24;
 int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
+int laplace3D = 4;
 char latfile[256] = "";
 bool unit_gauge = false;
 char gauge_outfile[256] = "";
@@ -1662,6 +1674,9 @@ int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
 int gcrNkrylov = 10;
+QudaCABasis ca_basis = QUDA_POWER_BASIS;
+double ca_lambda_min = 0.0;
+double ca_lambda_max = -1.0;
 int pipeline = 0;
 int solution_accumulator_pipeline = 0;
 int test_type = 0;
@@ -1680,6 +1695,7 @@ bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
+double epsilon = 0.01;
 double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
@@ -1691,7 +1707,6 @@ double tol_hq = 0.;
 double reliable_delta = 0.1;
 bool alternative_reliable = false;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
-bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -1713,6 +1728,10 @@ int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
 double setup_tol[QUDA_MAX_MG_LEVEL] = { };
 int setup_maxiter[QUDA_MAX_MG_LEVEL] = { };
 int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL] = { };
+QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL] = { };
+int setup_ca_basis_size[QUDA_MAX_MG_LEVEL] = { };
+double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL] = { };
+double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL] = { };
 QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
 bool pre_orthonormalize = false;
 bool post_orthonormalize = true;
@@ -1723,6 +1742,10 @@ QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL] = { };
 QudaPrecision smoother_halo_prec = QUDA_INVALID_PRECISION;
 double smoother_tol[QUDA_MAX_MG_LEVEL] = { };
 int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL] = { };
+QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL] = { };
+int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL] = { };
+double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL] = { };
+double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL] = { };
 bool generate_nullspace = true;
 bool generate_all_levels = true;
 QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL] = { };
@@ -1829,16 +1852,19 @@ void usage(char** argv )
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --rank-order <col/row>                    # Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)\n");
-  printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
+  printf("    --laplace3D <n>                           # Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
   printf("    --unit-gauge <true/false>                 # Generate a unit valued gauge field in the tests. If false, a random gauge is generated (default false)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
-  printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l (default 10)\n");
+  printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)\n");
+  printf("    --ca-basis-type <power/chebyshev>         # The basis to use for CA-CG (default power)\n");
+  printf("    --cheby-basis-eig-min                     # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)\n");
+  printf("    --cheby-basis-eig-max                     # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG (default is to guess with power iterations)\n");
   printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n");
   printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
@@ -1847,7 +1873,9 @@ void usage(char** argv )
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
-  printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
+  printf("    --mu                                      # Twisted-Mass chiral twist of Dirac operator (default 0.1)\n");
+  printf(
+	 "    --epsilon                                 # Twisted-Mass flavor twist of Dirac operator (default 0.01)\n");
   printf("    --tadpole-coeff                           # Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)\n");
   printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
@@ -1880,6 +1908,10 @@ void usage(char** argv )
   printf("    --mg-setup-maxiter-refresh <level iter>   # The maximum number of solver iterations to use when refreshing the pre-existing null space vectors (default 100)\n");
   printf("    --mg-setup-iters <level iter>             # The number of setup iterations to use for the multigrid (default 1)\n");
   printf("    --mg-setup-tol <level tol>                # The tolerance to use for the setup of multigrid (default 5e-6)\n");
+  printf("    --mg-setup-ca-basis-type <level power/chebyshev> # The basis to use for CA-CG setup of multigrid(default power)\n");
+  printf("    --mg-setup-ca-basis-size <level size>     # The basis size to use for CA-CG setup of multigrid (default 4)\n");
+  printf("    --mg-setup-cheby-basis-eig-min <level val> # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default 0)\n");
+  printf("    --mg-setup-cheby-basis-eig-max <level val> # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default is to guess with power iterations)\n");
   printf("    --mg-setup-type <null/test>               # The type of setup to use for the multigrid (default null)\n");
   printf("    --mg-pre-orth <true/false>                # If orthonormalize the vector before inverting in the setup of multigrid (default false)\n");
   printf("    --mg-post-orth <true/false>               # If orthonormalize the vector after inverting in the setup of multigrid (default true)\n");
@@ -1887,6 +1919,10 @@ void usage(char** argv )
   printf("    --mg-coarse-solver <level gcr/etc.>       # The solver to wrap the V cycle on each level (default gcr, only for levels 1+)\n");
   printf("    --mg-coarse-solver-tol <level gcr/etc.>   # The coarse solver tolerance for each level (default 0.25, only for levels 1+)\n");
   printf("    --mg-coarse-solver-maxiter <level n>      # The coarse solver maxiter for each level (default 100)\n");
+  printf("    --mg-coarse-solver-ca-basis-type <level power/chebyshev> # The basis to use for CA-CG setup of multigrid(default power)\n");
+  printf("    --mg-coarse-solver-ca-basis-size <level size>  # The basis size to use for CA-CG setup of multigrid (default 4)\n");
+  printf("    --mg-coarse-solver-cheby-basis-eig-min <level val> # Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default 0)\n");
+  printf("    --mg-coarse-solver-cheby-basis-eig-max <level val> # Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default is to guess with power iterations)\n");
   printf("    --mg-smoother <level mr/etc.>             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-smoother-tol <level resid_tol>       # The smoother tolerance to use for each multigrid (default 0.25)\n");
   printf("    --mg-smoother-halo-prec                   # The smoother halo precision (applies to all levels - defaults to null_precision)\n");
@@ -2352,13 +2388,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--kernel-pack-t") == 0){
-    kernel_pack_t = true;
-    ret= 0;
-    goto out;
-  }
-
-
   if( strcmp(argv[i], "--multishift") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2498,6 +2527,18 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if (strcmp(argv[i], "--laplace3D") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    laplace3D = atoi(argv[i + 1]);
+    if (laplace3D > 4 || laplace3D < 3) {
+      printf("ERROR: invalid transverse dim %d given. Please use 3 or 4 for t,none.\n", laplace3D);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--flavor") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2600,6 +2641,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mu = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--epsilon") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    epsilon = atof(argv[i + 1]);
     i++;
     ret = 0;
     goto out;
@@ -3041,6 +3090,91 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--mg-setup-ca-basis-type") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i+1], "power") == 0){
+      setup_ca_basis[level] = QUDA_POWER_BASIS;
+    }else if (strcmp(argv[i+1], "chebyshev") == 0 || strcmp(argv[i+1], "cheby") == 0){
+      setup_ca_basis[level] = QUDA_CHEBYSHEV_BASIS;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for basis ca cg type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-ca-basis-size") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_ca_basis_size[level] = atoi(argv[i+1]);
+    if (setup_ca_basis_size[level] < 1){
+      printf("ERROR: invalid basis size for CA-CG (%d < 1)\n", setup_ca_basis_size[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-cheby-basis-eig-min") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_ca_lambda_min[level] = atof(argv[i+1]);
+    if (setup_ca_lambda_min[level] < 0.0){
+      printf("ERROR: invalid minimum eigenvalue for CA-CG (%f < 0.0)\n", setup_ca_lambda_min[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-cheby-basis-eig-max") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_ca_lambda_max[level] = atof(argv[i+1]);
+    // negative value induces power iterations to guess
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mg-setup-type") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3212,6 +3346,92 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
+
+    if( strcmp(argv[i], "--mg-coarse-solver-ca-basis-type") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i+1], "power") == 0){
+      coarse_solver_ca_basis[level] = QUDA_POWER_BASIS;
+    }else if (strcmp(argv[i+1], "chebyshev") == 0 || strcmp(argv[i+1], "cheby") == 0){
+      coarse_solver_ca_basis[level] = QUDA_CHEBYSHEV_BASIS;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for basis ca cg type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarse-solver-ca-basis-size") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_ca_basis_size[level] = atoi(argv[i+1]);
+    if (coarse_solver_ca_basis_size[level] < 1){
+      printf("ERROR: invalid basis size for CA-CG (%d < 1)\n", coarse_solver_ca_basis_size[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarse-solver-cheby-basis-eig-min") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_ca_lambda_min[level] = atof(argv[i+1]);
+    if (coarse_solver_ca_lambda_min[level] < 0.0){
+      printf("ERROR: invalid minimum eigenvalue for CA-CG (%f < 0.0)\n", coarse_solver_ca_lambda_min[level]);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarse-solver-cheby-basis-eig-max") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_ca_lambda_max[level] = atof(argv[i+1]);
+    // negative value induces power iterations to guess
+    i++;
+    ret = 0;
+    goto out;
+  }
+
 
 
   if( strcmp(argv[i], "--mg-smoother-halo-prec") == 0){
@@ -3765,7 +3985,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  //DMH
   if( strcmp(argv[i], "--mg-eig-check-interval") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -4000,8 +4219,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-
-  if( strcmp(argv[i], "--ngcrkrylov") == 0){
+  
+  if( strcmp(argv[i], "--ngcrkrylov") == 0 || strcmp(argv[i], "--ca-basis-size") == 0) {
     if (i+1 >= argc){
       usage(argv);
     }
@@ -4015,6 +4234,50 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--ca-basis-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "power") == 0){
+      ca_basis = QUDA_POWER_BASIS;
+    }else if (strcmp(argv[i+1], "chebyshev") == 0 || strcmp(argv[i+1], "cheby") == 0){
+      ca_basis = QUDA_CHEBYSHEV_BASIS;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for basis ca cg type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--cheby-basis-eig-min") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    ca_lambda_min = atof(argv[i+1]);
+    if (ca_lambda_min < 0.0){
+      printf("ERROR: invalid minimum eigenvalue for CA-CG (%f < 0.0)\n", ca_lambda_min);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--cheby-basis-eig-max") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    ca_lambda_max = atof(argv[i+1]);
+    // negative value induces power iterations to guess
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--pipeline") == 0){
     if (i+1 >= argc){
       usage(argv);

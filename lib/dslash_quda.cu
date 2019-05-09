@@ -6,49 +6,13 @@
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
-
-// these control the Wilson-type actions
-#ifdef GPU_WILSON_DIRAC
-//#define DIRECT_ACCESS_LINK
-//#define DIRECT_ACCESS_WILSON_SPINOR
-//#define DIRECT_ACCESS_WILSON_ACCUM
-//#define DIRECT_ACCESS_WILSON_INTER
-//#define DIRECT_ACCESS_WILSON_PACK_SPINOR
-//#define DIRECT_ACCESS_CLOVER
-#endif // GPU_WILSON_DIRAC
-
-//these are access control for staggered action
-#ifdef GPU_STAGGERED_DIRAC
-#if (__COMPUTE_CAPABILITY__ >= 300) // Kepler works best with texture loads only
-//#define DIRECT_ACCESS_FAT_LINK
-//#define DIRECT_ACCESS_LONG_LINK
-//#define DIRECT_ACCESS_SPINOR
-//#define DIRECT_ACCESS_ACCUM
-//#define DIRECT_ACCESS_INTER
-//#define DIRECT_ACCESS_PACK
-#else // fermi
-//#define DIRECT_ACCESS_FAT_LINK
-//#define DIRECT_ACCESS_LONG_LINK
-#define DIRECT_ACCESS_SPINOR
-//#define DIRECT_ACCESS_ACCUM
-//#define DIRECT_ACCESS_INTER
-//#define DIRECT_ACCESS_PACK
-#endif
-#endif // GPU_STAGGERED_DIRAC
-
-#include <quda_internal.h>
 #include <dslash_quda.h>
-#include <sys/time.h>
-#include <blas_quda.h>
-
-#include <inline_ptx.h>
-
-
 #include <color_spinor_field_order.h>
 #include <clover_field_order.h>
 #include <index_helper.cuh>
 #include <color_spinor.h>
 #include <linalg.cuh>
+#include <dslash_policy.cuh>
 
 namespace quda {
 
@@ -88,15 +52,35 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
-#ifdef PTHREADS
-    cudaEvent_t interiorDslashEnd;
-#endif
     cudaEvent_t packEnd[2];
     cudaEvent_t gatherStart[Nstream];
     cudaEvent_t gatherEnd[Nstream];
     cudaEvent_t scatterStart[Nstream];
     cudaEvent_t scatterEnd[Nstream];
     cudaEvent_t dslashStart[2];
+
+    // these variables are used for benchmarking the dslash components in isolation
+    bool dslash_pack_compute;
+    bool dslash_interior_compute;
+    bool dslash_exterior_compute;
+    bool dslash_comms;
+    bool dslash_copy;
+
+    // whether the dslash policy tuner has been enabled
+    bool dslash_policy_init;
+
+    // used to keep track of which policy to start the autotuning
+    int first_active_policy;
+    int first_active_p2p_policy;
+
+    // list of dslash policies that are enabled
+    std::vector<QudaDslashPolicy> policies;
+
+    // list of p2p policies that are enabled
+    std::vector<QudaP2PPolicy> p2p_policies;
+
+    // string used as a tunekey to ensure we retune if the dslash policy env changes
+    char policy_string[TuneKey::aux_n];
 
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
@@ -122,9 +106,6 @@ namespace quda {
       cudaEventCreateWithFlags(&packEnd[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
     }
-#ifdef PTHREADS
-    cudaEventCreateWithFlags(&interiorDslashEnd, cudaEventDisableTiming);
-#endif
 
     aux_worker = NULL;
 
@@ -137,6 +118,26 @@ namespace quda {
 #endif
 
     checkCudaError();
+
+    dslash_pack_compute = true;
+    dslash_interior_compute = true;
+    dslash_exterior_compute = true;
+    dslash_comms = true;
+    dslash_copy = true;
+
+    dslash_policy_init = false;
+    first_active_policy = 0;
+    first_active_p2p_policy = 0;
+
+    // list of dslash policies that are enabled
+    policies = std::vector<QudaDslashPolicy>(
+        static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+
+    // list of p2p policies that are enabled
+    p2p_policies = std::vector<QudaP2PPolicy>(
+        static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
+
+    strcat(policy_string, ",pol=");
   }
 
 
@@ -160,9 +161,6 @@ namespace quda {
       cudaEventDestroy(packEnd[i]);
       cudaEventDestroy(dslashStart[i]);
     }
-#ifdef PTHREADS
-    cudaEventDestroy(interiorDslashEnd);
-#endif
 
     checkCudaError();
   }
@@ -181,9 +179,9 @@ namespace quda {
     const int nParity;    // number of parities we're working on
     bool doublet;         // whether we applying the operator to a doublet
     const int volumeCB;   // checkerboarded volume
-    RegType a;
-    RegType b;
-    RegType c;
+    RegType a;            // scale factor
+    RegType b;            // chiral twist
+    RegType c;            // flavor twist
 
     GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
 	     RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
@@ -198,19 +196,26 @@ namespace quda {
 
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
 	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-	  a = 2.0 * kappa * mu;
-	  b = 1.0;
-	} else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-	  a = -2.0 * kappa * mu;
-	  b = 1.0 / (1.0 + a*a);
-	}
+          b = 2.0 * kappa * mu;
+          a = 1.0;
+        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
+          b = -2.0 * kappa * mu;
+          a = 1.0 / (1.0 + b * b);
+        }
 	c = 0.0;
-	if (dagger) a *= -1.0;
+        if (dagger) b *= -1.0;
       } else if (doublet) {
-	a = (twist == QUDA_TWIST_GAMMA5_INVERSE) ? -2.0 * kappa * mu : 2.0 * kappa * mu;
-	b = 2.0 * kappa * epsilon;
-	c = 1.0 / (1.0 + a*a - b*b);
-	if (c<=0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
+        if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+          b = 2.0 * kappa * mu;
+          c = -2.0 * kappa * epsilon;
+          a = 1.0;
+        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
+          b = -2.0 * kappa * mu;
+          c = 2.0 * kappa * epsilon;
+          a = 1.0 / (1.0 + b * b - c * c);
+          if (a <= 0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
+        }
+        if (dagger) b *= -1.0;
       }
     }
   };
@@ -315,6 +320,8 @@ namespace quda {
       ApplyGamma<float>(out, in, d);
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
       ApplyGamma<short>(out, in, d);
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyGamma<char>(out, in, d);
     } else {
       errorQuda("Unsupported precision %d\n", in.Precision());
     }
@@ -329,13 +336,13 @@ namespace quda {
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
 	if (!doublet) {
 	  ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-	  arg.out(x_cb, parity) = arg.b*(in + arg.a*in.igamma(arg.d));
-	} else {
+          arg.out(x_cb, parity) = arg.a * (in + arg.b * in.igamma(arg.d));
+        } else {
 	  ColorSpinor<RegType,nColor,4> in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
 	  ColorSpinor<RegType,nColor,4> in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
-	  arg.out(x_cb+0*arg.volumeCB, parity) = arg.c*(in_1 - arg.a*in_1.igamma(arg.d) + arg.b*in_2);
-	  arg.out(x_cb+1*arg.volumeCB, parity) = arg.c*(in_2 + arg.a*in_2.igamma(arg.d) + arg.b*in_1);
-	}
+          arg.out(x_cb + 0 * arg.volumeCB, parity) = arg.a * (in_1 + arg.b * in_1.igamma(arg.d) + arg.c * in_2);
+          arg.out(x_cb + 1 * arg.volumeCB, parity) = arg.a * (in_2 - arg.b * in_2.igamma(arg.d) + arg.c * in_1);
+        }
       } // 4-d volumeCB
     } // parity
 
@@ -352,12 +359,12 @@ namespace quda {
 
     if (!doublet) {
       ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
-      arg.out(x_cb, parity) = arg.b*(in + arg.a*in.igamma(d));
+      arg.out(x_cb, parity) = arg.a * (in + arg.b * in.igamma(d));
     } else {
       ColorSpinor<RegType,nColor,4> in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
       ColorSpinor<RegType,nColor,4> in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
-      arg.out(x_cb+0*arg.volumeCB, parity) = arg.c*(in_1 - arg.a*in_1.igamma(d) + arg.b*in_2);
-      arg.out(x_cb+1*arg.volumeCB, parity) = arg.c*(in_2 + arg.a*in_2.igamma(d) + arg.b*in_1);
+      arg.out(x_cb + 0 * arg.volumeCB, parity) = arg.a * (in_1 + arg.b * in_1.igamma(d) + arg.c * in_2);
+      arg.out(x_cb + 1 * arg.volumeCB, parity) = arg.a * (in_2 - arg.b * in_2.igamma(d) + arg.c * in_1);
     }
   }
 
@@ -440,6 +447,8 @@ namespace quda {
       ApplyTwistGamma<float>(out, in, d, kappa, mu, epsilon, dagger, type);
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
       ApplyTwistGamma<short>(out, in, d, kappa, mu, epsilon, dagger, type);
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyTwistGamma<char>(out, in, d, kappa, mu, epsilon, dagger, type);
     } else {
       errorQuda("Unsupported precision %d\n", in.Precision());
     }
@@ -508,17 +517,30 @@ namespace quda {
 
   template <typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ inline void cloverApply(Arg &arg, int x_cb, int parity) {
+    using namespace linalg; // for Cholesky
     typedef typename mapper<Float>::type RegType;
+    typedef ColorSpinor<RegType, nColor, nSpin> Spinor;
+    typedef ColorSpinor<RegType, nColor, nSpin / 2> HalfSpinor;
     int spinor_parity = arg.nParity == 2 ? parity : 0;
-    ColorSpinor<RegType,nColor,nSpin> in = arg.in(x_cb, spinor_parity);
-    ColorSpinor<RegType,nColor,nSpin> out;
+    Spinor in = arg.in(x_cb, spinor_parity);
+    Spinor out;
 
     in.toRel(); // change to chiral basis here
 
 #pragma unroll
     for (int chirality=0; chirality<2; chirality++) {
+
       HMatrix<RegType,nColor*nSpin/2> A = arg.clover(x_cb, parity, chirality);
-      out += (A * in.chiral_project(chirality)).chiral_reconstruct(chirality);
+      HalfSpinor chi = in.chiral_project(chirality);
+
+      if (arg.dynamic_clover) {
+        Cholesky<HMatrix, RegType, nColor * nSpin / 2> cholesky(A);
+        chi = static_cast<RegType>(0.25) * cholesky.backward(cholesky.forward(chi));
+      } else {
+        chi = A * chi;
+      }
+
+      out += chi.chiral_reconstruct(chirality);
     }
 
     out.toNonRel(); // change basis back
@@ -583,9 +605,21 @@ namespace quda {
   {
     if (in.Nspin() != 4) errorQuda("Unsupported nSpin=%d", in.Nspin());
     constexpr int nSpin = 4;
-    CloverArg<Float,nSpin,nColor> arg(out, in, clover, inverse, parity);
-    Clover<Float,nSpin,nColor,CloverArg<Float,nSpin,nColor> > worker(arg, in);
-    worker.apply(streams[Nstream-1]);
+
+    if (inverse) {
+#ifdef DYNAMIC_CLOVER
+      constexpr bool dynamic_clover = true;
+#else
+      constexpr bool dynamic_clover = false;
+#endif
+      CloverArg<Float, nSpin, nColor, dynamic_clover> arg(out, in, clover, inverse, parity);
+      Clover<Float, nSpin, nColor, CloverArg<Float, nSpin, nColor, dynamic_clover>> worker(arg, in);
+      worker.apply(streams[Nstream - 1]);
+    } else {
+      CloverArg<Float, nSpin, nColor, false> arg(out, in, clover, inverse, parity);
+      Clover<Float, nSpin, nColor, CloverArg<Float, nSpin, nColor, false>> worker(arg, in);
+      worker.apply(streams[Nstream - 1]);
+    }
 
     checkCudaError();
   }
@@ -615,6 +649,8 @@ namespace quda {
       ApplyClover<float>(out, in, clover, inverse, parity);
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
       ApplyClover<short>(out, in, clover, inverse, parity);
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyClover<char>(out, in, clover, inverse, parity);
     } else {
       errorQuda("Unsupported precision %d\n", in.Precision());
     }
@@ -776,6 +812,8 @@ namespace quda {
       ApplyTwistClover<float>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
       ApplyTwistClover<short>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyTwistClover<char>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
     } else {
       errorQuda("Unsupported precision %d\n", in.Precision());
     }
@@ -785,5 +823,3 @@ namespace quda {
   }
 
 } // namespace quda
-
-#include "contract.cu"

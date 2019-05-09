@@ -1,4 +1,3 @@
-#include <typeinfo>
 #include <gauge_field_order.h>
 
 namespace quda {
@@ -61,8 +60,9 @@ namespace quda {
     double nrm1 = 0.0;
     switch(precision) {
     case QUDA_DOUBLE_PRECISION: nrm1 = norm<double>(*this, d, NORM1); break;
-    case QUDA_SINGLE_PRECISION: nrm1 = norm< float>(*this, d, NORM1); break;
-    case   QUDA_HALF_PRECISION: nrm1 = norm< short>(*this, d, NORM1); break;
+    case QUDA_SINGLE_PRECISION: nrm1 = norm<float>(*this, d, NORM1); break;
+    case QUDA_HALF_PRECISION: nrm1 = norm<short>(*this, d, NORM1); break;
+    case QUDA_QUARTER_PRECISION: nrm1 = norm<char>(*this, d, NORM1); break;
     default: errorQuda("Unsupported precision %d", precision);
     }
     return nrm1;
@@ -73,8 +73,9 @@ namespace quda {
     double nrm2 = 0.0;
     switch(precision) {
     case QUDA_DOUBLE_PRECISION: nrm2 = norm<double>(*this, d, NORM2); break;
-    case QUDA_SINGLE_PRECISION: nrm2 = norm< float>(*this, d, NORM2); break;
-    case   QUDA_HALF_PRECISION: nrm2 = norm< short>(*this, d, NORM2); break;
+    case QUDA_SINGLE_PRECISION: nrm2 = norm<float>(*this, d, NORM2); break;
+    case QUDA_HALF_PRECISION: nrm2 = norm<short>(*this, d, NORM2); break;
+    case QUDA_QUARTER_PRECISION: nrm2 = norm<char>(*this, d, NORM2); break;
     default: errorQuda("Unsupported precision %d", precision);
     }
     return nrm2;
@@ -85,8 +86,9 @@ namespace quda {
     double max = 0.0;
     switch(precision) {
     case QUDA_DOUBLE_PRECISION: max = norm<double>(*this, d, ABS_MAX); break;
-    case QUDA_SINGLE_PRECISION: max = norm< float>(*this, d, ABS_MAX); break;
-    case   QUDA_HALF_PRECISION: max = norm< short>(*this, d, ABS_MAX); break;
+    case QUDA_SINGLE_PRECISION: max = norm<float>(*this, d, ABS_MAX); break;
+    case QUDA_HALF_PRECISION: max = norm<short>(*this, d, ABS_MAX); break;
+    case QUDA_QUARTER_PRECISION: max = norm<char>(*this, d, ABS_MAX); break;
     default: errorQuda("Unsupported precision %d", precision);
     }
     return max;
@@ -97,8 +99,9 @@ namespace quda {
     double min = 0.0;
     switch(precision) {
     case QUDA_DOUBLE_PRECISION: min = norm<double>(*this, d, ABS_MIN); break;
-    case QUDA_SINGLE_PRECISION: min = norm< float>(*this, d, ABS_MIN); break;
-    case   QUDA_HALF_PRECISION: min = norm< short>(*this, d, ABS_MIN); break;
+    case QUDA_SINGLE_PRECISION: min = norm<float>(*this, d, ABS_MIN); break;
+    case QUDA_HALF_PRECISION: min = norm<short>(*this, d, ABS_MIN); break;
+    case QUDA_QUARTER_PRECISION: min = norm<char>(*this, d, ABS_MIN); break;
     default: errorQuda("Unsupported precision %d", precision);
     }
     return min;

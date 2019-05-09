@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <complex.h>
 
 #include <quda.h>
 #include <test_util.h>
@@ -267,10 +268,10 @@ void multiplySpinorByDiracProjector5(Float *res, int projIdx, Float *spinorIn) {
 //
 //An "ok" will only be granted once check2.tex is deemed complete,
 //since the logic in this function is important and nontrivial.
-template <QudaDWFPCType type, typename sFloat, typename gFloat>
-void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, 
-			     int oddBit, int daggerBit) {
-  
+template <QudaPCType type, typename sFloat, typename gFloat>
+void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int oddBit, int daggerBit)
+{
+
   // Initialize the return half-spinor to zero.  Note that it is a
   // 5d spinor, hence the use of V5h.
   for (int i=0; i<V5h*4*3*2; i++) res[i] = 0.0;
@@ -325,9 +326,9 @@ void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorFiel
 }
 
 #ifdef MULTI_GPU
-template <QudaDWFPCType type, typename sFloat, typename gFloat>
+template <QudaPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField,
-			     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
+    sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
 {
   int mySpinorSiteSize = 24;		    
   for (int i=0; i<V5h*mySpinorSiteSize; i++) res[i] = 0.0;
@@ -373,9 +374,9 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
 #endif
 
 //Currently we consider only spacetime decomposition (not in 5th dim), so this operator is local
-template <QudaDWFPCType type, bool zero_initialize=false, typename sFloat>
-void dslashReference_5th(sFloat *res, sFloat *spinorField, 
-                int oddBit, int daggerBit, sFloat mferm) {
+template <QudaPCType type, bool zero_initialize = false, typename sFloat>
+void dslashReference_5th(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm)
+{
   for (int i = 0; i < V5h; i++) {
     if (zero_initialize) for(int one_site = 0 ; one_site < 24 ; one_site++)
       res[i*(4*3*2)+one_site] = 0.0;
@@ -401,8 +402,8 @@ void dslashReference_5th(sFloat *res, sFloat *spinorField,
 
 //Currently we consider only spacetime decomposition (not in 5th dim), so this operator is local
 template <typename sFloat>
-void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, 
-                int oddBit, int daggerBit, sFloat mferm, double *kappa) {
+void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm, double *kappa)
+{
   double *inv_Ftr = (double*)malloc(Ls*sizeof(sFloat));
   double *Ftr = (double*)malloc(Ls*sizeof(sFloat));
   for(int xs = 0 ; xs < Ls ; xs++)
@@ -489,9 +490,87 @@ void dslashReference_5th_inv(sFloat *res, sFloat *spinorField,
   free(Ftr);
 }
 
+// Currently we consider only spacetime decomposition (not in 5th dim), so this operator is local
+template <typename sFloat, typename sComplex>
+void mdslashReference_5th_inv(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm, sComplex *kappa)
+{
+  sComplex *inv_Ftr = (sComplex *)malloc(Ls * sizeof(sComplex));
+  sComplex *Ftr = (sComplex *)malloc(Ls * sizeof(sComplex));
+  for (int xs = 0; xs < Ls; xs++) {
+    inv_Ftr[xs] = 1.0 / (1.0 + cpow(2.0 * kappa[xs], Ls) * mferm);
+    Ftr[xs] = -2.0 * kappa[xs] * mferm * inv_Ftr[xs];
+    for (int i = 0; i < Vh; i++) {
+      memcpy(&res[24 * (i + Vh * xs)], &spinorField[24 * (i + Vh * xs)], 24 * sizeof(sFloat));
+    }
+  }
+  if (daggerBit == 0) {
+    // s = 0
+    for (int i = 0; i < Vh; i++) {
+      ax((sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], inv_Ftr[0],
+          (sComplex *)&spinorField[12 + 24 * (i + Vh * (Ls - 1))], 6);
+    }
+
+    // s = 1 ... ls-2
+    for (int xs = 0; xs <= Ls - 2; ++xs) {
+      for (int i = 0; i < Vh; i++) {
+        axpy((2.0 * kappa[xs]), (sComplex *)&res[24 * (i + Vh * xs)], (sComplex *)&res[24 * (i + Vh * (xs + 1))], 6);
+        axpy(Ftr[xs], (sComplex *)&res[12 + 24 * (i + Vh * xs)], (sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], 6);
+      }
+      for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] *= 2.0 * kappa[tmp_s];
+    }
+    for (int xs = 0; xs < Ls; xs++) Ftr[xs] = -cpow(2.0 * kappa[xs], Ls - 1) * mferm * inv_Ftr[xs];
+
+    // s = ls-2 ... 0
+    for (int xs = Ls - 2; xs >= 0; --xs) {
+      for (int i = 0; i < Vh; i++) {
+        axpy(Ftr[xs], (sComplex *)&res[24 * (i + Vh * (Ls - 1))], (sComplex *)&res[24 * (i + Vh * xs)], 6);
+        axpy((2.0 * kappa[xs]), (sComplex *)&res[12 + 24 * (i + Vh * (xs + 1))],
+            (sComplex *)&res[12 + 24 * (i + Vh * xs)], 6);
+      }
+      for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
+    }
+    // s = ls -1
+    for (int i = 0; i < Vh; i++) {
+      ax((sComplex *)&res[24 * (i + Vh * (Ls - 1))], inv_Ftr[Ls - 1], (sComplex *)&res[24 * (i + Vh * (Ls - 1))], 6);
+    }
+  } else {
+    // s = 0
+    for (int i = 0; i < Vh; i++) {
+      ax((sComplex *)&res[24 * (i + Vh * (Ls - 1))], inv_Ftr[0], (sComplex *)&spinorField[24 * (i + Vh * (Ls - 1))], 6);
+    }
+
+    // s = 1 ... ls-2
+    for (int xs = 0; xs <= Ls - 2; ++xs) {
+      for (int i = 0; i < Vh; i++) {
+        axpy(Ftr[xs], (sComplex *)&res[24 * (i + Vh * xs)], (sComplex *)&res[24 * (i + Vh * (Ls - 1))], 6);
+        axpy((2.0 * kappa[xs]), (sComplex *)&res[12 + 24 * (i + Vh * xs)],
+            (sComplex *)&res[12 + 24 * (i + Vh * (xs + 1))], 6);
+      }
+      for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] *= 2.0 * kappa[tmp_s];
+    }
+    for (int xs = 0; xs < Ls; xs++) Ftr[xs] = -cpow(2.0 * kappa[xs], Ls - 1) * mferm * inv_Ftr[xs];
+
+    // s = ls-2 ... 0
+    for (int xs = Ls - 2; xs >= 0; --xs) {
+      for (int i = 0; i < Vh; i++) {
+        axpy((2.0 * kappa[xs]), (sComplex *)&res[24 * (i + Vh * (xs + 1))], (sComplex *)&res[24 * (i + Vh * xs)], 6);
+        axpy(Ftr[xs], (sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], (sComplex *)&res[12 + 24 * (i + Vh * xs)], 6);
+      }
+      for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
+    }
+    // s = ls -1
+    for (int i = 0; i < Vh; i++) {
+      ax((sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], inv_Ftr[Ls - 1],
+          (sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], 6);
+    }
+  }
+  free(inv_Ftr);
+  free(Ftr);
+}
 
 // this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
-void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm) 
+void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+    QudaGaugeParam &gauge_param, double mferm)
 {
 #ifndef MULTI_GPU
   if (precision == QUDA_DOUBLE_PRECISION) {
@@ -525,8 +604,8 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    csParam.PCtype = QUDA_5D_PC;
-  
+    csParam.pc_type = QUDA_5D_PC;
+
     cpuColorSpinorField inField(csParam);
 
     {  // Now do the exchange
@@ -587,8 +666,8 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    csParam.PCtype = QUDA_4D_PC;
-  
+    csParam.pc_type = QUDA_4D_PC;
+
     cpuColorSpinorField inField(csParam);
 
     {  // Now do the exchange
@@ -633,7 +712,18 @@ void dslash_5_inv(void *out, void **gauge, void *in, int oddBit, int daggerBit, 
   }
 }
 
-void mdw_dslash_5(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double *kappa, bool zero_initialize)
+void mdw_dslash_5_inv(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+    QudaGaugeParam &gauge_param, double mferm, double _Complex *kappa)
+{
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    mdslashReference_5th_inv((double *)out, (double *)in, oddBit, daggerBit, mferm, kappa);
+  } else {
+    mdslashReference_5th_inv((float *)out, (float *)in, oddBit, daggerBit, (float)mferm, kappa);
+  }
+}
+
+void mdw_dslash_5(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+    QudaGaugeParam &gauge_param, double mferm, double _Complex *kappa, bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize) dslashReference_5th<QUDA_4D_PC,true>((double*)out, (double*)in, oddBit, daggerBit, mferm);
@@ -643,25 +733,31 @@ void mdw_dslash_5(void *out, void **gauge, void *in, int oddBit, int daggerBit, 
     else dslashReference_5th<QUDA_4D_PC,false>((float*)out, (float*)in, oddBit, daggerBit, (float)mferm);
   }
   for(int xs = 0 ; xs < Ls ; xs++) {
-    xpay((char*)in + precision*Vh*spinorSiteSize*xs, kappa[xs], (char*)out + precision*Vh*spinorSiteSize*xs, Vh*spinorSiteSize, precision);
+    cxpay((char *)in + precision * Vh * spinorSiteSize * xs, kappa[xs],
+        (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
   }
 }
 
-void mdw_dslash_4_pre(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double *b5, double *c5, bool zero_initialize)
+void mdw_dslash_4_pre(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+    QudaGaugeParam &gauge_param, double mferm, double _Complex *b5, double _Complex *c5, bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize) dslashReference_5th<QUDA_4D_PC, true>((double*)out, (double*)in, oddBit, daggerBit, mferm);
     else dslashReference_5th<QUDA_4D_PC, false>((double*)out, (double*)in, oddBit, daggerBit, mferm);
     for(int xs = 0 ; xs < Ls ; xs++)
     {
-      axpby(b5[xs],(double*)in  + Vh*spinorSiteSize*xs,0.5*c5[xs], (double*)out  + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
+      axpby(b5[xs], (double _Complex *)in + Vh * spinorSiteSize / 2 * xs, 0.5 * c5[xs],
+          (double _Complex *)out + Vh * spinorSiteSize / 2 * xs, Vh * spinorSiteSize / 2);
     }
   } else {
-    if (zero_initialize)  dslashReference_5th<QUDA_4D_PC, true>((float*)out, (float*)in, oddBit, daggerBit, (float)mferm);
+    if (zero_initialize)
+      dslashReference_5th<QUDA_4D_PC, true>((float *)out, (float *)in, oddBit, daggerBit, (float)mferm);
     else dslashReference_5th<QUDA_4D_PC,false>((float*)out, (float*)in, oddBit, daggerBit, (float)mferm);
     for(int xs = 0 ; xs < Ls ; xs++)
     {
-      axpby((float)(b5[xs]),(float*)in + Vh*spinorSiteSize*xs, (float)(0.5*c5[xs]), (float*)out + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
+      axpby((float _Complex)(b5[xs]), (float _Complex *)in + Vh * (spinorSiteSize / 2) * xs,
+          (float _Complex)(0.5 * c5[xs]), (float _Complex *)out + Vh * (spinorSiteSize / 2) * xs,
+          Vh * spinorSiteSize / 2);
     }
   }
   
@@ -698,10 +794,12 @@ void dw_4d_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, 
   xpay(in, -kappa, out, V5*spinorSiteSize, precision);
 }
 
-void mdw_mat(void *out, void **gauge, void *in, double *kappa_b, double *kappa_c, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double *b5, double *c5) {
+void mdw_mat(void *out, void **gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c, int dagger,
+    QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double _Complex *b5, double _Complex *c5)
+{
 
   void *tmp = malloc(V5h*spinorSiteSize*precision);
-  double *kappa5 = (double*)malloc(Ls*sizeof(double));
+  double _Complex *kappa5 = (double _Complex *)malloc(Ls * sizeof(double _Complex));
 
   for(int xs = 0; xs < Ls ; xs++) kappa5[xs] = 0.5*kappa_b[xs]/kappa_c[xs];
 
@@ -715,8 +813,8 @@ void mdw_mat(void *out, void **gauge, void *in, double *kappa_b, double *kappa_c
   mdw_dslash_5(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, kappa5, true);
 
   for(int xs = 0 ; xs < Ls ; xs++) {
-    xpay((char*)tmp + precision*Vh*spinorSiteSize*xs, -kappa_b[xs], (char*)outOdd + precision*Vh*spinorSiteSize*xs,
-	 Vh*spinorSiteSize, precision);
+    cxpay((char *)tmp + precision * Vh * spinorSiteSize * xs, -kappa_b[xs],
+        (char *)outOdd + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
   }
 
   mdw_dslash_4_pre(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
@@ -724,8 +822,8 @@ void mdw_mat(void *out, void **gauge, void *in, double *kappa_b, double *kappa_c
   mdw_dslash_5(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, kappa5, true);
 
   for(int xs = 0 ; xs < Ls ; xs++) {
-    xpay((char*)tmp + precision*Vh*spinorSiteSize*xs, -kappa_b[xs], (char*)outEven + precision*Vh*spinorSiteSize*xs,
-	 Vh*spinorSiteSize, precision);
+    cxpay((char *)tmp + precision * Vh * spinorSiteSize * xs, -kappa_b[xs],
+        (char *)outEven + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
   }
 
   free(kappa5);
@@ -805,12 +903,14 @@ void dw_4d_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType 
   free(kappa5);
 }
 
-void mdw_matpc(void *out, void **gauge, void *in, double *kappa_b, double *kappa_c, QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double *b5, double *c5)
+void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
+    QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
+    double _Complex *b5, double _Complex *c5)
 {
-  void *tmp = malloc(V5h*spinorSiteSize*precision);  
-  double *kappa5 = (double*)malloc(Ls*sizeof(double));
-  double *kappa2 = (double*)malloc(Ls*sizeof(double));
-  double *kappa_mdwf = (double*)malloc(Ls*sizeof(double));
+  void *tmp = malloc(V5h*spinorSiteSize*precision);
+  double _Complex *kappa5 = (double _Complex *)malloc(Ls * sizeof(double _Complex));
+  double _Complex *kappa2 = (double _Complex *)malloc(Ls * sizeof(double _Complex));
+  double _Complex *kappa_mdwf = (double _Complex *)malloc(Ls * sizeof(double _Complex));
   for(int xs = 0; xs < Ls ; xs++)
   {
     kappa5[xs] = 0.5*kappa_b[xs]/kappa_c[xs];
@@ -825,46 +925,46 @@ void mdw_matpc(void *out, void **gauge, void *in, double *kappa_b, double *kappa
   if (symmetric && !dagger) {
     mdw_dslash_4_pre(tmp, gauge, in, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
     dslash_4_4d(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm);
-    dslash_5_inv(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    mdw_dslash_5_inv(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
     mdw_dslash_4_pre(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
     dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
-    dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
     for(int xs = 0 ; xs < Ls ; xs++) {
-      xpay((char*)in + precision*Vh*spinorSiteSize*xs, kappa2[xs], (char*)out + precision*Vh*spinorSiteSize*xs,
-	   Vh*spinorSiteSize, precision);
+      cxpay((char *)in + precision * Vh * spinorSiteSize * xs, kappa2[xs],
+          (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
     }
   } else if (symmetric && dagger) {
-    dslash_5_inv(tmp, gauge, in, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    mdw_dslash_5_inv(tmp, gauge, in, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
     dslash_4_4d(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm);
     mdw_dslash_4_pre(tmp, gauge, out, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
-    dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
     dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
     mdw_dslash_4_pre(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
     for(int xs = 0 ; xs < Ls ; xs++) {
-      xpay((char*)in + precision*Vh*spinorSiteSize*xs, kappa2[xs], (char*)out + precision*Vh*spinorSiteSize*xs,
-	   Vh*spinorSiteSize, precision);
+      cxpay((char *)in + precision * Vh * spinorSiteSize * xs, kappa2[xs],
+          (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
     }
   } else if (!symmetric && !dagger) {
     mdw_dslash_4_pre(out, gauge, in, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
     dslash_4_4d(tmp, gauge, out, parity[0], dagger, precision, gauge_param, mferm);
-    dslash_5_inv(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    mdw_dslash_5_inv(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
     mdw_dslash_4_pre(tmp, gauge, out, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
     dslash_4_4d(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm);
     mdw_dslash_5(tmp, gauge, in, parity[0], dagger, precision, gauge_param, mferm, kappa5, true);
     for(int xs = 0 ; xs < Ls ; xs++) {
-      xpay((char*)tmp + precision*Vh*spinorSiteSize*xs, kappa2[xs], (char*)out + precision*Vh*spinorSiteSize*xs,
-	   Vh*spinorSiteSize, precision);
+      cxpay((char *)tmp + precision * Vh * spinorSiteSize * xs, kappa2[xs],
+          (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
     }
   } else if (!symmetric && dagger) {
     dslash_4_4d(out, gauge, in, parity[0], dagger, precision, gauge_param, mferm);
     mdw_dslash_4_pre(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
-    dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
     dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
     mdw_dslash_4_pre(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
     mdw_dslash_5(tmp, gauge, in, parity[0], dagger, precision, gauge_param, mferm, kappa5, true);
     for(int xs = 0 ; xs < Ls ; xs++) {
-      xpay((char*)tmp + precision*Vh*spinorSiteSize*xs, kappa2[xs], (char*)out + precision*Vh*spinorSiteSize*xs,
-	   Vh*spinorSiteSize, precision);
+      cxpay((char *)tmp + precision * Vh * spinorSiteSize * xs, kappa2[xs],
+          (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
     }
   } else {
     errorQuda("Unsupported matpc_type=%d dagger=%d", matpc_type, dagger);

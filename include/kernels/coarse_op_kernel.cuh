@@ -4,6 +4,7 @@
 #include <multigrid_helper.cuh>
 #include <index_helper.cuh>
 #include <gamma.cuh>
+#include <linalg.cuh>
 
 #define max_color_per_block 8
 
@@ -128,8 +129,7 @@ namespace quda {
 	   int coarseSpin, int coarseColor, typename Wtype, typename Arg>
   __device__ __host__ inline void computeUV(Arg &arg, const Wtype &W, int parity, int x_cb, int ic_c) {
 
-    int coord[5];
-    coord[4] = 0;
+    int coord[4];
     getCoords(coord, x_cb, arg.x_size, parity);
 
     constexpr int uvSpin = fineSpin * (from_coarse ? 2 : 1);
@@ -226,67 +226,82 @@ namespace quda {
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x)
      Where: s = fine spin, c' = coarse color, c = fine color
   */
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ inline void computeAV(Arg &arg, int parity, int x_cb, int ic_c) {
-
-    complex<Float> AV[fineSpin][fineColor];
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __device__ __host__ inline void computeAV(Arg &arg, int parity, int x_cb, int ch, int ic_c)
+  {
+    constexpr int N = fineSpin * fineColor / 2;
+    HMatrix<Float, N> A;
 
 #pragma unroll
-    for (int s = 0; s < fineSpin; s++) {
+    for (int i = 0; i < N; i++) {
+      int s_i = 2 * ch + i / fineColor;
+      int c_i = i % fineColor;
 #pragma unroll
-      for (int c = 0; c < fineColor; c++) {
-	AV[s][c] = static_cast<Float>(0.0);
+      for (int j = 0; j <= i; j++) {
+        int s_j = 2 * ch + j / fineColor;
+        int c_j = j % fineColor;
+#ifndef DYNAMIC_CLOVER
+        A(i, j) = arg.Cinv(0, parity, x_cb, s_i, s_j, c_i, c_j);
+#else
+        A(i, j) = arg.C(0, parity, x_cb, s_i, s_j, c_i, c_j);
+#endif
       }
     }
 
-#pragma unroll
-    for (int s = 0; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = arg.spin_map(s,parity); // Coarse spin
+    ColorSpinor<Float, fineColor, fineSpin / 2> V;
+    for (int s = 0; s < fineSpin / 2; s++) {
+      for (int c = 0; c < fineColor; c++) { V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c); }
+    }
 
-      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
-      //in the same chiral block.
-      for (int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
-
-#pragma unroll
-	for (int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-#pragma unroll
-	  for (int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	    caxpy(arg.Cinv(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, ic_c), AV[s][ic]);
-	  }  //Fine color columns
-	}  //Fine color rows
-      }
-    } //Fine Spin
+#ifndef DYNAMIC_CLOVER
+    auto AV = A * V;
+#else
+    // solve for the matrix
+    linalg::Cholesky<HMatrix, Float, N> cholesky(A);
+    auto AV = cholesky.backward(cholesky.forward(V));
+#endif
 
 #pragma unroll
-    for (int s=0; s<fineSpin; s++) {
+    for (int s = 0; s < fineSpin / 2; s++) {
 #pragma unroll
-      for (int ic=0; ic<fineColor; ic++) {
-	arg.AV(parity, x_cb, s, ic, ic_c) = AV[s][ic];
-      }
+      for (int ic = 0; ic < fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic); }
     }
 
   } // computeAV
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  void ComputeAVCPU(Arg &arg) {
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg> void ComputeAVCPU(Arg &arg)
+  {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-	for (int ic_c=0; ic_c < coarseColor; ic_c++) // coarse color
-	  computeAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, ic_c);
+        for (int ch = 0; ch < 2; ch++) { // Loop over chiral blocks
+
+          for (int ic_c = 0; ic_c < coarseColor; ic_c++) { // coarse color
+            computeAV<Float, fineSpin, fineColor, coarseColor>(arg, parity, x_cb, ch, ic_c);
+          }
+        }
       } // c/b volume
     }   // parity
   }
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __global__ void ComputeAVGPU(Arg arg) {
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __global__ void ComputeAVGPU(Arg arg)
+  {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
+    int ch_parity = blockDim.y * blockIdx.y + threadIdx.y;
+    if (ch_parity >= 4) return;
+    int ch = ch_parity % 2;
+    int parity = ch_parity / 2;
+
+    int ic_c = blockDim.z * blockIdx.z + threadIdx.z; // coarse color
     if (ic_c >= coarseColor) return;
-    computeAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, ic_c);
+
+    if (ch == 0)
+      computeAV<Float, fineSpin, fineColor, coarseColor>(arg, parity, x_cb, 0, ic_c);
+    else
+      computeAV<Float, fineSpin, fineColor, coarseColor>(arg, parity, x_cb, 1, ic_c);
   }
 
   /**
@@ -337,382 +352,174 @@ namespace quda {
   }
 
 #ifdef DYNAMIC_CLOVER
-#ifdef UGLY_DYNCLOV
-#include<dyninv_clover_mg.cuh>
-#else
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ inline void applyCloverInv(Arg &arg, const complex<Float> UV[fineSpin][fineColor][coarseColor], int parity, int x_cb) {
-    /* Applies the inverse of the clover term squared plus mu2 to the spinor */
-    /* Compute (T^2 + mu2) first, then invert */
-    /* We proceed by chiral blocks */
-
-    for (int ch = 0; ch < 2; ch++) {	/* Loop over chiral blocks */
-      Float diag[6], tmp[6];
-      complex<Float> tri[15];	/* Off-diagonal components of the inverse clover term */
-
-      /*	This macro avoid the infinitely long expansion of the tri products	*/
-#define Cl(s1,c1,s2,c2) (arg.C(0, parity, x_cb, s1+2*ch, s2+2*ch, c1, c2))
-
-      tri[0]  = Cl(0,1,0,0)*Cl(0,0,0,0).real() + Cl(0,1,0,1)*Cl(0,1,0,0) + Cl(0,1,0,2)*Cl(0,2,0,0) + Cl(0,1,1,0)*Cl(1,0,0,0) + Cl(0,1,1,1)*Cl(1,1,0,0) + Cl(0,1,1,2)*Cl(1,2,0,0);
-      tri[1]  = Cl(0,2,0,0)*Cl(0,0,0,0).real() + Cl(0,2,0,2)*Cl(0,2,0,0) + Cl(0,2,0,1)*Cl(0,1,0,0) + Cl(0,2,1,0)*Cl(1,0,0,0) + Cl(0,2,1,1)*Cl(1,1,0,0) + Cl(0,2,1,2)*Cl(1,2,0,0);
-      tri[3]  = Cl(1,0,0,0)*Cl(0,0,0,0).real() + Cl(1,0,1,0)*Cl(1,0,0,0) + Cl(1,0,0,1)*Cl(0,1,0,0) + Cl(1,0,0,2)*Cl(0,2,0,0) + Cl(1,0,1,1)*Cl(1,1,0,0) + Cl(1,0,1,2)*Cl(1,2,0,0);
-      tri[6]  = Cl(1,1,0,0)*Cl(0,0,0,0).real() + Cl(1,1,1,1)*Cl(1,1,0,0) + Cl(1,1,0,1)*Cl(0,1,0,0) + Cl(1,1,0,2)*Cl(0,2,0,0) + Cl(1,1,1,0)*Cl(1,0,0,0) + Cl(1,1,1,2)*Cl(1,2,0,0);
-      tri[10] = Cl(1,2,0,0)*Cl(0,0,0,0).real() + Cl(1,2,1,2)*Cl(1,2,0,0) + Cl(1,2,0,1)*Cl(0,1,0,0) + Cl(1,2,0,2)*Cl(0,2,0,0) + Cl(1,2,1,0)*Cl(1,0,0,0) + Cl(1,2,1,1)*Cl(1,1,0,0);
-
-      tri[2]  = Cl(0,2,0,1)*Cl(0,1,0,1).real() + Cl(0,2,0,2)*Cl(0,2,0,1) + Cl(0,2,0,0)*Cl(0,0,0,1) + Cl(0,2,1,0)*Cl(1,0,0,1) + Cl(0,2,1,1)*Cl(1,1,0,1) + Cl(0,2,1,2)*Cl(1,2,0,1);
-      tri[4]  = Cl(1,0,0,1)*Cl(0,1,0,1).real() + Cl(1,0,1,0)*Cl(1,0,0,1) + Cl(1,0,0,0)*Cl(0,0,0,1) + Cl(1,0,0,2)*Cl(0,2,0,1) + Cl(1,0,1,1)*Cl(1,1,0,1) + Cl(1,0,1,2)*Cl(1,2,0,1);
-      tri[7]  = Cl(1,1,0,1)*Cl(0,1,0,1).real() + Cl(1,1,1,1)*Cl(1,1,0,1) + Cl(1,1,0,0)*Cl(0,0,0,1) + Cl(1,1,0,2)*Cl(0,2,0,1) + Cl(1,1,1,0)*Cl(1,0,0,1) + Cl(1,1,1,2)*Cl(1,2,0,1);
-      tri[11] = Cl(1,2,0,1)*Cl(0,1,0,1).real() + Cl(1,2,1,2)*Cl(1,2,0,1) + Cl(1,2,0,0)*Cl(0,0,0,1) + Cl(1,2,0,2)*Cl(0,2,0,1) + Cl(1,2,1,0)*Cl(1,0,0,1) + Cl(1,2,1,1)*Cl(1,1,0,1);
-
-      tri[5]  = Cl(1,0,0,2)*Cl(0,2,0,2).real() + Cl(1,0,1,0)*Cl(1,0,0,2) + Cl(1,0,0,0)*Cl(0,0,0,2) + Cl(1,0,0,1)*Cl(0,1,0,2) + Cl(1,0,1,1)*Cl(1,1,0,2) + Cl(1,0,1,2)*Cl(1,2,0,2);
-      tri[8]  = Cl(1,1,0,2)*Cl(0,2,0,2).real() + Cl(1,1,1,1)*Cl(1,1,0,2) + Cl(1,1,0,0)*Cl(0,0,0,2) + Cl(1,1,0,1)*Cl(0,1,0,2) + Cl(1,1,1,0)*Cl(1,0,0,2) + Cl(1,1,1,2)*Cl(1,2,0,2);
-      tri[12] = Cl(1,2,0,2)*Cl(0,2,0,2).real() + Cl(1,2,1,2)*Cl(1,2,0,2) + Cl(1,2,0,0)*Cl(0,0,0,2) + Cl(1,2,0,1)*Cl(0,1,0,2) + Cl(1,2,1,0)*Cl(1,0,0,2) + Cl(1,2,1,1)*Cl(1,1,0,2);
-
-      tri[9]  = Cl(1,1,1,0)*Cl(1,0,1,0).real() + Cl(1,1,1,1)*Cl(1,1,1,0) + Cl(1,1,0,0)*Cl(0,0,1,0) + Cl(1,1,0,1)*Cl(0,1,1,0) + Cl(1,1,0,2)*Cl(0,2,1,0) + Cl(1,1,1,2)*Cl(1,2,1,0);
-      tri[13] = Cl(1,2,1,0)*Cl(1,0,1,0).real() + Cl(1,2,1,2)*Cl(1,2,1,0) + Cl(1,2,0,0)*Cl(0,0,1,0) + Cl(1,2,0,1)*Cl(0,1,1,0) + Cl(1,2,0,2)*Cl(0,2,1,0) + Cl(1,2,1,1)*Cl(1,1,1,0);
-      tri[14] = Cl(1,2,1,1)*Cl(1,1,1,1).real() + Cl(1,2,1,2)*Cl(1,2,1,1) + Cl(1,2,0,0)*Cl(0,0,1,1) + Cl(1,2,0,1)*Cl(0,1,1,1) + Cl(1,2,0,2)*Cl(0,2,1,1) + Cl(1,2,1,0)*Cl(1,0,1,1);
-
-      diag[0] = arg.mu*arg.mu + Cl(0,0,0,0).real()*Cl(0,0,0,0).real() + norm(Cl(0,1,0,0)) + norm(Cl(0,2,0,0)) + norm(Cl(1,0,0,0)) + norm(Cl(1,1,0,0)) + norm(Cl(1,2,0,0));
-      diag[1] = arg.mu*arg.mu + Cl(0,1,0,1).real()*Cl(0,1,0,1).real() + norm(Cl(0,0,0,1)) + norm(Cl(0,2,0,1)) + norm(Cl(1,0,0,1)) + norm(Cl(1,1,0,1)) + norm(Cl(1,2,0,1));
-      diag[2] = arg.mu*arg.mu + Cl(0,2,0,2).real()*Cl(0,2,0,2).real() + norm(Cl(0,0,0,2)) + norm(Cl(0,1,0,2)) + norm(Cl(1,0,0,2)) + norm(Cl(1,1,0,2)) + norm(Cl(1,2,0,2));
-      diag[3] = arg.mu*arg.mu + Cl(1,0,1,0).real()*Cl(1,0,1,0).real() + norm(Cl(0,0,1,0)) + norm(Cl(0,1,1,0)) + norm(Cl(0,2,1,0)) + norm(Cl(1,1,1,0)) + norm(Cl(1,2,1,0));
-      diag[4] = arg.mu*arg.mu + Cl(1,1,1,1).real()*Cl(1,1,1,1).real() + norm(Cl(0,0,1,1)) + norm(Cl(0,1,1,1)) + norm(Cl(0,2,1,1)) + norm(Cl(1,0,1,1)) + norm(Cl(1,2,1,1));
-      diag[5] = arg.mu*arg.mu + Cl(1,2,1,2).real()*Cl(1,2,1,2).real() + norm(Cl(0,0,1,2)) + norm(Cl(0,1,1,2)) + norm(Cl(0,2,1,2)) + norm(Cl(1,0,1,2)) + norm(Cl(1,1,1,2));
-
-#undef Cl
-
-      /*	INVERSION STARTS	*/
-
-      for (int j=0; j<6; j++) {
-        diag[j] = sqrt(diag[j]);
-        tmp[j] = 1./diag[j];
-
-        for (int k=j+1; k<6; k++) {
-          int kj = k*(k-1)/2+j;
-          tri[kj] *= tmp[j];
-        }
-
-        for(int k=j+1;k<6;k++){
-          int kj=k*(k-1)/2+j;
-          diag[k] -= (tri[kj] * conj(tri[kj])).real();
-          for(int l=k+1;l<6;l++){
-            int lj=l*(l-1)/2+j;
-            int lk=l*(l-1)/2+k;
-            tri[lk] -= tri[lj] * conj(tri[kj]);
-          }
-        }
-      }
-
-      /* Now use forward and backward substitution to construct inverse */
-      complex<Float> v1[6];
-      for (int k=0;k<6;k++) {
-        for(int l=0;l<k;l++) v1[l] = complex<Float>(0.0, 0.0);
-
-        /* Forward substitute */
-        v1[k] = complex<Float>(tmp[k], 0.0);
-        for(int l=k+1;l<6;l++){
-          complex<Float> sum = complex<Float>(0.0, 0.0);
-          for(int j=k;j<l;j++){
-            int lj=l*(l-1)/2+j;
-            sum -= tri[lj] * v1[j];
-          }
-          v1[l] = sum * tmp[l];
-        }
-
-        /* Backward substitute */
-        v1[5] = v1[5] * tmp[5];
-        for(int l=4;l>=k;l--){
-          complex<Float> sum = v1[l];
-          for(int j=l+1;j<6;j++){
-            int jl=j*(j-1)/2+l;
-            sum -= conj(tri[jl]) * v1[j];
-          }
-          v1[l] = sum * tmp[l];
-        }
-
-        /* Overwrite column k */
-        diag[k] = v1[k].real();
-        for(int l=k+1;l<6;l++){
-          int lk=l*(l-1)/2+k;
-          tri[lk] = v1[l];
-        }
-      }
-
-      /*	Calculate the product for the current chiral block	*/
-
-      //Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
-      //for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
-
-      complex<Float> AV[fineSpin/2][fineColor][coarseColor];
-      for (int s = 0; s < fineSpin/2; s++)
-        for (int c = 0; c < fineColor; c++)
-          for (int v = 0; v < coarseColor; v++)
-            AV[s][c][v] = static_cast<Float>(0.0);
-
-      for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  // Coarse Color
-	for (int j=0; j<(fineSpin/2)*fineColor; j++) {	// This won't work for anything different than fineColor = 3, fineSpin = 4
-	  int s = j / fineColor, ic = j % fineColor;
-
-	  AV[s][ic][ic_c] += diag[j] * UV[s+2*ch][ic][ic_c];	// Diagonal clover
-
-	  for (int k=0; k<j; k++) {
-	    const int jk = j*(j-1)/2 + k;
-	    const int s_col = k / fineColor, jc = k % fineColor;
-
-	    AV[s][ic][ic_c] += tri[jk] * UV[s_col+2*ch][jc][ic_c]; // Off-diagonal
-	  }
-
-	  for (int k=j+1; k<(fineSpin/2)*fineColor; k++) {
-	    int kj = k*(k-1)/2 + j;
-	    int s_col = k / fineColor, jc = k % fineColor;
-
-	    AV[s][ic][ic_c] += conj(tri[kj]) * UV[s_col+2*ch][jc][ic_c]; // Off-diagonal
-	  }
-	}
-      }	// Coarse color
-
-      for (int s = 0; s < fineSpin/2; s++)
-        for (int c = 0; c < fineColor; c++)
-          for (int v = 0; v < coarseColor; v++)
-            arg.AV(parity, x_cb, s+2*ch, c, v) = AV[s][c][v];
-
-    } // Chirality
-  }
-
-#endif // UGLY_DYNCLOV
-
-  template<typename Float, typename Arg>
-  __device__ __host__ inline Float computeCloverInvMax(Arg &arg, int parity, int x_cb) {
-    /* Applies the inverse of the clover term squared plus mu2 to the spinor */
-    /* Compute (T^2 + mu2) first, then invert */
-    /* We proceed by chiral blocks */
+  /**
+     @brief Computes the clover field maximum, which is needed for
+     setting the scale when using fixed point
+   */
+  template <typename Float, bool twist, typename Arg>
+  __device__ __host__ inline Float computeCloverInvMax(Arg &arg, int parity, int x_cb)
+  {
 
     Float max = 0.0;
 
-    for (int ch = 0; ch < 2; ch++) {	/* Loop over chiral blocks */
-      Float diag[6], tmp[6];
-      complex<Float> tri[15];	/* Off-diagonal components of the inverse clover term */
+    constexpr int nColor = 3;
+    constexpr int nSpin = 4;
+    constexpr int N = nColor * nSpin / 2;
+    typedef HMatrix<Float, N> Mat;
 
-      /*	This macro avoid the infinitely long expansion of the tri products	*/
-#define Cl(s1,c1,s2,c2) (arg.C(0, parity, x_cb, s1+2*ch, s2+2*ch, c1, c2))
+#pragma unroll
+    for (int ch = 0; ch < 2; ch++) { /* Loop over chiral blocks */
+      Mat A;
 
-      tri[0]  = Cl(0,1,0,0)*Cl(0,0,0,0).real() + Cl(0,1,0,1)*Cl(0,1,0,0) + Cl(0,1,0,2)*Cl(0,2,0,0) + Cl(0,1,1,0)*Cl(1,0,0,0) + Cl(0,1,1,1)*Cl(1,1,0,0) + Cl(0,1,1,2)*Cl(1,2,0,0);
-      tri[1]  = Cl(0,2,0,0)*Cl(0,0,0,0).real() + Cl(0,2,0,2)*Cl(0,2,0,0) + Cl(0,2,0,1)*Cl(0,1,0,0) + Cl(0,2,1,0)*Cl(1,0,0,0) + Cl(0,2,1,1)*Cl(1,1,0,0) + Cl(0,2,1,2)*Cl(1,2,0,0);
-      tri[3]  = Cl(1,0,0,0)*Cl(0,0,0,0).real() + Cl(1,0,1,0)*Cl(1,0,0,0) + Cl(1,0,0,1)*Cl(0,1,0,0) + Cl(1,0,0,2)*Cl(0,2,0,0) + Cl(1,0,1,1)*Cl(1,1,0,0) + Cl(1,0,1,2)*Cl(1,2,0,0);
-      tri[6]  = Cl(1,1,0,0)*Cl(0,0,0,0).real() + Cl(1,1,1,1)*Cl(1,1,0,0) + Cl(1,1,0,1)*Cl(0,1,0,0) + Cl(1,1,0,2)*Cl(0,2,0,0) + Cl(1,1,1,0)*Cl(1,0,0,0) + Cl(1,1,1,2)*Cl(1,2,0,0);
-      tri[10] = Cl(1,2,0,0)*Cl(0,0,0,0).real() + Cl(1,2,1,2)*Cl(1,2,0,0) + Cl(1,2,0,1)*Cl(0,1,0,0) + Cl(1,2,0,2)*Cl(0,2,0,0) + Cl(1,2,1,0)*Cl(1,0,0,0) + Cl(1,2,1,1)*Cl(1,1,0,0);
-
-      tri[2]  = Cl(0,2,0,1)*Cl(0,1,0,1).real() + Cl(0,2,0,2)*Cl(0,2,0,1) + Cl(0,2,0,0)*Cl(0,0,0,1) + Cl(0,2,1,0)*Cl(1,0,0,1) + Cl(0,2,1,1)*Cl(1,1,0,1) + Cl(0,2,1,2)*Cl(1,2,0,1);
-      tri[4]  = Cl(1,0,0,1)*Cl(0,1,0,1).real() + Cl(1,0,1,0)*Cl(1,0,0,1) + Cl(1,0,0,0)*Cl(0,0,0,1) + Cl(1,0,0,2)*Cl(0,2,0,1) + Cl(1,0,1,1)*Cl(1,1,0,1) + Cl(1,0,1,2)*Cl(1,2,0,1);
-      tri[7]  = Cl(1,1,0,1)*Cl(0,1,0,1).real() + Cl(1,1,1,1)*Cl(1,1,0,1) + Cl(1,1,0,0)*Cl(0,0,0,1) + Cl(1,1,0,2)*Cl(0,2,0,1) + Cl(1,1,1,0)*Cl(1,0,0,1) + Cl(1,1,1,2)*Cl(1,2,0,1);
-      tri[11] = Cl(1,2,0,1)*Cl(0,1,0,1).real() + Cl(1,2,1,2)*Cl(1,2,0,1) + Cl(1,2,0,0)*Cl(0,0,0,1) + Cl(1,2,0,2)*Cl(0,2,0,1) + Cl(1,2,1,0)*Cl(1,0,0,1) + Cl(1,2,1,1)*Cl(1,1,0,1);
-
-      tri[5]  = Cl(1,0,0,2)*Cl(0,2,0,2).real() + Cl(1,0,1,0)*Cl(1,0,0,2) + Cl(1,0,0,0)*Cl(0,0,0,2) + Cl(1,0,0,1)*Cl(0,1,0,2) + Cl(1,0,1,1)*Cl(1,1,0,2) + Cl(1,0,1,2)*Cl(1,2,0,2);
-      tri[8]  = Cl(1,1,0,2)*Cl(0,2,0,2).real() + Cl(1,1,1,1)*Cl(1,1,0,2) + Cl(1,1,0,0)*Cl(0,0,0,2) + Cl(1,1,0,1)*Cl(0,1,0,2) + Cl(1,1,1,0)*Cl(1,0,0,2) + Cl(1,1,1,2)*Cl(1,2,0,2);
-      tri[12] = Cl(1,2,0,2)*Cl(0,2,0,2).real() + Cl(1,2,1,2)*Cl(1,2,0,2) + Cl(1,2,0,0)*Cl(0,0,0,2) + Cl(1,2,0,1)*Cl(0,1,0,2) + Cl(1,2,1,0)*Cl(1,0,0,2) + Cl(1,2,1,1)*Cl(1,1,0,2);
-
-      tri[9]  = Cl(1,1,1,0)*Cl(1,0,1,0).real() + Cl(1,1,1,1)*Cl(1,1,1,0) + Cl(1,1,0,0)*Cl(0,0,1,0) + Cl(1,1,0,1)*Cl(0,1,1,0) + Cl(1,1,0,2)*Cl(0,2,1,0) + Cl(1,1,1,2)*Cl(1,2,1,0);
-      tri[13] = Cl(1,2,1,0)*Cl(1,0,1,0).real() + Cl(1,2,1,2)*Cl(1,2,1,0) + Cl(1,2,0,0)*Cl(0,0,1,0) + Cl(1,2,0,1)*Cl(0,1,1,0) + Cl(1,2,0,2)*Cl(0,2,1,0) + Cl(1,2,1,1)*Cl(1,1,1,0);
-      tri[14] = Cl(1,2,1,1)*Cl(1,1,1,1).real() + Cl(1,2,1,2)*Cl(1,2,1,1) + Cl(1,2,0,0)*Cl(0,0,1,1) + Cl(1,2,0,1)*Cl(0,1,1,1) + Cl(1,2,0,2)*Cl(0,2,1,1) + Cl(1,2,1,0)*Cl(1,0,1,1);
-
-      diag[0] = arg.mu*arg.mu + Cl(0,0,0,0).real()*Cl(0,0,0,0).real() + norm(Cl(0,1,0,0)) + norm(Cl(0,2,0,0)) + norm(Cl(1,0,0,0)) + norm(Cl(1,1,0,0)) + norm(Cl(1,2,0,0));
-      diag[1] = arg.mu*arg.mu + Cl(0,1,0,1).real()*Cl(0,1,0,1).real() + norm(Cl(0,0,0,1)) + norm(Cl(0,2,0,1)) + norm(Cl(1,0,0,1)) + norm(Cl(1,1,0,1)) + norm(Cl(1,2,0,1));
-      diag[2] = arg.mu*arg.mu + Cl(0,2,0,2).real()*Cl(0,2,0,2).real() + norm(Cl(0,0,0,2)) + norm(Cl(0,1,0,2)) + norm(Cl(1,0,0,2)) + norm(Cl(1,1,0,2)) + norm(Cl(1,2,0,2));
-      diag[3] = arg.mu*arg.mu + Cl(1,0,1,0).real()*Cl(1,0,1,0).real() + norm(Cl(0,0,1,0)) + norm(Cl(0,1,1,0)) + norm(Cl(0,2,1,0)) + norm(Cl(1,1,1,0)) + norm(Cl(1,2,1,0));
-      diag[4] = arg.mu*arg.mu + Cl(1,1,1,1).real()*Cl(1,1,1,1).real() + norm(Cl(0,0,1,1)) + norm(Cl(0,1,1,1)) + norm(Cl(0,2,1,1)) + norm(Cl(1,0,1,1)) + norm(Cl(1,2,1,1));
-      diag[5] = arg.mu*arg.mu + Cl(1,2,1,2).real()*Cl(1,2,1,2).real() + norm(Cl(0,0,1,2)) + norm(Cl(0,1,1,2)) + norm(Cl(0,2,1,2)) + norm(Cl(1,0,1,2)) + norm(Cl(1,1,1,2));
-
-#undef Cl
-
-      /*	INVERSION STARTS	*/
-
-      for (int j=0; j<6; j++) {
-        diag[j] = sqrt(diag[j]);
-        tmp[j] = 1./diag[j];
-
-        for (int k=j+1; k<6; k++) {
-          int kj = k*(k-1)/2+j;
-          tri[kj] *= tmp[j];
-        }
-
-        for(int k=j+1;k<6;k++){
-          int kj=k*(k-1)/2+j;
-          diag[k] -= (tri[kj] * conj(tri[kj])).real();
-          for(int l=k+1;l<6;l++){
-            int lj=l*(l-1)/2+j;
-            int lk=l*(l-1)/2+k;
-            tri[lk] -= tri[lj] * conj(tri[kj]);
-          }
+#pragma unroll
+      for (int i = 0; i < N; i++) {
+#pragma unroll
+        for (int j = 0; j <= i; j++) {
+          A(i, j) = arg.C(0, parity, x_cb, 2 * ch + i / nColor, 2 * ch + j / nColor, i % nColor, j % nColor);
         }
       }
 
-      /* Now use forward and backward substitution to construct inverse */
-      complex<Float> v1[6];
-      for (int k=0;k<6;k++) {
-        for(int l=0;l<k;l++) v1[l] = complex<Float>(0.0, 0.0);
-
-        /* Forward substitute */
-        v1[k] = complex<Float>(tmp[k], 0.0);
-        for(int l=k+1;l<6;l++){
-          complex<Float> sum = complex<Float>(0.0, 0.0);
-          for(int j=k;j<l;j++){
-            int lj=l*(l-1)/2+j;
-            sum -= tri[lj] * v1[j];
-          }
-          v1[l] = sum * tmp[l];
-        }
-
-        /* Backward substitute */
-        v1[5] = v1[5] * tmp[5];
-        for(int l=4;l>=k;l--){
-          complex<Float> sum = v1[l];
-          for(int j=l+1;j<6;j++){
-            int jl=j*(j-1)/2+l;
-            sum -= conj(tri[jl]) * v1[j];
-          }
-          v1[l] = sum * tmp[l];
-        }
-
-        /* Overwrite column k */
-        diag[k] = v1[k].real();
-        for(int l=k+1;l<6;l++){
-          int lk=l*(l-1)/2+k;
-          tri[lk] = v1[l];
-        }
+      if (twist) {
+        A = A.square();
+        A += arg.mu * arg.mu;
       }
 
-      for (int i=0; i<6; i++) max = max > abs(diag[i]) ? max : abs(diag[i]);
-      for (int i=0; i<15; i++) max = max > abs(tri[i]) ? max : abs(tri[i]);
-    } // Chirality
+      // compute the Colesky decomposition
+      linalg::Cholesky<HMatrix, Float, N> cholesky(A);
+
+      Mat Ainv = cholesky.invert();
+
+      Float inv_max = Ainv.max();
+      max = max > inv_max ? max : inv_max;
+
+    } // chirality
 
     return max;
   }
 
-  template<typename Float, typename Arg>
-  void ComputeCloverInvMaxCPU(Arg &arg) {
+  template <typename Float, bool twist, typename Arg> void ComputeCloverInvMaxCPU(Arg &arg)
+  {
     Float max = 0.0;
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for reduction(max:max)
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-	Float max_x = computeCloverInvMax<Float,Arg>(arg, parity, x_cb);
-	max = max > max_x ? max : max_x;
+        Float max_x = computeCloverInvMax<Float, twist, Arg>(arg, parity, x_cb);
+        max = max > max_x ? max : max_x;
       } // c/b volume
     }   // parity
     arg.max_h = max;
   }
 
-  template<typename Float, typename Arg>
-  __global__ void ComputeCloverInvMaxGPU(Arg arg) {
+  template <typename Float, bool twist, typename Arg> __global__ void ComputeCloverInvMaxGPU(Arg arg)
+  {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    arg.max_d[parity+2*x_cb] = computeCloverInvMax<Float,Arg>(arg, parity, x_cb);
+    arg.max_d[parity + 2 * x_cb] = computeCloverInvMax<Float, twist, Arg>(arg, parity, x_cb);
   }
+
 #endif // DYNAMIC_CLOVER
 
   /**
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x) for twisted-clover fermions
      Where: s = fine spin, c' = coarse color, c = fine color
   */
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ inline void computeTMCAV(Arg &arg, int parity, int x_cb) {
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __device__ __host__ inline void computeTMCAV(Arg &arg, int parity, int x_cb, int ch, int ic_c)
+  {
+    constexpr int N = fineSpin * fineColor / 2;
+    HMatrix<Float, N> A;
 
-    complex<Float> mu(0.,arg.mu);
-    complex<Float> UV[fineSpin][fineColor][coarseColor];
-
-    for (int s = 0; s < fineSpin; s++)
-      for (int c = 0; c < fineColor; c++)
-	for (int v = 0; v < coarseColor; v++)
-	  UV[s][c][v] = static_cast<Float>(0.0);
-
-    //First we store in UV the product [(Clover -/+ i mu)·Vector]
-    for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = arg.spin_map(s,parity); // Coarse Spin
-
-      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
-      //in the same chiral block.
-      for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
-
-	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	      caxpy(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, ic_c), UV[s][ic][ic_c]);
-	    }  //Fine color columns
-	  }  //Fine color rows
-	} //Coarse color
+#pragma unroll
+    for (int i = 0; i < N; i++) {
+      int s_i = 2 * ch + i / fineColor;
+      int c_i = i % fineColor;
+#pragma unroll
+      for (int j = 0; j <= i; j++) {
+        int s_j = 2 * ch + j / fineColor;
+        int c_j = j % fineColor;
+        A(i, j) = arg.C(0, parity, x_cb, s_i, s_j, c_i, c_j);
       }
-    } //Fine Spin
+    }
 
-    for(int s = 0; s < fineSpin/2; s++) {  //Fine Spin
-      for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	for(int ic = 0; ic < fineColor; ic++) { //Fine Color
-	  UV[s][ic][ic_c] -= mu * arg.V(parity, x_cb, s, ic, ic_c);
-	}  //Fine color
-      } //Coarse color
-    } //Fine Spin
+    complex<Float> mu(0., arg.mu);
+    if (ch == 0) mu *= static_cast<Float>(-1.0);
 
-    for(int s = fineSpin/2; s < fineSpin; s++) {  //Fine Spin
-      for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	for(int ic = 0; ic < fineColor; ic++) { //Fine Color
-	  UV[s][ic][ic_c] += mu * arg.V(parity, x_cb, s, ic, ic_c);
-	}  //Fine color
-      } //Coarse color
-    } //Fine Spin
+    ColorSpinor<Float, fineColor, fineSpin / 2> V;
 
-    complex<Float> AV[fineSpin][fineColor][coarseColor];
-    for (int s = 0; s < fineSpin; s++)
-      for (int c = 0; c < fineColor; c++)
-	for (int v = 0; v < coarseColor; v++)
-	  AV[s][c][v] = static_cast<Float>(0.0);
+    for (int s = 0; s < fineSpin / 2; s++) {
+      for (int c = 0; c < fineColor; c++) { V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c); }
+    }
 
-#ifndef	DYNAMIC_CLOVER
-    //Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
-    //for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
-    for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = arg.spin_map(s,parity); // Coarse Spin
+    // first apply the clover matrix directly, including mu
+    auto UV = A * V;
+    UV += mu * V;
 
-      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
-      //in the same chiral block.
-      for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
+    // Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
+    // for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
 
-	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-              caxpy(arg.Cinv(0, parity, x_cb, s, s_col, ic, jc), UV[s_col][jc][ic_c], AV[s][ic][ic_c]);
-	    }  //Fine color columns
-	  }  //Fine color rows
-	} //Coarse color
+#ifndef DYNAMIC_CLOVER
+    // load in the clover inverse matrix
+    HMatrix<Float, N> Ainv;
+#pragma unroll
+    for (int i = 0; i < N; i++) {
+      int s_i = 2 * ch + i / fineColor;
+      int c_i = i % fineColor;
+#pragma unroll
+      for (int j = 0; j <= i; j++) {
+        int s_j = 2 * ch + j / fineColor;
+        int c_j = j % fineColor;
+        Ainv(i, j) = arg.Cinv(0, parity, x_cb, s_i, s_j, c_i, c_j);
       }
-    } //Fine Spin
-
-    for (int s = 0; s < fineSpin; s++)
-      for (int c = 0; c < fineColor; c++)
-	for (int v = 0; v < coarseColor; v++)
-	  arg.AV(parity, x_cb, s, c, v) = AV[s][c][v];
+    }
+    auto AV = Ainv * UV;
 #else
-    applyCloverInv<Float,fineSpin,fineColor,coarseColor,Arg>(arg, UV, parity, x_cb);
+    // compute the clover inverse matrix with the already loaded clover matrix
+    A = A.square();
+    A += arg.mu * arg.mu;
+
+    linalg::Cholesky<HMatrix, Float, N> cholesky(A);
+    const auto AV = cholesky.backward(cholesky.forward(UV));
 #endif
+
+    for (int s = 0; s < fineSpin / 2; s++)
+      for (int c = 0; c < fineColor; c++) arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
   } // computeTMCAV
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  void ComputeTMCAVCPU(Arg &arg) {
-    for (int parity=0; parity<2; parity++) {
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg> void ComputeTMCAVCPU(Arg &arg)
+  {
+    for (int parity = 0; parity < 2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-	computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
+        for (int ch = 0; ch < 2; ch++) {
+          for (int ic_c = 0; ic_c < coarseColor; ic_c++) { // coarse color
+            computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, ch, ic_c);
+          }
+        }
       } // c/b volume
     }   // parity
   }
 
-  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __global__ void ComputeTMCAVGPU(Arg arg) {
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __global__ void ComputeTMCAVGPU(Arg arg)
+  {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
+    int ch_parity = blockDim.y * blockIdx.y + threadIdx.y;
+    if (ch_parity >= 4) return;
+    int ch = ch_parity % 2;
+    int parity = ch_parity / 2;
+
+    int ic_c = blockDim.z * blockIdx.z + threadIdx.z; // coarse color
+    if (ic_c >= coarseColor) return;
+
+    if (ch == 0)
+      computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, 0, ic_c);
+    else
+      computeTMCAV<Float, fineSpin, fineColor, coarseColor, Arg>(arg, parity, x_cb, 1, ic_c);
   }
 
   /**

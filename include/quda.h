@@ -12,7 +12,14 @@
 
 #include <enum_quda.h>
 #include <stdio.h> /* for FILE */
+#include <quda_define.h>
 #include <quda_constants.h>
+
+#ifndef __CUDACC_RTC__
+#define double_complex double _Complex
+#else // keep NVRTC happy since it can't handle C types
+#define double_complex double2
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -101,13 +108,15 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
-    double b_5[QUDA_MAX_DWF_LS];  /**< MDWF coefficients */
-    double c_5[QUDA_MAX_DWF_LS];  /**< will be used only for the mobius type of Fermion */
+    double_complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
+    double_complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
 
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
+
+    int laplace3D; /**< omit this direction from laplace operator: x,y,z,t -> 0,1,2,3 (-1 is full 4D) */
 
     double tol;    /**< Solver tolerance in the L2 residual norm */
     double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
@@ -275,6 +284,15 @@ extern "C" {
 
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;
+
+    /** Basis for CA algorithms */
+    QudaCABasis ca_basis;
+
+    /** Minimum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_min;
+
+    /** Maximum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_max;
 
     /** Number of preconditioner cycles to perform per iteration */
     int precondition_cycle;
@@ -483,6 +501,18 @@ extern "C" {
     /** Maximum number of iterations for refreshing the null-space vectors */
     int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
 
+    /** Basis to use for CA-CGN(E/R) setup */
+    QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
+
+    /** Basis size for CACG setup */
+    int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
+
+    /** Minimum eigenvalue for Chebyshev CA basis */
+    double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum eigenvalue for Chebyshev CA basis */
+    double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
+
     /** Null-space type to use in the setup phase */
     QudaSetupType setup_type;
 
@@ -498,8 +528,20 @@ extern "C" {
     /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
     double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
 
-    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
-    double coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+    /** Maximum number of iterations for the solver that wraps around the coarse grid correction and smoother */
+    int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
+    /** Basis to use for CA-CGN(E/R) coarse solver */
+    QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+
+    /** Basis size for CACG coarse solver */
+    int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
+
+    /** Minimum eigenvalue for Chebyshev CA basis */
+    double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum eigenvalue for Chebyshev CA basis */
+    double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL];
 
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
@@ -569,9 +611,15 @@ extern "C" {
 
     /** Deflate the coarsest grid  */
     QudaBoolean deflate_coarsest;
-    
+
+    /** Whether to load the null-space vectors to disk (requires QIO) */
+    QudaBoolean vec_load;
+
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];
+
+    /** Whether to store the null-space vectors to disk (requires QIO) */
+    QudaBoolean vec_store;
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
@@ -619,7 +667,7 @@ extern "C" {
    *                   printed.  The default is stdout.
    */
   void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[],
-      FILE *outfile);
+                        FILE *outfile);
 
   /**
    * initCommsGridQuda() takes an optional "rank_from_coords" argument that
@@ -632,6 +680,12 @@ extern "C" {
    * @see initCommsGridQuda
    */
   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
+
+  /**
+   * @param mycomm User provided MPI communicator in place of MPI_COMM_WORLD
+   */
+
+  void qudaSetCommHandle(void *mycomm);
 
   /**
    * Declare the grid mapping ("logical topology" in QMP parlance)
@@ -659,6 +713,7 @@ extern "C" {
    *
    * @see QudaCommsMap
    */
+
   void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata);
 
   /**
@@ -873,14 +928,27 @@ extern "C" {
   /**
    * @brief Free resources allocated by the multigrid solver
    * @param mg_instance Pointer to instance of multigrid_solver
+   * @param param Contains all metadata regarding host and device
+   * storage and solver parameters
    */
   void destroyMultigridQuda(void *mg_instance);
 
   /**
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
+   * @param param Contains all metadata regarding host and device
+   * storage and solver parameters
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
+
+  /**
+   * @brief Dump the null-space vectors to disk
+   * @param[in] mg_instance Pointer to the instance of multigrid_solver
+   * @param[in] param Contains all metadata regarding host and device
+   * storage and solver parameters (QudaMultigridParam::vec_outfile
+   * sets the output filename prefix).
+   */
+  void dumpMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
@@ -1254,9 +1322,14 @@ extern "C" {
    */
   void destroyDeflationQuda(void *df_instance);
 
+  void setMPICommHandleQuda(void *mycomm);
+
 #ifdef __cplusplus
 }
 #endif
+
+// remove NVRTC WAR
+#undef double_complex
 
 /* #include <quda_new_interface.h> */
 

@@ -572,7 +572,7 @@ def gen(dir, pack_only=False):
         else: str += "const int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.dc.volume_4d_cb : param.dc.volume_4d_cb+(face_idx % param.dc.ghostFace[static_cast<int>(kernel_type)]));\n"
+        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.dc.volume_4d_cb : param.dc.volume_4d_cb+(face_idx % param.dc.ghostFaceCB[static_cast<int>(kernel_type)]));\n"
         else: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : param.dc.volume_4d_cb+face_idx);\n"
         str += "#else\n"
         if domain_wall: str += "const int ga_idx = sp_idx % param.dc.volume_4d_cb;\n"
@@ -608,9 +608,9 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     if domain_wall : 
-        load_half += "const int sp_stride_pad = param.dc.Ls*param.dc.ghostFace[static_cast<int>(kernel_type)];\n"
+        load_half += "const int sp_stride_pad = param.dc.Ls*param.dc.ghostFaceCB[static_cast<int>(kernel_type)];\n"
     else :
-        load_half += "const int sp_stride_pad = param.dc.ghostFace[static_cast<int>(kernel_type)];\n" 
+        load_half += "const int sp_stride_pad = param.dc.ghostFaceCB[static_cast<int>(kernel_type)];\n" 
     #load_half += "#if (DD_PREC==2) // half precision\n"
     #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
     #load_half += "#endif\n"

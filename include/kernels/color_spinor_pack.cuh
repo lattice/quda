@@ -15,19 +15,19 @@ namespace quda {
     const int parity;
     const int nParity;
     const int dagger;
-    const QudaDWFPCType pc_type;
+    const QudaPCType pc_type;
     int commDim[4]; // whether a given dimension is partitioned or not
     int_fastdiv nParity2dim_threads;
 
-    PackGhostArg(Field field, const ColorSpinorField &a, int parity, int nFace, int dagger)
-      : field(field),
-	volumeCB(a.VolumeCB()),
-	nDim(a.Ndim()),
-	nFace(nFace),
-	parity(parity),
-	nParity(a.SiteSubset()),
-	dagger(dagger),
-	pc_type(a.DWFPCtype())
+    PackGhostArg(Field field, const ColorSpinorField &a, int parity, int nFace, int dagger) :
+        field(field),
+        volumeCB(a.VolumeCB()),
+        nDim(a.Ndim()),
+        nFace(nFace),
+        parity(parity),
+        nParity(a.SiteSubset()),
+        dagger(dagger),
+        pc_type(a.PCType())
     {
       X[0] = ((nParity == 1) ? 2 : 1) * a.X(0); // set to full lattice dimensions
       for (int d=1; d<nDim; d++) X[d] = a.X(d);
@@ -45,7 +45,7 @@ namespace quda {
      Compute the max element over the spin-color components of a given site.
    */
   template <typename Float, int Ns, int Ms, int Nc, int Mc, typename Arg>
-  __device__ __host__ inline Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block, bool active) {
+  __device__ __host__ __forceinline__ Float compute_site_max(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block, bool active) {
 
     Float thread_max = 0.0;
     Float site_max = active ? 0.0 : 1.0;
@@ -92,7 +92,7 @@ namespace quda {
 
 
   template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim, int dir, typename Arg>
-  __device__ __host__ inline void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block) {
+  __device__ __host__ __forceinline__ void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block) {
 
     int x[5] = { };
     if (nDim == 5) getCoords5(x, x_cb, arg.X, parity, arg.pc_type);
@@ -112,8 +112,9 @@ namespace quda {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
-	    arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0>(x,arg.X,dim,arg.nFace), s, c, 0, max) = rhs(spinor_parity, x_cb, s, c);
-	  }
+            arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0, nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
+                = rhs(spinor_parity, x_cb, s, c);
+          }
 	}
       }
 
@@ -122,8 +123,9 @@ namespace quda {
 	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
-	    arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1>(x,arg.X,dim,arg.nFace), s, c, 0, max) = rhs(spinor_parity, x_cb, s, c);
-	  }
+            arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1, nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
+                = rhs(spinor_parity, x_cb, s, c);
+          }
 	}
       }
     }

@@ -1,14 +1,16 @@
 /**
    @file object.h
 
-   @section DESCRIPTION 
+   @section DESCRIPTION
 
    Abstract parent class for all classes in QUDA.  This parent class
    defines the new/delete methods to use QUDA's memory allocators.
-   This gives us memory leak checking on these object intances.
+   This gives us memory leak checking on these object instances.
 */
 
 #pragma once
+
+#include <malloc_quda.h>
 
 namespace quda {
   

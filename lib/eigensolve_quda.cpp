@@ -98,6 +98,15 @@ namespace quda {
       reverse = true;
     }
 
+    //Ensure Eigensolver has correct params
+    printfQuda("nConv %d\n", nConv);
+    printfQuda("nEv %d\n", nEv);
+    printfQuda("nKr %d\n", nKr);
+    if(eig_param->use_poly_acc){
+      printfQuda("polyDeg %d\n", eig_param->poly_deg);
+      printfQuda("a-min %f\n", eig_param->a_min);
+      printfQuda("a-max %f\n", eig_param->a_max);
+    }
     
   }
   
@@ -115,13 +124,11 @@ namespace quda {
       break;
     case QUDA_IMP_RST_ARNOLDI:
       printfQuda("Creating IRAM eigensolver\n");
-      eig_solver = new IRAM(eig_param, mat, profile);
-      printfQuda("Done creating IRAM eigensolver\n");
+      errorQuda("IRAM eigensolver not implemented\n");
       break;
     case QUDA_THICK_RST_LANCZOS:
       printfQuda("Creating TRLM eigensolver\n");
-      eig_solver = new TRLM(eig_param, mat, profile);
-      printfQuda("Done creating TRLM eigensolver\n");
+      errorQuda("TRLM eigensolver not implemented\n");
       break;
     default:
       errorQuda("Invalid eig solver type");
@@ -379,11 +386,10 @@ namespace quda {
   
   void EigenSolver::loadVectors(std::vector<ColorSpinorField*> &eig_vecs, std::string vec_infile) {
     
-    //profile.TPSTOP(QUDA_PROFILE_INIT);
-    //profile.TPSTART(QUDA_PROFILE_IO);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_IO);
 
 #ifdef HAVE_QIO    
-    //std::string vec_infile(eig_param->vec_infile);   
     const int Nvec = eig_vecs.size();
     if (strcmp(vec_infile.c_str(),"")!=0) {
       printfQuda("Start loading %04d vectors from %s\n", Nvec, vec_infile.c_str());
@@ -430,17 +436,17 @@ namespace quda {
 #else
     errorQuda("\nQIO library was not built.\n");      
 #endif
-    //profile.TPSTOP(QUDA_PROFILE_IO);
-    //profile.TPSTART(QUDA_PROFILE_INIT);
-
+    profile.TPSTOP(QUDA_PROFILE_IO);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    
     return;
   }
   
   void EigenSolver::saveVectors(std::vector<ColorSpinorField*> &eig_vecs,
 				std::string vec_outfile) {
     
-    //profile.TPSTOP(QUDA_PROFILE_INIT);
-    //profile.TPSTART(QUDA_PROFILE_IO);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_IO);
 
 #ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
@@ -484,9 +490,9 @@ namespace quda {
 #else
     errorQuda("\nQIO library was not built.\n");      
 #endif
-    //profile.TPSTOP(QUDA_PROFILE_IO);
-    //profile.TPSTART(QUDA_PROFILE_INIT);
-
+    profile.TPSTOP(QUDA_PROFILE_IO);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    
     return;
   }
 
@@ -499,7 +505,6 @@ namespace quda {
     
     //Create the device side residual vector by cloning
     //the kSpace passed to the function.
-    //std::vector<ColorSpinorField*> r;
     ColorSpinorParam csParam(*kSpace[0]);
     r.push_back(ColorSpinorField::Create(csParam));
     
@@ -510,16 +515,11 @@ namespace quda {
 		 i, evals[i].real(), evals[i].imag(), residua[i]);
     }
     
-    //Local clean-up
-    delete r[0];
+    delete r[0];    
     return;
   }
   
-  EigenSolver::~EigenSolver() {
-    
-    delete r[0];
-    
-  }
+  EigenSolver::~EigenSolver() {}  
   //-----------------------------------------------------------------------------
   //-----------------------------------------------------------------------------
 
@@ -538,38 +538,18 @@ namespace quda {
   
   void IRLM::operator()(std::vector<ColorSpinorField*> &kSpace,
 			std::vector<Complex> &evals){
-   
-    //Clone the kSpace passed to the function to param
-    ColorSpinorParam csParam(*kSpace[0]);
 
-    //Device side residual vector.
-    r.push_back(ColorSpinorField::Create(csParam));
-    //Device side space for Lanczos Ritz vector basis rotation.
-    for(int i=0; i<nKr; i++) {
-      d_vecs_tmp.push_back(ColorSpinorField::Create(csParam));
-    }
-        
     //Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile,"") != 0) {
-
-      printfQuda("Loading eigenvectors\n");
-      loadVectors(kSpace, eig_param->vec_infile);
-      
-      //Error estimates (residua) given by ||A*vec - lambda*vec||
-      computeEvals(mat, evals, nEv);
-      for(int i=0; i<nEv; i++) {
-	printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
-		   i, evals[i].real(), evals[i].imag(), residua[i]);
-      }
+      loadFromFile(mat, kSpace, evals);
       return;
     }
 
-    //Ensure we are not trying to compute on a zero-field source
-    //and test for an initial guess
+    //Test for an initial guess
     double norm = sqrt(blas::norm2(*kSpace[0]));
     if (norm == 0) {
       printfQuda("Initial residual is zero. Populating with rands.\n");
-
+      
       if (kSpace[0] -> Location() == QUDA_CPU_FIELD_LOCATION) {
         kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
       } else {
@@ -580,26 +560,27 @@ namespace quda {
         delete rng;
       }
     }
+    
+    //Clone the kSpace params passed to the function.
+    ColorSpinorParam csParam(*kSpace[0]);
 
+    // r is a device side residual vector.
+    r.push_back(ColorSpinorField::Create(csParam));
+    // d_vecs_tmp are device side space for Lanczos Ritz vector basis rotation.
+    for(int i=0; i<nKr; i++) {
+      d_vecs_tmp.push_back(ColorSpinorField::Create(csParam));
+    }
+    
     //Normalise initial guess
     norm = sqrt(blas::norm2(*kSpace[0]));
     blas::ax(1.0/norm, *kSpace[0]);
     //---------------------------------------------------------------------------
-
     
     // Begin Eigensolver computation
     //---------------------------------------------------------------------------
     printfQuda("*****************************\n");
     printfQuda("**** START IRLM SOLUTION ****\n");
     printfQuda("*****************************\n");
-    printfQuda("nConv %d\n", nConv);
-    printfQuda("nEv %d\n", nEv);
-    printfQuda("nKr %d\n", nKr);
-    if(eig_param->use_poly_acc){
-      printfQuda("polyDeg %d\n", eig_param->poly_deg);
-      printfQuda("a-min %f\n", eig_param->a_min);
-      printfQuda("a-max %f\n", eig_param->a_max);
-    }
 
     double t1 = clock();
 
@@ -619,7 +600,7 @@ namespace quda {
     while(restart_iter < max_restarts && !converged) {
 
       for(step=k; step<m; step++) lanczosStep(kSpace, step);
-      iter += m-k;
+      iter += p;
       printfQuda("Restart %d complete\n", restart_iter+1);
       
       //alpha and beta will be updated in this function. The Q
@@ -627,10 +608,8 @@ namespace quda {
       computeQRfromTridiag(k);
 
       //Puts the rotated vectors into d_vecs_tmp.
-      //Number of rotated vectors is nEv.
+      //Number of rotated vectors is k.
       basisRotateQ(kSpace, k);
-      
-      //shiftAndCompressFromTriDiag(kSpace, k);
       
       //Store the residual vector in the last vector of kSpace
       *kSpace[m-1] = *r[0];
@@ -695,7 +674,6 @@ namespace quda {
       beta[k-1] = res_norm;
       time_ += clock();
       time_mb += time_;
-
 
       restart_iter++;
     }
@@ -839,181 +817,7 @@ namespace quda {
     } else
       beta_m = beta[j];
   }
-  
-  void IRLM::shiftAndCompressFromTriDiag(std::vector<ColorSpinorField*> &kSpace,
-					 int k) {
-    
-    //Switch notation
-    int m = nKr;
-    int p = m-k;
-
-    printfQuda("shiftAndCompressFromTriDiag: k=%d p=%d m=%d\n",k,p,m);
-    
-    MatrixXd triDiag = MatrixXd::Zero(m, m);
-    MatrixXd Q = MatrixXd::Identity(m, m);
-    MatrixXd Qj = MatrixXd::Zero(m, m);
-    MatrixXd TDmMuI = MatrixXd::Zero(m, m);
-    MatrixXd Id = MatrixXd::Identity(m, m);
-    SelfAdjointEigenSolver<MatrixXd> eigensolver;
-    
-    time_ = -clock();
-
-    //Construct Tridiagonal matrix T_{k,k}
-    for(int i=0; i<m; i++) {
-      triDiag(i,i) = alpha[i];
-      if(i<m-1) {
-	triDiag(i+1,i) = beta[i];
-	triDiag(i,i+1) = beta[i];
-      }
-    }
-
-    //Eigensolve the T_k matrix
-    Tridiagonalization<MatrixXd> TD(triDiag);
-    eigensolver.computeFromTridiagonal(TD.diagonal(), TD.subDiagonal());
-    
-    //Dump entire spectrum
-    for(int i=0; i<m; i++) {
-      residua_old[i] = residua[i];
-      residua[i] = beta_m*fabs(eigensolver.eigenvectors().col(i)[m-1]);
-      printfQuda("TD eig (sai) %d = %.16e residual(sai) = %.16e\n", i,
-		 eigensolver.eigenvalues()[i],
-		 residua[i]);
-    }
-    
-    //DMH: This is where the LR/SR spectrum is projected.
-    //     For SR, we project out the p LARGEST eigenvalues
-    //     For LR, we project out the p SMALLEST eigenvalues
-    //     Eigen returns Eigenvalues from Hermitian matrices in ascending order.
-    //     We take advantage of this here, but be mindful that Arnoldi
-    //     type solves will require some degree of sorting.
-
-    //Sort the eigenvalues in real ascending order
-    double shifts[p];
-    for(int j=0; j<p; j++) {
-      if(reverse) shifts[j] = eigensolver.eigenvalues()[j];
-      else shifts[j] = eigensolver.eigenvalues()[j+k];
-    }
-
-    //DMH: This can be batch parallelised on the GPU.
-    //     Will be useful when p is large.
-    //     The N lots of QR decomposition can be batched, and
-    //     the Q_0 * Q_1 * ... * Q_{N-1} product
-    //     can be done in pairs in parallel, like
-    //     a sum reduction.
-    //     (Q_0 * Q_1) * (Q_2 * Q_3) * ... * (Q_{N-2} * Q_{N-1})
-    //     =  (Q_{0*1} * Q_{2*3}) * ... * (Q_{(N-2)(N-1)})
-    //     ...
-    //     =  Q_{0*1*2*3*...*(N-2)(N-1)}
-    
-    if(flags) printfQuda("Computing QR\n");
-    
-    for(int j=0; j<p; j++) {
-
-      //Apply the shift \mu_j
-      TDmMuI = triDiag;
-      //Id is the identity matrix
-      TDmMuI -= shifts[j]*Id;
       
-      //QR decomposition of Hm - \mu_i I
-      HouseholderQR<MatrixXd> QR(TDmMuI);
-      
-      //Retain Qj matrices as a product.
-      Qj = QR.householderQ();
-      Q = Q * Qj;
-      
-      //Update the Tridiag
-      triDiag = Qj.adjoint() * triDiag;
-      triDiag = triDiag * Qj;
-      
-      if(flags) printfQuda("Shift[%d] = %.16e Complete\n", j,
-			   shifts[j]);
-    }
-
-    //Update sigma_k = Q(m,k)
-    sigma_k = Q(m-1,k-1);
-    
-    //Now that we have the Q matrix product from the p shifts, we may perform the
-    //basis rotation on the first k Krylov vectors.
-    //------------------------------------------------------------------------------
-    
-    //Place Q data in QUDA MultiBLAS friendly array.
-    Complex *Qmat_mk = new Complex[m*k];
-    //Place Q data in accessible arrays
-    for(int i=0; i<k; i++) {
-      for(int j=0; j<m; j++) {
-	Qmat_mk[j*k + i].real(Q.col(i)[j]);
-	Qmat_mk[j*k + i].imag(0.0);
-      }
-    }
-
-    //Update the TriDiag
-    for(int i=0; i<m; i++) {
-      alpha[i] = triDiag(i,i);
-      if(i<m-1) {
-	beta[i] = triDiag(i+1,i);
-      }
-    }
-    
-    time_ = -clock();
-
-    //Pointers to the required Krylov space vectors,
-    //no extra memory is allocated.
-    std::vector<ColorSpinorField*> d_vecs_ptr;
-    for(int i=0; i<k; i++) {
-      blas::zero(*d_vecs_tmp[i]);
-      d_vecs_ptr.push_back(d_vecs_tmp[i]);
-    }
-
-    //Basis rotate
-    blas::caxpy(Qmat_mk, kSpace, d_vecs_ptr);
-
-    //Copy back to Krylov space array
-    for(int i=0; i<k; i++) {
-      *kSpace[i] = *d_vecs_ptr[i];
-    }
-    
-    time_ += clock();
-    time_mb += time_;
-
-    delete Qmat_mk;
-    printfQuda("shiftAndCompressFromTriDiag Complete\n");
-    
-  }
-  
-  void IRLM::schurDecompTriDiag() {
-    
-    time_ = -clock();
-    
-    //Eigen objects
-    MatrixXcd TD = MatrixXcd::Zero(nKr, nKr);
-    ComplexSchur<MatrixXcd> schur;
-    
-    time_ = -clock();
-    
-    //Construct the updated tridiag for the convergence check
-    for(int i=0; i<nKr; i++) {
-      TD(i,i) = alpha[i];
-      if(i<nKr-1) {
-	TD(i+1,i) = beta[i];
-	TD(i,i+1) = beta[i];
-      }
-    }
-
-    //Eigensolve the H_{nKr,nKr} matrix
-    schur.compute(TD, true);
-
-    //Dump entire spectrum
-    for(int i=0; i<nKr; i++) {
-      residua_old[i] = residua[i];
-      residua[i] = beta_m*fabs(schur.matrixU().col(i)[nKr-1]);
-      printfQuda("TD eig (schur) %d = (%.16e,%.16e) residual = %.16e\n", i,
-		 schur.matrixT().col(i)[i].real(),
-		 schur.matrixT().col(i)[i].imag(),
-		 residua[i]);
-    }
-  }
-  
-  
   void IRLM::computeQRfromTridiag(int k) {
 
     //Switch notation
@@ -1046,9 +850,6 @@ namespace quda {
     for(int i=0; i<m; i++) {
       residua_old[i] = residua[i];
       residua[i] = beta_m*fabs(eigensolver.eigenvectors().col(i)[m-1]);
-      printfQuda("TD eig (cQR) %d = %.16e residual(sai) = %.16e\n", i,
-		 eigensolver.eigenvalues()[i],
-		 residua[i]);
     }
     //DMH: This is where the LR/SR spectrum is projected.
     //     For SR, we project out the (nKr - nEv) LARGEST eigenvalues
@@ -1212,7 +1013,6 @@ namespace quda {
       Complex lambda = evals[idx];
 
       //M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-      //matVec(*tmp[0], *evecs[idx]);
       matVec(mat, *tmp[0], *evecs[idx]);
       
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
@@ -1248,951 +1048,10 @@ namespace quda {
   }
 
   //Destructor
-  IRLM::~IRLM() {}
-
-  void IRAM::eigensolveUpperHess() {
-    
-    time_ = -clock();
-    
-    //Eigen objects
-    MatrixXcd H = MatrixXcd::Zero(nKr, nKr);
-       
-    //Construct upper Hessenberg matrix H_{nKr,nKr}
-    for(int i=0; i<nKr; i++) {
-      for(int j=0; j<nKr; j++) {      
-	//column major upperHess
-	//row    major H
-	H(i,j) = upperHess[j*nKr + i];
-      }
-    }
-
-    //Eigensolve the H_{nKr,nKr} matrix
-    ComplexEigenSolver<MatrixXcd> eigenSolver;
-    eigenSolver.compute(H, true);
-
-    //Dump entire spectrum
-    for(int i=0; i<nKr; i++) {
-      residua_old[i] = residua[i];
-      residua[i] = beta_m*fabs(eigenSolver.eigenvectors().col(i)[nKr-1]);
-      //printfQuda("H eig (eig) %d = (%.16e,%.16e) residual = %.16e\n", i,
-      //eigenSolver.eigenvalues()[i].real(),
-      //eigenSolver.eigenvalues()[i].imag(),
-      //residua[i]);
-    }    
+  IRLM::~IRLM() {
+    delete alpha;
+    delete beta;
   }
-
-  void IRAM::schurDecompUpperHess(std::vector<Complex> &evals) {
-    
-    time_ = -clock();
-    
-    //Eigen objects
-    MatrixXcd H = MatrixXcd::Zero(nKr, nKr);
-    
-    //Construct upper Hessenberg matrix H_{nKr,nKr}
-    for(int i=0; i<nKr; i++) {
-      for(int j=0; j<nKr; j++) {
-	//column major upperHess
-	//row    major H
-	H(i,j) = upperHess[j*nKr + i];
-      }
-    }
-
-    //Eigensolve the H_{nKr,nKr} matrix
-    ComplexSchur<MatrixXcd> schur;
-    schur.compute(H, true);
-
-    //Dump entire spectrum
-    for(int i=0; i<nKr; i++) {
-      residua_old[i] = residua[i];
-      residua[i] = beta_m*fabs(schur.matrixU().col(i)[nKr-1]);
-      evals[i] = schur.matrixT().col(i)[i];
-      printfQuda("UH eig (schur) %d = (%.16e,%.16e) residual = %.16e\n", i,
-		 schur.matrixT().col(i)[i].real(),
-		 schur.matrixT().col(i)[i].imag(),
-		 residua[i]);
-    }
-  }  
-  
-  void IRAM::basisRotateUpperHess(std::vector<ColorSpinorField*> &kSpace, int k) {
-
-    for(int i=1; i<nKr; i++) {
-      //std::vector<ColorSpinorField*> d_vecs_ptr;
-      //d_vecs_ptr.push_back(d_vecs_tmp[i]);
-      //printfQuda("PRE orth = %.e\n", blockOrthogonalise(d_vecs_tmp, d_vecs_ptr, i).real());
-    }
-    
-    //Eigen objects
-    MatrixXcd UH = MatrixXcd::Identity(k, k);
-    Complex *Rmat_k = new Complex[k*k];
-    
-    time_ = -clock();
-    
-    //Construct upper Hessenberg matrix UH_{k,k}
-    for(int i=0; i<k; i++) {
-      for(int j=0; j<k; j++) {
-	//column major upperHess
-	//row    major H
-	UH(i,j) = upperHess[j*nKr + i];
-      }
-    }
-
-    //Eigensolve the H_{nKr,nKr} matrix
-    ComplexSchur<MatrixXcd> schur;
-    schur.compute(UH, true);
-
-    //Eigensolve the H_{nKr,nKr} matrix
-    //ComplexEigenSolver<MatrixXcd> eigensolver;
-    //eigensolver.compute(UH, true);
-    
-    //Place data in accessible array
-    for(int i=0; i<k; i++) {
-      for(int j=0; j<k; j++) {	
-	//Rmat_k[j*k + i] = eigensolver.eigenvectors().col(i)[j];
-	Rmat_k[j*k + i] = schur.matrixU().col(i)[j];	
-      }
-    }
-    
-    time_ += clock();
-    time_e += time_;
-    
-    //Pointers to the required Krylov space vectors,
-    //no extra memory is allocated.
-    time_ = -clock();
-    std::vector<ColorSpinorField*> d_vecs_ptr1, d_vecs_ptr2;
-    for(int i=0; i<k; i++) {
-      blas::zero(*d_vecs_tmp[i]);
-      d_vecs_ptr1.push_back(kSpace[i]);
-      d_vecs_ptr2.push_back(d_vecs_tmp[i]);
-    }
-
-    //Basis rotate kSpace into d_vecs_tmp
-    blas::caxpy(Rmat_k, d_vecs_ptr1, d_vecs_ptr2);
-    
-    time_ += clock();
-    time_mb += time_;    
-
-    delete Rmat_k;
-  }
-
-  void IRAM::computeQRfromUpperHess(int k) {
-
-    //Switch notation
-    int m = nKr;
-    int p = m - k;
-
-    printfQuda("IRAM::computeQRfromUpperHess: k=%d p=%d m=%d\n",k,p,m);
-    
-    MatrixXcd UH = MatrixXcd::Zero(m, m);
-    MatrixXcd Q = MatrixXcd::Identity(m, m);
-    MatrixXcd Qj = MatrixXcd::Zero(m, m);
-    MatrixXcd UHmMuI = MatrixXcd::Zero(m, m);
-    MatrixXcd Id = MatrixXcd::Identity(m, m);
-    
-    time_ = -clock();
-    //Construct upper Hessenberg matrix UH_{m,m}
-    for(int i=0; i<m; i++) {
-      for(int j=0; j<m; j++) {
-	//column major upperHess
-	//row    major H
-	UH(i,j) = upperHess[j*m + i];
-      }
-    }
-
-    /*
-    printfQuda("Check UH pre\n");
-    for(int i=0; i<m; i++) {
-      for(int j=0; j<m; j++) {
-    	printfQuda("(%+.6e,%+.6e) ", UH(i,j).real(), UH(i,j).imag() );
-      }
-      printfQuda("\n");
-    }
-
-    printfQuda("Check upperHess pre\n");
-    for(int i=0; i<m; i++) {
-      for(int j=0; j<m; j++) {
-    	printfQuda("(%+.6e,%+.6e) ", upperHess[j*m + i].real(), upperHess[j*m + i].imag() );
-      }
-      printfQuda("\n");
-    }
-    */
-    
-    //Eigensolve the UH
-    ComplexEigenSolver<MatrixXcd> eigensolver;
-    eigensolver.compute(UH, true);
-    //ComplexSchur<MatrixXcd> schur;
-    //schur.compute(UH, true);
-    //Dump entire spectrum
-    for(int i=0; i<m; i++) {
-      residua_old[i] = residua[i];
-      residua[i] = beta_m*fabs(eigensolver.eigenvectors().col(i)[m-1]);
-      printfQuda("UH eig (eig)   %d = (%+.16e,%+.16e) residual = %.16e\n", i,
-		 eigensolver.eigenvalues()[i].real(),
-		 eigensolver.eigenvalues()[i].imag(),
-		 residua[i]);
-    }
-    
-    for(int i=0; i<m; i++) {
-      /*      
-      residua[i] = beta_m*fabs(schur.matrixU().col(i)[m-1]);
-      printfQuda("UH eig (schur) %d = (%+.16e,%+.16e) residual = %.16e\n", i,
-		 schur.matrixT().col(i)[i].real(),
-		 schur.matrixT().col(i)[i].imag(),
-		 residua[i]);
-      */
-    }
-    
-    //DMH: This is where the LR/SR spectrum is projected.
-    //     For SR, we project out the (nKr - nEv) LARGEST eigenvalues
-    //     For LR, we project out the (nKr - nEv) SMALLEST eigenvalues
-    //     Eigen returns Eigenvalues from Hermitian matrices in ascending order.
-    //     We take advantage of this here, but be mindful that Arnoldi
-    //     type solves will require some degree of sorting.
-
-    //Sort the eigenvalues in real ascending order
-    Complex shifts[p];
-    for(int j=0; j<p; j++) {
-      if(reverse) shifts[j] = eigensolver.eigenvalues()[j];
-      else shifts[j] = eigensolver.eigenvalues()[j+k];
-    }
-    
-    //DMH: This can be batch parallelised on the GPU.
-    //     Will be useful when (nKr - nEv) is large.
-    //     The N lots of QR decomp can be batched, and
-    //     the Q_0 * Q_1 * ... * Q_{N-1} product
-    //     can be done in pairs in parallel, like
-    //     a sum reduction.
-    //     (Q_0 * Q_1) * (Q_2 * Q_3) * ... * (Q_{N-2} * Q_{N-1})
-    //     =  (Q_{0*1} * Q_{2*3}) * ... * (Q_{(N-2)(N-1)})
-    //     ...
-    //     =  Q_{0*1*2*3*...*(N-2)(N-1)}
-    
-    if(flags) printfQuda("Computing QR\n");
-    
-    for(int j=0; j<p; j++) {
-      
-      //Apply the shift \mu_j
-      UHmMuI = UH;
-      //Id is the identity matrix
-      UHmMuI -= shifts[j]*Id;
-      
-      //QR decomposition of Tm - \mu_i I
-      HouseholderQR<MatrixXcd> QR(UHmMuI);
-      
-      //Retain Qj matrices as a product.
-      Qj = QR.householderQ();
-      Q = Q * Qj;
-      
-      //Update the Tridiag
-      UH = Qj.adjoint() * UH;
-      UH = UH * Qj;
-    }
-    
-    //Place Q data in accessible arrays
-    for(int i=0; i<k; i++) {
-      for(int j=0; j<m; j++) {
-	Qmat[j*k + i] = Q.col(i)[j];
-      }
-    }
-
-    //Update the upper Hessenberg
-    for(int i=0; i<m; i++) {
-      for(int j=0; j<m; j++) {	
-	upperHess[j*m + i] = UH(i,j);
-	if( i>j+1 ) upperHess[j*m + i] = 0.0;
-      }
-    }
-    
-    time_ += clock();
-    time_e += time_;
-    
-    if(flags) printfQuda("QR Flag computeQR Complete\n");
-  }
-  
-  void IRAM::shiftAndCompressFromUpperHess(std::vector<ColorSpinorField*> &kSpace,
-					   int k) {
-    
-    //Switch notation
-    int m = nKr;
-    int p = m-k;
-
-    printfQuda("shiftAndQrotateFromUpperHess: k=%d p=%d m=%d\n",k,p,m);
-    
-    MatrixXcd UH = MatrixXcd::Zero(m, m);
-    MatrixXcd Q = MatrixXcd::Identity(m, m);
-    MatrixXcd Qj = MatrixXcd::Zero(m, m);
-    MatrixXcd UHmMuI = MatrixXcd::Zero(m, m);
-    MatrixXcd Id = MatrixXcd::Identity(m, m);
-    
-    time_ = -clock();
-
-    //Construct upper Hessenberg matrix H_{m,m}
-    for(int i=0; i<m; i++) {
-      for(int j=0; j<m; j++) {
-	//column major upperHess
-	//row    major UH
-	UH(i,j) = upperHess[j*m + i];
-      }
-    }
-
-    printfQuda("Check UH pre\n");
-    for(int i=0; i<m; i++) {
-      for(int j=0; j<m; j++) {
-    	printfQuda("(%+.6e,%+.6e) ", UH(i,j).real(), UH(i,j).imag() );
-      }
-      printfQuda("\n");
-    }
-
-    printfQuda("Check upperHess pre\n");
-    for(int i=0; i<m; i++) {
-      for(int j=0; j<m; j++) {
-    	printfQuda("(%+.6e,%+.6e) ", upperHess[j*m + i].real(), upperHess[j*m + i].imag() );
-      }
-      printfQuda("\n");
-    }
-    
-    
-    //Eigensolve the H_{m,m} matrix
-    //ComplexEigenSolver<MatrixXcd> eigensolver;
-    //eigensolver.compute(UH, true);
-
-    ComplexSchur<MatrixXcd> schur;
-    schur.compute(UH, true);
-    
-    //Dump entire spectrum
-    for(int i=0; i<m; i++) {
-      /*
-      residua_old[i] = residua[i];
-      residua[i] = beta_m*fabs(eigensolver.eigenvectors().col(i)[m-1]);
-      printfQuda("UH (eig sai) %d = (%.16e,%.16e) residual(sai) = %.16e\n", i,
-		 eigensolver.eigenvalues()[i].real(),
-		 eigensolver.eigenvalues()[i].imag(),
-		 residua[i]);
-      */
-    }
-
-    for(int i=0; i<m; i++) {
-      
-      residua[i] = beta_m*fabs(schur.matrixU().col(i)[m-1]);
-      printfQuda("UH eig (schur) %d = (%+.16e,%+.16e) residual = %.16e\n", i,
-		 schur.matrixT().col(i)[i].real(),
-		 schur.matrixT().col(i)[i].imag(),
-		 residua[i]);
-      
-    }
-
-    
-    //DMH: This is where the LR/SR spectrum is projected.
-    //     For SR, we project out the p LARGEST eigenvalues
-    //     For LR, we project out the p SMALLEST eigenvalues
-    //     Eigen returns Eigenvalues from Hermitian matrices in ascending order.
-    //     We take advantage of this here, but be mindful that Arnoldi
-    //     type solves will require some degree of sorting.
-
-    //Sort the eigenvalues in real ascending order
-    Complex shifts[p];
-    for(int j=0; j<p; j++) {
-      //if(reverse) shifts[j] = eigensolver.eigenvalues()[j];
-      //else shifts[j] = eigensolver.eigenvalues()[j+k];
-
-      if(reverse) shifts[j] = schur.matrixT().col(j+k)[j+k];
-      else shifts[j] = schur.matrixT().col(j)[j];
-    }
-    
-    //DMH: This can be batch parallelised on the GPU.
-    //     Will be useful when p is large.
-    //     The N lots of QR decomposition can be batched, and
-    //     the Q_0 * Q_1 * ... * Q_{N-1} product
-    //     can be done in pairs in parallel, like
-    //     a sum reduction.
-    //     (Q_0 * Q_1) * (Q_2 * Q_3) * ... * (Q_{N-2} * Q_{N-1})
-    //     =  (Q_{0*1} * Q_{2*3}) * ... * (Q_{(N-2)(N-1)})
-    //     ...
-    //     =  Q_{0*1*2*3*...*(N-2)(N-1)}
-    
-    if(flags) printfQuda("Computing QR\n");
-    
-    for(int j=0; j<p; j++) {
-
-      //Apply the shift \mu_j
-      UHmMuI = UH;
-      //Id is the identity matrix
-      UHmMuI -= shifts[j]*Id;
-      
-      //QR decomposition of Hm - \mu_i I
-      HouseholderQR<MatrixXcd> QR(UHmMuI);
-      
-      //Retain Qj matrices as a product.
-      Qj = QR.householderQ();
-      Q = Q * Qj;
-      
-      //Update the Tridiag
-      UH = Qj.adjoint() * UH;
-      UH = UH * Qj;
-      
-      if(flags) printfQuda("Shift[%d] = (%.16e,%.16e) Complete\n", j,
-			   shifts[j].real(), shifts[j].imag());
-    }
-
-    //Update the upper Hessenberg
-    for(int i=0; i<m; i++) {
-      for(int j=0; j<m; j++) {	
-	upperHess[j*m + i] = UH(i,j);
-	if( i>j+1 ) upperHess[j*m + i] = 0.0;
-      }
-    }
-
-    //Now that we have the Q matrix product from the p shifts, we may perform the
-    //basis rotation on the first k Krylov vectors.
-    //------------------------------------------------------------------------------
-    
-    //Place Q data in QUDA MultiBLAS friendly array.
-    Complex *Qmat_mk = new Complex[m*k];
-    //Column-major
-    for(int i=0; i<k; i++) {
-      for(int j=0; j<m; j++) {
-	Qmat_mk[j*k + i] = Q.col(i)[j];
-      }
-    }
-    
-    time_ = -clock();
-
-    //Pointers to the required Krylov space vectors,
-    //no extra memory is allocated.
-    std::vector<ColorSpinorField*> d_vecs_ptr;
-    for(int i=0; i<k; i++) {
-      blas::zero(*d_vecs_tmp[i]);
-      d_vecs_ptr.push_back(d_vecs_tmp[i]);
-    }
-
-    //Basis rotate
-    blas::caxpy(Qmat_mk, kSpace, d_vecs_ptr);
-
-    //Copy back to Krylov space array
-    for(int i=0; i<k; i++) {
-      *kSpace[i] = *d_vecs_ptr[i];
-    }
-    
-    time_ += clock();
-    time_mb += time_;
-
-    delete Qmat_mk;
-    if(flags) printfQuda("shiftAndQrotateFromUpperHess Complete\n");
-    
-  }
-
-  void IRAM::arnoldiStep(std::vector<ColorSpinorField*> v,
-			 int j) {
-    
-    //Compute r = A * v_j - b_{j-i} * v_{j-1}
-    time_ = -clock();
-    //Purge locked eigenvectors from the residual
-    //DMH: This step ensures that the next mat vec
-    //     does not reintroduce components of the
-    //     existing eigenspace
-
-    int locked_size = 0;
-    std::vector<ColorSpinorField*> d_vecs_locked;
-    for(int i=0; i<j; i++) {
-      if(locked[i]) {
-	d_vecs_locked.push_back(v[i]);
-	locked_size++;
-      }
-    }
-    
-    if(locked_size > 0) {
-      Complex *s = new Complex[locked_size];    
-      //Block dot products stored in s.
-      std::vector<ColorSpinorField*> d_vec_vj;
-      d_vec_vj.push_back(v[j]);
-      blas::cDotProduct(s, d_vecs_locked, d_vec_vj);
-      for(int i=0; i<locked_size; i++) s[i] *= -1.0;  
-      blas::caxpy(s, d_vecs_locked, d_vec_vj);
-      delete s;
-    }
-    
-    time_ += clock();
-    time_mb += time_;
-
-    //r = A * v_j
-    chebyOp(mat, *r[0], *v[j]);
-
-    if(locked_size > 0) {
-      Complex *s = new Complex[locked_size];    
-      //Block dot products stored in s.
-      std::vector<ColorSpinorField*> d_vec_vj;
-      d_vec_vj.push_back(v[j]);
-      blas::cDotProduct(s, d_vecs_locked, d_vec_vj);
-      for(int i=0; i<locked_size; i++) s[i] *= -1.0;  
-      blas::caxpy(s, d_vecs_locked, d_vec_vj);
-      delete s;
-    }
-
-    
-    for(int i=0; i<j+1; i++) {
-      upperHess[j*nKr + i] = blas::cDotProduct(*v[i], *r[0]);
-      //r = r - H{i,j} * v_{i}
-      blas::caxpy(-upperHess[j*nKr + i], *v[i], *r[0]);
-    }
-    
-    /*
-    if( j>0 ) {
-
-      double alpha_shift = 0.0;
-      double alpha_orig  = upperHess[j*nKr + j].real();
-      double rho = 5.0;
-
-      double alphaj = upperHess[j*nKr + j].real();
-      double betajm1= upperHess[(j-1)*nKr + j].real();
-      double betaj  = upperHess[j*nKr + j+1].real();
-      
-      //Orthogonalise if beta[j] < (1.0)*sqrt(alpha[j]*alpha[j] + beta[j-1]*beta[j-1])
-      if(betaj < (rho)*sqrt(alphaj*alphaj + betajm1*betajm1)) {
-	
-	//The residual vector r has been deemed insufficiently
-	//orthogonal to the existing Krylov space. We must
-	//orthogonalise it.
-	printfQuda("orthogonalising attempt 1 at step %d, beta = %.16e < %.16e\n", j, betaj, (rho)*sqrt(alphaj*alphaj + betajm1*betajm1));
-	
-	alpha_shift = blockOrthogonalise(v, r, j);
-	//if (flags) printfQuda("Shifting alpha[%d] by %e\n", j, alpha_shift);
-	//printfQuda("Shifting alpha[%d] by %e\n", j, alpha_shift);
-	betaj = sqrt(blas::norm2(*r[0]));
-	alphaj += alpha_shift;
-      }
-      
-      //re-attempt if beta[j] < (1.0)*alpha_shift
-      int ortho_tries = 2;
-      while(ortho_tries < 5 && betaj < fabs(alpha_shift)) {
-
-	printfQuda("orthogonalising attempt %d at step %d, beta = %.16e < %.16e\n", ortho_tries, j, betaj, (rho)*sqrt(alphaj*alphaj + betajm1*betajm1));
-	
-	alpha_shift = blockOrthogonalise(v, r, j);
-	//if (flags) printfQuda("Shifting alpha[%d] by %e\n", j, alpha_shift);
-	//printfQuda("Shifting alpha[%d] by %e\n", j, alpha_shift);
-	betaj = sqrt(blas::norm2(*r[0]));
-	alphaj += alpha_shift;
-	ortho_tries++;   
-      }
-
-      //If the vector is still not orthogonal, we must replace it
-      if (betaj < fabs(alpha_shift)) {
-
-	printfQuda("refreshing at step %d\n", j);
-	
-	RNG *rng = new RNG(r[0]->Volume(), j+137, r[0]->X());
-        rng->Init();
-        spinorNoise(*r[0], *rng, QUDA_NOISE_UNIFORM);
-        rng->Release();
-        delete rng;
-
-	alpha_shift = blockOrthogonalise(v, r, j);
-	alphaj = alpha_orig;
-	betaj = 0.0;
-      } else {
-	//b_j = ||r||
-	betaj = sqrt(blas::norm2(*r[0]));
-      }
-      
-      upperHess[j*nKr + j+1].real(betaj);
-      upperHess[j*nKr + j].real(alphaj);
-    }
-    */
-    
-    double mod_r = sqrt(blas::norm2(*r[0]));
-
-    //Prepare next step.
-    //v_{j+1} = r / ||r||
-    if(j < nKr-1) {
-      upperHess[j*nKr + j+1] = mod_r;
-      blas::zero(*v[j+1]);
-      blas::axpy(1.0/mod_r, *r[0], *v[j+1]);
-    } else {
-      beta_m = mod_r;
-    }
-  }
-  
-  //Implicitly Restarted Arnoldi Method constructor
-  IRAM::IRAM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile) : EigenSolver(eig_param, profile), mat(mat){
-
-    //Upper Hessenberg matrix construct and initialise
-    //Column-major
-    upperHess = new Complex[nKr*nKr];
-    for(int i=0; i<nKr; i++) {
-      for(int j=0; j<nKr; j++) {
-	upperHess[j*nKr + i] = 0.0;
-      }
-    }    
-  }
-  
-  void IRAM::operator()(std::vector<ColorSpinorField*> &kSpace,
-			std::vector<Complex> &evals){
-    
-    //Check to see if we are loading eigenvectors
-    if (strcmp(eig_param->vec_infile,"") != 0) {
-      loadFromFile(mat, kSpace, evals);
-      return;
-    }
-
-    //Test for an initial guess
-    double norm = sqrt(blas::norm2(*kSpace[0]));
-    if (norm == 0) {
-      printfQuda("Initial residual is zero. Populating with rands.\n");
-      
-      if (kSpace[0] -> Location() == QUDA_CPU_FIELD_LOCATION) {
-        kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
-      } else {
-        RNG *rng = new RNG(kSpace[0]->Volume(), 1234, kSpace[0]->X());
-        rng->Init();
-        spinorNoise(*kSpace[0], *rng, QUDA_NOISE_UNIFORM);
-        rng->Release();
-        delete rng;
-      }
-    }
-
-    //Normalise initial guess
-    norm = sqrt(blas::norm2(*kSpace[0]));
-    blas::ax(1.0/norm, *kSpace[0]);
-    
-    //Create a device side residual vector by cloning
-    //the kSpace passed to the function.
-    ColorSpinorParam csParam(*kSpace[0]);
-    r.push_back(ColorSpinorField::Create(csParam));
-
-    //Device side space for Ritz vector basis rotation.
-    for(int i=0; i<nKr; i++) {
-      d_vecs_tmp.push_back(ColorSpinorField::Create(csParam));
-    }
-    //---------------------------------------------------------------------------
-    
-    // Begin IRAM Eigensolver computation
-    //---------------------------------------------------------------------------
-    printfQuda("*****************************\n");
-    printfQuda("**** START IRAM SOLUTION ****\n");
-    printfQuda("*****************************\n");
-    printfQuda("nConv %d\n", nConv);
-    printfQuda("nEv %d\n", nEv);
-    printfQuda("nKr %d\n", nKr);
-    if(eig_param->use_poly_acc){
-      printfQuda("polyDeg %d\n", eig_param->poly_deg);
-      printfQuda("a-min %f\n", eig_param->a_min);
-      printfQuda("a-max %f\n", eig_param->a_max);
-    }
-
-    double t1 = clock();
-
-    //Use conventional notation
-    int k = nEv;
-    int m = nKr;
-    int p = m - k;
-    
-    int step = 0;    
-    int iter = 0;
-    
-    //Initial k step factorisation
-    for(step=0; step<k; step++) arnoldiStep(kSpace, step);
-    iter += k;
-    printfQuda("Iter %04d: Initial %d step factorisation complete\n", iter, k);
-
-    //Loop over restart iterations.
-    while(restart_iter < max_restarts && !converged) {
-      
-      for(step=k; step<m; step++) arnoldiStep(kSpace, step);
-      iter += p;
-      printfQuda("Iter %04d: Restart %d complete\n", iter, restart_iter+1);
-      
-      //Convergence check
-      if((restart_iter+1)%check_interval == 0) {
-	
-	//Rotates the first k vectors only
-	basisRotateUpperHess(kSpace, k);	
-	//Error estimates (residua) given by ||A*vec - lambda*vec||
-	computeEvals(mat, evals, k);
-
-	//schurDecompUpperHess(evals);
-	
-	//Lock new eigenpairs
-	for(int i=0; i<k; i++) {
-	  //if(residua[i] < (1e-16)*tol*fabs(evals[i]) && !locked[i]) {
-	  if(residua[i] < tol && !locked[i]) {
-	    
-	    //This is a new eigenpair, lock it
-	    locked[i] = true;
-	    printfQuda("**** locking vector %d, converged eigenvalue = (%+.16e,%+.16e) resid %+.16e ****\n",
-		       i, evals[i].real(), evals[i].imag(), residua[i]);
-	    
-	    num_converged++;
-	  }
-	}
-	
-	printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter+1);
-
-	//Check for convergence
-	bool all_locked = true;
-	if(num_converged >= nConv) {
-	  for(int i=0; i<nConv; i++) {
-	    if(reverse) {
-	      if(!locked[k-1-i]) all_locked = false;
-	    } else {
-	      if(!locked[i]) all_locked = false;
-	    }
-	  }
-
-	  if(all_locked) {
-	    //Transfer eigenvectors to kSpace array and exit IRLM
-	    for(int i=0; i<nConv; i++) *kSpace[i] =  *d_vecs_tmp[i];
-	    converged = true;
-	  }
-	}
-      }
-
-      //Apply p shifts, rotate by Q = (Q_0*Q_1* ... *Q_{p-1}), update H.
-      shiftAndCompressFromUpperHess(kSpace, k);
-      
-      //Construct the rotation matrix from the upper Hessenberg
-      //and compress the m factorisation to k      
-      //computeQRfromUpperHess(k);
-      //basisRotateQ(kSpace, k);
-      
-      //Store the residual vector in the last vector of kSpace
-      //so r can be used as workspace
-      *kSpace[m-1] = *r[0];
-      
-      //Update the residual (stored in kspace[m-1])
-      //r_{k} = r_{m} * \sigma_{k}  |  sigma_{k} = Q(m,k)
-
-      blas::zero(*r[0]);
-      blas::caxpy(Qmat[m*k - 1], *kSpace[m-1], *r[0]);
-      
-      //r_{k} += v_{k+1} * beta_k  |  beta_k = H(k+1,k)
-      blas::axpy(upperHess[(k-1)*m + k].real(), *kSpace[k], *r[0]);
-
-      //Construct the new starting vector at k
-      //k = nEv + num_converged;
-      //p = m - k;
-      
-      double beta_k = sqrt(blas::norm2(*r[0]));
-      blas::zero(*kSpace[k]);
-      blas::axpy(1.0/beta_k, *r[0], *kSpace[k]);
-      upperHess[(k-1)*m + k].real(beta_k);
-      time_ += clock();
-      time_mb += time_;
-      
-      restart_iter++;
-    }    
-    //---------------------------------------------------------------------------
-    
-    
-    //Post computation report
-    //---------------------------------------------------------------------------
-    if(!converged) {
-      printfQuda("IRAM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d restart steps. "
-		 "Please either increase nKr and nEv and/or extend the number of restarts\n", nConv, nEv, nKr, max_restarts);
-    } else {
-      printfQuda("IRAM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", nConv, restart_iter, iter);
-      
-      //Error estimates (residua) given by ||A*vec - lambda*vec||	          
-      for(int i=0; i<nEv; i++) {
-	printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
-		   i, upperHess[i*nKr + i].real(),  upperHess[i*nKr + i].imag(), residua[i]);
-      }
-
-      computeEvals(mat, evals, nEv);
-      for(int i=0; i<nEv; i++) {
-	printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n",
-		   i, evals[i].real(), evals[i].imag(), residua[i]);
-      }
-    }
-
-    double t2 = clock() - t1;
-    double total;
-
-    if(eig_param->compute_svd) total = (time_e + time_mv + time_mb + time_svd)/CLOCKS_PER_SEC;
-    else total = (time_e + time_mv + time_mb)/CLOCKS_PER_SEC;
-    printfQuda("Time to solve problem using IRAM = %e\n", t2/CLOCKS_PER_SEC);
-    printfQuda("Time spent using EIGEN           = %e  %.1f%%\n", time_e/CLOCKS_PER_SEC, 100*(time_e/CLOCKS_PER_SEC)/total);
-    printfQuda("Time spent in matVec             = %e  %.1f%%\n", time_mv/CLOCKS_PER_SEC, 100*(time_mv/CLOCKS_PER_SEC)/total);
-    printfQuda("Time spent in (multi)blas        = %e  %.1f%%\n", time_mb/CLOCKS_PER_SEC, 100*(time_mb/CLOCKS_PER_SEC)/total);
-    if(eig_param->compute_svd) printfQuda("Time spent computing svd         = %e  %.1f%%\n", time_svd/CLOCKS_PER_SEC, 100*(time_svd/CLOCKS_PER_SEC)/total);
-    //---------------------------------------------------------------------------
-
-    printfQuda("Local clean-up\n");
-    //Local clean-up
-    //delete r[0];
-    for(int i=0; i<nKr; i++) {
-      delete d_vecs_tmp[i];
-    }
-
-    //Only save if outfile is defined
-    if (strcmp(eig_param->vec_outfile,"") != 0) {
-      printfQuda("saving eigenvectors\n");
-      saveVectors(kSpace, eig_param->vec_outfile);
-    }
-    
-    printfQuda("*****************************\n");
-    printfQuda("***** END IRAM SOLUTION *****\n");
-    printfQuda("*****************************\n");
-    
-  }
-  
-  //Destructor
-  IRAM::~IRAM() {    
-    delete upperHess;
-  }
-
-  //Thick Restarted Lanczos Method constructor
-  TRLM::TRLM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile) : IRLM(eig_param, mat, profile) {
-    
-  }
-  
-  void TRLM::operator()(std::vector<ColorSpinorField*> &kSpace,
-			std::vector<Complex> &evals){
-    
-    //Check to see if we are loading eigenvectors
-    if (strcmp(eig_param->vec_infile,"") != 0) {
-      loadFromFile(mat, kSpace, evals);
-      return;
-    }
-    
-    //Test for an initial guess
-    double norm = sqrt(blas::norm2(*kSpace[0]));
-    if (norm == 0) {
-      printfQuda("Initial residual is zero. Populating with rands.\n");
-      
-      if (kSpace[0] -> Location() == QUDA_CPU_FIELD_LOCATION) {
-        kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
-      } else {
-        RNG *rng = new RNG(kSpace[0]->Volume(), 1234, kSpace[0]->X());
-        rng->Init();
-        spinorNoise(*kSpace[0], *rng, QUDA_NOISE_UNIFORM);
-        rng->Release();
-        delete rng;
-      }
-    }
-
-    //Normalise initial guess
-    norm = sqrt(blas::norm2(*kSpace[0]));
-    blas::ax(1.0/norm, *kSpace[0]);
-    
-    //Create a device side residual vector by cloning
-    //the kSpace passed to the function.
-    ColorSpinorParam csParam(*kSpace[0]);
-    r.push_back(ColorSpinorField::Create(csParam));
-
-    //Device side space for Ritz vector basis rotation.
-    for(int i=0; i<nKr; i++) {
-      d_vecs_tmp.push_back(ColorSpinorField::Create(csParam));
-    }
-    //---------------------------------------------------------------------------
-    
-    // Begin TRLM Eigensolver computation
-    //---------------------------------------------------------------------------
-    printfQuda("*****************************\n");
-    printfQuda("**** START TRLM SOLUTION ****\n");
-    printfQuda("*****************************\n");
-    printfQuda("nConv %d\n", nConv);
-    printfQuda("nEv %d\n", nEv);
-    printfQuda("nKr %d\n", nKr);
-    if(eig_param->use_poly_acc){
-      printfQuda("polyDeg %d\n", eig_param->poly_deg);
-      printfQuda("a-min %f\n", eig_param->a_min);
-      printfQuda("a-max %f\n", eig_param->a_max);
-    }
-
-    double t1 = clock();
-
-    //Define some literature consistent parameters    
-    int k = nEv;
-    int m = nKr;
-    int p = m - k;
-    int nLocked = 0;
-    
-    //Initial nEv step factorisation
-    int step=0;
-    int iter=0;
-    for(step=0; step<nEv; step++) lanczosStep(kSpace, step);
-    iter += nEv;
-    printfQuda("Initial %d step factorisation complete\n", nEv);
-
-    //Loop over restart iterations.
-    while(restart_iter < max_restarts && !converged) {
-      
-      for(step=k; step<m; step++) lanczosStep(kSpace, step);
-      iter += m-k;
-      printfQuda("Restart %d complete\n", restart_iter+1);
-
-      int arrow_pos = k-1;
-      
-      //The arrow matrix will be updated in this function. The Q
-      //rotation matrix is put in Qmat for use in multiBLAS functions.
-      eigensolveFromArrowMat(nLocked, arrow_pos);
-
-      double epsilon = DBL_EPSILON;
-      
-      //Number of rotated vectors is nEv.
-      //basisRotateQ(kSpace, k);
-      
-      //shiftAndCompressFromTriDiag(kSpace, k);
-      
-    }
-  }
-  
-  //Destructor
-  TRLM::~TRLM() {}
-  
-  void TRLM::eigensolveFromArrowMat(int nLocked, int arrow_pos) {
-    
-    int dim = nKr - nLocked;
-    
-    time_ = -clock();    
-    //Eigen objects
-    MatrixXd A = MatrixXd::Zero(dim, dim);
-    
-    //Construct arrow mat A_{dim,dim}
-    for(int i=0; i<dim; i++) {
-
-      //alpha populates the diagonal
-      A(i,i) = alpha[i];
-
-      //beta populates the arrow and sub/super diagonals
-      if(i<dim-1) {
-	if(i<arrow_pos) {
-	  A(arrow_pos,i) = beta[i];
-	  A(i,arrow_pos) = beta[i];
-	} else {
-	  A(i,i+1) = beta[i];
-	  A(i+1,i) = beta[i];
-	}
-      }
-    }
-
-    printfQuda("Check A pre\n");
-    for(int i=0; i<dim; i++) {
-      for(int j=0; j<dim; j++) {
-    	printfQuda("%+.6e ", A(i,j));
-      }
-      printfQuda("\n");
-    }
-
-    //Eigensolve the arrow matrix
-    SelfAdjointEigenSolver<MatrixXd> eigensolver;
-    eigensolver.compute(A);
-    
-    //Dump entire spectrum
-    max_eig = 0.0;
-    for(int i=0; i<dim; i++) {
-      residua_old[i+nLocked] = residua[i+nLocked];
-      residua[i+nLocked] = beta_m*fabs(eigensolver.eigenvectors().col(i)[nKr-1]);
-      printfQuda("A eig (eig) %d = %.16e residual = %.16e\n", i,
-		 eigensolver.eigenvalues()[i],
-		 residua[i]);
-      if (eigensolver.eigenvalues()[i] > max_eig)
-	max_eig = eigensolver.eigenvalues()[i];
-      //Update the alpha array
-      alpha[i+nLocked] = eigensolver.eigenvalues()[i];
-    }
-  }
-  
-  
   
   // ARPACK INTERAFCE ROUTINES
   //--------------------------------------------------------------------------

@@ -277,7 +277,7 @@ namespace quda {
 
     /** Parallel hyper-cubic random number generator for generating null-space vectors */
     RNG *rng;
-    
+
   public:
     /** 
       Constructor for MG class
@@ -285,12 +285,6 @@ namespace quda {
       @param profile Timeprofile instance used to profile
     */
     MG(MGParam &param, TimeProfile &profile);
-
-    //friend void EigenSolver::loadVectors(std::vector<ColorSpinorField*> &vecs,
-    //std::string file);
-
-    //friend void EigenSolver::saveVectors(std::vector<ColorSpinorField*> &vecs,
-    //std::string file);
     
     /**
        Destructor for MG class. Frees any existing coarse grid MG
@@ -303,6 +297,11 @@ namespace quda {
        @param Whether we are refreshing the null-space components or just updating the operators
      */
     void reset(bool refresh=false);
+
+    /**
+       @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
+    */
+    void dumpNullVectors();
 
     /**
        @brief Create the smoothers
@@ -355,7 +354,7 @@ namespace quda {
        @param B Save null-space vectors from here
     */
     void saveVectors(std::vector<ColorSpinorField*> &B);
-
+    
     /**
        @brief Generate the null-space vectors
        @param B Generated null-space vectors

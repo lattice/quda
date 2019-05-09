@@ -194,7 +194,14 @@ namespace quda {
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;
 
+    /** Basis for CA algorithms */
+    QudaCABasis ca_basis;
 
+    /** Minimum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_min;
+
+    /** Maximum eigenvalue for Chebyshev CA basis */
+    double ca_lambda_max; // -1 -> power iter generate
 
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
@@ -263,7 +270,8 @@ namespace quda {
       num_src(param.num_src), num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle),
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      omega(param.omega), ca_basis(param.ca_basis), ca_lambda_min(param.ca_lambda_min), ca_lambda_max(param.ca_lambda_max),
+      schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim),
       deflation_grid(param.deflation_grid), rhs_idx(0),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
@@ -300,7 +308,8 @@ namespace quda {
       num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.Nkrylov), precondition_cycle(param.precondition_cycle),
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      omega(param.omega), ca_basis(param.ca_basis), ca_lambda_min(param.ca_lambda_min), ca_lambda_max(param.ca_lambda_max),
+      schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.precision_ritz), nev(param.nev), m(param.m),
       deflation_grid(param.deflation_grid), rhs_idx(0),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
@@ -349,6 +358,9 @@ namespace quda {
       }
       //for incremental eigCG:
       param.rhs_idx = rhs_idx;
+
+      param.ca_lambda_min = ca_lambda_min;
+      param.ca_lambda_max = ca_lambda_max;
     }
 
     void updateRhsIndex(QudaInvertParam &param) {
@@ -566,24 +578,6 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
-
-  //DMH CGDF
-  class CGDF : public CG {
-    
-  private:
-    DiracMdagM mdagm;
-    DiracMdagM mdagmSloppy;
-    ColorSpinorField *bp;
-    bool init;
-
-  public:
-    CGDF(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
-    virtual ~CGDF();
-
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
-  };
-  //DMH CGDF
-
   
   class MPCG : public Solver {
     private:
@@ -810,11 +804,13 @@ namespace quda {
     const DiracMatrix &matSloppy;
     bool init;
 
-    Complex *W; // inner product matrix
-    Complex *C; // inner product matrix
-    Complex *alpha;
-    Complex *beta;
-    Complex *phi;
+    bool lambda_init;
+    QudaCABasis basis;
+
+    Complex *Q_AQandg; // Fused inner product matrix
+    Complex *Q_AS; // inner product matrix
+    Complex *alpha; // QAQ^{-1} g
+    Complex *beta; // QAQ^{-1} QpolyS
 
     ColorSpinorField *rp;
     ColorSpinorField *tmpp;
@@ -822,9 +818,15 @@ namespace quda {
     ColorSpinorField *tmp_sloppy;
     ColorSpinorField *tmp_sloppy2;
 
-    std::vector<ColorSpinorField*> r;  // residual vectors
-    std::vector<ColorSpinorField*> q;  // mat * residual vectors
-    std::vector<ColorSpinorField*> p;  // CG direction vectors
+    std::vector<ColorSpinorField*> S;  // residual vectors
+    std::vector<ColorSpinorField*> AS; // mat * residual vectors. Can be replaced by a single temporary.
+    std::vector<ColorSpinorField*> Q;  // CG direction vectors
+    std::vector<ColorSpinorField*> Qtmp; // CG direction vectors for pointer swap
+    std::vector<ColorSpinorField*> AQ; // mat * CG direction vectors.
+                                       // it's possible to avoid carrying these
+                                       // around, but there's a stability penalty,
+                                       // and computing QAQ becomes a pain (though
+                                       // it does let you fuse the reductions...)
 
     /**
        @brief Initiate the fields needed by the solver
@@ -837,16 +839,52 @@ namespace quda {
     /**
        @brief Compute the alpha coefficients
     */
-    void compute_alpha(Complex *x, Complex *W, Complex *phi);
+    void compute_alpha();
 
     /**
        @brief Compute the beta coefficients
     */
-    void compute_beta(Complex *beta, Complex *W, Complex *C);
+    void compute_beta();
+
+    /**
+       @ brief Check if it's time for a reliable update
+    */
+    int reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta);
 
   public:
     CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CACG();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class CACGNE : public CACG {
+
+  private:
+    DiracMMdag mmdag;
+    DiracMMdag mmdagSloppy;
+    ColorSpinorField *xp;
+    ColorSpinorField *yp;
+    bool init;
+
+  public:
+    CACGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CACGNE();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class CACGNR : public CACG {
+
+  private:
+    DiracMdagM mdagm;
+    DiracMdagM mdagmSloppy;
+    ColorSpinorField *bp;
+    bool init;
+
+  public:
+    CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CACGNR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
@@ -864,6 +902,10 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     bool init;
+
+    // Basis. Currently anything except POWER_BASIS causes a warning
+    // then swap to POWER_BASIS.
+    QudaCABasis basis;
 
     Complex *alpha; // Solution coefficient vectors
 
@@ -931,7 +973,7 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
-
+  
   class PreconditionedSolver : public Solver {
 
   private:
@@ -943,9 +985,10 @@ namespace quda {
   PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param,
 		       TimeProfile &profile, const char *prefix)
     : Solver(param, profile), solver(&solver), dirac(dirac), prefix(prefix) {
-      
+
       //DMH
       if(param.deflate) {
+	
 	/*
 	//Compute the deflation sub-space
 	eig_solver = EigenSolver::create(&param.eig_param,

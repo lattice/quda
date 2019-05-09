@@ -122,6 +122,8 @@ extern "C" {
     QUDA_CG3NE_INVERTER,
     QUDA_CG3NR_INVERTER,
     QUDA_CA_CG_INVERTER,
+    QUDA_CA_CGNE_INVERTER,
+    QUDA_CA_CGNR_INVERTER,
     QUDA_CA_GCR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
@@ -191,6 +193,13 @@ extern "C" {
     QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
   } QudaResidualType;
 
+  // Which basis to use for CA algorithms
+  typedef enum QudaCABasis_s {
+    QUDA_POWER_BASIS,
+    QUDA_CHEBYSHEV_BASIS,
+    QUDA_INVALID_BASIS = QUDA_INVALID_ENUM
+  } QudaCABasis;
+
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
   //
   // For the clover-improved Wilson Dirac operator, QUDA_MATPC_EVEN_EVEN
@@ -213,7 +222,7 @@ extern "C" {
     QUDA_DAG_YES,
     QUDA_DAG_INVALID = QUDA_INVALID_ENUM
   } QudaDagType;
-  
+
   typedef enum QudaMassNormalization_s {
     QUDA_KAPPA_NORMALIZATION,
     QUDA_MASS_NORMALIZATION,
@@ -233,15 +242,15 @@ extern "C" {
   } QudaPreserveSource;
 
   typedef enum QudaDiracFieldOrder_s {
-    QUDA_INTERNAL_DIRAC_ORDER,   // internal dirac order used, varies on precision and dslash type
-    QUDA_DIRAC_ORDER,            // even-odd, color inside spin
-    QUDA_QDP_DIRAC_ORDER,        // even-odd, spin inside color
-    QUDA_QDPJIT_DIRAC_ORDER,     // even-odd, complex-color-spin-spacetime
-    QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, color inside spin
-    QUDA_LEX_DIRAC_ORDER,        // lexicographical order, color inside spin
+    QUDA_INTERNAL_DIRAC_ORDER,    // internal dirac order used, varies on precision and dslash type
+    QUDA_DIRAC_ORDER,             // even-odd, color inside spin
+    QUDA_QDP_DIRAC_ORDER,         // even-odd, spin inside color
+    QUDA_QDPJIT_DIRAC_ORDER,      // even-odd, complex-color-spin-spacetime
+    QUDA_CPS_WILSON_DIRAC_ORDER,  // odd-even, color inside spin
+    QUDA_LEX_DIRAC_ORDER,         // lexicographical order, color inside spin
     QUDA_TIFR_PADDED_DIRAC_ORDER, // padded z dimension for TIFR RHMC code
     QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
-  } QudaDiracFieldOrder;  
+  } QudaDiracFieldOrder;
 
   typedef enum QudaCloverFieldOrder_s {
     QUDA_FLOAT_CLOVER_ORDER = 1,  // even-odd float ordering
@@ -283,7 +292,7 @@ extern "C" {
     QUDA_INVALID_PARITY = QUDA_INVALID_ENUM
   } QudaParity;
 
-  //  
+  //
   // Types used only internally
   //
 
@@ -294,6 +303,7 @@ extern "C" {
     QUDA_CLOVERPC_DIRAC,
     QUDA_DOMAIN_WALL_DIRAC,
     QUDA_DOMAIN_WALLPC_DIRAC,
+    QUDA_DOMAIN_WALL_4D_DIRAC,
     QUDA_DOMAIN_WALL_4DPC_DIRAC,
     QUDA_MOBIUS_DOMAIN_WALL_DIRAC,
     QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC,
@@ -319,14 +329,14 @@ extern "C" {
     QUDA_CUDA_FIELD_LOCATION = 2,
     QUDA_INVALID_FIELD_LOCATION = QUDA_INVALID_ENUM
   } QudaFieldLocation;
-  
+
   // Which sites are included
   typedef enum QudaSiteSubset_s {
     QUDA_PARITY_SITE_SUBSET = 1,
     QUDA_FULL_SITE_SUBSET = 2,
     QUDA_INVALID_SITE_SUBSET = QUDA_INVALID_ENUM
   } QudaSiteSubset;
-  
+
   // Site ordering (always t-z-y-x, with rightmost varying fastest)
   typedef enum QudaSiteOrder_s {
     QUDA_LEXICOGRAPHIC_SITE_ORDER, // lexicographic ordering
@@ -334,7 +344,7 @@ extern "C" {
     QUDA_ODD_EVEN_SITE_ORDER, // CPS uses this
     QUDA_INVALID_SITE_ORDER = QUDA_INVALID_ENUM
   } QudaSiteOrder;
-  
+
   // Degree of freedom ordering
   typedef enum QudaFieldOrder_s {
     QUDA_FLOAT_FIELD_ORDER = 1, // spin-color-complex-space
@@ -347,7 +357,7 @@ extern "C" {
     QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, // TIFR RHMC ordering
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
   } QudaFieldOrder;
-  
+
   typedef enum QudaFieldCreate_s {
     QUDA_NULL_FIELD_CREATE, // create new field
     QUDA_ZERO_FIELD_CREATE, // create new field and zero it
@@ -385,20 +395,16 @@ extern "C" {
       QUDA_INVALID_PROJECTION = QUDA_INVALID_ENUM
   } QudaProjectionType;
 
-  // used to select preconditioning method in domain-wall fermion
-  typedef enum QudaDWFPCType_s {
-    QUDA_5D_PC,
-    QUDA_4D_PC,
-    QUDA_PC_INVALID = QUDA_INVALID_ENUM
-  } QudaDWFPCType; 
+  // used to select checkerboard preconditioning method
+  typedef enum QudaPCType_s { QUDA_4D_PC = 4, QUDA_5D_PC = 5, QUDA_PC_INVALID = QUDA_INVALID_ENUM } QudaPCType;
 
   typedef enum QudaTwistFlavorType_s {
     QUDA_TWIST_SINGLET = 1,
     QUDA_TWIST_NONDEG_DOUBLET = +2,
-    QUDA_TWIST_DEG_DOUBLET = -2,    
-    QUDA_TWIST_NO  = 0,
+    QUDA_TWIST_DEG_DOUBLET = -2,
+    QUDA_TWIST_NO = 0,
     QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
-  } QudaTwistFlavorType; 
+  } QudaTwistFlavorType;
 
   typedef enum QudaTwistDslashType_s {
     QUDA_DEG_TWIST_INV_DSLASH,
@@ -422,7 +428,7 @@ extern "C" {
   } QudaTwistGamma5Type;
 
   typedef enum QudaUseInitGuess_s {
-    QUDA_USE_INIT_GUESS_NO,    
+    QUDA_USE_INIT_GUESS_NO,
     QUDA_USE_INIT_GUESS_YES,
     QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
   } QudaUseInitGuess;
@@ -434,7 +440,7 @@ extern "C" {
   } QudaDeflatedGuess;
 
   typedef enum QudaComputeNullVector_s {
-    QUDA_COMPUTE_NULL_VECTOR_NO,    
+    QUDA_COMPUTE_NULL_VECTOR_NO,
     QUDA_COMPUTE_NULL_VECTOR_YES,
     QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
   } QudaComputeNullVector;

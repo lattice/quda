@@ -79,7 +79,7 @@ void initFields(QudaPrecision prec)
   param.x[2] = zdim;
   param.x[3] = tdim;
   param.x[4] = Nsrc;
-  param.PCtype = QUDA_4D_PC;
+  param.pc_type = QUDA_4D_PC;
 
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;

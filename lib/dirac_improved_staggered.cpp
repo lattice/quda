@@ -46,16 +46,17 @@ namespace quda {
     }
   }
 
-
-  void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
-			      const QudaParity parity) const
+  void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
     if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+#ifdef USE_LEGACY_DSLASH
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 				  &static_cast<const cudaColorSpinorField&>(in), parity, 
 				  dagger, 0, 0, commDim, profile);
+#else
+      ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, parity, dagger, commDim, profile);
+#endif
     } else {
       errorQuda("Not supported");
     }  
@@ -63,16 +64,19 @@ namespace quda {
     flops += 1146ll*in.Volume();
   }
 
-  void DiracImprovedStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
-				  const QudaParity parity, const ColorSpinorField &x,
-				  const double &k) const
+  void DiracImprovedStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+      const ColorSpinorField &x, const double &k) const
   {    
     checkParitySpinor(in, out);
 
     if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+#ifdef USE_LEGACY_DSLASH
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+#else
+      ApplyImprovedStaggered(out, in, fatGauge, longGauge, k, x, parity, dagger, commDim, profile);
+#endif
     } else {
       errorQuda("Not supported");
     }  
@@ -83,8 +87,13 @@ namespace quda {
   // Full staggered operator
   void DiracImprovedStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
+#ifdef USE_LEGACY_DSLASH
     DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
+#else
+    checkFullSpinor(out, in);
+    ApplyImprovedStaggered(out, in, fatGauge, longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+#endif
   }
 
   void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
