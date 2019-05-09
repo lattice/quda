@@ -48,13 +48,13 @@
 
 */
 
-static int *squaresize;   /* dimensions of hypercubes */
-static int *nsquares;     /* number of hypercubes in each direction */
+static int *squaresize = NULL;   /* dimensions of hypercubes */
+static int *nsquares = NULL;     /* number of hypercubes in each direction */
 static int ndim;
-static int *size1[2], *size2;
+static int *size1[2] = {NULL, NULL}, *size2 = NULL;
 static int prime[] = {2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53};
 static int sites_on_node;
-static int *mcoord;
+static int *mcoord = NULL;
 
 #define MAXPRIMES (sizeof(prime)/sizeof(int))
 
@@ -151,14 +151,20 @@ int setup_layout(int len[], int nd, int numnodes){
   int i;
 
   ndim = nd;
+
+  if (squaresize) free(squaresize);
   squaresize = (int *) malloc(ndim*sizeof(int));
+
+  if (nsquares) free(nsquares);
   nsquares = (int *) malloc(ndim*sizeof(int));
+
+  if (mcoord) free(mcoord);
   mcoord = (int *) malloc(ndim*sizeof(int));
 
   /*
-   MAC: The miniminum surface area partitioning is disabled and QUDA
-   expects it to be determined by the user or calling application, but
-   this functionality is included for possible future use.
+    The miniminum surface area partitioning is disabled and QUDA
+    expects it to be determined by the user or calling application, but
+    this functionality is included for possible future use.
   */
 
   int create_geom = 0;
@@ -184,8 +190,11 @@ int setup_layout(int len[], int nd, int numnodes){
     sites_on_node *= squaresize[i];
   }
 
+  if (size1[0]) free(size1[0]);
   size1[0] = (int*)malloc(2*(ndim+1)*sizeof(int));
   size1[1] = size1[0] + ndim + 1;
+
+  if (size2) free(size2);
   size2 = (int*)malloc((ndim+1)*sizeof(int));
 
   size1[0][0] = 1;

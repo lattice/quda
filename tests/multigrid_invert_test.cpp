@@ -644,9 +644,7 @@ int main(int argc, char **argv)
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-
-  void *spinorOut = NULL;
-  spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  void *spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
   // start the timer
   double time0 = -((double)clock());
@@ -780,6 +778,10 @@ int main(int argc, char **argv)
 
   // finalize the QUDA library
   endQuda();
+
+  free(spinorIn);
+  free(spinorCheck);
+  free(spinorOut);
 
   // finalize the communications layer
   finalizeComms();

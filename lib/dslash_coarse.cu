@@ -531,7 +531,7 @@ namespace quda {
 
       if (dslash && comm_partitioned() && comms) {
 	const int nFace = 1;
-	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision);
+	inA.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1-parity) : 0), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision);
       }
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
