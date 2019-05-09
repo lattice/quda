@@ -16,21 +16,28 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 
 find_package(Git)
-SET(DEFBUILD "RELEASE")
-IF(GIT_FOUND)
-execute_process(COMMAND ${GIT_EXECUTABLE} show WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} RESULT_VARIABLE IS_GIT_REPOSIITORY OUTPUT_QUIET ERROR_QUIET)
-  IF(${IS_GIT_REPOSIITORY} EQUAL 0)
-    execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=0 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITTAG OUTPUT_STRIP_TRAILING_WHITESPACE)
-# we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but that might not always be available
-    execute_process(COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND wc -l OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${GIT_EXECUTABLE}  describe --long --dirty WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-    IF(GITCOUNT EQUAL 0)
-      SET(DEFBUILD "RELEASE")
-    ELSE()
-      SET(DEFBUILD "DEVEL")
-    ENDIF()
-  ENDIF()
-ENDIF(GIT_FOUND)
+
+# by default we will build RELASE
+if(DEFINED ENV{QUDA_BUILD_TYPE})
+  set(DEFBUILD $ENV{QUDA_BUILD_TYPE})
+else()
+  set(DEFBUILD "RELEASE")
+endif()
+
+# IF(GIT_FOUND)
+# execute_process(COMMAND ${GIT_EXECUTABLE} show WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} RESULT_VARIABLE IS_GIT_REPOSIITORY OUTPUT_QUIET ERROR_QUIET)
+#   IF(${IS_GIT_REPOSIITORY} EQUAL 0)
+#     execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=0 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITTAG OUTPUT_STRIP_TRAILING_WHITESPACE)
+# # we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but that might not always be available
+#     execute_process(COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND wc -l OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
+#     execute_process(COMMAND ${GIT_EXECUTABLE}  describe --long --dirty WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+#     IF(GITCOUNT EQUAL 0)
+#       SET(DEFBUILD "RELEASE")
+#     ELSE()
+#       SET(DEFBUILD "DEVEL")
+#     ENDIF()
+#   ENDIF()
+# ENDIF(GIT_FOUND)
 
 set(VALID_BUILD_TYPES DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
 SET(CMAKE_BUILD_TYPE "${DEFBUILD}" CACHE STRING  "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
@@ -96,7 +103,7 @@ set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
 
 # Multi-GPU options
 set(QUDA_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
-set(QUDA_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
+set(QUDA_MPI ON CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
 
 #BLAS library
 set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
@@ -129,7 +136,12 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 # that ususally should not be changed by users
 #######################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
-set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
+if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
+  set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
+else()
+  set(DEFSHARED "OFF")
+endif()
+set(QUDA_BUILD_SHAREDLIB ${DEFSHARED} CACHE BOOL "build quda as a shared lib")
 set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)")
 set(QUDA_LEGACY_DSLASH OFF CACHE BOOL "enable legacy dslash kernels?")
 set(QUDA_TEX ON CACHE BOOL "enable texture reads?")
