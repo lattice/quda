@@ -4,21 +4,18 @@ namespace quda {
      Compute the plaquette of the gauge field
 
      @param U The gauge field upon which to compute the plaquette
-     @param location The locaiton where to do the computation 
      @return double3 variable returning (plaquette, spatial plaquette,
      temporal plaquette) site averages normalized such that each
      plaquette is in the range [0,1]
    */
-  double3 plaquette(const GaugeField& U,
-		    QudaFieldLocation location);
+  double3 plaquette(const GaugeField& U);
 
-
-
-  /** Generate Gaussian distributed GaugeField
-   * @param dataDs The GaugeField
-   * @param rngstate random states
-   */
-
+  
+  /**
+     Generate Gaussian distributed GaugeField
+     @param dataDs The GaugeField
+     @param rngstate random states
+  */
   void gaugeGauss(GaugeField &dataDs, RNG &rngstate);
   
   /**
@@ -103,17 +100,14 @@ namespace quda {
      Compute the Fmunu tensor
      @param Fmunu The Fmunu tensor
      @param gauge The gauge field upon which to compute the Fmnu tensor
-     @param location The location of where to do the computation
    */
   void computeFmunu(GaugeField &Fmunu, 
-		    const GaugeField& gauge, 
-		    QudaFieldLocation location);
+		    const GaugeField& gauge);
 
   /**
      Compute the topological charge
      @param Fmunu The Fmunu tensor, usually calculated from a smeared configuration
-     @param location The location of where to do the computation, currently supports only the GPU
+     @return double The total topological charge
    */
-
-  double computeQCharge(GaugeField& Fmunu, QudaFieldLocation location);
+  double computeQCharge(const GaugeField& Fmunu);
 }
