@@ -20,6 +20,7 @@ namespace quda {
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
   {
+    for (int i=0; i<2*QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor, param.Precision(), param.pad,
         param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type);
   }
@@ -30,6 +31,7 @@ namespace quda {
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
+    for (int i=0; i<2*QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor, field.Precision(), field.pad,
         field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis, field.pc_type);
   }

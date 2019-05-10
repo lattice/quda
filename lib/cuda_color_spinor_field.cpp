@@ -745,7 +745,7 @@ namespace quda {
                                        MemoryLocation location_label, bool spin_project, double a, double b, double c)
   {
 #ifdef MULTI_GPU
-    void *packBuffer[2*QUDA_MAX_DIM];
+    void *packBuffer[2*QUDA_MAX_DIM] = { };
 
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
@@ -756,7 +756,7 @@ namespace quda {
 	case Host:   // pack to zero-copy memory
 	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
           break;
-	case Remote:   // pack to remote peer memory
+	case Remote: // pack to remote peer memory
 	  packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + precision*ghostOffset[dim][1-dir];
           break;
 	default: errorQuda("Undefined location %d", location[2*dim+dir]);
@@ -1024,8 +1024,6 @@ namespace quda {
         // all goes here
         void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
           + ghost_precision*ghostOffset[dim][(dir+1)%2];
-        void *ghost_norm_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-          + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][(d+1)%2];
 
         if (ghost_precision != precision) pushKernelPackT(true);
 
@@ -1073,9 +1071,10 @@ namespace quda {
 
               // we can probably issue this as a single cudaMemcpy2d along the fifth dimension
               if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-                size_t len = nFace * (ghostFace[3] / x4) * sizeof(float);
+                size_t len = nFace * (ghostFaceCB[3] / x4) * sizeof(float);
                 int norm_offset = (dir == 0) ? 0 : Nt_minus_offset * sizeof(float);
-                void *dst = (char *)ghost_norm_dst + s * len + parity * nFace * ghostFaceCB[3] * sizeof(float);
+                void *dst = (char *)ghost_dst + nParity * nFace * Nint * ghostFaceCB[3] * ghost_precision + s * len
+                  + parity * nFace * ghostFaceCB[3] * sizeof(float);
                 void *src = (char *)norm + norm_offset + s * (volumeCB / x4) * sizeof(float) + parity * norm_bytes / 2;
                 cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
               }

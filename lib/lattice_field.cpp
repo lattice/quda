@@ -88,6 +88,17 @@ namespace quda {
 
     for (int dir = 0; dir < 2; dir++) { // XLC cannot do multi-dimensional array initialization
       for (int dim = 0; dim < QUDA_MAX_DIM; dim++) {
+
+        for (int b=0; b<2; b++) {
+          my_face_dim_dir_d[b][dim][dir] = nullptr;
+          my_face_dim_dir_hd[b][dim][dir] = nullptr;
+          my_face_dim_dir_h[b][dim][dir] = nullptr;
+
+          from_face_dim_dir_d[b][dim][dir] = nullptr;
+          from_face_dim_dir_hd[b][dim][dir] = nullptr;
+          from_face_dim_dir_h[b][dim][dir] = nullptr;
+        }
+
         mh_recv_fwd[dir][dim] = nullptr;
         mh_recv_back[dir][dim] = nullptr;
         mh_send_fwd[dir][dim] = nullptr;

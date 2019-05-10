@@ -72,7 +72,7 @@ protected:
       // Also, the accessor constructor calls Ghost(), which uses
       // ghost_buf, but this is only presently set with the
       // synchronous exchangeGhost.
-      static void *ghost[8]; // needs to be persistent across interior and exterior calls
+      static void *ghost[8] = { }; // needs to be persistent across interior and exterior calls
       for (int dim = 0; dim < 4; dim++) {
 
         for (int dir = 0; dir < 2; dir++) {
