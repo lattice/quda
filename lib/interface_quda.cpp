@@ -644,7 +644,6 @@ void initQudaMemory()
 
   streams = new cudaStream_t[Nstream];
 
-#if (CUDA_VERSION >= 5050)
   int greatestPriority;
   int leastPriority;
   cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
@@ -652,11 +651,6 @@ void initQudaMemory()
     cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
   }
   cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
-#else
-  for (int i=0; i<Nstream; i++) {
-    cudaStreamCreate(&streams[i]);
-  }
-#endif
 
   checkCudaError();
   createDslashEvents();
@@ -1907,11 +1901,6 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     }
     blas::ax(gauge.Anisotropy(), in);
   }
-
-  if (diracParam.fatGauge != nullptr)
-    printfQuda("%s Fat gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, diracParam.fatGauge->norm1(),diracParam.fatGauge->norm2(),diracParam.fatGauge->abs_max());
-  if (diracParam.longGauge != nullptr)
-    printfQuda("%s Long gauge field norms: L1 = %e L2 = %e max = %e\n", __func__, diracParam.longGauge->norm1(),diracParam.longGauge->norm2(),diracParam.longGauge->abs_max());
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
