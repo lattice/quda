@@ -228,7 +228,6 @@ namespace quda {
       }
 
       if (ghost_bytes > 0) {
-
         for (int b = 0; b < 2; ++b) {
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
 	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
@@ -290,6 +289,12 @@ namespace quda {
   void LatticeField::createComms(bool no_comms_fill, bool bidir)
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
+
+    // before allocating local comm handles, synchronize since the
+    // comms buffers are static so remove potential for interferring
+    // with any outstanding exchanges to the same buffers
+    qudaDeviceSynchronize();
+    comm_barrier();
 
     // initialize the ghost pinned buffers
     for (int b=0; b<2; b++) {
