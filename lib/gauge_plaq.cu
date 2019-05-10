@@ -62,7 +62,8 @@ namespace quda {
     INSTANTIATE_RECONSTRUCT(plaquette<Float>, data, plq, location);
   }
 
-  double3 plaquette(const GaugeField& data) {
+  double3 plaquette(const GaugeField &data)
+  {
     double2 plq;
     QudaFieldLocation location = data.Location();
     INSTANTIATE_PRECISION(plaquette, data, plq, location);

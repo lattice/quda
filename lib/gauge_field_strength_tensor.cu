@@ -4,106 +4,109 @@
 #include <jitify_helper.cuh>
 #include <kernels/field_strength_tensor.cuh>
 
-namespace quda {
+namespace quda
+{
 
 #ifdef GPU_GAUGE_TOOLS
 
-  template<typename Float, typename Arg> class FmunuCompute : TunableVectorYZ
+  template <typename Float, typename Arg> class FmunuCompute : TunableVectorYZ
   {
     Arg &arg;
     const GaugeField &meta;
-    
-  private:
+
+private:
     unsigned int minThreads() const { return arg.threads; }
     bool tuneGridDim() const { return false; }
-    
-  public:
-    FmunuCompute(Arg &arg, const GaugeField &meta)
-      : TunableVectorYZ(2,6), arg(arg), meta(meta) {
-      writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,meta.Stride(),sizeof(Float));
+
+public:
+    FmunuCompute(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2, 6), arg(arg), meta(meta)
+    {
+      writeAuxString("threads=%d,stride=%d,prec=%lu", arg.threads, meta.Stride(), sizeof(Float));
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
-	create_jitify_program("kernels/field_strength_tensor.cuh");
+        create_jitify_program("kernels/field_strength_tensor.cuh");
 #endif
       }
     }
     virtual ~FmunuCompute() {}
-    
-    void apply(const cudaStream_t &stream){
+
+    void apply(const cudaStream_t &stream)
+    {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
-	using namespace jitify::reflection;
-	jitify_error = program->kernel("quda::computeFmunuKernel")
-	  .instantiate(Type<Float>(), Type<Arg>())
-	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-	  .launch(arg);
+        using namespace jitify::reflection;
+        jitify_error = program->kernel("quda::computeFmunuKernel")
+                         .instantiate(Type<Float>(), Type<Arg>())
+                         .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                         .launch(arg);
 #else
-	computeFmunuKernel<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        computeFmunuKernel<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
       } else {
-	computeFmunuCPU<Float>(arg);
+        computeFmunuCPU<Float>(arg);
       }
     }
-    
-    TuneKey tuneKey() const {
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
-    }
-    
-    long long flops() const { return (2430 + 36)*6*2*(long long)arg.threads; }
-    long long bytes() const { return ((16*arg.gauge.Bytes() + arg.f.Bytes())*6*2*arg.threads); } //  Ignores link reconstruction
+
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+
+    long long flops() const { return (2430 + 36) * 6 * 2 * (long long)arg.threads; }
+    long long bytes() const
+    {
+      return ((16 * arg.gauge.Bytes() + arg.f.Bytes()) * 6 * 2 * arg.threads);
+    } //  Ignores link reconstruction
 
   }; // FmunuCompute
 
-  
-  template<typename Float, typename Fmunu, typename Gauge>
-  void computeFmunu(Fmunu f_munu, Gauge gauge, const GaugeField &meta, const GaugeField &meta_ex) {
-    FmunuArg<Float,Fmunu,Gauge> arg(f_munu, gauge, meta, meta_ex);
-    FmunuCompute<Float,FmunuArg<Float,Fmunu,Gauge> > fmunuCompute(arg, meta);
+  template <typename Float, typename Fmunu, typename Gauge>
+  void computeFmunu(Fmunu f_munu, Gauge gauge, const GaugeField &meta, const GaugeField &meta_ex)
+  {
+    FmunuArg<Float, Fmunu, Gauge> arg(f_munu, gauge, meta, meta_ex);
+    FmunuCompute<Float, FmunuArg<Float, Fmunu, Gauge>> fmunuCompute(arg, meta);
     fmunuCompute.apply(0);
     qudaDeviceSynchronize();
     checkCudaError();
   }
 
-  template<typename Float>
-  void computeFmunu(GaugeField &Fmunu, const GaugeField &gauge) {
+  template <typename Float> void computeFmunu(GaugeField &Fmunu, const GaugeField &gauge)
+  {
     if (Fmunu.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (gauge.isNative()) {
-	typedef gauge::FloatNOrder<Float, 18, 2, 18> F;
+        typedef gauge::FloatNOrder<Float, 18, 2, 18> F;
 
-	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, gauge);
-	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
-	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, gauge);
-	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
-	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, gauge);
-	} else {
-	  errorQuda("Reconstruction type %d not supported", gauge.Reconstruct());
-	}
+        if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+          typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type G;
+          computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, gauge);
+        } else if (gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
+          typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_12>::type G;
+          computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, gauge);
+        } else if (gauge.Reconstruct() == QUDA_RECONSTRUCT_8) {
+          typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_8>::type G;
+          computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, gauge);
+        } else {
+          errorQuda("Reconstruction type %d not supported", gauge.Reconstruct());
+        }
       } else {
-	errorQuda("Gauge field order %d not supported", gauge.Order());
+        errorQuda("Gauge field order %d not supported", gauge.Order());
       }
     } else {
       errorQuda("Fmunu field order %d not supported", Fmunu.Order());
     }
-    
   }
-  
+
 #endif // GPU_GAUGE_TOOLS
 
-  void computeFmunu(GaugeField &Fmunu, const GaugeField& gauge){
-    
+  void computeFmunu(GaugeField &Fmunu, const GaugeField &gauge)
+  {
+
 #ifdef GPU_GAUGE_TOOLS
     if (Fmunu.Precision() != gauge.Precision()) {
       errorQuda("Fmunu precision %d must match gauge precision %d", Fmunu.Precision(), gauge.Precision());
     }
-    
-    if (gauge.Precision() == QUDA_DOUBLE_PRECISION){
+
+    if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
       computeFmunu<double>(Fmunu, gauge);
-    } else if(gauge.Precision() == QUDA_SINGLE_PRECISION) {
+    } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
       computeFmunu<float>(Fmunu, gauge);
     } else {
       errorQuda("Precision %d not supported", gauge.Precision());

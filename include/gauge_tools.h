@@ -8,9 +8,8 @@ namespace quda {
      temporal plaquette) site averages normalized such that each
      plaquette is in the range [0,1]
    */
-  double3 plaquette(const GaugeField& U);
+  double3 plaquette(const GaugeField &U);
 
-  
   /**
      Generate Gaussian distributed GaugeField
      @param dataDs The GaugeField
@@ -101,13 +100,12 @@ namespace quda {
      @param Fmunu The Fmunu tensor
      @param gauge The gauge field upon which to compute the Fmnu tensor
    */
-  void computeFmunu(GaugeField &Fmunu, 
-		    const GaugeField& gauge);
+  void computeFmunu(GaugeField &Fmunu, const GaugeField &gauge);
 
   /**
      Compute the topological charge
      @param Fmunu The Fmunu tensor, usually calculated from a smeared configuration
      @return double The total topological charge
    */
-  double computeQCharge(const GaugeField& Fmunu);
+  double computeQCharge(const GaugeField &Fmunu);
 }

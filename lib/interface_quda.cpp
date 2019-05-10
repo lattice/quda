@@ -5424,8 +5424,7 @@ void plaq_quda_(double plaq[3]) {
   plaqQuda(plaq);
 }
 
-
-void plaqQuda (double plaq[3])
+void plaqQuda(double plaq[3])
 {
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5560,7 +5559,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   delete cudaGaugeTemp;
 
   gaugeSmeared->exchangeExtendedGhost(R,profileAPE,redundant_comms);
-  
+
   plaq = plaquette(*gaugeSmeared);
   printfQuda("Plaquette after %d APE steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
 
@@ -5578,7 +5577,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
 
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
-  
+
   double3 plaq = plaquette(*gaugeSmeared);
   printfQuda("Plaquette after 0 STOUT steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
 
@@ -5624,7 +5623,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   gaugeSmeared->exchangeExtendedGhost(R,profileOvrImpSTOUT,redundant_comms);
 
   plaq = plaquette(*gaugeSmeared);
-  printfQuda("Plaquette after %d OvrImpSTOUT steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);  
+  printfQuda("Plaquette after %d OvrImpSTOUT steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
 
   profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -5823,7 +5822,7 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
   }
 }
 
-double qChargeQuda ()
+double qChargeQuda()
 {
   profileQCharge.TPSTART(QUDA_PROFILE_TOTAL);
 

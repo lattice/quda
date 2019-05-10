@@ -298,7 +298,7 @@ TEST_F(GaugeAlgTest,Landau_FFT){
   if(!checkDimsPartitioned()){
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
     gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
-     ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
+    ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
   }
 }
 
