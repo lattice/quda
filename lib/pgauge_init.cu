@@ -8,7 +8,7 @@
 #include <unitarization_links.h>
 #include <pgauge_monte.h>
 #include <random_quda.h>
-#include <cub/cub.cuh>
+#include <cub_helper.cuh>
 #include <index_helper.cuh>
 
 

@@ -2,11 +2,10 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 
-#define DOUBLE_TOL 1e-15
-#define SINGLE_TOL 2e-6
-
+#include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
 #include <kernels/gauge_qcharge.cuh>
+
 
 namespace quda
 {
@@ -42,8 +41,7 @@ public:
                          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                          .launch(arg);
 #else
-        // DMH: Hardcoded 32 blockSize for reduction kernel
-        qChargeComputeKernel<32, Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	LAUNCH_KERNEL(qChargeComputeKernel, tp, stream, arg, Float);
 #endif
         qudaDeviceSynchronize();
       } else { // run the CPU code

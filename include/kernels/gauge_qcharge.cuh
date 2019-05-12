@@ -1,9 +1,5 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-#include <quda_matrix.h>
-#include <su3_project.cuh>
-
-#include <cub/cub.cuh>
 #include <cub_helper.cuh>
 
 #ifndef Pi2
@@ -12,12 +8,15 @@
 
 namespace quda
 {
-
+  
   template <typename Float, typename Gauge> struct QChargeArg : public ReduceArg<double> {
     int threads; // number of active threads required
     Gauge data;
 
-    QChargeArg(const Gauge &data, const GaugeField &Fmunu) : ReduceArg<double>(), data(data), threads(Fmunu.VolumeCB())
+    QChargeArg(const Gauge &data, const GaugeField &Fmunu) :
+      ReduceArg<double>(),
+      data(data),
+      threads(Fmunu.VolumeCB())
     {
     }
   };
