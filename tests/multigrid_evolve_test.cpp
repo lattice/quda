@@ -754,7 +754,7 @@ int main(int argc, char **argv)
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     double3 plaq = plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
-    double charge = qChargeCuda();
+    double charge = qChargeQuda();
     printfQuda("step=0 plaquette = %e topological charge = %e\n", plaq.x, charge);
 
     // create a point source at 0 (in each subvolume...  FIXME)
@@ -803,7 +803,7 @@ int main(int argc, char **argv)
 
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
       plaq = plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
-      charge = qChargeCuda();
+      charge = qChargeQuda();
       printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
 
       // reference BiCGStab for comparison

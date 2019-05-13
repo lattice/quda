@@ -1169,7 +1169,7 @@ extern "C" {
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
-  double qChargeCuda();
+  double qChargeQuda();
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
