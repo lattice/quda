@@ -5551,7 +5551,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Plaquette after 0 APE steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
-  
+
   for (unsigned int i=0; i<nSteps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileAPE,redundant_comms);
@@ -5566,7 +5566,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Plaquette after %d APE steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
   }
-  
+
   profileAPE.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -5586,7 +5586,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Plaquette after 0 STOUT steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
-  
+
   for (unsigned int i=0; i<nSteps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
@@ -5601,7 +5601,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Plaquette after %d STOUT steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
   }
-  
+
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -5621,7 +5621,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Plaquette after 0 OvrImpSTOUT steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
-  
+
   for (unsigned int i=0; i<nSteps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileOvrImpSTOUT,redundant_comms);
@@ -5636,7 +5636,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Plaquette after %d OvrImpSTOUT steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
   }
-  
+
   profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
