@@ -193,13 +193,13 @@ namespace quda {
   {
     postTrace();
     pushVerbosity(param.mg_global.verbosity[level]);
-    setOutputPrefix(prefix);
+    pushOutputPrefix(prefix);
   }
 
   void MG::popLevel(int level) const
   {
     popVerbosity();
-    setOutputPrefix("");
+    popOutputPrefix();
     postTrace();
   }
 
@@ -589,8 +589,6 @@ namespace quda {
     zero(*r_coarse);
 
     spinorNoise(*tmp_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
-
-    //tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp1, *tmp_coarse);
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
