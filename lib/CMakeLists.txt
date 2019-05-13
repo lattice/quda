@@ -35,7 +35,7 @@ set (QUDA_OBJS
   dslash4_domain_wall_4d.cu  dslash4_domain_wall_5d.cu
   dslash_pack.cu dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu contract.cu
+  multi_reduce_quda.cu contract.cu contract_new.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_noise.cu

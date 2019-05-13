@@ -74,7 +74,7 @@
 #undef PRINT_PARAM
 
 #include <gauge_tools.h>
-#include <contractQuda.h>
+#include <contract_quda.h>
 
 #include <momentum.h>
 
