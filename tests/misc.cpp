@@ -1356,6 +1356,7 @@ get_solve_ext_lib_type(char* s)
   return ret;
 }
 
+
 QudaFieldLocation
 get_location(char* s)
 {
@@ -1373,6 +1374,25 @@ get_location(char* s)
   return ret;
 }
 
+const char*
+get_ritz_location_str(QudaFieldLocation type)
+{
+  const char *s;
+
+  switch (type) {
+  case QUDA_CPU_FIELD_LOCATION:
+    s = "cpu";
+    break;
+  case QUDA_CUDA_FIELD_LOCATION:
+    s = "cuda";
+    break;
+  default:
+    fprintf(stderr, "Error: invalid location\n");
+    exit(1);
+  }
+
+  return s;
+}
 
 QudaMemoryType
 get_df_mem_type_ritz(char* s)
@@ -1386,11 +1406,34 @@ get_df_mem_type_ritz(char* s)
   } else if (strcmp(s, "mapped") == 0) {
     ret = QUDA_MEMORY_MAPPED;
   } else {
-    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    fprintf(stderr, "Error: invalid memory type %s\n", s);
     exit(1);
   }
 
   return ret;
+}
+
+const char*
+get_memory_type_str(QudaMemoryType type)
+{
+  const char *s;
+
+  switch (type) {
+  case QUDA_MEMORY_DEVICE:
+    s = "device";
+    break;
+  case QUDA_MEMORY_PINNED:
+    s = "pinned";
+    break;
+  case QUDA_MEMORY_MAPPED:
+    s = "mapped";
+    break;    
+  default:
+    fprintf(stderr, "Error: invalid memory type\n");
+    exit(1);
+  }
+
+  return s;
 }
 
 

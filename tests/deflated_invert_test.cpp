@@ -88,6 +88,7 @@ extern QudaFieldLocation location_ritz;
 extern QudaMemoryType    mem_type_ritz;
 
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
+extern QudaVerbosity verbosity;
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -99,7 +100,7 @@ display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("prec    prec_sloppy   matpc_type  recon  recon_sloppy S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
-  printfQuda("%6s   %6s    %12s     %2s     %2s         %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+  printfQuda("%6s   %6s    %12s     %2s     %2s         %3d/%3d/%3d     %3d         %2d     %14s  %8s\n",
 	     get_prec_str(prec),get_prec_str(prec_sloppy), get_matpc_str(matpc_type),
 	     get_recon_str(link_recon),
 	     get_recon_str(link_recon_sloppy),
@@ -113,6 +114,9 @@ display_test_info()
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3));
+
+  printfQuda("Deflation space info: location   mem_type\n");
+  printfQuda("                     %5s     %8s\n", get_ritz_location_str(location_ritz),  get_memory_type_str( mem_type_ritz )  );
 
   return ;
 
@@ -260,8 +264,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
   }
 
   inv_param.cuda_prec_ritz = cuda_prec_ritz;
-  inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity = verbosity;
+  inv_param.verbosity_precondition = verbosity;
 
   inv_param.inv_type_precondition = precon_type;
   inv_param.gcrNkrylov = 6;
@@ -318,6 +322,7 @@ int main(int argc, char **argv)
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
+  if (prec_ritz == QUDA_INVALID_PRECISION) prec_ritz = prec_sloppy;  
   if (prec_refinement_sloppy == QUDA_INVALID_PRECISION) prec_refinement_sloppy = prec_sloppy;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
