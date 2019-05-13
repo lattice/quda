@@ -224,20 +224,18 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.clover_coeff = clover_coeff;
 
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = normalization; //QUDA_KAPPA_NORMALIZATION;
+  inv_param.mass_normalization = normalization;
 
   // do we want full solution or single-parity solution
-  //inv_param.solution_type = QUDA_MAT_SOLUTION;
-  inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  //inv_param.solution_type = QUDA_MATPC_SOLUTION;
 
   // do we want to use an even-odd preconditioned solve or not
   inv_param.solve_type = solve_type;
   inv_param.matpc_type = matpc_type;
 
-
-  // set default solver type to incremental eigcg is not set at command line
   if (inv_type != QUDA_EIGCG_INVERTER && inv_type != QUDA_INC_EIGCG_INVERTER && inv_type != QUDA_GMRESDR_INVERTER)
-    inv_type = QUDA_INC_EIGCG_INVERTER;
+    errorQuda("Unknown deflated solver type", inv_type);
 
   //! For deflated solvers only:
   inv_param.inv_type = inv_type;
