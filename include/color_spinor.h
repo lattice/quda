@@ -304,7 +304,7 @@ namespace quda {
       return proj;
     }
 
-    /** 
+    /**
 	Return this spinor spin projected
 	@param dim Which dimension projector are we using
 	@param sign Positive or negative projector
@@ -314,7 +314,7 @@ namespace quda {
     {
       ColorSpinor<Float,Nc,2> proj;
       complex<Float> j(0.0,1.0);
-      
+
       switch (dim) {
       case 0: // x dimension
 	switch (sign) {
@@ -723,7 +723,7 @@ namespace quda {
       return recon;
     }
 
-    /** 
+    /**
 	@brief Spin reconstruct the full Spinor from the projected spinor
 	@param dim Which dimension projector are we using
 	@param sign Positive or negative projector
@@ -733,7 +733,7 @@ namespace quda {
     {
       ColorSpinor<Float,Nc,4> recon;
       complex<Float> j(0.0,1.0);
-      
+
       switch (dim) {
       case 0: // x dimension
 	switch (sign) {
@@ -778,7 +778,7 @@ namespace quda {
 	  }
 	  break;
 	}
-	break;      
+	break;
       case 2: // z dimension
 	switch (sign) {
 	case 1: // positive projector
@@ -901,6 +901,72 @@ namespace quda {
     }
   };
 
+  /**
+     @brief Compute the inner product over color and spin
+     dot = \sum_s,c conj(a(s,c)) * b(s,c)
+     @param a Left-hand side ColorSpinor
+     @param b Right-hand side ColorSpinor
+     @return The inner product
+  */
+  template<typename Float, int Nc, int Ns>
+  __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float,Nc,Ns> &a, const ColorSpinor<Float,Nc,Ns> &b)
+  {
+    complex<Float> dot = 0;
+#pragma unroll
+    for (int s=0; s<Ns; s++) {
+#pragma unroll
+      for (int c=0; c<Nc; c++) {
+        dot.x += a(s,c).real() * b(s,c).real();
+        dot.x += a(s,c).imag() * b(s,c).imag();
+        dot.y += a(s,c).real() * b(s,c).imag();
+        dot.y -= a(s,c).imag() * b(s,c).real();
+      }
+    }
+    return dot;
+  }
+
+  /**
+     Compute the inner product over color at spin s between two ColorSpinor fields
+     dot = \sum_c conj(a(s,c)) * b(s,c)
+     @param a Left-hand side ColorSpinor
+     @param b Right-hand side ColorSpinor
+     @return The inner product
+  */
+  template<typename Float, int Nc, int Ns>
+  __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float,Nc,Ns> &a, const ColorSpinor<Float,Nc,Ns> &b, int s)
+  {
+    complex<Float> dot = 0;
+#pragma unroll
+    for (int c=0; c<Nc; c++) {
+      dot.x += a(s,c).real() * b(s,c).real();
+      dot.x += a(s,c).imag() * b(s,c).imag();
+      dot.y += a(s,c).real() * b(s,c).imag();
+      dot.y -= a(s,c).imag() * b(s,c).real();
+    }
+    return dot;
+  }
+
+  /**
+     @brief Compute the inner product over color at spin s between a
+     color vector and a color spinor
+     dot = \sum_c conj(a(c)) * b(s,c)
+     @param a Left-hand side ColorVector
+     @param b Right-hand side ColorSpinor
+     @return The inner product
+  */
+  template<typename Float, int Nc, int Ns>
+  __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float,Nc,1> &a, const ColorSpinor<Float,Nc,Ns> &b, int s)
+  {
+    complex<Float> dot = 0;
+#pragma unroll
+    for (int c=0; c<Nc; c++) {
+      dot.x += a(0,c).real() * b(s,c).real();
+      dot.x += a(0,c).imag() * b(s,c).imag();
+      dot.y += a(0,c).real() * b(s,c).imag();
+      dot.y -= a(0,c).imag() * b(s,c).real();
+    }
+    return dot;
+  }
 
   /**
      Compute the outer product over color and take the spin trace
