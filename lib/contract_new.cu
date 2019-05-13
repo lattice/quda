@@ -64,7 +64,8 @@ namespace quda {
     
     void preTune() {} 
     void postTune() {}
-    
+
+    //DMH FIXME: Work out what these should be
     long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
     long long bytes() const { return 3 * (1 + 2 * 6) * arg.threads; }
   }; 
