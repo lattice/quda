@@ -252,6 +252,9 @@ namespace quda {
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
+
+    if( 2*param.nev > param.m )  errorQuda("\nIncorrect number of the requested low modes: m= %d while nev=%d (note that 2*nev must be less then m).\n", param.m, param.nev);
+	  
     if( param.rhs_idx < param.deflation_grid )  printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.\n", param.m, param.nev);
     else {  
       printfQuda("\nDeflation space is complete, running initCG solver.\n");
