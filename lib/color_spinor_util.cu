@@ -324,11 +324,11 @@ namespace quda {
     int parity = x%o.Nparity();
 
     for (int s=0; s<o.Nspin(); s++) {
-      std::cout << "x = " << x << ", s = " << s << ", { ";
+      printfQuda("x = %u, s = %d, { ", x_cb, s);
       for (int c=0; c<o.Ncolor(); c++) {
-	std::cout << o(parity, x_cb, s, c) << " ";
+        printfQuda("(%f,%f) ", o(parity, x_cb, s, c).real(), o(parity, x_cb, s, c).imag());
       }
-      std::cout << "}" << std::endl;
+      printfQuda("}\n");
     }
 
   }
@@ -433,9 +433,9 @@ namespace quda {
     for (int s = 0; s < Ns; s++) {
       printfQuda("x = %u, s = %d, { ", i, s);
       for (int c = 0; c < Nc; c++) {
-        printf("(%f,%f) ", data_cpu[(s * Nc + c) * 2], data_cpu[(s * Nc + c) * 2 + 1]);
+        printfQuda("(%f,%f) ", data_cpu[(s * Nc + c) * 2], data_cpu[(s * Nc + c) * 2 + 1]);
       }
-      printf("}\n");
+      printfQuda("}\n");
     }
 
     delete[] data_cpu;
