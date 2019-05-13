@@ -121,6 +121,11 @@ extern "C" {
   int comm_partitioned();
 
   /**
+     @brief Create the topology and partition strings that are used in tuneKeys
+  */
+  void comm_set_tunekey_string();
+
+  /**
      @brief Return a string that defines the comm partitioning (used as a tuneKey)
      @param comm_dim_override Optional override for partitioning
      @return String specifying comm partitioning

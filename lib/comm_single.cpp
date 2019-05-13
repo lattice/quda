@@ -7,13 +7,11 @@
 #include <csignal>
 #include <comm_quda.h>
 
-static char partition_string[16] = ",comm=0000";
-static char topology_string[16] = ",topo=1111";
-
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
   Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
   comm_set_default_topology(topo);
+  comm_set_tunekey_string();
 }
 
 int comm_rank(void) { return 0; }
@@ -75,12 +73,4 @@ void comm_abort(int status) {
   raise(SIGINT);
 #endif
   exit(status);
-}
-
-const char* comm_dim_partitioned_string(const int *comm_dim_override) {
-  return partition_string;
-}
-
-const char* comm_dim_topology_string() {
-  return topology_string;
 }

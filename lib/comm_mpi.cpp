@@ -45,9 +45,6 @@ static int rank = -1;
 static int size = -1;
 static int gpuid = -1;
 
-static char partition_string[16];
-static char topology_string[128];
-
 static bool deterministic_reduce = false;
 
 void comm_gather_hostname(char *hostname_recv_buf) {
@@ -115,43 +112,12 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
 
   host_free(hostname_recv_buf);
 
-  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
-
-  // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
-  char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
-  if (device_order_env) {
-
-    // to ensure we have process consistency define using rank 0
-    if (comm_rank() == 0) {
-      std::stringstream device_list_raw(device_order_env); // raw input
-      std::stringstream device_list;                       // formatted (no commas)
-
-      int device;
-      int deviceCount;
-      cudaGetDeviceCount(&deviceCount);
-      while (device_list_raw >> device) {
-        // check this is a valid policy choice
-        if ( device < 0 ) {
-          errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device);
-        }
-
-        device_list << device;
-        if (device_list_raw.peek() == ',') device_list_raw.ignore();
-      }
-      snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s",
-               comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3), device_list.str().c_str());
-    }
-
-    comm_broadcast(topology_string, 128);
-  } else {
-    snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
-  }
-
   char *enable_reduce_env = getenv("QUDA_DETERMINISTIC_REDUCE");
   if (enable_reduce_env && strcmp(enable_reduce_env, "1") == 0) {
     deterministic_reduce = true;
   }
 
+  comm_set_tunekey_string();
 }
 
 int comm_rank(void)
@@ -416,24 +382,3 @@ void comm_abort(int status)
 #endif
   MPI_Abort(MPI_COMM_HANDLE, status);
 }
-
-static char partition_override_string[16];
-
-const char* comm_dim_partitioned_string(const int *comm_dim_override)
-{
-  if (comm_dim_override) {
-    char comm[5] = {
-      (!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
-      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
-      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
-      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'),
-      '\0'};
-    strcpy(partition_override_string, ",comm=");
-    strcat(partition_override_string, comm);
-    return partition_override_string;
-  } else {
-    return partition_string;
-  }
-}
-
-const char *comm_dim_topology_string() { return topology_string; }

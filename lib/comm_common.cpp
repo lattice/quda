@@ -443,7 +443,18 @@ inline bool isHost(const void *buffer)
     cuGetErrorName(err, &str);
     errorQuda("cuPointerGetAttributes returned error %s", str);
   }
-  return (memType != CU_MEMORYTYPE_DEVICE);
+
+  switch (memType) {
+  case CU_MEMORYTYPE_DEVICE:
+    return false;
+  case CU_MEMORYTYPE_ARRAY:
+    errorQuda("Using array memory for communications buffer is not supported");
+  case CU_MEMORYTYPE_UNIFIED:
+    errorQuda("Using unified memory for communications buffer is not supported");
+  case CU_MEMORYTYPE_HOST:
+  default: // memory not allocated by CUDA allocaters will default to being host memory
+    return true;
+  }
 }
 
 /**
@@ -677,6 +688,45 @@ bool comm_gdr_blacklist() {
   return blacklist;
 }
 
+static char partition_string[16]; /** static string that contains a string of the machine partition */
+static char topology_string[128]; /** static string that contains a string of the machine partition */
+static char partition_override_string[16]; /** static string that contains a string of overridden communication partitioning */
+
+void comm_set_tunekey_string()
+{
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+
+  // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
+  char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
+  if (device_order_env) {
+
+    // to ensure we have process consistency define using rank 0
+    if (comm_rank() == 0) {
+      std::stringstream device_list_raw(device_order_env); // raw input
+      std::stringstream device_list;                       // formatted (no commas)
+
+      int device;
+      int deviceCount;
+      cudaGetDeviceCount(&deviceCount);
+      while (device_list_raw >> device) {
+        // check this is a valid policy choice
+        if ( device < 0 ) {
+          errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device);
+        }
+
+        device_list << device;
+        if (device_list_raw.peek() == ',') device_list_raw.ignore();
+      }
+      snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s",
+               comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3), device_list.str().c_str());
+    }
+
+    comm_broadcast(topology_string, 128);
+  } else {
+    snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+  }
+}
+
 const char *comm_config_string()
 {
   static char config_string[16];
@@ -691,6 +741,28 @@ const char *comm_config_string()
   }
 
   return config_string;
+}
+
+const char* comm_dim_partitioned_string(const int *comm_dim_override)
+{
+  if (comm_dim_override) {
+    char comm[5] = {
+      (!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
+      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
+      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
+      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'),
+      '\0'};
+    strcpy(partition_override_string, ",comm=");
+    strcat(partition_override_string, comm);
+    return partition_override_string;
+  } else {
+    return partition_string;
+  }
+}
+
+const char* comm_dim_topology_string()
+{
+  return topology_string;
 }
 
 static bool globalReduce = true;
