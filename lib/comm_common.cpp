@@ -141,6 +141,12 @@ void comm_destroy_topology(Topology *topo)
   host_free(topo);
 }
 
+static int gpuid = -1;
+
+int comm_gpuid(void)
+{
+  return gpuid;
+}
 
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
@@ -692,8 +698,48 @@ static char partition_string[16]; /** static string that contains a string of th
 static char topology_string[128]; /** static string that contains a string of the machine partition */
 static char partition_override_string[16]; /** static string that contains a string of overridden communication partitioning */
 
-void comm_set_tunekey_string()
+static bool deterministic_reduce = false;
+
+void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
+  Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
+  comm_set_default_topology(topo);
+
+  // determine which GPU this rank will use
+  char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
+  comm_gather_hostname(hostname_recv_buf);
+
+  gpuid = 0;
+  for (int i = 0; i < comm_rank(); i++) {
+    if (!strncmp(comm_hostname(), &hostname_recv_buf[128*i], 128)) {
+      gpuid++;
+    }
+  }
+
+  int device_count;
+  cudaGetDeviceCount(&device_count);
+  if (device_count == 0) {
+    errorQuda("No CUDA devices found");
+  }
+  if (gpuid >= device_count) {
+    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
+    if (enable_mps_env && strcmp(enable_mps_env,"1") == 0) {
+      gpuid = gpuid%device_count;
+      printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
+    } else {
+      errorQuda("Too few GPUs available on %s", comm_hostname());
+    }
+  }
+
+  comm_peer2peer_init(hostname_recv_buf);
+
+  host_free(hostname_recv_buf);
+
+  char *enable_reduce_env = getenv("QUDA_DETERMINISTIC_REDUCE");
+  if (enable_reduce_env && strcmp(enable_reduce_env, "1") == 0) {
+    deterministic_reduce = true;
+  }
+
   snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
 
   // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
@@ -763,6 +809,11 @@ const char* comm_dim_partitioned_string(const int *comm_dim_override)
 const char* comm_dim_topology_string()
 {
   return topology_string;
+}
+
+bool comm_deterministic_reduce()
+{
+  return deterministic_reduce;
 }
 
 static bool globalReduce = true;

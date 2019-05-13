@@ -43,9 +43,6 @@ struct MsgHandle_s {
 
 static int rank = -1;
 static int size = -1;
-static int gpuid = -1;
-
-static bool deterministic_reduce = false;
 
 void comm_gather_hostname(char *hostname_recv_buf) {
   // determine which GPU this rank will use
@@ -54,6 +51,7 @@ void comm_gather_hostname(char *hostname_recv_buf) {
 }
 
 void comm_gather_gpuid(int *gpuid_recv_buf) {
+  int gpuid = comm_gpuid();
   MPI_CHECK(MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_HANDLE));
 }
 
@@ -78,46 +76,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
               " total number of MPI ranks (%d != %d)", grid_size, size);
   }
 
-  Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
-  comm_set_default_topology(topo);
-
-  // determine which GPU this MPI rank will use
-  char *hostname_recv_buf = (char *)safe_malloc(128*size);
-
-  comm_gather_hostname(hostname_recv_buf);
-
-  gpuid = 0;
-  for (int i = 0; i < rank; i++) {
-    if (!strncmp(comm_hostname(), &hostname_recv_buf[128*i], 128)) {
-      gpuid++;
-    }
-  }
-
-  int device_count;
-  cudaGetDeviceCount(&device_count);
-  if (device_count == 0) {
-    errorQuda("No CUDA devices found");
-  }
-  if (gpuid >= device_count) {
-    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
-    if (enable_mps_env && strcmp(enable_mps_env,"1") == 0) {
-      gpuid = gpuid%device_count;
-      printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
-    } else {
-      errorQuda("Too few GPUs available on %s", comm_hostname());
-    }
-  }
-
-  comm_peer2peer_init(hostname_recv_buf);
-
-  host_free(hostname_recv_buf);
-
-  char *enable_reduce_env = getenv("QUDA_DETERMINISTIC_REDUCE");
-  if (enable_reduce_env && strcmp(enable_reduce_env, "1") == 0) {
-    deterministic_reduce = true;
-  }
-
-  comm_set_tunekey_string();
+  comm_init_common(ndim, dims, rank_from_coords, map_data);
 }
 
 int comm_rank(void)
@@ -129,12 +88,6 @@ int comm_rank(void)
 int comm_size(void)
 {
   return size;
-}
-
-
-int comm_gpuid(void)
-{
-  return gpuid;
 }
 
 
@@ -280,10 +233,16 @@ int comm_query(MsgHandle *mh)
   return query;
 }
 
+template <typename T>
+T deterministic_reduce(T *array, int n)
+{
+  std::sort(array, array+n); // sort reduction into ascending order for deterministic reduction
+  return std::accumulate(array, array+n, 0.0);
+}
 
 void comm_allreduce(double* data)
 {
-  if (!deterministic_reduce) {
+  if (!comm_deterministic_reduce()) {
     double recvbuf;
     MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
     *data = recvbuf;
@@ -291,10 +250,7 @@ void comm_allreduce(double* data)
     const size_t n = comm_size();
     double *recv_buf = (double*)safe_malloc(n * sizeof(double));
     MPI_CHECK(MPI_Allgather(data, 1, MPI_DOUBLE, recv_buf, 1, MPI_DOUBLE, MPI_COMM_HANDLE));
-
-    std::sort(recv_buf, recv_buf+n); // sort reduction into ascending order for deterministic reduction
-    *data = std::accumulate(recv_buf, recv_buf+n, 0.0);
-
+    *data = deterministic_reduce(recv_buf, n);
     host_free(recv_buf);
   }
 }
@@ -316,7 +272,7 @@ void comm_allreduce_min(double* data)
 
 void comm_allreduce_array(double* data, size_t size)
 {
-  if (!deterministic_reduce) {
+  if (!comm_deterministic_reduce()) {
     double *recvbuf = new double[size];
     MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
     memcpy(data, recvbuf, size*sizeof(double));
@@ -334,8 +290,7 @@ void comm_allreduce_array(double* data, size_t size)
     }
 
     for (size_t i=0; i<size; i++) {
-      std::sort(recv_trans+i*n, recv_trans+i*n+n); // sort reduction into ascending order for deterministic reduction
-      data[i] = std::accumulate(recv_trans+i*n, recv_trans+i*n+n, 0.0);
+      data[i] = deterministic_reduce(recv_trans+i*n, n);
     }
 
     delete []recv_buf;

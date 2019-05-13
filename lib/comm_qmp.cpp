@@ -28,10 +28,6 @@ struct MsgHandle_s {
   QMP_msghandle_t handle;
 };
 
-static int gpuid = -1;
-
-static bool deterministic_reduce = false;
-
 // While we can emulate an all-gather using QMP reductions, this
 // scales horribly as the number of nodes increases, so for
 // performance we just call MPI directly
@@ -73,12 +69,13 @@ void comm_gather_hostname(char *hostname_recv_buf) {
 void comm_gather_gpuid(int *gpuid_recv_buf) {
 
 #ifdef USE_MPI_GATHER
+  int gpuid = comm_gpuid();
   MPI_CHECK(MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_HANDLE));
 #else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local gpu to all other nodes
   for (int i=0; i<comm_size(); i++) {
-    int data = (i == comm_rank()) ? gpuid : 0;
+    int data = (i == comm_rank()) ? comm_gpuid() : 0;
     QMP_sum_int(&data);
     gpuid_recv_buf[i] = data;
   }
@@ -101,45 +98,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
               " total number of QMP nodes (%d != %d)", grid_size, QMP_get_number_of_nodes());
   }
 
-  Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
-  comm_set_default_topology(topo);
-
-  // determine which GPU this rank will use
-  char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
-  comm_gather_hostname(hostname_recv_buf);
-
-  gpuid = 0;
-  for (int i = 0; i < comm_rank(); i++) {
-    if (!strncmp(comm_hostname(), &hostname_recv_buf[128*i], 128)) {
-      gpuid++;
-    }
-  }
-
-  int device_count;
-  cudaGetDeviceCount(&device_count);
-  if (device_count == 0) {
-    errorQuda("No CUDA devices found");
-  }
-  if (gpuid >= device_count) {
-    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
-    if (enable_mps_env && strcmp(enable_mps_env,"1") == 0) {
-      gpuid = gpuid%device_count;
-      printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
-    } else {
-      errorQuda("Too few GPUs available on %s", comm_hostname());
-    }
-  }
-
-  comm_peer2peer_init(hostname_recv_buf);
-
-  host_free(hostname_recv_buf);
-
-  char *enable_reduce_env = getenv("QUDA_DETERMINISTIC_REDUCE");
-  if (enable_reduce_env && strcmp(enable_reduce_env, "1") == 0) {
-    deterministic_reduce = true;
-  }
-
-  comm_set_tunekey_string();
+  comm_init_common(ndim, dims, rank_from_coords, map_data);
 }
 
 int comm_rank(void)
@@ -151,12 +110,6 @@ int comm_rank(void)
 int comm_size(void)
 {
   return QMP_get_number_of_nodes();
-}
-
-
-int comm_gpuid(void)
-{
-  return gpuid;
 }
 
 
@@ -267,10 +220,16 @@ int comm_query(MsgHandle *mh)
   return (QMP_is_complete(mh->handle) == QMP_TRUE);
 }
 
+template <typename T>
+T deterministic_reduce(T *array, int n)
+{
+  std::sort(array, array+n); // sort reduction into ascending order for deterministic reduction
+  return std::accumulate(array, array+n, 0.0);
+}
 
 void comm_allreduce(double* data)
 {
-  if (!deterministic_reduce) {
+  if (!comm_deterministic_reduce()) {
     QMP_CHECK( QMP_sum_double(data) );
   } else {
     // we need to break out of QMP for the deterministic floating point reductions
@@ -299,7 +258,7 @@ void comm_allreduce_min(double* data)
 
 void comm_allreduce_array(double* data, size_t size)
 {
-  if (!deterministic_reduce) {
+  if (!comm_deterministic_reduce()) {
     QMP_CHECK( QMP_sum_double_array(data, size) );
   } else {
     // we need to break out of QMP for the deterministic floating point reductions
