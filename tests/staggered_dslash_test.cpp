@@ -818,10 +818,12 @@ static int dslashTest()
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
 
     if (niter > 2) { // only print this if valid
-      printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
-                 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
-                 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
-                 2*cudaSpinor->GhostBytes());
+      printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for "
+                 "aggregate message size %lu bytes\n",
+                 1.0e-9 * 2 * cudaSpinor->GhostBytes() * niter / dslash_time.event_time,
+                 1.0e-9 * 2 * cudaSpinor->GhostBytes() * niter / dslash_time.cpu_time,
+                 1.0e-9 * 2 * cudaSpinor->GhostBytes() / dslash_time.cpu_max,
+                 1.0e-9 * 2 * cudaSpinor->GhostBytes() / dslash_time.cpu_min, 2 * cudaSpinor->GhostBytes());
     }
 
     double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
@@ -853,8 +855,7 @@ void display_test_info()
 
 }
 
-
-void usage_extra(char** argv )
+void usage_extra(char **argv)
 {
   printfQuda("Extra options:\n");
   printfQuda("    --test <0/1/2>                              # Test method\n");

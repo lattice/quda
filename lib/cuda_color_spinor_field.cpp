@@ -745,7 +745,7 @@ namespace quda {
                                        MemoryLocation location_label, bool spin_project, double a, double b, double c)
   {
 #ifdef MULTI_GPU
-    void *packBuffer[2*QUDA_MAX_DIM] = { };
+    void *packBuffer[2 * QUDA_MAX_DIM] = {};
 
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
@@ -756,8 +756,8 @@ namespace quda {
 	case Host:   // pack to zero-copy memory
 	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
           break;
-	case Remote: // pack to remote peer memory
-	  packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + precision*ghostOffset[dim][1-dir];
+        case Remote: // pack to remote peer memory
+          packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + precision*ghostOffset[dim][1-dir];
           break;
 	default: errorQuda("Undefined location %d", location[2*dim+dir]);
 	}

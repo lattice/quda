@@ -76,8 +76,7 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  RNG::RNG(int rng_sizes, int seedin, const int XX[4]) :
-    seed(seedin), rng_size(rng_sizes)
+  RNG::RNG(int rng_sizes, int seedin, const int XX[4]) : seed(seedin), rng_size(rng_sizes)
   {
     state = NULL;
     node_offset = 0;
@@ -107,7 +106,9 @@ namespace quda {
     if (rng_size>0 && state == NULL) {
       state = (cuRNGState*)device_malloc(rng_size * sizeof(cuRNGState));
       CUDA_SAFE_CALL(cudaMemset( state , 0 , rng_size * sizeof(cuRNGState) ));
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Allocated array of random numbers with rng_size: %.2f MB\n", rng_size * sizeof(cuRNGState)/(float)(1048576));
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+        printfQuda("Allocated array of random numbers with rng_size: %.2f MB\n",
+                   rng_size * sizeof(cuRNGState) / (float)(1048576));
     } else {
       errorQuda("Array of random numbers not allocated, array size: %d !\nExiting...\n",rng_size);
     }
@@ -120,7 +121,8 @@ namespace quda {
     if(rng_size>0 && state != NULL) {
       device_free(state);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("Free array of random numbers with rng_size: %.2f MB\n", rng_size * sizeof(cuRNGState)/(float)(1048576));
+        printfQuda("Free array of random numbers with rng_size: %.2f MB\n",
+                   rng_size * sizeof(cuRNGState) / (float)(1048576));
       rng_size = 0;
       state = NULL;
     }

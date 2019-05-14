@@ -83,7 +83,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      SpinorNoiseGPU<real, Ns, Nc, type> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      SpinorNoiseGPU<real, Ns, Nc, type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
     bool advanceTuneParam(TuneParam &param) const {
@@ -162,13 +162,13 @@ namespace quda {
     }
   }
 
-  void spinorNoise(ColorSpinorField &src_, RNG& randstates, QudaNoiseType type)
+  void spinorNoise(ColorSpinorField &src_, RNG &randstates, QudaNoiseType type)
   {
     // if src is a CPU field then create GPU field
     ColorSpinorField *src = &src_;
     if (src_.Location() == QUDA_CPU_FIELD_LOCATION) {
       ColorSpinorParam param(src_);
-      param.setPrecision(param.Precision(),param.Precision(),true); // change to native field order
+      param.setPrecision(param.Precision(), param.Precision(), true); // change to native field order
       param.create = QUDA_NULL_FIELD_CREATE;
       param.location = QUDA_CUDA_FIELD_LOCATION;
       src = ColorSpinorField::Create(param);

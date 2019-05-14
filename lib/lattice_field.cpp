@@ -89,7 +89,7 @@ namespace quda {
     for (int dir = 0; dir < 2; dir++) { // XLC cannot do multi-dimensional array initialization
       for (int dim = 0; dim < QUDA_MAX_DIM; dim++) {
 
-        for (int b=0; b<2; b++) {
+        for (int b = 0; b < 2; b++) {
           my_face_dim_dir_d[b][dim][dir] = nullptr;
           my_face_dim_dir_hd[b][dim][dir] = nullptr;
           my_face_dim_dir_h[b][dim][dir] = nullptr;
@@ -223,7 +223,7 @@ namespace quda {
     if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes) {
 
       if (initGhostFaceBuffer) {
-	if (ghostFaceBytes) {
+        if (ghostFaceBytes) {
           // remove potential for inter-process race conditions
           // ensures that all outstanding communication is complete
           // before we free any comms buffers
@@ -235,7 +235,7 @@ namespace quda {
 	    host_free(ghost_pinned_send_buffer_h[b]);
 	    host_free(ghost_pinned_recv_buffer_h[b]);
 	  }
-	}
+        }
       }
 
       if (ghost_bytes > 0) {
@@ -435,7 +435,7 @@ namespace quda {
 	  }
 	  // now send
           cudaIpcMemHandle_t ipcLocalGhostDestHandle;
-	  if (comm_peer2peer_enabled(dir,dim)) {
+          if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_recv_buffer_d[b]);
 	    sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
 						    dim, disp,
@@ -457,8 +457,8 @@ namespace quda {
       // open the remote memory handles and set the send ghost pointers
       for (int dim=0; dim<4; ++dim) {
 	if (comm_dim(dim)==1) continue;
-	// even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
-	const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
+        // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
+        const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
 	for (int dir=0; dir<num_dir; ++dir) {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
 	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
@@ -493,7 +493,7 @@ namespace quda {
 
 	  // now send
           cudaIpcEventHandle_t ipcLocalEventHandle;
-	  if (comm_peer2peer_enabled(dir,dim)) {
+          if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaEventCreate(&ipcCopyEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
 	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 

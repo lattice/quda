@@ -48,8 +48,8 @@
 
 */
 
-static int *squaresize = NULL;   /* dimensions of hypercubes */
-static int *nsquares = NULL;     /* number of hypercubes in each direction */
+static int *squaresize = NULL; /* dimensions of hypercubes */
+static int *nsquares = NULL;   /* number of hypercubes in each direction */
 static int ndim;
 static int *size1[2] = {NULL, NULL}, *size2 = NULL;
 static int prime[] = {2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53};

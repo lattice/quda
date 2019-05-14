@@ -274,8 +274,8 @@ namespace quda {
       Functor<NXZ, Float2, RegType> f(a, b, c, NYW);
 
       MultiBlas<NXZ, RegType, M, SpinorTexture<RegType, StoreType, M>, Spinor<RegType, yType, M, write::Y>,
-          SpinorTexture<RegType, StoreType, M>, Spinor<RegType, StoreType, M, write::W>, decltype(f), T>
-          blas(X, Y, Z, W, f, a, b, c, x, y, z, w, NYW, length);
+                SpinorTexture<RegType, StoreType, M>, Spinor<RegType, StoreType, M, write::W>, decltype(f), T>
+        blas(X, Y, Z, W, f, a, b, c, x, y, z, w, NYW, length);
       blas.apply(*getStream());
 
       blas::bytes += blas.bytes();

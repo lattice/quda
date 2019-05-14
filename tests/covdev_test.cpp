@@ -404,8 +404,8 @@ int main(int argc, char **argv)
 
         if (!transfer) {
           double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
-          printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, spinor_ref_norm2,
-                     cuda_spinor_out_norm2, spinor_out_norm2);
+          printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, spinor_ref_norm2, cuda_spinor_out_norm2,
+                     spinor_out_norm2);
         } else {
           printfQuda("Result mu = %d: CPU=%f , CPU-CUDA=%f", mu, spinor_ref_norm2, spinor_out_norm2);
         }

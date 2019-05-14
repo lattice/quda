@@ -137,7 +137,7 @@ void set_layout(const int *X)
   }
 
   /* Set the mapping of coordinates to nodes */
-  if (setup_layout(lattice_size, 4, QMP_get_number_of_nodes())!=0) { errorQuda("Setup layout failed\n"); }
+  if (setup_layout(lattice_size, 4, QMP_get_number_of_nodes()) != 0) { errorQuda("Setup layout failed\n"); }
   printfQuda("%s layout set for %d nodes\n", __func__, QMP_get_number_of_nodes());
   int sites_on_node = num_sites(this_node);
 
@@ -195,8 +195,8 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
   return status;
 }
 
-void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
-		       int nColor, int nSpin, int Nvec, int argc, char *argv[])
+void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, int nColor, int nSpin,
+                       int Nvec, int argc, char *argv[])
 {
   this_node = mynode();
 
@@ -234,8 +234,8 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   int lower[nDim] = {0, 0, 0, 0};
   int upper[nDim] = {lattice_size[0], lattice_size[1], lattice_size[2], lattice_size[3]};
 
-  QIO_RecordInfo *rec_info = QIO_create_record_info(QIO_FIELD, lower, upper, nDim, const_cast<char*>(type),
-                                                    const_cast<char*>(precision), nColor, nSpin, file_prec*len, count);
+  QIO_RecordInfo *rec_info = QIO_create_record_info(QIO_FIELD, lower, upper, nDim, const_cast<char *>(type),
+                                                    const_cast<char *>(precision), nColor, nSpin, file_prec * len, count);
 
   // Create the record XML for the field
   QIO_String *xml_record_out = QIO_string_create();
@@ -275,7 +275,7 @@ int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
   return write_field<18>(outfile, count, field_out, file_prec, cpu_prec, 1, 9, type); 
 }
 
-void write_gauge_field(const char *filename, void* gauge[], QudaPrecision precision, const int *X, int argc, char* argv[])
+void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
 {
   this_node = mynode();
 
@@ -300,7 +300,6 @@ void write_gauge_field(const char *filename, void* gauge[], QudaPrecision precis
   printfQuda("%s: Closed file for writing\n", __func__);
 }
 
-
 // count is the number of vectors
 // Ninternal is the size of the "inner struct" (24 for Wilson spinor)
 int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[],
@@ -324,8 +323,8 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
   return status;
 }
 
-void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
-                        int nColor, int nSpin, int Nvec, int argc, char *argv[])
+void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, int nColor, int nSpin,
+                        int Nvec, int argc, char *argv[])
 {
   this_node = mynode();
 

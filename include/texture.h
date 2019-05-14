@@ -127,8 +127,8 @@ __device__ inline float store_norm(float *norm, FloatN x[M], int i)
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
 */
-template <typename RegType, typename StoreType, int N>
-  class SpinorTexture {
+template <typename RegType, typename StoreType, int N> class SpinorTexture
+{
 
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
 
@@ -285,7 +285,7 @@ class Spinor : public SpinorTexture<RegType, StoreType, N>
 {
 
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
-  typedef SpinorTexture<RegType,StoreType,N> ST;
+  typedef SpinorTexture<RegType, StoreType, N> ST;
 
   private:
   StoreType *spinor;

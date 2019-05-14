@@ -64,7 +64,8 @@
 				    QudaDslashType dslash_type);
 
   /** Create random spinor source field using QUDA's internal hypercubic GPU RNG */
-  void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int * const x, quda::RNG &rng);
+  void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
+                               quda::RNG &rng);
   void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
   void createSiteLinkCPU(void** link,  QudaPrecision precision, int phase) ;
 

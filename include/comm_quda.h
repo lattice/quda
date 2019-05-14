@@ -130,7 +130,7 @@ extern "C" {
      @param comm_dim_override Optional override for partitioning
      @return String specifying comm partitioning
   */
-  const char* comm_dim_partitioned_string(const int *comm_dim_override=0);
+  const char *comm_dim_partitioned_string(const int *comm_dim_override = 0);
 
   /**
      @brief Return a string that defines the comm topology (for use as a tuneKey)

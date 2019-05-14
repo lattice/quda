@@ -396,7 +396,7 @@ int main(int argc, char **argv)
   auto *rng = new quda::RNG(V, 1234, gauge_param.X);
   rng->Init();
 
-  for (int k=0; k<Nsrc; k++) {
+  for (int k = 0; k < Nsrc; k++) {
 
     construct_spinor_source(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
 

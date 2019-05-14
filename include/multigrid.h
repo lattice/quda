@@ -297,7 +297,7 @@ namespace quda {
     */
     void popLevel(int level) const;
 
-  public:
+public:
     /** 
       Constructor for MG class
       @param param MGParam struct that defines all meta data

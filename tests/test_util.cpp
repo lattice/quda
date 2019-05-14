@@ -175,12 +175,10 @@ void setDims(int *X) {
 
 }
 
-
 void dw_setDims(int *X, const int L5)
 {
   V = 1;
-  for (int d=0; d< 4; d++)
-  {
+  for (int d = 0; d < 4; d++) {
     V *= X[d];
     Z[d] = X[d];
 
@@ -463,11 +461,10 @@ int fullLatticeIndex(int i, int oddBit) {
   int x3 = zb - x4*X3;
   int x1odd = (x2 + x3 + x4 + oddBit) & 1;
   //int x1 = 2*x1h + x1odd;
-  int X = 2*sid + x1odd;
+  int X = 2 * sid + x1odd;
 
   return X;
 }
-
 
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.
@@ -536,21 +533,18 @@ neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
   if ( (ghost_x4 >= 0 && ghost_x4 < Z[3]) || !comm_dim_partitioned(3)){
     ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
   }else{
-    ret = (x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+    ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
   }
-
 
   return ret;
 }
-
 
 /*
  * This is a computation of neighbor using the full index and the displacement in each direction
  *
  */
 
-int
-neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
+int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
 {
   int oddBit = 0;
   int half_idx = i;
@@ -595,10 +589,7 @@ neighborIndexFullLattice(int dim[4], int index, int dx[4])
   return neighborHalfIndex + oddBit*halfVolume;
 }
 
-
-
-int
-neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
+int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
 {
   int ret;
   int oddBit = 0;
@@ -623,7 +614,7 @@ neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
   if ( ghost_x4 >= 0 && ghost_x4 < Z[3]){
     ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
   }else{
-    ret = (x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+    ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
     return ret;
   }
 
@@ -667,7 +658,7 @@ int fullLatticeIndex_4d(int i, int oddBit) {
   int x3 = zb - x4*X3;
   int x1odd = (x2 + x3 + x4 + oddBit) & 1;
   //int x1 = 2*x1h + x1odd;
-  int X = 2*sid + x1odd;
+  int X = 2 * sid + x1odd;
 
   return X;
 }
@@ -689,8 +680,7 @@ int fullLatticeIndex_5d_4dpc(int i, int oddBit) {
   return 2*i + (boundaryCrossings + oddBit) % 2;
 }
 
-int
-x4_from_full_index(int i)
+int x4_from_full_index(int i)
 {
   int oddBit = 0;
   int half_idx = i;
@@ -911,86 +901,7 @@ static void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
 }
 
 template <typename Float>
-static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type=QUDA_WILSON_DSLASH) {
-  Float *resOdd[4], *resEven[4];
-  for (int dir = 0; dir < 4; dir++) {
-    resEven[dir] = res[dir];
-    resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
-  }
-
-  for (int dir = 0; dir < 4; dir++) {
-    for (int i = 0; i < Vh; i++) {
-      for (int m = 1; m < 3; m++) { // last 2 rows
-	for (int n = 0; n < 3; n++) { // 3 columns
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
-	}
-      }
-      normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
-      orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
-      normalize((complex<Float>*)(resEven[dir] + (i*3 + 2)*3*2), 3);
-
-      normalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), 3);
-      orthogonalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), (complex<Float>*)(resOdd[dir] + (i*3+2)*3*2), 3);
-      normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
-
-      {
-	Float *w = resEven[dir]+(i*3+0)*3*2;
-	Float *u = resEven[dir]+(i*3+1)*3*2;
-	Float *v = resEven[dir]+(i*3+2)*3*2;
-
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
-      }
-
-      {
-	Float *w = resOdd[dir]+(i*3+0)*3*2;
-	Float *u = resOdd[dir]+(i*3+1)*3*2;
-	Float *v = resOdd[dir]+(i*3+2)*3*2;
-
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
-      }
-
-    }
-  }
-
-  if (param->type == QUDA_WILSON_LINKS){
-    applyGaugeFieldScaling(res, Vh, param);
-  } else if (param->type == QUDA_ASQTAD_LONG_LINKS){
-    applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
-  } else if (param->type == QUDA_ASQTAD_FAT_LINKS){
-    for (int dir = 0; dir < 4; dir++){
-      for (int i = 0; i < Vh; i++) {
-	for (int m = 0; m < 3; m++) { // last 2 rows
-	  for (int n = 0; n < 3; n++) { // 3 columns
-	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] =1.0* rand() / (Float)RAND_MAX;
-	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 2.0* rand() / (Float)RAND_MAX;
-	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = 3.0*rand() / (Float)RAND_MAX;
-	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 4.0*rand() / (Float)RAND_MAX;
-	  }
-	}
-      }
-    }
-
-  }
-
-}
-
-template <typename Float>
-void constructUnitaryGaugeField(Float **res)
+static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type = QUDA_WILSON_DSLASH)
 {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
@@ -1005,8 +916,8 @@ void constructUnitaryGaugeField(Float **res)
 	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
 	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
 	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
-	}
+          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
+        }
       }
       normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
       orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
@@ -1021,7 +932,7 @@ void constructUnitaryGaugeField(Float **res)
 	Float *u = resEven[dir]+(i*3+1)*3*2;
 	Float *v = resEven[dir]+(i*3+2)*3*2;
 
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
 	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
 	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
 	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
@@ -1035,7 +946,7 @@ void constructUnitaryGaugeField(Float **res)
 	Float *u = resOdd[dir]+(i*3+1)*3*2;
 	Float *v = resOdd[dir]+(i*3+2)*3*2;
 
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
 	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
 	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
 	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
@@ -1046,16 +957,91 @@ void constructUnitaryGaugeField(Float **res)
 
     }
   }
+
+  if (param->type == QUDA_WILSON_LINKS) {
+    applyGaugeFieldScaling(res, Vh, param);
+  } else if (param->type == QUDA_ASQTAD_LONG_LINKS) {
+    applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
+  } else if (param->type == QUDA_ASQTAD_FAT_LINKS) {
+    for (int dir = 0; dir < 4; dir++) {
+      for (int i = 0; i < Vh; i++) {
+	for (int m = 0; m < 3; m++) { // last 2 rows
+	  for (int n = 0; n < 3; n++) { // 3 columns
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] =1.0* rand() / (Float)RAND_MAX;
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 2.0* rand() / (Float)RAND_MAX;
+	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = 3.0*rand() / (Float)RAND_MAX;
+	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 4.0*rand() / (Float)RAND_MAX;
+	  }
+	}
+      }
+    }
+  }
 }
 
-template <typename Float>
-static void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type) {
+template <typename Float> void constructUnitaryGaugeField(Float **res)
+{
+  Float *resOdd[4], *resEven[4];
+  for (int dir = 0; dir < 4; dir++) {
+    resEven[dir] = res[dir];
+    resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
+  }
+
+  for (int dir = 0; dir < 4; dir++) {
+    for (int i = 0; i < Vh; i++) {
+      for (int m = 1; m < 3; m++) { // last 2 rows
+	for (int n = 0; n < 3; n++) { // 3 columns
+	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
+	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
+        }
+      }
+      normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
+      orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
+      normalize((complex<Float>*)(resEven[dir] + (i*3 + 2)*3*2), 3);
+
+      normalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), 3);
+      orthogonalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), (complex<Float>*)(resOdd[dir] + (i*3+2)*3*2), 3);
+      normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
+
+      {
+	Float *w = resEven[dir]+(i*3+0)*3*2;
+	Float *u = resEven[dir]+(i*3+1)*3*2;
+	Float *v = resEven[dir]+(i*3+2)*3*2;
+
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
+	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+      }
+
+      {
+	Float *w = resOdd[dir]+(i*3+0)*3*2;
+	Float *u = resOdd[dir]+(i*3+1)*3*2;
+	Float *v = resOdd[dir]+(i*3+2)*3*2;
+
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
+	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+      }
+    }
+  }
+}
+
+template <typename Float> static void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type)
+{
 
   if(type == 3)  applyGaugeFieldScaling_long((Float**)res, Vh, param, QUDA_STAGGERED_DSLASH);
 
   return;
 }
-
 
 void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
   if (type == 0) {
@@ -1066,7 +1052,8 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
     else constructGaugeField((float**)gauge, param);
   } else {
     if (precision == QUDA_DOUBLE_PRECISION) applyGaugeFieldScaling((double**)gauge, Vh, param);
-    else applyGaugeFieldScaling((float**)gauge, Vh, param);
+    else
+      applyGaugeFieldScaling((float **)gauge, Vh, param);
   }
 
 }
@@ -1100,8 +1087,7 @@ void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, Q
       else applyStaggeredScaling((float**)fatlink, param, type);
 
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH)
-      {
+      if (dslash_type == QUDA_ASQTAD_DSLASH) {
         if(type != 3) constructGaugeField((float**)longlink, param, dslash_type);
         else applyStaggeredScaling((float**)longlink, param, type);
       }
@@ -1223,9 +1209,9 @@ static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
   printf("\nDeviation Failures = (X, Y, Z, T)\n");
   for (int f=0; f<fail_check; f++) {
-    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0,-(f+1)),
-	   fail[0][f], fail[1][f], fail[2][f], fail[3][f],
-	   fail[0][f]/(double)(V*18), fail[1][f]/(double)(V*18), fail[2][f]/(double)(V*18), fail[3][f]/(double)(V*18));
+    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0, -(f + 1)), fail[0][f],
+           fail[1][f], fail[2][f], fail[3][f], fail[0][f] / (double)(V * 18), fail[1][f] / (double)(V * 18),
+           fail[2][f] / (double)(V * 18), fail[3][f] / (double)(V * 18));
   }
 
 }
@@ -1237,10 +1223,7 @@ void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precisi
     checkGauge((float**)oldG, (float**)newG, epsilon);
 }
 
-
-
-void
-createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
+void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 {
 
   if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1276,9 +1259,9 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	int i4 = full_idx /(X3*X2*X1);
 	int i3 = (full_idx - i4*(X3*X2*X1))/(X2*X1);
 	int i2 = (full_idx - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
-	int i1 = full_idx - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
+        int i1 = full_idx - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
 
-	double coeff= 1.0;
+        double coeff= 1.0;
 	switch(dir){
 	case XUP:
 	  if ( (i4 & 1) != 0){
@@ -1298,7 +1281,7 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	  }
 	  break;
 
-	case TUP:
+        case TUP:
 	  if (last_node_in_t && i4 == (X4-1)){
 	    coeff *= -1;
 	  }
@@ -1309,7 +1292,7 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	  exit(1);
 	}
 
-	if (precision == QUDA_DOUBLE_PRECISION){
+        if (precision == QUDA_DOUBLE_PRECISION){
 	  //double* mylink = (double*)link;
 	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
 	  double* mylink = (double*)link[dir];
@@ -1322,24 +1305,22 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	  mylink[16] *= coeff;
 	  mylink[17] *= coeff;
 
-	}else{
+        }else{
 	  //float* mylink = (float*)link;
 	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
 	  float* mylink = (float*)link[dir];
 	  mylink = mylink + i*gaugeSiteSize;
 
-	  mylink[12] *= coeff;
+          mylink[12] *= coeff;
 	  mylink[13] *= coeff;
 	  mylink[14] *= coeff;
 	  mylink[15] *= coeff;
 	  mylink[16] *= coeff;
 	  mylink[17] *= coeff;
-
-	}
+        }
       }
     }
   }
-
 
 #if 1
   for(int dir= 0;dir < 4;dir++){
@@ -1356,9 +1337,7 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	  fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
 	  exit(1);
 	}
-
       }
-
     }
   }
 #endif
@@ -1366,8 +1345,7 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
   return;
 }
 
-
-void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int * const x, quda::RNG &rng)
+void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng)
 {
   quda::ColorSpinorParam param;
   param.v = v;
@@ -1379,12 +1357,11 @@ void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision preci
   param.nDim = 4;
   param.siteSubset = QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  for (int d=0; d<4; d++) param.x[d] = x[d];
+  for (int d = 0; d < 4; d++) param.x[d] = x[d];
   quda::cpuColorSpinorField spinor_in(param);
 
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
-
 
 template <typename Float>
 int compareLink(Float **linkA, Float **linkB, int len) {
@@ -1429,9 +1406,9 @@ compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 {
   int ret;
 
-  if (precision == QUDA_DOUBLE_PRECISION){
+  if (precision == QUDA_DOUBLE_PRECISION) {
     ret = compareLink((double**)linkA, (double**)linkB, len);
-  }else {
+  } else {
     ret = compareLink((float**)linkA, (float**)linkB, len);
   }
 
@@ -1440,8 +1417,7 @@ compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 
 
 // X indexes the lattice site
-static void
-printLinkElement(void *link, int X, QudaPrecision precision)
+static void printLinkElement(void *link, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
     for(int i=0; i < 3;i++){
@@ -1456,16 +1432,14 @@ printLinkElement(void *link, int X, QudaPrecision precision)
   }
 }
 
-int strong_check_link(void** linkA, const char* msgA,
-		      void **linkB, const char* msgB,
-		      int len, QudaPrecision prec)
+int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec)
 {
   printfQuda("%s\n", msgA);
   printLinkElement(linkA[0], 0, prec);
   printfQuda("\n");
   printLinkElement(linkA[0], 1, prec);
   printfQuda("...\n");
-  printLinkElement(linkA[3], len-1, prec);
+  printLinkElement(linkA[3], len - 1, prec);
   printfQuda("\n");
 
   printfQuda("\n%s\n", msgB);
@@ -1473,16 +1447,14 @@ int strong_check_link(void** linkA, const char* msgA,
   printfQuda("\n");
   printLinkElement(linkB[0], 1, prec);
   printfQuda("...\n");
-  printLinkElement(linkB[3], len-1, prec);
+  printLinkElement(linkB[3], len - 1, prec);
   printfQuda("\n");
 
   int ret = compare_link(linkA, linkB, len, prec);
   return ret;
 }
 
-
-void
-createMomCPU(void* mom,  QudaPrecision precision)
+void createMomCPU(void *mom, QudaPrecision precision)
 {
   void* temp;
 
@@ -1493,24 +1465,22 @@ createMomCPU(void* mom,  QudaPrecision precision)
     exit(1);
   }
 
-
-
   for(int i=0;i < V;i++){
     if (precision == QUDA_DOUBLE_PRECISION){
       for(int dir=0;dir < 4;dir++){
-	double* thismom = (double*)mom;
-	for(int k=0; k < momSiteSize; k++){
-	  thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;
-	  if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
-	}
+        double *thismom = (double *)mom;
+        for(int k=0; k < momSiteSize; k++){
+          thismom[(4 * i + dir) * momSiteSize + k] = 1.0 * rand() / RAND_MAX;
+          if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
+        }
       }
     }else{
       for(int dir=0;dir < 4;dir++){
 	float* thismom=(float*)mom;
 	for(int k=0; k < momSiteSize; k++){
-	  thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;
-	  if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
-	}
+          thismom[(4 * i + dir) * momSiteSize + k] = 1.0 * rand() / RAND_MAX;
+          if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
+        }
       }
     }
   }
@@ -1580,8 +1550,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
   return accuracy_level;
 }
 
-static void
-printMomElement(void *mom, int X, QudaPrecision precision)
+static void printMomElement(void *mom, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
     double* thismom = ((double*)mom)+ X*momSiteSize;
@@ -1593,7 +1562,7 @@ printMomElement(void *mom, int X, QudaPrecision precision)
     printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
   }
 }
-int strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
+int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
 {
   printfQuda("mom:\n");
   printMomElement(momA, 0, prec);
@@ -1624,7 +1593,6 @@ int strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
 
   return ret;
 }
-
 
 /************
  * return value
@@ -1931,9 +1899,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--verify") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
 
     if (strcmp(argv[i+1], "true") == 0){
       verify_results = true;
@@ -1974,9 +1940,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--prec") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     prec =  get_prec(argv[i+1]);
     i++;
     ret = 0;
@@ -1984,9 +1948,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--prec-sloppy") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     prec_sloppy =  get_prec(argv[i+1]);
     i++;
     ret = 0;
@@ -1994,9 +1956,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--prec-refine") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     prec_refinement_sloppy =  get_prec(argv[i+1]);
     i++;
     ret = 0;
@@ -2152,9 +2112,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--tdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     tdim =  atoi(argv[i+1]);
     if (tdim < 0 || tdim > 512){
       printf("Error: invalid t dimension");
@@ -2166,9 +2124,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--sdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int sdim =  atoi(argv[i+1]);
     if (sdim < 0 || sdim > 512){
       printf("ERROR: invalid S dimension\n");
@@ -2181,9 +2137,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--Lsdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int Ls =  atoi(argv[i+1]);
     if (Ls < 0 || Ls > 128){
       printf("ERROR: invalid Ls dimension\n");
@@ -2222,9 +2176,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--multishift") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
 
     if (strcmp(argv[i+1], "true") == 0){
       multishift = true;
@@ -2241,9 +2193,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--gridsize") == 0){
-    if (i+4 >= argc){
-      usage(argv);
-    }
+    if (i + 4 >= argc) { usage(argv); }
     int xsize =  atoi(argv[i+1]);
     if (xsize <= 0 ){
       printf("ERROR: invalid X grid size");
@@ -2281,9 +2231,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--xgridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int xsize =  atoi(argv[i+1]);
     if (xsize <= 0 ){
       printf("ERROR: invalid X grid size");
@@ -2296,9 +2244,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--ygridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int ysize =  atoi(argv[i+1]);
     if (ysize <= 0 ){
       printf("ERROR: invalid Y grid size");
@@ -2311,9 +2257,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--zgridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int zsize =  atoi(argv[i+1]);
     if (zsize <= 0 ){
       printf("ERROR: invalid Z grid size");
@@ -2326,9 +2270,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--tgridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int tsize =  atoi(argv[i+1]);
     if (tsize <= 0 ){
       printf("ERROR: invalid T grid size");
@@ -2351,9 +2293,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--dslash-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     dslash_type = get_dslash_type(argv[i+1]);
     i++;
     ret = 0;
@@ -2373,9 +2313,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--flavor") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     twist_flavor = get_flavor_type(argv[i+1]);
     i++;
     ret = 0;
@@ -2383,9 +2321,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--inv-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     inv_type = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
@@ -2595,9 +2531,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--load-gauge") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     strcpy(latfile, argv[i+1]);
     i++;
     ret = 0;
@@ -2605,9 +2539,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--save-gauge") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     strcpy(gauge_outfile, argv[i+1]);
     i++;
     ret = 0;
@@ -2643,9 +2575,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--test") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     test_type = atoi(argv[i+1]);
     i++;
     ret = 0;
@@ -3280,9 +3210,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--mg-block-size") == 0){
-    if (i+5 >= argc){
-      usage(argv);
-    }
+    if (i + 5 >= argc) { usage(argv); }
     int level = atoi(argv[i+1]);
     if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
       printf("ERROR: invalid multigrid level %d", level);
@@ -3458,7 +3386,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-
   if( strcmp(argv[i], "--df-tol-restart") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3469,7 +3396,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-
 
   if( strcmp(argv[i], "--df-tol-eigenval") == 0){
     if (i+1 >= argc){
@@ -3723,8 +3649,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--version") == 0){
-    printf("This program is linked with QUDA library, version %s,",
-	   get_quda_ver_str());
+    printf("This program is linked with QUDA library, version %s,", get_quda_ver_str());
     printf(" %s GPU build\n", msg);
     exit(0);
   }

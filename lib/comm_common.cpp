@@ -143,10 +143,7 @@ void comm_destroy_topology(Topology *topo)
 
 static int gpuid = -1;
 
-int comm_gpuid(void)
-{
-  return gpuid;
-}
+int comm_gpuid(void) { return gpuid; }
 
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
@@ -437,7 +434,6 @@ int comm_coord(int dim)
   return comm_coords(topo)[dim];
 }
 
-
 inline bool isHost(const void *buffer)
 {
   CUmemorytype memType;
@@ -451,12 +447,9 @@ inline bool isHost(const void *buffer)
   }
 
   switch (memType) {
-  case CU_MEMORYTYPE_DEVICE:
-    return false;
-  case CU_MEMORYTYPE_ARRAY:
-    errorQuda("Using array memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_UNIFIED:
-    errorQuda("Using unified memory for communications buffer is not supported");
+  case CU_MEMORYTYPE_DEVICE: return false;
+  case CU_MEMORYTYPE_ARRAY: errorQuda("Using array memory for communications buffer is not supported");
+  case CU_MEMORYTYPE_UNIFIED: errorQuda("Using unified memory for communications buffer is not supported");
   case CU_MEMORYTYPE_HOST:
   default: // memory not allocated by CUDA allocaters will default to being host memory
     return true;
@@ -696,7 +689,8 @@ bool comm_gdr_blacklist() {
 
 static char partition_string[16]; /** static string that contains a string of the machine partition */
 static char topology_string[128]; /** static string that contains a string of the machine partition */
-static char partition_override_string[16]; /** static string that contains a string of overridden communication partitioning */
+static char
+  partition_override_string[16]; /** static string that contains a string of overridden communication partitioning */
 
 static bool deterministic_reduce = false;
 
@@ -706,25 +700,21 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
   comm_set_default_topology(topo);
 
   // determine which GPU this rank will use
-  char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
+  char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
   comm_gather_hostname(hostname_recv_buf);
 
   gpuid = 0;
   for (int i = 0; i < comm_rank(); i++) {
-    if (!strncmp(comm_hostname(), &hostname_recv_buf[128*i], 128)) {
-      gpuid++;
-    }
+    if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
   }
 
   int device_count;
   cudaGetDeviceCount(&device_count);
-  if (device_count == 0) {
-    errorQuda("No CUDA devices found");
-  }
+  if (device_count == 0) { errorQuda("No CUDA devices found"); }
   if (gpuid >= device_count) {
     char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
-    if (enable_mps_env && strcmp(enable_mps_env,"1") == 0) {
-      gpuid = gpuid%device_count;
+    if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
+      gpuid = gpuid % device_count;
       printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
     } else {
       errorQuda("Too few GPUs available on %s", comm_hostname());
@@ -736,11 +726,10 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
   host_free(hostname_recv_buf);
 
   char *enable_reduce_env = getenv("QUDA_DETERMINISTIC_REDUCE");
-  if (enable_reduce_env && strcmp(enable_reduce_env, "1") == 0) {
-    deterministic_reduce = true;
-  }
+  if (enable_reduce_env && strcmp(enable_reduce_env, "1") == 0) { deterministic_reduce = true; }
 
-  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
+           comm_dim_partitioned(2), comm_dim_partitioned(3));
 
   // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
   char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
@@ -756,15 +745,13 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
       cudaGetDeviceCount(&deviceCount);
       while (device_list_raw >> device) {
         // check this is a valid policy choice
-        if ( device < 0 ) {
-          errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device);
-        }
+        if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
 
         device_list << device;
         if (device_list_raw.peek() == ',') device_list_raw.ignore();
       }
-      snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s",
-               comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3), device_list.str().c_str());
+      snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
+               device_list.str().c_str());
     }
 
     comm_broadcast(topology_string, 128);
@@ -789,15 +776,13 @@ const char *comm_config_string()
   return config_string;
 }
 
-const char* comm_dim_partitioned_string(const int *comm_dim_override)
+const char *comm_dim_partitioned_string(const int *comm_dim_override)
 {
   if (comm_dim_override) {
-    char comm[5] = {
-      (!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
-      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
-      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
-      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'),
-      '\0'};
+    char comm[5] = {(!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
+                    (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
+                    (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
+                    (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'), '\0'};
     strcpy(partition_override_string, ",comm=");
     strcat(partition_override_string, comm);
     return partition_override_string;
@@ -806,15 +791,9 @@ const char* comm_dim_partitioned_string(const int *comm_dim_override)
   }
 }
 
-const char* comm_dim_topology_string()
-{
-  return topology_string;
-}
+const char *comm_dim_topology_string() { return topology_string; }
 
-bool comm_deterministic_reduce()
-{
-  return deterministic_reduce;
-}
+bool comm_deterministic_reduce() { return deterministic_reduce; }
 
 static bool globalReduce = true;
 static bool asyncReduce = false;

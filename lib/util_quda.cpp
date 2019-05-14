@@ -100,12 +100,12 @@ void popVerbosity()
   vstack.pop();
 }
 
-static std::stack<char*> pstack;
+static std::stack<char *> pstack;
 
 void pushOutputPrefix(const char *prefix)
 {
   // backup current prefix onto the stack
-  char *prefix_backup = (char*)safe_malloc(MAX_PREFIX_SIZE * sizeof(char));
+  char *prefix_backup = (char *)safe_malloc(MAX_PREFIX_SIZE * sizeof(char));
   strncpy(prefix_backup, getOutputPrefix(), MAX_PREFIX_SIZE);
   pstack.push(prefix_backup);
 
@@ -114,15 +114,13 @@ void pushOutputPrefix(const char *prefix)
 
   if (pstack.size() > 10) {
     warningQuda("Verbosity stack contains %u elements.  Is there a missing popOutputPrefix() somewhere?",
-		static_cast<unsigned int>(vstack.size()));
+                static_cast<unsigned int>(vstack.size()));
   }
 }
 
 void popOutputPrefix()
 {
-  if (pstack.empty()) {
-    errorQuda("popOutputPrefix() called with empty stack");
-  }
+  if (pstack.empty()) { errorQuda("popOutputPrefix() called with empty stack"); }
 
   // recover prefix from stack
   char *prefix_restore = pstack.top();

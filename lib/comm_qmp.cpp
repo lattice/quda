@@ -12,16 +12,17 @@
     errorQuda("(QMP) %s", QMP_error_string(status)); \
 } while (0)
 
-#define MPI_CHECK(mpi_call) do {                    \
-  int status = mpi_call;                            \
-  if (status != MPI_SUCCESS) {                      \
-    char err_string[128];                           \
-    int err_len;                                    \
-    MPI_Error_string(status, err_string, &err_len); \
-    err_string[127] = '\0';                         \
-    errorQuda("(MPI) %s", err_string);              \
-  }                                                 \
-} while (0)
+#define MPI_CHECK(mpi_call)                                                                                            \
+  do {                                                                                                                 \
+    int status = mpi_call;                                                                                             \
+    if (status != MPI_SUCCESS) {                                                                                       \
+      char err_string[128];                                                                                            \
+      int err_len;                                                                                                     \
+      MPI_Error_string(status, err_string, &err_len);                                                                  \
+      err_string[127] = '\0';                                                                                          \
+      errorQuda("(MPI) %s", err_string);                                                                               \
+    }                                                                                                                  \
+  } while (0)
 
 struct MsgHandle_s {
   QMP_msgmem_t mem;
@@ -220,21 +221,20 @@ int comm_query(MsgHandle *mh)
   return (QMP_is_complete(mh->handle) == QMP_TRUE);
 }
 
-template <typename T>
-T deterministic_reduce(T *array, int n)
+template <typename T> T deterministic_reduce(T *array, int n)
 {
-  std::sort(array, array+n); // sort reduction into ascending order for deterministic reduction
-  return std::accumulate(array, array+n, 0.0);
+  std::sort(array, array + n); // sort reduction into ascending order for deterministic reduction
+  return std::accumulate(array, array + n, 0.0);
 }
 
 void comm_allreduce(double* data)
 {
   if (!comm_deterministic_reduce()) {
-    QMP_CHECK( QMP_sum_double(data) );
+    QMP_CHECK(QMP_sum_double(data));
   } else {
     // we need to break out of QMP for the deterministic floating point reductions
     const size_t n = comm_size();
-    double *recv_buf = (double*)safe_malloc(n * sizeof(double));
+    double *recv_buf = (double *)safe_malloc(n * sizeof(double));
     MPI_CHECK(MPI_Allgather(data, 1, MPI_DOUBLE, recv_buf, 1, MPI_DOUBLE, MPI_COMM_HANDLE));
     *data = deterministic_reduce(recv_buf, n);
     host_free(recv_buf);
@@ -256,7 +256,7 @@ void comm_allreduce_min(double* data)
 void comm_allreduce_array(double* data, size_t size)
 {
   if (!comm_deterministic_reduce()) {
-    QMP_CHECK( QMP_sum_double_array(data, size) );
+    QMP_CHECK(QMP_sum_double_array(data, size));
   } else {
     // we need to break out of QMP for the deterministic floating point reductions
     size_t n = comm_size();
@@ -264,18 +264,14 @@ void comm_allreduce_array(double* data, size_t size)
     MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
 
     double *recv_trans = new double[size * n];
-    for (size_t i=0; i<n; i++) {
-      for (size_t j=0; j<size; j++) {
-        recv_trans[j*n + i] = recv_buf[i*size + j];
-      }
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
     }
 
-    for (size_t i=0; i<size; i++) {
-      data[i] = deterministic_reduce(recv_trans+i*n, n);
-    }
+    for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans + i * n, n); }
 
-    delete []recv_buf;
-    delete []recv_trans;
+    delete[] recv_buf;
+    delete[] recv_trans;
   }
 }
 

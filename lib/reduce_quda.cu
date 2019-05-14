@@ -287,7 +287,7 @@ namespace quda {
 
       Spinor<RegType, StoreType, M, writeX> X(x);
       Spinor<RegType, StoreType, M, writeY> Y(y);
-      Spinor<RegType,     zType, M, writeZ> Z(z);
+      Spinor<RegType, zType, M, writeZ> Z(z);
       Spinor<RegType, StoreType, M, writeW> W(w);
       Spinor<RegType, StoreType, M, writeV> V(v);
 
