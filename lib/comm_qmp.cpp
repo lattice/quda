@@ -236,10 +236,7 @@ void comm_allreduce(double* data)
     const size_t n = comm_size();
     double *recv_buf = (double*)safe_malloc(n * sizeof(double));
     MPI_CHECK(MPI_Allgather(data, 1, MPI_DOUBLE, recv_buf, 1, MPI_DOUBLE, MPI_COMM_HANDLE));
-
-    std::sort(recv_buf, recv_buf+n); // sort reduction into ascending order for deterministic reduction
-    *data = std::accumulate(recv_buf, recv_buf+n, 0.0);
-
+    *data = deterministic_reduce(recv_buf, n);
     host_free(recv_buf);
   }
 }
@@ -274,8 +271,7 @@ void comm_allreduce_array(double* data, size_t size)
     }
 
     for (size_t i=0; i<size; i++) {
-      std::sort(recv_trans+i*n, recv_trans+i*n+n); // sort reduction into ascending order for deterministic reduction
-      data[i] = std::accumulate(recv_trans+i*n, recv_trans+i*n+n, 0.0);
+      data[i] = deterministic_reduce(recv_trans+i*n, n);
     }
 
     delete []recv_buf;
