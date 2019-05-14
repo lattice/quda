@@ -12,7 +12,8 @@ namespace quda
   template <typename Float> struct ContractionArg {
     
     int threads; // number of active threads required
-
+    int X[4];    // grid dimensions
+    
     //DMH: Hardcode Wilson types for now
     static constexpr int nSpin = 4;
     static constexpr int nColor = 3;
@@ -27,11 +28,12 @@ namespace quda
     Float *result;
     
     ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, Float *result) :
-      threads(1),
+      threads(x.Volume()/2),
       x(x),
       y(y),
       result(result)
-    {}
+    {
+    }
   };
   
   
@@ -52,10 +54,10 @@ namespace quda
     Vector y = arg.y(idx,parity);
     
     for (int i=0; i<arg.nSpin; i++)
-      for (int j=0; j<arg.nSpin; j++) 
-	arg.result[idx + i*nSpin + j] = innerProduct(x,y).real();
-    
-    //Do the thing, win the points
+      for (int j=0; j<arg.nSpin; j++) {
+	arg.result[idx + i*nSpin + j] = innerProduct(x,y,i,j).real();
+	//printf("%d %d %d %d %f\n", idx, parity, i, j, arg.result[idx]);
+      }
     
   }  
 } // namespace quda

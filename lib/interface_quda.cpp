@@ -5835,11 +5835,49 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
 }
 
 //New contraction routines
-void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, const QudaContractGamma cGamma)
+void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType, const QudaContractGamma cGamma, QudaInvertParam *param, const int *X)
 {
+  //DMH: Easiest way to construct ColorSpinorField? Do we require the user
+  //     to declare and fill and invert_param, or can it just be hacked?.
   
-  contractQuda(x,y,result);
+  //const int X[4] = {8,8,8,8};
+
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam((void*)hp_x, *param, X, false, param->input_location);
+  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+
+  cpuParam.v = (void*)hp_y;
+  //cpuParam.location = param->output_location;
+  ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
+
+  // download source
+  ColorSpinorParam *cudaParam(&cpuParam);
+  cudaParam->location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam->create = QUDA_ZERO_FIELD_CREATE;
+  param->cuda_prec == QUDA_DOUBLE_PRECISION ?
+    cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
+    cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
   
+  std::vector<ColorSpinorField*> x,y;
+  x.push_back(ColorSpinorField::Create(*cudaParam));
+  y.push_back(ColorSpinorField::Create(*cudaParam));
+
+  *x[0] = *h_x;
+  *y[0] = *h_y;
+
+  size_t sSize = (param->cuda_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t data_bytes = X[0]*X[1]*X[2]*X[3]*16*sSize;
+  void *d_result = device_malloc(data_bytes);
+  
+  contractQuda(*x[0],*y[0],d_result);
+
+  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
+  device_free(d_result);
+
+  delete x[0];
+  delete y[0];
+  delete h_y;
+  delete h_x;
 }
 
 double qChargeQuda()

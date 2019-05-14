@@ -130,17 +130,6 @@ display_test_info()
 	     get_recon_str(link_recon), 
 	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
 
-  printfQuda("MG parameters\n");
-  printfQuda(" - number of levels %d\n", mg_levels);
-  for (int i=0; i<mg_levels-1; i++) {
-    printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
-    printfQuda(" - level %d number of pre-smoother applications %d\n", i+1, nu_pre[i]);
-    printfQuda(" - level %d number of post-smoother applications %d\n", i+1, nu_post[i]);
-  }
-
-  printfQuda("Outer solver paramers\n");
-  printfQuda(" - pipeline = %d\n", pipeline);
-
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
@@ -154,6 +143,65 @@ QudaPrecision &cpu_prec = prec;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
+
+void setInvertParam(QudaInvertParam &inv_param) {  
+  inv_param.Ls = 1;
+
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+
+  inv_param.cpu_prec = cpu_prec;
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.dslash_type = dslash_type;
+
+  inv_param.dagger = QUDA_DAG_NO;
+
+  // do we want full solution or single-parity solution
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+  // do we want to use an even-odd preconditioned solve or not
+  inv_param.solve_type = solve_type;
+  inv_param.matpc_type = matpc_type;
+
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+
+  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity_precondition = mg_verbosity[0];
+
+  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
+  inv_param.pipeline = pipeline;
+  inv_param.gcrNkrylov = gcrNkrylov;
+  inv_param.tol = tol;
+
+  // require both L2 relative and heavy quark residual to determine convergence
+  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+  inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
+
+  // these can be set individually
+  for (int i=0; i<inv_param.num_offset; i++) {
+    inv_param.tol_offset[i] = inv_param.tol;
+    inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+  }
+  inv_param.maxiter = niter;
+  inv_param.reliable_delta = reliable_delta;
+
+  // domain decomposition preconditioner parameters
+  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  inv_param.precondition_cycle = 1;
+  inv_param.tol_precondition = 1e-1;
+  inv_param.maxiter_precondition = 1;
+  inv_param.omega = 1.0;
+}
 
 int main(int argc, char **argv)
 {
@@ -180,15 +228,17 @@ int main(int argc, char **argv)
   // *** application-specific.
 
   int X[4] = {xdim,ydim,zdim,tdim};  
-  setDims(X);
-  
+  setDims(X);  
   setSpinorSiteSize(24);
+
+  QudaInvertParam inv_param = newQudaInvertParam();
+  setInvertParam(inv_param); 
   
   size_t sSize = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  void *spinorX = malloc(V*spinorSiteSize*sSize*Lsdim);
-  void *spinorY = malloc(V*spinorSiteSize*sSize*Lsdim);
-  void *result = malloc(V*16*sSize*Lsdim);
-
+  void *spinorX = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  void *spinorY = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  void *result = malloc(V*16*sSize*inv_param.Ls);
+  
   // start the timer
   double time0 = -((double)clock());
   
@@ -196,12 +246,12 @@ int main(int argc, char **argv)
   initQuda(device);
   
   if (cpu_prec == QUDA_SINGLE_PRECISION) {
-    for (int i=0; i<Lsdim*V*spinorSiteSize; i++) {
+    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) {
       ((float*)spinorX)[i] = rand() / (float)RAND_MAX;
       ((float*)spinorY)[i] = rand() / (float)RAND_MAX;
     }
   } else {
-    for (int i=0; i<Lsdim*V*spinorSiteSize; i++) {
+    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) {
       ((double*)spinorX)[i] = rand() / (double)RAND_MAX;
       ((double*)spinorY)[i] = rand() / (double)RAND_MAX;
     }
@@ -210,9 +260,15 @@ int main(int argc, char **argv)
   //Host side spinor data and result passed to QUDA.
   //QUDA will allocate GPU memory, transfer the data,
   //perform the requested contraction, and return the
-  //result in teh array 'result'
-  contractQuda(spinorX, spinorY, result, QUDA_CONTRACT_GAMMA5, QUDA_CONTRACT_GAMMA_G5);
-  
+  //result in the array 'result'
+  contractQuda(spinorX, spinorY, result, QUDA_CONTRACT_GAMMA5, QUDA_CONTRACT_GAMMA_G5, &inv_param, X);
+
+  for(int i=0; i<xdim; i++) {
+    for(int j=0; j<16; j++) {
+      printfQuda("%d %d %.16e\n", i, j, ((double*)result)[i*16 + j]);
+    }
+  }
+      
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;

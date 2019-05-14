@@ -930,6 +930,7 @@ namespace quda {
      dot = \sum_c conj(a(s,c)) * b(s,c)
      @param a Left-hand side ColorSpinor
      @param b Right-hand side ColorSpinor
+     @param s diagonal spin index
      @return The inner product
   */
   template<typename Float, int Nc, int Ns>
@@ -946,6 +947,29 @@ namespace quda {
     return dot;
   }
 
+  /**
+     Compute the inner product over color at spin sa and sb  between two ColorSpinor fields
+     dot = \sum_c conj(a(s1,c)) * b(s2,c)
+     @param a Left-hand side ColorSpinor
+     @param b Right-hand side ColorSpinor
+     @param sa Left-hand side spin index
+     @param sb Right-hand side spin index
+     @return The inner product
+  */
+  template<typename Float, int Nc, int Ns>
+    __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float,Nc,Ns> &a, const ColorSpinor<Float,Nc,Ns> &b, int sa, int sb)
+  {
+    complex<Float> dot = 0;
+#pragma unroll
+    for (int c=0; c<Nc; c++) {
+      dot.x += a(sa,c).real() * b(sb,c).real();
+      dot.x += a(sa,c).imag() * b(sb,c).imag();
+      dot.y += a(sa,c).real() * b(sb,c).imag();
+      dot.y -= a(sa,c).imag() * b(sb,c).real();
+    }
+    return dot;
+  }
+  
   /**
      @brief Compute the inner product over color at spin s between a
      color vector and a color spinor

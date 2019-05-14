@@ -9,7 +9,7 @@
 namespace quda {
   
 #ifdef GPU_CONTRACT
-  template <typename Float, typename Arg> class Contraction : TunableVectorY
+  template <typename Float, typename Arg> class Contraction : TunableVectorYZ
   {
     
   protected:
@@ -24,7 +24,7 @@ namespace quda {
     
   public:
     Contraction(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, Float *result) :
-      TunableVectorY(2),
+      TunableVectorYZ(2,3),
       arg(arg),
       x(x),
       y(y),
@@ -41,13 +41,13 @@ namespace quda {
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
-      using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeContraction")
-	.instantiate(Type<Float>(), Type<Arg>())
-	.configure(tp.grid, tp.block, tp.shared_bytes, stream)
-	.launch(arg);
+	using namespace jitify::reflection;
+	jitify_error = program->kernel("quda::computeContraction")
+	  .instantiate(Type<Float>(), Type<Arg>())
+	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+	  .launch(arg);
 #else
-      computeContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	computeContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
       } else {
 	errorQuda("CPU not supported yet\n");
