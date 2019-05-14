@@ -40,15 +40,21 @@ namespace quda
     
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
+    const int nSpin = arg.nSpin;
+    const int nColor = arg.nColor;
     
     if (idx >= arg.threads) return;
     
     typedef typename mapper<Float>::type real;
-    typedef ColorSpinor<real, arg.nColor, arg.nSpin> Vector;
+    typedef ColorSpinor<real, nColor, nSpin> Vector;
 
     Vector x = arg.x(idx,parity);
     Vector y = arg.y(idx,parity);
-    arg.result[idx] = 0.0;
+    
+    for (int i=0; i<arg.nSpin; i++)
+      for (int j=0; j<arg.nSpin; j++) 
+	arg.result[idx + i*nSpin + j] = innerProduct(x,y).real();
+    
     //Do the thing, win the points
     
   }  

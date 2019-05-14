@@ -1172,6 +1172,16 @@ extern "C" {
   double qChargeQuda();
 
   /**
+   * Public function to perform color contractions of the host spinors x and y.
+   * @param[in] x pointer to host data 
+   * @param[in] y pointer to host data 
+   * @param[out] result pointer to the 16 spin projections per lattice site
+   * @param[in] cType type of contraction to perform
+   * @param[in] cGamma Which of the 16 gamma matrices to insert
+   */
+  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, const QudaContractGamma cGamma);
+  
+  /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing

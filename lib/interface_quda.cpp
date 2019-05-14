@@ -5834,6 +5834,14 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
   }
 }
 
+//New contraction routines
+void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, const QudaContractGamma cGamma)
+{
+  
+  contractQuda(x,y,result);
+  
+}
+
 double qChargeQuda()
 {
   profileQCharge.TPSTART(QUDA_PROFILE_TOTAL);
