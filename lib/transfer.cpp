@@ -225,48 +225,14 @@ namespace quda {
     if (geo_bs) delete []geo_bs;
   }
 
-  void Transfer::setSiteSubset(QudaSiteSubset site_subset_, QudaParity parity_) {
-    if (site_subset_ == QUDA_PARITY_SITE_SUBSET && parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
+  void Transfer::setSiteSubset(QudaSiteSubset site_subset_, QudaParity parity_)
+  {
+    if (site_subset_ == QUDA_PARITY_SITE_SUBSET && parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY)
+      errorQuda("Undefined parity %d", parity_);
     parity = parity_;
 
     if (site_subset == site_subset_) return;
     site_subset = site_subset_;
-
-    return; // FIXME apply memory optimization
-
-    // this function only does something non-trivial if the operator is on the GPU
-    if (!enable_gpu) return;
-
-    if (site_subset == QUDA_PARITY_SITE_SUBSET) {
-      // if doing single-parity then delete full field V and replace with single parity
-
-      ColorSpinorParam param(*V_h);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      param.x[0] /= 2;
-      param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      param.setPrecision(V_d->Precision());
-
-      delete V_d;
-      V_d = ColorSpinorField::Create(param);
-      *V_d = parity == QUDA_EVEN_PARITY ? V_h->Even() : V_h->Odd();
-
-    } else if (site_subset == QUDA_FULL_SITE_SUBSET) {
-      // if doing full field then delete single parity V and replace with single parity
-
-      ColorSpinorParam param(*V_h);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      param.setPrecision(V_d->Precision());
-
-      delete V_d;
-      V_d = ColorSpinorField::Create(param);
-      *V_d = *V_h;
-
-    } else {
-      errorQuda("Undefined site_subset %d", site_subset_);
-    }
-
   }
 
   struct Int2 {

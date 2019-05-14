@@ -422,15 +422,15 @@ namespace quda {
     inB.allocateGhostBuffer(nFace);
 
     if (inEven.Precision() == QUDA_DOUBLE_PRECISION) {
-      Spinor<double2, double2, 3, 0, 0> spinorA(inA, nFace);
-      Spinor<double2, double2, 3, 0, 1> spinorB(inB, nFace);
+      Spinor<double2, double2, 3, 0> spinorA(inA, nFace);
+      Spinor<double2, double2, 3, 0> spinorB(inB, nFace);
       exchangeGhost(nFace,static_cast<cudaColorSpinorField&>(inB), parity, 0);
 
       computeStaggeredOprodCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(outA), gauge::FloatNOrder<double, 18, 2, 18>(outB),
 					outA, outB, spinorA, spinorB, inB, parity, inB.GhostFace(), coeff, nFace);
     } else if (inEven.Precision() == QUDA_SINGLE_PRECISION) {
-      Spinor<float2, float2, 3, 0, 0> spinorA(inA, nFace);
-      Spinor<float2, float2, 3, 0, 1> spinorB(inB, nFace);
+      Spinor<float2, float2, 3, 0> spinorA(inA, nFace);
+      Spinor<float2, float2, 3, 0> spinorB(inB, nFace);
       exchangeGhost(nFace,static_cast<cudaColorSpinorField&>(inB), parity, 0);
 
       computeStaggeredOprodCuda<float>(gauge::FloatNOrder<float, 18, 2, 18>(outA), gauge::FloatNOrder<float, 18, 2, 18>(outB),
