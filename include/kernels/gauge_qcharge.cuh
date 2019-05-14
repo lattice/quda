@@ -24,7 +24,6 @@ namespace quda
   // Core routine for computing the topological charge from the field strength
   template <int blockSize, typename Float, typename Arg> __global__ void qChargeComputeKernel(Arg arg)
   {
-
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
@@ -32,8 +31,8 @@ namespace quda
 
     while (idx < arg.threads) {
       // Load the field-strength tensor from global memory
-      Matrix<complex<Float>, 3> F[6];
-      for (int i = 0; i < 6; ++i) F[i] = arg.data(i, idx, parity);
+      Matrix<complex<Float>, 3> F[] = { arg.data(0, idx, parity), arg.data(1, idx, parity), arg.data(2, idx, parity),
+                                        arg.data(3, idx, parity), arg.data(4, idx, parity), arg.data(2, idx, parity) };
 
       double Q1 = getTrace(F[0] * F[5]).real();
       double Q2 = getTrace(F[1] * F[4]).real();
