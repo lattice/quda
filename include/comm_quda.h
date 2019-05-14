@@ -121,10 +121,16 @@ extern "C" {
   int comm_partitioned();
 
   /**
+     @brief Create the topology and partition strings that are used in tuneKeys
+  */
+  void comm_set_tunekey_string();
+
+  /**
      @brief Return a string that defines the comm partitioning (used as a tuneKey)
+     @param comm_dim_override Optional override for partitioning
      @return String specifying comm partitioning
   */
-  const char* comm_dim_partitioned_string();
+  const char *comm_dim_partitioned_string(const int *comm_dim_override = 0);
 
   /**
      @brief Return a string that defines the comm topology (for use as a tuneKey)
@@ -140,12 +146,35 @@ extern "C" {
   */
   const char *comm_config_string();
 
-  /* implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp */
-
+  /**
+     @brief Initialize the communications, implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp
+  */
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
+
+  /**
+     @brief Initialize the communications common to all communications abstractions
+  */
+  void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
+
+  /**
+     @return Rank id of this process
+  */
   int comm_rank(void);
+
+  /**
+     @return Number of processes
+  */
   int comm_size(void);
+
+  /**
+     @return GPU id associated with this process
+  */
   int comm_gpuid(void);
+
+  /**
+     @return Whether are doing determinisitic multi-process reductions or not
+   */
+  bool comm_deterministic_reduce();
 
   /**
      @brief Gather all hostnames
