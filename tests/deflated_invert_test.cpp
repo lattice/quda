@@ -235,7 +235,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.matpc_type = matpc_type;
 
   if (inv_type != QUDA_EIGCG_INVERTER && inv_type != QUDA_INC_EIGCG_INVERTER && inv_type != QUDA_GMRESDR_INVERTER)
-    errorQuda("Unknown deflated solver type", inv_type);
+    errorQuda("Unknown deflated solver type %d.", inv_type);
 
   //! For deflated solvers only:
   inv_param.inv_type = inv_type;
