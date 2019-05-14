@@ -53,11 +53,11 @@ extern "C" {
 
   QudaFieldLocation get_location(char* s);
 
-  const char* get_ritz_location_str(QudaFieldLocation type);
+  const char *get_ritz_location_str(QudaFieldLocation type);
 
   QudaMemoryType get_df_mem_type_ritz(char* s);
 
-  const char* get_memory_type_str(QudaMemoryType type);
+  const char *get_memory_type_str(QudaMemoryType type);
 
 #ifdef __cplusplus
 }
