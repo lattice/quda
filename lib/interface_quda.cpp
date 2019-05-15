@@ -2265,6 +2265,8 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
 {
   quda::cudaGaugeField *cudaGauge = nullptr;
   if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+    if (gaugePrecise == nullptr) errorQuda("Precise gauge field doesn't exist");
+
     if (param->cuda_prec != gaugePrecise->Precision()) {
       errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, gaugePrecise->Precision());
     }
@@ -2280,7 +2282,6 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
       loadSloppyGaugeQuda(precision, recon);
     }
 
-    if (gaugePrecise == nullptr) errorQuda("Precise gauge field doesn't exist");
     if (gaugeSloppy == nullptr) errorQuda("Sloppy gauge field doesn't exist");
     if (gaugePrecondition == nullptr) errorQuda("Precondition gauge field doesn't exist");
     if (gaugeRefinement == nullptr) errorQuda("Refinement gauge field doesn't exist");
@@ -2289,6 +2290,9 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
     }
     cudaGauge = gaugePrecise;
   } else {
+    if (gaugeFatPrecise == nullptr) errorQuda("Precise gauge fat field doesn't exist");
+    if (gaugeLongPrecise == nullptr) errorQuda("Precise gauge long field doesn't exist");
+
     if (param->cuda_prec != gaugeFatPrecise->Precision()) {
       errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, gaugeFatPrecise->Precision());
     }
@@ -2309,7 +2313,6 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
       loadSloppyGaugeQuda(precision, recon);
     }
 
-    if (gaugeFatPrecise == nullptr) errorQuda("Precise gauge fat field doesn't exist");
     if (gaugeFatSloppy == nullptr) errorQuda("Sloppy gauge fat field doesn't exist");
     if (gaugeFatPrecondition == nullptr) errorQuda("Precondition gauge fat field doesn't exist");
     if (gaugeFatRefinement == nullptr) errorQuda("Refinement gauge fat field doesn't exist");
@@ -2317,7 +2320,6 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
       if (gaugeFatExtended == nullptr) errorQuda("Extended gauge fat field doesn't exist");
     }
 
-    if (gaugeLongPrecise == nullptr) errorQuda("Precise gauge long field doesn't exist");
     if (gaugeLongSloppy == nullptr) errorQuda("Sloppy gauge long field doesn't exist");
     if (gaugeLongPrecondition == nullptr) errorQuda("Precondition gauge long field doesn't exist");
     if (gaugeLongRefinement == nullptr) errorQuda("Refinement gauge long field doesn't exist");
