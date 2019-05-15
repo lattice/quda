@@ -2225,10 +2225,15 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   popVerbosity();
 }
 
-namespace quda{
-bool canReuseResidentGauge(QudaInvertParam *param){
-  return (gaugePrecise != nullptr) and param->cuda_prec == gaugePrecise->Precision();
-}
+namespace quda {
+  bool canReuseResidentGauge(QudaInvertParam *param)
+  {
+    if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+      return (gaugePrecise != nullptr) and param->cuda_prec == gaugePrecise->Precision();
+    } else {
+      return (gaugeFatPrecise != nullptr) and param->cuda_prec == gaugeFatPrecise->Precision();
+    }
+  }
 }
 
 void checkClover(QudaInvertParam *param) {
