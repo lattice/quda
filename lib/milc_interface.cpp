@@ -557,7 +557,7 @@ void qudaGaugeForce( int precision,
 }
 
 
-static int getFatLinkPadding(const int dim[4])
+static int getLinkPadding(const int dim[4])
 {
   int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
   padding = MAX(padding, dim[0]*dim[1]*dim[3]/2);
@@ -702,24 +702,26 @@ static void setGaugeParams(QudaGaugeParam &fat_param, QudaGaugeParam &long_param
   fat_param.anisotropy = 1.0;
   fat_param.t_boundary = QUDA_PERIODIC_T; // anti-periodic boundary conditions are built into the gauge field
   fat_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  fat_param.ga_pad = getFatLinkPadding(dim);
+  fat_param.ga_pad = getLinkPadding(dim);
 
-  const int fat_pad = getFatLinkPadding(dim);
-  fat_param.type = QUDA_GENERAL_LINKS;
-  fat_param.ga_pad = fat_pad;
+  if (longlink != nullptr) {
+    // improved staggered parameters
+    fat_param.type = QUDA_ASQTAD_FAT_LINKS;
 
-  // if doing naive staggered then we need to set the phase
-  if (longlink == nullptr) fat_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+    // now set the long link parameters needed
+    long_param = fat_param;
+    long_param.tadpole_coeff = tadpole;
+    long_param.scale = -(1.0 + naik_epsilon) / (24.0 * long_param.tadpole_coeff * long_param.tadpole_coeff);
+    long_param.type = QUDA_THREE_LINKS;
+    long_param.ga_pad = 3*fat_param.ga_pad;
+    getReconstruct(long_param.reconstruct, long_param.reconstruct_sloppy);
+    long_param.reconstruct_precondition = long_param.reconstruct_sloppy;
+  } else {
+    // naive staggered parameters
+    fat_param.type = QUDA_SU3_LINKS;
+    fat_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  }
 
-  // now set the long link parameters needed
-  long_param = fat_param;
-  long_param.tadpole_coeff = tadpole;
-  long_param.scale = -(1.0 + naik_epsilon) / (24.0 * long_param.tadpole_coeff * long_param.tadpole_coeff);
-  const int long_pad = 3 * fat_pad;
-  long_param.type = QUDA_THREE_LINKS;
-  long_param.ga_pad = long_pad;
-  getReconstruct(long_param.reconstruct, long_param.reconstruct_sloppy);
-  long_param.reconstruct_precondition = long_param.reconstruct_sloppy;
 }
 
 static void setColorSpinorParams(const int dim[4], QudaPrecision precision, ColorSpinorParam *param)
@@ -917,14 +919,8 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
 } // qudaInvert
 
 
-void qudaDslash(int external_precision,
-		int quda_precision,
-		QudaInvertArgs_t inv_args,
-		const void* const fatlink,
-		const void* const longlink,
-		void* src,
-		void* dst,
-		int* num_iters)
+void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, const void *const fatlink,
+                const void *const longlink, void* src, void* dst, int* num_iters)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1250,7 +1246,7 @@ void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs
   gaugeParam.cuda_prec_sloppy         = device_precision_sloppy;
   gaugeParam.cuda_prec_precondition   = device_precision_sloppy;
   gaugeParam.gauge_fix                = QUDA_GAUGE_FIXED_NO;
-  gaugeParam.ga_pad                   = getFatLinkPadding(dim);
+  gaugeParam.ga_pad                   = getLinkPadding(dim);
 }
 
 
