@@ -18,7 +18,12 @@
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
 
 #ifdef INTERFACE_NVTX
+
+#if QUDA_NVTX_VERSION==3
+#include "nvtx3/nvToolsExt.h"
+#else
 #include "nvToolsExt.h"
+#endif
 
 static const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
 static const int num_colors = sizeof(colors)/sizeof(uint32_t);
@@ -61,19 +66,20 @@ using namespace quda::fermion_force;
 
 
 #define QUDAMILC_VERBOSE 1
+
 template <bool start> void inline qudamilc_called(const char *func, QudaVerbosity verb)
 {
+  PUSH_RANGE(func, 1);
 #ifdef QUDAMILC_VERBOSE
-if (verb >= QUDA_VERBOSE) {
-  if (start) {
-    printfQuda("QUDA_MILC_INTERFACE: %s (called) \n", func);
-    PUSH_RANGE(func, 1);
-  } else {
-    printfQuda("QUDA_MILC_INTERFACE: %s (return) \n", func);
-    POP_RANGE;
+  if (verb >= QUDA_VERBOSE) {
+    if (start) {
+      printfQuda("QUDA_MILC_INTERFACE: %s (called) \n", func);
+    } else {
+      printfQuda("QUDA_MILC_INTERFACE: %s (return) \n", func);
+    }
   }
-}
 #endif
+  POP_RANGE;
 }
 
 template <bool start> void inline qudamilc_called(const char *func) { qudamilc_called<start>(func, getVerbosity()); }
@@ -808,7 +814,7 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   QudaParity local_parity = inv_args.evenodd;
   const double reliable_delta = (use_mixed_precision ? 1e-1 : 0.0);
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, num_offsets, offset,
-                  target_residual, target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
+                  target_residual, target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, QUDA_VERBOSE,
                   QUDA_CG_INVERTER, &invertParam);
 
   if (inv_args.mixed_precision == 1) {
@@ -887,7 +893,7 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   const double reliable_delta = 1e-1;
 
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, mass, target_residual,
-                  target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
+                  target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, QUDA_VERBOSE,
                   QUDA_CG_INVERTER, &invertParam);
 
   ColorSpinorParam csParam;

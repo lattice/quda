@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <vector>
 
-#include <nvToolsExt.h>
 
 namespace quda {
 
