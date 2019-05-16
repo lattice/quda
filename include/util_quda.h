@@ -18,12 +18,29 @@ QudaVerbosity getVerbosity();
 char *getOutputPrefix();
 FILE *getOutputFile();
 
-void setVerbosity(const QudaVerbosity verbosity);
+void setVerbosity(QudaVerbosity verbosity);
 void setOutputPrefix(const char *prefix);
 void setOutputFile(FILE *outfile);
 
+/**
+   @brief Push a new verbosity onto the stack
+*/
 void pushVerbosity(QudaVerbosity verbosity);
+
+/**
+   @brief Pop the verbosity restoring the prior one on the stack
+*/
 void popVerbosity();
+
+/**
+   @brief Push a new output prefix onto the stack
+*/
+void pushOutputPrefix(const char *prefix);
+
+/**
+   @brief Pop the output prefix restoring the prior one on the stack
+*/
+void popOutputPrefix();
 
 /**
    @brief This function returns true if the calling rank is enabled

@@ -6,7 +6,6 @@
 #include <jitify_helper.cuh>
 #include <kernels/gauge_qcharge.cuh>
 
-
 namespace quda
 {
 
@@ -14,7 +13,6 @@ namespace quda
 
   template <typename Float, typename Arg> class QChargeCompute : TunableLocalParity
   {
-
     Arg &arg;
     const GaugeField &meta;
 

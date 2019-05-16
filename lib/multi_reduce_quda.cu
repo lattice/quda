@@ -358,10 +358,10 @@ namespace quda {
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
       }
 
-      SpinorTexture<RegType, StoreType, M, 0> X[NXZ];
-      Spinor<RegType, yType, M, write::Y, 1> Y[MAX_MULTI_BLAS_N];
-      SpinorTexture<RegType, StoreType, M, 2> Z[NXZ];
-      Spinor<RegType, StoreType, M, write::W, 3> W[MAX_MULTI_BLAS_N];
+      SpinorTexture<RegType, StoreType, M> X[NXZ];
+      Spinor<RegType, yType, M, write::Y> Y[MAX_MULTI_BLAS_N];
+      SpinorTexture<RegType, StoreType, M> Z[NXZ];
+      Spinor<RegType, StoreType, M, write::W> W[MAX_MULTI_BLAS_N];
 
       for (int i = 0; i < NXZ; i++) {
         X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
@@ -374,10 +374,10 @@ namespace quda {
 
       Reducer<NXZ, ReduceType, Float2, RegType> r(a, b, c, NYW);
 
-      MultiReduceCuda<NXZ, doubleN, ReduceType, RegType, M, SpinorTexture<RegType, StoreType, M, 0>,
-          Spinor<RegType, yType, M, write::Y, 1>, SpinorTexture<RegType, StoreType, M, 2>,
-          Spinor<RegType, StoreType, M, write::W, 3>, decltype(r)>
-          reduce(result, X, Y, Z, W, r, x, y, z, w, NYW, length);
+      MultiReduceCuda<NXZ, doubleN, ReduceType, RegType, M, SpinorTexture<RegType, StoreType, M>,
+                      Spinor<RegType, yType, M, write::Y>, SpinorTexture<RegType, StoreType, M>,
+                      Spinor<RegType, StoreType, M, write::W>, decltype(r)>
+        reduce(result, X, Y, Z, W, r, x, y, z, w, NYW, length);
       reduce.apply(*blas::getStream());
 
       blas::bytes += reduce.bytes();

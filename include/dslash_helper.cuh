@@ -60,13 +60,13 @@ namespace quda
     switch (type) {                                      // intentional fall-through
     case EXTERIOR_KERNEL_ALL: incomplete = false; break; // all active threads are complete
     case INTERIOR_KERNEL:
-      incomplete = incomplete || (arg.ghostDim[3] && (coord[3] == 0 || coord[3] == (arg.dc.X[3] - 1)));
+      incomplete = incomplete || (arg.commDim[3] && (coord[3] == 0 || coord[3] == (arg.dc.X[3] - 1)));
     case EXTERIOR_KERNEL_T:
-      incomplete = incomplete || (arg.ghostDim[2] && (coord[2] == 0 || coord[2] == (arg.dc.X[2] - 1)));
+      incomplete = incomplete || (arg.commDim[2] && (coord[2] == 0 || coord[2] == (arg.dc.X[2] - 1)));
     case EXTERIOR_KERNEL_Z:
-      incomplete = incomplete || (arg.ghostDim[1] && (coord[1] == 0 || coord[1] == (arg.dc.X[1] - 1)));
+      incomplete = incomplete || (arg.commDim[1] && (coord[1] == 0 || coord[1] == (arg.dc.X[1] - 1)));
     case EXTERIOR_KERNEL_Y:
-      incomplete = incomplete || (arg.ghostDim[0] && (coord[0] == 0 || coord[0] == (arg.dc.X[0] - 1)));
+      incomplete = incomplete || (arg.commDim[0] && (coord[0] == 0 || coord[0] == (arg.dc.X[0] - 1)));
     case EXTERIOR_KERNEL_X: break;
     }
 
@@ -239,7 +239,7 @@ namespace quda
     const int_fastdiv dim[5]; // full lattice dimensions
     const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
-    int ghostDim[4]; // always equal to actual dimension partitioning (used inside kernel to ensure corect indexing)
+    int ghostDim[4]; // always equal to actual dimension partitioning (used inside kernel to ensure correct indexing)
 
     const bool dagger; // dagger
     const bool xpay;   // whether we are doing xpay or not
@@ -285,7 +285,7 @@ namespace quda
     {
       for (int d = 0; d < 4; d++) {
         ghostDim[d] = comm_dim_partitioned(d);
-        commDim[d] = (!comm_override[d]) ? 0 : comm_dim_partitioned(d);
+        commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
       }
 
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {

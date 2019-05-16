@@ -2,11 +2,12 @@
 #include <cstdio>
 #include <cstring>
 #include <stack>
+#include <sstream>
 #include <sys/time.h>
 
 #include <enum_quda.h>
 #include <util_quda.h>
-#include <sstream>
+#include <malloc_quda.h>
 
 static const size_t MAX_PREFIX_SIZE = 100;
 
@@ -97,6 +98,35 @@ void popVerbosity()
   }
   setVerbosity(vstack.top());
   vstack.pop();
+}
+
+static std::stack<char *> pstack;
+
+void pushOutputPrefix(const char *prefix)
+{
+  // backup current prefix onto the stack
+  char *prefix_backup = (char *)safe_malloc(MAX_PREFIX_SIZE * sizeof(char));
+  strncpy(prefix_backup, getOutputPrefix(), MAX_PREFIX_SIZE);
+  pstack.push(prefix_backup);
+
+  // set new prefix
+  setOutputPrefix(prefix);
+
+  if (pstack.size() > 10) {
+    warningQuda("Verbosity stack contains %u elements.  Is there a missing popOutputPrefix() somewhere?",
+                static_cast<unsigned int>(vstack.size()));
+  }
+}
+
+void popOutputPrefix()
+{
+  if (pstack.empty()) { errorQuda("popOutputPrefix() called with empty stack"); }
+
+  // recover prefix from stack
+  char *prefix_restore = pstack.top();
+  setOutputPrefix(prefix_restore);
+  host_free(prefix_restore);
+  pstack.pop();
 }
 
 char *getPrintBuffer() { return buffer_; }
