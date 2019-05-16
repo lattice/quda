@@ -370,7 +370,6 @@ namespace quda {
     double maxrr = rNorm;
     double delta = param.delta;
 
-
     // this parameter determines how many consective reliable update
     // residual increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
@@ -556,7 +555,7 @@ namespace quda {
         blas::zero(xSloppy);
 
         // alternative reliable updates
-        if(alternative_reliable){
+        if (alternative_reliable) {
           dinit = uhigh*(sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
           d = d_new;
           xnorm = 0;//sqrt(norm2(x));
@@ -570,17 +569,16 @@ namespace quda {
           maxrx = rNorm;
         }
 
-
         // calculate new reliable HQ resididual
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
 
         // break-out check if we have reached the limit of the precision
-        if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
+        if (sqrt(r2) > r0Norm && updateX and not L2breakdown) { // reuse r0Norm for this
           resIncrease++;
           resIncreaseTotal++;
           warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-          sqrt(r2), r0Norm, resIncreaseTotal);
-          if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+                      sqrt(r2), r0Norm, resIncreaseTotal);
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
             } else {
@@ -591,6 +589,7 @@ namespace quda {
         } else {
           resIncrease = 0;
         }
+
         // if L2 broke down already we turn off reliable updates and restart the CG
         if (use_heavy_quark_res and L2breakdown) {
           delta = 0;
