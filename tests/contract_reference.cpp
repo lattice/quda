@@ -17,4 +17,8 @@ extern void *memset(void *s, int c, size_t n);
 
 #include <dslash_util.h>
 
-void contraction_reference() {}
+void contraction_reference(void *spinorX, void *spinorY, void *result) {
+
+  
+  
+}

@@ -52,12 +52,25 @@ namespace quda
 
     Vector x = arg.x(idx,parity);
     Vector y = arg.y(idx,parity);
+
+    complex<Float> innerP(0.0,0.0);
+    complex<Float> elem(0.0,0.0);
     
-    for (int i=0; i<arg.nSpin; i++)
-      for (int j=0; j<arg.nSpin; j++) {
-	arg.result[idx + i*nSpin + j] = innerProduct(x,y,i,j).real();
-	//printf("%d %d %d %d %f\n", idx, parity, i, j, arg.result[idx]);
+    for (int i=0; i<nSpin; i++) {
+      //Hackson Jackson: inspect order
+      for(int c=0; c<nColor; c++) {
+	elem = x(i,c);
+	//if(idx == 0 && parity == 0) printf("%d %d %d %d (%f,%f)\n", idx, parity, i, c, elem.real(), elem.imag());
       }
-    
+      for (int j=0; j<nSpin; j++) {
+	
+	//Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}>
+	//The Bra is conjugated	
+	innerP = innerProduct(x,y,i,j);
+	
+	arg.result[2*(nSpin*nSpin*idx + i*nSpin + j)  ] = innerP.real();
+	arg.result[2*(nSpin*nSpin*idx + i*nSpin + j)+1] = innerP.imag();
+      }
+    }
   }  
 } // namespace quda

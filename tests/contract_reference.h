@@ -9,4 +9,4 @@ extern int V;
 
 using namespace quda;
 
-void contraction_reference();
+void contraction_reference(void *spinorX, void *spinorY, void *result);

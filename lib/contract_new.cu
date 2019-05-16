@@ -9,7 +9,7 @@
 namespace quda {
   
 #ifdef GPU_CONTRACT
-  template <typename Float, typename Arg> class Contraction : TunableVectorYZ
+  template <typename Float, typename Arg> class Contraction : TunableVectorY
   {
     
   protected:
@@ -24,7 +24,7 @@ namespace quda {
     
   public:
     Contraction(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, Float *result) :
-      TunableVectorYZ(2,3),
+      TunableVectorY(2),
       arg(arg),
       x(x),
       y(y),

@@ -5808,7 +5808,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
  * @param cType Contraction type, allows for volume or time-slice contractions.
  * @param tC    Time-slice to contract in case the contraction is in a single time-slice.
  */
-void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType)
+void contract(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *ctrn, const QudaContractType cType)
 {
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     contractCuda(x.Even(), y.Even(), ((double2*)ctrn), cType, QUDA_EVEN_PARITY, profileContract);
@@ -5821,7 +5821,7 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
   }
 }
 
-void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType, const int tC)
+void contract(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *ctrn, const QudaContractType cType, const int tC)
 {
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     contractCuda(x.Even(), y.Even(), ((double2*)ctrn), cType, tC, QUDA_EVEN_PARITY, profileContract);
@@ -5866,14 +5866,35 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   *y[0] = *h_y;
 
   size_t sSize = (param->cuda_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  size_t data_bytes = X[0]*X[1]*X[2]*X[3]*16*sSize;
+  size_t data_bytes = X[0]*X[1]*X[2]*X[3]*16*2*sSize;
   void *d_result = device_malloc(data_bytes);
-  
-  contractQuda(*x[0],*y[0],d_result);
 
+  printfQuda("flag 1\n");
+  contractQuda(*x[0], *y[0], d_result);
+  printfQuda("flag 2\n");
+  
   qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
   device_free(d_result);
 
+  printfQuda("flag 3\n");
+  
+  /*
+    param->cuda_prec == QUDA_DOUBLE_PRECISION ?
+    cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
+    cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+  
+    cudaColorSpinorField xp(*cudaParam);
+    cudaColorSpinorField yp(*cudaParam);
+    
+    xp = *x[0];
+    yp = *y[0];
+  
+    void *d_result2 = device_malloc(data_bytes);
+    contract(xp, yp, d_result2, QUDA_CONTRACT);
+    qudaMemcpy(h_result, d_result2, data_bytes, cudaMemcpyDeviceToHost);
+    device_free(d_result2);
+  */
+  
   delete x[0];
   delete y[0];
   delete h_y;

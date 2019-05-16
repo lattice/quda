@@ -24,6 +24,7 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
+#include <color_spinor_field.h> 
 
 // Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
 extern QudaDslashType dslash_type;
@@ -237,7 +238,7 @@ int main(int argc, char **argv)
   size_t sSize = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   void *spinorX = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *spinorY = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-  void *result = malloc(V*16*sSize*inv_param.Ls);
+  void *result1 = malloc(2*V*16*sSize*inv_param.Ls);
   
   // start the timer
   double time0 = -((double)clock());
@@ -261,18 +262,78 @@ int main(int argc, char **argv)
   //QUDA will allocate GPU memory, transfer the data,
   //perform the requested contraction, and return the
   //result in the array 'result'
-  contractQuda(spinorX, spinorY, result, QUDA_CONTRACT_GAMMA5, QUDA_CONTRACT_GAMMA_G5, &inv_param, X);
+  contractQuda(spinorX, spinorY, result1, QUDA_CONTRACT_GAMMA5, QUDA_CONTRACT_GAMMA_G5, &inv_param, X);
 
-  for(int i=0; i<xdim; i++) {
-    for(int j=0; j<16; j++) {
-      printfQuda("%d %d %.16e\n", i, j, ((double*)result)[i*16 + j]);
+  if (cpu_prec == QUDA_DOUBLE_PRECISION) {
+    
+    for(int i=0; i<V; i++) {
+      for(int j=0; j<4; j++) {
+	for(int k=0; k<3; k++) {
+	  //if (i == 0) printfQuda("%d %d %d (%f,%f)\n", i,j,k, ((double*)spinorX)[24*i + 6*j + 2*k],  ((double*)spinorX)[24*i + 6*j + 2*k + 1]);
+	}
+      }
+    }
+    
+    
+    for(int i=0; i<xdim; i++) {
+      for(int s1=0; s1<4; s1++) {
+	for(int s2=0; s2<4; s2++) {
+	  
+	  double re=0.0, im=0.0;
+	  for(int c=0; c<3; c++) {
+	    re += (((double*)spinorX)[24*i + 6*s1+ 2*c + 0]*((double*)spinorY)[24*i + 6*s2 + 2*c + 0] +
+		   ((double*)spinorX)[24*i + 6*s1 + 2*c + 1]*((double*)spinorY)[24*i + 6*s2 + 2*c + 1]);
+	    
+	    im += (((double*)spinorX)[24*i + 6*s1+ 2*c + 0]*((double*)spinorY)[24*i + 6*s2 + 2*c + 1] -
+		   ((double*)spinorX)[24*i + 6*s1 + 2*c + 1]*((double*)spinorY)[24*i + 6*s2 + 2*c + 0]);
+	  }
+	  
+	  printfQuda("%d %d %d (%+.16e,%+.16e) (%+.16e,%+.16e)\n", i, s2, s2,
+		     ((double*)result1)[2*(i*16 + 4*s1 + s2)  ],
+		     ((double*)result1)[2*(i*16 + 4*s1 + s2)+1],
+		     re, im);
+	  
+	}
+      }
     }
   }
-      
+  else {
+    for(int i=0; i<V; i++) {
+      for(int j=0; j<4; j++) {
+	for(int k=0; k<3; k++) {
+	  //if (i == 0) printfQuda("%d %d %d (%f,%f)\n", i,j,k, ((float*)spinorX)[24*i + 6*j + 2*k],  ((float*)spinorX)[24*i + 6*j + 2*k + 1]);
+	}
+      }
+    }
+    
+    
+    for(int i=0; i<xdim; i++) {
+      for(int s1=0; s1<4; s1++) {
+	for(int s2=0; s2<4; s2++) {
+	  
+	  float re=0.0, im=0.0;
+	  for(int c=0; c<3; c++) {
+	    re += (((float*)spinorX)[24*i + 6*s1+ 2*c + 0]*((float*)spinorY)[24*i + 6*s2 + 2*c + 0] +
+		   ((float*)spinorX)[24*i + 6*s1 + 2*c + 1]*((float*)spinorY)[24*i + 6*s2 + 2*c + 1]);
+	    
+	    im += (((float*)spinorX)[24*i + 6*s1+ 2*c + 0]*((float*)spinorY)[24*i + 6*s2 + 2*c + 1] -
+		   ((float*)spinorX)[24*i + 6*s1 + 2*c + 1]*((float*)spinorY)[24*i + 6*s2 + 2*c + 0]);
+	  }
+	  
+	  printfQuda("%d %d %d (%+.16e,%+.16e) (%+.16e,%+.16e)\n", i, s2, s2,
+		     ((float*)result1)[2*(i*16 + 4*s1 + s2)  ],
+		     ((float*)result1)[2*(i*16 + 4*s1 + s2)+1],
+		     re, im);
+	  
+	}
+      }
+    }
+  }
+
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-    
+  
   // finalize the QUDA library
   endQuda();
 
