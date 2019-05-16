@@ -19,7 +19,7 @@
 
 #ifdef INTERFACE_NVTX
 
-#if QUDA_NVTX_VERSION==3
+#if QUDA_NVTX_VERSION == 3
 #include "nvtx3/nvToolsExt.h"
 #else
 #include "nvToolsExt.h"
@@ -814,7 +814,7 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   QudaParity local_parity = inv_args.evenodd;
   const double reliable_delta = (use_mixed_precision ? 1e-1 : 0.0);
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, num_offsets, offset,
-                  target_residual, target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, QUDA_VERBOSE,
+                  target_residual, target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
 
   if (inv_args.mixed_precision == 1) {
@@ -893,7 +893,7 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   const double reliable_delta = 1e-1;
 
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, mass, target_residual,
-                  target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, QUDA_VERBOSE,
+                  target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
 
   ColorSpinorParam csParam;

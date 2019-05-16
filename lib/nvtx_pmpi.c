@@ -27,7 +27,7 @@ _EXTERN_C_ void pmpi_init__(MPI_Fint *ierr);
 static int in_wrapper = 0;
 #include <pthread.h>
 
-#if QUDA_NVTX_VERSION==3
+#if QUDA_NVTX_VERSION == 3
 #include <nvtx3/nvToolsExt.h>
 #include <nvtx3/nvToolsExtCudaRt.h>
 #else
