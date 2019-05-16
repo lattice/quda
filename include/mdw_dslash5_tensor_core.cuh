@@ -411,6 +411,9 @@ namespace quda {
       block_wise_reduce_vector(v, smem_scale);
       // Now smem_scale[0] contains the maximum value
       float current_scale = smem_scale[0];
+      // if(current_scale == 0){
+      //   current_scale = 1.0f;
+      // } // Zero scale means all numbers in the block are strictly zero.
       #pragma unroll
       for(int spin = 0; spin < 4; spin++){
         #pragma unroll

@@ -450,19 +450,19 @@ namespace quda {
       
       Mpk2 = reDotProduct(*ip, *immp);
 
-      alpha = rk2 / Mpk2; 
+      alpha = rk2 / (Mpk2==0.0 ? 1.0 : Mpk2); 
 
       rkp12 = axpyNorm(-alpha, *immp, ib);
       
-      beta = rkp12 / rk2;
+      beta = rkp12 / (rk2==0.0 ? 1.0 : rk2);
       rk2 = rkp12;
 
       axpyZpbx(alpha, *ip, ix, ib, beta);
       
       // Want to leave this debug code here since this might be useful.
       /**
-      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e p2 = %8.4e\n",
-        local_loop_count, rk2, alpha, beta, Mpk2, sqrt(ip2/ip->Volume()/24.));
+      printf("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
+        local_loop_count, rk2, alpha, beta, Mpk2);
       */
     }
 
