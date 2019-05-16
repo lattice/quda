@@ -584,7 +584,7 @@ static void setInvertParams(const int dim[4], QudaPrecision cpu_prec, QudaPrecis
     static_cast<QudaResidualType_s>(invertParam->residual_type | QUDA_HEAVY_QUARK_RESIDUAL) :
     invertParam->residual_type;
 
-  if (invertParam->residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam->heavy_quark_check = 1;
+  invertParam->heavy_quark_check = (invertParam->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ? 1 : 0);
 
   invertParam->use_sloppy_partial_accumulator = 0;
   invertParam->num_offset = 0;
@@ -1400,7 +1400,7 @@ void qudaCloverInvert(int external_precision,
 
   invertParam.tol =  target_residual;
   invertParam.tol_hq = target_fermilab_residual;
-  if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
+  invertParam.heavy_quark_check = (invertParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL ? 1 : 0);
   invertParam.clover_coeff = clover_coeff;
 
   // solution types
@@ -1452,7 +1452,7 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
 
   invertParam.tol =  target_residual;
   invertParam.tol_hq = target_fermilab_residual;
-  if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
+  invertParam.heavy_quark_check = (invertParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL ? 1 : 0);
   invertParam.clover_coeff = clover_coeff;
 
   // solution types
