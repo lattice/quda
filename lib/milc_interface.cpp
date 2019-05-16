@@ -69,8 +69,14 @@ using namespace quda::fermion_force;
 
 template <bool start> void inline qudamilc_called(const char *func, QudaVerbosity verb)
 {
-  PUSH_RANGE(func, 1);
-#ifdef QUDAMILC_VERBOSE
+  // add NVTX markup if enabled
+  if (start) {
+    PUSH_RANGE(func, 1);
+  } else {
+    POP_RANGE;
+  }
+
+  #ifdef QUDAMILC_VERBOSE
   if (verb >= QUDA_VERBOSE) {
     if (start) {
       printfQuda("QUDA_MILC_INTERFACE: %s (called) \n", func);
@@ -79,7 +85,6 @@ template <bool start> void inline qudamilc_called(const char *func, QudaVerbosit
     }
   }
 #endif
-  POP_RANGE;
 }
 
 template <bool start> void inline qudamilc_called(const char *func) { qudamilc_called<start>(func, getVerbosity()); }
