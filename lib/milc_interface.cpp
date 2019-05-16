@@ -585,6 +585,10 @@ static void setInvertParams(const int dim[4], QudaPrecision cpu_prec, QudaPrecis
     invertParam->residual_type;
 
   invertParam->heavy_quark_check = (invertParam->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ? 1 : 0);
+  if (invertParam->heavy_quark_check) {
+    invertParam->max_res_increase = 5;        // this caps the number of consecutive hq residual increases
+    invertParam->max_res_increase_total = 10; // this caps the number of hq restarts in case of solver stalling
+  }
 
   invertParam->use_sloppy_partial_accumulator = 0;
   invertParam->num_offset = 0;
