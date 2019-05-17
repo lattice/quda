@@ -236,6 +236,7 @@ int main(int argc, char **argv)
   size_t sSize = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   void *spinorX = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *spinorY = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  void *spinorA = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *result  = malloc(2*V*16*sSize*inv_param.Ls);
   
   // start the timer
@@ -260,14 +261,22 @@ int main(int argc, char **argv)
   //QUDA will allocate GPU memory, transfer the data,
   //perform the requested contraction, and return the
   //result in the array 'result'
-  contractQuda(spinorX, spinorY, result, QUDA_CONTRACT_GAMMA5, QUDA_CONTRACT_GAMMA_I, &inv_param, X);
+  //We then compare the GPU result with a CPU refernce code
+
+  QudaContractGamma cGamma = QUDA_CONTRACT_GAMMA_I;
+  
+  contractQuda(spinorX, spinorY, result, cGamma, &inv_param, X);
 
   //This function will compare each color contraction from the host and device.
   //It returns the number of faults it detects.
-  int faults = contraction_reference(spinorX, spinorY, result, QUDA_CONTRACT_GAMMA_I,
-				     cpu_prec, X);
-
-  printfQuda("Contraction comparison complete with %d/%d faults\n", faults, V*16*2);
+  int faults = 0;
+  if (cpu_prec == QUDA_DOUBLE_PRECISION) {
+    faults = contraction_reference((double*)spinorX, (double*)spinorY, (double*)spinorA, (double*)result, cGamma, X);
+  }else {
+    faults = contraction_reference((float*)spinorX, (float*)spinorY, (float*)spinorA, (float*)result, cGamma, X);
+  }
+  
+  printfQuda("Contraction comparison for gamma matrix insertio %d complete with %d/%d faults\n", cGamma, faults, V*16*2);
   
   // stop the timer
   time0 += clock();

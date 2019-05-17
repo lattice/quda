@@ -5855,7 +5855,7 @@ void contract(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void
 }
 
 //New contraction routines
-void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractType cType, const QudaContractGamma cGamma, QudaInvertParam *param, const int *X)
+void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const QudaContractGamma cGamma, QudaInvertParam *param, const int *X)
 {
   //DMH: Easiest way to construct ColorSpinorField? Do we require the user
   //     to declare and fill and invert_param, or can it just be hacked?.
