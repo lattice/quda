@@ -26,8 +26,16 @@ _EXTERN_C_ void pmpi_init_(MPI_Fint *ierr);
 _EXTERN_C_ void pmpi_init__(MPI_Fint *ierr);
 static int in_wrapper = 0;
 #include <pthread.h>
+
+#if QUDA_NVTX_VERSION == 3
+#include <nvtx3/nvToolsExt.h>
+#include <nvtx3/nvToolsExtCudaRt.h>
+#else
 #include <nvToolsExt.h>
 #include <nvToolsExtCudaRt.h>
+#endif
+
+#include <mpi_comm_handle.h>
 // Setup event category name
 /* ================== C Wrappers for MPI_Init ================== */
 _EXTERN_C_ int PMPI_Init(int *argc, char ***argv);
@@ -39,7 +47,7 @@ _EXTERN_C_ int MPI_Init(int *argc, char ***argv) {
   nvtxNameCategoryA(999, "MPI");
   _wrap_py_return_val = PMPI_Init(argc, argv);
   int rank;
-  PMPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  PMPI_Comm_rank(MPI_COMM_HANDLE, &rank);
   char name[256];
   sprintf( name, "MPI Rank %d", rank );
  

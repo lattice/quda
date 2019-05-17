@@ -139,12 +139,15 @@ namespace quda
   inline void issuePack(cudaColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location, int packIndex)
   {
 
+    auto &arg = dslash.dslashParam;
     if ( (location & Device) & Host) errorQuda("MemoryLocation cannot be both Device and Host");
 
     bool pack = false;
     for (int i=3; i>=0; i--)
-      if (dslash.dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
-        { pack = true; break; }
+      if (arg.commDim[i] && (i != 3 || getKernelPackT())) {
+        pack = true;
+        break;
+      }
 
     MemoryLocation pack_dest[2*QUDA_MAX_DIM];
     for (int dim=0; dim<4; dim++) {
@@ -160,8 +163,8 @@ namespace quda
     }
     if (pack) {
       PROFILE(if (dslash_pack_compute) in.pack(dslash.Nface() / 2, parity, dslash.Dagger(), packIndex, pack_dest,
-                  location, dslash.dslashParam.twist_a, dslash.dslashParam.twist_b, dslash.dslashParam.twist_c),
-          profile, QUDA_PROFILE_PACK_KERNEL);
+                                               location, arg.spin_project, arg.twist_a, arg.twist_b, arg.twist_c),
+              profile, QUDA_PROFILE_PACK_KERNEL);
 
       // Record the end of the packing
       PROFILE(if (location != Host) qudaEventRecord(packEnd[in.bufferIndex], streams[packIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -379,8 +382,9 @@ namespace quda
       issueRecv(*in, dslash, 0, false); // Prepost receives
 
       const int packIndex = Nstream - 1;
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       issueGather(*in, dslash);
 
@@ -474,8 +478,9 @@ namespace quda
       issueRecv(*in, dslash, 0, false); // Prepost receives
 
       const int packIndex = Nstream - 1;
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       issueGather(*in, dslash);
 
@@ -556,8 +561,9 @@ namespace quda
       issueRecv(*in, dslash, 0, true); // Prepost receives
 
       const int packIndex = Nstream - 1;
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
@@ -637,8 +643,9 @@ namespace quda
       issueRecv(*in, dslash, 0, true); // Prepost receives
 
       const int packIndex = Nstream - 1;
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
@@ -716,8 +723,9 @@ namespace quda
       issueRecv(*in, dslash, 0, true); // Prepost receives
 
       const int packIndex = Nstream - 1;
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       issueGather(*in, dslash);
 
@@ -797,8 +805,9 @@ namespace quda
       issueRecv(*in, dslash, 0, true); // Prepost receives
 
       const int packIndex = Nstream - 1;
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       issueGather(*in, dslash);
 
@@ -888,8 +897,9 @@ namespace quda
       issueRecv(*in, dslash, 0, false); // Prepost receives
 
       const int packIndex = Nstream - 1;
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       issueGather(*in, dslash);
 
@@ -1004,8 +1014,9 @@ namespace quda
       issueRecv(*in, dslash, 0, false); // Prepost receives
 
       const int packIndex = Nstream - 1;
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       issueGather(*in, dslash);
 
@@ -1111,8 +1122,9 @@ namespace quda
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
@@ -1209,8 +1221,9 @@ namespace quda
       const int packScatterIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(streams[packScatterIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)), packScatterIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
+                packScatterIndex);
 
       issueRecv(*in, dslash, 0, false); // Prepost receives
 
@@ -1304,8 +1317,9 @@ namespace quda
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
@@ -1391,8 +1405,9 @@ namespace quda
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       issueRecv(*in, dslash, 0, true); // Prepost receives
 
@@ -1476,8 +1491,9 @@ namespace quda
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
@@ -1565,8 +1581,9 @@ namespace quda
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
-      issuePack(*in, dslash, 1 - dslashParam.parity,
-          static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)), packIndex);
+      const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
+      issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
+                packIndex);
 
       PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
@@ -1758,7 +1775,6 @@ namespace quda
     cudaColorSpinorField *in;
     const int volume;
     const int *ghostFace;
-    int config;
     TimeProfile &profile;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -1774,7 +1790,6 @@ public:
         in(in),
         volume(volume),
         ghostFace(ghostFace),
-        config(0),
         profile(profile)
     {
       in->streamInit(streams);
@@ -2070,7 +2085,7 @@ public:
      KernelType kernel_type = dslashParam.kernel_type;
      dslashParam.kernel_type = KERNEL_POLICY;
      TuneKey key = dslash.tuneKey();
-     strcat(key.aux,comm_dim_topology_string());
+     strcat(key.aux, comm_dim_topology_string());
      strcat(key.aux, comm_config_string()); // any change in P2P/GDR will be stored as a separate tunecache entry
      strcat(key.aux, policy_string);        // any change in policies enabled will be stored as a separate entry
      dslashParam.kernel_type = kernel_type;

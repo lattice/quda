@@ -77,6 +77,7 @@ extern int niter;
 
 extern double mass; // the mass of the Dirac operator
 extern double kappa; // will get overriden
+extern int laplace3D;
 
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
 
@@ -92,6 +93,8 @@ extern char latfile[];
 
 int X[4];
 extern int Nsrc; // number of spinors to apply to simultaneously
+
+extern QudaVerbosity verbosity;
 
 Dirac* dirac;
 
@@ -201,8 +204,6 @@ void init()
 
   initQuda(device);
 
-  setVerbosity(QUDA_VERBOSE);
-
   gaugeParam = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
@@ -263,6 +264,11 @@ void init()
   inv_param.mass = mass;
   inv_param.kappa = kappa = 1.0/(8.0+mass); // for laplace
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+  inv_param.laplace3D = laplace3D; // for laplace
+
+  // set verbosity prior to loadGaugeQuda
+  setVerbosity(verbosity);
+  inv_param.verbosity = verbosity;
 
   /*if (test_type < 2) {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
@@ -811,10 +817,14 @@ static int dslashTest()
     unsigned long long flops = dirac->Flops();
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
 
-    printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
-	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
-	       1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
-	       2*cudaSpinor->GhostBytes());
+    if (niter > 2) { // only print this if valid
+      printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for "
+                 "aggregate message size %lu bytes\n",
+                 1.0e-9 * 2 * cudaSpinor->GhostBytes() * niter / dslash_time.event_time,
+                 1.0e-9 * 2 * cudaSpinor->GhostBytes() * niter / dslash_time.cpu_time,
+                 1.0e-9 * 2 * cudaSpinor->GhostBytes() / dslash_time.cpu_max,
+                 1.0e-9 * 2 * cudaSpinor->GhostBytes() / dslash_time.cpu_min, 2 * cudaSpinor->GhostBytes());
+    }
 
     double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
     printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
@@ -845,9 +855,7 @@ void display_test_info()
 
 }
 
-
-  void
-usage_extra(char** argv )
+void usage_extra(char **argv)
 {
   printfQuda("Extra options:\n");
   printfQuda("    --test <0/1/2>                              # Test method\n");

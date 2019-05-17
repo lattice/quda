@@ -8,7 +8,7 @@
 #include <blas_quda.h>
 #include <dslash_quda.h>
 
-int zeroCopy = 0;
+static bool zeroCopy = false;
 
 namespace quda {
 
@@ -710,6 +710,7 @@ namespace quda {
           qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
           qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
         } else {
+          qudaDeviceSynchronize();
           memcpy(dest.V(), buffer, dest.Bytes());
           memcpy(dest.Norm(), static_cast<char*>(buffer) + dest.Bytes(), dest.NormBytes());
         }
@@ -740,11 +741,11 @@ namespace quda {
 
   // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir,
-      const int dagger, cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
-      double a, double b, double c)
+                                       const int dagger, cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM],
+                                       MemoryLocation location_label, bool spin_project, double a, double b, double c)
   {
 #ifdef MULTI_GPU
-    void *packBuffer[2*QUDA_MAX_DIM];
+    void *packBuffer[2 * QUDA_MAX_DIM] = {};
 
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
@@ -755,8 +756,8 @@ namespace quda {
 	case Host:   // pack to zero-copy memory
 	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
           break;
-	case Remote:   // pack to remote peer memory
-	  packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + precision*ghostOffset[dim][1-dir];
+        case Remote: // pack to remote peer memory
+          packBuffer[2*dim+dir] = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + precision*ghostOffset[dim][1-dir];
           break;
 	default: errorQuda("Undefined location %d", location[2*dim+dir]);
 	}
@@ -767,7 +768,7 @@ namespace quda {
     const int face_num = (dir == QUDA_BACKWARDS) ? 0 : (dir == QUDA_FORWARDS) ? 1 : 2;
     packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
 #else
-    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, a, b, c, *stream);
+    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, *stream);
 #endif
 
 #else
@@ -781,24 +782,18 @@ namespace quda {
 				       cudaStream_t *stream) {
 
 #ifdef MULTI_GPU
-    int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-    int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
-    int Npad = Nint / Nvec; // number Nvec buffers we have
-
     if (precision != ghost_precision) { pushKernelPackT(true); }
     
     if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
-      size_t bytes = nFace*Nint*ghostFace[dim]*ghost_precision;
-
-      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
-
       void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
-
-      qudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream);
+      qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], cudaMemcpyDeviceToHost, *stream);
 
     } else {
 
+      const int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
+      const int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
+      const int Npad = Nint / Nvec;                                 // number Nvec buffers we have
       const int nParity = siteSubset;
       const int x4 = nDim==5 ? x[4] : 1;
       const int Nt_minus1_offset = (volumeCB - nFace * ghostFaceCB[3]) / x4; // N_t-1 = Vh-Vsh
@@ -925,14 +920,15 @@ namespace quda {
   }
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx,
-      MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label, double a, double b, double c)
+                                  MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
+                                  bool spin_project, double a, double b, double c)
   {
-    createComms(nFace); // must call this first
+    createComms(nFace, spin_project); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
 
-    packGhost(
-        nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label, a, b, c);
+    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label,
+              spin_project, a, b, c);
   }
 
   void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, 
@@ -1028,8 +1024,6 @@ namespace quda {
         // all goes here
         void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
           + ghost_precision*ghostOffset[dim][(dir+1)%2];
-        void *ghost_norm_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-          + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][(d+1)%2];
 
         if (ghost_precision != precision) pushKernelPackT(true);
 
@@ -1077,9 +1071,10 @@ namespace quda {
 
               // we can probably issue this as a single cudaMemcpy2d along the fifth dimension
               if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-                size_t len = nFace * (ghostFace[3] / x4) * sizeof(float);
+                size_t len = nFace * (ghostFaceCB[3] / x4) * sizeof(float);
                 int norm_offset = (dir == 0) ? 0 : Nt_minus_offset * sizeof(float);
-                void *dst = (char *)ghost_norm_dst + s * len + parity * nFace * ghostFaceCB[3] * sizeof(float);
+                void *dst = (char *)ghost_dst + nParity * nFace * Nint * ghostFaceCB[3] * ghost_precision + s * len
+                  + parity * nFace * ghostFaceCB[3] * sizeof(float);
                 void *src = (char *)norm + norm_offset + s * (volumeCB / x4) * sizeof(float) + parity * norm_bytes / 2;
                 cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
               }

@@ -30,7 +30,9 @@
 #ifdef GPU_STAGGERED_DIRAC
     int long_gauge_stride;
     float fat_link_max;
-#endif 
+#endif
+
+    bool spin_project; // If using covDev, turn off spin projection.
 
     int gauge_fixed; // whether the gauge field is fixed to axial gauge
 
@@ -175,6 +177,7 @@
       printfQuda("long_gauge_stride = %d\n", long_gauge_stride);
       printfQuda("fat_link_max = %e\n", fat_link_max);
 #endif
+      printfQuda("spin_project = %s\n", spin_project ? "true" : "false");
       printfQuda("threadDimMapLower = {%d, %d, %d, %d}\n", threadDimMapLower[0], threadDimMapLower[1],
 		 threadDimMapLower[2], threadDimMapLower[3]);
       printfQuda("threadDimMapUpper = {%d, %d, %d, %d}\n", threadDimMapUpper[0], threadDimMapUpper[1],

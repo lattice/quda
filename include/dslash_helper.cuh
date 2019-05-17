@@ -60,13 +60,13 @@ namespace quda
     switch (type) {                                      // intentional fall-through
     case EXTERIOR_KERNEL_ALL: incomplete = false; break; // all active threads are complete
     case INTERIOR_KERNEL:
-      incomplete = incomplete || (arg.ghostDim[3] && (coord[3] == 0 || coord[3] == (arg.dc.X[3] - 1)));
+      incomplete = incomplete || (arg.commDim[3] && (coord[3] == 0 || coord[3] == (arg.dc.X[3] - 1)));
     case EXTERIOR_KERNEL_T:
-      incomplete = incomplete || (arg.ghostDim[2] && (coord[2] == 0 || coord[2] == (arg.dc.X[2] - 1)));
+      incomplete = incomplete || (arg.commDim[2] && (coord[2] == 0 || coord[2] == (arg.dc.X[2] - 1)));
     case EXTERIOR_KERNEL_Z:
-      incomplete = incomplete || (arg.ghostDim[1] && (coord[1] == 0 || coord[1] == (arg.dc.X[1] - 1)));
+      incomplete = incomplete || (arg.commDim[1] && (coord[1] == 0 || coord[1] == (arg.dc.X[1] - 1)));
     case EXTERIOR_KERNEL_Y:
-      incomplete = incomplete || (arg.ghostDim[0] && (coord[0] == 0 || coord[0] == (arg.dc.X[0] - 1)));
+      incomplete = incomplete || (arg.commDim[0] && (coord[0] == 0 || coord[0] == (arg.dc.X[0] - 1)));
     case EXTERIOR_KERNEL_X: break;
     }
 
@@ -239,7 +239,7 @@ namespace quda
     const int_fastdiv dim[5]; // full lattice dimensions
     const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
-    int ghostDim[4]; // always equal to actual dimension partitioning (used inside kernel to ensure corect indexing)
+    int ghostDim[4]; // always equal to actual dimension partitioning (used inside kernel to ensure correct indexing)
 
     const bool dagger; // dagger
     const bool xpay;   // whether we are doing xpay or not
@@ -254,6 +254,8 @@ namespace quda
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
+    const bool spin_project; // whether to spin project nSpin=4 fields (generally true, except for, e.g., covariant derivative)
+
     // these are set with symmetric preconditioned twisted-mass dagger
     // operator for the packing (which needs to a do a twist)
     real twist_a; // scale factor
@@ -262,33 +264,34 @@ namespace quda
 
     // constructor needed for staggered to set xpay from derived class
     DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
-        const int *comm_override) :
-        parity(parity),
-        nParity(in.SiteSubset()),
-        nFace(nFace),
-        reconstruct(U.Reconstruct()),
-        X0h(nParity == 2 ? in.X(0) / 2 : in.X(0)),
-        dim {(3 - nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1},
-        volumeCB(in.VolumeCB()),
-        dagger(dagger),
-        xpay(xpay),
-        kernel_type(INTERIOR_KERNEL),
-        threads(in.VolumeCB()),
-        threadDimMapLower {},
-        threadDimMapUpper {},
-        twist_a(0.0),
-        twist_b(0.0),
-        twist_c(0.0)
+              int spin_project, const int *comm_override) :
+      parity(parity),
+      nParity(in.SiteSubset()),
+      nFace(nFace),
+      reconstruct(U.Reconstruct()),
+      X0h(nParity == 2 ? in.X(0) / 2 : in.X(0)),
+      dim {(3 - nParity) * in.X(0), in.X(1), in.X(2), in.X(3), in.Ndim() == 5 ? in.X(4) : 1},
+      volumeCB(in.VolumeCB()),
+      dagger(dagger),
+      xpay(xpay),
+      kernel_type(INTERIOR_KERNEL),
+      threads(in.VolumeCB()),
+      threadDimMapLower {},
+      threadDimMapUpper {},
+      spin_project(spin_project),
+      twist_a(0.0),
+      twist_b(0.0),
+      twist_c(0.0)
     {
       for (int d = 0; d < 4; d++) {
         ghostDim[d] = comm_dim_partitioned(d);
-        commDim[d] = (!comm_override[d]) ? 0 : comm_dim_partitioned(d);
+        commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
       }
 
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
         // create comms buffers - need to do this before we grab the dslash constants
         ColorSpinorField *in_ = const_cast<ColorSpinorField *>(&in);
-        static_cast<cudaColorSpinorField *>(in_)->createComms(nFace);
+        static_cast<cudaColorSpinorField *>(in_)->createComms(nFace, spin_project);
       }
       dc = in.getDslashConstant();
     }

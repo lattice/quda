@@ -386,15 +386,27 @@ namespace quda {
       if (a.GhostPrecision() == QUDA_SINGLE_PRECISION) {
         genericPackGhost<float,float>(ghost, a, parity, nFace, dagger, destination);
       } else if (a.GhostPrecision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
         genericPackGhost<float,short>(ghost, a, parity, nFace, dagger, destination);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
       } else if (a.GhostPrecision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
         genericPackGhost<float,char>(ghost, a, parity, nFace, dagger, destination);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
       } else {
         errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
       }
     } else if (a.Precision() == QUDA_HALF_PRECISION) {
       if (a.GhostPrecision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
         genericPackGhost<short,short>(ghost, a, parity, nFace, dagger, destination);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
       } else {
         errorQuda("precision = %d and ghost precision = %d not supported", a.Precision(), a.GhostPrecision());
       }

@@ -106,10 +106,12 @@ cuda_add_executable(blas_test blas_test.cu)
 target_link_libraries(blas_test ${TEST_LIBS})
 QUDA_CHECKBUILDTEST(blas_test QUDA_BUILD_ALL_TESTS)
 
-cuda_add_executable(covdev_test covdev_test.cpp  covdev_reference.cpp)
-target_link_libraries(covdev_test ${TEST_LIBS})
-QUDA_CHECKBUILDTEST(covdev_test QUDA_BUILD_ALL_TESTS)
-
+if(QUDA_COVDEV)
+  cuda_add_executable(covdev_test covdev_test.cpp  covdev_reference.cpp)
+  target_link_libraries(covdev_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(covdev_test QUDA_BUILD_ALL_TESTS)
+endif()
+  
 if(QUDA_LINK_ASQTAD OR QUDA_LINK_HISQ)
   cuda_add_executable(llfat_test llfat_test.cpp llfat_reference.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})

@@ -12,6 +12,7 @@
 
 #include <enum_quda.h>
 #include <stdio.h> /* for FILE */
+#include <quda_define.h>
 #include <quda_constants.h>
 
 #ifndef __CUDACC_RTC__
@@ -114,6 +115,8 @@ extern "C" {
     double epsilon; /**< Twisted mass parameter */
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
+
+    int laplace3D; /**< omit this direction from laplace operator: x,y,z,t -> 0,1,2,3 (-1 is full 4D) */
 
     double tol;    /**< Solver tolerance in the L2 residual norm */
     double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
@@ -624,6 +627,12 @@ extern "C" {
   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
   /**
+   * @param mycomm User provided MPI communicator in place of MPI_COMM_WORLD
+   */
+
+  void qudaSetCommHandle(void *mycomm);
+
+  /**
    * Declare the grid mapping ("logical topology" in QMP parlance)
    * used for communications in a multi-GPU grid.  This function
    * should be called prior to initQuda().  The only case in which
@@ -649,6 +658,7 @@ extern "C" {
    *
    * @see QudaCommsMap
    */
+
   void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata);
 
   /**
@@ -1170,7 +1180,7 @@ extern "C" {
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
-  double qChargeCuda();
+  double qChargeQuda();
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
@@ -1245,6 +1255,8 @@ extern "C" {
    * Free resources allocated by the deflated solver
    */
   void destroyDeflationQuda(void *df_instance);
+
+  void setMPICommHandleQuda(void *mycomm);
 
 #ifdef __cplusplus
 }

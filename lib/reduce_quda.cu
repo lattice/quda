@@ -284,11 +284,11 @@ namespace quda {
       checkLength(x, w);
       checkLength(x, v);
 
-      Spinor<RegType, StoreType, M, writeX, 0> X(x);
-      Spinor<RegType, StoreType, M, writeY, 1> Y(y);
-      Spinor<RegType, zType, M, writeZ, 2> Z(z);
-      Spinor<RegType, StoreType, M, writeW, 3> W(w);
-      Spinor<RegType, StoreType, M, writeV, 4> V(v);
+      Spinor<RegType, StoreType, M, writeX> X(x);
+      Spinor<RegType, StoreType, M, writeY> Y(y);
+      Spinor<RegType, zType, M, writeZ> Z(z);
+      Spinor<RegType, StoreType, M, writeW> W(w);
+      Spinor<RegType, StoreType, M, writeV> V(v);
 
       doubleN value;
       typedef typename scalar<RegType>::type Float;
@@ -354,7 +354,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 8
           if (x.Nspin() == 4 || x.Nspin() == 2) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID) || defined(GPU_COVDEV)
             const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
             if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
             value = nativeReduce<doubleN, ReduceType, double2, double2, double2, M, Reducer, writeX, writeY, writeZ,
@@ -381,7 +381,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
             const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
             value = nativeReduce<doubleN, ReduceType, float4, float4, float4, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (4 * M));
@@ -408,7 +408,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 2
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
             const int M = 6; // determines how much work per thread to do
             value = nativeReduce<doubleN, ReduceType, float4, short4, short4, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, y.Volume());
@@ -443,7 +443,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 1
           if (x.Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
             const int M = 6; // determines how much work per thread to do
             value
                 = nativeReduce<doubleN, ReduceType, float4, char4, char4, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(

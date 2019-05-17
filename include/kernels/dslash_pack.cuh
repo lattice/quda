@@ -8,7 +8,7 @@ namespace quda
 
   static int commDim[QUDA_MAX_DIM];
 
-  template <typename Float_, int nColor_, int nSpin_> struct PackArg {
+  template <typename Float_, int nColor_, int nSpin_, bool spin_project_ = true> struct PackArg {
 
     typedef Float_ Float;
     typedef typename mapper<Float>::type real;
@@ -16,7 +16,7 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
 
-    static constexpr bool spin_project = (nSpin == 4 ? true : false);
+    static constexpr bool spin_project = (nSpin == 4 && spin_project_ ? true : false);
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
 
@@ -123,8 +123,11 @@ namespace quda
         else
           f = arg.a * (f - arg.b * f.igamma(4) + arg.c * f1);
       }
-      in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
-
+      if (arg.spin_project) {
+        in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+      } else {
+        in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      }
     } else { // forwards
 
       int idx = indexFromFaceIndex<nDim, pc, dim, nFace, 1>(ghost_idx, parity, arg);
@@ -139,7 +142,11 @@ namespace quda
         else
           f = arg.a * (f - arg.b * f.igamma(4) + arg.c * f1);
       }
-      in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+      if (arg.spin_project) {
+        in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+      } else {
+        in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      }
     }
   }
 
@@ -153,7 +160,7 @@ namespace quda
 
     // compute where the output is located
     // compute an index into the local volume from the index into the face
-    // read spinor, spin-project, and write half spinor to face
+    // read spinor and write spinor to face buffer
 
     // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
     const int face_num = (ghost_idx >= nFace * arg.dc.ghostFaceCB[dim]) ? 1 : 0;
