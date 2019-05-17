@@ -28,11 +28,12 @@ namespace quda
     Float *result;
     
     ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, Float *result) :
-      threads(x.Volume()/2),
+      threads(x.VolumeCB()),
       x(x),
       y(y),
       result(result)
     {
+      for (int dir=0; dir<4; dir++) X[dir] = x.X()[dir];      
     }
   };
   
@@ -40,36 +41,40 @@ namespace quda
   template <typename Float, typename Arg> __global__ void computeContraction(Arg arg)
   {
     
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     const int nSpin = arg.nSpin;
     const int nColor = arg.nColor;
     
-    if (idx >= arg.threads) return;
+    if (x_cb >= arg.threads) return;
     
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real, nColor, nSpin> Vector;
 
-    Vector x = arg.x(idx,parity);
-    Vector y = arg.y(idx,parity);
-
-    complex<Float> innerP(0.0,0.0);
-    complex<Float> elem(0.0,0.0);
+    Vector x = arg.x(x_cb, parity);
+    Vector y = arg.y(x_cb, parity);
     
-    for (int i=0; i<nSpin; i++) {
-      //Hackson Jackson: inspect order
-      for(int c=0; c<nColor; c++) {
-	elem = x(i,c);
-	//if(idx == 0 && parity == 0) printf("%d %d %d %d (%f,%f)\n", idx, parity, i, c, elem.real(), elem.imag());
-      }
-      for (int j=0; j<nSpin; j++) {
+    complex<Float> innerP(0.0,0.0);
+
+    //Lexicographic index
+    int idx = x_cb + parity*arg.threads;
+
+    //CB index
+    //int x_coords[4];
+    //getCoords(x_coords, x_cb, arg.X, parity);     
+    //int idx = ((x_coords[3]*arg.X[2] + x_coords[2])*arg.X[1] + x_coords[1])*arg.X[0] + x_coords[0];    
+    
+    printf("%d %d %d (%d,%d,%d,%d)\n", idx, x_cb, parity, x_coords[0], x_coords[1], x_coords[2], x_coords[3]); 
+    for (int mu=0; mu<nSpin; mu++) {
+      for (int nu=0; nu<nSpin; nu++) {
 	
 	//Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}>
 	//The Bra is conjugated	
-	innerP = innerProduct(x,y,i,j);
+	innerP = innerProduct(x,y,mu,nu);
 	
-	arg.result[2*(nSpin*nSpin*idx + i*nSpin + j)  ] = innerP.real();
-	arg.result[2*(nSpin*nSpin*idx + i*nSpin + j)+1] = innerP.imag();
+	//static_cast<complex<Float>*>(arg.result)[nSpin*nSpin*idx + mu*nSpin + nu] = innerProduct(x,y,mu,nu);
+	arg.result[2*(nSpin*nSpin*idx + mu*nSpin + nu)  ] = innerP.real();
+	arg.result[2*(nSpin*nSpin*idx + mu*nSpin + nu)+1] = innerP.imag();
       }
     }
   }  

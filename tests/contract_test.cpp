@@ -7,9 +7,6 @@
 #include <util_quda.h>
 #include <test_util.h>
 #include <dslash_util.h>
-//#include <blas_reference.h>
-//#include <wilson_dslash_reference.h>
-//#include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
 #if defined(QMP_COMMS)
@@ -266,70 +263,62 @@ int main(int argc, char **argv)
 
   if (cpu_prec == QUDA_DOUBLE_PRECISION) {
     
+    double re=0.0, im=0.0;    
     for(int i=0; i<V; i++) {
-      for(int j=0; j<4; j++) {
-	for(int k=0; k<3; k++) {
-	  //if (i == 0) printfQuda("%d %d %d (%f,%f)\n", i,j,k, ((double*)spinorX)[24*i + 6*j + 2*k],  ((double*)spinorX)[24*i + 6*j + 2*k + 1]);
-	}
-      }
-    }
-    
-    
-    for(int i=0; i<xdim; i++) {
       for(int s1=0; s1<4; s1++) {
 	for(int s2=0; s2<4; s2++) {
 	  
-	  double re=0.0, im=0.0;
+	  re = im = 0.0;
 	  for(int c=0; c<3; c++) {
-	    re += (((double*)spinorX)[24*i + 6*s1+ 2*c + 0]*((double*)spinorY)[24*i + 6*s2 + 2*c + 0] +
+	    re += (((double*)spinorX)[24*i + 6*s1 + 2*c + 0]*((double*)spinorY)[24*i + 6*s2 + 2*c + 0] +
 		   ((double*)spinorX)[24*i + 6*s1 + 2*c + 1]*((double*)spinorY)[24*i + 6*s2 + 2*c + 1]);
 	    
-	    im += (((double*)spinorX)[24*i + 6*s1+ 2*c + 0]*((double*)spinorY)[24*i + 6*s2 + 2*c + 1] -
+	    im += (((double*)spinorX)[24*i + 6*s1 + 2*c + 0]*((double*)spinorY)[24*i + 6*s2 + 2*c + 1] -
 		   ((double*)spinorX)[24*i + 6*s1 + 2*c + 1]*((double*)spinorY)[24*i + 6*s2 + 2*c + 0]);
 	  }
 	  
-	  printfQuda("%d %d %d (%+.16e,%+.16e) (%+.16e,%+.16e)\n", i, s2, s2,
-		     ((double*)result1)[2*(i*16 + 4*s1 + s2)  ],
-		     ((double*)result1)[2*(i*16 + 4*s1 + s2)+1],
-		     re, im);
-	  
+	  if(s1 == s2 && s1 == 0) {
+	    for(int j = 0; j<V; j++) {
+	      if( abs(re - ((double*)result1)[2*(j*16 + 4*s1 + s2)]) < 1e-9) {
+		int idx = i;
+		int jdx = j;
+		printfQuda("%d (%d,%d,%d,%d) mapped to %d (%d,%d,%d,%d)\n",
+			   i, i%xdim, (i%(xdim*ydim))/xdim, (i%(xdim*ydim*xdim))/(xdim*ydim), i/(xdim*ydim*zdim),
+			   j, j%xdim, (j%(xdim*ydim))/xdim, (j%(xdim*ydim*xdim))/(xdim*ydim), j/(xdim*ydim*zdim));
+		continue;
+	      }
+	    }
+	  }
 	}
       }
     }
   }
   else {
+    
     for(int i=0; i<V; i++) {
-      for(int j=0; j<4; j++) {
-	for(int k=0; k<3; k++) {
-	  //if (i == 0) printfQuda("%d %d %d (%f,%f)\n", i,j,k, ((float*)spinorX)[24*i + 6*j + 2*k],  ((float*)spinorX)[24*i + 6*j + 2*k + 1]);
-	}
-      }
-    }
-    
-    
-    for(int i=0; i<xdim; i++) {
       for(int s1=0; s1<4; s1++) {
 	for(int s2=0; s2<4; s2++) {
 	  
 	  float re=0.0, im=0.0;
 	  for(int c=0; c<3; c++) {
-	    re += (((float*)spinorX)[24*i + 6*s1+ 2*c + 0]*((float*)spinorY)[24*i + 6*s2 + 2*c + 0] +
+	    re += (((float*)spinorX)[24*i + 6*s1 + 2*c + 0]*((float*)spinorY)[24*i + 6*s2 + 2*c + 0] +
 		   ((float*)spinorX)[24*i + 6*s1 + 2*c + 1]*((float*)spinorY)[24*i + 6*s2 + 2*c + 1]);
 	    
-	    im += (((float*)spinorX)[24*i + 6*s1+ 2*c + 0]*((float*)spinorY)[24*i + 6*s2 + 2*c + 1] -
+	    im += (((float*)spinorX)[24*i + 6*s1 + 2*c + 0]*((float*)spinorY)[24*i + 6*s2 + 2*c + 1] -
 		   ((float*)spinorX)[24*i + 6*s1 + 2*c + 1]*((float*)spinorY)[24*i + 6*s2 + 2*c + 0]);
 	  }
 	  
-	  printfQuda("%d %d %d (%+.16e,%+.16e) (%+.16e,%+.16e)\n", i, s2, s2,
+	  printfQuda("%d %d %d (%+.16e,%+.16e) (%+.16e,%+.16e) %+.16f\n", i, s2, s2,
 		     ((float*)result1)[2*(i*16 + 4*s1 + s2)  ],
 		     ((float*)result1)[2*(i*16 + 4*s1 + s2)+1],
-		     re, im);
+		     re, im,
+		     abs(pow((((float*)result1)[2*(i*16 + 4*s1 + s2)] - re),2) - pow((((float*)result1)[2*(i*16 + 4*s1 + s2)+1] - im),2)));
 	  
 	}
       }
     }
   }
-
+  
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
