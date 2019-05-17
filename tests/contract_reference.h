@@ -1,4 +1,5 @@
 #pragma once 
+
 #include <blas_reference.h>
 #include <quda_internal.h>
 #include "color_spinor_field.h"
@@ -9,4 +10,4 @@ extern int V;
 
 using namespace quda;
 
-void contraction_reference(void *spinorX, void *spinorY, void *result);
+int contraction_reference(void *spinorX, void *spinorY, void *result, QudaContractGamma cGamma, QudaPrecision cpu_prec, int X[]);

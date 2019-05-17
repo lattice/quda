@@ -56,15 +56,8 @@ namespace quda
     
     complex<Float> innerP(0.0,0.0);
 
-    //Lexicographic index
     int idx = x_cb + parity*arg.threads;
 
-    //CB index
-    //int x_coords[4];
-    //getCoords(x_coords, x_cb, arg.X, parity);     
-    //int idx = ((x_coords[3]*arg.X[2] + x_coords[2])*arg.X[1] + x_coords[1])*arg.X[0] + x_coords[0];    
-    
-    printf("%d %d %d (%d,%d,%d,%d)\n", idx, x_cb, parity, x_coords[0], x_coords[1], x_coords[2], x_coords[3]); 
     for (int mu=0; mu<nSpin; mu++) {
       for (int nu=0; nu<nSpin; nu++) {
 	

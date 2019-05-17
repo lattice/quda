@@ -5860,17 +5860,14 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   //DMH: Easiest way to construct ColorSpinorField? Do we require the user
   //     to declare and fill and invert_param, or can it just be hacked?.
   
-  //const int X[4] = {8,8,8,8};
-
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam((void*)hp_x, *param, X, false, param->input_location);
   ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
 
   cpuParam.v = (void*)hp_y;
-  //cpuParam.location = param->output_location;
   ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
-
-  // download source
+  
+  //Create device parameter
   ColorSpinorParam *cudaParam(&cpuParam);
   cudaParam->location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam->create = QUDA_ZERO_FIELD_CREATE;
@@ -5889,32 +5886,11 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   size_t data_bytes = X[0]*X[1]*X[2]*X[3]*16*2*sSize;
   void *d_result = device_malloc(data_bytes);
 
-  printfQuda("flag 1\n");
   contractQuda(*x[0], *y[0], d_result);
-  printfQuda("flag 2\n");
   
   qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
   device_free(d_result);
 
-  printfQuda("flag 3\n");
-  
-  /*
-    param->cuda_prec == QUDA_DOUBLE_PRECISION ?
-    cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
-    cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-  
-    cudaColorSpinorField xp(*cudaParam);
-    cudaColorSpinorField yp(*cudaParam);
-    
-    xp = *x[0];
-    yp = *y[0];
-  
-    void *d_result2 = device_malloc(data_bytes);
-    contract(xp, yp, d_result2, QUDA_CONTRACT);
-    qudaMemcpy(h_result, d_result2, data_bytes, cudaMemcpyDeviceToHost);
-    device_free(d_result2);
-  */
-  
   delete x[0];
   delete y[0];
   delete h_y;

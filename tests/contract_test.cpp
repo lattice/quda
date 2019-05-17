@@ -7,6 +7,7 @@
 #include <util_quda.h>
 #include <test_util.h>
 #include <dslash_util.h>
+#include <contract_reference.h>
 #include "misc.h"
 
 #if defined(QMP_COMMS)
@@ -235,7 +236,7 @@ int main(int argc, char **argv)
   size_t sSize = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   void *spinorX = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *spinorY = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-  void *result1 = malloc(2*V*16*sSize*inv_param.Ls);
+  void *result  = malloc(2*V*16*sSize*inv_param.Ls);
   
   // start the timer
   double time0 = -((double)clock());
@@ -259,65 +260,14 @@ int main(int argc, char **argv)
   //QUDA will allocate GPU memory, transfer the data,
   //perform the requested contraction, and return the
   //result in the array 'result'
-  contractQuda(spinorX, spinorY, result1, QUDA_CONTRACT_GAMMA5, QUDA_CONTRACT_GAMMA_G5, &inv_param, X);
+  contractQuda(spinorX, spinorY, result, QUDA_CONTRACT_GAMMA5, QUDA_CONTRACT_GAMMA_I, &inv_param, X);
 
-  if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-    
-    double re=0.0, im=0.0;    
-    for(int i=0; i<V; i++) {
-      for(int s1=0; s1<4; s1++) {
-	for(int s2=0; s2<4; s2++) {
-	  
-	  re = im = 0.0;
-	  for(int c=0; c<3; c++) {
-	    re += (((double*)spinorX)[24*i + 6*s1 + 2*c + 0]*((double*)spinorY)[24*i + 6*s2 + 2*c + 0] +
-		   ((double*)spinorX)[24*i + 6*s1 + 2*c + 1]*((double*)spinorY)[24*i + 6*s2 + 2*c + 1]);
-	    
-	    im += (((double*)spinorX)[24*i + 6*s1 + 2*c + 0]*((double*)spinorY)[24*i + 6*s2 + 2*c + 1] -
-		   ((double*)spinorX)[24*i + 6*s1 + 2*c + 1]*((double*)spinorY)[24*i + 6*s2 + 2*c + 0]);
-	  }
-	  
-	  if(s1 == s2 && s1 == 0) {
-	    for(int j = 0; j<V; j++) {
-	      if( abs(re - ((double*)result1)[2*(j*16 + 4*s1 + s2)]) < 1e-9) {
-		int idx = i;
-		int jdx = j;
-		printfQuda("%d (%d,%d,%d,%d) mapped to %d (%d,%d,%d,%d)\n",
-			   i, i%xdim, (i%(xdim*ydim))/xdim, (i%(xdim*ydim*xdim))/(xdim*ydim), i/(xdim*ydim*zdim),
-			   j, j%xdim, (j%(xdim*ydim))/xdim, (j%(xdim*ydim*xdim))/(xdim*ydim), j/(xdim*ydim*zdim));
-		continue;
-	      }
-	    }
-	  }
-	}
-      }
-    }
-  }
-  else {
-    
-    for(int i=0; i<V; i++) {
-      for(int s1=0; s1<4; s1++) {
-	for(int s2=0; s2<4; s2++) {
-	  
-	  float re=0.0, im=0.0;
-	  for(int c=0; c<3; c++) {
-	    re += (((float*)spinorX)[24*i + 6*s1 + 2*c + 0]*((float*)spinorY)[24*i + 6*s2 + 2*c + 0] +
-		   ((float*)spinorX)[24*i + 6*s1 + 2*c + 1]*((float*)spinorY)[24*i + 6*s2 + 2*c + 1]);
-	    
-	    im += (((float*)spinorX)[24*i + 6*s1 + 2*c + 0]*((float*)spinorY)[24*i + 6*s2 + 2*c + 1] -
-		   ((float*)spinorX)[24*i + 6*s1 + 2*c + 1]*((float*)spinorY)[24*i + 6*s2 + 2*c + 0]);
-	  }
-	  
-	  printfQuda("%d %d %d (%+.16e,%+.16e) (%+.16e,%+.16e) %+.16f\n", i, s2, s2,
-		     ((float*)result1)[2*(i*16 + 4*s1 + s2)  ],
-		     ((float*)result1)[2*(i*16 + 4*s1 + s2)+1],
-		     re, im,
-		     abs(pow((((float*)result1)[2*(i*16 + 4*s1 + s2)] - re),2) - pow((((float*)result1)[2*(i*16 + 4*s1 + s2)+1] - im),2)));
-	  
-	}
-      }
-    }
-  }
+  //This function will compare each color contraction from the host and device.
+  //It returns the number of faults it detects.
+  int faults = contraction_reference(spinorX, spinorY, result, QUDA_CONTRACT_GAMMA_I,
+				     cpu_prec, X);
+
+  printfQuda("Contraction comparison complete with %d/%d faults\n", faults, V*16*2);
   
   // stop the timer
   time0 += clock();
