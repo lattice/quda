@@ -373,12 +373,12 @@ namespace quda {
     // this parameter determines how many consective reliable update
     // residual increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
-    const int maxResIncrease = (use_heavy_quark_res ? 0 : param.max_res_increase); //  check if we reached the limit of our tolerance
+    const int maxResIncrease = param.max_res_increase; //  check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
     // this means when using heavy quarks we will switch to simple hq restarts as soon as the reliable strategy fails
-    const int hqmaxresIncrease = param.max_res_increase;
-    const int hqmaxresRestartTotal = maxResIncreaseTotal; // this limits the number of heavy quark restarts we can do
+    const int hqmaxresIncrease = param.max_hq_res_increase;
+    const int hqmaxresRestartTotal = param.max_hq_res_restart_total; // this limits the number of heavy quark restarts we can do
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
@@ -575,7 +575,7 @@ namespace quda {
           resIncreaseTotal++;
           warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
                       sqrt(r2), r0Norm, resIncreaseTotal);
-          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
             } else {
