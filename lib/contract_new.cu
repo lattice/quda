@@ -17,18 +17,20 @@ namespace quda {
     const ColorSpinorField &x;
     const ColorSpinorField &y;
     Float *result;
+    const QudaContractType cType;
     
   private:
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
     
   public:
-    Contraction(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, Float *result) :
+    Contraction(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, Float *result, const QudaContractType cType) :
       TunableVectorY(2),
       arg(arg),
       x(x),
       y(y),
-      result(result)
+      result(result),
+      cType(cType)
     {
 #ifdef JITIFY
       create_jitify_program("kernels/contraction.cuh");
@@ -41,13 +43,44 @@ namespace quda {
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
+	std::string function_name;
+	switch(cType) {
+	case QUDA_CONTRACT_TYPE_OPEN:
+	  function_name = "quda::computeColorContraction";
+	  break;
+	case QUDA_CONTRACT_TYPE_DR:
+	  function_name = "quda::computeDegrandRossiContraction";
+	  break;
+	case QUDA_CONTRACT_TYPE_DP:
+	  errorQuda("Contraction type not implemented");
+	  //function_name = "quda::computeDiracPauliContraction";
+	  break;
+	default:
+	  function_name = "quda::computeColorContraction";
+	  break;
+	}
+	
 	using namespace jitify::reflection;
-	jitify_error = program->kernel("quda::computeContraction")
+	jitify_error = program->kernel(function_name)
 	  .instantiate(Type<Float>(), Type<Arg>())
 	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
 	  .launch(arg);
 #else
-	computeContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	switch(cType) {
+	case QUDA_CONTRACT_TYPE_OPEN:
+	  computeColorContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	  break;
+	case QUDA_CONTRACT_TYPE_DR:	  
+	  computeDegrandRossiContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	  break;
+	case QUDA_CONTRACT_TYPE_DP:
+	  errorQuda("Contraction type not implemented");
+	  //computeDiracPauliContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	  break;
+	default:
+	  computeColorContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	  break;
+	}	
 #endif
       } else {
 	errorQuda("CPU not supported yet\n");
@@ -72,17 +105,16 @@ namespace quda {
   
   template<typename Float>
   void contract_quda(const ColorSpinorField &x, const ColorSpinorField &y,
-		     Float *result) {
+		     Float *result, const QudaContractType cType) {
     ContractionArg<Float> arg(x, y, result);
-    Contraction<Float, ContractionArg<Float>> contraction(arg, x, y, result);
+    Contraction<Float, ContractionArg<Float>> contraction(arg, x, y, result, cType);
     contraction.apply(0);
     qudaDeviceSynchronize();
   }
   
 #endif
   
-  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y,
-		    void *result)
+  void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
   {
 #ifdef GPU_CONTRACT
     
@@ -91,9 +123,9 @@ namespace quda {
     }
     
     if (x.Precision() == QUDA_SINGLE_PRECISION){
-      contract_quda<float>(x, y, (float*)result);
+      contract_quda<float>(x, y, (float*)result, cType);
     } else if(x.Precision() == QUDA_DOUBLE_PRECISION) {
-      contract_quda<double>(x, y, (double*)result);
+      contract_quda<double>(x, y, (double*)result, cType);
     } else {
       errorQuda("Precision %d not supported", x.Precision());
     }
