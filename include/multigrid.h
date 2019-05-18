@@ -270,18 +270,6 @@ namespace quda {
     RNG *rng;
 
     /**
-       @brief Load the null space vectors in from file
-       @param B Loaded null-space vectors (pre-allocated)
-    */
-    void loadVectors(std::vector<ColorSpinorField*> &B);
-
-    /**
-       @brief Save the null space vectors in from file
-       @param B Save null-space vectors from here
-    */
-    void saveVectors(std::vector<ColorSpinorField*> &B) const;
-
-    /**
        @brief Helper function called on entry to each MG function
        @param[in] level The level we working on
     */

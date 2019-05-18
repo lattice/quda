@@ -382,8 +382,8 @@ namespace quda
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
   {
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_IO);
+    //profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    //profile.TPSTART(QUDA_PROFILE_IO);
 
 #ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
@@ -426,18 +426,18 @@ namespace quda
 #else
     errorQuda("\nQIO library was not built.\n");
 #endif
-    profile.TPSTOP(QUDA_PROFILE_IO);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    //profile.TPSTOP(QUDA_PROFILE_IO);
+    //profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     return;
   }
 
   void EigenSolver::saveVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_outfile)
   {
-
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_IO);
-
+    
+    //profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    //profile.TPSTART(QUDA_PROFILE_IO);
+    
 #ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
     std::vector<ColorSpinorField *> tmp;
@@ -476,8 +476,8 @@ namespace quda
 #else
     errorQuda("\nQIO library was not built.\n");
 #endif
-    profile.TPSTOP(QUDA_PROFILE_IO);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    //profile.TPSTOP(QUDA_PROFILE_IO);
+    //profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     return;
   }
