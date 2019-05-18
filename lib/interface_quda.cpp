@@ -5859,7 +5859,9 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
 {
   //DMH: Easiest way to construct ColorSpinorField? Do we require the user
   //     to declare and fill and invert_param, or can it just be hacked?.
-  
+
+  profileContract.TPSTART(QUDA_PROFILE_TOTAL);
+  profileContract.TPSTART(QUDA_PROFILE_INIT);
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam((void*)hp_x, *param, X, false, param->input_location);
   ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
@@ -5879,22 +5881,34 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   x.push_back(ColorSpinorField::Create(*cudaParam));
   y.push_back(ColorSpinorField::Create(*cudaParam));
 
-  *x[0] = *h_x;
-  *y[0] = *h_y;
-
   size_t sSize = (param->cuda_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t data_bytes = X[0]*X[1]*X[2]*X[3]*16*2*sSize;
   void *d_result = device_malloc(data_bytes);
-
-  contractQuda(*x[0], *y[0], d_result, cType);
+  profileContract.TPSTOP(QUDA_PROFILE_INIT);
   
+  profileContract.TPSTART(QUDA_PROFILE_H2D);
+  *x[0] = *h_x;
+  *y[0] = *h_y;
+  profileContract.TPSTOP(QUDA_PROFILE_H2D);
+  
+  profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
+  contractQuda(*x[0], *y[0], d_result, cType);
+  profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
+  
+  profileContract.TPSTART(QUDA_PROFILE_D2H);
   qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
-  device_free(d_result);
+  profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
+  profileContract.TPSTART(QUDA_PROFILE_FREE);
+  device_free(d_result);  
   delete x[0];
   delete y[0];
   delete h_y;
   delete h_x;
+  profileContract.TPSTOP(QUDA_PROFILE_FREE);
+  
+  profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
+  
 }
 
 double qChargeQuda()

@@ -97,10 +97,14 @@ namespace quda {
     
     void preTune() {} 
     void postTune() {}
-
-    //DMH FIXME: Work out what these should be
-    long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return 3 * (1 + 2 * 6) * arg.threads; }
+    
+    long long flops() const {
+      if (cType == QUDA_CONTRACT_TYPE_OPEN) return 16 * 3 * 6ll * arg.threads;
+      else return ((16 * 3 * 6ll) + (16 * (4+12))) * arg.threads;
+    }
+    long long bytes() const {
+      return  24 * 2 * arg.threads;
+    }
   }; 
   
   template<typename Float>
