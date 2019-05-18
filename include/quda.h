@@ -101,7 +101,7 @@ extern "C" {
 
     QudaDslashType dslash_type; /**< The Dirac Dslash type that is being used */
     QudaInverterType inv_type; /**< Which linear solver to use */
-    
+
     double mass;  /**< Used for staggered only */
     double kappa; /**< Used for Wilson and Wilson-clover */
 
@@ -240,8 +240,7 @@ extern "C" {
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
 
-    QudaTune tune;                         /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
-
+    QudaTune tune; /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
 
     /** Number of steps in s-step algorithms */
     int Nsteps;
@@ -268,7 +267,7 @@ extern "C" {
 
     /** defines deflation */
     void *eig_param;
-    
+
     /**
       Dirac Dslash used in preconditioner
     */
@@ -363,11 +362,10 @@ extern "C" {
 
   } QudaInvertParam;
 
-
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
 
-    //EIGENSOLVER PARAMS
+    // EIGENSOLVER PARAMS
     //-------------------------------------------------
     /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
@@ -382,14 +380,14 @@ extern "C" {
     int poly_deg;
 
     /** Range used in polynomial acceleration **/
-    double a_min;    
+    double a_min;
     double a_max;
 
     /** What type of Dirac operator we are using **/
     /** If !(use_norm_op) && !(use_dagger) use M. **/
     /** If use_dagger, use Mdag **/
     /** If use_norm_op, use MdagM **/
-    /** If use_norm_op && use_dagger use MMdag. **/    
+    /** If use_norm_op && use_dagger use MMdag. **/
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
 
@@ -421,14 +419,14 @@ extern "C" {
 
     /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
     char QUDA_logfile[512];
-    
+
     //-------------------------------------------------
-    
-    //EIG-CG PARAMS
+
+    // EIG-CG PARAMS
     //-------------------------------------------------
     int nk;
-    int np;         
-    
+    int np;
+
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
 
@@ -467,7 +465,7 @@ extern "C" {
     QudaInvertParam *invert_param;
 
     QudaEigParam *eig_param[QUDA_MAX_MG_LEVEL];
-    
+
     /** Number of multigrid levels */
     int n_level;
 
@@ -866,7 +864,7 @@ extern "C" {
                    void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
 
   /**
-   * Perform the eigensolve. The problem matrix is defined by the invert param, the 
+   * Perform the eigensolve. The problem matrix is defined by the invert param, the
    * mode of solution is specified by the eig param. It is assumed that the gauge
    * field has already been loaded via  loadGaugeQuda().
    * @param h_els  Host side eigenvalues
@@ -876,15 +874,15 @@ extern "C" {
   void eigensolveQuda(void *h_evals, void *h_evecs, QudaEigParam *param);
 
   /**
-   * Perform the eigensolve using ARPACK. The problem matrix is defined by the 
-   * invert param, the mode of solution is specified by the eig param. 
+   * Perform the eigensolve using ARPACK. The problem matrix is defined by the
+   * invert param, the mode of solution is specified by the eig param.
    * It is assumed that the gauge field has already been loaded via loadGaugeQuda().
    * @param h_els  Host side eigenvalues
    * @param h_evs  Host side eigenvectors
    * @param param  Contains all metadata regarding the type of solve.
    */
   void eigensolveARPACK(void *h_evals, void *h_evecs, QudaEigParam *param);
-  
+
   /**
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
@@ -893,9 +891,9 @@ extern "C" {
    * @param h_b    Source spinor field
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
-   */  
+   */
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
-  
+
   /**
    * Perform the solve like @invertQuda but for multiples right hand sides.
    *

@@ -129,11 +129,11 @@ extern "C" {
   } QudaInverterType;
 
   typedef enum QudaEigType_s {
-    QUDA_LANCZOS,           //Lanczos solver
-    QUDA_IMP_RST_LANCZOS,   //Implicitly restarted lanczos solver
-    QUDA_THICK_RST_LANCZOS, //Thick restarted lanczos solver
-    QUDA_ARNOLDI,           //Arnoldi solver
-    QUDA_IMP_RST_ARNOLDI,   //Implicitly restarted Arnoldi solver
+    QUDA_LANCZOS,           // Lanczos solver
+    QUDA_IMP_RST_LANCZOS,   // Implicitly restarted lanczos solver
+    QUDA_THICK_RST_LANCZOS, // Thick restarted lanczos solver
+    QUDA_ARNOLDI,           // Arnoldi solver
+    QUDA_IMP_RST_ARNOLDI,   // Implicitly restarted Arnoldi solver
     QUDA_INVALID_EIG_TYPE = QUDA_INVALID_ENUM
   } QudaEigType;
 
@@ -149,7 +149,6 @@ extern "C" {
     QUDA_INVALID_EIG_SPECTRUM = QUDA_INVALID_ENUM
   } QudaEigSpectrumType;
 
-  
   typedef enum QudaSolutionType_s {
     QUDA_MAT_SOLUTION,
     QUDA_MATDAG_MAT_SOLUTION,

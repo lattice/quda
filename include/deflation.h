@@ -183,26 +183,26 @@ namespace quda {
     DiracMatrix *m;
 
     ColorSpinorField *RV;//Ritz vectors
-    
+
     DeflationParam *deflParam;
 
     Deflation *defl;
     TimeProfile &profile;
-    
+
     deflated_solver(QudaEigParam &eig_param, TimeProfile &profile);
-    
+
     virtual ~deflated_solver()
     {
       profile.TPSTART(QUDA_PROFILE_FREE);
-      
+
       if (defl) delete defl;
       if (deflParam) delete deflParam;
-      
+
       if (RV) delete RV;
-      
+
       if (m) delete m;
       if (d) delete d;
-      
+
       profile.TPSTOP(QUDA_PROFILE_FREE);
     }
   };

@@ -54,7 +54,7 @@ extern QudaMatPCType matpc_type; // preconditioning type
 
 extern int niter; // max solver iterations
 extern char latfile[];
-extern bool unit_gauge; 
+extern bool unit_gauge;
 
 extern void usage(char** );
 
@@ -338,11 +338,11 @@ int main(int argc, char **argv)
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate an SU(3) field
-    if(unit_gauge){
-      //unit SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
       construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
     } else {
-      //random SU(3) field
+      // random SU(3) field
       construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
     }
   }

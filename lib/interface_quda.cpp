@@ -2390,23 +2390,24 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
-void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param) {
+void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
+{
 
   profilerStart(__func__);
 
-  //Transfer the inv param structure contained in eig_param
+  // Transfer the inv param structure contained in eig_param
   QudaInvertParam *inv_param;
   inv_param = eig_param->invert_param;
 
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
-  
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH)
+    setKernelPackT(true);
+
   profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
   profileEigensolve.TPSTART(QUDA_PROFILE_INIT);
-  
+
   if (!initialized) errorQuda("QUDA not initialized");
-  
+
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
     printQudaInvertParam(inv_param);
@@ -2416,17 +2417,15 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   checkInvertParam(inv_param);
   checkEigParam(eig_param);
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
-  
-  bool pc_solve =
-    (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) ||
-    (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE)
+    || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   inv_param->secs = 0;
   inv_param->gflops = 0;
   inv_param->iter = 0;
 
-  //Define problem matrix
+  // Define problem matrix
   //------------------------------------------------------
   Dirac *d = nullptr;
   Dirac *dSloppy = nullptr;
@@ -2436,40 +2435,34 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
   Dirac &dirac = *d;
   //------------------------------------------------------
-  
-  //Create device side ColorSpinorField vector space and to pass to the
-  //compute function.
+
+  // Create device side ColorSpinorField vector space and to pass to the
+  // compute function.
   const int *X = cudaGauge->X();
-  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type,
-			    inv_param->input_location);
+  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
 
   cpuParam.v = host_evecs;
   ColorSpinorField *h_tmp = ColorSpinorField::Create(cpuParam);
   double norm = sqrt(blas::norm2(*h_tmp));
   printfQuda("Initial residual vector norm = %f\n", norm);
-  
+
   ColorSpinorParam *cudaParam(&cpuParam);
   cudaParam->location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam->create = QUDA_ZERO_FIELD_CREATE;
-  eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ?
-    cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
-    cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+  eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ? cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
+                                                       cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
 
-  if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) {
-    cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  }
-  
+  if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) { cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER; }
+
   std::vector<Complex> evals(eig_param->nKr, 0.0);
-  std::vector<ColorSpinorField*> kSpace;
-  for(int i=0; i<eig_param->nKr; i++) {
-    kSpace.push_back(ColorSpinorField::Create(*cudaParam));
-  }
-  
-  //Test for initial guess
-  if(norm == 0.0) {
+  std::vector<ColorSpinorField *> kSpace;
+  for (int i = 0; i < eig_param->nKr; i++) { kSpace.push_back(ColorSpinorField::Create(*cudaParam)); }
+
+  // Test for initial guess
+  if (norm == 0.0) {
     printfQuda("Initial residual is zero. Populating with rands.\n");
-    if (kSpace[0] -> Location() == QUDA_CPU_FIELD_LOCATION) {
-      kSpace[0] -> Source(QUDA_RANDOM_SOURCE);
+    if (kSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
+      kSpace[0]->Source(QUDA_RANDOM_SOURCE);
     } else {
       RNG *rng = new RNG(kSpace[0]->Volume(), 1234, kSpace[0]->X());
       rng->Init();
@@ -2479,54 +2472,54 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     }
     printfQuda("Random guess set\n");
   } else {
-    //Transfer host guess to device
+    // Transfer host guess to device
     printfQuda("Using initial guess\n");
     *kSpace[0] = *h_tmp;
-  }     
+  }
   delete h_tmp;
-  
+
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
   profileEigensolve.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  //If you use polynomial acceleration on a non-symmetric matrix,
-  //the solver will fail.
-  if(eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
+  // If you use polynomial acceleration on a non-symmetric matrix,
+  // the solver will fail.
+  if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
     errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
   }
 
-  //DMH solver param here 
+  // DMH solver param here
   EigenSolver *eig_solve = EigenSolver::create(eig_param, dirac, profileEigensolve);
   (*eig_solve)(kSpace, evals);
 
-  profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);  
-  profileEigensolve.TPSTART(QUDA_PROFILE_FREE);  
+  profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
   delete d;
   delete dSloppy;
   delete dPre;
-  for(int i=0; i<eig_param->nKr; i++) delete kSpace[i]; 
+  for (int i = 0; i < eig_param->nKr; i++) delete kSpace[i];
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
 
   // cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache();
-  
+
   profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
-  
 }
 
-void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_param) {
+void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
+{
 
   profilerStart(__func__);
 
-  //Transfer the inv param structure contained in eig_param
+  // Transfer the inv param structure contained in eig_param
   QudaInvertParam *inv_param;
   inv_param = eig_param->invert_param;
 
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH)
+    setKernelPackT(true);
 
   profileEigensolveARPACK.TPSTART(QUDA_PROFILE_TOTAL);
   profileEigensolveARPACK.TPSTART(QUDA_PROFILE_INIT);
@@ -2543,16 +2536,14 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
   checkEigParam(eig_param);
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
 
-  bool pc_solve =
-    (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) ||
-    (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE)
+    || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   inv_param->secs = 0;
   inv_param->gflops = 0;
   inv_param->iter = 0;
 
-  //Define problem matrix
+  // Define problem matrix
   //------------------------------------------------------
   Dirac *d = nullptr;
   Dirac *dSloppy = nullptr;
@@ -2563,14 +2554,13 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
   Dirac &dirac = *d;
   //------------------------------------------------------
 
-  //For QUDA data type eigenvectors
+  // For QUDA data type eigenvectors
   const int *X = cudaGauge->X();
-  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X,
-			    inv_param->solution_type, inv_param->input_location);
+  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
 
-  //The Arnoldi can solve any problem. However, if you use poly acc on a
-  //non-symmetric matrix, this routine will fail.
-  if(eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
+  // The Arnoldi can solve any problem. However, if you use poly acc on a
+  // non-symmetric matrix, this routine will fail.
+  if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
     errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
   }
 
@@ -2594,9 +2584,7 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
 
   profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
-
 }
-
 
 /*
 void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
@@ -2750,8 +2738,6 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 }
 */
 
-
-
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
   : profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
@@ -2816,10 +2802,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   csParam.fieldOrder = mg_param.setup_location[0] == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_YES ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
-  for (int i=0; i<mg_param.n_vec[0]; i++) {
-    B[i] = ColorSpinorField::Create(csParam);
-  }
-  
+  for (int i = 0; i < mg_param.n_vec[0]; i++) { B[i] = ColorSpinorField::Create(csParam); }
+
   // fill out the MG parameters for the fine level
   mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
 
@@ -5645,11 +5629,11 @@ void plaq_quda_(double plaq[3]) {
 
 void plaqQuda (double plq[3])
 {
-  
+
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (!gaugePrecise) errorQuda("Cannot compute plaquette as there is no resident gauge field");
-  
+
   cudaGaugeField *data = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
   extendedGaugeResident = data;
 
@@ -5812,16 +5796,16 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
     cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
     STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho);
   }
-  
+
   delete cudaGaugeTemp;
-  
+
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
-  
+
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
     printfQuda("Plaquette after %d STOUT steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
   }
-  
+
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 

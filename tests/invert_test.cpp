@@ -352,11 +352,11 @@ int main(int argc, char **argv)
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate an SU(3) field
-    if(unit_gauge){
-      //unit SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
       construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
     } else {
-      //random SU(3) field
+      // random SU(3) field
       construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
     }
   }
@@ -614,9 +614,9 @@ int main(int argc, char **argv)
       
 	}
       }
-      
+
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      
+
       void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
@@ -679,11 +679,11 @@ int main(int argc, char **argv)
       } else {
         errorQuda("Unsupported dslash_type");
       }
-      
+
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	errorQuda("Mass normalization not implemented");
       }
-      
+
       free(spinorTmp);
     }
 

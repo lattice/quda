@@ -14,7 +14,6 @@ namespace quda {
     // compute parity of the node
     for (int i=0; i<4; i++) node_parity += commCoords(i);
     node_parity = node_parity % 2;
-    
   }
 
   // solver factory
@@ -22,8 +21,7 @@ namespace quda {
 			 DiracMatrix &matPrecon, TimeProfile &profile)
   {
     Solver *solver = nullptr;
-    
-       
+
     if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER)
       errorQuda("Explicit preconditoner not supported for %d solver", param.inv_type);
 
@@ -141,7 +139,7 @@ namespace quda {
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
     }
-    
+
     return solver;
   }
 
@@ -244,11 +242,11 @@ namespace quda {
 
   /*
   void Solver::loadVectors(std::vector<ColorSpinorField*> &eig_vecs, std::string vec_infile) {
-    
+
     //profile.TPSTOP(QUDA_PROFILE_INIT);
     //profile.TPSTART(QUDA_PROFILE_IO);
 
-#ifdef HAVE_QIO    
+#ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
     if (strcmp(vec_infile.c_str(),"")!=0) {
       printfQuda("Start loading %04d vectors from %s\n", Nvec, vec_infile.c_str());
@@ -257,29 +255,27 @@ namespace quda {
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
         ColorSpinorParam csParam(*eig_vecs[0]);
         csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-        csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : eig_vecs[0]->Precision());
-        csParam.location = QUDA_CPU_FIELD_LOCATION;
-        csParam.create = QUDA_NULL_FIELD_CREATE;
-        for (int i=0; i<Nvec; i++) {
-          tmp.push_back(ColorSpinorField::Create(csParam));
+        csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION :
+eig_vecs[0]->Precision()); csParam.location = QUDA_CPU_FIELD_LOCATION; csParam.create = QUDA_NULL_FIELD_CREATE; for (int
+i=0; i<Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam));
         }
       } else {
         for (int i=0; i<Nvec; i++) {
           tmp.push_back(eig_vecs[i]);
         }
       }
-      
+
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
-      for (int i=0; i<Nvec; i++) { 
-	V[i] = tmp[i]->V();
-	if (V[i] == NULL) {
-	  printfQuda("Could not allocate space for eigenVector[%d]\n", i);
-	}
+      for (int i=0; i<Nvec; i++) {
+        V[i] = tmp[i]->V();
+        if (V[i] == NULL) {
+          printfQuda("Could not allocate space for eigenVector[%d]\n", i);
+        }
       }
-      
+
       read_spinor_field(vec_infile.c_str(), &V[0], eig_vecs[0]->Precision(),
-			eig_vecs[0]->X(), eig_vecs[0]->Ncolor(), eig_vecs[0]->Nspin(),
-			Nvec, 0,  (char**)0);
+                        eig_vecs[0]->X(), eig_vecs[0]->Ncolor(), eig_vecs[0]->Nspin(),
+                        Nvec, 0,  (char**)0);
       host_free(V);
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
         for (int i=0; i<Nvec; i++) {
@@ -287,23 +283,23 @@ namespace quda {
           delete tmp[i];
         }
       }
-      
+
       printfQuda("Done loading vectors\n");
     } else {
       errorQuda("No eigenspace input file defined.");
     }
 #else
-    errorQuda("\nQIO library was not built.\n");      
+    errorQuda("\nQIO library was not built.\n");
 #endif
     //profile.TPSTOP(QUDA_PROFILE_IO);
     //profile.TPSTART(QUDA_PROFILE_INIT);
 
     return;
   }
-  
+
   void Solver::saveVectors(std::vector<ColorSpinorField*> &eig_vecs,
-			   std::string vec_outfile) {
-    
+                           std::string vec_outfile) {
+
     //profile.TPSTOP(QUDA_PROFILE_INIT);
     //profile.TPSTART(QUDA_PROFILE_IO);
 
@@ -313,44 +309,41 @@ namespace quda {
     if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
       ColorSpinorParam csParam(*eig_vecs[0]);
       csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-      csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : eig_vecs[0]->Precision());
-      csParam.location = QUDA_CPU_FIELD_LOCATION;
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      for (int i=0; i<Nvec; i++) {
-        tmp.push_back(ColorSpinorField::Create(csParam));
-        *tmp[i] = *eig_vecs[i];
+      csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION :
+eig_vecs[0]->Precision()); csParam.location = QUDA_CPU_FIELD_LOCATION; csParam.create = QUDA_NULL_FIELD_CREATE; for (int
+i=0; i<Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam)); *tmp[i] = *eig_vecs[i];
       }
     } else {
       for (int i=0; i<Nvec; i++) {
         tmp.push_back(eig_vecs[i]);
       }
-    }    
+    }
     if (strcmp(vec_outfile.c_str(),"")!=0) {
-      printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str()); 
-      
+      printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
+
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
       for (int i=0; i<Nvec; i++) {
-	V[i] = tmp[i]->V();
-	if (V[i] == NULL) {
-	  printfQuda("Could not allocate space for eigenVector[%04d]\n", i);
-	}
+        V[i] = tmp[i]->V();
+        if (V[i] == NULL) {
+          printfQuda("Could not allocate space for eigenVector[%04d]\n", i);
+        }
       }
-      
+
       write_spinor_field(vec_outfile.c_str(), &V[0], eig_vecs[0]->Precision(),
-			 eig_vecs[0]->X(), eig_vecs[0]->Ncolor(), eig_vecs[0]->Nspin(),
-			 Nvec, 0,  (char**)0);
-      
+                         eig_vecs[0]->X(), eig_vecs[0]->Ncolor(), eig_vecs[0]->Nspin(),
+                         Nvec, 0,  (char**)0);
+
       host_free(V);
       printfQuda("Done saving vectors\n");
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-	for (int i=0; i<Nvec; i++) delete tmp[i];
+        for (int i=0; i<Nvec; i++) delete tmp[i];
       }
-      
+
     } else {
       errorQuda("No eigenspace output file defined.");
     }
 #else
-    errorQuda("\nQIO library was not built.\n");      
+    errorQuda("\nQIO library was not built.\n");
 #endif
     //profile.TPSTOP(QUDA_PROFILE_IO);
     //profile.TPSTART(QUDA_PROFILE_INIT);
@@ -359,7 +352,6 @@ namespace quda {
   }
 */
 
-  
   bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
 
     for (int i=0; i<n; i++) {

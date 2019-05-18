@@ -121,21 +121,21 @@ void SU3test(int argc, char **argv) {
 
   // call srand() with a rank-dependent seed
   initRand();
-  
+
   // load in the command line supplied gauge field
   if (strcmp(latfile,"")) {  
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate an SU(3) field
-    if(unit_gauge){
-      //unit SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
       construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
     } else {
-      //random SU(3) field
+      // random SU(3) field
       construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
     }
   }
-  
+
   loadGaugeQuda(gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
 

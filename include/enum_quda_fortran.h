@@ -126,11 +126,11 @@
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaEigType integer(4)
-#define QUDA_LANCZOS 0           //Lanczos solver
-#define QUDA_IMP_RST_LANCZOS 1   //Implicitly restarted lanczos solver
-#define QUDA_THICK_RST_LANCZOS 2 //Thick restarted lanczos solver
-#define QUDA_ARNOLDI 3           //Arnoldi solver
-#define QUDA_IMP_RST_ARNOLDI 4   //Implicitly restarted Arnoldi solver
+#define QUDA_LANCZOS 0           // Lanczos solver
+#define QUDA_IMP_RST_LANCZOS 1   // Implicitly restarted lanczos solver
+#define QUDA_THICK_RST_LANCZOS 2 // Thick restarted lanczos solver
+#define QUDA_ARNOLDI 3           // Arnoldi solver
+#define QUDA_IMP_RST_ARNOLDI 4   // Implicitly restarted Arnoldi solver
 #define QUDA_INVALID_EIG QUDA_INVALID_ENUM
 
 #define QudaSolutionType integer(4)

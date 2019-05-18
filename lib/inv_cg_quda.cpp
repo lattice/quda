@@ -24,7 +24,6 @@ namespace quda {
     rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
     rSloppyp(nullptr), xSloppyp(nullptr), init(false)
   {
-    
   }
 
   CG::~CG() {
@@ -36,21 +35,22 @@ namespace quda {
       if (yp) delete yp;
       if (App) delete App;
       if (param.precision != param.precision_sloppy) {
-	if (rSloppyp) delete rSloppyp;
+        if (rSloppyp) delete rSloppyp;
 	if (xSloppyp) delete xSloppyp;
       }
       if (tmpp) delete tmpp;
       if (!mat.isStaggered()) {
-	if (tmp2p && tmpp != tmp2p) delete tmp2p;
+        if (tmp2p && tmpp != tmp2p) delete tmp2p;
 	if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
       }
       if (rnewp) delete rnewp;
       if (deflate_init) {
-	for (auto veci : param.evecs) if (veci) delete veci;
-	delete defl_tmp1[0];
-	delete defl_tmp2[0];
+        for (auto veci : param.evecs)
+          if (veci) delete veci;
+        delete defl_tmp1[0];
+        delete defl_tmp2[0];
       }
-      
+
       init = false;
     }
     profile.TPSTOP(QUDA_PROFILE_FREE);
@@ -110,7 +110,7 @@ namespace quda {
       mmdag.Expose()->Mdag(x,*yp);
 
     }
-  
+
     // future optimization: with preserve_source == QUDA_PRESERVE_SOURCE_NO; b is already
     // expected to be the CG residual which matches the CGNE residual
     // (but only with zero initial guess).  at the moment, CG does not respect this convention
@@ -141,7 +141,6 @@ namespace quda {
   CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()),
     bp(nullptr), init(false) {
-    
   }
 
   CGNR::~CGNR() {
@@ -203,34 +202,32 @@ namespace quda {
 
   }
 
-  void CG::constructDeflationSpace(){
-    
-    //Deflation requested + first instance of solver
-    eig_solver = EigenSolver::create(&param.eig_param,
-				     *mat.Expose(),
-				     profile);
-    
-    //Clone from an existing vector
+  void CG::constructDeflationSpace()
+  {
+
+    // Deflation requested + first instance of solver
+    eig_solver = EigenSolver::create(&param.eig_param, *mat.Expose(), profile);
+
+    // Clone from an existing vector
     ColorSpinorParam csParam(*rp);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    //This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);      
+    // This is the vector precision used by matResidual
+    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
     param.evecs.resize(param.eig_param.nKr);
-    for (int i=0; i<param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
-    
-    //Construct vectors to hold deflated RHS
+    for (int i = 0; i < param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
+
+    // Construct vectors to hold deflated RHS
     defl_tmp1.push_back(ColorSpinorField::Create(csParam));
     defl_tmp2.push_back(ColorSpinorField::Create(csParam));
-    
+
     param.evals.resize(param.eig_param.nEv);
-    for (int i=0; i<param.eig_param.nEv; i++)  param.evals[i] = 0.0;
-    
+    for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
+
     (*eig_solver)(param.evecs, param.evals);
-    
+
     deflate_init = true;
-    
   }
-  
+
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField* p_init, double r2_old_init) {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
@@ -296,12 +293,10 @@ namespace quda {
       init = true;
     }
 
-    //Once the CG operator is called, we are able to construct an appropriate
-    //Krylov space for deflation
-    if (param.deflate && !deflate_init) {
-      constructDeflationSpace();
-    }
-    
+    // Once the CG operator is called, we are able to construct an appropriate
+    // Krylov space for deflation
+    if (param.deflate && !deflate_init) { constructDeflationSpace(); }
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
@@ -351,29 +346,29 @@ namespace quda {
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
 
-      //DMH start
-      //Just replace any initial guess with a deflated RHS
+      // DMH start
+      // Just replace any initial guess with a deflated RHS
       if (param.deflate == true) {
-	
-	//Deflate the exact part from the RHS
-	std::vector<ColorSpinorField*> rhs;
-	rhs.push_back(&b);
-	eig_solver->deflate(defl_tmp1, rhs, param.evecs, param.evals);
-	
-	//Compute r_defl  = b - A * x_defl
-	mat(r, *defl_tmp1[0], y, tmp3);
-	r2 = blas::xmyNorm(b, r);
-	
-	//Place the initial residiual in r. defl_tmp1 must be added
-	//to the solution at the end.
-	blas::copy(y, *defl_tmp1[0]);
+
+        // Deflate the exact part from the RHS
+        std::vector<ColorSpinorField *> rhs;
+        rhs.push_back(&b);
+        eig_solver->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+
+        // Compute r_defl  = b - A * x_defl
+        mat(r, *defl_tmp1[0], y, tmp3);
+        r2 = blas::xmyNorm(b, r);
+
+        // Place the initial residiual in r. defl_tmp1 must be added
+        // to the solution at the end.
+        blas::copy(y, *defl_tmp1[0]);
       } else {
-	//Compute r = b - A * x
-	mat(r, x, y, tmp3);
-	r2 = blas::xmyNorm(b, r);
-	if (b2 == 0) b2 = r2;
-	//y contains the original guess.
-	blas::copy(y, x);
+        // Compute r = b - A * x
+        mat(r, x, y, tmp3);
+        r2 = blas::xmyNorm(b, r);
+        if (b2 == 0) b2 = r2;
+        // y contains the original guess.
+        blas::copy(y, x);
       }
     } else {
       if (&r != &b) blas::copy(r, b);
@@ -389,11 +384,12 @@ namespace quda {
       p.resize(Np);
       ColorSpinorParam csParam(rSloppy);
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      for (auto &pi : p) pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);      
+      for (auto &pi : p)
+        pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);
     } else {
       for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
     }
-    
+
     double r2_old=0.0;
     if (r2_old_init != 0.0 and p_init) {
       r2_old = r2_old_init;
@@ -524,8 +520,8 @@ namespace quda {
         updateX = ( (d <= deps*sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac * dinit);
         updateR = 0;
         // if(updateX)
-	// printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
-        // updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
+        // printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1
+        // dinit %e %e)\n", updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
       }
       else{
         if (rNorm > maxrx) maxrx = rNorm;
@@ -721,7 +717,7 @@ namespace quda {
 
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
-    
+
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
@@ -735,7 +731,7 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
-    
+
     if (param.compute_true_res) {
       // compute the true residuals
       mat(r, x, y, tmp3);
@@ -828,7 +824,7 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   if(!rnewp) {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
-    //ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
   }
 
   ColorSpinorField &r = *rp;
@@ -1221,7 +1217,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if(!rnewp) {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
-    //ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
   }
 
   ColorSpinorField &r = *rp;

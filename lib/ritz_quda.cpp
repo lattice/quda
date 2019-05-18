@@ -12,11 +12,6 @@
 #include <lanczos_quda.h>
 #include <ritz_quda.h>
 
-
-
-
-
-
 #if 0
 namespace quda {
 

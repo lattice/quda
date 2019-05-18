@@ -24,7 +24,7 @@ namespace quda {
      given level.
    */
   struct MGParam : SolverParam {
-    
+
     /** This points to the parameter struct that is passed into QUDA.
 	We use this to set per-level parameters */
     QudaMultigridParam  &mg_global;
@@ -55,7 +55,7 @@ namespace quda {
 
     /** The eigenvalue array */
     std::vector<Complex> evals;
-    
+
     /** Number of pre-smoothing applications to perform */
     int nu_pre;
 
@@ -102,14 +102,10 @@ namespace quda {
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
-    MGParam(QudaMultigridParam &param,
-	    std::vector<ColorSpinorField*> &B,
-	    DiracMatrix *matResidual,
-	    DiracMatrix *matSmooth,
-	    DiracMatrix *matSmoothSloppy,
-	    int level=0) :
-      SolverParam(*(param.invert_param)), 
-      mg_global(param), 
+    MGParam(QudaMultigridParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual,
+            DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
+      SolverParam(*(param.invert_param)),
+      mg_global(param),
       level(level),
       Nlevel(param.n_level),
       spinBlockSize(param.spin_block_size[level]),
@@ -128,44 +124,39 @@ namespace quda {
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
       setup_location(param.setup_location[level])
-      { 
-	// set the block size
-	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
+    {
+      // set the block size
+      for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
 
-	// set the smoother relaxation factor
-	omega = param.omega[level];
+      // set the smoother relaxation factor
+      omega = param.omega[level];
       }
 
-    MGParam(const MGParam &param, 
-	    std::vector<ColorSpinorField*> &B,
-	    std::vector<Complex> evals,
-	    DiracMatrix *matResidual,
-	    DiracMatrix *matSmooth,
-	    DiracMatrix *matSmoothSloppy,
-	    int level=0) :
-      SolverParam(param),
-      mg_global(param.mg_global),
-      level(level),
-      Nlevel(param.Nlevel),
-      spinBlockSize(param.mg_global.spin_block_size[level]),
-      Nvec(param.mg_global.n_vec[level]),
-      coarse(param.coarse),
-      fine(param.fine),
-      B(B),
-      evals(evals),
-      nu_pre(param.mg_global.nu_pre[level]),
-      nu_post(param.mg_global.nu_post[level]),
-      smoother_tol(param.mg_global.smoother_tol[level]),
-      cycle_type(param.mg_global.cycle_type[level]),
-      global_reduction(param.mg_global.global_reduction[level]),
-      matResidual(matResidual),
-      matSmooth(matSmooth),
-      matSmoothSloppy(matSmoothSloppy),
-      smoother(param.mg_global.smoother[level]),
-      coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
-      smoother_solve_type(param.mg_global.smoother_solve_type[level]),
-      location(param.mg_global.location[level]),
-      setup_location(param.mg_global.setup_location[level])
+      MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, std::vector<Complex> evals,
+              DiracMatrix *matResidual, DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
+        SolverParam(param),
+        mg_global(param.mg_global),
+        level(level),
+        Nlevel(param.Nlevel),
+        spinBlockSize(param.mg_global.spin_block_size[level]),
+        Nvec(param.mg_global.n_vec[level]),
+        coarse(param.coarse),
+        fine(param.fine),
+        B(B),
+        evals(evals),
+        nu_pre(param.mg_global.nu_pre[level]),
+        nu_post(param.mg_global.nu_post[level]),
+        smoother_tol(param.mg_global.smoother_tol[level]),
+        cycle_type(param.mg_global.cycle_type[level]),
+        global_reduction(param.mg_global.global_reduction[level]),
+        matResidual(matResidual),
+        matSmooth(matSmooth),
+        matSmoothSloppy(matSmoothSloppy),
+        smoother(param.mg_global.smoother[level]),
+        coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
+        smoother_solve_type(param.mg_global.smoother_solve_type[level]),
+        location(param.mg_global.location[level]),
+        setup_location(param.mg_global.setup_location[level])
       {
 	// set the block size
 	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
@@ -180,7 +171,7 @@ namespace quda {
      Adaptive Multigrid solver
    */
   class MG : public Solver {
-    
+
   private:
     /** Local copy of the multigrid metadata */
     MGParam &param;
@@ -285,7 +276,7 @@ namespace quda {
       @param profile Timeprofile instance used to profile
     */
     MG(MGParam &param, TimeProfile &profile);
-    
+
     /**
        Destructor for MG class. Frees any existing coarse grid MG
        instance
@@ -347,14 +338,14 @@ namespace quda {
        @brief Load the null space vectors in from file
        @param B Loaded null-space vectors (pre-allocated)
     */
-    void loadVectors(std::vector<ColorSpinorField*> &B);
+    void loadVectors(std::vector<ColorSpinorField *> &B);
 
     /**
        @brief Save the null space vectors in from file
        @param B Save null-space vectors from here
     */
-    void saveVectors(std::vector<ColorSpinorField*> &B);
-    
+    void saveVectors(std::vector<ColorSpinorField *> &B);
+
     /**
        @brief Generate the null-space vectors
        @param B Generated null-space vectors
@@ -370,19 +361,15 @@ namespace quda {
     /**
        @brief Deflate coarse grid initial guess with Eigenvectors
     */
-    void deflateEigenvectors(std::vector<ColorSpinorField*> vec_defl,
-			     std::vector<ColorSpinorField*> vec,
-			     std::vector<ColorSpinorField*> evecs,
-			     std::vector<Complex> evals);
+    void deflateEigenvectors(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
+                             std::vector<ColorSpinorField *> evecs, std::vector<Complex> evals);
 
     /**
        @brief Deflate coarse grid initial guess with SVD
     */
-    void deflateSVD(std::vector<ColorSpinorField*> vec_defl,
-		    std::vector<ColorSpinorField*> vec,
-		    std::vector<ColorSpinorField*> svd_vecs,
-		    std::vector<Complex> svals);
-    
+    void deflateSVD(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
+                    std::vector<ColorSpinorField *> svd_vecs, std::vector<Complex> svals);
+
     /**
        @brief Build free-field null-space vectors
        @param B Free-field null-space vectors
@@ -483,7 +470,7 @@ namespace quda {
 
     std::vector<ColorSpinorField*> B;
     std::vector<Complex> evals;
-    
+
     MGParam *mgParam;
 
     MG *mg;
@@ -512,5 +499,3 @@ namespace quda {
   };
 
 } // namespace quda
-
-

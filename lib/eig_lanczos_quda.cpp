@@ -13,7 +13,6 @@
 
 #include <iostream>
 
-
 #if 0
 namespace quda {
 
@@ -92,7 +91,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     return;
   }
-  
+
 #if 0
   ImpRstLanczos::ImpRstLanczos(RitzMat &ritz_mat, QudaEigParam &eigParam, TimeProfile &profile) :
     Eig_Solver(eigParam, profile), ritz_mat(ritz_mat)

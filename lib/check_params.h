@@ -160,10 +160,10 @@ void printQudaEigParam(QudaEigParam *param) {
   P(tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
-  P(arpack_check, QUDA_BOOLEAN_NO);  
+  P(arpack_check, QUDA_BOOLEAN_NO);
   P(nk, 0);
   P(np, 0);
-  P(eig_type, QUDA_IMP_RST_LANCZOS);  
+  P(eig_type, QUDA_IMP_RST_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
@@ -180,16 +180,15 @@ void printQudaEigParam(QudaEigParam *param) {
   P(tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
-  P(arpack_check, QUDA_BOOLEAN_INVALID);  
+  P(arpack_check, QUDA_BOOLEAN_INVALID);
   P(nk, INVALID_INT);
   P(np, INVALID_INT);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
-  P(eig_type, QUDA_INVALID_EIG_TYPE);  
+  P(eig_type, QUDA_INVALID_EIG_TYPE);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
-
 
 #if defined INIT_PARAM
   P(location, QUDA_CUDA_FIELD_LOCATION);
@@ -267,7 +266,8 @@ void printQudaCloverParam(QudaInvertParam *param)
 // define the appropriate function for InvertParam
 
 #if defined INIT_PARAM
- QudaInvertParam newQudaInvertParam(void) {
+QudaInvertParam newQudaInvertParam(void)
+{
   QudaInvertParam ret;
   QudaInvertParam *param=&ret;
 #elif defined CHECK_PARAM
@@ -475,13 +475,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #ifdef INIT_PARAM
   P(use_init_guess, QUDA_USE_INIT_GUESS_NO); //set the default to no
-  //P(deflated_guess, QUDA_DEFLATED_GUESS_NO); //set the default to no
-  //P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_NO); //set the default to no
+  // P(deflated_guess, QUDA_DEFLATED_GUESS_NO); //set the default to no
+  // P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_NO); //set the default to no
   P(omega, 1.0); // set default to no relaxation
 #else
   P(use_init_guess, QUDA_USE_INIT_GUESS_INVALID);
-  //P(deflated_guess, QUDA_DEFLATED_GUESS_INVALID);
-  //P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
+  // P(deflated_guess, QUDA_DEFLATED_GUESS_INVALID);
+  // P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(omega, INVALID_DOUBLE);
 #endif
 
@@ -760,7 +760,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(use_low_modes, QUDA_BOOLEAN_INVALID);
   P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
   P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
-  
+
 #ifdef INIT_PARAM
   P(vec_load, QUDA_BOOLEAN_INVALID);
   P(vec_store, QUDA_BOOLEAN_INVALID);
