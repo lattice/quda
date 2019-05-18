@@ -54,17 +54,14 @@ namespace quda
     Vector x = arg.x(x_cb, parity);
     Vector y = arg.y(x_cb, parity);
     
-    complex<Float> innerP(0.0,0.0);
-
     int idx = x_cb + parity*arg.threads;
 
     for (int mu=0; mu<nSpin; mu++) {
       for (int nu=0; nu<nSpin; nu++) {
 
-	innerP = innerProduct(x,y,mu,nu);
 	//Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}>
 	//The Bra is conjugated	
-	reinterpret_cast<complex<Float>*>(arg.result)[nSpin*nSpin*idx + mu*nSpin + nu] = innerP;//roduct(x,y,mu,nu);
+	reinterpret_cast<complex<Float>*>(arg.result)[nSpin*nSpin*idx + mu*nSpin + nu] = innerProduct(x,y,mu,nu);
       }
     }
   }
@@ -89,13 +86,14 @@ namespace quda
     int site = x_cb + parity*arg.threads;
     int idx = site*nSpin*nSpin;
     
-    complex<Float> temp[4][4];
+    complex<Float> spin_elem[4][4];
+    complex<Float> result_local(0.0,0.0);
     
     //Color contract: <\phi(x)_{\mu} | \phi(y)_{\nu}>
     //The Bra is conjugated	
     for (int mu=0; mu<nSpin; mu++) {
       for (int nu=0; nu<nSpin; nu++) {
-	temp[mu][nu] = innerProduct(x,y,mu,nu);	
+	spin_elem[mu][nu] = innerProduct(x,y,mu,nu);	
       }
     }
     
@@ -108,138 +106,153 @@ namespace quda
 
     //SCALAR
     //G_idx = 0: I
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[0][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[1][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[2][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[3][3];    
+    result_local = 0.0;
+    result_local += spin_elem[0][0];
+    result_local += spin_elem[1][1];
+    result_local += spin_elem[2][2];
+    result_local += spin_elem[3][3];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //VECTORS
     //G_idx = 1: \gamma_1
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[0][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[1][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[2][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[3][0];
+    result_local = 0.0;
+    result_local += I*spin_elem[0][3];
+    result_local += I*spin_elem[1][2];
+    result_local -= I*spin_elem[2][1];
+    result_local -= I*spin_elem[3][0];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //G_idx = 2: \gamma_2
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[0][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[1][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[2][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[3][0];
+    result_local = 0.0;
+    result_local -= spin_elem[0][3];
+    result_local += spin_elem[1][2];
+    result_local += spin_elem[2][1];
+    result_local -= spin_elem[3][0];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //G_idx = 3: \gamma_3
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[0][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[1][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[2][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[3][1];
+    result_local = 0.0;
+    result_local += I*spin_elem[0][2];
+    result_local -= I*spin_elem[1][3];
+    result_local -= I*spin_elem[2][0];
+    result_local += I*spin_elem[3][1];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //G_idx = 4: \gamma_4
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[0][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[1][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[2][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[3][1];
+    result_local = 0.0;
+    result_local += spin_elem[0][2];
+    result_local += spin_elem[1][3];
+    result_local += spin_elem[2][0];
+    result_local += spin_elem[3][1];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //PSEUDO-SCALAR
     //G_idx = 5: \gamma_5
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[0][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[1][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[2][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[3][3];
+    result_local = 0.0;
+    result_local += spin_elem[0][0];
+    result_local += spin_elem[1][1];
+    result_local -= spin_elem[2][2];
+    result_local -= spin_elem[3][3];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //PSEUDO-VECTORS
     //DMH: Careful here... we may wish to use  \gamma_1,2,3,4\gamma_5 for pseudovectors
     //G_idx = 6: \gamma_5\gamma_1
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[0][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[1][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[2][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[3][0];
+    result_local = 0.0;
+    result_local += I*spin_elem[0][3];
+    result_local += I*spin_elem[1][2];
+    result_local += I*spin_elem[2][1];
+    result_local += I*spin_elem[3][0];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //G_idx = 7: \gamma_5\gamma_2
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[0][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[1][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[2][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[3][0];
+    result_local = 0.0;
+    result_local -= spin_elem[0][3];
+    result_local += spin_elem[1][2];
+    result_local -= spin_elem[2][1];
+    result_local += spin_elem[3][0];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //G_idx = 8: \gamma_5\gamma_3
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[0][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[1][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[2][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[3][1];
+    result_local = 0.0;
+    result_local += I*spin_elem[0][2];
+    result_local -= I*spin_elem[1][3];
+    result_local += I*spin_elem[2][0];
+    result_local -= I*spin_elem[3][1];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
     
     //G_idx = 9: \gamma_5\gamma_4
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[0][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[1][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[2][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[3][1];
+    result_local = 0.0;
+    result_local += spin_elem[0][2];
+    result_local += spin_elem[1][3];
+    result_local -= spin_elem[2][0];
+    result_local -= spin_elem[3][1];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //TENSORS
     //G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[0][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[1][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[2][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[3][3];
+    result_local = 0.0;
+    result_local += spin_elem[0][0];
+    result_local -= spin_elem[1][1];
+    result_local += spin_elem[2][2];
+    result_local -= spin_elem[3][3];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //G_idx = 11: (i/2) * [\gamma_1, \gamma_3]
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[0][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[1][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[2][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[3][1];
+    result_local = 0.0;
+    result_local -= I*spin_elem[0][2];
+    result_local -= I*spin_elem[1][3];
+    result_local += I*spin_elem[2][0];
+    result_local += I*spin_elem[3][1];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[0][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[1][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[2][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[3][2];
+    result_local = 0.0;
+    result_local -= spin_elem[0][1];
+    result_local -= spin_elem[1][0];
+    result_local += spin_elem[2][3];
+    result_local += spin_elem[3][2];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[0][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[1][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[2][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[3][2];
+    result_local = 0.0;
+    result_local += spin_elem[0][1];
+    result_local += spin_elem[1][0];
+    result_local += spin_elem[2][3];
+    result_local += spin_elem[3][2];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
     
     //G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[0][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[1][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += I*temp[2][3];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= I*temp[3][2];
+    result_local = 0.0;
+    result_local -= I*spin_elem[0][1];
+    result_local += I*spin_elem[1][0];
+    result_local += I*spin_elem[2][3];
+    result_local -= I*spin_elem[3][2];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;
 
     //G_idx = 15: (i/2) * [\gamma_3, \gamma_4]
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = 0.0;
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[0][0];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] -= temp[1][1];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[2][2];
-    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] += temp[3][3];
+    result_local = 0.0;
+    result_local -= spin_elem[0][0];
+    result_local -= spin_elem[1][1];
+    result_local += spin_elem[2][2];
+    result_local += spin_elem[3][3];
+    reinterpret_cast<complex<Float>*>(arg.result)[idx + G_idx] = result_local;
     G_idx++;    
   }
   
 } // namespace quda
-  

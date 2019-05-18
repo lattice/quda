@@ -1173,15 +1173,16 @@ extern "C" {
 
   /**
    * Public function to perform color contractions of the host spinors x and y.
-   * @param[in] x pointer to host data 
-   * @param[in] y pointer to host data 
+   * @param[in] x pointer to host data
+   * @param[in] y pointer to host data
    * @param[out] result pointer to the 16 spin projections per lattice site
    * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
    * @param[in] param meta data for construction of ColorSpinorFields.
    * @param[in] X spacetime data for construction of ColorSpinorFields.
    */
-  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param, const int *X);
-  
+  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
+                    const int *X);
+
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed

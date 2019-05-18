@@ -471,9 +471,9 @@ extern "C" {
   } QudaStaggeredPhase;
 
   typedef enum QudaContractType_s {
-    QUDA_CONTRACT_TYPE_OPEN, //Open spin elementals
-    QUDA_CONTRACT_TYPE_DR,   //DegrandRossi
-    QUDA_CONTRACT_TYPE_DP,   //DiracPauli
+    QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
+    QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
+    QUDA_CONTRACT_TYPE_DP,   // DiracPauli
     QUDA_CONTRACT,
     QUDA_CONTRACT_PLUS,
     QUDA_CONTRACT_MINUS,
@@ -502,7 +502,7 @@ extern "C" {
     QUDA_CONTRACT_GAMMA_S14 = 12,
     QUDA_CONTRACT_GAMMA_S21 = 13,
     QUDA_CONTRACT_GAMMA_S23 = 14,
-    QUDA_CONTRACT_GAMMA_S34 = 15,    
+    QUDA_CONTRACT_GAMMA_S34 = 15,
     QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
   } QudaContractGamma;
 

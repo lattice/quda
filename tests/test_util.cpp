@@ -1845,7 +1845,8 @@ void usage(char** argv )
   printf("    --mg-generate-all-levels <true/talse>     # true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
-  printf("    --mg-verbosity <level verb>               # The verbosity to use on each level of the multigrid (default summarize)\n");
+  printf("    --mg-verbosity <level verb>               # The verbosity to use on each level of the multigrid (default "
+         "summarize)\n");
   printf("    --df-nev <nev>                            # Set number of eigenvectors computed within a single solve cycle (default 8)\n");
   printf("    --df-max-search-dim <dim>                 # Set the size of eigenvector search space (default 64)\n");
   printf("    --df-deflation-grid <n>                   # Set maximum number of cycles needed to compute eigenvectors(default 1)\n");
@@ -1871,8 +1872,9 @@ void usage(char** argv )
   printf("    --heatbath-num-or-per-step <n>            # Number of overrelaxation hits per heatbath step (default 5)\n");
   printf("    --heatbath-coldstart <true/false>         # Whether to use a cold or hot start in heatbath test (default false)\n");
 
-  printf("    --contraction-type <open/dr/dp>           # Whether to leave spin elemental open, or use a gamma basis and contract on spin (default open)\n");
-  
+  printf("    --contraction-type <open/dr/dp>           # Whether to leave spin elemental open, or use a gamma basis "
+         "and contract on spin (default open)\n");
+
   printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv);
@@ -3652,14 +3654,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--contract-type") == 0){
+  if (strcmp(argv[i], "--contract-type") == 0) {
     if (i + 1 >= argc) { usage(argv); }
-    contract_type = get_contract_type(argv[i+1]);
+    contract_type = get_contract_type(argv[i + 1]);
     i++;
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--version") == 0){
     printf("This program is linked with QUDA library, version %s,", get_quda_ver_str());
     printf(" %s GPU build\n", msg);

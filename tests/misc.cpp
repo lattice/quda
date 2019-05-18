@@ -959,49 +959,36 @@ get_dslash_str(QudaDslashType type)
     
 }
 
-QudaContractType
-get_contract_type(char* s)
+QudaContractType get_contract_type(char *s)
 {
   QudaContractType ret = QUDA_CONTRACT_INVALID;
-  
-  if (strcmp(s, "open") == 0 || strcmp(s, "OPEN") == 0 || strcmp(s, "Open") == 0){
+
+  if (strcmp(s, "open") == 0 || strcmp(s, "OPEN") == 0 || strcmp(s, "Open") == 0) {
     ret = QUDA_CONTRACT_TYPE_OPEN;
-  }else if (strcmp(s, "dr") == 0 || strcmp(s, "DR") == 0){
+  } else if (strcmp(s, "dr") == 0 || strcmp(s, "DR") == 0) {
     ret = QUDA_CONTRACT_TYPE_DR;
-  }else if (strcmp(s, "dp") == 0 || strcmp(s, "DP") == 0){
+  } else if (strcmp(s, "dp") == 0 || strcmp(s, "DP") == 0) {
     ret = QUDA_CONTRACT_TYPE_DP;
-  }else{
-    fprintf(stderr, "Error: invalid contract type\n");	
+  } else {
+    fprintf(stderr, "Error: invalid contract type\n");
     exit(1);
-  }  
-  return ret;
-}
-
-const char* 
-get_contract_str(QudaContractType type)
-{
-  const char* ret;
-  
-  switch( type){	
-  case QUDA_CONTRACT_TYPE_OPEN:
-    ret=  "open";
-    break;
-  case QUDA_CONTRACT_TYPE_DR:
-    ret= "Degrand-Rossi";
-    break;
-  case QUDA_CONTRACT_TYPE_DP:
-    ret= "Dirac-Pauli";
-    break;
-  default:
-    ret = "unknown";	
-    break;
   }
-  
-  
   return ret;
-    
 }
 
+const char *get_contract_str(QudaContractType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_CONTRACT_TYPE_OPEN: ret = "open"; break;
+  case QUDA_CONTRACT_TYPE_DR: ret = "Degrand-Rossi"; break;
+  case QUDA_CONTRACT_TYPE_DP: ret = "Dirac-Pauli"; break;
+  default: ret = "unknown"; break;
+  }
+
+  return ret;
+}
 
 QudaMassNormalization
 get_mass_normalization_type(char* s)

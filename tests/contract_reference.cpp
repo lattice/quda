@@ -23,11 +23,11 @@ extern void *memset(void *s, int c, size_t n);
 
 #include <dslash_util.h>
 
-//Definition of the Degrand Rossi gamma basis
-//The slowest index is the gamma matrix,
-//the next index is the row (top to bottom)
-//the last index is the 8 integers defining
-//the entries of the row.
+// Definition of the Degrand Rossi gamma basis
+// The slowest index is the gamma matrix,
+// the next index is the row (top to bottom)
+// the last index is the 8 integers defining
+// the entries of the row.
 
 #if 0
 static const int degrand_rossi[5][4][8] = {
