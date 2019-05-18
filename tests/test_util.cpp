@@ -4,11 +4,7 @@
 #include <string.h>
 #include <short.h>
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
+#include <comm_quda.h>
 
 // This contains the appropriate ifdef guards already
 #include <mpi_comm_handle.h>
@@ -413,28 +409,6 @@ void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconst
     else su3Reconstruct8((float*)mat, dir, ga_idx, param);
   }
 }
-
-/*
-  void su3_construct_8_half(float *mat, short *mat_half) {
-  su3Construct8(mat);
-
-  mat_half[0] = floatToShort(mat[0] / M_PI);
-  mat_half[1] = floatToShort(mat[1] / M_PI);
-  for (int i=2; i<18; i++) {
-  mat_half[i] = floatToShort(mat[i]);
-  }
-  }
-
-  void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx, QudaGaugeParam *param) {
-
-  for (int i=0; i<18; i++) {
-  mat[i] = shortToFloat(mat_half[i]);
-  }
-  mat[0] *= M_PI;
-  mat[1] *= M_PI;
-
-  su3Reconstruct8(mat, dir, ga_idx, param);
-  }*/
 
 template <typename Float>
 static int compareFloats(Float *a, Float *b, int len, double epsilon) {
@@ -1371,8 +1345,23 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
   return;
 }
 
+void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng)
+{
+  quda::ColorSpinorParam param;
+  param.v = v;
+  param.nColor = nColor;
+  param.nSpin = nSpin;
+  param.setPrecision(precision);
+  param.create = QUDA_REFERENCE_FIELD_CREATE;
+  param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  param.nDim = 4;
+  param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  for (int d = 0; d < 4; d++) param.x[d] = x[d];
+  quda::cpuColorSpinorField spinor_in(param);
 
-
+  quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
+}
 
 template <typename Float>
 int compareLink(Float **linkA, Float **linkB, int len) {
@@ -4091,7 +4080,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--ngcrkrylov") == 0 || strcmp(argv[i], "--ca-basis-size") == 0) {
     if (i+1 >= argc){
       usage(argv);
@@ -4149,7 +4138,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--pipeline") == 0){
     if (i+1 >= argc){
       usage(argv);

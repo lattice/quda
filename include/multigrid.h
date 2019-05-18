@@ -269,7 +269,31 @@ namespace quda {
     /** Parallel hyper-cubic random number generator for generating null-space vectors */
     RNG *rng;
 
-  public:
+    /**
+       @brief Load the null space vectors in from file
+       @param B Loaded null-space vectors (pre-allocated)
+    */
+    void loadVectors(std::vector<ColorSpinorField*> &B);
+
+    /**
+       @brief Save the null space vectors in from file
+       @param B Save null-space vectors from here
+    */
+    void saveVectors(std::vector<ColorSpinorField*> &B) const;
+
+    /**
+       @brief Helper function called on entry to each MG function
+       @param[in] level The level we working on
+    */
+    void pushLevel(int level) const;
+
+    /**
+       @brief Helper function called on exit to each MG member function
+       @param[in] level The level we working on
+    */
+    void popLevel(int level) const;
+
+public:
     /** 
       Constructor for MG class
       @param param MGParam struct that defines all meta data

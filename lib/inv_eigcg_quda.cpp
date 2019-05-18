@@ -221,7 +221,7 @@ public:
     cudaHostUnregister(evecm);
     cudaHostUnregister(evecm1);
 #else
-    errorQuda("Magma library was not built.\n");
+    errorQuda("Magma library was not built.");
 #endif
     return;
   }
@@ -272,9 +272,16 @@ public:
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
-    if( param.rhs_idx < param.deflation_grid )  printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.\n", param.m, param.nev);
-    else {  
-      printfQuda("\nDeflation space is complete, running initCG solver.\n");
+
+    if (2 * param.nev >= param.m)
+      errorQuda(
+        "Incorrect number of the requested low modes: m= %d while nev=%d (note that 2*nev must be less then m).",
+        param.m, param.nev);
+
+    if (param.rhs_idx < param.deflation_grid)
+      printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.", param.m, param.nev);
+    else {
+      printfQuda("\nDeflation space is complete, running initCG solver.");
       fillInitCGSolverParam(Kparam, param);
       //K = new CG(mat, matPrecon, Kparam, profile);//Preconditioned Mat has comms flag on
       return;
@@ -283,7 +290,8 @@ public:
     if ( param.inv_type == QUDA_EIGCG_INVERTER ) {
       fillEigCGInnerSolverParam(Kparam, param);
     } else if ( param.inv_type == QUDA_INC_EIGCG_INVERTER ) {
-      if(param.inv_type_precondition != QUDA_INVALID_INVERTER)  errorQuda("preconditioning is not supported for the incremental solver \n");
+      if (param.inv_type_precondition != QUDA_INVALID_INVERTER)
+        errorQuda("preconditioning is not supported for the incremental solver.");
       fillInitCGSolverParam(Kparam, param);
     }
 
@@ -333,7 +341,7 @@ public:
     } else if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {
       ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
     } else {
-      errorQuda( "Library type %d is currently not supported.\n",param.extlib_type );
+      errorQuda("Library type %d is currently not supported.", param.extlib_type);
     }
 
     //Restart V:
