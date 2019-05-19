@@ -948,20 +948,33 @@ namespace quda
   }
 
   // supports separate reading or single file read
-  void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
-    
+  void MG::loadVectors(std::vector<ColorSpinorField*> &B)
+  {
+    popLevel(param.level);
+    profile_global.TPSTOP(QUDA_PROFILE_INIT);
+    profile_global.TPSTART(QUDA_PROFILE_IO);    
     std::string vec_infile(param.mg_global.vec_infile);
     vec_infile += "_level_";
     vec_infile += std::to_string(param.level);
     eig_solver->loadVectors(B, vec_infile);
+    popLevel(param.level);
+    profile_global.TPSTOP(QUDA_PROFILE_IO);
+    profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
   
   void MG::saveVectors(std::vector<ColorSpinorField *> &B)
   {
+
+    profile_global.TPSTOP(QUDA_PROFILE_INIT);
+    profile_global.TPSTART(QUDA_PROFILE_IO);
+    pushLevel(param.level);
     std::string vec_outfile(param.mg_global.vec_outfile);
     vec_outfile += "_level_";
     vec_outfile += std::to_string(param.level);
     eig_solver->saveVectors(B, vec_outfile);
+    popLevel(param.level);
+    profile_global.TPSTOP(QUDA_PROFILE_IO);
+    profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
   
   void MG::dumpNullVectors()
