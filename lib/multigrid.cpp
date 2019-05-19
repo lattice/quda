@@ -92,7 +92,7 @@ namespace quda
         }
         if ( param.mg_global.num_setup_iter[param.level] > 0 ) generateNullVectors(param.B);
       } else if (param.mg_global.vec_load == QUDA_BOOLEAN_YES) { // only conditional load of null vectors
-
+	
         loadVectors(param.B);
       } else { // generate free field vectors
         buildFreeVectors(param.B);
@@ -912,6 +912,8 @@ namespace quda
 
   //supports seperate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
+
+    profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     pushLevel(param.level);
 
@@ -982,10 +984,13 @@ namespace quda
 
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
+    profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) const {
 #ifdef HAVE_QIO
+    
+    profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     pushLevel(param.level);
 
@@ -1030,6 +1035,7 @@ namespace quda
 
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
+    profile_global.TPSTART(QUDA_PROFILE_INIT);
 #else
     if (strcmp(param.mg_global.vec_outfile,"")!=0) {
       errorQuda("\nQIO library was not built.\n");
