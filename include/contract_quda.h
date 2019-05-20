@@ -7,5 +7,3 @@ namespace quda
 {
   void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, QudaContractType cType);
 } // namespace quda
-
-#endif
