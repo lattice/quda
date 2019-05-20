@@ -92,7 +92,7 @@ namespace quda
         }
         if ( param.mg_global.num_setup_iter[param.level] > 0 ) generateNullVectors(param.B);
       } else if (param.mg_global.vec_load == QUDA_BOOLEAN_YES) { // only conditional load of null vectors
-	
+
         loadVectors(param.B);
       } else { // generate free field vectors
         buildFreeVectors(param.B);
@@ -989,7 +989,7 @@ namespace quda
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) const {
 #ifdef HAVE_QIO
-    
+
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     pushLevel(param.level);
