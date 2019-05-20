@@ -596,12 +596,15 @@ namespace quda {
 
           if (heavy_quark_res > heavy_quark_res_old) { // check if new hq residual is greater than previous
             hqresIncrease++; // count the number of consecutive increases
-            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
+            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
+                        heavy_quark_res, heavy_quark_res_old);
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
               warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
               break;
             }
+          } else {
+            hqresIncrease = 0;
           }
 
           if (hqresRestartTotal > hqmaxresRestartTotal) {
@@ -639,7 +642,7 @@ namespace quda {
 
       // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
-        // L2 is concverged or precision maxed out for L2
+        // L2 is converged or precision maxed out for L2
         bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
         // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
         bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
