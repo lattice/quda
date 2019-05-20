@@ -25,7 +25,11 @@ namespace quda {
 #include <sys/time.h>
 
 #ifdef INTERFACE_NVTX
+#if QUDA_NVTX_VERSION == 3
+#include "nvtx3/nvToolsExt.h"
+#else
 #include "nvToolsExt.h"
+#endif
 #endif
 
 namespace quda {
