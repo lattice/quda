@@ -32,28 +32,27 @@ protected:
     bool reverse;   // True if using polynomial acceleration
     char *spectrum; // Part of the spectrum to be computed.
 
-    // Algorithm parameters
+    // Algorithm variables
     //--------------------
     bool converged;
-    int num_converged;
     int restart_iter;
     int max_restarts;
     int check_interval;
-
+    int iter;
+    int iter_converged;
+    int iter_locked;
+    int iter_keep;
+    int num_converged;
+    int num_locked;
+    int num_keep;
+    
     double *residua;
-    double *residua_old;
-    // Tracks if an eigenpair is locked
-    bool *locked;
 
     // Device side vector workspace
     std::vector<ColorSpinorField *> r;
     std::vector<ColorSpinorField *> d_vecs_tmp;
 
     Complex *Qmat;
-
-    Complex sigma_k;
-    double beta_m;
-    double max_eig; // Used as an estimate for the Lanczos matrix norm.
 
 public:
     EigenSolver(QudaEigParam *eig_param, TimeProfile &profile);
@@ -115,17 +114,12 @@ public:
     /**
        @brief Compute eigenvalues and their residiua
        @param[in] mat Matrix operator
+       @param[in] evecs The eigenvectors
        @param[in] evals The eigenvalues
        @param[in] k The number to compute
     */
-    void computeEvals(const Dirac &mat, std::vector<Complex> &evals, int k);
-
-    /**
-       @brief Rotate eigenvectors by dense matrix
-       @param[in] kSpace the vectors to be rotated
-    */
-    void basisRotateQ(std::vector<ColorSpinorField *> &kSpace, int k);
-
+    void computeEvals(const Dirac &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals, int k);
+    
     /**
        @brief Load vectors from file
        @param[in] eig_vecs The eigenvectors to load
@@ -150,27 +144,33 @@ public:
   };
 
   /**
-     @brief Implicily Restarted Lanczos Method.
+     @brief Thick Restarted LAnczos Method.
   */
-  class IRLM : public EigenSolver
-  {
-
-public:
+  class TRLM : public EigenSolver {
+    
+  public:
     const Dirac &mat;
-    IRLM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
-    virtual ~IRLM();
-
-    // Tridiagonal matrix
+    TRLM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
+    virtual ~TRLM();
+    
+    //Variable size
+    std::vector<double> ritz_mat;
+    
+    // Tridiagonal/Arrow matrix, fixed size.
     double *alpha;
     double *beta;
-
+    
+    //Used to clone vectors and resize arrays.
+    ColorSpinorParam csParam;
+    
     /**
        @brief Compute eigenpairs
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
-
+       
     */
-    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    void operator()(std::vector<ColorSpinorField*> &kSpace,
+		    std::vector<Complex> &evals);
 
     /**
        @brief Lanczos step: extends the Kylov space.
@@ -180,18 +180,23 @@ public:
     void lanczosStep(std::vector<ColorSpinorField *> v, int j);
 
     /**
-       @brief Rotate eigenvectors by dense matrix dervied
-       from the tridiagonal matrix in Lanczos
-       @param[in] kSpace The vectors to be rotated
-       @param[in] size The number of vectors to be rotated
+       @brief Reorder the Krylov space by eigenvalue
+       @param[in] kSpace the Krylov space
     */
-    void basisRotateTriDiag(std::vector<ColorSpinorField *> &kSpace, int size);
+    void reorder(std::vector<ColorSpinorField*> &kSpace);
 
     /**
-       @brief Computes QR factorisation from the Lanczos tridiagonal matrix
-       @param[in] k size of current factorisation
+       @brief Get the eigendecomposition from the arrow matrix
+       @param[in] nLocked Number of locked eigenvectors
+       @param[in] arrow_pos position of arrowhead
     */
-    void computeQRfromTridiag(int k);
+    void eigensolveFromArrowMat(int nLocked, int arror_pos);
+
+    /**
+       @brief Get the eigen-decomposition from the arrow matrix
+       @param[in] nKspace current Kryloc space
+    */
+    void computeKeptRitz(std::vector<ColorSpinorField*> &kSpace);
 
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left
@@ -203,9 +208,17 @@ public:
        @param[in] inverse Inverse sort if using PolyAcc
     */
     void computeSVD(std::vector<ColorSpinorField *> &kSpace, std::vector<ColorSpinorField *> &evecs,
-                    std::vector<Complex> &evals, bool inverse);
+                    std::vector<Complex> &evals, bool reverse);
   };
-
+  
+  /**
+     @brief Computes eigen-decomposition using QUDA's arpack interface 
+     @param[in] h_evecs host pointer to evecs
+     @param[in] h_evals host pointer to evals
+     @param[in] mat The operator
+     @param[in] eig_param parameter structure for all QUDA eigensolvers
+     @param[in] cpuParam parameter structure for creating device vectors
+  */
   void arpack_solve(void *h_evecs, void *h_evals, const Dirac &mat, QudaEigParam *eig_param, ColorSpinorParam *cpuParam);
 
 } // namespace quda

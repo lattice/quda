@@ -2457,21 +2457,22 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   // Create device side ColorSpinorField vector space and to pass to the
   // compute function.
   const int *X = cudaGauge->X();
-  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
 
+  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
+  
   cpuParam.v = host_evecs;
   ColorSpinorField *h_tmp = ColorSpinorField::Create(cpuParam);
   double norm = sqrt(blas::norm2(*h_tmp));
   printfQuda("Initial residual vector norm = %f\n", norm);
-
+  
   ColorSpinorParam *cudaParam(&cpuParam);
   cudaParam->location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam->create = QUDA_ZERO_FIELD_CREATE;
   eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ? cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
-                                                       cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-
+    cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+  
   if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) { cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER; }
-
+  
   std::vector<Complex> evals(eig_param->nKr, 0.0);
   std::vector<ColorSpinorField *> kSpace;
   for (int i = 0; i < eig_param->nKr; i++) { kSpace.push_back(ColorSpinorField::Create(*cudaParam)); }

@@ -1373,9 +1373,10 @@ namespace quda
     // Extract eigensolver params from the size of the null space.
     int nConv = param.B.size();
     param.mg_global.eig_param[param.level]->nConv = nConv;
-    int nEv = param.B.size();
+    int nEv = param.B.size() + 10;
     param.mg_global.eig_param[param.level]->nEv = nEv;
-    int nKr = nEv + nEv / 2;
+    //int nKr = nEv + nEv / 2;
+    int nKr = 3*nEv;
     param.mg_global.eig_param[param.level]->nKr = nKr;
 
     // Dummy array to keep the eigensolver happy.

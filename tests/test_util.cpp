@@ -1727,7 +1727,7 @@ QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
-int eig_nEv = 24;
+int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
 int eig_check_interval = 10;
@@ -1735,13 +1735,13 @@ int eig_max_restarts = 1000;
 double eig_tol = 1e-6;
 bool eig_use_poly_acc = true;
 int eig_poly_deg = 100;
-double eig_amin = 1.0;
-double eig_amax = 10.0;
+double eig_amin = 0.1;
+double eig_amax = 4.0;
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
 bool eig_compute_svd = false;
 QudaEigSpectrumType eig_spectrum = QUDA_LR_EIG_SPECTRUM;
-QudaEigType eig_type = QUDA_IMP_RST_LANCZOS;
+QudaEigType eig_type = QUDA_THICK_RST_LANCZOS;
 bool eig_arpack_check = false;
 char eig_arpack_logfile[256] = "arpack_logfile.log";
 char eig_QUDA_logfile[256] = "QUDA_logfile.log";
@@ -1829,7 +1829,7 @@ void usage(char** argv )
   printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
   printf(
-    "    --inv-deflate <true/false>                # Run the IRLM eigensolver to deflate low modes (default false)\n");
+	 "    --inv-deflate <true/false>                # Run the IRLM eigensolver to deflate low modes (default false)\n");
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
