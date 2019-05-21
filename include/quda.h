@@ -141,7 +141,7 @@ extern "C" {
        requires more low-precision memory allocation. */
     int solution_accumulator_pipeline;
 
-    /**< This parameter determines how many consective reliable update
+    /**< This parameter determines how many consecutive reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase;
@@ -150,6 +150,16 @@ extern "C" {
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
+
+    /**< This parameter determines how many consecutive heavy-quark
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_hq_res_increase;
+
+    /**< This parameter determines how many total heavy-quark residual
+    restarts we tolerate before terminating the solver, i.e., how long
+    do we want to keep trying to converge */
+    int max_hq_res_restart_total;
 
     /**< After how many iterations shall the heavy quark residual be updated */
     int heavy_quark_check;

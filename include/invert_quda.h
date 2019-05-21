@@ -72,7 +72,7 @@ namespace quda {
        requires more low-precision memory allocation. */
     int solution_accumulator_pipeline;
 
-    /**< This parameter determines how many consective reliable update
+    /**< This parameter determines how many consecutive reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase;
@@ -81,6 +81,16 @@ namespace quda {
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
+
+    /**< This parameter determines how many consecutive heavy-quark
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_hq_res_increase;
+
+    /**< This parameter determines how many total heavy-quark residual
+    restarts we tolerate before terminating the solver, i.e., how long
+    do we want to keep trying to converge */
+    int max_hq_res_restart_total;
 
     /**< After how many iterations shall the heavy quark residual be updated */
     int heavy_quark_check;
@@ -246,6 +256,7 @@ namespace quda {
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
+      max_hq_res_increase(param.max_hq_res_increase), max_hq_res_restart_total(param.max_hq_res_restart_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
       compute_true_res(param.compute_true_res), sloppy_converge(false), true_res(param.true_res),
@@ -285,6 +296,7 @@ namespace quda {
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
+      max_hq_res_increase(param.max_hq_res_increase), max_hq_res_restart_total(param.max_hq_res_restart_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
       compute_true_res(param.compute_true_res), sloppy_converge(param.sloppy_converge), true_res(param.true_res),
