@@ -193,8 +193,7 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
 {
 
   int faults = 0;
-  Float tol = 0.0;
-  tol = (sizeof(Float) == sizeof(double)) ? tol = 1e-9 : tol = 2e-5;
+  Float tol = (sizeof(Float) == sizeof(double) ? 1e-9 : 2e-5);
   void *h_result = malloc(V * 2 * 16 * sizeof(Float));
 
   // compute spin elementals
@@ -210,17 +209,17 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
       if (abs(((Float *)h_result)[32 * i + 2 * j] - ((Float *)d_result)[32 * i + 2 * j]) > tol) {
         faults++;
         pass = false;
-        // printfQuda("Contrcation %d %d failed\n", i, j);
+        // printfQuda("Contraction %d %d failed\n", i, j);
       } else {
-        // printfQuda("Contrcation %d %d passed\n", i, j);
+        // printfQuda("Contraction %d %d passed\n", i, j);
       }
       // printfQuda("%.16f %.16f\n", ((Float*)h_result)[32*i + 2*j],((Float*)d_result)[32*i + 2*j]);
       if (abs(((Float *)h_result)[32 * i + 2 * j + 1] - ((Float *)d_result)[32 * i + 2 * j + 1]) > tol) {
         faults++;
         pass = false;
-        // printfQuda("Contrcation %d %d failed\n", i, j);
+        // printfQuda("Contraction %d %d failed\n", i, j);
       } else {
-        // printfQuda("Contrcation %d %d passed\n", i, j);
+        // printfQuda("Contraction %d %d passed\n", i, j);
       }
       // printfQuda("%.16f %.16f\n", ((Float*)h_result)[32*i+2*j+1],((Float*)d_result)[32*i+2*j+1]);
     }

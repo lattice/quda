@@ -502,7 +502,7 @@ double benchmark(int kernel, const int niter) {
 #define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)
 
 double test(int kernel) {
-
+  
   double a = M_PI, b = M_PI*exp(1.0), c = sqrt(M_PI);
   quda::Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
   double error = 0;

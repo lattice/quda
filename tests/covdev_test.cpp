@@ -409,11 +409,11 @@ int main(int argc, char **argv)
         } else {
           printfQuda("Result mu = %d: CPU=%f , CPU-CUDA=%f", mu, spinor_ref_norm2, spinor_out_norm2);
         }
-
+	
         if (verify_results) {
           ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
           if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-
+	  
           test_rc = RUN_ALL_TESTS();
           if (test_rc != 0) warningQuda("Tests failed");
         }
