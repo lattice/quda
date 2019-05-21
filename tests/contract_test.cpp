@@ -193,8 +193,7 @@ void test(int contractionType, int Prec)
   // result in the array 'result'
   // We then compare the GPU result with a CPU refernce code
 
-  QudaContractType cType = QUDA_CONTRACT_TYPE_OPEN;
-
+  QudaContractType cType = QUDA_CONTRACT_TYPE_INVALID;
   switch (contractionType) {
   case 0: cType = QUDA_CONTRACT_TYPE_OPEN; break;
   case 1: cType = QUDA_CONTRACT_TYPE_DR; break;

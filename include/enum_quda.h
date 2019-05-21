@@ -474,16 +474,7 @@ extern "C" {
     QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
     QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
     QUDA_CONTRACT_TYPE_DP,   // DiracPauli
-    QUDA_CONTRACT,
-    QUDA_CONTRACT_PLUS,
-    QUDA_CONTRACT_MINUS,
-    QUDA_CONTRACT_GAMMA5,
-    QUDA_CONTRACT_GAMMA5_PLUS,
-    QUDA_CONTRACT_GAMMA5_MINUS,
-    QUDA_CONTRACT_TSLICE,
-    QUDA_CONTRACT_TSLICE_PLUS,
-    QUDA_CONTRACT_TSLICE_MINUS,
-    QUDA_CONTRACT_INVALID = QUDA_INVALID_ENUM
+    QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
 
   typedef enum QudaContractGamma_s {
@@ -506,7 +497,7 @@ extern "C" {
     QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
   } QudaContractGamma;
 
-  //Allows to choose an appropriate external library
+  // Allows to choose an appropriate external library
   typedef enum QudaExtLibType_s {
     QUDA_CUSOLVE_EXTLIB,
     QUDA_EIGEN_EXTLIB,
