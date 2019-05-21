@@ -5881,7 +5881,7 @@ double qChargeQuda()
 
   computeFmunu(Fmunu, *gauge);
   double charge = quda::computeQCharge(Fmunu);
-  
+
   profileQCharge.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileQCharge.TPSTOP(QUDA_PROFILE_TOTAL);
 
@@ -5901,7 +5901,7 @@ double qChargeDensityQuda(const int array_size, void *h_qDensity)
   }
   // Do we keep the smeared extended field on memory, or the unsmeared one?
   profileQCharge.TPSTART(QUDA_PROFILE_INIT);
-  // create the Fmunu field  
+  // create the Fmunu field
   GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
   tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
@@ -5910,20 +5910,20 @@ double qChargeDensityQuda(const int array_size, void *h_qDensity)
 
   void *d_qDensity = device_malloc(array_size);
   profileQCharge.TPSTOP(QUDA_PROFILE_INIT);
-  
+
   profileQCharge.TPSTART(QUDA_PROFILE_COMPUTE);
-  computeFmunu(Fmunu, *gauge);  
+  computeFmunu(Fmunu, *gauge);
   double charge = quda::computeQChargeDensity(Fmunu, d_qDensity);
   profileQCharge.TPSTOP(QUDA_PROFILE_COMPUTE);
-  
+
   profileQCharge.TPSTART(QUDA_PROFILE_D2H);
   qudaMemcpy(h_qDensity, d_qDensity, array_size, cudaMemcpyDeviceToHost);
   profileQCharge.TPSTOP(QUDA_PROFILE_D2H);
 
   profileQCharge.TPSTART(QUDA_PROFILE_FREE);
-  device_free(d_qDensity);  
+  device_free(d_qDensity);
   profileQCharge.TPSTOP(QUDA_PROFILE_FREE);
-  
+
   profileQCharge.TPSTOP(QUDA_PROFILE_TOTAL);
 
   return charge;
