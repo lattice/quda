@@ -174,7 +174,7 @@ void test(int contractionType, int Prec)
   void *spinorX = malloc(V * spinorSiteSize * sSize);
   void *spinorY = malloc(V * spinorSiteSize * sSize);
   void *d_result = malloc(2 * V * 16 * sSize);
-  
+
   if (testPrec == QUDA_SINGLE_PRECISION) {
     for (int i = 0; i < V * spinorSiteSize; i++) {
       ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
@@ -194,20 +194,13 @@ void test(int contractionType, int Prec)
   // We then compare the GPU result with a CPU refernce code
 
   QudaContractType cType = QUDA_CONTRACT_TYPE_OPEN;
-  
+
   switch (contractionType) {
-  case 0:
-    cType = QUDA_CONTRACT_TYPE_OPEN;
-    break;
-  case 1:
-    cType = QUDA_CONTRACT_TYPE_DR;
-    break;
-  case 2:
-    cType = QUDA_CONTRACT_TYPE_DP;
-    break;
-  default:
-     errorQuda("Undefined contraction type %d\n", contractionType);
-  }   
+  case 0: cType = QUDA_CONTRACT_TYPE_OPEN; break;
+  case 1: cType = QUDA_CONTRACT_TYPE_DR; break;
+  case 2: cType = QUDA_CONTRACT_TYPE_DP; break;
+  default: errorQuda("Undefined contraction type %d\n", contractionType);
+  }
 
   // Perform GPU contraction.
   contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
@@ -220,9 +213,10 @@ void test(int contractionType, int Prec)
   } else {
     faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType, X);
   }
-  
-  printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType), faults, V * 16 * 2);
-  
+
+  printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),
+             faults, V * 16 * 2);
+
   EXPECT_LE(faults, 0) << "CPU and GPU implementations do not agree";
 
   free(spinorX);
@@ -231,32 +225,34 @@ void test(int contractionType, int Prec)
 }
 
 // The following tests gets each contraction type and precision using google testing framework
-using ::testing::TestWithParam;
 using ::testing::Bool;
-using ::testing::Values;
-using ::testing::Range;
 using ::testing::Combine;
+using ::testing::Range;
+using ::testing::TestWithParam;
+using ::testing::Values;
 
 class ContractionTest : public ::testing::TestWithParam<::testing::tuple<int, int>>
 {
-  
- protected:
+
+  protected:
   ::testing::tuple<int, int> param;
-  
- public:
-  virtual ~ContractionTest() { }
+
+  public:
+  virtual ~ContractionTest() {}
   virtual void SetUp() { param = GetParam(); }
 };
 
 // Sets up the Google test
-TEST_P(ContractionTest, verify) {
+TEST_P(ContractionTest, verify)
+{
   int prec = ::testing::get<0>(GetParam());
   int contractionType = ::testing::get<1>(GetParam());
   test(contractionType, prec);
 }
 
 // Helper function to construct the test name
-std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> param){
+std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> param)
+{
   int prec = ::testing::get<0>(param.param);
   int contractType = ::testing::get<1>(param.param);
   std::string str(names[contractType]);
