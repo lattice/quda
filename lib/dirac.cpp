@@ -9,6 +9,7 @@ namespace quda {
   // FIXME: At the moment, it's unsafe for more than one Dirac operator to be active unless
   // they all have the same volume, etc. (used to initialize the various CUDA constants).
 
+
   Dirac::Dirac(const DiracParam &param) :
     gauge(param.gauge),
     kappa(param.kappa),
@@ -42,10 +43,12 @@ namespace quda {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
 
+  // Destroy
   Dirac::~Dirac() {   
     if (getVerbosity() > QUDA_VERBOSE) profile.Print();
   }
 
+  // Assignment
   Dirac& Dirac::operator=(const Dirac &dirac)
   {
     if (&dirac != this) {
@@ -77,6 +80,7 @@ namespace quda {
 
     return true;
   }
+
 
   void Dirac::deleteTmp(ColorSpinorField **a, const bool &reset) const {
     if (reset) {
@@ -167,6 +171,12 @@ namespace quda {
     } else if (param.type == QUDA_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracClover operator\n");
       return new DiracClover(param);
+    } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwist operator\n");
+      return new DiracCloverHasenbuschTwist(param);
+    } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwistPC operator\n");
+      return new DiracCloverHasenbuschTwistPC(param);
     } else if (param.type == QUDA_CLOVERPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
       return new DiracCloverPC(param);
@@ -260,6 +270,7 @@ namespace quda {
 	break;
       case QUDA_WILSON_DIRAC:
       case QUDA_CLOVER_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
       case QUDA_DOMAIN_WALL_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
       case QUDA_STAGGERED_DIRAC:

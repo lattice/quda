@@ -889,6 +889,8 @@ get_dslash_type(char* s)
     ret = QUDA_WILSON_DSLASH;
   }else if (strcmp(s, "clover") == 0){
     ret = QUDA_CLOVER_WILSON_DSLASH;
+  }else if (strcmp(s, "clover-hasenbusch-twist") == 0) { 
+    ret = QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
   }else if (strcmp(s, "twisted-mass") == 0){
     ret = QUDA_TWISTED_MASS_DSLASH;
   }else if (strcmp(s, "twisted-clover") == 0){
@@ -924,6 +926,9 @@ get_dslash_str(QudaDslashType type)
     break;
   case QUDA_CLOVER_WILSON_DSLASH:
     ret= "clover";
+    break;
+  case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH:
+    ret="clover-hasenbusch-twist";
     break;
   case QUDA_TWISTED_MASS_DSLASH:
     ret= "twisted-mass";

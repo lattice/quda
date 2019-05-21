@@ -1769,7 +1769,7 @@ void usage(char** argv )
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --rank-order <col/row>                    # Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
+	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered/clover-hasenbusch-twist\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
   printf("    --laplace3D <n>                           # Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");

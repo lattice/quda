@@ -115,6 +115,7 @@ public:
 
       checkCudaError();
     }
+
   };
 
   // Apply the Wilson-clover operator
@@ -139,6 +140,95 @@ public:
     errorQuda("Clover dslash has not been built");
 #endif
   }
+
+
+ /******** FIXME: OLD WAY
+#ifdef GPU_CLOVER_DIRAC
+  // Overloads to specify twists to the A-kD
+  // Should produce (A - i g5 mu) x + k D y
+  //
+  template <typename Float, int nColor, QudaReconstructType recon>
+  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+			 double kappa, double b, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override, TimeProfile &profile)
+  {
+    constexpr int nDim = 4;
+    WilsonCloverArg<Float,nColor,recon,true> arg(out, in, U, A, kappa, b, x, parity, dagger, comm_override);
+    WilsonClover<Float,nDim,nColor,WilsonCloverArg<Float,nColor,recon,true> > wilson(arg, out, in);
+
+    DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
+                                              in.VolumeCB(), in.GhostFaceCB(), profile);
+    policy.apply(0);
+
+    checkCudaError();
+  }
+
+  // template on the gauge reconstruction
+  template <typename Float, int nColor>
+  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+			 double kappa, double b, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override, TimeProfile &profile)
+  {
+    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
+      ApplyWilsonClover<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, A, kappa, b, x, parity, dagger, comm_override, profile);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
+      ApplyWilsonClover<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, A, kappa, b, x, parity, dagger, comm_override, profile);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
+      ApplyWilsonClover<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, A, kappa, b, x, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+    }
+  }
+
+  // template on the number of colors
+  template <typename Float>
+  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+			 double kappa, double b, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override, TimeProfile &profile)
+  {
+    if (in.Ncolor() == 3) {
+      ApplyWilsonClover<Float,3>(out, in, U, A, kappa, b, x, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+    }
+  }
+
+#endif // GPU_CLOVER_DIRAC
+
+  // Apply the Wilson-clover operator
+  // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
+  // Uses the kappa normalization for the Wilson operator.
+  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+			 const CloverField &A, double kappa, double b, const ColorSpinorField &x, int parity, bool dagger,
+			 const int *comm_override, TimeProfile &profile)
+  {
+#ifdef GPU_CLOVER_DIRAC
+    if (in.V() == out.V()) errorQuda("Aliasing pointers");
+    if (in.FieldOrder() != out.FieldOrder())
+      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
+
+    // check all precisions match
+    checkPrecision(out, in, U, A);
+
+    // check all locations match
+    checkLocation(out, in, U, A);
+
+    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
+      ApplyWilsonClover<double>(out, in, U, A, kappa, b, x, parity, dagger, comm_override, profile);
+    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+      ApplyWilsonClover<float>(out, in, U, A, kappa, b, x, parity, dagger, comm_override, profile);
+    } else if (U.Precision() == QUDA_HALF_PRECISION) {
+      ApplyWilsonClover<short>(out, in, U, A, kappa, b, x, parity, dagger, comm_override, profile);
+    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
+      ApplyWilsonClover<char>(out, in, U, A, kappa, b, x, parity, dagger, comm_override, profile);
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+#else
+    errorQuda("Clover dslash has not been built");
+#endif
+  }
+  /******* FIXME -- End of OLD WAY 
 
 } // namespace quda
 

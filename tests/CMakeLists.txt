@@ -215,6 +215,13 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
+ if(QUDA_DIRAC_CLOVER)
+    add_test(NAME dslash_clover_hasenbusch_twist-policy${pol2} COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> --dslash-type clover-hasenbusch-twist --test 3 --dim 2 4 6 8 --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_clover_hasenbusch_twist--policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
+  
   if(QUDA_DIRAC_TWISTED_MASS)
     add_test(NAME dslash_twisted-mass-sym-policy${pol2} COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS} --dslash-type twisted-mass --test 3 --matpc even-even --dim 2 4 6 8 --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
     if(polenv)
