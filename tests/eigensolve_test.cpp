@@ -43,7 +43,8 @@ extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
 extern double kappa; // kappa of Dirac operator
-double kappa5;       // Derived, not given. Used in matVec checks.
+extern int laplace3D;
+double kappa5; // Derived, not given. Used in matVec checks.
 extern double mu;
 extern double anisotropy;
 extern double tol;    // tolerance for inverter
@@ -188,6 +189,7 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.mass = 0.5 / kappa - (1.0 + 3.0 / anisotropy);
     if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.mass = 1.0 / kappa - 8.0;
   }
+  inv_param.laplace3D = laplace3D;
 
   printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
 
@@ -487,21 +489,6 @@ int main(int argc, char **argv)
     printfQuda("     Speed-up for QUDA Vs ARPACK is x%.1f       \n",
                (timeARPACK / CLOCKS_PER_SEC) / (timeQUDA / CLOCKS_PER_SEC));
     printfQuda("************************************************\n\n");
-
-    /*
-    printfQuda("Eigenpair comparison:\n");
-    for(int i=0; i<eig_param.nEv; i++) {
-      double delta_val = abs(((double*)ARPACK_host_evals)[i] - ((double*)QUDA_host_evals)[i]);
-      double delta_vec = 0.0;
-      for(int j=0; j<vol*sss; j++) {
-        delta_vec += pow(((double*)ARPACK_host_evecs)[i*vol*sss + j] - ((double*)QUDA_host_evecs)[i*vol*sss + j],2);
-      }
-      delta_vec = sqrt(delta_vec);
-
-      printfQuda("[%d] Eigenvalue diff = %f, Eigenvector diff = %f\n",
-                 i, delta_val, delta_vec);
-    }
-    */
 
     // Deallocate host memory
     free(ARPACK_host_evecs);

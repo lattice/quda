@@ -45,7 +45,7 @@ protected:
     int num_converged;
     int num_locked;
     int num_keep;
-    
+
     double *residua;
 
     // Device side vector workspace
@@ -60,7 +60,7 @@ public:
 
     virtual void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals) = 0;
 
-    static EigenSolver *create(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
+    static EigenSolver *create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
 
     /**
        @brief Applies the specified matVec operation:
@@ -69,8 +69,7 @@ public:
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
-
-    void matVec(const Dirac &mat, ColorSpinorField &out, const ColorSpinorField &in);
+    void matVec(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @brief Promoted the specified matVec operation:
@@ -79,7 +78,7 @@ public:
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
-    void chebyOp(const Dirac &mat, ColorSpinorField &out, const ColorSpinorField &in);
+    void chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @brief Orthogonalise input vector r against
@@ -118,8 +117,8 @@ public:
        @param[in] evals The eigenvalues
        @param[in] k The number to compute
     */
-    void computeEvals(const Dirac &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals, int k);
-    
+    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals, int k);
+
     /**
        @brief Load vectors from file
        @param[in] eig_vecs The eigenvectors to load
@@ -140,37 +139,37 @@ public:
        @param[in] eig_vecs The eigenvectors to save
        @param[in] file The filename to save
     */
-    void loadFromFile(const Dirac &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
+    void loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
   };
 
   /**
      @brief Thick Restarted LAnczos Method.
   */
-  class TRLM : public EigenSolver {
-    
-  public:
-    const Dirac &mat;
-    TRLM(QudaEigParam *eig_param, const Dirac &mat, TimeProfile &profile);
+  class TRLM : public EigenSolver
+  {
+
+public:
+    const DiracMatrix &mat;
+    TRLM(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
     virtual ~TRLM();
-    
-    //Variable size
+
+    // Variable size matrix
     std::vector<double> ritz_mat;
-    
+
     // Tridiagonal/Arrow matrix, fixed size.
     double *alpha;
     double *beta;
-    
-    //Used to clone vectors and resize arrays.
+
+    // Used to clone vectors and resize arrays.
     ColorSpinorParam csParam;
-    
+
     /**
        @brief Compute eigenpairs
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
-       
+
     */
-    void operator()(std::vector<ColorSpinorField*> &kSpace,
-		    std::vector<Complex> &evals);
+    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
     /**
        @brief Lanczos step: extends the Kylov space.
@@ -183,7 +182,7 @@ public:
        @brief Reorder the Krylov space by eigenvalue
        @param[in] kSpace the Krylov space
     */
-    void reorder(std::vector<ColorSpinorField*> &kSpace);
+    void reorder(std::vector<ColorSpinorField *> &kSpace);
 
     /**
        @brief Get the eigendecomposition from the arrow matrix
@@ -196,7 +195,7 @@ public:
        @brief Get the eigen-decomposition from the arrow matrix
        @param[in] nKspace current Kryloc space
     */
-    void computeKeptRitz(std::vector<ColorSpinorField*> &kSpace);
+    void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
 
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left
@@ -210,15 +209,16 @@ public:
     void computeSVD(std::vector<ColorSpinorField *> &kSpace, std::vector<ColorSpinorField *> &evecs,
                     std::vector<Complex> &evals, bool reverse);
   };
-  
+
   /**
-     @brief Computes eigen-decomposition using QUDA's arpack interface 
+     @brief Computes eigen-decomposition using QUDA's arpack interface
      @param[in] h_evecs host pointer to evecs
      @param[in] h_evals host pointer to evals
      @param[in] mat The operator
      @param[in] eig_param parameter structure for all QUDA eigensolvers
      @param[in] cpuParam parameter structure for creating device vectors
   */
-  void arpack_solve(void *h_evecs, void *h_evals, const Dirac &mat, QudaEigParam *eig_param, ColorSpinorParam *cpuParam);
+  void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
+                    ColorSpinorParam *cpuParam);
 
 } // namespace quda

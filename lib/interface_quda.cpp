@@ -2452,6 +2452,8 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   // create the dirac operator
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
   Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
   //------------------------------------------------------
 
   // Create device side ColorSpinorField vector space and to pass to the
@@ -2459,21 +2461,20 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   const int *X = cudaGauge->X();
 
   ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
-  
+
   cpuParam.v = host_evecs;
   ColorSpinorField *h_tmp = ColorSpinorField::Create(cpuParam);
   double norm = sqrt(blas::norm2(*h_tmp));
   printfQuda("Initial residual vector norm = %f\n", norm);
-  
+
   ColorSpinorParam *cudaParam(&cpuParam);
   cudaParam->location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam->create = QUDA_ZERO_FIELD_CREATE;
   eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ? cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
-    cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-  
+                                                       cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
   if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) { cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER; }
-  
-  std::vector<Complex> evals(eig_param->nKr, 0.0);
+
+  std::vector<Complex> evals(eig_param->nEv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
   for (int i = 0; i < eig_param->nKr; i++) { kSpace.push_back(ColorSpinorField::Create(*cudaParam)); }
 
@@ -2506,9 +2507,31 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
   }
 
-  // DMH solver param here
-  EigenSolver *eig_solve = EigenSolver::create(eig_param, dirac, profileEigensolve);
-  (*eig_solve)(kSpace, evals);
+  if (!eig_param->use_norm_op && !eig_param->use_dagger) {
+    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+    (*eig_solve)(kSpace, evals);
+  } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
+    DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+    (*eig_solve)(kSpace, evals);
+  } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
+    DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+    (*eig_solve)(kSpace, evals);
+  } else if (eig_param->use_norm_op && eig_param->use_dagger) {
+    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+    (*eig_solve)(kSpace, evals);
+  } else {
+    errorQuda("Invalid use_norm_op and dagger combination");
+  }
+
+  if (inv_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
+    for (int i = 0; i < eig_param->nEv; i++) ((complex<double> *)host_evals)[i] = evals[i];
+  } else {
+    for (int i = 0; i < eig_param->nEv; i++) ((complex<float> *)host_evals)[i] = evals[i];
+  }
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
@@ -2571,6 +2594,8 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
   // create the dirac operator
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
   Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
   //------------------------------------------------------
 
   // For QUDA data type eigenvectors
@@ -2586,8 +2611,22 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
   profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_INIT);
   profileEigensolveARPACK.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  arpack_solve(host_evecs, host_evals, dirac, eig_param, &cpuParam);
-
+  if (!eig_param->use_norm_op && !eig_param->use_dagger) {
+    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);    
+  } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
+    DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+  } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
+    DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+  } else if (eig_param->use_norm_op && eig_param->use_dagger) {
+    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+  } else {
+    errorQuda("Invalid use_norm_op and dagger combination");
+  }
+  
   profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileEigensolveARPACK.TPSTART(QUDA_PROFILE_FREE);
 
@@ -2604,158 +2643,6 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
   profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
 }
-
-/*
-void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
-                 void *hp_alpha, void *hp_beta, QudaEigParam *eig_param)
-{
-  QudaInvertParam *param;
-  param = eig_param->invert_param;
-
-  if (gaugePrecise == nullptr) errorQuda("Gauge field not allocated");
-
-  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-
-  if (!initialized) errorQuda("QUDA not initialized");
-
-  pushVerbosity(param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
-
-  checkInvertParam(param);
-
-  // check the gauge fields have been created
-  cudaGaugeField *cudaGauge = checkGauge(param);
-
-  checkEigParam(eig_param);
-
-  bool pc_solution = (param->solution_type == QUDA_MATPC_DAG_SOLUTION) ||
-                     (param->solution_type == QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION);
-
-  // create the dirac operator
-  DiracParam diracParam;
-  setDiracParam(diracParam, param, pc_solution);
-  Dirac *d = Dirac::create(diracParam); // create the Dirac operator
-
-  Dirac &dirac = *d;
-
-  profileInvert.TPSTART(QUDA_PROFILE_H2D);
-
-  cudaColorSpinorField *r = nullptr;
-  cudaColorSpinorField *Apsi = nullptr;
-  const int *X = cudaGauge->X();
-
-  // wrap CPU host side pointers
-  ColorSpinorParam cpuParam(hp_r, *param, X, pc_solution);
-  ColorSpinorField *h_r = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-                          static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) :
-                          static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
-
-  cpuParam.v = hp_Apsi;
-  ColorSpinorField *h_Apsi = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-                             static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) :
-                             static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
-
-  //Make Eigen vector data set
-  cpuColorSpinorField **h_Eig_Vec;
-  h_Eig_Vec =(cpuColorSpinorField **)safe_malloc( m*sizeof(cpuColorSpinorField*));
-  for( int k = 0 ; k < m ; k++)
-  {
-    cpuParam.v = ((double**)hp_V)[k];
-    h_Eig_Vec[k] = new cpuColorSpinorField(cpuParam);
-  }
-
-  // download source
-  ColorSpinorParam cudaParam(cpuParam, *param);
-  cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  r = new cudaColorSpinorField(*h_r, cudaParam);
-  Apsi = new cudaColorSpinorField(*h_Apsi, cudaParam);
-
-  double cpu;
-  double gpu;
-
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    cpu = blas::norm2(*h_r);
-    gpu = blas::norm2(*r);
-    printfQuda("r vector CPU %1.14e CUDA %1.14e\n", cpu, gpu);
-    cpu = blas::norm2(*h_Apsi);
-    gpu = blas::norm2(*Apsi);
-    printfQuda("Apsi vector CPU %1.14e CUDA %1.14e\n", cpu, gpu);
-  }
-
-  // download Eigen vector set
-  cudaColorSpinorField **Eig_Vec;
-  Eig_Vec = (cudaColorSpinorField **)safe_malloc( m*sizeof(cudaColorSpinorField*));
-
-  for( int k = 0 ; k < m ; k++)
-  {
-    Eig_Vec[k] = new cudaColorSpinorField(*h_Eig_Vec[k], cudaParam);
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      cpu = blas::norm2(*h_Eig_Vec[k]);
-      gpu = blas::norm2(*Eig_Vec[k]);
-      printfQuda("Eig_Vec[%d] CPU %1.14e CUDA %1.14e\n", k, cpu, gpu);
-    }
-  }
-  profileInvert.TPSTOP(QUDA_PROFILE_H2D);
-
-  if(eig_param->RitzMat_lanczos == QUDA_MATPC_DAG_SOLUTION)
-  {
-    DiracMdag mat(dirac);
-    RitzMat ritz_mat(mat,*eig_param);
-    Eig_Solver *eig_solve = Eig_Solver::create(*eig_param, ritz_mat, profileInvert);
-    (*eig_solve)((double*)hp_alpha, (double*)hp_beta, Eig_Vec, *r, *Apsi, k0, m);
-    delete eig_solve;
-  }
-  else if(eig_param->RitzMat_lanczos == QUDA_MATPCDAG_MATPC_SOLUTION)
-  {
-    DiracMdagM mat(dirac);
-    RitzMat ritz_mat(mat,*eig_param);
-    Eig_Solver *eig_solve = Eig_Solver::create(*eig_param, ritz_mat, profileInvert);
-    (*eig_solve)((double*)hp_alpha, (double*)hp_beta, Eig_Vec, *r, *Apsi, k0, m);
-    delete eig_solve;
-  }
-  else if(eig_param->RitzMat_lanczos == QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION)
-  {
-    DiracMdagM mat(dirac);
-    RitzMat ritz_mat(mat,*eig_param);
-    Eig_Solver *eig_solve = Eig_Solver::create(*eig_param, ritz_mat, profileInvert);
-    (*eig_solve)((double*)hp_alpha, (double*)hp_beta, Eig_Vec, *r, *Apsi, k0, m);
-    delete eig_solve;
-  }
-  else
-  {
-    errorQuda("invalid ritz matrix type\n");
-    exit(0);
-  }
-
-  //Write back calculated eigen vector
-  profileInvert.TPSTART(QUDA_PROFILE_D2H);
-  for( int k = 0 ; k < m ; k++)
-  {
-    *h_Eig_Vec[k] = *Eig_Vec[k];
-  }
-  *h_r = *r;
-  *h_Apsi = *Apsi;
-  profileInvert.TPSTOP(QUDA_PROFILE_D2H);
-
-
-  delete h_r;
-  delete h_Apsi;
-  for( int k = 0 ; k < m ; k++)
-  {
-    delete Eig_Vec[k];
-    delete h_Eig_Vec[k];
-  }
-  host_free(Eig_Vec);
-  host_free(h_Eig_Vec);
-
-  delete d;
-
-  popVerbosity();
-
-  saveTuneCache();
-  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-}
-*/
 
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
   : profile(profile) {
@@ -5946,9 +5833,6 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
   checkCudaError();
   return 0;
 }
-
-
-
 
 int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const unsigned int Nsteps, \
   const unsigned int verbose_interval, const double alpha, const unsigned int autotune, const double tolerance, \

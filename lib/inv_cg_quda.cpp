@@ -36,12 +36,12 @@ namespace quda {
       if (App) delete App;
       if (param.precision != param.precision_sloppy) {
         if (rSloppyp) delete rSloppyp;
-	if (xSloppyp) delete xSloppyp;
+        if (xSloppyp) delete xSloppyp;
       }
       if (tmpp) delete tmpp;
       if (!mat.isStaggered()) {
         if (tmp2p && tmpp != tmp2p) delete tmp2p;
-	if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
+        if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
       }
       if (rnewp) delete rnewp;
       if (deflate_init) {
@@ -204,9 +204,8 @@ namespace quda {
 
   void CG::constructDeflationSpace()
   {
-
     // Deflation requested + first instance of solver
-    eig_solver = EigenSolver::create(&param.eig_param, *mat.Expose(), profile);
+    eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
 
     // Clone from an existing vector
     ColorSpinorParam csParam(*rp);
@@ -223,12 +222,13 @@ namespace quda {
     param.evals.resize(param.eig_param.nEv);
     for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
 
-    (*eig_solver)(param.evecs, param.evals);
+    (*eig_solve)(param.evecs, param.evals);
 
     deflate_init = true;
   }
 
-  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField* p_init, double r2_old_init) {
+  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
+  {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (checkPrecision(x, b) != param.precision)
@@ -353,7 +353,7 @@ namespace quda {
         // Deflate the exact part from the RHS
         std::vector<ColorSpinorField *> rhs;
         rhs.push_back(&b);
-        eig_solver->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+        eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
 
         // Compute r_defl  = b - A * x_defl
         mat(r, *defl_tmp1[0], y, tmp3);
@@ -522,8 +522,7 @@ namespace quda {
         // if(updateX)
         // printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1
         // dinit %e %e)\n", updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
-      }
-      else{
+      } else {
         if (rNorm > maxrx) maxrx = rNorm;
         if (rNorm > maxrr) maxrr = rNorm;
         updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
@@ -750,7 +749,6 @@ namespace quda {
 
     return;
   }
-
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1

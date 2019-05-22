@@ -956,7 +956,7 @@ namespace quda
     std::string vec_infile(param.mg_global.vec_infile);
     vec_infile += "_level_";
     vec_infile += std::to_string(param.level);
-    eig_solver->loadVectors(B, vec_infile);
+    eig_solve->loadVectors(B, vec_infile);
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -971,7 +971,7 @@ namespace quda
     std::string vec_outfile(param.mg_global.vec_outfile);
     vec_outfile += "_level_";
     vec_outfile += std::to_string(param.level);
-    eig_solver->saveVectors(B, vec_outfile);
+    eig_solve->saveVectors(B, vec_outfile);
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -1391,10 +1391,9 @@ namespace quda
 
     for (int i = 0; i < nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
-    EigenSolver *eig_solve
-      = EigenSolver::create(param.mg_global.eig_param[param.level], *param.matResidual->Expose(), profile);
+    EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *param.matResidual, profile);
     (*eig_solve)(B_evecs, evals);
-
+    
     // Copy evecs back to MG
     for (unsigned int i = 0; i < param.B.size(); i++) { *param.B[i] = *B_evecs[i]; }
 

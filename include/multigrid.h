@@ -130,39 +130,39 @@ namespace quda {
 
       // set the smoother relaxation factor
       omega = param.omega[level];
-      }
+    }
 
-      MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, std::vector<Complex> evals,
-              DiracMatrix *matResidual, DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
-        SolverParam(param),
-        mg_global(param.mg_global),
-        level(level),
-        Nlevel(param.Nlevel),
-        spinBlockSize(param.mg_global.spin_block_size[level]),
-        Nvec(param.mg_global.n_vec[level]),
-        coarse(param.coarse),
-        fine(param.fine),
-        B(B),
-        evals(evals),
-        nu_pre(param.mg_global.nu_pre[level]),
-        nu_post(param.mg_global.nu_post[level]),
-        smoother_tol(param.mg_global.smoother_tol[level]),
-        cycle_type(param.mg_global.cycle_type[level]),
-        global_reduction(param.mg_global.global_reduction[level]),
-        matResidual(matResidual),
-        matSmooth(matSmooth),
-        matSmoothSloppy(matSmoothSloppy),
-        smoother(param.mg_global.smoother[level]),
-        coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
-        smoother_solve_type(param.mg_global.smoother_solve_type[level]),
-        location(param.mg_global.location[level]),
-        setup_location(param.mg_global.setup_location[level])
-      {
-	// set the block size
-	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
+    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, std::vector<Complex> evals,
+            DiracMatrix *matResidual, DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
+      SolverParam(param),
+      mg_global(param.mg_global),
+      level(level),
+      Nlevel(param.Nlevel),
+      spinBlockSize(param.mg_global.spin_block_size[level]),
+      Nvec(param.mg_global.n_vec[level]),
+      coarse(param.coarse),
+      fine(param.fine),
+      B(B),
+      evals(evals),
+      nu_pre(param.mg_global.nu_pre[level]),
+      nu_post(param.mg_global.nu_post[level]),
+      smoother_tol(param.mg_global.smoother_tol[level]),
+      cycle_type(param.mg_global.cycle_type[level]),
+      global_reduction(param.mg_global.global_reduction[level]),
+      matResidual(matResidual),
+      matSmooth(matSmooth),
+      matSmoothSloppy(matSmoothSloppy),
+      smoother(param.mg_global.smoother[level]),
+      coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
+      smoother_solve_type(param.mg_global.smoother_solve_type[level]),
+      location(param.mg_global.location[level]),
+      setup_location(param.mg_global.setup_location[level])
+    {
+      // set the block size
+      for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
 
-	// set the smoother relaxation factor
-	omega = param.mg_global.omega[level];
+      // set the smoother relaxation factor
+      omega = param.mg_global.omega[level];
       }
 
   };

@@ -67,7 +67,7 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
-  quda_cuda_api.cpp quda_arpack_interface.cpp deflation.cpp checksum.cu version.cpp )
+  quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp )
 
 if(QUDA_LEGACY_DSLASH)
 LIST(APPEND QUDA_OBJS dslash_improved_staggered.cu dslash_staggered.cu)

@@ -529,7 +529,7 @@ namespace quda {
     /**
        Deflation objects
     */
-    EigenSolver *eig_solver;
+    EigenSolver *eig_solve;
     bool deflate_init = false;
     std::vector<ColorSpinorField *> defl_tmp1;
     std::vector<ColorSpinorField *> defl_tmp2;

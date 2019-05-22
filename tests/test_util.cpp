@@ -1829,7 +1829,7 @@ void usage(char** argv )
   printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
   printf(
-	 "    --inv-deflate <true/false>                # Run the IRLM eigensolver to deflate low modes (default false)\n");
+    "    --inv-deflate <true/false>                # Run the IRLM eigensolver to deflate low modes (default false)\n");
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");

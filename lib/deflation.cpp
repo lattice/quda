@@ -12,8 +12,8 @@
 
 #include <Eigen/Dense>
 
-
-namespace quda {
+namespace quda
+{
 
   using namespace blas;
 
@@ -206,7 +206,8 @@ namespace quda {
   }
 
   void Deflation::increment(ColorSpinorField &Vm, int nev) {
-    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER)
+    if (param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER
+        && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER)
       errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
 
     if( nev == 0 ) return; //nothing to do
@@ -452,4 +453,4 @@ namespace quda {
     return;
   }
 
-}
+} // namespace quda
