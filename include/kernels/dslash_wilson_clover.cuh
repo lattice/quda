@@ -163,10 +163,10 @@ namespace quda
 
     	tmp.toNonRel(); // switch back to non-chiral basis
 
-    	out = tmp + arg.kappa * out;
+    	out = tmp + arg.a * out;
     } else if (active) {
     	Vector x = arg.out(x_cb, my_spinor_parity);
-    	out = x + arg.kappa * out;
+    	out = x + arg.a * out;
     }
 
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;

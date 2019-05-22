@@ -1,6 +1,7 @@
 #pragma once
 
 #include <kernels/dslash_wilson.cuh>
+#include <clover_field_order.h>
 #include <linalg.cuh>
 
 namespace quda {
@@ -19,9 +20,9 @@ namespace quda {
     real b;
 
     WilsonCloverHasenbuschTwistArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		    const CloverField &A_, double kappa_, double b_, const ColorSpinorField &x,
+		    const CloverField &A_, double a_, double b_, const ColorSpinorField &x,
 		    int parity, bool dagger, const int *comm_override)
-      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, kappa_, x, parity, dagger, comm_override),
+      : WilsonArg<Float,nColor,reconstruct_>(out, in, U, a_, x, parity, dagger, comm_override),
 	A(A_,false), A_inv(A_, dynamic_clover ? false : true), b(dagger ? -0.5*b_ : 0.5*b_) // if dynamic clover we don't want the inverse field
     { }
   };
@@ -29,7 +30,7 @@ namespace quda {
   /**
      @brief Apply the clover preconditioned Wilson dslash
      - no xpay: out(x) = M*in = A(x)^{-1}D * in(x-mu)
-     - with xpay:  out(x) = M*in = (1 - kappa*A(x)^{-1}D) * in(x-mu)
+     - with xpay:  out(x) = M*in = (1 - a*A(x)^{-1}D) * in(x-mu)
   */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, bool doClovInv, typename Arg>
   __device__ __host__ inline void wilsonCloverHasenbuschTwist(Arg &arg, int idx, int parity)
@@ -63,7 +64,7 @@ namespace quda {
 		  if ( ! doClovInv ) {
 
 			  Vector x = arg.x(x_cb, my_spinor_parity);
-			  out = x + arg.kappa * out ;
+			  out = x + arg.a * out ;
 		  }
 		  else {
 			  out.toRel(); // switch to chiral basis
@@ -88,7 +89,7 @@ namespace quda {
 
 			  tmp.toNonRel(); // switch back to non-chiral basis
 			  Vector x = arg.x(x_cb, my_spinor_parity);
-			  out = x + arg.kappa * tmp;
+			  out = x + arg.a * tmp;
 		  }
 
 		  // At this point: out = x + k A^{-1} D in or out = x + k D in
