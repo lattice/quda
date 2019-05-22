@@ -131,7 +131,7 @@ public:
        @param[in] eig_vecs The eigenvectors to save
        @param[in] file The filename to save
     */
-    void saveVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string file);
+    void saveVectors(const std::vector<ColorSpinorField *> &eig_vecs, std::string file);
 
     /**
        @brief Load and check eigenpairs from file

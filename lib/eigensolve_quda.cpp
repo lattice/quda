@@ -401,7 +401,7 @@ namespace quda
     return;
   }
 
-  void EigenSolver::saveVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_outfile)
+  void EigenSolver::saveVectors(const std::vector<ColorSpinorField *> &eig_vecs, std::string vec_outfile)
   {
 
     // profile.TPSTOP(QUDA_PROFILE_COMPUTE);

@@ -159,7 +159,7 @@ namespace quda
         B_coarse = new std::vector<ColorSpinorField*>();
         int nVec_coarse
           = (param.level == param.Nlevel - 2 ? param.mg_global.n_vec[param.level + 1] :
-                                               std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]));
+	     std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]));
         B_coarse->resize(nVec_coarse);
 
         // only have single precision B vectors on the coarse grid
@@ -495,7 +495,7 @@ namespace quda
       if (B_coarse) {
         int nVec_coarse
           = (param.level == param.Nlevel - 2 ? param.mg_global.n_vec[param.level + 1] :
-                                               std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]));
+	     std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]));
         for (int i = 0; i < nVec_coarse; i++)
           if ((*B_coarse)[i]) delete (*B_coarse)[i];
         delete B_coarse;
@@ -562,7 +562,7 @@ namespace quda
 
   /**
      Verification that the constructed multigrid operator is valid
-   */
+  */
   void MG::verify() {
     pushLevel(param.level);
 
@@ -947,7 +947,7 @@ namespace quda
 
     setOutputPrefix(param.level == 0 ? "" : prefix_bkup);
   }
-
+  
   // supports separate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField *> &B)
   {
@@ -962,83 +962,80 @@ namespace quda
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
-
-  void MG::saveVectors(std::vector<ColorSpinorField *> &B)
+  
+  void MG::saveVectors(const std::vector<ColorSpinorField *> & B) 
   {
+    
+    profile_global.TPSTOP(QUDA_PROFILE_INIT);
+    profile_global.TPSTART(QUDA_PROFILE_IO);
+    pushLevel(param.level);
+    std::string vec_outfile(param.mg_global.vec_outfile);
+    vec_outfile += "_level_";
+    vec_outfile += std::to_string(param.level);
+    eig_solve->saveVectors(B, vec_outfile);
+    popLevel(param.level);
+    profile_global.TPSTOP(QUDA_PROFILE_IO);
+    profile_global.TPSTART(QUDA_PROFILE_INIT);
+  }
 
-    void MG::saveVectors(std::vector<ColorSpinorField *> & B) const
-    {
+  void MG::dumpNullVectors()
+  {
+    saveVectors(param.B);
+    if (param.level < param.Nlevel - 2) coarse->dumpNullVectors();
+  }
 
-      profile_global.TPSTOP(QUDA_PROFILE_INIT);
-      profile_global.TPSTART(QUDA_PROFILE_IO);
-      pushLevel(param.level);
-      std::string vec_outfile(param.mg_global.vec_outfile);
-      vec_outfile += "_level_";
-      vec_outfile += std::to_string(param.level);
-      eig_solve->saveVectors(B, vec_outfile);
-      popLevel(param.level);
-      profile_global.TPSTOP(QUDA_PROFILE_IO);
-      profile_global.TPSTART(QUDA_PROFILE_INIT);
+  void MG::generateNullVectors(std::vector<ColorSpinorField *> & B, bool refresh)
+  {
+    pushLevel(param.level);
+
+    SolverParam solverParam(param); // Set solver field parameters:
+    // set null-space generation options - need to expose these
+    solverParam.maxiter
+      = refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level];
+    solverParam.tol = param.mg_global.setup_tol[param.level];
+    solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    solverParam.delta = 1e-1;
+    solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
+    // Hard coded for now...
+    if (solverParam.inv_type == QUDA_CA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CGNE_INVERTER
+	|| solverParam.inv_type == QUDA_CA_CGNR_INVERTER || solverParam.inv_type == QUDA_CA_GCR_INVERTER) {
+      solverParam.ca_basis = param.mg_global.setup_ca_basis[param.level];
+      solverParam.ca_lambda_min = param.mg_global.setup_ca_lambda_min[param.level];
+      solverParam.ca_lambda_max = param.mg_global.setup_ca_lambda_max[param.level];
+      solverParam.Nkrylov = param.mg_global.setup_ca_basis_size[param.level];
+    } else {
+      solverParam.Nkrylov = 4;
     }
+    solverParam.pipeline
+      = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
+    solverParam.precision = r->Precision();
 
-    void MG::dumpNullVectors()
-    {
-      saveVectors(param.B);
-      if (param.level < param.Nlevel - 2) coarse->dumpNullVectors();
+    if (param.level == 0) { // this enables half precision on the fine grid only if set
+      solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
+      solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
+    } else {
+      solverParam.precision_precondition = solverParam.precision;
     }
+    solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+    solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
+    ColorSpinorParam csParam(*B[0]);                            // Create spinor field parameters:
+    csParam.setPrecision(r->Precision(), r->Precision(), true); // ensure native ordering
+    csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
+    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField *b = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));
+    ColorSpinorField *x = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));
 
-    void MG::generateNullVectors(std::vector<ColorSpinorField *> & B, bool refresh)
-    {
-      pushLevel(param.level);
+    csParam.create = QUDA_NULL_FIELD_CREATE;
 
-      SolverParam solverParam(param); // Set solver field parameters:
-      // set null-space generation options - need to expose these
-      solverParam.maxiter
-        = refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level];
-      solverParam.tol = param.mg_global.setup_tol[param.level];
-      solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      solverParam.delta = 1e-1;
-      solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
-      // Hard coded for now...
-      if (solverParam.inv_type == QUDA_CA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CGNE_INVERTER
-          || solverParam.inv_type == QUDA_CA_CGNR_INVERTER || solverParam.inv_type == QUDA_CA_GCR_INVERTER) {
-        solverParam.ca_basis = param.mg_global.setup_ca_basis[param.level];
-        solverParam.ca_lambda_min = param.mg_global.setup_ca_lambda_min[param.level];
-        solverParam.ca_lambda_max = param.mg_global.setup_ca_lambda_max[param.level];
-        solverParam.Nkrylov = param.mg_global.setup_ca_basis_size[param.level];
-      } else {
-        solverParam.Nkrylov = 4;
-      }
-      solverParam.pipeline
-        = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
-      solverParam.precision = r->Precision();
-
-      if (param.level == 0) { // this enables half precision on the fine grid only if set
-        solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
-        solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
-      } else {
-        solverParam.precision_precondition = solverParam.precision;
-      }
-      solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
-      solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
-      ColorSpinorParam csParam(*B[0]);                            // Create spinor field parameters:
-      csParam.setPrecision(r->Precision(), r->Precision(), true); // ensure native ordering
-      csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      ColorSpinorField *b = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));
-      ColorSpinorField *x = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));
-
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-
-      // if we not using GCR/MG smoother then we need to switch off Schwarz since regular Krylov solvers do not support it
-      bool schwarz_reset = solverParam.inv_type != QUDA_MG_INVERTER
-        && param.mg_global.smoother_schwarz_type[param.level] != QUDA_INVALID_SCHWARZ;
-      if (schwarz_reset) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Disabling Schwarz for null-space finding");
-        int commDim[QUDA_MAX_DIM];
-        for (int i = 0; i < QUDA_MAX_DIM; i++) commDim[i] = 1;
-        diracSmootherSloppy->setCommDim(commDim);
+    // if we not using GCR/MG smoother then we need to switch off Schwarz since regular Krylov solvers do not support it
+    bool schwarz_reset = solverParam.inv_type != QUDA_MG_INVERTER
+      && param.mg_global.smoother_schwarz_type[param.level] != QUDA_INVALID_SCHWARZ;
+    if (schwarz_reset) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Disabling Schwarz for null-space finding");
+      int commDim[QUDA_MAX_DIM];
+      for (int i = 0; i < QUDA_MAX_DIM; i++) commDim[i] = 1;
+      diracSmootherSloppy->setCommDim(commDim);
     }
 
     // if quarter precision halo, promote for null-space finding to half precision
@@ -1186,174 +1183,174 @@ namespace quda
     const int Nspin = B[0]->Nspin();
 
     if (Ncolor == 3) // fine level
-    {
-      if (Nspin == 4) // Wilson or Twisted Mass (singlet)
       {
-        // There needs to be 6 null vectors -> 12 after chirality.
-        if (Nvec != 6)
-          errorQuda("\nError in MG::buildFreeVectors: Wilson-type fermions require Nvec = 6");
+	if (Nspin == 4) // Wilson or Twisted Mass (singlet)
+	  {
+	    // There needs to be 6 null vectors -> 12 after chirality.
+	    if (Nvec != 6)
+	      errorQuda("\nError in MG::buildFreeVectors: Wilson-type fermions require Nvec = 6");
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Wilson-type fermions\n", Nvec);
+	    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Wilson-type fermions\n", Nvec);
 
-        // Zero the null vectors.
-        for (int i = 0; i < Nvec ;i++) zero(*B[i]);
+	    // Zero the null vectors.
+	    for (int i = 0; i < Nvec ;i++) zero(*B[i]);
 
-        // Create a temporary vector.
-        ColorSpinorParam csParam(*B[0]);
-        csParam.create = QUDA_ZERO_FIELD_CREATE;
-        ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
+	    // Create a temporary vector.
+	    ColorSpinorParam csParam(*B[0]);
+	    csParam.create = QUDA_ZERO_FIELD_CREATE;
+	    ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
 
-        int counter = 0;
-        for (int c = 0; c < Ncolor; c++)
-        {
-          for (int s = 0; s < 2; s++)
-          {
-            tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
-            xpy(*tmp, *B[counter]);
-            tmp->Source(QUDA_CONSTANT_SOURCE, 1, s+2, c);
-            xpy(*tmp, *B[counter]);
-            counter++;
-          }
-        }
+	    int counter = 0;
+	    for (int c = 0; c < Ncolor; c++)
+	      {
+		for (int s = 0; s < 2; s++)
+		  {
+		    tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
+		    xpy(*tmp, *B[counter]);
+		    tmp->Source(QUDA_CONSTANT_SOURCE, 1, s+2, c);
+		    xpy(*tmp, *B[counter]);
+		    counter++;
+		  }
+	      }
 
-        delete tmp;
+	    delete tmp;
+	  }
+	else if (Nspin == 1) // Staggered
+	  {
+	    // There needs to be 24 null vectors -> 48 after chirality.
+	    if (Nvec != 24)
+	      errorQuda("\nError in MG::buildFreeVectors: Staggered-type fermions require Nvec = 24\n");
+
+	    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Staggered-type fermions\n", Nvec);
+
+	    // Zero the null vectors.
+	    for (int i = 0; i < Nvec ;i++)
+	      zero(*B[i]);
+
+	    // Create a temporary vector.
+	    ColorSpinorParam csParam(*B[0]);
+	    csParam.create = QUDA_ZERO_FIELD_CREATE;
+	    ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
+
+	    // Build free null vectors.
+	    for (int c = 0; c < B[0]->Ncolor(); c++)
+	      {
+		// Need to pair an even+odd corner together
+		// since they'll get split up.
+
+		// 0000, 0001
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x0, c);
+		xpy(*tmp,*B[8*c+0]);
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x1, c);
+		xpy(*tmp,*B[8*c+0]);
+
+		// 0010, 0011
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x2, c);
+		xpy(*tmp,*B[8*c+1]);
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x3, c);
+		xpy(*tmp,*B[8*c+1]);
+
+		// 0100, 0101
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x4, c);
+		xpy(*tmp,*B[8*c+2]);
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x5, c);
+		xpy(*tmp,*B[8*c+2]);
+
+		// 0110, 0111
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x6, c);
+		xpy(*tmp,*B[8*c+3]);
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x7, c);
+		xpy(*tmp,*B[8*c+3]);
+
+		// 1000, 1001
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x8, c);
+		xpy(*tmp,*B[8*c+4]);
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0x9, c);
+		xpy(*tmp,*B[8*c+4]);
+
+		// 1010, 1011
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0xA, c);
+		xpy(*tmp,*B[8*c+5]);
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0xB, c);
+		xpy(*tmp,*B[8*c+5]);
+
+		// 1100, 1101
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0xC, c);
+		xpy(*tmp,*B[8*c+6]);
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0xD, c);
+		xpy(*tmp,*B[8*c+6]);
+
+		// 1110, 1111
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0xE, c);
+		xpy(*tmp,*B[8*c+7]);
+		tmp->Source(QUDA_CORNER_SOURCE, 1, 0xF, c);
+		xpy(*tmp,*B[8*c+7]);
+	      }
+
+	    delete tmp;
+	  }
+	else
+	  {
+	    errorQuda("\nError in MG::buildFreeVectors: Unsupported combo of Nc %d, Nspin %d", Ncolor, Nspin);
+	  }
       }
-      else if (Nspin == 1) // Staggered
-      {
-        // There needs to be 24 null vectors -> 48 after chirality.
-        if (Nvec != 24)
-          errorQuda("\nError in MG::buildFreeVectors: Staggered-type fermions require Nvec = 24\n");
-
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Staggered-type fermions\n", Nvec);
-
-        // Zero the null vectors.
-        for (int i = 0; i < Nvec ;i++)
-          zero(*B[i]);
-
-        // Create a temporary vector.
-        ColorSpinorParam csParam(*B[0]);
-        csParam.create = QUDA_ZERO_FIELD_CREATE;
-        ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
-
-        // Build free null vectors.
-        for (int c = 0; c < B[0]->Ncolor(); c++)
-        {
-          // Need to pair an even+odd corner together
-          // since they'll get split up.
-
-          // 0000, 0001
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x0, c);
-          xpy(*tmp,*B[8*c+0]);
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x1, c);
-          xpy(*tmp,*B[8*c+0]);
-
-          // 0010, 0011
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x2, c);
-          xpy(*tmp,*B[8*c+1]);
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x3, c);
-          xpy(*tmp,*B[8*c+1]);
-
-          // 0100, 0101
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x4, c);
-          xpy(*tmp,*B[8*c+2]);
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x5, c);
-          xpy(*tmp,*B[8*c+2]);
-
-          // 0110, 0111
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x6, c);
-          xpy(*tmp,*B[8*c+3]);
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x7, c);
-          xpy(*tmp,*B[8*c+3]);
-
-          // 1000, 1001
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x8, c);
-          xpy(*tmp,*B[8*c+4]);
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0x9, c);
-          xpy(*tmp,*B[8*c+4]);
-
-          // 1010, 1011
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0xA, c);
-          xpy(*tmp,*B[8*c+5]);
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0xB, c);
-          xpy(*tmp,*B[8*c+5]);
-
-          // 1100, 1101
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0xC, c);
-          xpy(*tmp,*B[8*c+6]);
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0xD, c);
-          xpy(*tmp,*B[8*c+6]);
-
-          // 1110, 1111
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0xE, c);
-          xpy(*tmp,*B[8*c+7]);
-          tmp->Source(QUDA_CORNER_SOURCE, 1, 0xF, c);
-          xpy(*tmp,*B[8*c+7]);
-        }
-
-        delete tmp;
-      }
-      else
-      {
-        errorQuda("\nError in MG::buildFreeVectors: Unsupported combo of Nc %d, Nspin %d", Ncolor, Nspin);
-      }
-    }
     else // coarse level
-    {
-      if (Nspin == 2)
       {
-        // There needs to be Ncolor null vectors.
-        if (Nvec != Ncolor)
-          errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
+	if (Nspin == 2)
+	  {
+	    // There needs to be Ncolor null vectors.
+	    if (Nvec != Ncolor)
+	      errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
+	    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
 
-        // Zero the null vectors.
-        for (int i = 0; i < Nvec; i++) zero(*B[i]);
+	    // Zero the null vectors.
+	    for (int i = 0; i < Nvec; i++) zero(*B[i]);
 
-        // Create a temporary vector.
-        ColorSpinorParam csParam(*B[0]);
-        csParam.create = QUDA_ZERO_FIELD_CREATE;
-        ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
+	    // Create a temporary vector.
+	    ColorSpinorParam csParam(*B[0]);
+	    csParam.create = QUDA_ZERO_FIELD_CREATE;
+	    ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
 
-        for (int c = 0; c < Ncolor; c++)
-        {
-          tmp->Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
-          xpy(*tmp, *B[c]);
-          tmp->Source(QUDA_CONSTANT_SOURCE, 1, 1, c);
-          xpy(*tmp, *B[c]);
-        }
+	    for (int c = 0; c < Ncolor; c++)
+	      {
+		tmp->Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
+		xpy(*tmp, *B[c]);
+		tmp->Source(QUDA_CONSTANT_SOURCE, 1, 1, c);
+		xpy(*tmp, *B[c]);
+	      }
 
-        delete tmp;
+	    delete tmp;
+	  }
+	else if (Nspin == 1)
+	  {
+	    // There needs to be Ncolor null vectors.
+	    if (Nvec != Ncolor)
+	      errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
+
+	    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
+
+	    // Zero the null vectors.
+	    for (int i = 0; i < Nvec; i++) zero(*B[i]);
+
+	    // Create a temporary vector.
+	    ColorSpinorParam csParam(*B[0]);
+	    csParam.create = QUDA_ZERO_FIELD_CREATE;
+	    ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
+
+	    for (int c = 0; c < Ncolor; c++)
+	      {
+		tmp->Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
+		xpy(*tmp, *B[c]);
+	      }
+
+	    delete tmp;
+	  }
+	else
+	  {
+	    errorQuda("\nError in MG::buildFreeVectors: Unexpected Nspin = %d for coarse fermions", Nspin);
+	  }
       }
-      else if (Nspin == 1)
-      {
-        // There needs to be Ncolor null vectors.
-        if (Nvec != Ncolor)
-          errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
-
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
-
-        // Zero the null vectors.
-        for (int i = 0; i < Nvec; i++) zero(*B[i]);
-
-        // Create a temporary vector.
-        ColorSpinorParam csParam(*B[0]);
-        csParam.create = QUDA_ZERO_FIELD_CREATE;
-        ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
-
-        for (int c = 0; c < Ncolor; c++)
-        {
-          tmp->Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
-          xpy(*tmp, *B[c]);
-        }
-
-        delete tmp;
-      }
-      else
-      {
-        errorQuda("\nError in MG::buildFreeVectors: Unexpected Nspin = %d for coarse fermions", Nspin);
-      }
-    }
 
     // global orthonormalization of the generated null-space vectors
     if(param.mg_global.post_orthonormalize) {
@@ -1412,4 +1409,4 @@ namespace quda
     sprintf(prefix, "MG level %d (%s): ", param.level + 1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
     setOutputPrefix(prefix);
   }
-  } // namespace quda
+} // namespace quda

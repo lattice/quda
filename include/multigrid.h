@@ -355,7 +355,7 @@ public:
        @brief Save the null space vectors in from file
        @param B Save null-space vectors from here
     */
-    void saveVectors(std::vector<ColorSpinorField *> &B);
+    void saveVectors(const std::vector<ColorSpinorField *> &B);
 
     /**
        @brief Generate the null-space vectors
@@ -368,18 +368,6 @@ public:
        @brief Generate lowest eigenvectors
     */
     void generateEigenVectors();
-
-    /**
-       @brief Deflate coarse grid initial guess with Eigenvectors
-    */
-    void deflateEigenvectors(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-                             std::vector<ColorSpinorField *> evecs, std::vector<Complex> evals);
-
-    /**
-       @brief Deflate coarse grid initial guess with SVD
-    */
-    void deflateSVD(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-                    std::vector<ColorSpinorField *> svd_vecs, std::vector<Complex> svals);
 
     /**
        @brief Build free-field null-space vectors
