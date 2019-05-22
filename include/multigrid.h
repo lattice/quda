@@ -163,8 +163,7 @@ namespace quda {
 
       // set the smoother relaxation factor
       omega = param.mg_global.omega[level];
-      }
-
+    }
   };
 
   /**

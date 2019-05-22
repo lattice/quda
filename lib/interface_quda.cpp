@@ -2613,7 +2613,7 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
 
   if (!eig_param->use_norm_op && !eig_param->use_dagger) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);    
+    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
   } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
@@ -2626,7 +2626,7 @@ void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_para
   } else {
     errorQuda("Invalid use_norm_op and dagger combination");
   }
-  
+
   profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileEigensolveARPACK.TPSTART(QUDA_PROFILE_FREE);
 

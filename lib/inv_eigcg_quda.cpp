@@ -328,7 +328,7 @@ public:
       }
       delete eigcg_args;
     } else if (K) {
-      //delete K; //hack for the init CG solver
+      // delete K; //hack for the init CG solver
     }
   }
 

@@ -54,7 +54,7 @@ namespace quda {
 #else
     ApplyLaplace(out, in, *gauge, k, &x, parity);
 #endif
-    
+
     flops += 1368ll*in.Volume(); // FIXME
   }
 
@@ -63,7 +63,7 @@ namespace quda {
     checkFullSpinor(out, in);
     DslashXpay(out, in, QUDA_INVALID_PARITY, in, -kappa);
   }
-  
+
   void GaugeLaplace::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp1, in);

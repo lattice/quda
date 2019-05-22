@@ -141,7 +141,7 @@ extern "C" {
        requires more low-precision memory allocation. */
     int solution_accumulator_pipeline;
 
-    /**< This parameter determines how many consective reliable update
+    /**< This parameter determines how many consecutive reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase;
@@ -150,6 +150,16 @@ extern "C" {
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
+
+    /**< This parameter determines how many consecutive heavy-quark
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_hq_res_increase;
+
+    /**< This parameter determines how many total heavy-quark residual
+    restarts we tolerate before terminating the solver, i.e., how long
+    do we want to keep trying to converge */
+    int max_hq_res_restart_total;
 
     /**< After how many iterations shall the heavy quark residual be updated */
     int heavy_quark_check;
@@ -591,9 +601,9 @@ extern "C" {
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
- 
+
     /** Whether to generate on all levels or just on level 0 */
-    QudaBoolean generate_all_levels; 
+    QudaBoolean generate_all_levels;
 
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
@@ -860,8 +870,8 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
-                   void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
+  void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V, void *hp_alpha, void *hp_beta,
+                   QudaEigParam *eig_param);
 
   /**
    * Perform the eigensolve. The problem matrix is defined by the invert param, the

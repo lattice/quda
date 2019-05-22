@@ -99,13 +99,13 @@ namespace quda
       } else if (strcmp(param.mg_global.vec_infile, "") != 0) { // only load if infile is defined and not computing
         if ( param.mg_global.num_setup_iter[param.level] > 0 ) generateNullVectors(param.B);
       } else if (param.mg_global.vec_load == QUDA_BOOLEAN_YES) { // only conditional load of null vectors
-	
+
         loadVectors(param.B);
       } else { // generate free field vectors
         buildFreeVectors(param.B);
       }
     }
-    
+
     // in case of iterative setup with MG the coarse level may be already built
     if (!transfer) reset();
 
@@ -496,8 +496,9 @@ namespace quda
         int nVec_coarse
           = (param.level == param.Nlevel - 2 ? param.mg_global.n_vec[param.level + 1] :
                                                std::max(param.Nvec, param.mg_global.n_vec[param.level + 1]));
-        for (int i=0; i<nVec_coarse; i++) if ((*B_coarse)[i]) delete (*B_coarse)[i];
-	delete B_coarse;
+        for (int i = 0; i < nVec_coarse; i++)
+          if ((*B_coarse)[i]) delete (*B_coarse)[i];
+        delete B_coarse;
       }
       if (transfer) delete transfer;
       if (matCoarseSmootherSloppy) delete matCoarseSmootherSloppy;
@@ -774,12 +775,12 @@ namespace quda
       generateEigenVectors();
 
       for (int i = 0; i < param.Nvec; i++) {
-	
-	// Restrict Evec, place result in r_coarse
+
+        // Restrict Evec, place result in r_coarse
         transfer->R(*r_coarse, *param.B[i]);
         // Prolong r_coarse, place result in tmp2
         transfer->P(*tmp2, *r_coarse);
-	
+
         printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n", i, norm2(*param.B[i]),
                    norm2(*r_coarse), norm2(*tmp2));
 
@@ -814,13 +815,13 @@ namespace quda
         setOutputPrefix(prefix);
       }
     }
-    
+
     delete tmp1;
     delete tmp2;
     delete tmp_coarse;
-    
+
     if (param.level < param.Nlevel - 2) coarse->verify();
-    
+
     popLevel(param.level);
   }
 
@@ -948,11 +949,11 @@ namespace quda
   }
 
   // supports separate reading or single file read
-  void MG::loadVectors(std::vector<ColorSpinorField*> &B)
+  void MG::loadVectors(std::vector<ColorSpinorField *> &B)
   {
-    popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
-    profile_global.TPSTART(QUDA_PROFILE_IO);    
+    profile_global.TPSTART(QUDA_PROFILE_IO);
+    pushLevel(param.level);
     std::string vec_infile(param.mg_global.vec_infile);
     vec_infile += "_level_";
     vec_infile += std::to_string(param.level);
@@ -961,77 +962,82 @@ namespace quda
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
-  
+
   void MG::saveVectors(std::vector<ColorSpinorField *> &B)
   {
 
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
-    profile_global.TPSTART(QUDA_PROFILE_IO);
-    pushLevel(param.level);
-    std::string vec_outfile(param.mg_global.vec_outfile);
-    vec_outfile += "_level_";
-    vec_outfile += std::to_string(param.level);
-    eig_solve->saveVectors(B, vec_outfile);
-    popLevel(param.level);
-    profile_global.TPSTOP(QUDA_PROFILE_IO);
-    profile_global.TPSTART(QUDA_PROFILE_INIT);
-  }
-  
-  void MG::dumpNullVectors()
-  {
-    saveVectors(param.B);
-    if (param.level < param.Nlevel-2) coarse->dumpNullVectors();
-  }
-  
-  void MG::generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh) {
-    pushLevel(param.level);
-    
-    SolverParam solverParam(param);  // Set solver field parameters:
-    // set null-space generation options - need to expose these
-    solverParam.maxiter = refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level];
-    solverParam.tol = param.mg_global.setup_tol[param.level];
-    solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    solverParam.delta = 1e-1;
-    solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
-    // Hard coded for now...
-    if (solverParam.inv_type == QUDA_CA_CG_INVERTER ||
-        solverParam.inv_type == QUDA_CA_CGNE_INVERTER ||
-        solverParam.inv_type == QUDA_CA_CGNR_INVERTER ||
-        solverParam.inv_type == QUDA_CA_GCR_INVERTER) {
-      solverParam.ca_basis = param.mg_global.setup_ca_basis[param.level];
-      solverParam.ca_lambda_min = param.mg_global.setup_ca_lambda_min[param.level];
-      solverParam.ca_lambda_max = param.mg_global.setup_ca_lambda_max[param.level];
-      solverParam.Nkrylov = param.mg_global.setup_ca_basis_size[param.level];
-    } else {
-      solverParam.Nkrylov = 4;
+    void MG::saveVectors(std::vector<ColorSpinorField *> & B) const
+    {
+
+      profile_global.TPSTOP(QUDA_PROFILE_INIT);
+      profile_global.TPSTART(QUDA_PROFILE_IO);
+      pushLevel(param.level);
+      std::string vec_outfile(param.mg_global.vec_outfile);
+      vec_outfile += "_level_";
+      vec_outfile += std::to_string(param.level);
+      eig_solve->saveVectors(B, vec_outfile);
+      popLevel(param.level);
+      profile_global.TPSTOP(QUDA_PROFILE_IO);
+      profile_global.TPSTART(QUDA_PROFILE_INIT);
     }
-    solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
-    solverParam.precision = r->Precision();
 
-    if (param.level == 0) { // this enables half precision on the fine grid only if set
-      solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
-      solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
-    } else {
-      solverParam.precision_precondition = solverParam.precision;
+    void MG::dumpNullVectors()
+    {
+      saveVectors(param.B);
+      if (param.level < param.Nlevel - 2) coarse->dumpNullVectors();
     }
-    solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
-    solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
-    ColorSpinorParam csParam(*B[0]);  // Create spinor field parameters:
-    csParam.setPrecision(r->Precision(), r->Precision(), true); // ensure native ordering
-    csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
-    ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
 
-    csParam.create = QUDA_NULL_FIELD_CREATE;
+    void MG::generateNullVectors(std::vector<ColorSpinorField *> & B, bool refresh)
+    {
+      pushLevel(param.level);
 
-    // if we not using GCR/MG smoother then we need to switch off Schwarz since regular Krylov solvers do not support it
-    bool schwarz_reset = solverParam.inv_type != QUDA_MG_INVERTER && param.mg_global.smoother_schwarz_type[param.level] != QUDA_INVALID_SCHWARZ;
-    if (schwarz_reset) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Disabling Schwarz for null-space finding");
-      int commDim[QUDA_MAX_DIM];
-      for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
+      SolverParam solverParam(param); // Set solver field parameters:
+      // set null-space generation options - need to expose these
+      solverParam.maxiter
+        = refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level];
+      solverParam.tol = param.mg_global.setup_tol[param.level];
+      solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      solverParam.delta = 1e-1;
+      solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
+      // Hard coded for now...
+      if (solverParam.inv_type == QUDA_CA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CGNE_INVERTER
+          || solverParam.inv_type == QUDA_CA_CGNR_INVERTER || solverParam.inv_type == QUDA_CA_GCR_INVERTER) {
+        solverParam.ca_basis = param.mg_global.setup_ca_basis[param.level];
+        solverParam.ca_lambda_min = param.mg_global.setup_ca_lambda_min[param.level];
+        solverParam.ca_lambda_max = param.mg_global.setup_ca_lambda_max[param.level];
+        solverParam.Nkrylov = param.mg_global.setup_ca_basis_size[param.level];
+      } else {
+        solverParam.Nkrylov = 4;
+      }
+      solverParam.pipeline
+        = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
+      solverParam.precision = r->Precision();
+
+      if (param.level == 0) { // this enables half precision on the fine grid only if set
+        solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
+        solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
+      } else {
+        solverParam.precision_precondition = solverParam.precision;
+      }
+      solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+      solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
+      ColorSpinorParam csParam(*B[0]);                            // Create spinor field parameters:
+      csParam.setPrecision(r->Precision(), r->Precision(), true); // ensure native ordering
+      csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
+      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      ColorSpinorField *b = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));
+      ColorSpinorField *x = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));
+
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+
+      // if we not using GCR/MG smoother then we need to switch off Schwarz since regular Krylov solvers do not support it
+      bool schwarz_reset = solverParam.inv_type != QUDA_MG_INVERTER
+        && param.mg_global.smoother_schwarz_type[param.level] != QUDA_INVALID_SCHWARZ;
+      if (schwarz_reset) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Disabling Schwarz for null-space finding");
+        int commDim[QUDA_MAX_DIM];
+        for (int i = 0; i < QUDA_MAX_DIM; i++) commDim[i] = 1;
         diracSmootherSloppy->setCommDim(commDim);
     }
 
@@ -1375,8 +1381,8 @@ namespace quda
     param.mg_global.eig_param[param.level]->nConv = nConv;
     int nEv = param.B.size() + 10;
     param.mg_global.eig_param[param.level]->nEv = nEv;
-    //int nKr = nEv + nEv / 2;
-    int nKr = 3*nEv;
+    // int nKr = nEv + nEv / 2;
+    int nKr = 3 * nEv;
     param.mg_global.eig_param[param.level]->nKr = nKr;
 
     // Dummy array to keep the eigensolver happy.
@@ -1393,7 +1399,7 @@ namespace quda
 
     EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *param.matResidual, profile);
     (*eig_solve)(B_evecs, evals);
-    
+
     // Copy evecs back to MG
     for (unsigned int i = 0; i < param.B.size(); i++) { *param.B[i] = *B_evecs[i]; }
 
@@ -1405,6 +1411,5 @@ namespace quda
 
     sprintf(prefix, "MG level %d (%s): ", param.level + 1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
     setOutputPrefix(prefix);
-  }  
-} // namespace quda
-
+  }
+  } // namespace quda

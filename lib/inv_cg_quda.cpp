@@ -334,7 +334,7 @@ namespace quda {
     double ppnorm = 0;
     double Anorm = 0;
     double beta = 0.0;
-    
+
     // for alternative reliable updates
     if(alternative_reliable){
       // estimate norm for reliable updates
@@ -396,7 +396,7 @@ namespace quda {
       Complex rp = blas::cDotProduct(rSloppy, *p[0]) / (r2);
       blas::caxpy(-rp, rSloppy, *p[0]);
       beta = r2 / r2_old;
-      blas::xpayz(rSloppy, beta, *p[0], *p[0]); 
+      blas::xpayz(rSloppy, beta, *p[0], *p[0]);
     }
 
     const bool use_heavy_quark_res =
@@ -427,19 +427,20 @@ namespace quda {
     double maxrr = rNorm;
     double delta = param.delta;
 
-
     // this parameter determines how many consective reliable update
     // residual increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
-    const int maxResIncrease = (use_heavy_quark_res ? 0 : param.max_res_increase); //  check if we reached the limit of our tolerance
+    const int maxResIncrease = param.max_res_increase; //  check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
-    // 0 means we have no tolerance
-    // maybe we should expose this as a parameter
-    const int hqmaxresIncrease = maxResIncrease + 1;
+
+    // this means when using heavy quarks we will switch to simple hq restarts as soon as the reliable strategy fails
+    const int hqmaxresIncrease = param.max_hq_res_increase;
+    const int hqmaxresRestartTotal = param.max_hq_res_restart_total; // this limits the number of heavy quark restarts we can do
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
     int hqresIncrease = 0;
+    int hqresRestartTotal = 0;
 
     // set this to true if maxResIncrease has been exceeded but when we use heavy quark residual we still want to continue the CG
     // only used if we use the heavy_quark_res
@@ -493,12 +494,11 @@ namespace quda {
         r2_old = r2;
 
         // alternative reliable updates,
-        if(alternative_reliable){
+        if (alternative_reliable) {
           double3 pAppp = blas::cDotProductNormA(*p[j],Ap);
           pAp = pAppp.x;
           ppnorm = pAppp.z;
-        }
-        else{
+        } else {
           pAp = blas::reDotProduct(*p[j], Ap);
         }
 
@@ -515,18 +515,15 @@ namespace quda {
       int updateX;
       int updateR;
 
-      if(alternative_reliable){
+      if (alternative_reliable) {
         // alternative reliable updates
         updateX = ( (d <= deps*sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac * dinit);
         updateR = 0;
-        // if(updateX)
-        // printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1
-        // dinit %e %e)\n", updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
       } else {
         if (rNorm > maxrx) maxrx = rNorm;
         if (rNorm > maxrr) maxrr = rNorm;
-        updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-        updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+        updateX = (rNorm < delta * r0Norm && r0Norm <= maxrx) ? 1 : 0;
+        updateR = ((rNorm < delta * maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
       }
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
@@ -612,7 +609,7 @@ namespace quda {
         blas::zero(xSloppy);
 
         // alternative reliable updates
-        if(alternative_reliable){
+        if (alternative_reliable) {
           dinit = uhigh*(sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
           d = d_new;
           xnorm = 0;//sqrt(norm2(x));
@@ -626,17 +623,16 @@ namespace quda {
           maxrx = rNorm;
         }
 
-
         // calculate new reliable HQ resididual
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
 
         // break-out check if we have reached the limit of the precision
-        if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
+        if (sqrt(r2) > r0Norm && updateX and not L2breakdown) { // reuse r0Norm for this
           resIncrease++;
           resIncreaseTotal++;
           warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-          sqrt(r2), r0Norm, resIncreaseTotal);
-          if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+                      sqrt(r2), r0Norm, resIncreaseTotal);
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
             } else {
@@ -647,19 +643,30 @@ namespace quda {
         } else {
           resIncrease = 0;
         }
+
         // if L2 broke down already we turn off reliable updates and restart the CG
         if (use_heavy_quark_res and L2breakdown) {
+          hqresRestartTotal++; // count the number of heavy quark restarts we've done
           delta = 0;
-          warningQuda("CG: Restarting without reliable updates for heavy-quark residual");
+          warningQuda("CG: Restarting without reliable updates for heavy-quark residual (total #inc %i)", hqresRestartTotal);
           heavy_quark_restart = true;
-          if (heavy_quark_res > heavy_quark_res_old) {
-            hqresIncrease++;
-            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
+
+          if (heavy_quark_res > heavy_quark_res_old) { // check if new hq residual is greater than previous
+            hqresIncrease++; // count the number of consecutive increases
+            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
+                        heavy_quark_res, heavy_quark_res_old);
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
               warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
               break;
             }
+          } else {
+            hqresIncrease = 0;
+          }
+
+          if (hqresRestartTotal > hqmaxresRestartTotal) {
+            warningQuda("CG: solver exiting due to too many heavy quark residual restarts");
+            break;
           }
         }
 
@@ -692,7 +699,7 @@ namespace quda {
 
       // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
-        // L2 is concverged or precision maxed out for L2
+        // L2 is converged or precision maxed out for L2
         bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
         // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
         bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);

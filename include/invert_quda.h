@@ -85,7 +85,7 @@ namespace quda {
        requires more low-precision memory allocation. */
     int solution_accumulator_pipeline;
 
-    /**< This parameter determines how many consective reliable update
+    /**< This parameter determines how many consecutive reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase;
@@ -94,6 +94,16 @@ namespace quda {
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
+
+    /**< This parameter determines how many consecutive heavy-quark
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_hq_res_increase;
+
+    /**< This parameter determines how many total heavy-quark residual
+    restarts we tolerate before terminating the solver, i.e., how long
+    do we want to keep trying to converge */
+    int max_hq_res_restart_total;
 
     /**< After how many iterations shall the heavy quark residual be updated */
     int heavy_quark_check;
@@ -233,8 +243,8 @@ namespace quda {
     bool global_reduction; //! whether to use a global or local (node) reduction for this solver
 
     /** Whether the MG preconditioner (if any) is an instance of MG
-	(used internally in MG) or of multigrid_solver (used in the
-	interface)*/
+        (used internally in MG) or of multigrid_solver (used in the
+        interface)*/
     bool mg_instance;
 
     /** Which external lib to use in the solver */
@@ -320,12 +330,13 @@ namespace quda {
       extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {
-	offset[i] = param.offset[i];
-	tol_offset[i] = param.tol_offset[i];
-	tol_hq_offset[i] = param.tol_hq_offset[i];
+        offset[i] = param.offset[i];
+        tol_offset[i] = param.tol_offset[i];
+        tol_hq_offset[i] = param.tol_hq_offset[i];
       }
 
-      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
+      if (param.rhs_idx != 0
+          && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
     }
@@ -1044,53 +1055,54 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
-  class PreconditionedSolver : public Solver {
+  class PreconditionedSolver : public Solver
+  {
 
-  private:
+private:
     Solver *solver;
     const Dirac &dirac;
     const char *prefix;
 
-  public:
-      PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile,
-                           const char *prefix) :
-        Solver(param, profile),
-        solver(&solver),
-        dirac(dirac),
-        prefix(prefix)
-      {
+public:
+    PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile,
+                         const char *prefix) :
+      Solver(param, profile),
+      solver(&solver),
+      dirac(dirac),
+      prefix(prefix)
+    {
 
-        // DMH
-        if (param.deflate) {
+      // DMH
+      if (param.deflate) {
 
-          /*
-          //Compute the deflation sub-space
-          eig_solver = EigenSolver::create(&param.eig_param,
-                                           dirac,
-                                           profile);
+        /*
+        //Compute the deflation sub-space
+        eig_solver = EigenSolver::create(&param.eig_param,
+                                         dirac,
+                                         profile);
 
-          //Clone from an existing vector
-          ColorSpinorParam csParam(x);
-          csParam.create = QUDA_ZERO_FIELD_CREATE;
-          //This is the vector precision used by matResidual
-          csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
-          param.evecs.resize(param.eig_param.nKr);
-          for (int i=0; i<param.eig_param.nKr; i++)
-            param.evecs[i] = ColorSpinorField::Create(csParam);
+        //Clone from an existing vector
+        ColorSpinorParam csParam(x);
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        //This is the vector precision used by matResidual
+        csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+        param.evecs.resize(param.eig_param.nKr);
+        for (int i=0; i<param.eig_param.nKr; i++)
+          param.evecs[i] = ColorSpinorField::Create(csParam);
 
-          //Construct vectors to hold deflated RHS
-          defl_tmp1.push_back(ColorSpinorField::Create(csParam));
-          defl_tmp2.push_back(ColorSpinorField::Create(csParam));
+        //Construct vectors to hold deflated RHS
+        defl_tmp1.push_back(ColorSpinorField::Create(csParam));
+        defl_tmp2.push_back(ColorSpinorField::Create(csParam));
 
-          param.evals.resize(param.eig_param.nEv);
-          for (int i=0; i<param.eig_param.nEv; i++)  param.evals[i] = 0.0;
+        param.evals.resize(param.eig_param.nEv);
+        for (int i=0; i<param.eig_param.nEv; i++)  param.evals[i] = 0.0;
 
-          (*eig_solver)(param.evecs, param.evals);
+        (*eig_solver)(param.evecs, param.evals);
 
-          deflate_init = true;
-          */
-        }
+        deflate_init = true;
+        */
       }
+    }
 
     virtual ~PreconditionedSolver() { delete solver; }
 
@@ -1109,7 +1121,6 @@ namespace quda {
       setOutputPrefix("");
     }
   };
-
 
   class MultiShiftSolver {
 
@@ -1256,12 +1267,11 @@ namespace quda {
 
     EigCGArgs *eigcg_args;
 
-    TimeProfile &profile;    //time profile for initCG solver
+    TimeProfile &profile; // time profile for initCG solver
 
     bool init;
 
-  public:
-
+public:
     IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~IncEigCG();
