@@ -961,7 +961,7 @@ get_dslash_str(QudaDslashType type)
 
 QudaContractType get_contract_type(char *s)
 {
-  QudaContractType ret = QUDA_CONTRACT_INVALID;
+  QudaContractType ret = QUDA_CONTRACT_TYPE_INVALID;
 
   if (strcmp(s, "open") == 0 || strcmp(s, "OPEN") == 0 || strcmp(s, "Open") == 0) {
     ret = QUDA_CONTRACT_TYPE_OPEN;
