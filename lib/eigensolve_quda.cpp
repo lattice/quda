@@ -723,7 +723,7 @@ namespace quda
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
-      //saveVectors(kSpace, eig_param->vec_outfile);
+      saveVectors(kSpace, eig_param->vec_outfile);
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
