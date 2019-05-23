@@ -158,6 +158,9 @@ namespace quda
       applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
                                                                          active);
       break;
+    default:
+      errorQuda("Unsupported laplace direction %d given", arg.dir);
+      break;
     }
 
     if (xpay && kernel_type == INTERIOR_KERNEL) {
