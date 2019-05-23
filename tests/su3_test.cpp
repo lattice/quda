@@ -153,10 +153,10 @@ void SU3test(int argc, char **argv) {
 
   // Size of floating point data
   size_t sSize = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
-  int array_size = V * sSize;
+  size_t array_size = V * sSize;
   // Void array passed to the GPU. QUDA will allocate GPU memory and pass back a populated host array.
   void *qDensity = malloc(array_size);
-  qCharge = qChargeDensityQuda(array_size, qDensity);
+  qCharge = qChargeDensityQuda(qDensity);
 
   // Ensure host array sums to return value
   if (prec == QUDA_DOUBLE_PRECISION) {

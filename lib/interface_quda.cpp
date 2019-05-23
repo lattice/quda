@@ -5888,7 +5888,7 @@ double qChargeQuda()
   return charge;
 }
 
-double qChargeDensityQuda(const int array_size, void *h_qDensity)
+double qChargeDensityQuda(void *h_qDensity)
 {
   profileQCharge.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5908,7 +5908,8 @@ double qChargeDensityQuda(const int array_size, void *h_qDensity)
   tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField Fmunu(tensorParam);
 
-  void *d_qDensity = device_malloc(array_size);
+  size_t size = Fmunu.Volume() * Fmunu.Precision();
+  void *d_qDensity = device_malloc(size);
   profileQCharge.TPSTOP(QUDA_PROFILE_INIT);
 
   profileQCharge.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -5917,7 +5918,7 @@ double qChargeDensityQuda(const int array_size, void *h_qDensity)
   profileQCharge.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileQCharge.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_qDensity, d_qDensity, array_size, cudaMemcpyDeviceToHost);
+  qudaMemcpy(h_qDensity, d_qDensity, size, cudaMemcpyDeviceToHost);
   profileQCharge.TPSTOP(QUDA_PROFILE_D2H);
 
   profileQCharge.TPSTART(QUDA_PROFILE_FREE);
