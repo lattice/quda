@@ -704,7 +704,7 @@ namespace quda
       total = (time_e + time_mv + time_mb) / CLOCKS_PER_SEC;
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("Time to solve problem using TRLM = %e\n", t2 / CLOCKS_PER_SEC);
+      printfQuda("Time to solve problem using TRLM = %e\n", total);
       printfQuda("Time spent using EIGEN           = %e  %.1f%%\n", time_e / CLOCKS_PER_SEC,
                  100 * (time_e / CLOCKS_PER_SEC) / total);
       printfQuda("Time spent in matVec             = %e  %.1f%%\n", time_mv / CLOCKS_PER_SEC,
@@ -723,7 +723,7 @@ namespace quda
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
-      saveVectors(kSpace, eig_param->vec_outfile);
+      //saveVectors(kSpace, eig_param->vec_outfile);
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {

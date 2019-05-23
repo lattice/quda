@@ -1379,7 +1379,7 @@ namespace quda
     int nEv = param.B.size() + 10;
     param.mg_global.eig_param[param.level]->nEv = nEv;
     // int nKr = nEv + nEv / 2;
-    int nKr = 3 * nEv;
+    int nKr = 2 * nEv;
     param.mg_global.eig_param[param.level]->nKr = nKr;
 
     // Dummy array to keep the eigensolver happy.
@@ -1394,14 +1394,16 @@ namespace quda
 
     for (int i = 0; i < nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
-    EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *param.matResidual, profile);
+    //EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *param.matResidual, profile);
+    DiracMdagM *mdagm = new DiracMdagM(*diracResidual);
+    EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdagm, profile);
     (*eig_solve)(B_evecs, evals);
-
+    
     // Copy evecs back to MG
     for (unsigned int i = 0; i < param.B.size(); i++) { *param.B[i] = *B_evecs[i]; }
 
     // only save if outfile is defined
-    if (strcmp(param.mg_global.vec_outfile, "") != 0) { saveVectors(B_evecs); }
+    //if (strcmp(param.mg_global.vec_outfile, "") != 0) { saveVectors(B_evecs); }
 
     // Local clean-up
     for (unsigned int i = 0; i < B_evecs.size(); i++) { delete B_evecs[i]; }

@@ -615,11 +615,11 @@ int main(int argc, char **argv)
 
     // Default eigensolver params
     mg_eig_tol[i] = 1e-3;
-    mg_eig_type[i] = QUDA_IMP_RST_LANCZOS;
+    mg_eig_type[i] = QUDA_THICK_RST_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SR_EIG_SPECTRUM;
     mg_eig_check_interval[i] = 5;
     mg_eig_max_restarts[i] = 100;
-    mg_eig_use_normop[i] = QUDA_BOOLEAN_YES;
+    mg_eig_use_normop[i] = QUDA_BOOLEAN_NO;
     mg_eig_use_dagger[i] = QUDA_BOOLEAN_NO;
     mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_YES;
     mg_eig_poly_deg[i] = 100;
