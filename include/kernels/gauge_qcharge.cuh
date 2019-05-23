@@ -8,13 +8,13 @@
 
 namespace quda
 {
-  
+
   template <typename Float, typename Gauge, bool density_=false> struct QChargeArg : public ReduceArg<double> {
     static constexpr bool density = density_;
     int threads; // number of active threads required
     Gauge data;
     Float *qDensity;
-    
+
     QChargeArg(const Gauge &data, const GaugeField &Fmunu, Float *qDensity=nullptr) :
       ReduceArg<double>(),
       data(data),
@@ -23,7 +23,7 @@ namespace quda
     {
     }
   };
-  
+
   // Core routine for computing the topological charge from the field strength
   template <int blockSize, typename Float, typename Arg> __global__ void qChargeComputeKernel(Arg arg)
   {
@@ -31,7 +31,7 @@ namespace quda
     int parity = threadIdx.y;
 
     double Q = 0.0;
-    
+
     while (x_cb < arg.threads) {
       // Load the field-strength tensor from global memory
       Matrix<complex<Float>, 3> F[] = {arg.data(0, x_cb, parity), arg.data(1, x_cb, parity), arg.data(2, x_cb, parity),
@@ -42,7 +42,7 @@ namespace quda
       double Q3 = getTrace(F[3] * F[2]).real();
       double Q_idx = (Q1 + Q3 - Q2);
       Q += Q_idx;
-      
+
       if (Arg::density) {
         int idx = x_cb + parity*arg.threads;
         arg.qDensity[idx] = Q_idx/(Pi2 * Pi2);
@@ -50,7 +50,7 @@ namespace quda
       x_cb += blockDim.x * gridDim.x;
     }
     Q /= (Pi2 * Pi2);
-    
+
     reduce2d<blockSize, 2>(arg, Q);
   }
 
