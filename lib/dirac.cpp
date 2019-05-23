@@ -281,6 +281,7 @@ namespace quda {
         break;
       case QUDA_WILSONPC_DIRAC:
       case QUDA_CLOVERPC_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
       case QUDA_DOMAIN_WALLPC_DIRAC:
       case QUDA_DOMAIN_WALL_4DPC_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
