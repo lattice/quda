@@ -1668,7 +1668,7 @@ bool alternative_reliable = false;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
-QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
+QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 
 int mg_levels = 2;
