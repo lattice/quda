@@ -108,7 +108,7 @@ public:
        @param[in] r Vector to be orthogonalised
        @param[in] j Number of vectors in v to orthogonalise against
     */
-    Complex orthogonalise(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+    Complex orthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
 
     /**
        @brief Orthogonalise input vector r against
@@ -118,7 +118,7 @@ public:
        @param[in] r Vector to be orthogonalised
        @param[in] j Number of vectors in v to orthogonalise against
     */
-    Complex blockOrthogonalise(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+    Complex blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
 
     /**
        @brief Deflate vector with Eigenvectors

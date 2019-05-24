@@ -1066,54 +1066,23 @@ private:
 public:
     PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile,
                          const char *prefix) :
-      Solver(param, profile),
+    Solver(param, profile),
       solver(&solver),
       dirac(dirac),
       prefix(prefix)
-    {
-
-      // DMH
-      if (param.deflate) {
-
-        /*
-        //Compute the deflation sub-space
-        eig_solver = EigenSolver::create(&param.eig_param,
-                                         dirac,
-                                         profile);
-
-        //Clone from an existing vector
-        ColorSpinorParam csParam(x);
-        csParam.create = QUDA_ZERO_FIELD_CREATE;
-        //This is the vector precision used by matResidual
-        csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
-        param.evecs.resize(param.eig_param.nKr);
-        for (int i=0; i<param.eig_param.nKr; i++)
-          param.evecs[i] = ColorSpinorField::Create(csParam);
-
-        //Construct vectors to hold deflated RHS
-        defl_tmp1.push_back(ColorSpinorField::Create(csParam));
-        defl_tmp2.push_back(ColorSpinorField::Create(csParam));
-
-        param.evals.resize(param.eig_param.nEv);
-        for (int i=0; i<param.eig_param.nEv; i++)  param.evals[i] = 0.0;
-
-        (*eig_solver)(param.evecs, param.evals);
-
-        deflate_init = true;
-        */
+      {
       }
-    }
-
+    
     virtual ~PreconditionedSolver() { delete solver; }
-
+    
     void operator()(ColorSpinorField &x, ColorSpinorField &b) {
       setOutputPrefix(prefix);
-
+      
       QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
-
+      
       ColorSpinorField *out=nullptr;
       ColorSpinorField *in=nullptr;
-
+      
       dirac.prepare(in, out, x, b, solution_type);
       (*solver)(*out, *in);
       dirac.reconstruct(x, b, solution_type);
