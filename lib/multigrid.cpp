@@ -771,7 +771,6 @@ namespace quda
 
       // Reuse the space for the Null vectors. By this point,
       // the coarse grid has already been constructed.
-      // generateEigenVectors(param.B);
       generateEigenVectors();
 
       for (int i = 0; i < param.Nvec; i++) {
@@ -1377,7 +1376,6 @@ namespace quda
 
     for (int i = 0; i < nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
-    // EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *param.matResidual, profile);
     DiracMdagM *mdagm = new DiracMdagM(*diracResidual);
     EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdagm, profile);
     (*eig_solve)(B_evecs, evals);

@@ -1246,7 +1246,7 @@ public:
     virtual ~IncEigCG();
 
     /**
-       @breif Expands deflation space.
+       @brief Expands deflation space.
        @param V container of new eigenvectors
        @param nev number of vectors to load
      */
