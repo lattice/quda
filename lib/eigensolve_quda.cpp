@@ -577,7 +577,7 @@ namespace quda
       iter += (nKr - num_keep);
       // if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Restart %d complete\n", restart_iter+1);
 
-      int arrow_pos = std::max(num_keep - num_locked + 1, (unsigned int)2);
+      int arrow_pos = std::max(num_keep - num_locked + 1, 2);
       // The eigenvalues are returned in the alpha array and the
       eigensolveFromArrowMat(num_locked, arrow_pos);
 
@@ -874,7 +874,7 @@ namespace quda
     int offset = nKr + 1;
     int dim = nKr - num_locked;
 
-    if (kSpace.size() < offset + iter_keep) {
+    if ((int)kSpace.size() < offset + iter_keep) {
       for (int i = kSpace.size(); i < offset + iter_keep; i++) {
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
         kSpace.push_back(ColorSpinorField::Create(csParam));
@@ -904,7 +904,6 @@ namespace quda
     // Switch to M (or Mdag) mat vec
     eig_param->use_norm_op = QUDA_BOOLEAN_NO;
     int nConv = eig_param->nConv;
-    int nEv = eig_param->nEv;
 
     Complex sigma_tmp[nConv / 2];
 

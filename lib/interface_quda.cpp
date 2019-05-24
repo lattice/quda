@@ -14,7 +14,6 @@
 #include <blas_quda.h>
 #include <gauge_field.h>
 #include <dirac_quda.h>
-#include <ritz_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <eigensolve_quda.h>

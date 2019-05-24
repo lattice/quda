@@ -25,9 +25,9 @@ protected:
 
     // Problem parameters
     //------------------
-    unsigned int nEv;   // Size of initial factorisation
-    unsigned int nKr;   // Size of Krylov space after extension
-    unsigned int nConv; // Number of converged eigenvalues requested
+    int nEv;   // Size of initial factorisation
+    int nKr;   // Size of Krylov space after extension
+    int nConv; // Number of converged eigenvalues requested
     double tol;         // Tolerance on eigenvalues
     bool reverse;       // True if using polynomial acceleration
     char *spectrum;     // Part of the spectrum to be computed.
@@ -35,16 +35,16 @@ protected:
     // Algorithm variables
     //--------------------
     bool converged;
-    unsigned int restart_iter;
-    unsigned int max_restarts;
-    unsigned int check_interval;
-    unsigned int iter;
-    unsigned int iter_converged;
-    unsigned int iter_locked;
-    unsigned int iter_keep;
-    unsigned int num_converged;
-    unsigned int num_locked;
-    unsigned int num_keep;
+    int restart_iter;
+    int max_restarts;
+    int check_interval;
+    int iter;
+    int iter_converged;
+    int iter_locked;
+    int iter_keep;
+    int num_converged;
+    int num_locked;
+    int num_keep;
 
     double *residua;
 
