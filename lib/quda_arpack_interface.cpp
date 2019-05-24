@@ -18,7 +18,7 @@
 
 namespace quda
 {
-  
+
 #ifdef ARPACK_LIB
 
   void arpackErrorHelpNAUPD();
