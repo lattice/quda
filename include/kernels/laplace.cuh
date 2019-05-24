@@ -45,7 +45,7 @@ namespace quda
       a(a)
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
-        errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
+        errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());      
     }
   };
 

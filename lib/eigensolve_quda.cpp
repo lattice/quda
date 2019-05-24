@@ -242,7 +242,7 @@ namespace quda
   }
 
   // Orthogonalise r against V_[j]
-  Complex EigenSolver::orthogonalise(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> rvec, int j)
+  Complex EigenSolver::orthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> rvec, int j)
   {
     time_ = -clock();
     Complex s(0.0, 0.0);
@@ -258,7 +258,7 @@ namespace quda
   }
 
   // Orthogonalise r against V_[j]
-  Complex EigenSolver::blockOrthogonalise(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> rvec,
+  Complex EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> rvec,
                                           int j)
   {
     time_ = -clock();
@@ -310,12 +310,7 @@ namespace quda
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
     blas::caxpy(s, eig_vecs_ptr, vec_defl);
-
-    // Orthonormality check in deflation.
-    for (int i = 0; i < n_defl; i++)
-      for (int j = 0; j <= i; j++) {
-        // printfQuda("%d %d %.6e \n", i, j, blas::cDotProduct(*eig_vecs_ptr[i], *eig_vecs_ptr[j]).real() );
-      }
+    
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
