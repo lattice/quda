@@ -2410,7 +2410,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
 {
-  
+
   profilerStart(__func__);
 
   // Transfer the inv param structure contained in eig_param
@@ -2480,10 +2480,10 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
   profileEigensolve.TPSTART(QUDA_PROFILE_COMPUTE);
-  
+
   if (!eig_param->use_norm_op && !eig_param->use_dagger) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    if (eig_param.arpack_check) {
+    if (eig_param->arpack_check) {
       arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
@@ -2491,7 +2491,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     }
   } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    if (eig_param.arpack_check) {
+    if (eig_param->arpack_check) {
       arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
@@ -2499,7 +2499,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     }
   } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    if (eig_param.arpack_check) {
+    if (eig_param->arpack_check) {
       arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
@@ -2507,7 +2507,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     }
   } else if (eig_param->use_norm_op && eig_param->use_dagger) {
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    if (eig_param.arpack_check) {
+    if (eig_param->arpack_check) {
       arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);

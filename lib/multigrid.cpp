@@ -1183,7 +1183,7 @@ namespace quda
     const int Nspin = B[0]->Nspin();
 
     if (Ncolor == 3) // fine level
-      {
+    {
       if (Nspin == 4) // Wilson or Twisted Mass (singlet)
       {
         // There needs to be 6 null vectors -> 12 after chirality.
@@ -1286,57 +1286,54 @@ namespace quda
       } else {
         errorQuda("\nError in MG::buildFreeVectors: Unsupported combo of Nc %d, Nspin %d", Ncolor, Nspin);
       }
-      }
-    else // coarse level
-      {
-        if (Nspin == 2) {
-          // There needs to be Ncolor null vectors.
-          if (Nvec != Ncolor) errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
+    } else // coarse level
+    {
+      if (Nspin == 2) {
+        // There needs to be Ncolor null vectors.
+        if (Nvec != Ncolor) errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
 
-          if (getVerbosity() >= QUDA_VERBOSE)
-            printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
 
-          // Zero the null vectors.
-          for (int i = 0; i < Nvec; i++) zero(*B[i]);
+        // Zero the null vectors.
+        for (int i = 0; i < Nvec; i++) zero(*B[i]);
 
-          // Create a temporary vector.
-          ColorSpinorParam csParam(*B[0]);
-          csParam.create = QUDA_ZERO_FIELD_CREATE;
-          ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
+        // Create a temporary vector.
+        ColorSpinorParam csParam(*B[0]);
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
 
-          for (int c = 0; c < Ncolor; c++) {
-            tmp->Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
-            xpy(*tmp, *B[c]);
-            tmp->Source(QUDA_CONSTANT_SOURCE, 1, 1, c);
-            xpy(*tmp, *B[c]);
-          }
-
-          delete tmp;
-        } else if (Nspin == 1) {
-          // There needs to be Ncolor null vectors.
-          if (Nvec != Ncolor) errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
-
-          if (getVerbosity() >= QUDA_VERBOSE)
-            printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
-
-          // Zero the null vectors.
-          for (int i = 0; i < Nvec; i++) zero(*B[i]);
-
-          // Create a temporary vector.
-          ColorSpinorParam csParam(*B[0]);
-          csParam.create = QUDA_ZERO_FIELD_CREATE;
-          ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
-
-          for (int c = 0; c < Ncolor; c++) {
-            tmp->Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
-            xpy(*tmp, *B[c]);
-          }
-
-          delete tmp;
-        } else {
-          errorQuda("\nError in MG::buildFreeVectors: Unexpected Nspin = %d for coarse fermions", Nspin);
+        for (int c = 0; c < Ncolor; c++) {
+          tmp->Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
+          xpy(*tmp, *B[c]);
+          tmp->Source(QUDA_CONSTANT_SOURCE, 1, 1, c);
+          xpy(*tmp, *B[c]);
         }
+
+        delete tmp;
+      } else if (Nspin == 1) {
+        // There needs to be Ncolor null vectors.
+        if (Nvec != Ncolor) errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
+
+        // Zero the null vectors.
+        for (int i = 0; i < Nvec; i++) zero(*B[i]);
+
+        // Create a temporary vector.
+        ColorSpinorParam csParam(*B[0]);
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
+
+        for (int c = 0; c < Ncolor; c++) {
+          tmp->Source(QUDA_CONSTANT_SOURCE, 1, 0, c);
+          xpy(*tmp, *B[c]);
+        }
+
+        delete tmp;
+      } else {
+        errorQuda("\nError in MG::buildFreeVectors: Unexpected Nspin = %d for coarse fermions", Nspin);
       }
+    }
 
     // global orthonormalization of the generated null-space vectors
     if(param.mg_global.post_orthonormalize) {

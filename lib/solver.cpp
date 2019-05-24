@@ -239,7 +239,7 @@ namespace quda {
       }
     }
   }
-  
+
   bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
 
     for (int i=0; i<n; i++) {
