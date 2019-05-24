@@ -152,17 +152,14 @@ namespace quda
     //case 4 is an operator in all x,y,z,t dimensions
     //case 3 is a spatial operator only, the t dimension is omitted.
     switch (arg.dir) {
-    case 4:
-      applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx,
-                                                                          thread_dim, active);
-      break;
     case 3:
       applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
                                                                          active);
       break;
+    case 4:
     default:
       applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx,
-									  thread_dim, active);
+                                                                          thread_dim, active);
       break;
     }
 
