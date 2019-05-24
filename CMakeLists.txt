@@ -358,18 +358,20 @@ endif()
 
 if(QUDA_QMP)
   if("${QUDA_QMPHOME}" STREQUAL "")
-  ExternalProject_Add(QMP
-  GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-  GIT_TAG qmp2-5-1 
-  PREFIX usqcd
-  CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
-  BUILD_COMMAND COMMAND make
-  INSTALL_COMMAND make install
-)
+    ExternalProject_Add(QMP
+      GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
+      GIT_TAG qmp2-5-1 
+      PREFIX usqcd
+      CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+      UPDATE_COAMMD ""
+      BUILD_COMMAND COMMAND make
+      INSTALL_COMMAND make install
+    )
 
-ExternalProject_Get_Property(QMP INSTALL_DIR)
-set(QUDA_QMPHOME ${INSTALL_DIR})
+    ExternalProject_Get_Property(QMP INSTALL_DIR)
+    set(QUDA_QMPHOME ${INSTALL_DIR})
   endif()
+  
   add_definitions(-DQMP_COMMS)
 
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -377,7 +379,6 @@ set(QUDA_QMPHOME ${INSTALL_DIR})
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
   set(QUDA_QMP_LDFLAGS  ${QUDA_QMP_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
   set(QUDA_QMP_LIBS  ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-  #FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
   set(COMM_OBJS comm_qmp.cpp)
@@ -385,30 +386,33 @@ endif()
 
 if(QUDA_QIO)
   if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
-  ExternalProject_Add(QIO
-  GIT_REPOSITORY https://github.com/usqcd-software/qio.git
-  GIT_TAG qio2-5-0
-  PREFIX usqcd 
-  CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp=${INSTALL_DIR} --prefix=<INSTALL_DIR>
-  BUILD_COMMAND COMMAND make
-  INSTALL_COMMAND make install
-)
-ExternalProject_Get_Property(QIO INSTALL_DIR)
-set(QUDA_QIOHOME ${INSTALL_DIR})
-set(QUDA_LIME_HOME ${INSTALL_DIR})
+    ExternalProject_Add(QIO
+      GIT_REPOSITORY https://github.com/usqcd-software/qio.git
+      GIT_TAG qio2-5-0
+      PREFIX usqcd 
+      CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp=${INSTALL_DIR} --prefix=<INSTALL_DIR>
+      UPDATE_COAMMD ""
+      BUILD_COMMAND COMMAND make
+      INSTALL_COMMAND make install
+      DEPENDS QMP
 
-ExternalProject_Add_Step(QIO reconf
-COMMAND autoreconf
-WORKING_DIRECTORY <SOURCE_DIR>
-DEPENDERS configure
-DEPENDEES download)
+    )
+    ExternalProject_Get_Property(QIO INSTALL_DIR)
+    set(QUDA_QIOHOME ${INSTALL_DIR})
+    set(QUDA_LIME_HOME ${INSTALL_DIR})
 
-ExternalProject_Add_StepDependencies(QIO configure QMP)
+    ExternalProject_Add_Step(QIO reconf
+      COMMAND autoreconf
+      WORKING_DIRECTORY <SOURCE_DIR>
+      DEPENDERS configure
+      DEPENDEES download
+    )
+
+
   endif()
+  
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
-  #FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
-  #FIND_LIBRARY(LIME_LIB lime ${QUDA_LIMEHOME}/lib/)
   execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QIO_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -417,10 +421,6 @@ ExternalProject_Add_StepDependencies(QIO configure QMP)
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
 endif()
-
-
-
-
 
 
 if(QUDA_MAGMA)
