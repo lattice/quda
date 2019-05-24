@@ -46,6 +46,8 @@ namespace quda
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
+      if (dir < 3 || dir > 4)
+	errorQuda("Unsupported laplace direction given");
     }
   };
 
@@ -159,7 +161,8 @@ namespace quda
                                                                          active);
       break;
     default:
-      errorQuda("Unsupported laplace direction %d given", arg.dir);
+      applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx,
+									  thread_dim, active);
       break;
     }
 
