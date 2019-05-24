@@ -962,7 +962,7 @@ get_dslash_str(QudaDslashType type)
 QudaEigSpectrumType get_eig_spectrum_type(char *s)
 {
 
-  QudaEigSpectrumType ret = QUDA_INVALID_SPECTRUM;
+  QudaEigSpectrumType ret = QUDA_SPECTRUM_INVALID;
 
   if (strcmp(s, "SR") == 0) {
     ret = QUDA_SPECTRUM_SR_EIG;

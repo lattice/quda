@@ -143,7 +143,7 @@ extern "C" {
     QUDA_SPECTRUM_LM_EIG,
     QUDA_SPECTRUM_SI_EIG,
     QUDA_SPECTRUM_LI_EIG,
-    QUDA_INVALID_SPECTRUM = QUDA_INVALID_ENUM
+    QUDA_SPECTRUM_INVALID = QUDA_INVALID_ENUM
   } QudaEigSpectrumType;
 
   typedef enum QudaSolutionType_s {

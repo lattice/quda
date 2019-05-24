@@ -159,7 +159,8 @@ namespace quda
                                                                          active);
       break;
     default:
-      errorQuda("Unsupported laplace3D type given");
+      applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
       break;
     }
 

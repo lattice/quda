@@ -646,7 +646,7 @@ namespace quda
     }
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-      printfQuda("kSpace size at convergence/max restarts = %d\n", kSpace.size());
+      printfQuda("kSpace size at convergence/max restarts = %d\n", (int)kSpace.size());
     // Prune the Krylov space back to size when passed to eigensolver
     for (unsigned int i = nKr; i < kSpace.size(); i++) { delete kSpace[i]; }
     kSpace.resize(nKr);
