@@ -233,7 +233,7 @@ public:
     */
     void computeSVD(std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals);
   };
-  
+
   /**
      @brief Computes eigen-decomposition using QUDA's arpack interface
      @param[in] h_evecs host pointer to evecs

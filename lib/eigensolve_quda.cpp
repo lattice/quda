@@ -310,7 +310,6 @@ namespace quda
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
     blas::caxpy(s, eig_vecs_ptr, vec_defl);
-    
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
@@ -676,9 +675,7 @@ namespace quda
 
       // Compute SVD if requested
       time_svd = -clock();
-      if (eig_param->compute_svd) {
-	computeSVD(kSpace, evals);
-      }
+      if (eig_param->compute_svd) { computeSVD(kSpace, evals); }
       time_svd += clock();
     }
 
@@ -899,9 +896,9 @@ namespace quda
 
     int nConv = eig_param->nConv;
     Complex sigma_tmp[nConv / 2];
-    
+
     for (int i = 0; i < nConv / 2; i++) {
-      
+
       // This function assumes that you have computed the eigenvectors
       // of MdagM(MMdag), ie, the right(left) SVD of M. The ith eigen vector in the
       // array corresponds to the ith right(left) singular vector. We place the
@@ -914,22 +911,22 @@ namespace quda
       Complex lambda = evals[i];
 
       // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-      mat.Expose()->M(*evecs[nConv/2 + i], *evecs[i]);
-      
+      mat.Expose()->M(*evecs[nConv / 2 + i], *evecs[i]);
+
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      Complex sigma_sq = blas::cDotProduct(*evecs[nConv/2 + i], *evecs[nConv/2 + i]);
+      Complex sigma_sq = blas::cDotProduct(*evecs[nConv / 2 + i], *evecs[nConv / 2 + i]);
       sigma_tmp[i] = Complex(sqrt(sigma_sq.real()), sqrt(abs(sigma_sq.imag())));
 
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-      double norm = sqrt(blas::norm2(*evecs[nConv/2 + i]));
-      blas::ax(1.0 / norm, *evecs[nConv/2 + i]);
-      
+      double norm = sqrt(blas::norm2(*evecs[nConv / 2 + i]));
+      blas::ax(1.0 / norm, *evecs[nConv / 2 + i]);
+
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Sval[%04d] = %+.16e  %+.16e   sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i].real(),
                    sigma_tmp[i].imag(), sigma_tmp[i].real() - sqrt(abs(lambda.real())));
       //--------------------------------------------------------------------------
     }
-    
+
     // Update the host evals array
     for (int i = 0; i < nConv / 2; i++) {
       evals[2 * i + 0] = sigma_tmp[i];
