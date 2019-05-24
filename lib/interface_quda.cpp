@@ -180,9 +180,6 @@ static TimeProfile profileMulti("invertMultiShiftQuda");
 //!< Profiler for eigensolveQuda
 static TimeProfile profileEigensolve("eigensolveQuda");
 
-//!< Profiler for eigensolveARPACK
-static TimeProfile profileEigensolveARPACK("eigensolveARPACKQuda");
-
 //!< Profiler for computeFatLinkQuda
 static TimeProfile profileFatLink("computeKSLinkQuda");
 

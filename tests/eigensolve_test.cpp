@@ -455,48 +455,15 @@ int main(int argc, char **argv)
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the
-  // solve is in the eig_param container.
+  // solve is in the eig_param container. If eig_param.arpack_check == true and
+  // precision is double, the routine will use ARPACK rather than the GPU.
   double timeQUDA = -((double)clock());
+  if (eig_param.arpack_check && !eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+    errorQuda("ARPACK check only availible in double precision");
+  }
   eigensolveQuda(QUDA_host_evecs, QUDA_host_evals, &eig_param);
   timeQUDA += (double)clock();
   printfQuda("Time for QUDA solution = %f\n", timeQUDA / CLOCKS_PER_SEC);
-
-  if (eig_param.arpack_check && eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-
-    // Host side arrays to store the eigenpairs computed by ARPACK
-    void *ARPACK_host_evecs;
-    void *ARPACK_host_evals;
-    int vol = xdim * ydim * zdim * tdim * eig_inv_param.Ls;
-    // Memory allocation
-    if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      ARPACK_host_evecs = (void *)malloc(vol * sss * eig_param.nKr * sizeof(float));
-      ARPACK_host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(float));
-    } else {
-      ARPACK_host_evecs = (void *)malloc(vol * sss * eig_param.nKr * sizeof(double));
-      ARPACK_host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(double));
-    }
-
-    // Perform a cross-check using the ARPACK interface
-    // Use the same initial guess
-    for (int i = 0; i < vol * sss; i++) { ((double *)ARPACK_host_evecs)[i] = ((double *)init_guess)[i]; }
-
-    double timeARPACK = -((double)clock());
-    eigensolveARPACK(ARPACK_host_evecs, ARPACK_host_evals, &eig_param);
-    timeARPACK += (double)clock();
-
-    printfQuda("Time for ARPACK solution = %f\n\n", timeARPACK / CLOCKS_PER_SEC);
-    printfQuda("************************************************\n");
-    printfQuda("     Speed-up for QUDA Vs ARPACK is x%.1f       \n",
-               (timeARPACK / CLOCKS_PER_SEC) / (timeQUDA / CLOCKS_PER_SEC));
-    printfQuda("************************************************\n\n");
-
-    // Deallocate host memory
-    free(ARPACK_host_evecs);
-    free(ARPACK_host_evals);
-
-  } else {
-    printfQuda("Double prec ARPACK cross check omitted\n");
-  }
 
   // Deallocate host memory
   free(init_guess);
