@@ -358,7 +358,17 @@ endif()
 
 if(QUDA_QMP)
   if("${QUDA_QMPHOME}" STREQUAL "")
-    message( FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is set" )
+  ExternalProject_Add(QMP
+  GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
+  GIT_TAG qmp2-5-1 
+  PREFIX usqcd
+  CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+  BUILD_COMMAND COMMAND make
+  INSTALL_COMMAND make install
+)
+
+ExternalProject_Get_Property(QMP INSTALL_DIR)
+set(QUDA_QMPHOME ${INSTALL_DIR})
   endif()
   add_definitions(-DQMP_COMMS)
 
@@ -375,15 +385,43 @@ endif()
 
 if(QUDA_QIO)
   if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
-    message( FATAL_ERROR "QUDA_QIOHOME and QUDA_LIMEHOME must be defined when QUDA_QIO is set" )
+  ExternalProject_Add(QIO
+  GIT_REPOSITORY https://github.com/usqcd-software/qio.git
+  GIT_TAG qio2-5-0
+  PREFIX usqcd 
+  CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp=${INSTALL_DIR} --prefix=<INSTALL_DIR>
+  BUILD_COMMAND COMMAND make
+  INSTALL_COMMAND make install
+)
+ExternalProject_Get_Property(QIO INSTALL_DIR)
+set(QUDA_QIOHOME ${INSTALL_DIR})
+set(QUDA_LIME_HOME ${INSTALL_DIR})
+
+ExternalProject_Add_Step(QIO reconf
+COMMAND autoreconf
+WORKING_DIRECTORY <SOURCE_DIR>
+DEPENDERS configure
+DEPENDEES download)
+
+ExternalProject_Add_StepDependencies(QIO configure QMP)
   endif()
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
-  FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
-  FIND_LIBRARY(LIME_LIB lime ${QUDA_LIMEHOME}/lib/)
+  #FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
+  #FIND_LIBRARY(LIME_LIB lime ${QUDA_LIMEHOME}/lib/)
+  execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QIO_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+  set(QUDA_QIO_LDFLAGS  ${QUDA_QIO_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+  set(QUDA_QIO_LIBS  ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
 endif()
+
+
+
+
+
 
 if(QUDA_MAGMA)
   add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
