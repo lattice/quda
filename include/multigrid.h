@@ -281,10 +281,10 @@ namespace quda {
     void popLevel(int level) const;
 
 public:
-    /** 
-      Constructor for MG class
-      @param param MGParam struct that defines all meta data
-      @param profile Timeprofile instance used to profile
+    /**
+       Constructor for MG class
+       @param param MGParam struct that defines all meta data
+       @param profile Timeprofile instance used to profile
     */
     MG(MGParam &param, TimeProfile &profile);
 
@@ -303,7 +303,7 @@ public:
     /**
        @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
     */
-    void dumpNullVectors();
+    void dumpNullVectors() const;
 
     /**
        @brief Create the smoothers
@@ -355,7 +355,7 @@ public:
        @brief Save the null space vectors in from file
        @param B Save null-space vectors from here
     */
-    void saveVectors(const std::vector<ColorSpinorField *> &B);
+    void saveVectors(const std::vector<ColorSpinorField *> &B) const;
 
     /**
        @brief Generate the null-space vectors

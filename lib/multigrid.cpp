@@ -963,7 +963,7 @@ namespace quda
     profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
 
-  void MG::saveVectors(const std::vector<ColorSpinorField *> &B)
+  void MG::saveVectors(const std::vector<ColorSpinorField *> &B) const
   {
 
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
@@ -978,7 +978,7 @@ namespace quda
     profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
 
-  void MG::dumpNullVectors()
+  void MG::dumpNullVectors() const
   {
     saveVectors(param.B);
     if (param.level < param.Nlevel - 2) coarse->dumpNullVectors();

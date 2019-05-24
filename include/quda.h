@@ -884,16 +884,6 @@ extern "C" {
   void eigensolveQuda(void *h_evals, void *h_evecs, QudaEigParam *param);
 
   /**
-   * Perform the eigensolve using ARPACK. The problem matrix is defined by the
-   * invert param, the mode of solution is specified by the eig param.
-   * It is assumed that the gauge field has already been loaded via loadGaugeQuda().
-   * @param h_els  Host side eigenvalues
-   * @param h_evs  Host side eigenvectors
-   * @param param  Contains all metadata regarding the type of solve.
-   */
-  void eigensolveARPACK(void *h_evals, void *h_evecs, QudaEigParam *param);
-
-  /**
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
    * loadGaugeQuda().

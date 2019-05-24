@@ -3,6 +3,7 @@
 #include <math.h>
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 #include <quda_internal.h>
 #include <quda_arpack_interface.h>
@@ -73,30 +74,30 @@ namespace quda
     spectrum = strdup("SR"); // Initialsed to stop the compiler warning.
 
     if (eig_param->use_poly_acc) {
-      if (eig_param->spectrum == QUDA_SR_EIG_SPECTRUM)
+      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
         spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_LR_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
         spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_SM_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
         spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_LM_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
         spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_SI_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
         spectrum = strdup("LI");
-      else if (eig_param->spectrum == QUDA_LI_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
         spectrum = strdup("SI");
     } else {
-      if (eig_param->spectrum == QUDA_SR_EIG_SPECTRUM)
+      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
         spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_LR_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
         spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_SM_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
         spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_LM_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
         spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_SI_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
         spectrum = strdup("SI");
-      else if (eig_param->spectrum == QUDA_LI_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
         spectrum = strdup("LI");
     }
 
@@ -132,9 +133,8 @@ namespace quda
     EigenSolver *eig_solver = nullptr;
 
     switch (eig_param->eig_type) {
-    case QUDA_IMP_RST_LANCZOS: errorQuda("IRLM not implemented"); break;
-    case QUDA_IMP_RST_ARNOLDI: errorQuda("IRAM not implemented"); break;
-    case QUDA_THICK_RST_LANCZOS:
+    case QUDA_EIG_ARNOLDI: errorQuda("Arnoldi not implemented"); break;
+    case QUDA_EIG_LANCZOS:
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating TRLM eigensolver\n");
       eig_solver = new TRLM(eig_param, mat, profile);
       break;
@@ -1055,30 +1055,30 @@ namespace quda
     spectrum = strdup("SR"); // Initialsed just to stop the compiler warning...
 
     if (eig_param->use_poly_acc) {
-      if (eig_param->spectrum == QUDA_SR_EIG_SPECTRUM)
+      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
         spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_LR_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
         spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_SM_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
         spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_LM_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
         spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_SI_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
         spectrum = strdup("LI");
-      else if (eig_param->spectrum == QUDA_LI_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
         spectrum = strdup("SI");
     } else {
-      if (eig_param->spectrum == QUDA_SR_EIG_SPECTRUM)
+      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
         spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_LR_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
         spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_SM_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
         spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_LM_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
         spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_SI_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
         spectrum = strdup("SI");
-      else if (eig_param->spectrum == QUDA_LI_EIG_SPECTRUM)
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
         spectrum = strdup("LI");
     }
 

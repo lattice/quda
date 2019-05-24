@@ -55,11 +55,31 @@ protected:
     Complex *Qmat;
 
 public:
+    /**
+       @brief Constructor for base Eigensolver class
+       @param eig_param MGParam struct that defines all meta data
+       @param profile Timeprofile instance used to profile
+    */
     EigenSolver(QudaEigParam *eig_param, TimeProfile &profile);
+
+    /**
+       Destructor for EigenSolver class.
+    */
     virtual ~EigenSolver();
 
+    /**
+       @brief Computes the eigen decomposition for the operator passed to create.
+       @param kSpace The converged eigenvectors
+       @param evals The converged eigenvalues
+     */
     virtual void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals) = 0;
 
+    /**
+       @brief Creates the eigensolver using the parameters given and the matrix.
+       @param eig_param The eigensolver parameters
+       @param mat The operator to solve
+       @param profile Time Profile
+     */
     static EigenSolver *create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
 
     /**
@@ -143,14 +163,24 @@ public:
   };
 
   /**
-     @brief Thick Restarted LAnczos Method.
+     @brief Thick Restarted Lanczos Method.
   */
   class TRLM : public EigenSolver
   {
 
 public:
     const DiracMatrix &mat;
+    /**
+       @brief Constructor for Thick Restarted Eigensolver class
+       @param eig_param The eigensolver parameters
+       @param mat The operator to solve
+       @param profile Time Profile
+    */
     TRLM(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
+
+    /**
+       @brief Destructor for Thick Restarted Eigensolver class
+    */
     virtual ~TRLM();
 
     // Variable size matrix
@@ -167,7 +197,6 @@ public:
        @brief Compute eigenpairs
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
-
     */
     void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 

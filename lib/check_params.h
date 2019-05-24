@@ -152,7 +152,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_dagger, QUDA_BOOLEAN_NO);
   P(use_norm_op, QUDA_BOOLEAN_NO);
   P(compute_svd, QUDA_BOOLEAN_NO);
-  P(spectrum, QUDA_LR_EIG_SPECTRUM);
+  P(spectrum, QUDA_SPECTRUM_LR_EIG);
   P(nEv, 0);
   P(nKr, 0);
   P(nConv, 0);
@@ -162,7 +162,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(arpack_check, QUDA_BOOLEAN_NO);
   P(nk, 0);
   P(np, 0);
-  P(eig_type, QUDA_IMP_RST_LANCZOS);
+  P(eig_type, QUDA_EIG_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
@@ -184,7 +184,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, INVALID_INT);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
-  P(eig_type, QUDA_INVALID_EIG_TYPE);
+  P(eig_type, QUDA_INVALID_EIG);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
@@ -477,13 +477,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #ifdef INIT_PARAM
   P(use_init_guess, QUDA_USE_INIT_GUESS_NO); //set the default to no
-  // P(deflated_guess, QUDA_DEFLATED_GUESS_NO); //set the default to no
-  // P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_NO); //set the default to no
   P(omega, 1.0); // set default to no relaxation
 #else
   P(use_init_guess, QUDA_USE_INIT_GUESS_INVALID);
-  // P(deflated_guess, QUDA_DEFLATED_GUESS_INVALID);
-  // P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(omega, INVALID_DOUBLE);
 #endif
 

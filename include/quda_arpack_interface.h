@@ -6,8 +6,6 @@
 
 #include <color_spinor_field.h>
 #include <dirac_quda.h>
-#include <vector>
-#include <algorithm>
 
 #ifdef ARPACK_LIB
 

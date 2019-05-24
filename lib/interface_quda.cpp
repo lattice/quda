@@ -182,7 +182,7 @@ static TimeProfile profileMulti("invertMultiShiftQuda");
 static TimeProfile profileEigensolve("eigensolveQuda");
 
 //!< Profiler for eigensolveARPACK
-static TimeProfile profileEigensolveARPACK("eigensolveARPACK");
+static TimeProfile profileEigensolveARPACK("eigensolveARPACKQuda");
 
 //!< Profiler for computeFatLinkQuda
 static TimeProfile profileFatLink("computeKSLinkQuda");
@@ -2410,7 +2410,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
 {
-
+  
   profilerStart(__func__);
 
   // Transfer the inv param structure contained in eig_param
@@ -2459,14 +2459,8 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   // Create device side ColorSpinorField vector space and to pass to the
   // compute function.
   const int *X = cudaGauge->X();
-
   ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
-
   cpuParam.v = host_evecs;
-  ColorSpinorField *h_tmp = ColorSpinorField::Create(cpuParam);
-  double norm = sqrt(blas::norm2(*h_tmp));
-  printfQuda("Initial residual vector norm = %f\n", norm);
-
   ColorSpinorParam *cudaParam(&cpuParam);
   cudaParam->location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam->create = QUDA_ZERO_FIELD_CREATE;
@@ -2478,51 +2472,47 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   std::vector<ColorSpinorField *> kSpace;
   for (int i = 0; i < eig_param->nKr; i++) { kSpace.push_back(ColorSpinorField::Create(*cudaParam)); }
 
-  // Test for initial guess
-  if (norm == 0.0) {
-    printfQuda("Initial residual is zero. Populating with rands.\n");
-    if (kSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
-      kSpace[0]->Source(QUDA_RANDOM_SOURCE);
-    } else {
-      RNG *rng = new RNG(kSpace[0]->Volume(), 1234, kSpace[0]->X());
-      rng->Init();
-      spinorNoise(*kSpace[0], *rng, QUDA_NOISE_UNIFORM);
-      rng->Release();
-      delete rng;
-    }
-    printfQuda("Random guess set\n");
-  } else {
-    // Transfer host guess to device
-    printfQuda("Using initial guess\n");
-    *kSpace[0] = *h_tmp;
-  }
-  delete h_tmp;
-
-  profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
-  profileEigensolve.TPSTART(QUDA_PROFILE_COMPUTE);
-
   // If you use polynomial acceleration on a non-symmetric matrix,
   // the solver will fail.
   if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
     errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
   }
 
+  profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
+  profileEigensolve.TPSTART(QUDA_PROFILE_COMPUTE);
+  
   if (!eig_param->use_norm_op && !eig_param->use_dagger) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-    (*eig_solve)(kSpace, evals);
+    if (eig_param.arpack_check) {
+      arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+    } else {
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+      (*eig_solve)(kSpace, evals);
+    }
   } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-    (*eig_solve)(kSpace, evals);
+    if (eig_param.arpack_check) {
+      arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+    } else {
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+      (*eig_solve)(kSpace, evals);
+    }
   } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-    (*eig_solve)(kSpace, evals);
+    if (eig_param.arpack_check) {
+      arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+    } else {
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+      (*eig_solve)(kSpace, evals);
+    }
   } else if (eig_param->use_norm_op && eig_param->use_dagger) {
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-    (*eig_solve)(kSpace, evals);
+    if (eig_param.arpack_check) {
+      arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+    } else {
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+      (*eig_solve)(kSpace, evals);
+    }
   } else {
     errorQuda("Invalid use_norm_op and dagger combination");
   }
@@ -2547,100 +2537,6 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   saveTuneCache();
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
-  profilerStop(__func__);
-}
-
-void eigensolveARPACK(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
-{
-
-  profilerStart(__func__);
-
-  // Transfer the inv param structure contained in eig_param
-  QudaInvertParam *inv_param;
-  inv_param = eig_param->invert_param;
-
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH)
-    setKernelPackT(true);
-
-  profileEigensolveARPACK.TPSTART(QUDA_PROFILE_TOTAL);
-  profileEigensolveARPACK.TPSTART(QUDA_PROFILE_INIT);
-
-  if (!initialized) errorQuda("QUDA not initialized");
-
-  pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printQudaInvertParam(inv_param);
-    printQudaEigParam(eig_param);
-  }
-
-  checkInvertParam(inv_param);
-  checkEigParam(eig_param);
-  cudaGaugeField *cudaGauge = checkGauge(inv_param);
-
-  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE)
-    || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
-
-  inv_param->secs = 0;
-  inv_param->gflops = 0;
-  inv_param->iter = 0;
-
-  // Define problem matrix
-  //------------------------------------------------------
-  Dirac *d = nullptr;
-  Dirac *dSloppy = nullptr;
-  Dirac *dPre = nullptr;
-
-  // create the dirac operator
-  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
-  Dirac &dirac = *d;
-  Dirac &diracSloppy = *dSloppy;
-  Dirac &diracPre = *dPre;
-  //------------------------------------------------------
-
-  // For QUDA data type eigenvectors
-  const int *X = cudaGauge->X();
-  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
-
-  // The Arnoldi can solve any problem. However, if you use poly acc on a
-  // non-symmetric matrix, this routine will fail.
-  if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
-    errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
-  }
-
-  profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_INIT);
-  profileEigensolveARPACK.TPSTART(QUDA_PROFILE_COMPUTE);
-
-  if (!eig_param->use_norm_op && !eig_param->use_dagger) {
-    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
-  } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
-    DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
-  } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
-    DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
-  } else if (eig_param->use_norm_op && eig_param->use_dagger) {
-    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
-  } else {
-    errorQuda("Invalid use_norm_op and dagger combination");
-  }
-
-  profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileEigensolveARPACK.TPSTART(QUDA_PROFILE_FREE);
-
-  delete d;
-  delete dSloppy;
-  delete dPre;
-  profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_FREE);
-
-  popVerbosity();
-
-  // cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache();
-
-  profileEigensolveARPACK.TPSTOP(QUDA_PROFILE_TOTAL);
   profilerStop(__func__);
 }
 

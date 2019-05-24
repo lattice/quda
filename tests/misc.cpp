@@ -962,20 +962,20 @@ get_dslash_str(QudaDslashType type)
 QudaEigSpectrumType get_eig_spectrum_type(char *s)
 {
 
-  QudaEigSpectrumType ret = QUDA_INVALID_EIG_SPECTRUM;
+  QudaEigSpectrumType ret = QUDA_INVALID_SPECTRUM;
 
   if (strcmp(s, "SR") == 0) {
-    ret = QUDA_SR_EIG_SPECTRUM;
+    ret = QUDA_SPECTRUM_SR_EIG;
   } else if (strcmp(s, "LR") == 0) {
-    ret = QUDA_LR_EIG_SPECTRUM;
+    ret = QUDA_SPECTRUM_LR_EIG;
   } else if (strcmp(s, "SM") == 0) {
-    ret = QUDA_SM_EIG_SPECTRUM;
+    ret = QUDA_SPECTRUM_SM_EIG;
   } else if (strcmp(s, "LM") == 0) {
-    ret = QUDA_LM_EIG_SPECTRUM;
+    ret = QUDA_SPECTRUM_LM_EIG;
   } else if (strcmp(s, "SI") == 0) {
-    ret = QUDA_SI_EIG_SPECTRUM;
+    ret = QUDA_SPECTRUM_SI_EIG;
   } else if (strcmp(s, "LI") == 0) {
-    ret = QUDA_LI_EIG_SPECTRUM;
+    ret = QUDA_SPECTRUM_LI_EIG;
   } else {
     fprintf(stderr, "Error: invalid eigen spectrum type\n");
     exit(1);
@@ -989,12 +989,12 @@ const char *get_eig_spectrum_str(QudaEigSpectrumType type)
   const char *ret;
 
   switch (type) {
-  case QUDA_SR_EIG_SPECTRUM: ret = "SR"; break;
-  case QUDA_LR_EIG_SPECTRUM: ret = "LR"; break;
-  case QUDA_SM_EIG_SPECTRUM: ret = "SM"; break;
-  case QUDA_LM_EIG_SPECTRUM: ret = "LM"; break;
-  case QUDA_SI_EIG_SPECTRUM: ret = "SI"; break;
-  case QUDA_LI_EIG_SPECTRUM: ret = "LI"; break;
+  case QUDA_SPECTRUM_SR_EIG: ret = "SR"; break;
+  case QUDA_SPECTRUM_LR_EIG: ret = "LR"; break;
+  case QUDA_SPECTRUM_SM_EIG: ret = "SM"; break;
+  case QUDA_SPECTRUM_LM_EIG: ret = "LM"; break;
+  case QUDA_SPECTRUM_SI_EIG: ret = "SI"; break;
+  case QUDA_SPECTRUM_LI_EIG: ret = "LI"; break;
   default: ret = "unknown eigenspectrum"; break;
   }
 
@@ -1004,18 +1004,12 @@ const char *get_eig_spectrum_str(QudaEigSpectrumType type)
 QudaEigType get_eig_type(char *s)
 {
 
-  QudaEigType ret = QUDA_INVALID_EIG_TYPE;
+  QudaEigType ret = QUDA_INVALID_EIG;
 
   if (strcmp(s, "lanczos") == 0) {
-    ret = QUDA_LANCZOS;
-  } else if (strcmp(s, "irlm") == 0) {
-    ret = QUDA_IMP_RST_LANCZOS;
-  } else if (strcmp(s, "trlm") == 0) {
-    ret = QUDA_THICK_RST_LANCZOS;
+    ret = QUDA_EIG_LANCZOS;
   } else if (strcmp(s, "arnoldi") == 0) {
-    ret = QUDA_ARNOLDI;
-  } else if (strcmp(s, "iram") == 0) {
-    ret = QUDA_IMP_RST_ARNOLDI;
+    ret = QUDA_EIG_ARNOLDI;
   } else {
     fprintf(stderr, "Error: invalid quda eigensolver type\n");
     exit(1);
@@ -1029,29 +1023,25 @@ const char *get_eig_type_str(QudaEigType type)
   const char *ret;
 
   switch (type) {
-  case QUDA_LANCZOS: ret = "lanczos"; break;
-  case QUDA_IMP_RST_LANCZOS: ret = "irlm"; break;
-  case QUDA_THICK_RST_LANCZOS: ret = "trlm"; break;
-  case QUDA_ARNOLDI: ret = "arnoldi"; break;
-  case QUDA_IMP_RST_ARNOLDI: ret = "iram"; break;
+  case QUDA_EIG_LANCZOS: ret = "lanczos"; break;
+  case QUDA_EIG_ARNOLDI: ret = "arnoldi"; break;
   default: ret = "unknown eigensolver"; break;
   }
 
   return ret;
 }
 
-QudaMassNormalization
-get_mass_normalization_type(char* s)
+QudaMassNormalization get_mass_normalization_type(char *s)
 {
-  QudaMassNormalization ret =  QUDA_INVALID_NORMALIZATION;
+  QudaMassNormalization ret = QUDA_INVALID_NORMALIZATION;
 
-  if (strcmp(s, "kappa") == 0){
+  if (strcmp(s, "kappa") == 0) {
     ret = QUDA_KAPPA_NORMALIZATION;
-  }else if (strcmp(s, "mass") == 0){
+  } else if (strcmp(s, "mass") == 0) {
     ret = QUDA_MASS_NORMALIZATION;
-  }else if (strcmp(s, "asym-mass") == 0){
+  } else if (strcmp(s, "asym-mass") == 0) {
     ret = QUDA_ASYMMETRIC_MASS_NORMALIZATION;
-  }else{
+  } else {
     fprintf(stderr, "Error: invalid mass normalization\n");
     exit(1);
   }
