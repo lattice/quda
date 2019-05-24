@@ -52,8 +52,7 @@ namespace quda {
 	  function_name = "quda::computeDegrandRossiContraction";
 	  break;
 	case QUDA_CONTRACT_TYPE_DP:
-	  errorQuda("Contraction type not implemented");
-	  //function_name = "quda::computeDiracPauliContraction";
+	  function_name = "quda::computeDiracPauliContraction";
 	  break;
 	default:
 	  function_name = "quda::computeColorContraction";
@@ -74,8 +73,7 @@ namespace quda {
 	  computeDegrandRossiContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 	  break;
 	case QUDA_CONTRACT_TYPE_DP:
-	  errorQuda("Contraction type not implemented");
-	  //computeDiracPauliContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	  computeDiracPauliContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 	  break;
 	default:
 	  computeColorContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
@@ -84,7 +82,6 @@ namespace quda {
 #endif
       } else {
 	errorQuda("CPU not supported yet\n");
-	//computeContractionCPU(arg);
       }
     }
     

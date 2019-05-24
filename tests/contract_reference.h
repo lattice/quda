@@ -12,6 +12,156 @@ extern int V;
 using namespace quda;
 using namespace std;
 
+template <typename Float> void contractDiracPauli(Float *h_result_)
+{
+
+  // Put data in complex form
+  complex<Float> temp[16];
+  complex<Float> *h_result = (complex<Float> *)(Float *)(h_result_);
+  complex<Float> I(0.0, 1.0);
+
+  for (int site = 0; site < V; site++) {
+
+    // Spin contract: <\phi(x)_{\mu} \Gamma_{mu,nu}^{rho,tau} \phi(y)_{\nu}>
+    // The rho index runs slowest.
+    // Layout is defined in enum_quda.h: G_idx = 4*rho + tau
+
+    int idx = 16 * site;
+
+    int G_idx = 0;
+    // G_idx = 0: I
+    temp[G_idx] = 0.0;
+    temp[G_idx] += h_result[idx + 4 * 0 + 0];
+    temp[G_idx] += h_result[idx + 4 * 1 + 1];
+    temp[G_idx] += h_result[idx + 4 * 2 + 2];
+    temp[G_idx] += h_result[idx + 4 * 3 + 3];
+    G_idx++;
+
+    // G_idx = 1: \gamma_1
+    temp[G_idx] = 0.0;
+    temp[G_idx] -= I * h_result[idx + 4 * 0 + 3];
+    temp[G_idx] -= I * h_result[idx + 4 * 1 + 2];
+    temp[G_idx] += I * h_result[idx + 4 * 2 + 1];
+    temp[G_idx] += I * h_result[idx + 4 * 3 + 0];
+    G_idx++;
+
+    // G_idx = 2: \gamma_2
+    temp[G_idx] = 0.0;
+    temp[G_idx] -= h_result[idx + 4 * 0 + 3];
+    temp[G_idx] += h_result[idx + 4 * 1 + 2];
+    temp[G_idx] += h_result[idx + 4 * 2 + 1];
+    temp[G_idx] -= h_result[idx + 4 * 3 + 0];
+    G_idx++;
+
+    // G_idx = 3: \gamma_3
+    temp[G_idx] = 0.0;
+    temp[G_idx] -= I * h_result[idx + 4 * 0 + 2];
+    temp[G_idx] += I * h_result[idx + 4 * 1 + 3];
+    temp[G_idx] += I * h_result[idx + 4 * 2 + 0];
+    temp[G_idx] -= I * h_result[idx + 4 * 3 + 1];
+    G_idx++;
+
+    // G_idx = 4: \gamma_4
+    temp[G_idx] = 0.0;
+    temp[G_idx] += h_result[idx + 4 * 0 + 0];
+    temp[G_idx] += h_result[idx + 4 * 1 + 1];
+    temp[G_idx] -= h_result[idx + 4 * 2 + 2];
+    temp[G_idx] -= h_result[idx + 4 * 3 + 3];
+    G_idx++;
+
+    // G_idx = 5: \gamma_5
+    temp[G_idx] = 0.0;
+    temp[G_idx] += h_result[idx + 4 * 0 + 2];
+    temp[G_idx] += h_result[idx + 4 * 1 + 3];
+    temp[G_idx] += h_result[idx + 4 * 2 + 0];
+    temp[G_idx] += h_result[idx + 4 * 3 + 1];
+    G_idx++;
+
+    // G_idx = 6: \gamma_5\gamma_1
+    temp[G_idx] = 0.0;
+    temp[G_idx] += I * h_result[idx + 4 * 0 + 0];
+    temp[G_idx] += I * h_result[idx + 4 * 1 + 1];
+    temp[G_idx] -= I * h_result[idx + 4 * 2 + 2];
+    temp[G_idx] -= I * h_result[idx + 4 * 3 + 3];
+    G_idx++;
+
+    // G_idx = 7: \gamma_5\gamma_2
+    temp[G_idx] = 0.0;
+    temp[G_idx] += h_result[idx + 4 * 0 + 1];
+    temp[G_idx] -= h_result[idx + 4 * 1 + 0];
+    temp[G_idx] -= h_result[idx + 4 * 2 + 3];
+    temp[G_idx] += h_result[idx + 4 * 3 + 2];
+    G_idx++;
+
+    // G_idx = 8: \gamma_5\gamma_3
+    temp[G_idx] = 0.0;
+    temp[G_idx] += I * h_result[idx + 4 * 0 + 0];
+    temp[G_idx] -= I * h_result[idx + 4 * 1 + 1];
+    temp[G_idx] -= I * h_result[idx + 4 * 2 + 2];
+    temp[G_idx] += I * h_result[idx + 4 * 3 + 3];
+    G_idx++;
+
+    // G_idx = 9: \gamma_5\gamma_4
+    temp[G_idx] = 0.0;
+    temp[G_idx] -= h_result[idx + 4 * 0 + 2];
+    temp[G_idx] -= h_result[idx + 4 * 1 + 3];
+    temp[G_idx] += h_result[idx + 4 * 2 + 0];
+    temp[G_idx] += h_result[idx + 4 * 3 + 1];
+    G_idx++;
+
+    // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
+    temp[G_idx] = 0.0;
+    temp[G_idx] += h_result[idx + 4 * 0 + 0];
+    temp[G_idx] -= h_result[idx + 4 * 1 + 1];
+    temp[G_idx] += h_result[idx + 4 * 2 + 2];
+    temp[G_idx] -= h_result[idx + 4 * 3 + 3];
+    G_idx++;
+
+    // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]
+    temp[G_idx] = 0.0;
+    temp[G_idx] -= I * h_result[idx + 4 * 0 + 1];
+    temp[G_idx] += I * h_result[idx + 4 * 1 + 0];
+    temp[G_idx] -= I * h_result[idx + 4 * 2 + 3];
+    temp[G_idx] += I * h_result[idx + 4 * 3 + 2];
+    G_idx++;
+
+    // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
+    temp[G_idx] = 0.0;
+    temp[G_idx] -= h_result[idx + 4 * 0 + 3];
+    temp[G_idx] -= h_result[idx + 4 * 1 + 2];
+    temp[G_idx] -= h_result[idx + 4 * 2 + 1];
+    temp[G_idx] -= h_result[idx + 4 * 3 + 0];
+    G_idx++;
+
+    // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
+    temp[G_idx] = 0.0;
+    temp[G_idx] += h_result[idx + 4 * 0 + 1];
+    temp[G_idx] += h_result[idx + 4 * 1 + 0];
+    temp[G_idx] += h_result[idx + 4 * 2 + 3];
+    temp[G_idx] += h_result[idx + 4 * 3 + 2];
+    G_idx++;
+
+    // G_idx = 14: (i/2) * [\gamma_2, \gamma_3]
+    temp[G_idx] = 0.0;
+    temp[G_idx] += I * h_result[idx + 4 * 0 + 3];
+    temp[G_idx] -= I * h_result[idx + 4 * 1 + 2];
+    temp[G_idx] += I * h_result[idx + 4 * 2 + 1];
+    temp[G_idx] -= I * h_result[idx + 4 * 3 + 0];
+    G_idx++;
+
+    // G_idx = 14: (i/2) * [\gamma_2, \gamma_3]
+    temp[G_idx] = 0.0;
+    temp[G_idx] -= h_result[idx + 4 * 0 + 2];
+    temp[G_idx] += h_result[idx + 4 * 1 + 3];
+    temp[G_idx] -= h_result[idx + 4 * 2 + 0];
+    temp[G_idx] += h_result[idx + 4 * 3 + 1];
+    G_idx++;
+
+    // Replace data in h_result with spin contracted data
+    for (int i = 0; i < 16; i++) h_result[idx + i] = temp[i];
+  }
+}
+
 template <typename Float> void contractDegrandRossi(Float *h_result_)
 {
 
@@ -201,7 +351,8 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
 
   // Apply gamma insertion on host spin elementals
   if (cType == QUDA_CONTRACT_TYPE_DR) contractDegrandRossi((Float *)h_result);
-
+  if (cType == QUDA_CONTRACT_TYPE_DP) contractDiracPauli((Float *)h_result);
+  
   // compare each contraction
   for (int j = 0; j < 16; j++) {
     bool pass = true;

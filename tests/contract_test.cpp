@@ -38,7 +38,7 @@ extern QudaPrecision prec_null;
 extern QudaContractType contract_type;
 
 // If you add a new contraction type, this must be updated++
-const int NcontractType = 2;
+const int NcontractType = 3;
 
 extern bool verify_results;
 
@@ -91,10 +91,7 @@ const char *prec_str[] = {"single", "double"};
 
 // For googletest, names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore.
-const char *names[] = {
-  "OpenSpin",
-  "DegrandRossi",
-};
+const char *names[] = {"OpenSpin", "DegrandRossi", "DiracPauli"};
 
 int main(int argc, char **argv)
 {

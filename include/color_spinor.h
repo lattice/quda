@@ -117,6 +117,9 @@ namespace quda {
       */
       __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
 
+      /**
+         @brief Prints the NsxNc complex elements of the color spinor
+      */
       __device__ __host__ void print() const
       {
         for (int s=0; s<Ns; s++) {
@@ -130,13 +133,13 @@ namespace quda {
   /**
      This is the specialization for Nspin=4.  For fields with four
      spins we can define a spin projection operation.
-   */
+  */
   template <typename Float, int Nc>
     struct ColorSpinor<Float, Nc, 4> {
     static constexpr int Ns = 4;
     static constexpr int size = Nc * Ns;
     complex<Float> data[size];
-
+    
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>() {
 #pragma unroll
       for (int i = 0; i < size; i++) { data[i] = 0; }
@@ -450,7 +453,7 @@ namespace quda {
       ColorSpinor<Float,Nc,4> a;
       ColorSpinor<Float,Nc,4> &b = *this;
       complex<Float> j(0.0,1.0);
-
+      
       switch(mu) {
       case 0:
 	switch(nu) {
@@ -577,7 +580,6 @@ namespace quda {
 	}
 	break;
       }
-
       return a;
     }
 
@@ -654,7 +656,7 @@ namespace quda {
       }
       *this = a;
     }
-
+    
     __device__ __host__ void print() const
     {
       for (int s=0; s<Ns; s++) {
@@ -731,7 +733,7 @@ namespace quda {
     */
     __device__ __host__ inline ColorSpinor<Float, Nc, 4> reconstruct(int dim, int sign) const
     {
-      ColorSpinor<Float,Nc,4> recon;
+      ColorSpinor<Float, Nc, 4> recon;
       complex<Float> j(0.0,1.0);
 
       switch (dim) {
@@ -776,8 +778,8 @@ namespace quda {
 	    recon(2,i) = (*this)(1,i);
 	    recon(3,i) = -(*this)(0,i);
 	  }
-	  break;
-	}
+          break;
+        }
         break;
       case 2: // z dimension
 	switch (sign) {
@@ -914,15 +916,7 @@ namespace quda {
   {
     complex<Float> dot = 0;
 #pragma unroll
-    for (int s = 0; s < Ns; s++) {
-#pragma unroll
-      for (int c = 0; c < Nc; c++) {
-        dot.x += a(s, c).real() * b(s, c).real();
-        dot.x += a(s, c).imag() * b(s, c).imag();
-        dot.y += a(s, c).real() * b(s, c).imag();
-        dot.y -= a(s, c).imag() * b(s, c).real();
-      }
-    }
+    for (int s = 0; s < Ns; s++) { dot += innerProduct(a, b, s, s); }
     return dot;
   }
 
@@ -938,15 +932,7 @@ namespace quda {
   __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Ns> &a,
                                                          const ColorSpinor<Float, Nc, Ns> &b, int s)
   {
-    complex<Float> dot = 0;
-#pragma unroll
-    for (int c = 0; c < Nc; c++) {
-      dot.x += a(s, c).real() * b(s, c).real();
-      dot.x += a(s, c).imag() * b(s, c).imag();
-      dot.y += a(s, c).real() * b(s, c).imag();
-      dot.y -= a(s, c).imag() * b(s, c).real();
-    }
-    return dot;
+    return innerProduct(a, b, s, s);
   }
 
   /**
@@ -985,15 +971,7 @@ namespace quda {
   __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, 1> &a,
                                                          const ColorSpinor<Float, Nc, Ns> &b, int s)
   {
-    complex<Float> dot = 0;
-#pragma unroll
-    for (int c = 0; c < Nc; c++) {
-      dot.x += a(0, c).real() * b(s, c).real();
-      dot.x += a(0, c).imag() * b(s, c).imag();
-      dot.y += a(0, c).real() * b(s, c).imag();
-      dot.y -= a(0, c).imag() * b(s, c).real();
-    }
-    return dot;
+    return innerProduct(a, b, 0, s);
   }
 
   /**
@@ -1003,19 +981,21 @@ namespace quda {
      @param b Right-hand side ColorSpinor
      @return The spin traced matrix
   */
-  template<typename Float, int Nc, int Ns> __device__ __host__ inline
-    Matrix<complex<Float>,Nc> outerProdSpinTrace(const ColorSpinor<Float,Nc,Ns> &a, const ColorSpinor<Float,Nc,Ns> &b) {
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline Matrix<complex<Float>, Nc> outerProdSpinTrace(const ColorSpinor<Float, Nc, Ns> &a,
+                                                                           const ColorSpinor<Float, Nc, Ns> &b)
+  {
 
-    Matrix<complex<Float>,Nc> out;
+    Matrix<complex<Float>, Nc> out;
 
     // outer product over color
 #pragma unroll
-    for (int i=0; i<Nc; i++) {
+    for (int i = 0; i < Nc; i++) {
 #pragma unroll
-      for(int j=0; j<Nc; j++) {
-	// trace over spin (manual unroll for perf)
-	out(j,i).real(                   a(0,j).real() * b(0,i).real() );
-	out(j,i).real( out(j,i).real() + a(0,j).imag() * b(0,i).imag() );
+      for (int j = 0; j < Nc; j++) {
+        // trace over spin (manual unroll for perf)
+        out(j, i).real(a(0, j).real() * b(0, i).real());
+        out(j,i).real( out(j,i).real() + a(0,j).imag() * b(0,i).imag() );
 	out(j,i).imag(                   a(0,j).imag() * b(0,i).real() );
 	out(j,i).imag( out(j,i).imag() - a(0,j).real() * b(0,i).imag() );
 	//out(j,i) = a(0,j) * conj(b(0,i));
