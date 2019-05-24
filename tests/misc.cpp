@@ -1119,8 +1119,7 @@ get_matpc_str(QudaMatPCType type)
   return ret;
 }
 
-QudaSolveType
-get_solve_type(char* s)
+QudaSolveType get_solve_type(char* s)
 {
   QudaSolveType ret = QUDA_INVALID_SOLVE;
 
@@ -1170,6 +1169,28 @@ get_solve_str(QudaSolveType type)
     break;
   default:
     fprintf(stderr, "Error: invalid solve type %d\n", type);
+    exit(1);
+  }
+
+  return ret;
+}
+
+QudaSolutionType get_solution_type(char* s)
+{
+  QudaSolutionType ret = QUDA_INVALID_SOLUTION;
+
+  if (strcmp(s, "mat") == 0) {
+    ret = QUDA_MAT_SOLUTION;
+  } else if (strcmp(s, "mat-dag-mat") == 0) {
+    ret = QUDA_MATDAG_MAT_SOLUTION;
+  } else if (strcmp(s, "mat-pc") == 0) {
+    ret = QUDA_MATPC_SOLUTION;
+  } else if (strcmp(s, "mat-pc-dag") == 0) {
+    ret = QUDA_MATPC_DAG_SOLUTION;
+  } else if (strcmp(s, "mat-pc-dag-mat-pc") == 0) {
+    ret = QUDA_MATPCDAG_MATPC_SOLUTION;
+  } else {
+    fprintf(stderr, "Error: invalid solution type %s\n", s);
     exit(1);
   }
 
