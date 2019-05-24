@@ -159,7 +159,7 @@ namespace quda
                                                                          active);
       break;
     default:
-      errorQuda("Unsupported laplace3D type given");
+      errorQuda("Unsupported laplace direction %d given", arg.dir);
       break;
     }
 
