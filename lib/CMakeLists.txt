@@ -199,6 +199,14 @@ if (QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda Eigen)
 endif()
 
+configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
+
+if(QUDA_JITIFY)
+  configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
+endif()
+
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 

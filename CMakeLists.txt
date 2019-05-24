@@ -1,5 +1,5 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
@@ -21,7 +21,7 @@ find_package(Git)
 if(DEFINED ENV{QUDA_BUILD_TYPE})
   set(DEFBUILD $ENV{QUDA_BUILD_TYPE})
 else()
-  set(DEFBUILD "RELEASE")
+  set(DEFBUILD "DEVEL")
 endif()
 
 # IF(GIT_FOUND)
@@ -203,9 +203,7 @@ mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_JITIFY)
 
-#######################################################################
-# options that are not exposed at all because only one option exists
-set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
+
 
 
 #######################################################################
@@ -265,6 +263,7 @@ include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 ## Note: This only applies to the RELASE build type
 ## this is just a quick fix and we should probably use https://cmake.org/cmake/help/latest/module/CheckCXXCompilerFlag.html
 
+set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 if(${CPU_ARCH} STREQUAL "x86_64")
   set(CXX_OPT "-march=native")
 elseif(${CPU_ARCH} STREQUAL "ppc64le")
@@ -287,9 +286,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fn
     "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined ${CLANG_FORCE_COLOR}" CACHE STRING
     "Flags used by the C++ compiler during santizer debug builds.")
+
 enable_language(CXX)
-
-
 
 
 #define C FLAGS
@@ -459,8 +457,6 @@ if(QUDA_JITIFY)
 #  find_library(LibDL_Libraries nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
   LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
   LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
-  configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
-  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
 endif()
 
 if(QUDA_USE_EIGEN)
@@ -627,8 +623,8 @@ set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
 set(CMAKE_CUDA_FLAGS_SANITIZE "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG -Xcompiler -fsanitize=address,-fsanitize=undefined" CACHE STRING
   "Flags used by the C++ compiler during sanitizer debug builds." )
 
+# CUDA Wrapper for finding libs etc
 find_package(CUDAWrapper)
-
 
 # We need threads
 find_package(Threads REQUIRED)
@@ -656,10 +652,10 @@ set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERS
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
-string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
 # build up git version
 # add -debug to GITVERSION if we build with debug options enabled
+string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 if(DEBUG_BUILD)
   if(GITVERSION)
     set(GITVERSION ${GITVERSION}-debug)
@@ -697,11 +693,8 @@ mark_as_advanced(CMAKE_C_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_SANITIZE)
-
 mark_as_advanced(CMAKE_F_FLAGS)
 
-configure_file(include/quda_define.h.in include/quda_define.h @ONLY)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 
 set(BUILDNAME ${HASH})
 include( CTest )
