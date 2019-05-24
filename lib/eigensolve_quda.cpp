@@ -681,7 +681,9 @@ namespace quda
 
       // Compute SVD if requested
       time_svd = -clock();
-      if (eig_param->compute_svd) computeSVD(kSpace, d_vecs_tmp, evals, reverse);
+      if (eig_param->compute_svd) {
+	computeSVD(kSpace, evals);
+      }
       time_svd += clock();
     }
 
@@ -895,78 +897,48 @@ namespace quda
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * ritz_mat[dim * (i + 1) - 1];
   }
 
-  void TRLM::computeSVD(std::vector<ColorSpinorField *> &kSpace, std::vector<ColorSpinorField *> &evecs,
-                        std::vector<Complex> &evals, bool reverse)
+  void TRLM::computeSVD(std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M%s\n", eig_param->use_dagger ? "dag" : "");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
 
-    // Switch to M (or Mdag) mat vec
-    eig_param->use_norm_op = QUDA_BOOLEAN_NO;
     int nConv = eig_param->nConv;
-
     Complex sigma_tmp[nConv / 2];
-
-    // Create a device side temp vector by cloning
-    // the evecs passed to the function. We create a
-    // vector of one element. In future, we may wish to
-    // make a block eigensolver, so an std::vector structure
-    // will be needed.
-
-    std::vector<ColorSpinorField *> tmp;
-    ColorSpinorParam csParam(*evecs[0]);
-    tmp.push_back(ColorSpinorField::Create(csParam));
-
+    
     for (int i = 0; i < nConv / 2; i++) {
-
+      
       // This function assumes that you have computed the eigenvectors
-      // of MdagM, ie, the right SVD of M. The ith eigen vector in the array corresponds
-      // to the ith right singular vector. We will sort the array as:
+      // of MdagM(MMdag), ie, the right(left) SVD of M. The ith eigen vector in the
+      // array corresponds to the ith right(left) singular vector. We place the
+      // computed left(right) singular vectors in the second half of the array. We
+      // assume, in the comments, that right vectors are given and we compute the left.
       //
-      //     EV_array_MdagM = (Rev_0, Rev_1, ... , Rev_{n-1{)
-      // to  SVD_array_M    = (Rsv_0, Lsv_0, Rsv_1, Lsv_1, ... ,
-      //                       Rsv_{nEv/2-1}, Lsv_{nEv/2-1})
-      //
-      // We start at Rev_(n/2-1), compute Lsv_(n/2-1), then move the vectors
-      // to the n-2 and n-1 positions in the array respectively.
-
       // As a cross check, we recompute the singular values from mat vecs rather
       // than make the direct relation (sigma_i)^2 = |lambda_i|
       //--------------------------------------------------------------------------
       Complex lambda = evals[i];
 
       // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-      mat(*tmp[0], *evecs[i]);
-
+      mat.Expose()->M(*evecs[nConv/2 + i], *evecs[i]);
+      
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      Complex sigma_sq = blas::cDotProduct(*tmp[0], *tmp[0]);
+      Complex sigma_sq = blas::cDotProduct(*evecs[nConv/2 + i], *evecs[nConv/2 + i]);
       sigma_tmp[i] = Complex(sqrt(sigma_sq.real()), sqrt(abs(sigma_sq.imag())));
 
-      // Copy device Rsv[i] (EV[i]) to host SVD[2*i]
-      *kSpace[2 * i] = *evecs[i];
-
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-      double norm = sqrt(blas::norm2(*tmp[0]));
-      blas::ax(1.0 / norm, *tmp[0]);
-      // Copy Lsv[i] to SVD[2*i+1]
-      *kSpace[2 * i + 1] = *evecs[i];
-
+      double norm = sqrt(blas::norm2(*evecs[nConv/2 + i]));
+      blas::ax(1.0 / norm, *evecs[nConv/2 + i]);
+      
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Sval[%04d] = %+.16e  %+.16e   sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i].real(),
                    sigma_tmp[i].imag(), sigma_tmp[i].real() - sqrt(abs(lambda.real())));
       //--------------------------------------------------------------------------
     }
-
+    
     // Update the host evals array
     for (int i = 0; i < nConv / 2; i++) {
       evals[2 * i + 0] = sigma_tmp[i];
       evals[2 * i + 1] = sigma_tmp[i];
     }
-
-    // Revert to MdagM (or MMdag) mat vec
-    eig_param->use_norm_op = QUDA_BOOLEAN_YES;
-
-    delete tmp[0];
   }
-
 } // namespace quda

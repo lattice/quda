@@ -228,17 +228,12 @@ public:
 
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left
-       @param[in] v Vector space
-       @param[in] r Current vector to add
-       @param[in] kSpace
        @param[in] evecs Computed eigenvectors of NormOp
        @param[in] evals Computed eigenvalues of NormOp
-       @param[in] inverse Inverse sort if using PolyAcc
     */
-    void computeSVD(std::vector<ColorSpinorField *> &kSpace, std::vector<ColorSpinorField *> &evecs,
-                    std::vector<Complex> &evals, bool reverse);
+    void computeSVD(std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals);
   };
-
+  
   /**
      @brief Computes eigen-decomposition using QUDA's arpack interface
      @param[in] h_evecs host pointer to evecs
