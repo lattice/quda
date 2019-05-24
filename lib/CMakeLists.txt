@@ -158,7 +158,7 @@ target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 if(QUDA_QIO)
   add_dependencies(quda QIO)
   add_dependencies(quda_cpp QIO)
-  target_link_libraries(quda INTERFACE ${QUDA_QIO_LDFLAGS} ${QUDA_QIO_LIBS}})
+  target_link_libraries(quda INTERFACE ${QUDA_QIO_LDFLAGS} ${QUDA_QIO_LIBS})
 endif()
 
 if(QUDA_QDPJIT)

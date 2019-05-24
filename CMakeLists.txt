@@ -363,22 +363,34 @@ if(QUDA_QMP)
       GIT_TAG qmp2-5-1 
       PREFIX usqcd
       CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
-      UPDATE_COAMMD ""
-      BUILD_COMMAND COMMAND make
+      UPDATE_COMMAND ""
+      BUILD_COMMAND  make
       INSTALL_COMMAND make install
     )
 
     ExternalProject_Get_Property(QMP INSTALL_DIR)
     set(QUDA_QMPHOME ${INSTALL_DIR})
+    set(QUDA_QMP_LDFLAGS  "-L${QUDA_QMPHOME}/lib" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+    set(QUDA_QMP_LIBS "-lqmp" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+    ExternalProject_Add_Step(QMP reconf
+      COMMAND autoreconf
+      WORKING_DIRECTORY <SOURCE_DIR>
+      DEPENDERS configure
+      DEPENDEES download
+    )
+
+
+  else()
+    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(QUDA_QMP_LDFLAGS  ${QUDA_QMP_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+    set(QUDA_QMP_LIBS  ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
   
   add_definitions(-DQMP_COMMS)
 
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
-  set(QUDA_QMP_LDFLAGS  ${QUDA_QMP_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-  set(QUDA_QMP_LIBS  ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+  
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
   set(COMM_OBJS comm_qmp.cpp)
@@ -391,8 +403,8 @@ if(QUDA_QIO)
       GIT_TAG qio2-5-0
       PREFIX usqcd 
       CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp=${INSTALL_DIR} --prefix=<INSTALL_DIR>
-      UPDATE_COAMMD ""
-      BUILD_COMMAND COMMAND make
+      UPDATE_COMMAND ""
+      BUILD_COMMAND  make
       INSTALL_COMMAND make install
       DEPENDS QMP
 
@@ -407,17 +419,19 @@ if(QUDA_QIO)
       DEPENDERS configure
       DEPENDEES download
     )
+  set(QUDA_QIO_LDFLAGS  "-L${QUDA_QIOHOME}/lib" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+  set(QUDA_QIO_LIBS  "-lqio -llime" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
 
-
+  else()
+    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QIO_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(QUDA_QIO_LDFLAGS  ${QUDA_QIO_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+    set(QUDA_QIO_LIBS  ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
-  
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
-  execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QIO_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
-  set(QUDA_QIO_LDFLAGS  ${QUDA_QIO_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-  set(QUDA_QIO_LIBS  ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+  
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
 endif()
