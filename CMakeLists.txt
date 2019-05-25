@@ -362,7 +362,7 @@ if(QUDA_QMP)
       GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
       GIT_TAG qmp2-5-1 
       PREFIX usqcd
-      CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER}  <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
       UPDATE_COMMAND ""
       BUILD_COMMAND  make
       INSTALL_COMMAND make install
@@ -397,12 +397,15 @@ if(QUDA_QMP)
 endif()
 
 if(QUDA_QIO)
+  if(NOT QUDA_QMP)
+    message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
+  endif()
   if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
     ExternalProject_Add(QIO
       GIT_REPOSITORY https://github.com/usqcd-software/qio.git
       GIT_TAG qio2-5-0
       PREFIX usqcd 
-      CONFIGURE_COMMAND CC=mpicc CXX=mpicxx <SOURCE_DIR>/configure --with-qmp=${INSTALL_DIR} --prefix=<INSTALL_DIR>
+      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
       UPDATE_COMMAND ""
       BUILD_COMMAND  make
       INSTALL_COMMAND make install
