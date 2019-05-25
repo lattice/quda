@@ -235,7 +235,8 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
 
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
-  if (mg_eig_type[level] == QUDA_EIG_LANCZOS && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
+  if (mg_eig_type[level] == QUDA_EIG_LANCZOS
+      && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
   }
 
