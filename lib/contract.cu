@@ -9,7 +9,7 @@
 namespace quda {
 
 #ifdef GPU_CONTRACT
-  template <typename Float, typename Arg> class Contraction : TunableVectorY
+  template <typename real, typename Arg> class Contraction : TunableVectorY
   {
   protected:
     Arg &arg;
@@ -64,19 +64,19 @@ namespace quda {
 
 	using namespace jitify::reflection;
 	jitify_error = program->kernel(function_name)
-	  .instantiate(Type<Float>(), Type<Arg>())
+	  .instantiate(Type<real>(), Type<Arg>())
 	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
 	  .launch(arg);
 #else
 	switch(cType) {
 	case QUDA_CONTRACT_TYPE_OPEN:
-	  computeColorContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	  computeColorContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 	  break;
 	case QUDA_CONTRACT_TYPE_DR:
-	  computeDegrandRossiContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	  computeDegrandRossiContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 	  break;
 	case QUDA_CONTRACT_TYPE_DP:
-	  computeDiracPauliContraction<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	  computeDiracPauliContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 	  break;
 	default:
           errorQuda("Unexpected contraction type %d", cType);
@@ -98,15 +98,15 @@ namespace quda {
     }
 
     long long bytes() const {
-      return x.Bytes() + y.Bytes() + x.Nspin()*x.Nspin()*x.Volume()*sizeof(complex<Float>);
+      return x.Bytes() + y.Bytes() + x.Nspin()*x.Nspin()*x.Volume()*sizeof(complex<real>);
     }
   };
 
-  template<typename Float>
-  void contract_quda(const ColorSpinorField &x, const ColorSpinorField &y, complex<Float> *result, const QudaContractType cType)
+  template<typename real>
+  void contract_quda(const ColorSpinorField &x, const ColorSpinorField &y, complex<real> *result, const QudaContractType cType)
   {
-    ContractionArg<Float> arg(x, y, result);
-    Contraction<Float, ContractionArg<Float>> contraction(arg, x, y, cType);
+    ContractionArg<real> arg(x, y, result);
+    Contraction<real, ContractionArg<real>> contraction(arg, x, y, cType);
     contraction.apply(0);
     qudaDeviceSynchronize();
   }

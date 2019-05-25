@@ -9,7 +9,7 @@
 namespace quda
 {
 
-  template <typename Float> struct ContractionArg
+  template <typename real> struct ContractionArg
   {
     int threads; // number of active threads required
     int X[4];    // grid dimensions
@@ -20,13 +20,13 @@ namespace quda
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     //Create a typename F for the ColorSpinorField (F for fermion)
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<real, nSpin, nColor, spin_project, spinor_direct_load>::type F;
 
     F x;
     F y;
-    complex<Float> *result;
+    complex<real> *result;
 
-    ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<Float> *result) :
+    ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<real> *result) :
       threads(x.VolumeCB()),
       x(x),
       y(y),
@@ -52,7 +52,7 @@ namespace quda
 #endif
   }
 
-  template <typename Float, typename Arg> __global__ void computeColorContraction(Arg arg)
+  template <typename real, typename Arg> __global__ void computeColorContraction(Arg arg)
   {
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
@@ -60,7 +60,6 @@ namespace quda
 
     constexpr int nSpin = arg.nSpin;
     constexpr int nColor = arg.nColor;
-    typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real, nColor, nSpin> Vector;
 
     Vector x = arg.x(x_cb, parity);
@@ -82,7 +81,7 @@ namespace quda
     save<nSpin*nSpin>(arg.result, idx, A);
   }
 
-  template <typename Float, typename Arg> __global__ void computeDegrandRossiContraction(Arg arg)
+  template <typename real, typename Arg> __global__ void computeDegrandRossiContraction(Arg arg)
   {
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
@@ -91,17 +90,16 @@ namespace quda
 
     if (x_cb >= arg.threads) return;
 
-    typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real, nColor, nSpin> Vector;
 
     Vector x = arg.x(x_cb, parity);
     Vector y = arg.y(x_cb, parity);
 
-    complex<Float> I(0.0,1.0);
+    complex<real> I(0.0,1.0);
     int idx = x_cb + parity*arg.threads;
 
-    complex<Float> spin_elem[4][4];
-    complex<Float> result_local(0.0,0.0);
+    complex<real> spin_elem[4][4];
+    complex<real> result_local(0.0,0.0);
 
     //Color contract: <\phi(x)_{\mu} | \phi(y)_{\nu}>
     //The Bra is conjugated
@@ -258,7 +256,7 @@ namespace quda
   }
 
 
-  template <typename Float, typename Arg> __global__ void computeDiracPauliContraction(Arg arg)
+  template <typename real, typename Arg> __global__ void computeDiracPauliContraction(Arg arg)
   {
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
@@ -267,17 +265,16 @@ namespace quda
 
     if (x_cb >= arg.threads) return;
 
-    typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real, nColor, nSpin> Vector;
 
     Vector x = arg.x(x_cb, parity);
     Vector y = arg.y(x_cb, parity);
 
-    complex<Float> I(0.0,1.0);
+    complex<real> I(0.0,1.0);
     int idx = x_cb + parity*arg.threads;
 
-    complex<Float> spin_elem[4][4];
-    complex<Float> result_local(0.0,0.0);
+    complex<real> spin_elem[4][4];
+    complex<real> result_local(0.0,0.0);
 
     //Color contract: <\phi(x)_{\mu} | \phi(y)_{\nu}>
     //The Bra is conjugated
