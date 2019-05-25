@@ -18,20 +18,20 @@
 
 namespace quda
 {
-
+  
 #ifdef ARPACK_LIB
-
+  
   void arpackErrorHelpNAUPD();
   void arpackErrorHelpNEUPD();
-
+  
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
 #include <mpi.h>
 #endif
-
+  
   void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
                     ColorSpinorParam *cpuParam)
   {
-
+    
     // ARPACK logfile name
     char *arpack_logfile = eig_param->arpack_logfile;
     if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -73,7 +73,7 @@ namespace quda
     int *ipntr_ = (int *)malloc(14 * sizeof(int));
     int *iparam_ = (int *)malloc(11 * sizeof(int));
     int n_ = local_vol * nSpin * 3, nEv_ = eig_param->nEv, nKr_ = eig_param->nKr, ldv_ = local_vol * nSpin * 3,
-        lworkl_ = (3 * nKr_ * nKr_ + 5 * nKr_) * 2, rvec_ = 1;
+      lworkl_ = (3 * nKr_ * nKr_ + 5 * nKr_) * 2, rvec_ = 1;
     int max_iter = eig_param->max_restarts * (nKr_ - nEv_) + nEv_;
     int *h_evals_sorted_idx = (int *)malloc(nKr_ * sizeof(int));
 
@@ -116,7 +116,7 @@ namespace quda
       else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
         spectrum = strdup("LI");
     }
-
+    
     bool reverse = true;
     const char *L = "L";
     const char *S = "S";
@@ -167,7 +167,7 @@ namespace quda
     }
 
     int iter_count = 0;
-
+    
     bool allocate = true;
     ColorSpinorField *h_v = nullptr;
     ColorSpinorField *d_v = nullptr;
@@ -182,20 +182,20 @@ namespace quda
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
 
     if (arpack_logfile != NULL && (comm_rank() == 0)) {
-
+      /*      
       ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
       int msglvl0 = 9, msglvl3 = 9;
       ARPACK(pmcinitdebug)
-      (&arpack_log_u, // logfil
-       &msglvl3,      // mcaupd
-       &msglvl3,      // mcaup2
-       &msglvl0,      // mcaitr
-       &msglvl3,      // mceigh
-       &msglvl0,      // mcapps
-       &msglvl0,      // mcgets
-       &msglvl3       // mceupd
-      );
-
+	(&arpack_log_u, // logfil
+	 &msglvl3,      // mcaupd
+	 &msglvl3,      // mcaup2
+	 &msglvl0,      // mcaitr
+	 &msglvl3,      // mceigh
+	 &msglvl0,      // mcapps
+	 &msglvl0,      // mcgets
+	 &msglvl3       // mceupd
+	 );
+      */
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("eigenSolver: Log info:\n");
         printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");
@@ -205,26 +205,27 @@ namespace quda
 #else
     if (arpack_logfile != NULL) {
 
+      /*
       ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
       int msglvl0 = 9, msglvl3 = 9;
       ARPACK(mcinitdebug)
-      (&arpack_log_u, // logfil
-       &msglvl3,      // mcaupd
-       &msglvl3,      // mcaup2
-       &msglvl0,      // mcaitr
-       &msglvl3,      // mceigh
-       &msglvl0,      // mcapps
-       &msglvl0,      // mcgets
-       &msglvl3       // mceupd
-      );
-
+	(&arpack_log_u, // logfil
+	 &msglvl3,      // mcaupd
+	 &msglvl3,      // mcaup2
+	 &msglvl0,      // mcaitr
+	 &msglvl3,      // mceigh
+	 &msglvl0,      // mcapps
+	 &msglvl0,      // mcgets
+	 &msglvl3       // mceupd
+	 );
+      */
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("eigenSolver: Log info:\n");
         printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");
         printfQuda("output is directed to %s\n", arpack_logfile);
       }
     }
-
+    
 #endif
 
     // Start ARPACK routines
@@ -241,8 +242,8 @@ namespace quda
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
 
       ARPACK(pznaupd)
-      (fcomm_, &ido_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
-       w_workl_, &lworkl_, w_rwork_, &info_, 1, 2);
+	(fcomm_, &ido_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
+	 w_workl_, &lworkl_, w_rwork_, &info_, 1, 2);
 
       if (info_ != 0) {
         arpackErrorHelpNAUPD();
@@ -250,14 +251,14 @@ namespace quda
       }
 #else
       ARPACK(znaupd)
-      (&ido_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_,
-       &lworkl_, w_rwork_, &info_, 1, 2);
+	(&ido_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_,
+	 &lworkl_, w_rwork_, &info_, 1, 2);
       if (info_ != 0) {
         arpackErrorHelpNAUPD();
         errorQuda("\nError in znaupd info = %d. Exiting.", info_);
       }
 #endif
-
+      
       // If this is the first iteration, we allocate CPU and GPU memory for QUDA
       if (allocate) {
 
@@ -310,7 +311,7 @@ namespace quda
       iter_count++;
 
     } while (99 != ido_ && iter_count < max_iter);
-
+    
     // Subspace calulated sucessfully. Compute nEv eigenvectors and values
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -324,8 +325,8 @@ namespace quda
     //----------------------------
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
     ARPACK(pzneupd)
-    (fcomm_, &rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nEv_, &tol_,
-     resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
+      (fcomm_, &rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nEv_, &tol_,
+       resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
     if (info_ == -15) {
       arpackErrorHelpNEUPD();
       errorQuda("\nError in pzneupd info = %d. You likely need to\n"
@@ -337,8 +338,8 @@ namespace quda
     }
 #else
     ARPACK(zneupd)
-    (&rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_,
-     &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
+      (&rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_,
+       &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
     if (info_ == -15) {
       arpackErrorHelpNEUPD();
       errorQuda("\nError in zneupd info = %d. You likely need to\n"
@@ -347,6 +348,7 @@ namespace quda
     } else if (info_ != 0) {
       arpackErrorHelpNEUPD();
       errorQuda("\nError in zneupd info = %d. Exiting.", info_);
+    }
 #endif
 
     // Print additional convergence information.
@@ -354,42 +356,42 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Maximum number of iterations reached.\n");
     } else {
       if (info_ == 3) {
-        errorQuda("ARPACK Error: No shifts could be applied during implicit\n");
-        errorQuda("Arnoldi update.\n");
+	errorQuda("ARPACK Error: No shifts could be applied during implicit\n");
+	errorQuda("Arnoldi update.\n");
       }
     }
-
+    
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
-
+    
     if (comm_rank() == 0) {
-      if (arpack_logfile != NULL) { ARPACK(finilog)(&arpack_log_u); }
+      //if (arpack_logfile != NULL) { ARPACK(finilog)(&arpack_log_u); }
     }
 #else
-      if (arpack_logfile != NULL) ARPACK(finilog)(&arpack_log_u);
-
+    //if (arpack_logfile != NULL) ARPACK(finilog)(&arpack_log_u);
+    
 #endif
-
+    
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking eigenvalues\n");
-
+    
     int nconv = iparam_[4];
-
+    
     // Sort the eigenvalues in absolute ascending order
     std::vector<std::pair<double, int>> evals_sorted;
     for (int j = 0; j < nconv; j++) { evals_sorted.push_back(std::make_pair(h_evals_[j].real(), j)); }
-
+    
     // Sort the array by value (first in the pair)
     // and the index (second in the pair) will come along
     // for the ride.
     std::sort(evals_sorted.begin(), evals_sorted.end());
     if (reverse) std::reverse(evals_sorted.begin(), evals_sorted.end());
-
+    
     // print out the computed Ritz values and their error estimates
     for (int j = 0; j < nconv; j++) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[j]), imag(h_evals_[j]),
-                   std::abs(*(w_workl_ + ipntr_[10] - 1 + j)));
+	printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[j]), imag(h_evals_[j]),
+		   std::abs(*(w_workl_ + ipntr_[10] - 1 + j)));
     }
-
+    
     // Compute Eigenvalues from Eigenvectors.
     ColorSpinorField *h_v3 = NULL;
     int idx = 0;
@@ -397,44 +399,44 @@ namespace quda
       idx = nconv - 1 - evals_sorted[i].second;
       cpuParam->v = (Complex *)h_evecs_ + idx * ldv_;
       h_v3 = ColorSpinorField::Create(*cpuParam);
-
+      
       // d_v = v
       *d_v = *h_v3;
-
+      
       // d_v2 = M*v
       eig_solver->matVec(mat, *d_v2, *d_v);
-
+      
       // lambda = v^dag * M*v
       h_evals_[idx] = blas::cDotProduct(*d_v, *d_v2);
-
+      
       Complex unit(1.0, 0.0);
       Complex m_lambda(-real(h_evals_[idx]), -imag(h_evals_[idx]));
-
+      
       // d_v = ||M*v - lambda*v||
       blas::caxpby(unit, *d_v2, m_lambda, *d_v);
       double L2norm = blas::norm2(*d_v);
-
+      
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("EigValue[%04d] = %+.16e  %+.16e  Residual: %.16e\n", i, real(h_evals_[idx]), imag(h_evals_[idx]),
-                   sqrt(L2norm));
-
+	printfQuda("EigValue[%04d] = %+.16e  %+.16e  Residual: %.16e\n", i, real(h_evals_[idx]), imag(h_evals_[idx]),
+		   sqrt(L2norm));
+      
       delete h_v3;
     }
-
+    
     time_ev += clock();
-
+    
     double total = (time_ar + time_ev) / CLOCKS_PER_SEC;
-
+    
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Time to solve problem using ARPACK         = %e\n", total);
       printfQuda("Time spent in ARPACK                       = %e  %.1f%%\n", (time_ar - time_mv) / CLOCKS_PER_SEC,
-                 100 * ((time_ar - time_mv) / CLOCKS_PER_SEC) / total);
+		 100 * ((time_ar - time_mv) / CLOCKS_PER_SEC) / total);
       printfQuda("Time spent in QUDA (M*vec + data transfer) = %e  %.1f%%\n", time_mv / CLOCKS_PER_SEC,
-                 100 * (time_mv / CLOCKS_PER_SEC) / total);
+		 100 * (time_mv / CLOCKS_PER_SEC) / total);
       printfQuda("Time spent in computing Eigenvectors       = %e  %.1f%%\n", time_ev / CLOCKS_PER_SEC,
-                 100 * (time_ev / CLOCKS_PER_SEC) / total);
+		 100 * (time_ev / CLOCKS_PER_SEC) / total);
     }
-
+    
     // cleanup
     free(ipntr_);
     free(iparam_);
@@ -447,16 +449,16 @@ namespace quda
     free(w_rwork_);
     free(select_);
     free(spectrum);
-
+    
     delete h_v;
     delete h_v2;
     delete d_v;
     delete d_v2;
     delete resid;
-
+    
     return;
   }
-
+  
   void arpackErrorHelpNAUPD()
   {
     printfQuda("Error help NAUPD\n");
@@ -536,7 +538,7 @@ namespace quda
 #else
 
   void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
-                    ColorSpinorParam *cpuParam)
+		    ColorSpinorParam *cpuParam)
   {
     errorQuda("(P)ARPACK has not been enabled for this build");
   }
