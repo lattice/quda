@@ -1,5 +1,10 @@
 # basic setup for cmake
 cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
+
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
@@ -171,6 +176,7 @@ set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
+set(QUDA_DOWNLOAD_USQCD OFF CACHE BOOL "Download USQCD software as requested by QUDA_QMP / QUDA_QIO")
 
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
@@ -357,7 +363,7 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_QMP)
-  if("${QUDA_QMPHOME}" STREQUAL "")
+  if(QUDA_DOWNLOAD_USQCD)
     ExternalProject_Add(QMP
       GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
       GIT_TAG qmp2-5-1
@@ -386,6 +392,9 @@ if(QUDA_QMP)
 
 
   else()
+    if("${QUDA_QMPHOME}" STREQUAL "")
+      message( FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is ON and QUDA_DOWNLOAD_USQCD is OFF" )
+    endif()
     execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -405,7 +414,7 @@ if(QUDA_QIO)
   if(NOT QUDA_QMP)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
-  if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
+  if(QUDA_DOWNLOAD_USQCD)
     ExternalProject_Add(QIO
       GIT_REPOSITORY https://github.com/usqcd-software/qio.git
       GIT_TAG qio2-5-0
@@ -435,6 +444,9 @@ if(QUDA_QIO)
   set(QUDA_QIO_LIBS  "-lqio -llime" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
 
   else()
+    if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
+      message( FATAL_ERROR "QUDA_QIOHOME and QUDA_LIMEHOME must be defined when QUDA_QIO is ON and QUDA_DOWNLOAD_USQCD is OFF" )
+    endif()
     execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QIO_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(COMMAND ${QUDA_QIOHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
