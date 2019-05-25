@@ -490,11 +490,12 @@ namespace quda
     // Thick restart specific checks
     if (nKr < nEv + 6) errorQuda("nKr=%d must be greater than nEv+6=%d\n", nKr, nEv + 6);
 
-    if (eig_param->eig_type == QUDA_EIG_LANCZOS && !(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    if (eig_param->eig_type == QUDA_EIG_LANCZOS
+        && !(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
       errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
-    }  
+    }
   }
-  
+
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
 

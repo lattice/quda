@@ -1119,7 +1119,7 @@ get_matpc_str(QudaMatPCType type)
   return ret;
 }
 
-QudaSolveType get_solve_type(char* s)
+QudaSolveType get_solve_type(char *s)
 {
   QudaSolveType ret = QUDA_INVALID_SOLVE;
 
@@ -1175,7 +1175,7 @@ get_solve_str(QudaSolveType type)
   return ret;
 }
 
-QudaSolutionType get_solution_type(char* s)
+QudaSolutionType get_solution_type(char *s)
 {
   QudaSolutionType ret = QUDA_INVALID_SOLUTION;
 

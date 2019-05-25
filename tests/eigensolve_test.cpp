@@ -288,7 +288,7 @@ void setEigParam(QudaEigParam &eig_param)
   if (eig_type == QUDA_EIG_LANCZOS && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
   }
-  
+
   // The solver will exit when nConv extremal eigenpairs have converged
   if (eig_nConv < 0) {
     eig_param.nConv = eig_nEv;
