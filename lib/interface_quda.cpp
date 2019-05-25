@@ -5836,19 +5836,17 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
 
   // Create device parameter
-  ColorSpinorParam *cudaParam(&cpuParam);
-  cudaParam->location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam->create = QUDA_ZERO_FIELD_CREATE;
-  param->cuda_prec == QUDA_DOUBLE_PRECISION ? cudaParam->fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
-                                              cudaParam->fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+  ColorSpinorParam cudaParam(cpuParam);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
 
   std::vector<ColorSpinorField *> x, y;
-  x.push_back(ColorSpinorField::Create(*cudaParam));
-  y.push_back(ColorSpinorField::Create(*cudaParam));
+  x.push_back(ColorSpinorField::Create(cudaParam));
+  y.push_back(ColorSpinorField::Create(cudaParam));
 
-  size_t sSize = (param->cuda_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  size_t data_bytes = X[0] * X[1] * X[2] * X[3] * 16 * 2 * sSize;
-  void *d_result = device_malloc(data_bytes);
+  size_t data_bytes = x[0]->Volume() * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
+  void *d_result = pool_device_malloc(data_bytes);
   profileContract.TPSTOP(QUDA_PROFILE_INIT);
 
   profileContract.TPSTART(QUDA_PROFILE_H2D);
@@ -5865,7 +5863,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
   profileContract.TPSTART(QUDA_PROFILE_FREE);
-  device_free(d_result);
+  pool_device_free(d_result);
   delete x[0];
   delete y[0];
   delete h_y;
