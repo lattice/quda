@@ -360,12 +360,17 @@ if(QUDA_QMP)
   if("${QUDA_QMPHOME}" STREQUAL "")
     ExternalProject_Add(QMP
       GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-      GIT_TAG qmp2-5-1 
+      GIT_TAG qmp2-5-1
+      GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER}  <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
-      UPDATE_COMMAND ""
       BUILD_COMMAND  make
       INSTALL_COMMAND make install
+      LOG_MERGED_STDOUTERR ON
+      LOG_INSTALL ON
+      LOG_BUILD ON
+      LOG_DOWNLOAD ON
+      LOG_OUTPUT_ON_FAILURE ON
     )
 
     ExternalProject_Get_Property(QMP INSTALL_DIR)
@@ -404,13 +409,17 @@ if(QUDA_QIO)
     ExternalProject_Add(QIO
       GIT_REPOSITORY https://github.com/usqcd-software/qio.git
       GIT_TAG qio2-5-0
+      GIT_SHALLOW YES
       PREFIX usqcd 
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
-      UPDATE_COMMAND ""
       BUILD_COMMAND  make
       INSTALL_COMMAND make install
       DEPENDS QMP
-
+      LOG_MERGED_STDOUTERR ON
+      LOG_INSTALL ON
+      LOG_BUILD ON
+      LOG_DOWNLOAD ON
+      LOG_OUTPUT_ON_FAILURE ON
     )
     ExternalProject_Get_Property(QIO INSTALL_DIR)
     set(QUDA_QIOHOME ${INSTALL_DIR})
