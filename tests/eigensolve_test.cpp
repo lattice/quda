@@ -285,7 +285,10 @@ void setEigParam(QudaEigParam &eig_param)
 
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
-
+  if (eig_type == QUDA_EIG_LANCZOS && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
+  }
+  
   // The solver will exit when nConv extremal eigenpairs have converged
   if (eig_nConv < 0) {
     eig_param.nConv = eig_nEv;
@@ -458,7 +461,7 @@ int main(int argc, char **argv)
   // solve is in the eig_param container. If eig_param.arpack_check == true and
   // precision is double, the routine will use ARPACK rather than the GPU.
   double timeQUDA = -((double)clock());
-  if (eig_param.arpack_check && !eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+  if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only availible in double precision");
   }
   eigensolveQuda(QUDA_host_evecs, QUDA_host_evals, &eig_param);
