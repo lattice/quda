@@ -276,7 +276,7 @@ namespace quda
     }
     blas::caxpy(s, vecs_ptr, rvec);
 
-    delete s;
+    delete []s;
     time_ += clock();
     time_mb += time_;
     return sum;
