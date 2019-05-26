@@ -372,11 +372,11 @@ if(QUDA_QMP)
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER}  <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
       BUILD_COMMAND  make
       INSTALL_COMMAND make install
-      LOG_MERGED_STDOUTERR ON
       LOG_INSTALL ON
       LOG_BUILD ON
       LOG_DOWNLOAD ON
-      LOG_OUTPUT_ON_FAILURE ON
+      #LOG_MERGED_STDOUTERR ON
+      #LOG_OUTPUT_ON_FAILURE ON
     )
 
     ExternalProject_Get_Property(QMP INSTALL_DIR)
@@ -424,11 +424,11 @@ if(QUDA_QIO)
       BUILD_COMMAND  make
       INSTALL_COMMAND make install
       DEPENDS QMP
-      LOG_MERGED_STDOUTERR ON
       LOG_INSTALL ON
       LOG_BUILD ON
       LOG_DOWNLOAD ON
-      LOG_OUTPUT_ON_FAILURE ON
+      #LOG_MERGED_STDOUTERR ON
+      #LOG_OUTPUT_ON_FAILURE ON
     )
     ExternalProject_Get_Property(QIO INSTALL_DIR)
     set(QUDA_QIOHOME ${INSTALL_DIR})
