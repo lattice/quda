@@ -46,7 +46,7 @@ namespace quda
     pushLevel(param.level);
 
     if (param.level >= QUDA_MAX_MG_LEVEL)
-      errorQuda("Level=%d is greater than limit of multigrid recursion depth", param.level+1);
+      errorQuda("Level=%d is greater than limit of multigrid recursion depth", param.level);
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("Cannot use preconditioned coarse grid solution without preconditioned smoother solve");
@@ -115,7 +115,7 @@ namespace quda
   void MG::reset(bool refresh) {
     pushLevel(param.level);
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d of %d levels\n", transfer ? "Resetting":"Creating", param.level+1, param.Nlevel);
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d\n", transfer ? "Resetting":"Creating", param.level);
 
     destroySmoother();
     destroyCoarseSolver();
@@ -214,7 +214,7 @@ namespace quda
       if (param.mg_global.run_verify) verify();
     }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Setup of level %d of %d done\n", param.level+1, param.Nlevel);
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Setup of level %d done\n", param.level);
 
     popLevel(param.level);
   }
@@ -1070,7 +1070,7 @@ namespace quda
     }
 
     for (int si=0; si<param.mg_global.num_setup_iter[param.level]; si++ ) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level+1, si+1, param.mg_global.num_setup_iter[param.level]);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level, si+1, param.mg_global.num_setup_iter[param.level]);
 
       // global orthonormalization of the initial null-space vectors
       if(param.mg_global.pre_orthonormalize) {
@@ -1350,10 +1350,7 @@ namespace quda
 
   void MG::generateEigenVectors()
   {
-
-    sprintf(prefix, "MG level %d (%s): Eigensolver: ", param.level + 1,
-            param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-    setOutputPrefix(prefix);
+    pushLevel(param.level);
 
     // Extract eigensolver params from the size of the null space.
     int nConv = param.B.size();
@@ -1389,7 +1386,7 @@ namespace quda
     // Local clean-up
     for (unsigned int i = 0; i < B_evecs.size(); i++) { delete B_evecs[i]; }
 
-    sprintf(prefix, "MG level %d (%s): ", param.level + 1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-    setOutputPrefix(prefix);
+    popLevel(param.level);
   }
+
 } // namespace quda
