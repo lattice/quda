@@ -1,9 +1,9 @@
 #pragma once
 
-#include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
+#include <matrix_field.h>
 #include <su3_project.cuh>
 
 namespace quda
@@ -24,33 +24,17 @@ namespace quda
 
     F x;
     F y;
-    complex<real> *result;
+    matrix_field<complex<real>,nSpin> s;
 
-    ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<real> *result) :
+    ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<real> *s) :
       threads(x.VolumeCB()),
       x(x),
       y(y),
-      result(result)
+      s(s,x.VolumeCB())
     {
       for (int dir=0; dir<4; dir++) X[dir] = x.X()[dir];
     }
   };
-
-  template <typename T, int n> struct S { T v[n]; };
-
-  /**
-     @brief This is a helper function for writing out a vector of data
-  */
-  template <int n, typename T> __device__ __host__ inline void save(T *out, int idx, T A[n])
-  {
-#if __CUDA_ARCH__
-    trove::coalesced_ptr<S<T,n>> out_((S<T,n>*)out);
-    out_[idx] = *(S<T,n>*)A;
-#else
-#pragma unroll
-    for (int i=0; i<n; i++) out[n*idx + i] = A[i];
-#endif
-  }
 
   template <typename real, typename Arg> __global__ void computeColorContraction(Arg arg)
   {
@@ -65,20 +49,18 @@ namespace quda
     Vector x = arg.x(x_cb, parity);
     Vector y = arg.y(x_cb, parity);
 
-    int idx = x_cb + parity*arg.threads;
-
-    complex<real> A[nSpin*nSpin];
+    Matrix<complex<real>,nSpin> A;
 #pragma unroll
     for (int mu=0; mu<nSpin; mu++) {
 #pragma unroll
       for (int nu=0; nu<nSpin; nu++) {
 	//Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}>
 	//The Bra is conjugated
-	A[mu*nSpin+nu] = innerProduct(x,y,mu,nu);
+	A(mu,nu) = innerProduct(x,y,mu,nu);
       }
     }
 
-    save<nSpin*nSpin>(arg.result, idx, A);
+    arg.s.save(A, x_cb, parity);
   }
 
   template <typename real, typename Arg> __global__ void computeDegrandRossiContraction(Arg arg)
@@ -96,9 +78,7 @@ namespace quda
     Vector y = arg.y(x_cb, parity);
 
     complex<real> I(0.0,1.0);
-    int idx = x_cb + parity*arg.threads;
-
-    complex<real> spin_elem[4][4];
+    complex<real> spin_elem[nSpin][nSpin];
     complex<real> result_local(0.0,0.0);
 
     //Color contract: <\phi(x)_{\mu} | \phi(y)_{\nu}>
@@ -252,7 +232,7 @@ namespace quda
     result_local += spin_elem[3][3];
     A[G_idx++] = result_local;
 
-    save<nSpin*nSpin>(arg.result, idx, A);
+    arg.s.save(A, x_cb, parity);
   }
 
 
@@ -271,8 +251,6 @@ namespace quda
     Vector y = arg.y(x_cb, parity);
 
     complex<real> I(0.0,1.0);
-    int idx = x_cb + parity*arg.threads;
-
     complex<real> spin_elem[4][4];
     complex<real> result_local(0.0,0.0);
 
@@ -433,7 +411,7 @@ namespace quda
     result_local += spin_elem[3][1];
     A[G_idx++] = result_local;
 
-    save<nSpin*nSpin>(arg.result, idx, A);
+    arg.s.save(A, x_cb, parity);
   }
 
 } // namespace quda
