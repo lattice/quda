@@ -26,7 +26,8 @@ namespace quda {
   {
   }
 
-  CG::~CG() {
+  CG::~CG()
+  {
     profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
       for (auto pi : p) if (pi) delete pi;

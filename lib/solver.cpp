@@ -10,10 +10,19 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
   }
 
-  Solver::Solver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile), node_parity(0) {
+  Solver::Solver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile), node_parity(0), eig_solve(nullptr)
+  {
     // compute parity of the node
     for (int i=0; i<4; i++) node_parity += commCoords(i);
     node_parity = node_parity % 2;
+  }
+
+  Solver::~Solver()
+  {
+    if (eig_solve) {
+      delete eig_solve;
+      eig_solve = nullptr;
+    }
   }
 
   // solver factory

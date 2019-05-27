@@ -62,11 +62,11 @@ namespace quda
     if (nKr == 0) errorQuda("nKr=0 passed to Eigensolver\n");
     if (nConv == 0) errorQuda("nConv=0 passed to Eigensolver\n");
 
-    residua = new double[nKr];
+    residua = (double*)safe_malloc(nKr * sizeof(double));
     for (int i = 0; i < nKr; i++) { residua[nKr] = 0.0; }
 
     // Quda MultiBLAS freindly array
-    Qmat = new Complex[nEv * nKr];
+    Qmat = (Complex*)safe_malloc(nEv * nKr * sizeof(Complex));
 
     // Part of the spectrum to be computed.
     spectrum = strdup("SR"); // Initialsed to stop the compiler warning.
@@ -262,7 +262,7 @@ namespace quda
                                           int j)
   {
     time_ = -clock();
-    Complex *s = new Complex[j + 1];
+    Complex *s = (Complex*)safe_malloc((j + 1)*sizeof(Complex));
     Complex sum(0.0, 0.0);
     std::vector<ColorSpinorField *> vecs_ptr;
     for (int i = 0; i < j + 1; i++) { vecs_ptr.push_back(vecs[i]); }
@@ -276,7 +276,7 @@ namespace quda
     }
     blas::caxpy(s, vecs_ptr, rvec);
 
-    delete []s;
+    host_free(s);
     time_ += clock();
     time_mb += time_;
     return sum;
@@ -286,7 +286,6 @@ namespace quda
   void EigenSolver::deflate(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
                             std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
   {
-
     // number of evecs
     int n_defl = eig_param->nEv;
 
@@ -301,7 +300,7 @@ namespace quda
     for (int i = 0; i < n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
-    Complex *s = new Complex[n_defl];
+    Complex *s = (Complex*)safe_malloc(n_defl*sizeof(Complex));
     blas::cDotProduct(s, eig_vecs_ptr, vec);
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
@@ -314,6 +313,8 @@ namespace quda
     // function that just writes over vec_defl and doesn't sum.  When
     // we exceed the multi-blas limit this would deompose into caxy
     // for the kernel call and caxpy for the subsequent ones
+
+    host_free(s);
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
@@ -471,7 +472,10 @@ namespace quda
     return;
   }
 
-  EigenSolver::~EigenSolver() {}
+  EigenSolver::~EigenSolver() {
+    host_free(residua);
+    host_free(Qmat);
+  }
   //-----------------------------------------------------------------------------
   //-----------------------------------------------------------------------------
 
@@ -480,10 +484,9 @@ namespace quda
     EigenSolver(eig_param, profile),
     mat(mat)
   {
-
     // Tridiagonal/Arrow matrix
-    alpha = new double[nKr];
-    beta = new double[nKr];
+    alpha = (double*)safe_malloc(nKr*sizeof(double));
+    beta = (double*)safe_malloc(nKr*sizeof(double));
     for (int i = 0; i < nKr; i++) {
       alpha[i] = 0.0;
       beta[i] = 0.0;
@@ -728,8 +731,8 @@ namespace quda
   {
     ritz_mat.clear();
     ritz_mat.shrink_to_fit();
-    delete alpha;
-    delete beta;
+    host_free(alpha);
+    host_free(beta);
   }
 
   // Thick Restart Member functions

@@ -464,7 +464,7 @@ namespace quda {
 
   public:
     Solver(SolverParam &param, TimeProfile &profile);
-    virtual ~Solver() { ; }
+    virtual ~Solver();
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
 
