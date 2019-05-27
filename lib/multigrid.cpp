@@ -964,7 +964,6 @@ namespace quda
 
   void MG::saveVectors(const std::vector<ColorSpinorField *> &B) const
   {
-
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     pushLevel(param.level);
@@ -1373,18 +1372,25 @@ namespace quda
 
     for (int i = 0; i < nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
+    // before entering the eigen solver, lets free the B vectors to save some memory
+    ColorSpinorParam bParam(*param.B[0]);
+    for (int i = 0; i < (int)param.B.size(); i++) delete param.B[i];
+
     DiracMdagM *mdagm = new DiracMdagM(*diracResidual);
     EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdagm, profile);
     (*eig_solve)(B_evecs, evals);
 
-    // Copy evecs back to MG
-    for (unsigned int i = 0; i < param.B.size(); i++) { *param.B[i] = *B_evecs[i]; }
+    // now reallocate the B vectors
+    for (int i = 0; i < (int)param.B.size(); i++) param.B[i] = ColorSpinorField::Create(bParam);
 
-    // only save if outfile is defined
-    if (strcmp(param.mg_global.vec_outfile, "") != 0) { saveVectors(B_evecs); }
+    // Copy evecs back to MG
+    for (unsigned int i = 0; i < (int)param.B.size(); i++) { *param.B[i] = *B_evecs[i]; }
 
     // Local clean-up
     for (unsigned int i = 0; i < B_evecs.size(); i++) { delete B_evecs[i]; }
+
+    // only save if outfile is defined
+    if (strcmp(param.mg_global.vec_outfile, "") != 0) { saveVectors(param.B); }
 
     popLevel(param.level);
   }
