@@ -319,7 +319,6 @@ namespace quda
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
-
     for (int i = 0; i < size; i++) {
 
       // r = A * v_i
@@ -343,7 +342,6 @@ namespace quda
 
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
   {
-
     // profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     // profile.TPSTART(QUDA_PROFILE_IO);
 
