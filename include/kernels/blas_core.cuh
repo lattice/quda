@@ -209,67 +209,16 @@ namespace quda
       static int flops() { return 7; }   //! flops per element
     };
 
-    /**
-       Functor to performs the operation z[i] = x[i] + a*y[i] + b*z[i]
-    */
-
-    __device__ __host__ void _cxpaypbz(const float4 &x, const float2 &a, const float4 &y, const float2 &b, float4 &z)
-    {
-      float4 zz;
-      zz.x = x.x + a.x * y.x;
-      zz.x -= a.y * y.y;
-      zz.x += b.x * z.x;
-      zz.x -= b.y * z.y;
-      zz.y = x.y + a.y * y.x;
-      zz.y += a.x * y.y;
-      zz.y += b.y * z.x;
-      zz.y += b.x * z.y;
-      zz.z = x.z + a.x * y.z;
-      zz.z -= a.y * y.w;
-      zz.z += b.x * z.z;
-      zz.z -= b.y * z.w;
-      zz.w = x.w + a.y * y.z;
-      zz.w += a.x * y.w;
-      zz.w += b.y * z.z;
-      zz.w += b.x * z.w;
-      z = zz;
-    }
-
-    __device__ __host__ void _cxpaypbz(const float2 &x, const float2 &a, const float2 &y, const float2 &b, float2 &z)
-    {
-      float2 zz;
-      zz.x = x.x + a.x * y.x;
-      zz.x -= a.y * y.y;
-      zz.x += b.x * z.x;
-      zz.x -= b.y * z.y;
-      zz.y = x.y + a.y * y.x;
-      zz.y += a.x * y.y;
-      zz.y += b.y * z.x;
-      zz.y += b.x * z.y;
-      z = zz;
-    }
-
-    __device__ __host__ void _cxpaypbz(const double2 &x, const double2 &a, const double2 &y, const double2 &b, double2 &z)
-    {
-      double2 zz;
-      zz.x = x.x + a.x * y.x;
-      zz.x -= a.y * y.y;
-      zz.x += b.x * z.x;
-      zz.x -= b.y * z.y;
-      zz.y = x.y + a.y * y.x;
-      zz.y += a.x * y.y;
-      zz.y += b.y * z.x;
-      zz.y += b.x * z.y;
-      z = zz;
-    }
-
-    template <typename Float2, typename FloatN> struct cxpaypbz_ : public BlasFunctor<Float2, FloatN> {
+    template <typename Float2, typename FloatN> struct caxpbypczw_ : public BlasFunctor<Float2, FloatN> {
       const Float2 a;
       const Float2 b;
-      cxpaypbz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+      const Float2 c;
+      caxpbypczw_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        _cxpaypbz(x, a, y, b, z);
+        w = y;
+        _caxpby(a, x, b, w);
+        _caxpy(c, z, w);
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 8; }   //! flops per element
