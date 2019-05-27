@@ -277,8 +277,6 @@ namespace quda {
       BlockOrthogonalize<vFloat,bFloat,4,2>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
 #endif
 #ifdef GPU_STAGGERED_DIRAC
-    } else if (V.Nspin() == 1 && spin_bs == 0) { // coarsening staggered fermions.
-      BlockOrthogonalize<vFloat,bFloat,1,0>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
     } else if (V.Nspin() == 1 && spin_bs == 1) { // coarsening Laplace-like operators.
       BlockOrthogonalize<vFloat,bFloat,1,1>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
 #endif
