@@ -370,8 +370,9 @@ namespace quda
         }
       }
 
-      read_spinor_field(vec_infile.c_str(), &V[0], eig_vecs[0]->Precision(), eig_vecs[0]->X(), eig_vecs[0]->Ncolor(),
-                        eig_vecs[0]->Nspin(), Nvec, 0, (char **)0);
+      read_spinor_field(vec_infile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(),
+                        tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
+
       host_free(V);
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
         for (int i = 0; i < Nvec; i++) {
@@ -395,7 +396,6 @@ namespace quda
 
   void EigenSolver::saveVectors(const std::vector<ColorSpinorField *> &eig_vecs, std::string vec_outfile)
   {
-
     // profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     // profile.TPSTART(QUDA_PROFILE_IO);
 
@@ -427,8 +427,8 @@ namespace quda
       }
     }
 
-    write_spinor_field(vec_outfile.c_str(), &V[0], eig_vecs[0]->Precision(), eig_vecs[0]->X(), eig_vecs[0]->Ncolor(),
-                       eig_vecs[0]->Nspin(), Nvec, 0, (char **)0);
+    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(),
+                       tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
 
     host_free(V);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
