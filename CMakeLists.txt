@@ -414,76 +414,37 @@ if(QUDA_MAGMA)
   endif()  
 endif(QUDA_MAGMA)
 
+# This selects arpack or parpack for Multi GPU
 if(QUDA_ARPACK)
+  enable_language(Fortran)
   add_definitions(-DARPACK_LIB)
   find_package(PkgConfig REQUIRED)
+  enable_language(Fortran)
   
-  # Check if the library is installed already
+  # We always need the serial library
   pkg_check_modules(ARPACK QUIET arpack)
-  if(QUDA_MPI OR QUDA_QMP)
-    pkg_check_modules(PARPACK QUIET parpack)
-  endif()
-  
-  if(QUDA_ARPACK_HOME)
-    # User has specified a path, use it
+  if(NOT ARPACK_FOUND OR QUDA_ARPACK_HOME)
     find_library(ARPACK arpack PATH ${QUDA_ARPACK_HOME})
-    if(QUDA_MPI OR QUDA_QMP)
-      find_library(PARPACK parpack PATH ${QUDA_ARPACK_HOME})
-    endif()
-  endif()
-    
-  if(ARPACK_FOUND AND NOT QUDA_ARPACK_HOME)
-    # ARPACK is installed, user did not give specific path
+  else()
     find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
-    if(QUDA_MPI OR QUDA_QMP)
-      find_library(PARPACK ${PARPACK_LIBRARIES} PATH ${PARPACK_LIBRARY_DIRS})
-    endif()
   endif()
-  
-  if(NOT ARPACK_FOUND AND NOT QUDA_ARPACK_HOME)
-    # Download and install (P)ARPACK
-    set(QUDA_ARPACK_CONFIG CC=${C_COMPILER} CXX=${CXX_COMPILER} F77=${FORTRAN_COMPILER} --prefix=<INSTALL_DIR>)
-    if(QUDA_MPI OR QUDA_QMP)
-      set(QUDA_ARPACK_CONFIG CC=${C_COMPILER} CXX=${CXX_COMPILER} F77=${FORTRAN_COMPILER} MPICC=${C_COMPILER} MPICXX=${CXX_COMPILER} MPIF77=${MPI_FORTRAN_COMPILER} --enable-mpi --prefix=<INSTALL_DIR>)
-    endif()
-    ExternalProject_Add(ARPACK-NG
-      GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
-      GIT_TAG 3.7.0
-      GIT_SHALLOW YES
-      PREFIX arpack-ng
-      CONFIGURE_COMMAND <SOURCE_DIR>/configure ${QUDA_ARPACK_CONFIG}
-      BUILD_COMMAND  make
-      BUILD_IN_SOURCE ON
-      LOG_MERGED_STDOUTERR ON
-      LOG_INSTALL ON
-      LOG_BUILD ON
-      LOG_DOWNLOAD ON
-      LOG_OUTPUT_ON_FAILURE ON
-      )        
-  endif()
-
-  ExternalProject_Add_Step(ARPACK-NG bootstrap
-    COMMAND ./bootstrap
-    WORKING_DIRECTORY <SOURCE_DIR>
-    DEPENDERS configure
-    DEPENDEES download
-    )  
-  
-  ExternalProject_Get_Property(ARPACK-NG INSTALL_DIR)
-  set(QUDA_ARPACK_HOME ${INSTALL_DIR})
-  set(ARPACK "-L${INSTALL_DIR}/lib -larpack")
-  set(PARPACK "-L${INSTALL_DIR}/lib -lparpack")
   include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
   include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
-
-  # Include the parallel library if required
+  
+  
+  # Link the parallel library if required
   if(QUDA_MPI OR QUDA_QMP)
+    pkg_check_modules(PARPACK QUIET parpack)
+    if(NOT PARPACK_FOUND OR QUDA_ARPACK_HOME)
+      find_library(PARPACK parpack PATH ${QUDA_ARPACK_HOME})
+    else()
+      find_library(PARPACK ${PARPACK_LIBRARIES} PATH ${PARPACK_LIBRARY_DIRS})
+    endif()
     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
   endif()
   
 endif(QUDA_ARPACK)
-
 
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
