@@ -224,18 +224,17 @@ namespace quda
       time_mv += time_;
 
       time_ = -clock();
-      blas::ax(d3, *tmp1);
       Complex d1c(d1, 0.0);
       Complex d2c(d2, 0.0);
-      blas::cxpaypbz(*tmp1, d2c, *tmp2, d1c, out);
-
-      blas::copy(*tmp1, *tmp2);
-      blas::copy(*tmp2, out);
+      Complex d3c(d3, 0.0);
+      blas::caxpbypczw(d3c, *tmp1, d2c, *tmp2, d1c, out, *tmp1);
+      std::swap(tmp1, tmp2);
       time_ += clock();
       time_mb += time_;
 
       sigma_old = sigma;
     }
+    blas::copy(out,*tmp2);
 
     delete tmp1;
     delete tmp2;
@@ -321,7 +320,6 @@ namespace quda
                                  std::vector<Complex> &evals, int size)
   {
     for (int i = 0; i < size; i++) {
-
       // r = A * v_i
       time_ = -clock();
       mat(*r[0], *evecs[i]);
