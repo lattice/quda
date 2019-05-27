@@ -207,6 +207,13 @@ namespace quda
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
 
       createCoarseSolver();
+
+      if (param.level == param.Nlevel-2 && param.mg_global.deflate_coarsest) {
+        // if we are deflating the coarsest grid, then run a dummy solve
+        // so that the deflation is done during the setup
+        spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
+        (*coarse_solver)(*x_coarse, *r_coarse);
+      }
     }
 
     if (param.level == 0) {
@@ -431,7 +438,6 @@ namespace quda
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
         param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
         param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-        printfQuda("deflate coarsest true\n");
       }
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
       param_coarse_solver->global_reduction = true;
@@ -591,7 +597,7 @@ namespace quda
       deviation = sqrt(xmyNorm(*tmp1, *tmp2) / norm2(*tmp1));
 
       if (getVerbosity() >= QUDA_VERBOSE)
-        printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e, L2 relative deivation = %e\n",
+        printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e, L2 relative deviation = %e\n",
                    i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2), deviation);
       if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
     }
@@ -827,7 +833,7 @@ namespace quda
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     char prefix_bkup[100];  strncpy(prefix_bkup, prefix, 100);  setOutputPrefix(prefix);
 
-    { // set parity for the solver in the transfer operator
+    if (param.level < param.Nlevel-1) { // set parity for the solver in the transfer operator
       QudaSiteSubset site_subset
         = param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
       QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;

@@ -346,7 +346,6 @@ namespace quda {
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
 
-      // DMH start
       // Just replace any initial guess with a deflated RHS
       if (param.deflate == true) {
 

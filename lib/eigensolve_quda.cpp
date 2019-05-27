@@ -310,6 +310,10 @@ namespace quda
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
     blas::caxpy(s, eig_vecs_ptr, vec_defl);
+    // FIXME - we can optimize the zeroing out with a "multi-caxy"
+    // function that just writes over vec_defl and doesn't sum.  When
+    // we exceed the multi-blas limit this would deompose into caxy
+    // for the kernel call and caxpy for the subsequent ones
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
