@@ -21,7 +21,6 @@ namespace quda
     profile_global(profile_global),
     profile("MG level " + std::to_string(param.level), false),
     coarse(nullptr),
-    fine(param.fine),
     coarse_solver(nullptr),
     param_coarse(nullptr),
     param_presmooth(nullptr),
@@ -31,6 +30,7 @@ namespace quda
     r_coarse(nullptr),
     x_coarse(nullptr),
     tmp_coarse(nullptr),
+    tmp2_coarse(nullptr),
     diracResidual(param.matResidual->Expose()),
     diracSmoother(param.matSmooth->Expose()),
     diracSmootherSloppy(param.matSmoothSloppy->Expose()),
@@ -150,6 +150,9 @@ namespace quda
         // create coarse temporary vector
         tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
 
+        // create coarse temporary vector
+        tmp2_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
+
         // create coarse residual vector
         r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
 
@@ -212,7 +215,9 @@ namespace quda
         // if we are deflating the coarsest grid, then run a dummy solve
         // so that the deflation is done during the setup
         spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
+        param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
         (*coarse_solver)(*x_coarse, *r_coarse);
+        param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level+1];
       }
     }
 
@@ -346,6 +351,7 @@ namespace quda
     diracParam.matpcType = matpc_type;
     diracParam.type = QUDA_COARSE_DIRAC;
     diracParam.tmp1 = tmp_coarse;
+    diracParam.tmp2 = tmp2_coarse;
     diracParam.halo_precision = param.mg_global.precision_null[param.level];
     constexpr int MAX_BLOCK_FLOAT_NC=32; // FIXME this is the maximum number of colors for which we support block-float format
     if (param.Nvec > MAX_BLOCK_FLOAT_NC) diracParam.halo_precision = QUDA_SINGLE_PRECISION;
@@ -364,6 +370,7 @@ namespace quda
     if (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) {
       diracParam.type = QUDA_COARSEPC_DIRAC;
       diracParam.tmp1 = &(tmp_coarse->Even());
+      diracParam.tmp2 = &(tmp2_coarse->Even());
       diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
       {
         bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
@@ -373,6 +380,7 @@ namespace quda
     } else {
       diracParam.type = QUDA_COARSE_DIRAC;
       diracParam.tmp1 = tmp_coarse;
+      diracParam.tmp2 = tmp2_coarse;
       diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
       {
         bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
@@ -546,6 +554,7 @@ namespace quda
     if (r_coarse) delete r_coarse;
     if (x_coarse) delete x_coarse;
     if (tmp_coarse) delete tmp_coarse;
+    if (tmp2_coarse) delete tmp2_coarse;
 
     if (param_coarse) delete param_coarse;
 
