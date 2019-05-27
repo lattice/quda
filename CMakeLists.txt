@@ -1,5 +1,10 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
+
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
@@ -21,7 +26,7 @@ find_package(Git)
 if(DEFINED ENV{QUDA_BUILD_TYPE})
   set(DEFBUILD $ENV{QUDA_BUILD_TYPE})
 else()
-  set(DEFBUILD "RELEASE")
+  set(DEFBUILD "DEVEL")
 endif()
 
 # IF(GIT_FOUND)
@@ -171,6 +176,7 @@ set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
+set(QUDA_DOWNLOAD_USQCD OFF CACHE BOOL "Download USQCD software as requested by QUDA_QMP / QUDA_QIO")
 
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
@@ -203,9 +209,7 @@ mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_JITIFY)
 
-#######################################################################
-# options that are not exposed at all because only one option exists
-set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
+
 
 
 #######################################################################
@@ -265,6 +269,7 @@ include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 ## Note: This only applies to the RELASE build type
 ## this is just a quick fix and we should probably use https://cmake.org/cmake/help/latest/module/CheckCXXCompilerFlag.html
 
+set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 if(${CPU_ARCH} STREQUAL "x86_64")
   set(CXX_OPT "-march=native")
 elseif(${CPU_ARCH} STREQUAL "ppc64le")
@@ -287,9 +292,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fn
     "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined ${CLANG_FORCE_COLOR}" CACHE STRING
     "Flags used by the C++ compiler during santizer debug builds.")
+
 enable_language(CXX)
-
-
 
 
 #define C FLAGS
@@ -359,33 +363,103 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_QMP)
-  if("${QUDA_QMPHOME}" STREQUAL "")
-    message( FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is set" )
+  if(QUDA_DOWNLOAD_USQCD)
+    ExternalProject_Add(QMP
+      GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
+      GIT_TAG qmp2-5-1
+      GIT_SHALLOW YES
+      PREFIX usqcd
+      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER}  <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+      BUILD_COMMAND  make
+      INSTALL_COMMAND make install
+      LOG_INSTALL ON
+      LOG_BUILD ON
+      LOG_DOWNLOAD ON
+      #LOG_MERGED_STDOUTERR ON
+      #LOG_OUTPUT_ON_FAILURE ON
+    )
+
+    ExternalProject_Get_Property(QMP INSTALL_DIR)
+    set(QUDA_QMPHOME ${INSTALL_DIR})
+    set(QUDA_QMP_LDFLAGS  "-L${QUDA_QMPHOME}/lib" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+    set(QUDA_QMP_LIBS "-lqmp" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+    ExternalProject_Add_Step(QMP reconf
+      COMMAND autoreconf
+      WORKING_DIRECTORY <SOURCE_DIR>
+      DEPENDERS configure
+      DEPENDEES download
+    )
+
+
+  else()
+    if("${QUDA_QMPHOME}" STREQUAL "")
+      message( FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is ON and QUDA_DOWNLOAD_USQCD is OFF" )
+    endif()
+    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(QUDA_QMP_LDFLAGS  ${QUDA_QMP_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+    set(QUDA_QMP_LIBS  ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
+  
   add_definitions(-DQMP_COMMS)
 
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
-  set(QUDA_QMP_LDFLAGS  ${QUDA_QMP_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-  set(QUDA_QMP_LIBS  ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-  #FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
+  
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
 if(QUDA_QIO)
-  if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
-    message( FATAL_ERROR "QUDA_QIOHOME and QUDA_LIMEHOME must be defined when QUDA_QIO is set" )
+  if(NOT QUDA_QMP)
+    message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
+  endif()
+  if(QUDA_DOWNLOAD_USQCD)
+    ExternalProject_Add(QIO
+      GIT_REPOSITORY https://github.com/usqcd-software/qio.git
+      GIT_TAG qio2-5-0
+      GIT_SHALLOW YES
+      PREFIX usqcd 
+      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+      BUILD_COMMAND  make
+      INSTALL_COMMAND make install
+      DEPENDS QMP
+      LOG_INSTALL ON
+      LOG_BUILD ON
+      LOG_DOWNLOAD ON
+      #LOG_MERGED_STDOUTERR ON
+      #LOG_OUTPUT_ON_FAILURE ON
+    )
+    ExternalProject_Get_Property(QIO INSTALL_DIR)
+    set(QUDA_QIOHOME ${INSTALL_DIR})
+    set(QUDA_LIME_HOME ${INSTALL_DIR})
+
+    ExternalProject_Add_Step(QIO reconf
+      COMMAND autoreconf
+      WORKING_DIRECTORY <SOURCE_DIR>
+      DEPENDERS configure
+      DEPENDEES download
+    )
+    set(QUDA_QIO_LDFLAGS  "-L${QUDA_QIOHOME}/lib" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+    set(QUDA_QIO_LIBS  "-lqio -llime" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+
+  else()
+    if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
+      message( FATAL_ERROR "QUDA_QIOHOME and QUDA_LIMEHOME must be defined when QUDA_QIO is ON and QUDA_DOWNLOAD_USQCD is OFF" )
+    endif()
+    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --cflags OUTPUT_VARIABLE QUDA_QIO_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --ldflags OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --libs OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(QUDA_QIO_LDFLAGS  ${QUDA_QIO_LDFLAGS_INTERNAL} CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+    set(QUDA_QIO_LIBS  ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
-  FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
-  FIND_LIBRARY(LIME_LIB lime ${QUDA_LIMEHOME}/lib/)
+  
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
 endif()
+
 
 if(QUDA_MAGMA)
   add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
@@ -459,8 +533,6 @@ if(QUDA_JITIFY)
 #  find_library(LibDL_Libraries nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
   LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
   LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
-  configure_file(include/jitify_options.hpp.in include/jitify_options.hpp)
-  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
 endif()
 
 if(QUDA_USE_EIGEN)
@@ -627,8 +699,8 @@ set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
 set(CMAKE_CUDA_FLAGS_SANITIZE "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG -Xcompiler -fsanitize=address,-fsanitize=undefined" CACHE STRING
   "Flags used by the C++ compiler during sanitizer debug builds." )
 
+# CUDA Wrapper for finding libs etc
 find_package(CUDAWrapper)
-
 
 # We need threads
 find_package(Threads REQUIRED)
@@ -656,10 +728,10 @@ set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERS
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
-string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
 # build up git version
 # add -debug to GITVERSION if we build with debug options enabled
+string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 if(DEBUG_BUILD)
   if(GITVERSION)
     set(GITVERSION ${GITVERSION}-debug)
@@ -697,11 +769,8 @@ mark_as_advanced(CMAKE_C_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_SANITIZE)
-
 mark_as_advanced(CMAKE_F_FLAGS)
 
-configure_file(include/quda_define.h.in include/quda_define.h @ONLY)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 
 set(BUILDNAME ${HASH})
 include( CTest )
