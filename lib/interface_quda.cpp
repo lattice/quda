@@ -3111,14 +3111,92 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
     delete solve;
   } else { // norm_error_solve
-    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    cudaColorSpinorField tmp(*out);
-    SolverParam solverParam(*param);
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(tmp, *in); // y = (M M^\dag) b
-    dirac.Mdag(*out, tmp);  // x = M^dag y
-    solverParam.updateInvertParam(*param);
-    delete solve;
+
+    if(0){
+      DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      cudaColorSpinorField tmp(*out);
+      SolverParam solverParam(*param);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      (*solve)(tmp, *in); // y = (M M^\dag) b
+      dirac.Mdag(*out, tmp);  // x = M^dag y
+      solverParam.updateInvertParam(*param);
+      delete solve;
+    }
+    else{
+
+      // FIXME: hardcoded section, useful for testing (I - QQ^)(MM^ - shift)(I - QQ^)x = b
+
+      printfQuda("\n\nSolving for MM^ in shifted-and-projected form !\n\n\n");
+      DiracProjMMdagProj m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+
+      // Cloning params for the creation of new spinors
+      ColorSpinorParam csParamClone(*out);
+      csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+
+      // Dimensionality of the projection sub-space
+      int nrOfProjVecs = 4;
+
+      // Test case: using a dim=nrOfProjVecs projection space, for now populated with rands
+      for(int i=0; i<nrOfProjVecs; i++){
+        mSloppy.projSpace.push_back(ColorSpinorField::Create(csParamClone));
+      }
+      if (out->Location() == QUDA_CPU_FIELD_LOCATION) {
+        for(int i=0; i<nrOfProjVecs; i++){
+          mSloppy.projSpace[i]->Source(QUDA_RANDOM_SOURCE);
+        }
+      } else {
+        for(int i=0; i<nrOfProjVecs; i++){
+          RNG *rng = new RNG(mSloppy.projSpace[i]->Volume(), 1234 + 57*i, mSloppy.projSpace[i]->X());
+          rng->Init();
+          spinorNoise(*mSloppy.projSpace[i], *rng, QUDA_NOISE_UNIFORM);
+          rng->Release();
+          delete rng;
+        }
+      }
+
+      // Orthonormalizing the set of vectors spanning the projection sub-space
+      // First vector
+      double normSp = sqrt( blas::norm2( *(mSloppy.projSpace[0]) ) );
+      blas::ax( 1.0/normSp, *(mSloppy.projSpace[0]) );
+      // Buffer
+      std::vector<ColorSpinorField*> buffProj;
+      buffProj.push_back(ColorSpinorField::Create(csParamClone));
+      // And for the rest
+      for(int i=1; i<nrOfProjVecs; i++){
+        *buffProj[0] = *mSloppy.projSpace[i];
+        for(int j=0; j<i; j++){
+          Complex orthNormFact = blas::cDotProduct( *mSloppy.projSpace[i], *mSloppy.projSpace[j] ) / blas::cDotProduct( *mSloppy.projSpace[j], *mSloppy.projSpace[j] );
+          blas::caxpy( -orthNormFact, *mSloppy.projSpace[j], *buffProj[0] );
+        }
+        normSp = sqrt( blas::norm2( *buffProj[0] ) );
+        blas::ax( 1.0/normSp, *buffProj[0] );
+        *mSloppy.projSpace[i] = *buffProj[0];
+      }
+
+      printfQuda("\nTesting orthonormality of projection vectors:\n\n");
+      for(int i=0; i<nrOfProjVecs; i++){
+        for(int j=0; j<nrOfProjVecs; j++){
+          if(i==j){ continue; }
+          printfQuda("%d * %d = %f\n", i, j, blas::cDotProduct( *mSloppy.projSpace[i], *mSloppy.projSpace[j] ));
+        }
+      }
+      printfQuda("\n");
+
+      // Solving the system
+      cudaColorSpinorField tmp(*out);
+      SolverParam solverParam(*param);
+      //Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      Solver *solve = Solver::create(solverParam, mSloppy, mSloppy, mSloppy, profileInvert);
+      (*solve)(tmp, *in); // y = (M M^\dag) b
+      dirac.Mdag(*out, tmp);  // x = M^dag y
+      solverParam.updateInvertParam(*param);
+
+      // Deleting temp mem
+      delete solve;
+      for(int i=0; i<nrOfProjVecs; i++){ delete mSloppy.projSpace[i]; }
+      delete buffProj[0];
+
+    }
   }
 
   if (getVerbosity() >= QUDA_VERBOSE){
