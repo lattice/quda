@@ -177,7 +177,7 @@ set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 set(QUDA_DOWNLOAD_USQCD OFF CACHE BOOL "Download USQCD software as requested by QUDA_QMP / QUDA_QIO")
-
+set(QUDA_DOWNLOAD_ARPACK OFF CACHE BOOL "Download ARPACK-NG software as requested by QUDA_ARPACK")
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
@@ -315,7 +315,7 @@ set(CMAKE_C_FLAGS_SANITIZE "-Wall -g -fno-inline -DHOST_DEBUG -fsanitize=address
 enable_language(C)
 # do all the build definitions
 #
-
+enable_language(Fortran)
 set(CMAKE_EXE_LINKER_FLAGS_SANITIZE ${CMAKE_EXE_LINKER_FLAGS_SANITIZE} "-fsanitize=address,undefined")
 
 if(QUDA_MPI OR QUDA_QMP)
@@ -338,6 +338,9 @@ if(QUDA_MPI OR QUDA_QMP)
   endif() 
   if(mpimessage)
     message("Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation.")
+  endif()
+  if(QUDA_ARPACK)
+    enable_language(Fortran)
   endif()
   find_package(MPI)
 else()
@@ -492,8 +495,48 @@ endif(QUDA_MAGMA)
 if(QUDA_ARPACK)
   enable_language(Fortran)
   add_definitions(-DARPACK_LIB)
+  
+  set(ARPACK_MPI QUDA_MPI OR QUDA_QMP)
+
+  if(QUDA_DOWNLOAD_ARPACK)
+    ExternalProject_Add(ARPACK-NG
+      GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
+      GIT_TAG 3.7.0
+      GIT_SHALLOW YES
+      PREFIX arpack-ng
+      #CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER}  <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+      CMAKE_ARGS -DMPI=${ARPACK_MPI} -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      CMAKE_GENERATOR "Unix Makefiles"
+      #BUILD_COMMAND  make
+      #INSTALL_COMMAND make install
+      #LOG_INSTALL ON
+      #LOG_BUILD ON
+      #LOG_DOWNLOAD ON
+      #LOG_MERGED_STDOUTERR ON
+      #LOG_OUTPUT_ON_FAILURE ON
+    )
+    ExternalProject_Get_Property(ARPACK-NG INSTALL_DIR)
+    set(QUDA_ARPACK_HOME ${INSTALL_DIR})
+    add_library(arpack-ng STATIC IMPORTED)
+    add_dependencies(arpack-ng ARPACK-NG)
+    find_package(BLAS REQUIRED)
+    find_package(LAPACK REQUIRED)
+    #target_link_libraries(arpack-ng INTERFACE  -L${QUDA_ARPACK_HOME}/lib -larpack)
+    target_link_libraries(arpack-ng INTERFACE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+    set_target_properties(arpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
+    set_target_properties(arpack-ng PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/lib/libarpack.a)
+    if(QUDA_MPI OR QUDA_QMP)
+      add_library(parpack-ng STATIC IMPORTED)
+      #target_link_libraries(arpack-ng INTERFACE -L${QUDA_ARPACK_HOME}/lib -lparpack)
+      target_link_libraries(parpack-ng INTERFACE  arpack-ng MPI::MPI_Fortran)
+      set_target_properties(parpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
+      set_target_properties(parpack-ng PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/lib/libparpack.a)
+      # include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
+      #include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)    
+    endif()
+
+  else(QUDA_DOWNLOAD_ARPACK)
   find_package(PkgConfig REQUIRED)
-  enable_language(Fortran)
   
   # We always need the serial library
   pkg_check_modules(ARPACK QUIET arpack)
@@ -502,8 +545,8 @@ if(QUDA_ARPACK)
   else()
     find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
   endif()
-  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
-  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
+  # include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
+  # include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
   
   
   # Link the parallel library if required
@@ -514,11 +557,19 @@ if(QUDA_ARPACK)
     else()
       find_library(PARPACK ${PARPACK_LIBRARIES} PATH ${PARPACK_LIBRARY_DIRS})
     endif()
-    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
-    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
   endif()
-  
+  endif(QUDA_DOWNLOAD_ARPACK)
+
+   include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
+   include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
+   if(ARPACK_MPI)
+     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
+     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
+     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
+     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
+   endif()
 endif(QUDA_ARPACK)
+
 
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})

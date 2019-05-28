@@ -1,7 +1,7 @@
 
 include_directories(. googletest/include googletest)
 
-
+  enable_language(Fortran)
 
 ## enable tests
 #build a common library for all test utilities
@@ -39,6 +39,7 @@ if(NOT QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_ARPACK)
+
   LIST(APPEND TEST_LIBS ${ARPACK})
   if(QUDA_MPI OR QUDA_QMP) 
     LIST(APPEND TEST_LIBS ${PARPACK})
