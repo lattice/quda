@@ -1410,6 +1410,7 @@ namespace quda
     DiracMdagM *mdagm = new DiracMdagM(*diracResidual);
     EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdagm, profile);
     (*eig_solve)(B_evecs, evals);
+    delete eig_solve;
 
     // now reallocate the B vectors
     for (int i = 0; i < (int)param.B.size(); i++) param.B[i] = ColorSpinorField::Create(bParam);
