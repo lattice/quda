@@ -25,9 +25,9 @@ namespace quda
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
-  EigenSolver::EigenSolver(QudaEigParam *eig_param, TimeProfile &profile) : eig_param(eig_param), profile(profile)
+  EigenSolver::EigenSolver(QudaEigParam *eig_param, TimeProfile &profile)
+    : eig_param(eig_param), profile(profile), tmp1(nullptr), tmp2(nullptr)
   {
-
     // Timings for components of the eigensolver
     time_ = 0.0;
     time_e = 0.0;   // time in Eigen
@@ -69,7 +69,7 @@ namespace quda
     Qmat = (Complex*)safe_malloc(nEv * nKr * sizeof(Complex));
 
     // Part of the spectrum to be computed.
-    spectrum = strdup("SR"); // Initialsed to stop the compiler warning.
+    spectrum = strdup("SR"); // Initialised to stop the compiler warning.
 
     if (eig_param->use_poly_acc) {
       if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
@@ -127,7 +127,6 @@ namespace quda
   // eigensolver.
   EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile)
   {
-
     EigenSolver *eig_solver = nullptr;
 
     switch (eig_param->eig_type) {
@@ -146,17 +145,20 @@ namespace quda
 
   void EigenSolver::matVec(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in)
   {
-    mat(out, in);
-    return;
+    if (!tmp1 || !tmp2) {
+      ColorSpinorParam param(in);
+      if (!tmp1) tmp1 = ColorSpinorField::Create(param);
+      if (!tmp2) tmp2 = ColorSpinorField::Create(param);
+    }
+    mat(out, in, *tmp1, *tmp2);
   }
 
   void EigenSolver::chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in)
   {
-
     // Just do a simple matVec if no poly acc is requested
     if (!eig_param->use_poly_acc) {
       time_ = -clock();
-      mat(out, in);
+      matVec(mat, out, in);
       time_ += clock();
       time_mv += time_;
       return;
@@ -183,7 +185,7 @@ namespace quda
     // out = d2 * in + d1 * out
     // C_1(x) = x
     time_ = -clock();
-    mat(out, in);
+    matVec(mat, out, in);
     time_ += clock();
     time_mv += time_;
 
@@ -219,7 +221,7 @@ namespace quda
 
       // mat*C_{m}(x)
       time_ = -clock();
-      mat(out, *tmp2);
+      matVec(mat, out, *tmp2);
       time_ += clock();
       time_mv += time_;
 
@@ -322,7 +324,7 @@ namespace quda
     for (int i = 0; i < size; i++) {
       // r = A * v_i
       time_ = -clock();
-      mat(*r[0], *evecs[i]);
+      matVec(mat, *r[0], *evecs[i]);
       time_ += clock();
       time_mv += time_;
 
@@ -471,6 +473,8 @@ namespace quda
   }
 
   EigenSolver::~EigenSolver() {
+    if (tmp1) delete tmp1;
+    if (tmp2) delete tmp2;
     host_free(residua);
     host_free(Qmat);
   }
