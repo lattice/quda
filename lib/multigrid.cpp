@@ -1412,14 +1412,14 @@ namespace quda
     (*eig_solve)(B_evecs, evals);
     delete eig_solve;
 
-    // now reallocate the B vectors
-    for (int i = 0; i < (int)param.B.size(); i++) param.B[i] = ColorSpinorField::Create(bParam);
-
-    // Copy evecs back to MG
-    for (unsigned int i = 0; i < (int)param.B.size(); i++) { *param.B[i] = *B_evecs[i]; }
+    // now reallocate the B vectors copy in e-vectors
+    for (int i = 0; i < (int)param.B.size(); i++) {
+      param.B[i] = ColorSpinorField::Create(bParam);
+      *param.B[i] = *B_evecs[i];
+    }
 
     // Local clean-up
-    for (unsigned int i = 0; i < B_evecs.size(); i++) { delete B_evecs[i]; }
+    for (auto b : B_evecs) { delete b; }
 
     // only save if outfile is defined
     if (strcmp(param.mg_global.vec_outfile, "") != 0) { saveVectors(param.B); }
