@@ -51,10 +51,10 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.volumeCB; x_cb++) {
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
-            cuRNGState localState = arg.rng.State()[parity+2*x_cb];
+            cuRNGState localState = arg.rng.State()[parity*arg.volumeCB+x_cb];
             if (type == QUDA_NOISE_GAUSS) genGauss<real>(arg, localState, parity, x_cb, s, c);
             else if (type == QUDA_NOISE_UNIFORM) genUniform<real>(arg, localState, parity, x_cb, s, c);
-            arg.rng.State()[parity+2*x_cb] = localState;
+            arg.rng.State()[parity*arg.volumeCB+x_cb] = localState;
           }
         }
       }
@@ -71,14 +71,14 @@ namespace quda {
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
     if (parity >= arg.nParity) return;
 
-    cuRNGState localState = arg.rng.State()[parity+2*x_cb];
+    cuRNGState localState = arg.rng.State()[parity*arg.volumeCB+x_cb];
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         if (type == QUDA_NOISE_GAUSS) genGauss<real>(arg, localState, parity, x_cb, s, c);
         else if (type == QUDA_NOISE_UNIFORM) genUniform<real>(arg, localState, parity, x_cb, s, c);
       }
     }
-    arg.rng.State()[parity+2*x_cb] = localState;
+    arg.rng.State()[parity*arg.volumeCB+x_cb] = localState;
   }
 
   template <typename real, int Ns, int Nc, QudaNoiseType type, typename Arg>
@@ -101,11 +101,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	errorQuda("Not implemented");
-      } else {
-	SpinorNoiseGPU<real, Ns, Nc, type> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-      }
+      SpinorNoiseGPU<real, Ns, Nc, type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
     bool advanceTuneParam(TuneParam &param) const {
@@ -149,8 +145,6 @@ namespace quda {
       spinorNoise<real,Ns,Nc,QUDA_FLOAT2_FIELD_ORDER>(in, rngstate, type);
     } else if (in.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
       spinorNoise<real,Ns,Nc,QUDA_FLOAT4_FIELD_ORDER>(in, rngstate, type);
-    } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      spinorNoise<real,Ns,Nc,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(in, rngstate, type);
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);
     }
@@ -186,12 +180,27 @@ namespace quda {
     }
   }
 
-  void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
+  void spinorNoise(ColorSpinorField &src_, RNG &randstates, QudaNoiseType type)
   {
-    switch (src.Precision()) {
-    case QUDA_DOUBLE_PRECISION: spinorNoise<double>(src, randstates, type); break;
-    case QUDA_SINGLE_PRECISION: spinorNoise<float>(src, randstates, type); break;
-    default: errorQuda("Precision %d not implemented", src.Precision());
+    // if src is a CPU field then create GPU field
+    ColorSpinorField *src = &src_;
+    if (src_.Location() == QUDA_CPU_FIELD_LOCATION) {
+      ColorSpinorParam param(src_);
+      param.setPrecision(param.Precision(), param.Precision(), true); // change to native field order
+      param.create = QUDA_NULL_FIELD_CREATE;
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      src = ColorSpinorField::Create(param);
+    }
+
+    switch (src->Precision()) {
+    case QUDA_DOUBLE_PRECISION: spinorNoise<double>(*src, randstates, type); break;
+    case QUDA_SINGLE_PRECISION: spinorNoise<float>(*src, randstates, type); break;
+    default: errorQuda("Precision %d not implemented", src->Precision());
+    }
+
+    if (src != &src_) {
+      src_ = *src; // upload result
+      delete src;
     }
   }
 

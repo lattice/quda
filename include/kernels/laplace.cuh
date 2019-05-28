@@ -45,7 +45,7 @@ namespace quda
       a(a)
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
-        errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
+        errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());      
     }
   };
 
@@ -157,6 +157,10 @@ namespace quda
     case 3:
       applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
                                                                          active);
+      break;
+    default:
+      applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
       break;
     }
 

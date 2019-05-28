@@ -1,10 +1,11 @@
-#ifndef _INVERT_QUDA_H
-#define _INVERT_QUDA_H
+#pragma once
 
 #include <quda.h>
 #include <quda_internal.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
+#include <qio_field.h>
+#include <eigensolve_quda.h>
 #include <vector>
 #include <memory>
 
@@ -47,6 +48,18 @@ namespace quda {
      */
     QudaResidualType residual_type;
 
+    /**< Whether deflate the initial guess */
+    bool deflate;
+
+    /**< Used to define deflation */
+    QudaEigParam eig_param;
+
+    /**< Deflation eigenvectors */
+    std::vector<ColorSpinorField *> evecs;
+
+    /**< Deflation eigenvalues */
+    std::vector<Complex> evals;
+
     /**< Whether to use an initial guess in the solver or not */
     QudaUseInitGuess use_init_guess;
 
@@ -72,7 +85,7 @@ namespace quda {
        requires more low-precision memory allocation. */
     int solution_accumulator_pipeline;
 
-    /**< This parameter determines how many consective reliable update
+    /**< This parameter determines how many consecutive reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase;
@@ -81,6 +94,16 @@ namespace quda {
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
+
+    /**< This parameter determines how many consecutive heavy-quark
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_hq_res_increase;
+
+    /**< This parameter determines how many total heavy-quark residual
+    restarts we tolerate before terminating the solver, i.e., how long
+    do we want to keep trying to converge */
+    int max_hq_res_restart_total;
 
     /**< After how many iterations shall the heavy quark residual be updated */
     int heavy_quark_check;
@@ -220,8 +243,8 @@ namespace quda {
     bool global_reduction; //! whether to use a global or local (node) reduction for this solver
 
     /** Whether the MG preconditioner (if any) is an instance of MG
-	(used internally in MG) or of multigrid_solver (used in the
-	interface)*/
+        (used internally in MG) or of multigrid_solver (used in the
+        interface)*/
     bool mg_instance;
 
     /** Which external lib to use in the solver */
@@ -230,79 +253,154 @@ namespace quda {
     /**
        Default constructor
      */
-    SolverParam() : compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
-      compute_true_res(true), sloppy_converge(false), verbosity_precondition(QUDA_SILENT), mg_instance(false) { ; }
+    SolverParam() :
+      compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
+      compute_true_res(true),
+      sloppy_converge(false),
+      verbosity_precondition(QUDA_SILENT),
+      mg_instance(false)
+    {
+      ;
+    }
 
     /**
        Constructor that matches the initial values to that of the
        QudaInvertParam instance
        @param param The QudaInvertParam instance from which the values are copied
      */
-    SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type),
-      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
-      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
-      compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO), delta(param.reliable_delta),
+    SolverParam(const QudaInvertParam &param) :
+      inv_type(param.inv_type),
+      inv_type_precondition(param.inv_type_precondition),
+      preconditioner(param.preconditioner),
+      deflation_op(param.deflation_op),
+      residual_type(param.residual_type),
+      deflate(false),
+      use_init_guess(param.use_init_guess),
+      compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
+      delta(param.reliable_delta),
       use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
-      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
-      heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
-      tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
-      compute_true_res(param.compute_true_res), sloppy_converge(false), true_res(param.true_res),
-      true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
-      precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
-      precision_refinement_sloppy(param.cuda_prec_refinement_sloppy), precision_precondition(param.cuda_prec_precondition),
+      max_res_increase(param.max_res_increase),
+      max_res_increase_total(param.max_res_increase_total),
+      heavy_quark_check(param.heavy_quark_check),
+      pipeline(param.pipeline),
+      tol(param.tol),
+      tol_restart(param.tol_restart),
+      tol_hq(param.tol_hq),
+      compute_true_res(param.compute_true_res),
+      sloppy_converge(false),
+      true_res(param.true_res),
+      true_res_hq(param.true_res_hq),
+      maxiter(param.maxiter),
+      iter(param.iter),
+      precision(param.cuda_prec),
+      precision_sloppy(param.cuda_prec_sloppy),
+      precision_refinement_sloppy(param.cuda_prec_refinement_sloppy),
+      precision_precondition(param.cuda_prec_precondition),
       preserve_source(param.preserve_source),
       return_residual(preserve_source == QUDA_PRESERVE_SOURCE_NO ? true : false),
-      num_src(param.num_src), num_offset(param.num_offset),
-      Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle),
-      tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
-      omega(param.omega), ca_basis(param.ca_basis), ca_lambda_min(param.ca_lambda_min), ca_lambda_max(param.ca_lambda_max),
-      schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
-      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim),
-      deflation_grid(param.deflation_grid), rhs_idx(0),
-      eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
-      inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
+      num_src(param.num_src),
+      num_offset(param.num_offset),
+      Nsteps(param.Nsteps),
+      Nkrylov(param.gcrNkrylov),
+      precondition_cycle(param.precondition_cycle),
+      tol_precondition(param.tol_precondition),
+      maxiter_precondition(param.maxiter_precondition),
+      omega(param.omega),
+      ca_basis(param.ca_basis),
+      ca_lambda_min(param.ca_lambda_min),
+      ca_lambda_max(param.ca_lambda_max),
+      schwarz_type(param.schwarz_type),
+      secs(param.secs),
+      gflops(param.gflops),
+      precision_ritz(param.cuda_prec_ritz),
+      nev(param.nev),
+      m(param.max_search_dim),
+      deflation_grid(param.deflation_grid),
+      rhs_idx(0),
+      eigcg_max_restarts(param.eigcg_max_restarts),
+      max_restart_num(param.max_restart_num),
+      inc_tol(param.inc_tol),
+      eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(false), global_reduction(true), mg_instance(false), extlib_type(param.extlib_type)
+      is_preconditioner(false),
+      global_reduction(true),
+      mg_instance(false),
+      extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {
-	offset[i] = param.offset[i];
-	tol_offset[i] = param.tol_offset[i];
-	tol_hq_offset[i] = param.tol_hq_offset[i];
+        offset[i] = param.offset[i];
+        tol_offset[i] = param.tol_offset[i];
+        tol_hq_offset[i] = param.tol_hq_offset[i];
       }
 
-      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
+      if (param.rhs_idx != 0
+          && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
     }
 
-    SolverParam(const SolverParam &param) : inv_type(param.inv_type),
-      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
-      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
-      compute_null_vector(param.compute_null_vector), delta(param.delta),
+    SolverParam(const SolverParam &param) :
+      inv_type(param.inv_type),
+      inv_type_precondition(param.inv_type_precondition),
+      preconditioner(param.preconditioner),
+      deflation_op(param.deflation_op),
+      residual_type(param.residual_type),
+      deflate(false),
+      eig_param(param.eig_param),
+      use_init_guess(param.use_init_guess),
+      compute_null_vector(param.compute_null_vector),
+      delta(param.delta),
       use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
-      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
-      heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
-      tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
-      compute_true_res(param.compute_true_res), sloppy_converge(param.sloppy_converge), true_res(param.true_res),
-      true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
-      precision(param.precision), precision_sloppy(param.precision_sloppy),
-      precision_refinement_sloppy(param.precision_refinement_sloppy), precision_precondition(param.precision_precondition),
-      preserve_source(param.preserve_source), return_residual(param.return_residual),
+      max_res_increase(param.max_res_increase),
+      max_res_increase_total(param.max_res_increase_total),
+      heavy_quark_check(param.heavy_quark_check),
+      pipeline(param.pipeline),
+      tol(param.tol),
+      tol_restart(param.tol_restart),
+      tol_hq(param.tol_hq),
+      compute_true_res(param.compute_true_res),
+      sloppy_converge(param.sloppy_converge),
+      true_res(param.true_res),
+      true_res_hq(param.true_res_hq),
+      maxiter(param.maxiter),
+      iter(param.iter),
+      precision(param.precision),
+      precision_sloppy(param.precision_sloppy),
+      precision_refinement_sloppy(param.precision_refinement_sloppy),
+      precision_precondition(param.precision_precondition),
+      preserve_source(param.preserve_source),
+      return_residual(param.return_residual),
       num_offset(param.num_offset),
-      Nsteps(param.Nsteps), Nkrylov(param.Nkrylov), precondition_cycle(param.precondition_cycle),
-      tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
-      omega(param.omega), ca_basis(param.ca_basis), ca_lambda_min(param.ca_lambda_min), ca_lambda_max(param.ca_lambda_max),
-      schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
-      precision_ritz(param.precision_ritz), nev(param.nev), m(param.m),
-      deflation_grid(param.deflation_grid), rhs_idx(0),
-      eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
-      inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
+      Nsteps(param.Nsteps),
+      Nkrylov(param.Nkrylov),
+      precondition_cycle(param.precondition_cycle),
+      tol_precondition(param.tol_precondition),
+      maxiter_precondition(param.maxiter_precondition),
+      omega(param.omega),
+      ca_basis(param.ca_basis),
+      ca_lambda_min(param.ca_lambda_min),
+      ca_lambda_max(param.ca_lambda_max),
+      schwarz_type(param.schwarz_type),
+      secs(param.secs),
+      gflops(param.gflops),
+      precision_ritz(param.precision_ritz),
+      nev(param.nev),
+      m(param.m),
+      deflation_grid(param.deflation_grid),
+      rhs_idx(0),
+      eigcg_max_restarts(param.eigcg_max_restarts),
+      max_restart_num(param.max_restart_num),
+      inc_tol(param.inc_tol),
+      eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction), mg_instance(param.mg_instance), extlib_type(param.extlib_type)
+      is_preconditioner(param.is_preconditioner),
+      global_reduction(param.global_reduction),
+      mg_instance(param.mg_instance),
+      extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -440,16 +538,24 @@ namespace quda {
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
+       Deflation objects
+    */
+    EigenSolver *eig_solve;
+    bool deflate_init = false;
+    std::vector<ColorSpinorField *> defl_tmp1;
+    std::vector<ColorSpinorField *> defl_tmp2;
+
+    /**
      * Return flops
      * @return flops expended by this operator
      */
     virtual double flops() const { return 0; }
   };
 
-
   /**
      @brief  Conjugate-Gradient Solver.
    */
+
   class CG : public Solver {
 
   private:
@@ -464,8 +570,7 @@ namespace quda {
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
     /**
-     * @brief: Run CG.
-     * 
+     * @brief Run CG.
      * @param out Solution vector.
      * @param in Right-hand side.
      */
@@ -476,7 +581,6 @@ namespace quda {
     /**
      * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
      * @details This can be used when continuing a CG, e.g. as refinement step after a multi-shift solve.
-     * 
      * @param out Solution-vector.
      * @param in Right-hand side.
      * @param p_init Initial-search direction.
@@ -484,6 +588,7 @@ namespace quda {
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
 
+    void constructDeflationSpace();
 
     void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
   };
@@ -555,8 +660,6 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
-
-
 
   class MPCG : public Solver {
     private:
@@ -952,17 +1055,24 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  class PreconditionedSolver : public Solver
+  {
 
-  class PreconditionedSolver : public Solver {
-
-  private:
+private:
     Solver *solver;
     const Dirac &dirac;
     const char *prefix;
 
-  public:
-  PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile, const char *prefix)
-    : Solver(param, profile), solver(&solver), dirac(dirac), prefix(prefix) { }
+public:
+    PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile,
+                         const char *prefix) :
+      Solver(param, profile),
+      solver(&solver),
+      dirac(dirac),
+      prefix(prefix)
+    {
+    }
+
     virtual ~PreconditionedSolver() { delete solver; }
 
     void operator()(ColorSpinorField &x, ColorSpinorField &b) {
@@ -980,7 +1090,6 @@ namespace quda {
       setOutputPrefix("");
     }
   };
-
 
   class MultiShiftSolver {
 
@@ -1127,15 +1236,21 @@ namespace quda {
 
     EigCGArgs *eigcg_args;
 
-    TimeProfile &profile;    //time profile for initCG solver
+    TimeProfile &profile; // time profile for initCG solver
 
     bool init;
 
-  public:
-
+public:
     IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~IncEigCG();
+
+    /**
+       @brief Expands deflation space.
+       @param V container of new eigenvectors
+       @param nev number of vectors to load
+     */
+    void increment(ColorSpinorField &V, int nev);
 
     void RestartVT(const double beta, const double rho);
     void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2); 
@@ -1200,4 +1315,3 @@ namespace quda {
 
 } // namespace quda
 
-#endif // _INVERT_QUDA_H

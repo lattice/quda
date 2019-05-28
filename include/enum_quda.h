@@ -131,10 +131,22 @@ extern "C" {
   } QudaInverterType;
 
   typedef enum QudaEigType_s {
-    QUDA_LANCZOS, //Normal Lanczos eigen solver
-    QUDA_IMP_RST_LANCZOS, //implicit restarted lanczos solver
-    QUDA_INVALID_TYPE = QUDA_INVALID_ENUM
+    QUDA_EIG_LANCZOS, // Thick restarted lanczos solver
+    QUDA_EIG_ARNOLDI, // Arnoldi solver (not implemented)
+    QUDA_INVALID_EIG = QUDA_INVALID_ENUM
   } QudaEigType;
+
+  /** S=smallest L=largest
+      R=real M=modulus I=imaniary **/
+  typedef enum QudaEigSpectrumType_s {
+    QUDA_SPECTRUM_SR_EIG,
+    QUDA_SPECTRUM_LR_EIG,
+    QUDA_SPECTRUM_SM_EIG,
+    QUDA_SPECTRUM_LM_EIG,
+    QUDA_SPECTRUM_SI_EIG,
+    QUDA_SPECTRUM_LI_EIG,
+    QUDA_SPECTRUM_INVALID = QUDA_INVALID_ENUM
+  } QudaEigSpectrumType;
 
   typedef enum QudaSolutionType_s {
     QUDA_MAT_SOLUTION,
@@ -419,6 +431,12 @@ extern "C" {
     QUDA_USE_INIT_GUESS_YES,
     QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
   } QudaUseInitGuess;
+
+  typedef enum QudaDeflatedGuess_s {
+    QUDA_DEFLATED_GUESS_NO,
+    QUDA_DEFLATED_GUESS_YES,
+    QUDA_DEFLATED_GUESS_INVALID = QUDA_INVALID_ENUM
+  } QudaDeflatedGuess;
 
   typedef enum QudaComputeNullVector_s {
     QUDA_COMPUTE_NULL_VECTOR_NO,

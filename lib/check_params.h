@@ -56,8 +56,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #else
   if (param->type == QUDA_WILSON_LINKS) {
     P(anisotropy, INVALID_DOUBLE);
-  } else if (param->type == QUDA_ASQTAD_FAT_LINKS ||
-	     param->type == QUDA_ASQTAD_LONG_LINKS) {
+  } else if (param->type == QUDA_ASQTAD_LONG_LINKS) {
     P(tadpole_coeff, INVALID_DOUBLE);
     P(scale, INVALID_DOUBLE);
   }
@@ -146,24 +145,46 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
-  P(RitzMat_lanczos, QUDA_INVALID_SOLUTION);
-  P(RitzMat_Convcheck, QUDA_INVALID_SOLUTION);
-  P(eig_type, QUDA_INVALID_TYPE);
-  P(NPoly, 0);
-  P(Stp_residual, 0.0);
+  P(use_poly_acc, QUDA_BOOLEAN_NO);
+  P(poly_deg, 0);
+  P(a_min, 0.0);
+  P(a_max, 0.0);
+  P(use_dagger, QUDA_BOOLEAN_NO);
+  P(use_norm_op, QUDA_BOOLEAN_NO);
+  P(compute_svd, QUDA_BOOLEAN_NO);
+  P(spectrum, QUDA_SPECTRUM_LR_EIG);
+  P(nEv, 0);
+  P(nKr, 0);
+  P(nConv, 0);
+  P(tol, 0.0);
+  P(check_interval, 0);
+  P(max_restarts, 0);
+  P(arpack_check, QUDA_BOOLEAN_NO);
   P(nk, 0);
   P(np, 0);
-  P(f_size, 0);
-  P(eigen_shift, 0.0);
+  P(eig_type, QUDA_EIG_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
-  P(NPoly, INVALID_INT);
-  P(Stp_residual, INVALID_DOUBLE);
+  P(use_poly_acc, QUDA_BOOLEAN_INVALID);
+  P(poly_deg, INVALID_INT);
+  P(a_min, INVALID_DOUBLE);
+  P(a_max, INVALID_DOUBLE);
+  P(use_dagger, QUDA_BOOLEAN_INVALID);
+  P(use_norm_op, QUDA_BOOLEAN_INVALID);
+  P(compute_svd, QUDA_BOOLEAN_INVALID);
+  P(nEv, INVALID_INT);
+  P(nKr, INVALID_INT);
+  P(nConv, INVALID_INT);
+  P(tol, INVALID_DOUBLE);
+  P(check_interval, INVALID_INT);
+  P(max_restarts, INVALID_INT);
+  P(arpack_check, QUDA_BOOLEAN_INVALID);
   P(nk, INVALID_INT);
   P(np, INVALID_INT);
-  P(f_size, INVALID_INT);
-  P(eigen_shift, INVALID_DOUBLE);
+  P(check_interval, INVALID_INT);
+  P(max_restarts, INVALID_INT);
+  P(eig_type, QUDA_INVALID_EIG);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
@@ -244,7 +265,8 @@ void printQudaCloverParam(QudaInvertParam *param)
 // define the appropriate function for InvertParam
 
 #if defined INIT_PARAM
-QudaInvertParam newQudaInvertParam(void) {
+QudaInvertParam newQudaInvertParam(void)
+{
   QudaInvertParam ret;
   QudaInvertParam *param=&ret;
 #elif defined CHECK_PARAM
@@ -312,6 +334,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(solution_accumulator_pipeline, 1); /**< Default is solution accumulator depth of 1 */
   P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
   P(max_res_increase_total, 10); /**< Default is to allow ten residual increase */
+  P(max_hq_res_increase, 1); /**< Default is to allow one consecutive heavy-quark residual increase */
+  P(max_hq_res_restart_total, 10); /**< Default is to allow ten heavy-quark restarts */
   P(heavy_quark_check, 10); /**< Default is to update heavy quark residual after 10 iterations */
  #else
   P(use_alternative_reliable, INVALID_INT);
@@ -319,6 +343,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(solution_accumulator_pipeline, INVALID_INT);
   P(max_res_increase, INVALID_INT);
   P(max_res_increase_total, INVALID_INT);
+  P(max_hq_res_increase, INVALID_INT);
+  P(max_hq_res_restart_total, INVALID_INT);
   P(heavy_quark_check, INVALID_INT);
 #endif
 
@@ -449,14 +475,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
   }
 #endif
 
-
 #ifdef INIT_PARAM
   P(use_init_guess, QUDA_USE_INIT_GUESS_NO); //set the default to no
-  //P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_NO); //set the default to no
   P(omega, 1.0); // set default to no relaxation
 #else
   P(use_init_guess, QUDA_USE_INIT_GUESS_INVALID);
-  //P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(omega, INVALID_DOUBLE);
 #endif
 
@@ -732,6 +755,9 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
+  P(use_low_modes, QUDA_BOOLEAN_INVALID);
+  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
 
 #ifdef INIT_PARAM
   P(vec_load, QUDA_BOOLEAN_INVALID);

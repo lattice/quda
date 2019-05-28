@@ -1,384 +1,545 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <iostream>
+#include <vector>
+#include <algorithm>
+
+#include <quda_internal.h>
 #include <quda_arpack_interface.h>
-#include <thrust/sort.h>
+#include <eigensolve_quda.h>
+#include <color_spinor_field.h>
+#include <blas_quda.h>
+#include <util_quda.h>
+#include <sys/time.h>
 
-#if (defined (QMP_COMMS) || defined (MPI_COMMS))
+// ARPACK INTERAFCE ROUTINES
+//--------------------------------------------------------------------------
+
+namespace quda
+{
+
+#ifdef ARPACK_LIB
+
+  void arpackErrorHelpNAUPD();
+  void arpackErrorHelpNEUPD();
+
+#if (defined(QMP_COMMS) || defined(MPI_COMMS))
 #include <mpi.h>
-#include <mpi_comm_handle.h>
 #endif
 
-
-//using namespace quda ;
-
-  struct SortEvals{
-    double _val;
-    int    _idx;
-
-    static bool small_values;
-
-    SortEvals(double val, int idx) : _val(val), _idx(idx) {};
-
-    static bool SelectSmall (SortEvals v1, SortEvals v2) { return (v1._val < v2._val);}
-    static bool SelectLarge (SortEvals v1, SortEvals v2) { return (v1._val > v2._val);}
-
-  };
-
-  bool SortEvals::small_values = true;
-
-  template<typename Float> void arpack_naupd(int &ido, char &bmat, int &n, char *which, int &nev, Float &tol,  std::complex<Float> *resid, int &ncv, std::complex<Float> *v, int &ldv,
-                    int *iparam, int *ipntr, std::complex<Float> *workd, std::complex<Float> *workl, int &lworkl, Float *rwork, int &info, int *fcomm)
+  void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
+                    ColorSpinorParam *cpuParam)
   {
-#ifdef ARPACK_LIB
-    if(sizeof(Float) == sizeof(float))
-    {
-       float _tol  = static_cast<float>(tol);
-#ifdef MULTI_GPU
-       ARPACK(pcnaupd)(fcomm, &ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v),
-                       &ldv, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl), &lworkl, reinterpret_cast<float*>(rwork), &info);
-#else
-       ARPACK(cnaupd)(&ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v),
-                       &ldv, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl), &lworkl, reinterpret_cast<float*>(rwork), &info);
-#endif //MULTI_GPU
-    }
-    else
-    {
-       double _tol = static_cast<double>(tol);
-#ifdef MULTI_GPU
-       ARPACK(pznaupd)(fcomm, &ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v),
-                       &ldv, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl), &lworkl, reinterpret_cast<double*>(rwork), &info);
-#else
-       ARPACK(znaupd)(&ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v),
-                       &ldv, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl), &lworkl, reinterpret_cast<double*>(rwork), &info);
-#endif //MULTI_GPU
-    }
-#endif //ARPACK_LIB
-    return;
-  }
 
-  template<typename Float> void arpack_neupd (int &comp_evecs, char howmny, int *select, std::complex<Float>* evals, std::complex<Float>* v, int &ldv, std::complex<Float> sigma, std::complex<Float>* workev, 
-		       char bmat, int &n, char *which, int &nev, Float tol,  std::complex<Float>* resid, int &ncv, std::complex<Float>* v1, int &ldv1, int *iparam, int *ipntr, 
-                       std::complex<Float>* workd, std::complex<Float>* workl, int &lworkl, Float* rwork, int &info, int *fcomm)
-  {
-#ifdef ARPACK_LIB
-    if(sizeof(Float) == sizeof(float))
-    {   
-       float _tol = static_cast<float>(tol);
-       std::complex<float> _sigma = static_cast<std::complex<float> >(sigma);
-#ifdef MULTI_GPU
-       ARPACK(pcneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<float> *>(evals),
-                     reinterpret_cast<std::complex<float> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<float> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v1),
-                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl),
-                     &lworkl, reinterpret_cast<float *>(rwork), &info);
-#else
-
-       ARPACK(cneupd)(&comp_evecs, &howmny, select, reinterpret_cast<std::complex<float> *>(evals),
-                     reinterpret_cast<std::complex<float> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<float> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v1),
-                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl),
-                     &lworkl, reinterpret_cast<float *>(rwork), &info); 
-#endif //MULTI_GPU
-    }
-    else
-    {
-       double _tol = static_cast<double>(tol);
-       std::complex<double> _sigma = static_cast<std::complex<double> >(sigma);
-#ifdef MULTI_GPU
-       ARPACK(pzneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<double> *>(evals),
-                     reinterpret_cast<std::complex<double> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<double> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v1),
-                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl),
-                     &lworkl, reinterpret_cast<double *>(rwork), &info);
-#else
-       ARPACK(zneupd)(&comp_evecs, &howmny, select, reinterpret_cast<std::complex<double> *>(evals),
-                     reinterpret_cast<std::complex<double> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<double> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v1),
-                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl),
-                     &lworkl, reinterpret_cast<double *>(rwork), &info);
-#endif //MULTI_GPU
-    }
-#endif //ARPACK_LIB
-    return;
-  }
-
-namespace quda{
-
-  template<typename Float> class QudaMatvec {
-
-    protected:
-
-      /**Problem matrix **/
-      DiracMatrix &matEigen;
-      /**Matrix vector precision (may not coincide with arpack IRA routines precision) **/
-      QudaPrecision matPrecision;
-      /*Vector quda gpu fields required for the operation*/
-      ColorSpinorField *cuda_in ;
-      ColorSpinorField *cuda_out;
-
-    public:
-
-      QudaMatvec(DiracMatrix &matEigen, QudaPrecision prec, ColorSpinorField &meta) : matEigen(matEigen), matPrecision(prec) { 
-         ColorSpinorParam csParam(meta);
-         //we need an explicit fieldOrder setup here since meta is a none-native field. 
-         csParam.fieldOrder = (meta.Nspin() == 1 || matPrecision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-         csParam.location   = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-         csParam.create     = QUDA_ZERO_FIELD_CREATE;
-         csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-         csParam.setPrecision(matPrecision);
-
-         cuda_in = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
-         cuda_out = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
-      }
-
-      virtual ~QudaMatvec() { 
-        delete cuda_in ; 
-        delete cuda_out;
-      }
-
-      void operator()(std::complex<Float> *out, std::complex<Float> *in);
-  };
-
-  template<typename Float>
-  void QudaMatvec<Float>::operator() (std::complex<Float> *out, std::complex<Float> *in)
-  {
-      ColorSpinorParam csParam(*cuda_in);
-      csParam.setPrecision(sizeof(Float) == sizeof(float) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
-      csParam.location = QUDA_CPU_FIELD_LOCATION;
-      csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-
-      csParam.v      = static_cast<void*>(in);
-      cpuColorSpinorField *cpu_in = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
-
-      csParam.v      = static_cast<void*>(out);
-      cpuColorSpinorField *cpu_out = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
-
-      *cuda_in = *cpu_in;
-      //
-      matEigen(*cuda_out, *cuda_in);
-      //
-      *cpu_out = *cuda_out;
-
-      delete cpu_in ;
-      delete cpu_out;
-
-      return;
-  }
-
-  template<typename Float>  class ArpackArgs {
-
-    private:
-      //main setup:
-      QudaMatvec<Float>                       &matvec;
-      std::vector<ColorSpinorField*>          &evecs ; //container of spinor fields
-
-      //arpack objects:
-      size_t clen;
-      size_t cldn;
-      std::complex<Float> *w_d_; //just keep eigenvalues
-      std::complex<Float> *w_v_; //continuous buffer to keep eigenvectors
-
-      /**spectrum info**/
-      int nev;//number of eigenvecs to be comupted
-      int ncv;//search subspace dimension (note that 1 <= NCV-NEV and NCV <= N) 
-      char *lanczos_which;// ARPACK which="{S,L}{R,I,M}
-      /**general arpack library parameters**/	
-      Float tol;
-      int   info;
-
-    public:
-
-      ArpackArgs(QudaMatvec<Float> &matvec, std::vector<ColorSpinorField*> &evecs, std::complex<Float> *evals, int nev, int ncv, char *which, Float tol) : matvec(matvec), evecs(evecs), w_d_(evals), nev(nev), ncv(ncv), lanczos_which(which), tol(tol), info(0) 
-      {
-         clen = evecs[0]->Length() >> 1;//complex length
-         cldn = clen;
-
-         w_v_ = new std::complex<Float>[cldn*ncv];     /* workspace for evectors (BLAS-matrix), [ld_evec, >=ncv] */ 
-      }       
-
-      virtual ~ArpackArgs() {  delete w_v_; }
- 
-      //Main IRA algorithm driver:
-      void apply();     
-      //save computed eigenmodes to the user defined arrays:
-      void save();
-  };
-
-
-//copy fields:
-  template<typename Float> 
-  void ArpackArgs<Float>::save()
-  {
-    printfQuda("\nLoad eigenvectors..\n");
-
-    std::vector<SortEvals> sorted_evals;
-    sorted_evals.reserve(nev);
-
-    ColorSpinorParam csParam(*evecs[0]);
-
-    csParam.create = QUDA_REFERENCE_FIELD_CREATE;  
-    //cpuParam.extendDimensionality();5-dim field
-    csParam.location = QUDA_CPU_FIELD_LOCATION;
-    csParam.setPrecision(sizeof(Float) == sizeof(float) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
-
-    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-
-    std::string arpack_which(lanczos_which);
-
-    if (arpack_which.compare(std::string("SM"))) {
-      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(std::norm(w_d_[e]), e));
-    } else if (arpack_which.compare(std::string("SI"))) {
-      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(w_d_[e].imag(), e));
-    } else if (arpack_which.compare(std::string("SR"))) {
-      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(w_d_[e].real(), e));
-    } else if (arpack_which.compare(std::string("LM"))) {
-      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(std::norm(w_d_[e]), e));
-      SortEvals::small_values = false;
-    } else if (arpack_which.compare(std::string("LI"))) {
-      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(w_d_[e].imag(), e));
-      SortEvals::small_values = false;
-    } else if (arpack_which.compare(std::string("LR"))) {
-      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(w_d_[e].real(), e));
-      SortEvals::small_values = false;
-    } else {
-      errorQuda("\nSorting option is not supported.\n");
+    // ARPACK logfile name
+    char *arpack_logfile = eig_param->arpack_logfile;
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("**** START ARPACK SOLUTION ****\n");
+      printfQuda("Output directed to %s\n", arpack_logfile);
     }
 
-    if(SortEvals::small_values) thrust::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortEvals::SelectSmall );
-    else                        thrust::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortEvals::SelectLarge );
+    // Create Eigensolver object for member function use
+    TimeProfile profile("Dummy");
+    EigenSolver *eig_solver = EigenSolver::create(eig_param, mat, profile);
 
-    cpuColorSpinorField *cpu_tmp = nullptr;
-    int ev_id = 0;
+    // Construct parameters and memory allocation
+    //---------------------------------------------------------------------------------
+    double time_ar = 0.0; // time in ARPACK
+    double time_mv = 0.0; // time in QUDA mat vec + data transfer
+    double time_ev = 0.0; // time in computing Eigenvectors
 
-    for(std::vector<ColorSpinorField*>::iterator vec = evecs.begin() ; vec != evecs.end(); ++vec) {
-      int sorted_id =  sorted_evals[ev_id++]._idx;
-
-      printfQuda("%d ,Re= %le, Im= %le\n", sorted_id, w_d_[sorted_id].real(), w_d_[sorted_id].imag());
-
-      std::complex<Float>* tmp_buffer   =  &w_v_[sorted_id*cldn];
-      cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*vec);
-
-      csParam.v = static_cast<void*>(tmp_buffer);
-      cpu_tmp = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
-
-      *curr_nullvec = *cpu_tmp;//this does not work for different precision (usual memcpy)?
-
-      delete cpu_tmp;
-    }
-
-    return;
-  }
-
-  template<typename Float>
-  void ArpackArgs<Float>::apply( )
-  {
-    int *fcomm = nullptr;
-#ifdef MULTI_GPU
-    MPI_Fint mpi_comm_fort = MPI_Comm_c2f(MPI_COMM_HANDLE);
-    fcomm = static_cast<int*>(&mpi_comm_fort);
+    // MPI objects
+    int *fcomm_ = nullptr;
+#if (defined(QMP_COMMS) || defined(MPI_COMMS))
+    MPI_Fint mpi_comm_fort = MPI_Comm_c2f(MPI_COMM_WORLD);
+    fcomm_ = static_cast<int *>(&mpi_comm_fort);
 #endif
 
-    int   max_iter = 4000;
+    // Determine local volume for memory allocations
+    int local_dim[4];
+    int local_vol = 1;
+    for (int i = 0; i < 4; i++) {
+      local_dim[i] = cpuParam->x[i];
+      local_vol *= local_dim[i];
+    }
+    local_vol *= eig_param->invert_param->Ls;
 
-    /* all FORTRAN communication uses underscored variables */
-    int ido_; 
-    int info_;
-    int iparam_[11];
-    int ipntr_[14];
-    int n_      = clen,
-        nev_    = nev,
-        ncv_    = ncv,
-        ldv_    = cldn,
-        lworkl_ = (3 * ncv_ * ncv_ + 5 * ncv_),
-        rvec_   = 1;
-    std::complex<Float> sigma_ = 0.0;
-    Float tol_ = tol;
+    int nSpin = (eig_param->invert_param->dslash_type == QUDA_LAPLACE_DSLASH) ? 1 : 4;
 
-    std::complex<Float> *resid_      = new std::complex<Float>[cldn];
-    std::complex<Float> *w_workd_    = new std::complex<Float>[(cldn * 3)];
-    std::complex<Float> *w_workl_    = new std::complex<Float>[lworkl_];
-    Float *w_rwork_                  = new Float[ncv_];
-    
-    /* __neupd-only workspace */
-    std::complex<Float> *w_workev_   = new std::complex<Float>[ 2 * ncv_];
-    int *select_                     = new int[ ncv_];
+    // all FORTRAN communication uses underscored
+    int ido_ = 0;
+    int info_ = 1; // if 0, use random vector. If 1, initial residual lives in resid_
+    int *ipntr_ = (int *)malloc(14 * sizeof(int));
+    int *iparam_ = (int *)malloc(11 * sizeof(int));
+    int n_ = local_vol * nSpin * 3, nEv_ = eig_param->nEv, nKr_ = eig_param->nKr, ldv_ = local_vol * nSpin * 3,
+        lworkl_ = (3 * nKr_ * nKr_ + 5 * nKr_) * 2, rvec_ = 1;
+    int max_iter = eig_param->max_restarts * (nKr_ - nEv_) + nEv_;
+    int *h_evals_sorted_idx = (int *)malloc(nKr_ * sizeof(int));
 
-    /* cnaupd cycle */
-    ido_        = 0;
-    info_       = 0;
-    iparam_[0]  = 1;
-    iparam_[2]  = max_iter;
-    iparam_[3]  = 1;
-    iparam_[6]  = 1;
+    // Assign values to ARPACK params
+    iparam_[0] = 1;
+    iparam_[2] = max_iter;
+    iparam_[3] = 1;
+    iparam_[6] = 1;
 
-    char howmny='A';//'P'
+    // ARPACK problem type to be solved
+    char howmny = 'P';
     char bmat = 'I';
+    char *spectrum;
+    spectrum = strdup("SR"); // Initialsed just to stop the compiler warning...
 
-    int iter_cnt= 0;
+    if (eig_param->use_poly_acc) {
+      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
+        spectrum = strdup("LR");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
+        spectrum = strdup("SR");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
+        spectrum = strdup("LM");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
+        spectrum = strdup("SM");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
+        spectrum = strdup("LI");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
+        spectrum = strdup("SI");
+    } else {
+      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
+        spectrum = strdup("SR");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
+        spectrum = strdup("LR");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
+        spectrum = strdup("SM");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
+        spectrum = strdup("LM");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
+        spectrum = strdup("SI");
+      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
+        spectrum = strdup("LI");
+    }
+
+    bool reverse = true;
+    const char *L = "L";
+    const char *S = "S";
+    if (strncmp(L, spectrum, 1) == 0 && !eig_param->use_poly_acc) {
+      reverse = false;
+    } else if (strncmp(S, spectrum, 1) == 0 && eig_param->use_poly_acc) {
+      reverse = false;
+    } else if (strncmp(L, spectrum, 1) == 0 && eig_param->use_poly_acc) {
+      reverse = false;
+    }
+
+    double tol_ = eig_param->tol;
+    double *mod_h_evals_sorted = (double *)malloc(nKr_ * sizeof(double));
+
+    // Memory checks
+    if ((mod_h_evals_sorted == nullptr) || (h_evals_sorted_idx == nullptr)) {
+      errorQuda("eigenSolver: not enough memory for host eigenvalue sorting");
+    }
+
+    // ARPACK workspace
+    Complex I(0.0, 1.0);
+    Complex *resid_ = (Complex *)malloc(ldv_ * sizeof(Complex));
+
+    // Use initial guess?
+    if (info_ > 0)
+      for (int a = 0; a < ldv_; a++) {
+        resid_[a] = I;
+        // printfQuda("(%e , %e)\n", real(resid_[a]), imag(resid_[a]));
+      }
+
+    Complex sigma_ = 0.0;
+    Complex *w_workd_ = (Complex *)malloc(3 * ldv_ * sizeof(Complex));
+    Complex *w_workl_ = (Complex *)malloc(lworkl_ * sizeof(Complex));
+    Complex *w_workev_ = (Complex *)malloc(2 * nKr_ * sizeof(Complex));
+    double *w_rwork_ = (double *)malloc(nKr_ * sizeof(double));
+    int *select_ = (int *)malloc(nKr_ * sizeof(int));
+
+    // Alias pointers
+    Complex *h_evecs_ = nullptr;
+    h_evecs_ = (Complex *)(double *)(h_evecs);
+    Complex *h_evals_ = nullptr;
+    h_evals_ = (Complex *)(double *)(h_evals);
+
+    // Memory checks
+    if ((iparam_ == nullptr) || (ipntr_ == nullptr) || (resid_ == nullptr) || (w_workd_ == nullptr)
+        || (w_workl_ == nullptr) || (w_workev_ == nullptr) || (w_rwork_ == nullptr) || (select_ == nullptr)) {
+      errorQuda("eigenSolver: not enough memory for ARPACK workspace.\n");
+    }
+
+    int iter_count = 0;
+
+    bool allocate = true;
+    ColorSpinorField *h_v = nullptr;
+    ColorSpinorField *d_v = nullptr;
+    ColorSpinorField *h_v2 = nullptr;
+    ColorSpinorField *d_v2 = nullptr;
+    ColorSpinorField *resid = nullptr;
+
+    // ARPACK log routines
+    // Code added to print the log of ARPACK
+    int arpack_log_u = 9999;
+
+#if (defined(QMP_COMMS) || defined(MPI_COMMS))
+
+    if (arpack_logfile != NULL && (comm_rank() == 0)) {
+
+      ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
+      int msglvl0 = 9, msglvl3 = 9;
+      ARPACK(pmcinitdebug)
+      (&arpack_log_u, // logfil
+       &msglvl3,      // mcaupd
+       &msglvl3,      // mcaup2
+       &msglvl0,      // mcaitr
+       &msglvl3,      // mceigh
+       &msglvl0,      // mcapps
+       &msglvl0,      // mcgets
+       &msglvl3       // mceupd
+      );
+
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        printfQuda("eigenSolver: Log info:\n");
+        printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");
+        printfQuda("output is directed to %s\n", arpack_logfile);
+      }
+    }
+#else
+    if (arpack_logfile != NULL) {
+
+      ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
+      int msglvl0 = 9, msglvl3 = 9;
+      ARPACK(mcinitdebug)
+      (&arpack_log_u, // logfil
+       &msglvl3,      // mcaupd
+       &msglvl3,      // mcaup2
+       &msglvl0,      // mcaitr
+       &msglvl3,      // mceigh
+       &msglvl0,      // mcapps
+       &msglvl0,      // mcgets
+       &msglvl3       // mceupd
+      );
+
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        printfQuda("eigenSolver: Log info:\n");
+        printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");
+        printfQuda("output is directed to %s\n", arpack_logfile);
+      }
+    }
+
+#endif
+
+    // Start ARPACK routines
+    //---------------------------------------------------------------------------------
+
+    double t1, t2;
 
     do {
-      //interface to arpack routines
-      arpack_naupd<Float>(ido_, bmat, n_, lanczos_which, nev_, tol, resid_, ncv_, w_v_, ldv_, iparam_, ipntr_, w_workd_, w_workl_, lworkl_, w_rwork_, info_, fcomm);
-  
-      if (info_ != 0) errorQuda("\nError in ARPACK CNAUPD (error code %d) , exit.\n", info_);
 
-      iter_cnt++;
-        
+      t1 = -((double)clock());
+
+      // Interface to arpack routines
+      //----------------------------
+#if (defined(QMP_COMMS) || defined(MPI_COMMS))
+
+      ARPACK(pznaupd)
+      (fcomm_, &ido_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
+       w_workl_, &lworkl_, w_rwork_, &info_, 1, 2);
+
+      if (info_ != 0) {
+        arpackErrorHelpNAUPD();
+        errorQuda("\nError in pznaupd info = %d. Exiting.", info_);
+      }
+#else
+      ARPACK(znaupd)
+      (&ido_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_,
+       &lworkl_, w_rwork_, &info_, 1, 2);
+      if (info_ != 0) {
+        arpackErrorHelpNAUPD();
+        errorQuda("\nError in znaupd info = %d. Exiting.", info_);
+      }
+#endif
+
+      // If this is the first iteration, we allocate CPU and GPU memory for QUDA
+      if (allocate) {
+
+        // Fortran arrays start at 1. The C++ pointer is therefore the Fortran pointer
+        // less one, hence ipntr[0] - 1 to specify the correct address.
+
+        cpuParam->location = QUDA_CPU_FIELD_LOCATION;
+        cpuParam->create = QUDA_REFERENCE_FIELD_CREATE;
+        cpuParam->gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+        cpuParam->v = w_workd_ + (ipntr_[0] - 1);
+        h_v = ColorSpinorField::Create(*cpuParam);
+        // Adjust the position of the start of the array.
+        cpuParam->v = w_workd_ + (ipntr_[1] - 1);
+        h_v2 = ColorSpinorField::Create(*cpuParam);
+
+        ColorSpinorParam cudaParam(*cpuParam);
+        cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+        cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+        cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+        cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+
+        d_v = ColorSpinorField::Create(cudaParam);
+        d_v2 = ColorSpinorField::Create(cudaParam);
+        resid = ColorSpinorField::Create(cudaParam);
+        allocate = false;
+      }
+
+      if (ido_ == 99 || info_ == 1) break;
+
       if (ido_ == -1 || ido_ == 1) {
-         //apply matrix vector here:
-         matvec(&(w_workd_[(ipntr_[1]-1)]), &(w_workd_[(ipntr_[0]-1)]));
 
-         if(iter_cnt % 50 == 0) printfQuda("\nIteration : %d\n", iter_cnt);
-      } 
+        t2 = -clock();
 
-    } while (99 != ido_ && iter_cnt < max_iter);
+        *d_v = *h_v;
+        // apply matrix-vector operation here:
+        eig_solver->chebyOp(mat, *d_v2, *d_v);
+        *h_v2 = *d_v2;
 
-    printfQuda("Finish: iter=%04d  info=%d  ido=%d\n", iter_cnt, info_, ido_);
+        t2 += clock();
 
-    //int conv_cnt = iparam_[4];
+        time_mv += t2;
+      }
 
-    /* for howmny="P", no additional space is required */
-    arpack_neupd<Float>(rvec_, howmny, select_, w_d_, w_v_, ldv_, sigma_, w_workev_, bmat, n_, lanczos_which,
-                        nev_, tol_, resid_, ncv_, w_v_, ldv_, iparam_, ipntr_, w_workd_, w_workl_, lworkl_, w_rwork_, info_, fcomm);
+      t1 += clock();
+      time_ar += t1;
 
-    if (info_ != 0) errorQuda("\nError in ARPACK CNEUPD (error code %d) , exit.\n", info_);    
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+        printfQuda("Arpack Iteration %s: %d\n", eig_param->use_poly_acc ? "(with poly acc) " : "", iter_count);
+      iter_count++;
 
-    /* cleanup */
-    if (w_workl_ != nullptr)   delete [] w_workl_;
-    if (w_rwork_ != nullptr)   delete [] w_rwork_;
-    if (w_workev_ != nullptr)  delete [] w_workev_;
-    if (select_ != nullptr)    delete [] select_;
+    } while (99 != ido_ && iter_count < max_iter);
 
-    if (w_workd_ != nullptr)   delete [] w_workd_;
-    if (resid_   != nullptr)   delete [] resid_;
+    // Subspace calulated sucessfully. Compute nEv eigenvectors and values
+
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("Finish: iter=%04d  info=%d  ido=%d\n", iter_count, info_, ido_);
+      printfQuda("Computing eigenvectors\n");
+    }
+
+    time_ev = -clock();
+
+    // Interface to arpack routines
+    //----------------------------
+#if (defined(QMP_COMMS) || defined(MPI_COMMS))
+    ARPACK(pzneupd)
+    (fcomm_, &rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nEv_, &tol_,
+     resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
+    if (info_ == -15) {
+      arpackErrorHelpNEUPD();
+      errorQuda("\nError in pzneupd info = %d. You likely need to\n"
+                "increase the maximum ARPACK iterations. Exiting.",
+                info_);
+    } else if (info_ != 0) {
+      arpackErrorHelpNEUPD();
+      errorQuda("\nError in pzneupd info = %d. Exiting.", info_);
+    }
+#else
+    ARPACK(zneupd)
+    (&rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_,
+     &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
+    if (info_ == -15) {
+      arpackErrorHelpNEUPD();
+      errorQuda("\nError in zneupd info = %d. You likely need to\n"
+                "increase the maximum ARPACK iterations. Exiting.",
+                info_);
+    } else if (info_ != 0) {
+      arpackErrorHelpNEUPD();
+      errorQuda("\nError in zneupd info = %d. Exiting.", info_);
+#endif
+
+    // Print additional convergence information.
+    if ((info_) == 1) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Maximum number of iterations reached.\n");
+    } else {
+      if (info_ == 3) {
+        errorQuda("ARPACK Error: No shifts could be applied during implicit\n");
+        errorQuda("Arnoldi update.\n");
+      }
+    }
+
+#if (defined(QMP_COMMS) || defined(MPI_COMMS))
+
+    if (comm_rank() == 0) {
+      if (arpack_logfile != NULL) { ARPACK(finilog)(&arpack_log_u); }
+    }
+#else
+      if (arpack_logfile != NULL) ARPACK(finilog)(&arpack_log_u);
+
+#endif
+
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking eigenvalues\n");
+
+    int nconv = iparam_[4];
+
+    // Sort the eigenvalues in absolute ascending order
+    std::vector<std::pair<double, int>> evals_sorted;
+    for (int j = 0; j < nconv; j++) { evals_sorted.push_back(std::make_pair(h_evals_[j].real(), j)); }
+
+    // Sort the array by value (first in the pair)
+    // and the index (second in the pair) will come along
+    // for the ride.
+    std::sort(evals_sorted.begin(), evals_sorted.end());
+    if (reverse) std::reverse(evals_sorted.begin(), evals_sorted.end());
+
+    // print out the computed Ritz values and their error estimates
+    for (int j = 0; j < nconv; j++) {
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[j]), imag(h_evals_[j]),
+                   std::abs(*(w_workl_ + ipntr_[10] - 1 + j)));
+    }
+
+    // Compute Eigenvalues from Eigenvectors.
+    ColorSpinorField *h_v3 = NULL;
+    int idx = 0;
+    for (int i = 0; i < nconv; i++) {
+      idx = nconv - 1 - evals_sorted[i].second;
+      cpuParam->v = (Complex *)h_evecs_ + idx * ldv_;
+      h_v3 = ColorSpinorField::Create(*cpuParam);
+
+      // d_v = v
+      *d_v = *h_v3;
+
+      // d_v2 = M*v
+      eig_solver->matVec(mat, *d_v2, *d_v);
+
+      // lambda = v^dag * M*v
+      h_evals_[idx] = blas::cDotProduct(*d_v, *d_v2);
+
+      Complex unit(1.0, 0.0);
+      Complex m_lambda(-real(h_evals_[idx]), -imag(h_evals_[idx]));
+
+      // d_v = ||M*v - lambda*v||
+      blas::caxpby(unit, *d_v2, m_lambda, *d_v);
+      double L2norm = blas::norm2(*d_v);
+
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+        printfQuda("EigValue[%04d] = %+.16e  %+.16e  Residual: %.16e\n", i, real(h_evals_[idx]), imag(h_evals_[idx]),
+                   sqrt(L2norm));
+
+      delete h_v3;
+    }
+
+    time_ev += clock();
+
+    double total = (time_ar + time_ev) / CLOCKS_PER_SEC;
+
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("Time to solve problem using ARPACK         = %e\n", total);
+      printfQuda("Time spent in ARPACK                       = %e  %.1f%%\n", (time_ar - time_mv) / CLOCKS_PER_SEC,
+                 100 * ((time_ar - time_mv) / CLOCKS_PER_SEC) / total);
+      printfQuda("Time spent in QUDA (M*vec + data transfer) = %e  %.1f%%\n", time_mv / CLOCKS_PER_SEC,
+                 100 * (time_mv / CLOCKS_PER_SEC) / total);
+      printfQuda("Time spent in computing Eigenvectors       = %e  %.1f%%\n", time_ev / CLOCKS_PER_SEC,
+                 100 * (time_ev / CLOCKS_PER_SEC) / total);
+    }
+
+    // cleanup
+    free(ipntr_);
+    free(iparam_);
+    free(mod_h_evals_sorted);
+    free(h_evals_sorted_idx);
+    free(resid_);
+    free(w_workd_);
+    free(w_workl_);
+    free(w_workev_);
+    free(w_rwork_);
+    free(select_);
+    free(spectrum);
+
+    delete h_v;
+    delete h_v2;
+    delete d_v;
+    delete d_v2;
+    delete resid;
 
     return;
   }
 
-///////////////////////////////////////////////////ARPACK SOLVER////////////////////////////////////////////////////////
- template<typename Float>
- void arpack_solve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target)
- {
-   QudaMatvec<Float> mv(matEigen, matPrec, *B[0]);
-   ArpackArgs<Float> arg(mv, B, static_cast<std::complex<Float> *> (evals), nev , ncv, target, (Float)tol);
-   arg.apply();
-   arg.save();
+  void arpackErrorHelpNAUPD()
+  {
+    printfQuda("Error help NAUPD\n");
+    printfQuda("INFO Integer.  (INPUT/OUTPUT)\n");
+    printfQuda("     If INFO .EQ. 0, a randomly initial residual vector is used.\n");
+    printfQuda("     If INFO .NE. 0, RESID contains the initial residual vector,\n");
+    printfQuda("                        possibly from a previous run.\n");
+    printfQuda("     Error flag on output.\n");
+    printfQuda("     =  0: Normal exit.\n");
+    printfQuda("     =  1: Maximum number of iterations taken.\n");
+    printfQuda("        All possible eigenvalues of OP has been found. IPARAM(5)\n");
+    printfQuda("        returns the number of wanted converged Ritz values.\n");
+    printfQuda("     =  2: No longer an informational error. Deprecated starting\n");
+    printfQuda("        with release 2 of ARPACK.\n");
+    printfQuda("     =  3: No shifts could be applied during a cycle of the\n");
+    printfQuda("        Implicitly restarted Arnoldi iteration. One possibility\n");
+    printfQuda("        is to increase the size of NCV relative to NEV.\n");
+    printfQuda("        See remark 4 below.\n");
+    printfQuda("     = -1: N must be positive.\n");
+    printfQuda("     = -2: NEV must be positive.\n");
+    printfQuda("     = -3: NCV-NEV >= 1 and less than or equal to N.\n");
+    printfQuda("     = -4: The maximum number of Arnoldi update iteration\n");
+    printfQuda("        must be greater than zero.\n");
+    printfQuda("     = -5: WHICH must be 'LM', 'SM', 'LR', 'SR', 'LI', 'SI'\n");
+    printfQuda("     = -6: BMAT must be one of 'I' or 'G'.\n");
+    printfQuda("     = -7: Length of private work array is not sufficient.\n");
+    printfQuda("     = -8: Error return from LAPACK eigenvalue calculation;\n");
+    printfQuda("     = -9: Starting vector is zero.\n");
+    printfQuda("     = -10: IPARAM(7) must be 1,2,3.\n");
+    printfQuda("     = -11: IPARAM(7) = 1 and BMAT = 'G' are incompatible.\n");
+    printfQuda("     = -12: IPARAM(1) must be equal to 0 or 1.\n");
+    printfQuda("     = -9999: Could not build an Arnoldi factorization.\n");
+    printfQuda("        User input error highly likely.  Please\n");
+    printfQuda("        check actual array dimensions and layout.\n");
+    printfQuda("        IPARAM(5) returns the size of the current Arnoldi\n");
+    printfQuda("        factorization.\n");
+  }
 
-   return;
- }
+  void arpackErrorHelpNEUPD()
+  {
+    printfQuda("Error help NEUPD\n");
+    printfQuda("INFO Integer.  (OUTPUT)\n");
+    printfQuda("     Error flag on output.\n");
+    printfQuda("     =  0: Normal exit.\n");
+    printfQuda("     =  1: The Schur form computed by LAPACK routine csheqr\n");
+    printfQuda("        could not be reordered by LAPACK routine ztrsen.\n");
+    printfQuda("        Re-enter subroutine zneupd with IPARAM(5)=NCV and\n");
+    printfQuda("        increase the size of the array D to have\n");
+    printfQuda("        dimension at least dimension NCV and allocate at\n");
+    printfQuda("        least NCV\n");
+    printfQuda("        columns for Z. NOTE: Not necessary if Z and V share\n");
+    printfQuda("        the same space. Please notify the authors if this\n");
+    printfQuda("        error occurs.\n");
+    printfQuda("     = -1: N must be positive.\n");
+    printfQuda("     = -2: NEV must be positive.\n");
+    printfQuda("     = -3: NCV-NEV >= 1 and less than or equal to N.\n");
+    printfQuda("     = -5: WHICH must be 'LM', 'SM', 'LR', 'SR', 'LI', 'SI'\n");
+    printfQuda("     = -6: BMAT must be one of 'I' or 'G'.\n");
+    printfQuda("     = -7: Length of private work WORKL array is inufficient.\n");
+    printfQuda("     = -8: Error return from LAPACK eigenvalue calculation.\n");
+    printfQuda("        This should never happened.\n");
+    printfQuda("     = -9: Error return from calculation of eigenvectors.\n");
+    printfQuda("        Informational error from LAPACK routine ztrevc.\n");
+    printfQuda("     = -10: IPARAM(7) must be 1,2,3\n");
+    printfQuda("     = -11: IPARAM(7) = 1 and BMAT = 'G' are incompatible.\n");
+    printfQuda("     = -12: HOWMNY = 'S' not yet implemented\n");
+    printfQuda("     = -13: HOWMNY must be one of 'A' or 'P' if RVEC = .true.\n");
+    printfQuda("     = -14: ZNAUPD did not find any eigenvalues to sufficient\n");
+    printfQuda("        accuracy.\n");
+    printfQuda("     = -15: ZNEUPD got a different count of the number of\n");
+    printfQuda("        converged Ritz values than ZNAUPD got. This\n");
+    printfQuda("        indicates the user probably made an error in\n");
+    printfQuda("        passing data from ZNAUPD to ZNEUPD or that the\n");
+    printfQuda("        data was modified before entering ZNEUPD\n");
+  }
 
- void arpackSolve( std::vector<ColorSpinorField*> &B, void* evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target)
- {
-#ifdef ARPACK_LIB
-   if((nev <= 0) or (nev > static_cast<int>(B[0]->Length())))      errorQuda("Wrong number of the requested eigenvectors.\n");
-   if(((ncv-nev) < 2) or (ncv > static_cast<int>(B[0]->Length()))) errorQuda("Wrong size of the IRAM work subspace.\n");
-   if(arpackPrec == QUDA_DOUBLE_PRECISION) arpack_solve<double>(B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
-   else                                    arpack_solve<float> (B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
 #else
-   errorQuda("Arpack library was not built.\n");
- #endif
-   return;
- }
 
-}
+  void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
+                    ColorSpinorParam *cpuParam)
+  {
+    errorQuda("(P)ARPACK has not been enabled for this build");
+  }
+#endif
 
-
+} // namespace quda

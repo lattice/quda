@@ -16,8 +16,19 @@
 
 namespace quda {
 
+#define MMA_SYNC
+
 #if defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
   
+  __device__ inline int interleave_permute(int n){
+#ifdef MMA_SYNC  
+    int n32 = n & 31;
+    return (n>>5)*32 + ((n32>>2)&1)*16 + (n32>>3)*4 + (n&3);
+#else
+    return n;
+#endif
+  }
+
   template<class T>
   struct TensorCoreSharedMemory
   {
@@ -402,8 +413,8 @@ namespace quda {
       for(int spin = 0; spin < 4; spin++){
         #pragma unroll
         for(int color = 0; color < 3; color++){
-          int idx = (threadIdx.y*4+spin)*(N_sm_d2*2)+6*threadIdx.x+2*color;
-          v(spin, color) += complex<float>(__half2float(B[idx+0]), __half2float(B[idx+1]))*previous_scale;
+          int idx = (threadIdx.y*4+spin)*N_sm_d2 + interleave_permute(3*threadIdx.x+color);
+          v(spin, color) += complex<float>(__half2float(B[2*idx+0]), __half2float(B[2*idx+1]))*previous_scale;
         }
       }
     }
@@ -420,7 +431,7 @@ namespace quda {
         for(int color = 0; color < 3; color++){
           float real = v(spin, color).real() / current_scale;
           float imag = v(spin, color).imag() / current_scale;
-          int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
+          int idx = (threadIdx.y*4+spin)*N_sm_d2 + interleave_permute(3*threadIdx.x+color);
           sm_b[idx] = __floats2half2_rn(real, imag);
         }
       }
@@ -436,7 +447,7 @@ namespace quda {
     for(int spin = 0; spin < 4; spin++){
       #pragma unroll
       for(int color = 0; color < 3; color++){
-        int idx = (threadIdx.y*4+spin)*N_sm_d2+3*threadIdx.x+color;
+        int idx = (threadIdx.y*4+spin)*N_sm_d2 + interleave_permute(3*threadIdx.x+color);
         __half_max_abs_half2__(max_, sm_b[idx]);
       }
     }
@@ -449,28 +460,28 @@ namespace quda {
     storage_vec* out = reinterpret_cast<storage_vec*>(output.field);
     half2 a, b;
 
-    a = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+0 ], max_i_div_max2_);
-    b = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+1 ], max_i_div_max2_);
+    a = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2 + interleave_permute(3*threadIdx.x+0) ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2 + interleave_permute(3*threadIdx.x+1) ], max_i_div_max2_);
     out[sid + 0*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2+3*threadIdx.x+2 ], max_i_div_max2_);
-    b = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+0 ], max_i_div_max2_);
+    a = __hmul2(sm_b[ (threadIdx.y*4+0)*N_sm_d2 + interleave_permute(3*threadIdx.x+2) ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2 + interleave_permute(3*threadIdx.x+0) ], max_i_div_max2_);
     out[sid + 1*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+1 ], max_i_div_max2_);
-    b = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2+3*threadIdx.x+2 ], max_i_div_max2_);
+    a = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2 + interleave_permute(3*threadIdx.x+1) ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+1)*N_sm_d2 + interleave_permute(3*threadIdx.x+2) ], max_i_div_max2_);
     out[sid + 2*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+0 ], max_i_div_max2_);
-    b = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+1 ], max_i_div_max2_);
+    a = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2 + interleave_permute(3*threadIdx.x+0) ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2 + interleave_permute(3*threadIdx.x+1) ], max_i_div_max2_);
     out[sid + 3*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2+3*threadIdx.x+2 ], max_i_div_max2_);
-    b = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+0 ], max_i_div_max2_);
+    a = __hmul2(sm_b[ (threadIdx.y*4+2)*N_sm_d2 + interleave_permute(3*threadIdx.x+2) ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2 + interleave_permute(3*threadIdx.x+0) ], max_i_div_max2_);
     out[sid + 4*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
     
-    a = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+1 ], max_i_div_max2_);
-    b = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2+3*threadIdx.x+2 ], max_i_div_max2_);
+    a = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2 + interleave_permute(3*threadIdx.x+1) ], max_i_div_max2_);
+    b = __hmul2(sm_b[ (threadIdx.y*4+3)*N_sm_d2 + interleave_permute(3*threadIdx.x+2) ], max_i_div_max2_);
     out[sid + 5*output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b); 
   } 
 
@@ -543,6 +554,83 @@ namespace quda {
       nvcuda::wmma::store_matrix_sync(sm_c+c_col+c_row*N_sm, c_frag, N_sm, nvcuda::wmma::mem_row_major);
     }
   } 
+
+#if 1  
+ 
+  template<int block_dim_x, int Ls, int M, int N, int M_sm, int N_sm> 
+  __device__ inline void mma_sync_gemm(half* sm_a, half* sm_b, half* sm_c){
+    constexpr int WMMA_M = 16;
+    constexpr int WMMA_N = 16;
+    
+    constexpr int tm_dim = M/WMMA_M;
+    constexpr int tn_dim = N/WMMA_N;
+    
+    constexpr int total_warp = block_dim_x*Ls >> 5;
+    
+    static_assert( (tm_dim*tn_dim)%total_warp==0, "(tm_dim*tn_dim)%%total_warp==0\n" );
+    static_assert( tn_dim%(tm_dim*tn_dim/total_warp)==0, "tn_dim%%(tm_dim*tn_dim/total_warp)==0\n" );
+    static_assert( N%64==0, "N%%64==0\n" );
+    
+    constexpr int total_tile = tm_dim*tn_dim;
+    
+    constexpr int warp_cycle = total_tile/total_warp;
+
+    const int thread_num = threadIdx.y*block_dim_x+threadIdx.x; 
+    const int this_warp = thread_num >> 5; // warp_id
+    const int warp_m = this_warp*warp_cycle/tn_dim;
+
+    const int lane_id = thread_num & 0x1f;
+    const int octl_id = (lane_id >> 2);
+    const int quad_id = (octl_id & 0x3);
+    const int quad_row = (quad_id & 1);
+    const int quad_col = (quad_id >> 1);
+    const int quad_hilo = (octl_id >> 2) & 1; // quad higher or lower.
+    const int quad_thread = (lane_id & 0x3); // 0,1,2,3
+
+    #pragma unroll
+    for(int c = 0; c < warp_cycle; c++){
+      unsigned rc[4] = {0x0u, 0x0u, 0x0u, 0x0u};
+      // The logical warp assigned to each part of the matrix.
+      const int phys_warp_index = this_warp*warp_cycle+c;
+      const int warp_n = phys_warp_index-warp_m*tn_dim;
+      // eg. for 12 warps:
+      // 000|111|222|333
+      // 444|555|666|777
+      // 888|999|000|111
+      
+      #pragma unroll
+      for( int k = 0; k < tm_dim; k++ ){
+        // perform the mma.sync
+        #pragma unroll
+        for(int kC = 0; kC < 4; kC++){
+          unsigned* A = reinterpret_cast<unsigned*>(sm_a);
+          unsigned* B = reinterpret_cast<unsigned*>(sm_b);
+          int ldi = k*16 + kC*4 + quad_thread;
+          int thread_offset_a = ldi * (M_sm/2) + warp_m*8 + quad_row*4 + quad_hilo*2;
+          int thread_offset_b = ldi * (N_sm/2) + interleave_permute(warp_n*8 + quad_col*4 + quad_hilo*2);
+          asm volatile(
+              "mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
+            : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
+            : "r"(A[thread_offset_a + 0]),  "r"(A[thread_offset_a + 1]),  
+              "r"(B[thread_offset_b + 0]),  "r"(B[thread_offset_b + 1])
+          );
+        }
+      } 
+    
+      __syncthreads();
+      
+      unsigned* C = reinterpret_cast<unsigned*>(sm_c);
+      int thread_offset_c = (warp_m*16 + quad_row*8 + quad_hilo*4 + quad_thread) * (N_sm/2) + interleave_permute(warp_n*8 + quad_col*4);
+      
+      // Now store the results to shared memory
+      #pragma unroll
+      for(int i = 0; i < 4; i++){
+        C[thread_offset_c + i] = rc[i];
+      }
+    }
+  }
+
+#endif // CUDA version >= 10.1
 
 #endif // defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
 

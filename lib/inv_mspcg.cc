@@ -410,9 +410,9 @@ namespace quda {
       if(R[0] == 2){
         mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift2, shift2);
         mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift1, shift2);
-        mat_precondition->fused_f1(*ifmmp, *ifset, *iftmp, in, scale, parity[1], shift0, shift1);
+        mat_precondition->fused_f1(*ifmmp, *ifset, *fz, in, scale, parity[1], shift0, shift1);
         mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift1, shift1);
-        mat_precondition->fused_f3(out, *ifset, *iftmp, scale, parity[1], shift2, shift2);
+        mat_precondition->fused_f3(out, *ifset, *fz, scale, parity[1], shift2, shift2);
       }else{
         errorQuda("Padding can only be 2\n");
       }

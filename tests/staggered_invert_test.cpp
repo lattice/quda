@@ -219,6 +219,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->residual_type = static_cast<QudaResidualType_s>(0);
   inv_param->residual_type = (tol != 0) ? static_cast<QudaResidualType_s> ( inv_param->residual_type | QUDA_L2_RELATIVE_RESIDUAL) : inv_param->residual_type;
   inv_param->residual_type = (tol_hq != 0) ? static_cast<QudaResidualType_s> (inv_param->residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : inv_param->residual_type;
+  inv_param->heavy_quark_check = (inv_param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ? 5 : 0);
 
   inv_param->tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 
@@ -686,6 +687,7 @@ invert_test(void)
       break;
 
     case 3: //even
+    case 4:
 
       invertQuda(out->V(), in->V(), &inv_param);
 
@@ -693,27 +695,13 @@ invert_test(void)
       time0 /= CLOCKS_PER_SEC;
 
       matdagmat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec,
-          gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY, dslash_type);
+                gaugeParam.cpu_prec, tmp, test_type == 3 ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
 
       if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
         printfQuda("%f %f\n", ((float*)in->V())[12], ((float*)ref->V())[12]);
       } else {
         printfQuda("%f %f\n", ((double*)in->V())[12], ((double*)ref->V())[12]);
       }
-
-      mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-      nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-      src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-
-      break;
-
-    case 4: //odd
-      invertQuda(out->V(), in->V(), &inv_param);
-      time0 += clock(); // stop the timer
-      time0 /= CLOCKS_PER_SEC;
-
-      matdagmat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec,
-          gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY, dslash_type);
 
       mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);

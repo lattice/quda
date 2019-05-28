@@ -36,6 +36,7 @@ extern double anisotropy;
 extern bool verify_results;
 
 extern char latfile[];
+extern bool unit_gauge;
 
 extern QudaVerbosity verbosity;
 
@@ -125,11 +126,14 @@ void SU3test(int argc, char **argv) {
   if (strcmp(latfile,"")) {  
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { 
-    // generate a random SU(3) field
-    printfQuda("Randomizing fields...");
-    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    printfQuda("done.\n");
+  } else { // else generate an SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
+      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      // random SU(3) field
+      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    }
   }
 
   loadGaugeQuda(gauge, &gauge_param);
@@ -137,18 +141,36 @@ void SU3test(int argc, char **argv) {
 
   double plaq[3];
   plaqQuda(plaq);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  printfQuda("Computed plaquette gauge precise is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
+
   // Topological charge
-  double qCharge;
+  double qCharge = 0.0, qChargeCheck = 0.0;
   // start the timer
   double time0 = -((double)clock());
-  qCharge = qChargeCuda();
+  qCharge = qChargeQuda();
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-  printfQuda("Computed topological charge is %.16e Done in %g secs\n", qCharge, time0);
+  printfQuda("Computed topological charge gauge precise is %.16e Done in %g secs\n", qCharge, time0);
+
+  // Size of floating point data
+  size_t sSize = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
+  size_t array_size = V * sSize;
+  // Void array passed to the GPU. QUDA will allocate GPU memory and pass back a populated host array.
+  void *qDensity = malloc(array_size);
+  qCharge = qChargeDensityQuda(qDensity);
+
+  // Ensure host array sums to return value
+  if (prec == QUDA_DOUBLE_PRECISION) {
+    for (int i = 0; i < V; i++) qChargeCheck += ((double *)qDensity)[i];
+  } else {
+    for (int i = 0; i < V; i++) qChargeCheck += ((float *)qDensity)[i];
+  }
+  printfQuda("Computed topological charge gauge precise from density function is %.16e\n", qCharge);
+  printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", qCharge, qChargeCheck,
+             qCharge - qChargeCheck);
 
   // Stout smearing should be equivalent to APE smearing
   // on D dimensional lattices for rho = alpha/2*(D-1). 
@@ -165,8 +187,8 @@ void SU3test(int argc, char **argv) {
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for STOUT = %g secs\n", time0);
-  qCharge = qChargeCuda();
-  printfQuda("Computed topological charge after is %.16e \n", qCharge);
+  qCharge = qChargeQuda();
+  printf("Computed topological charge after is %.16e \n", qCharge);
 
   //APE
   // start the timer
@@ -176,8 +198,8 @@ void SU3test(int argc, char **argv) {
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for APE = %g secs\n", time0);
-  qCharge = qChargeCuda();
-  printfQuda("Computed topological charge after is %.16e \n", qCharge);
+  qCharge = qChargeQuda();
+  printfQuda("Computed topological charge after smearing is %.16e \n", qCharge);
 
   //Over Improved STOUT
   double epsilon = -0.25;
@@ -190,8 +212,8 @@ void SU3test(int argc, char **argv) {
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
-  qCharge = qChargeCuda();
-  printfQuda("Computed topological charge after is %.16e \n", qCharge);
+  qCharge = qChargeQuda();
+  printfQuda("Computed topological charge after smearing is %.16e \n", qCharge);
 
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");

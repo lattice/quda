@@ -88,6 +88,17 @@ namespace quda {
 
     for (int dir = 0; dir < 2; dir++) { // XLC cannot do multi-dimensional array initialization
       for (int dim = 0; dim < QUDA_MAX_DIM; dim++) {
+
+        for (int b = 0; b < 2; b++) {
+          my_face_dim_dir_d[b][dim][dir] = nullptr;
+          my_face_dim_dir_hd[b][dim][dir] = nullptr;
+          my_face_dim_dir_h[b][dim][dir] = nullptr;
+
+          from_face_dim_dir_d[b][dim][dir] = nullptr;
+          from_face_dim_dir_hd[b][dim][dir] = nullptr;
+          from_face_dim_dir_h[b][dim][dir] = nullptr;
+        }
+
         mh_recv_fwd[dir][dim] = nullptr;
         mh_recv_back[dir][dim] = nullptr;
         mh_send_fwd[dir][dim] = nullptr;
@@ -212,7 +223,7 @@ namespace quda {
     if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes) {
 
       if (initGhostFaceBuffer) {
-	if (ghost_bytes) {
+        if (ghostFaceBytes) {
           // remove potential for inter-process race conditions
           // ensures that all outstanding communication is complete
           // before we free any comms buffers
@@ -224,11 +235,10 @@ namespace quda {
 	    host_free(ghost_pinned_send_buffer_h[b]);
 	    host_free(ghost_pinned_recv_buffer_h[b]);
 	  }
-	}
+        }
       }
 
       if (ghost_bytes > 0) {
-
         for (int b = 0; b < 2; ++b) {
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
 	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
@@ -290,6 +300,12 @@ namespace quda {
   void LatticeField::createComms(bool no_comms_fill, bool bidir)
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
+
+    // before allocating local comm handles, synchronize since the
+    // comms buffers are static so remove potential for interferring
+    // with any outstanding exchanges to the same buffers
+    qudaDeviceSynchronize();
+    comm_barrier();
 
     // initialize the ghost pinned buffers
     for (int b=0; b<2; b++) {
@@ -383,6 +399,10 @@ namespace quda {
         }
       } // loop over b
 
+      // local take down complete - now synchronize to ensure globally complete
+      qudaDeviceSynchronize();
+      comm_barrier();
+
       initComms = false;
       checkCudaError();
     }
@@ -414,8 +434,8 @@ namespace quda {
 							  sizeof(ipcRemoteGhostDestHandle[b][1-dir][dim]));
 	  }
 	  // now send
-	  if (comm_peer2peer_enabled(dir,dim)) {
-	    cudaIpcMemHandle_t ipcLocalGhostDestHandle;
+          cudaIpcMemHandle_t ipcLocalGhostDestHandle;
+          if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_recv_buffer_d[b]);
 	    sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
 						    dim, disp,
@@ -437,8 +457,8 @@ namespace quda {
       // open the remote memory handles and set the send ghost pointers
       for (int dim=0; dim<4; ++dim) {
 	if (comm_dim(dim)==1) continue;
-	// even if comm_dim(2) == 2, we not have p2p enabled in both directions, so check this
-	const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
+        // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
+        const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
 	for (int dir=0; dir<num_dir; ++dir) {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
 	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
@@ -472,9 +492,9 @@ namespace quda {
 	  }
 
 	  // now send
-	  if (comm_peer2peer_enabled(dir,dim)) {
+          cudaIpcEventHandle_t ipcLocalEventHandle;
+          if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaEventCreate(&ipcCopyEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
-	    cudaIpcEventHandle_t ipcLocalEventHandle;
 	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 
 	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
@@ -571,6 +591,11 @@ namespace quda {
     } // iterate over dim
 
     checkCudaError();
+
+    // local take down complete - now synchronize to ensure globally complete
+    qudaDeviceSynchronize();
+    comm_barrier();
+
     initIPCComms = false;
   }
 

@@ -155,10 +155,10 @@ public:
       // add laplace transverse dir to the key
       char aux[TuneKey::aux_n];
       strcpy(aux, Dslash<Float>::aux[arg.kernel_type]);
-      strcat(aux, ",laplace3D=");
-      char laplace3D[32];
-      u32toa(laplace3D, arg.dir);
-      strcat(aux, laplace3D);
+      strcat(aux, ",laplace=");
+      char laplace[32];
+      u32toa(laplace, arg.dir);
+      strcat(aux, laplace);
       return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };

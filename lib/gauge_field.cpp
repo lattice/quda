@@ -27,16 +27,29 @@ namespace quda {
     site_size(u.SiteSize())
   { }
 
-
   GaugeField::GaugeField(const GaugeFieldParam &param) :
-    LatticeField(param), bytes(0), phase_offset(0), phase_bytes(0), nColor(param.nColor), nFace(param.nFace),
-    geometry(param.geometry), reconstruct(param.reconstruct), 
+    LatticeField(param),
+    bytes(0),
+    phase_offset(0),
+    phase_bytes(0),
+    nColor(param.nColor),
+    nFace(param.nFace),
+    geometry(param.geometry),
+    reconstruct(param.reconstruct),
     nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
-    order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
-    anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(link_type == QUDA_ASQTAD_FAT_LINKS ? 0.0 : 1.0),
+    order(param.order),
+    fixed(param.fixed),
+    link_type(param.link_type),
+    t_boundary(param.t_boundary),
+    anisotropy(param.anisotropy),
+    tadpole(param.tadpole),
+    fat_link_max(link_type == QUDA_ASQTAD_FAT_LINKS ? 0.0 : 1.0),
     create(param.create),
-    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu),
-    site_offset(param.site_offset), site_size(param.site_size)
+    staggeredPhaseType(param.staggeredPhaseType),
+    staggeredPhaseApplied(param.staggeredPhaseApplied),
+    i_mu(param.i_mu),
+    site_offset(param.site_offset),
+    site_size(param.site_size)
   {
     if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
 

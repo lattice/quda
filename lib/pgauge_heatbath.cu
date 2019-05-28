@@ -10,7 +10,7 @@
 #include <random_quda.h>
 #include <index_helper.cuh>
 #include <atomic.cuh>
-#include <cub/cub.cuh>
+#include <cub_helper.cuh>
 
 
 

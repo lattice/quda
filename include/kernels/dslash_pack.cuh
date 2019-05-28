@@ -160,7 +160,7 @@ namespace quda
 
     // compute where the output is located
     // compute an index into the local volume from the index into the face
-    // read spinor, spin-project, and write half spinor to face
+    // read spinor and write spinor to face buffer
 
     // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
     const int face_num = (ghost_idx >= nFace * arg.dc.ghostFaceCB[dim]) ? 1 : 0;

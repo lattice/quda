@@ -12,8 +12,8 @@
 
 #include <Eigen/Dense>
 
-
-namespace quda {  
+namespace quda
+{
 
   using namespace blas;
 
@@ -95,7 +95,7 @@ namespace quda {
 
   /**
      Verification that the computed approximate eigenvectors are (not) valid
-   */
+  */
 
   void Deflation::verify() {
     const int nevs_to_print = param.cur_dim;
@@ -125,33 +125,34 @@ namespace quda {
     std::vector<ColorSpinorField*> res;
     res.push_back(r);
 
-    for(int i = 0; i < nevs_to_print; i++)
-    {
-       zero(*r);
+    for (int i = 0; i < nevs_to_print; i++) {
+      zero(*r);
 
-       blas::caxpy(&projm.get()[i*param.ld], rv, res);//multiblas
+      blas::caxpy(&projm.get()[i * param.ld], rv, res); // multiblas
 
-       *r_sloppy = *r;
+      *r_sloppy = *r;
 
-       param.matDeflation(*Av_sloppy, *r_sloppy);
+      param.matDeflation(*Av_sloppy, *r_sloppy);
 
-       double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
+      double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
 
-       double eval = dotnorm.x / dotnorm.z;
+      double eval = dotnorm.x / dotnorm.z;
 
-       blas::xpay(*Av_sloppy, -eval, *r_sloppy );
+      blas::xpay(*Av_sloppy, -eval, *r_sloppy);
 
-       double relerr = sqrt( norm2(*r_sloppy) / dotnorm.z );
+      double relerr = sqrt(norm2(*r_sloppy) / dotnorm.z);
 
-       printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i+1, eval, relerr);
+      printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i + 1, eval, relerr);
     }
 
     return;
   }
 
   void Deflation::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER) 
-       errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
+
+    if (param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER
+        && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER)
+      errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
 
     if(param.cur_dim == 0) return;//nothing to do
 
@@ -170,22 +171,22 @@ namespace quda {
 
     blas::cDotProduct(vec.get(), rv_, in_);//<i, b>
 
-    if(!param.use_inv_ritz) 
-    {
-      if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
+    if (!param.use_inv_ritz) {
+      if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
 #ifdef MAGMA_LIB
         magma_Xgesv(vec.get(), param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
 #else
         errorQuda("MAGMA library was not built.\n");
 #endif
-      } else if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) { 
-        Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-        Map<VectorXcd, Unaligned> vec_ (vec.get(), param.cur_dim);
+      } else if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
+        Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim,
+                                                        DynamicStride(param.ld, 1));
+        Map<VectorXcd, Unaligned> vec_(vec.get(), param.cur_dim);
 
-        VectorXcd  vec2_(param.cur_dim);
+        VectorXcd vec2_(param.cur_dim);
         vec2_ = projm_.fullPivHouseholderQr().solve(vec_);
 
-        vec_  = vec2_;
+        vec_ = vec2_;
       } else {
         errorQuda("Library type %d is currently not supported.\n", param.eig_global.extlib_type);
       }
@@ -205,8 +206,9 @@ namespace quda {
   }
 
   void Deflation::increment(ColorSpinorField &Vm, int nev) {
-    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER) 
-       errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
+    if (param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER
+        && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER)
+      errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
 
     if( nev == 0 ) return; //nothing to do
 
@@ -225,52 +227,54 @@ namespace quda {
     // The degree to which we interpolate between modified GramSchmidt and GramSchmidt (performance vs stability)
     const int cdot_pipeline_length  = 4;
 
-    for(int i = first_idx; i < (first_idx + nev); i++)
-    {
-      std::unique_ptr<Complex[] > alpha(new Complex[i]);
+    for (int i = first_idx; i < (first_idx + nev); i++) {
+      std::unique_ptr<Complex[]> alpha(new Complex[i]);
 
       ColorSpinorField *accum = param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ? r : &param.RV->Component(i);
       *accum = param.RV->Component(i);
 
       int offset = 0;
       while (offset < i) {
-        
-        const int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset);
 
-        std::vector<ColorSpinorField*> vj_(param.RV->Components().begin()+offset, param.RV->Components().begin()+offset+local_length);
-        std::vector<ColorSpinorField*> vi_;
-	vi_.push_back(accum);
+        const int local_length = (i - offset) > cdot_pipeline_length ? cdot_pipeline_length : (i - offset);
+
+        std::vector<ColorSpinorField *> vj_(param.RV->Components().begin() + offset,
+                                            param.RV->Components().begin() + offset + local_length);
+        std::vector<ColorSpinorField *> vi_;
+        vi_.push_back(accum);
 
         blas::cDotProduct(alpha.get(), vj_, vi_);
         for (int j = 0; j < local_length; j++) alpha[j] = -alpha[j];
 
-        blas::caxpy(alpha.get(), vj_, vi_); //i-<j,i>j
+        blas::caxpy(alpha.get(), vj_, vi_); // i-<j,i>j
 
         offset += cdot_pipeline_length;
       }
 
       alpha[0] = blas::norm2(*accum);
 
-      if(alpha[0].real() > 1e-16) blas::ax(1.0 /sqrt(alpha[0].real()), *accum);
-      else                        errorQuda("\nCannot orthogonalize %dth vector\n", i);
+      if (alpha[0].real() > 1e-16)
+        blas::ax(1.0 / sqrt(alpha[0].real()), *accum);
+      else
+        errorQuda("\nCannot orthogonalize %dth vector\n", i);
 
       param.RV->Component(i) = *accum;
 
-      param.matDeflation(*Av_sloppy, param.RV->Component(i));//precision must match!
-      //load diagonal:
-      *Av = *Av_sloppy; 
-      param.matProj[i*param.ld+i] = cDotProduct(*accum, *Av);
+      param.matDeflation(*Av_sloppy, param.RV->Component(i)); // precision must match!
+      // load diagonal:
+      *Av = *Av_sloppy;
+      param.matProj[i * param.ld + i] = cDotProduct(*accum, *Av);
 
-      if (i>0) {
-        std::vector<ColorSpinorField*> vj_(param.RV->Components().begin(), param.RV->Components().begin()+i);
-        std::vector<ColorSpinorField*> av_;
-	av_.push_back(Av_sloppy);
+      if (i > 0) {
+        std::vector<ColorSpinorField *> vj_(param.RV->Components().begin(), param.RV->Components().begin() + i);
+        std::vector<ColorSpinorField *> av_;
+        av_.push_back(Av_sloppy);
 
-	blas::cDotProduct(alpha.get(), vj_, av_);
+        blas::cDotProduct(alpha.get(), vj_, av_);
 
         for (int j = 0; j < i; j++) {
-          param.matProj[i*param.ld+j] = alpha[j];
-          param.matProj[j*param.ld+i] = conj(alpha[j]);//conj
+          param.matProj[i * param.ld + j] = alpha[j];
+          param.matProj[j * param.ld + i] = conj(alpha[j]); // conj
         }
       }
     }
@@ -283,101 +287,97 @@ namespace quda {
 
 
   void Deflation::reduce(double tol, int max_nev) {
-     if(param.cur_dim < max_nev)
-     {
-        printf("\nToo big number of eigenvectors was requested, switched to maximum available number %d\n", param.cur_dim);
-        max_nev = param.cur_dim;
-     }
+    if (param.cur_dim < max_nev) {
+      printf("\nToo big number of eigenvectors was requested, switched to maximum available number %d\n", param.cur_dim);
+      max_nev = param.cur_dim;
+    }
 
-     std::unique_ptr<double[] > evals(new double[param.cur_dim]);
-     std::unique_ptr<Complex, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(Complex)), pinned_deleter);
+    std::unique_ptr<double[]> evals(new double[param.cur_dim]);
+    std::unique_ptr<Complex, decltype(pinned_deleter)> projm(
+      pinned_allocator(param.ld * param.cur_dim * sizeof(Complex)), pinned_deleter);
 
-     memcpy(projm.get(), param.matProj, param.ld*param.cur_dim*sizeof(Complex));
+    memcpy(projm.get(), param.matProj, param.ld * param.cur_dim * sizeof(Complex));
 
-     if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
+    if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
 #ifdef MAGMA_LIB
-       magma_Xheev(projm.get(), param.cur_dim, param.ld, evals.get(), sizeof(Complex));
+      magma_Xheev(projm.get(), param.cur_dim, param.ld, evals.get(), sizeof(Complex));
 #else
-       errorQuda("MAGMA library was not built.\n");
+      errorQuda("MAGMA library was not built.\n");
 #endif
-     } else if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
-       Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-       Map<VectorXd, Unaligned> evals_(evals.get(), param.cur_dim);
+    } else if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
+      Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm.get(), param.cur_dim, param.cur_dim,
+                                                      DynamicStride(param.ld, 1));
+      Map<VectorXd, Unaligned> evals_(evals.get(), param.cur_dim);
 
-       SelfAdjointEigenSolver<MatrixXcd> es(projm_);
+      SelfAdjointEigenSolver<MatrixXcd> es(projm_);
 
-       projm_ = es.eigenvectors();
-       evals_ = es.eigenvalues();
-     } else {
-       errorQuda("Library type %d is currently not supported.\n", param.eig_global.extlib_type);
-     }
+      projm_ = es.eigenvectors();
+      evals_ = es.eigenvalues();
+    } else {
+      errorQuda("Library type %d is currently not supported.\n", param.eig_global.extlib_type);
+    }
 
-     //reset projection matrix, now we will use inverse ritz values when deflate an initial guess:
-     param.use_inv_ritz = true;
-     for(int i = 0; i < param.cur_dim; i++)
-     {
-       if(fabs(evals[i]) > 1e-16)
-       {
-         param.invRitzVals[i] = 1.0 / evals[i];
-       }
-       else
-       {
-         errorQuda("\nCannot invert Ritz value.\n");
-       }
-     }
+    // reset projection matrix, now we will use inverse ritz values when deflate an initial guess:
+    param.use_inv_ritz = true;
+    for (int i = 0; i < param.cur_dim; i++) {
+      if (fabs(evals[i]) > 1e-16) {
+        param.invRitzVals[i] = 1.0 / evals[i];
+      } else {
+        errorQuda("\nCannot invert Ritz value.\n");
+      }
+    }
 
-     ColorSpinorParam csParam(param.RV->Component(0));
-     //Create an eigenvector set:
-     csParam.create   = QUDA_ZERO_FIELD_CREATE;
-     //csParam.setPrecision(search_space_prec);//eigCG internal search space precision: must be adjustable.
-     csParam.is_composite  = true;
-     csParam.composite_dim = max_nev;
+    ColorSpinorParam csParam(param.RV->Component(0));
+    // Create an eigenvector set:
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    // csParam.setPrecision(search_space_prec);//eigCG internal search space precision: must be adjustable.
+    csParam.is_composite = true;
+    csParam.composite_dim = max_nev;
 
-     csParam.mem_type       = QUDA_MEMORY_MAPPED;
-     std::unique_ptr<ColorSpinorField> buff(ColorSpinorField::Create(csParam));
+    csParam.mem_type = QUDA_MEMORY_MAPPED;
+    std::unique_ptr<ColorSpinorField> buff(ColorSpinorField::Create(csParam));
 
-     int idx       = 0;
-     double relerr = 0.0;
-     bool do_residual_check = (tol != 0.0); 
+    int idx = 0;
+    double relerr = 0.0;
+    bool do_residual_check = (tol != 0.0);
 
-     while ((relerr < tol) && (idx < max_nev))
-     {
-       std::vector<ColorSpinorField*> rv(param.RV->Components().begin(), param.RV->Components().begin() + param.cur_dim);
-       std::vector<ColorSpinorField*> res;
-       res.push_back(r);
+    while ((relerr < tol) && (idx < max_nev)) {
+      std::vector<ColorSpinorField *> rv(param.RV->Components().begin(), param.RV->Components().begin() + param.cur_dim);
+      std::vector<ColorSpinorField *> res;
+      res.push_back(r);
 
-       blas::zero(*r);
-       blas::caxpy(&projm.get()[idx*param.ld], rv, res);//multiblas
-       blas::copy(buff->Component(idx), *r);
+      blas::zero(*r);
+      blas::caxpy(&projm.get()[idx * param.ld], rv, res); // multiblas
+      blas::copy(buff->Component(idx), *r);
 
-       if( do_residual_check ) //if tol=0.0 then disable relative residual norm check
-       {
-         *r_sloppy = *r;
-         param.matDeflation(*Av_sloppy, *r_sloppy);
+      if (do_residual_check) // if tol=0.0 then disable relative residual norm check
+      {
+        *r_sloppy = *r;
+        param.matDeflation(*Av_sloppy, *r_sloppy);
 
-         double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
+        double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
 
-         double eval = dotnorm.x / dotnorm.z;
+        double eval = dotnorm.x / dotnorm.z;
 
-         blas::xpay(*Av_sloppy, -eval, *r_sloppy );
+        blas::xpay(*Av_sloppy, -eval, *r_sloppy);
 
-         relerr = sqrt( norm2(*r_sloppy) / dotnorm.z );
+        relerr = sqrt(norm2(*r_sloppy) / dotnorm.z);
 
-         if(getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
-       }
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
+      }
 
-       idx += 1;
-     }
+      idx += 1;
+    }
 
-     printfQuda("\nReserved eigenvectors: %d\n", idx);
-     //copy all the stuff to cudaRitzVectors set:
-     for(int i = 0; i < idx; i++) blas::copy(param.RV->Component(i), buff->Component(i));
+    printfQuda("\nReserved eigenvectors: %d\n", idx);
+    // copy all the stuff to cudaRitzVectors set:
+    for (int i = 0; i < idx; i++) blas::copy(param.RV->Component(i), buff->Component(i));
 
-     //reset current dimension:
-     param.cur_dim = idx;//idx never exceeds cur_dim.
-     param.tot_dim = idx;
+    // reset current dimension:
+    param.cur_dim = idx; // idx never exceeds cur_dim.
+    param.tot_dim = idx;
 
-     return;
+    return;
   }
 
   //supports seperate reading or single file read
@@ -453,4 +453,4 @@ namespace quda {
     return;
   }
 
-}
+} // namespace quda

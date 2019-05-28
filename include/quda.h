@@ -154,7 +154,7 @@ extern "C" {
        requires more low-precision memory allocation. */
     int solution_accumulator_pipeline;
 
-    /**< This parameter determines how many consective reliable update
+    /**< This parameter determines how many consecutive reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase;
@@ -163,6 +163,16 @@ extern "C" {
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
+
+    /**< This parameter determines how many consecutive heavy-quark
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_hq_res_increase;
+
+    /**< This parameter determines how many total heavy-quark residual
+    restarts we tolerate before terminating the solver, i.e., how long
+    do we want to keep trying to converge */
+    int max_hq_res_restart_total;
 
     /**< After how many iterations shall the heavy quark residual be updated */
     int heavy_quark_check;
@@ -253,8 +263,7 @@ extern "C" {
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
 
-    QudaTune tune;                          /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
-
+    QudaTune tune; /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
 
     /** Number of steps in s-step algorithms */
     int Nsteps;
@@ -278,6 +287,9 @@ extern "C" {
 
     /** Deflation instance */
     void *deflation_op;
+
+    /** defines deflation */
+    void *eig_param;
 
     /**
       Dirac Dslash used in preconditioner
@@ -373,31 +385,71 @@ extern "C" {
 
   } QudaInvertParam;
 
-
-  // Parameter set for solving the eigenvalue problems.
-  // Eigen problems are tightly related with Ritz algorithm.
-  // And the Lanczos algorithm use the Ritz operator.
-  // For Ritz matrix operation,
-  // we need to know about the solution type of dirac operator.
-  // For acceleration, we are also using chevisov polynomial method.
-  // And nk, np values are needed Implicit Restart Lanczos method
-  // which is optimized form of Lanczos algorithm
+  // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
 
+    // EIGENSOLVER PARAMS
+    //-------------------------------------------------
+    /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
-//specific for Lanczos method:
-    QudaSolutionType  RitzMat_lanczos;
-    QudaSolutionType  RitzMat_Convcheck;
+
+    /** Type of eigensolver algorithm to employ **/
     QudaEigType eig_type;
 
-    double *MatPoly_param;
-    int NPoly;
-    double Stp_residual;
+    /** Use Polynomial Acceleration **/
+    QudaBoolean use_poly_acc;
+
+    /** Degree of the Chebysev polynomial **/
+    int poly_deg;
+
+    /** Range used in polynomial acceleration **/
+    double a_min;
+    double a_max;
+
+    /** What type of Dirac operator we are using **/
+    /** If !(use_norm_op) && !(use_dagger) use M. **/
+    /** If use_dagger, use Mdag **/
+    /** If use_norm_op, use MdagM **/
+    /** If use_norm_op && use_dagger use MMdag. **/
+    QudaBoolean use_dagger;
+    QudaBoolean use_norm_op;
+
+    /** Performs an MdagM solve, then constructs the left and right SVD. **/
+    QudaBoolean compute_svd;
+
+    /** Which part of the spectrum to solve **/
+    QudaEigSpectrumType spectrum;
+
+    /** Size of the eigenvector search space **/
+    int nEv;
+    /** Total size of Krylov space **/
+    int nKr;
+    /** Max number of locked eigenpairs (deduced at runtime) **/
+    int nLockedMax;
+    /** Number of requested converged eigenvectors **/
+    int nConv;
+    /** Tolerance on the least well known eigenvalue's residual **/
+    double tol;
+    /** For IRLM/IRAM, check every nth restart **/
+    int check_interval;
+    /** For IRLM/IRAM, quit after n restarts **/
+    int max_restarts;
+
+    /** In the test function, cross check the device result against ARPACK **/
+    QudaBoolean arpack_check;
+    /** For Arpack cross check, name of the Arpack logfile **/
+    char arpack_logfile[512];
+
+    /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
+    char QUDA_logfile[512];
+
+    //-------------------------------------------------
+
+    // EIG-CG PARAMS
+    //-------------------------------------------------
     int nk;
     int np;
-    int f_size;
-    double eigen_shift;
-//more general stuff:
+
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
 
@@ -419,21 +471,23 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 
-    /** The Gflops rate of the multigrid solver setup */
+    /** The Gflops rate of the eigensolver setup */
     double gflops;
 
-    /**< The time taken by the multigrid solver setup */
+    /**< The time taken by the eigensolver setup */
     double secs;
 
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
+    //-------------------------------------------------
 
   } QudaEigParam;
-
 
   typedef struct QudaMultigridParam_s {
 
     QudaInvertParam *invert_param;
+
+    QudaEigParam *eig_param[QUDA_MAX_MG_LEVEL];
 
     /** Number of multigrid levels */
     int n_level;
@@ -560,12 +614,24 @@ extern "C" {
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
- 
+
     /** Whether to generate on all levels or just on level 0 */
-    QudaBoolean generate_all_levels; 
+    QudaBoolean generate_all_levels;
 
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
+
+    /** Whether to run null Vs eigen vector overlap checks once set up is complete */
+    QudaBoolean run_low_mode_check;
+
+    /** Whether to run null vector oblique checks once set up is complete */
+    QudaBoolean run_oblique_proj_check;
+
+    /** Whether to use eigenvectors for the nullspace */
+    QudaBoolean use_low_modes;
+
+    /** Deflate the coarsest grid  */
+    QudaBoolean deflate_coarsest;
 
     /** Whether to load the null-space vectors to disk (requires QIO) */
     QudaBoolean vec_load;
@@ -817,8 +883,18 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
-                   void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
+  void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V, void *hp_alpha, void *hp_beta,
+                   QudaEigParam *eig_param);
+
+  /**
+   * Perform the eigensolve. The problem matrix is defined by the invert param, the
+   * mode of solution is specified by the eig param. It is assumed that the gauge
+   * field has already been loaded via  loadGaugeQuda().
+   * @param h_els  Host side eigenvalues
+   * @param h_evs  Host side eigenvectors
+   * @param param  Contains all metadata regarding the type of solve.
+   */
+  void eigensolveQuda(void *h_evals, void *h_evecs, QudaEigParam *param);
 
   /**
    * Perform the solve, according to the parameters set in param.  It
@@ -841,7 +917,6 @@ extern "C" {
    *               storage and solver parameters
    */
   void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
-
 
   /**
    * Solve for multiple shifts (e.g., masses).
@@ -1184,7 +1259,14 @@ extern "C" {
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
-  double qChargeCuda();
+  double qChargeQuda();
+
+  /**
+     @brief Calculates the topological charge from gaugeSmeared, if it exist,
+     or from gaugePrecise if no smeared fields are present.
+     @param[out] qDensity array holding Q charge density
+  */
+  double qChargeDensityQuda(void *qDensity);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

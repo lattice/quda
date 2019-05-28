@@ -7,7 +7,8 @@ namespace quda {
   namespace mobius_tensor_core {
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700) && (__COMPUTE_CAPABILITY__ <= 750)
-    
+    constexpr int sm_m_pad_size = 0;
+    constexpr int sm_n_pad_size = 10;
     
     /**
       @brief Parameter structure for applying the Dslash
@@ -237,8 +238,8 @@ namespace quda {
       constexpr int M = 4 * Ls_;
       constexpr int N = 6 * block_dim_x;
 
-      constexpr int sm_m_pad_size = 0;
-      constexpr int sm_n_pad_size = 16;
+      // constexpr int sm_m_pad_size = 0;
+      // constexpr int sm_n_pad_size = 16;
 
       constexpr int N_sm = N + sm_n_pad_size;
       constexpr int M_sm = M + sm_m_pad_size;
@@ -250,7 +251,7 @@ namespace quda {
 
       half* sm_a = reload ? sm_c + M * N_sm : sm_c;
       // This is for type == 1 ONLY.
-      half* sm_a_black = sm_a + M * M_sm;
+      // half* sm_a_black = sm_a + M * M_sm;
 
       if (type_ == 0) {
         construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
@@ -287,7 +288,8 @@ namespace quda {
       typedef
           typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major>
               a_type;
-
+      // TODO: FIXME
+      /**
       a_type a_frag[reload ? 1 : tm_dim];
       a_type a_frag_black[reload ? 1 : tm_dim];
       if (!reload) { // in the preload case we preload ...
@@ -298,8 +300,9 @@ namespace quda {
           // Load Matrix
           nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a + a_row + a_col * M_sm, M_sm);
         }
-      }
+      }*/
 
+      /**
       if (type_ == 1) {
         arg.alpha = 1.;
         if (!reload) { // in the preload case we preload ...
@@ -316,7 +319,7 @@ namespace quda {
           construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a_black); // dagger = true
           __syncthreads();
         }
-      }
+      }*/
 
       while (s4_shift_base < arg.volume_4d_cb_shift) {
         int x[4];
@@ -349,38 +352,43 @@ namespace quda {
         load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
 
         __syncthreads();
-        wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+        // wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+        mma_sync_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
         __syncthreads();
 
         if (type_ == 1) {
           Vector aux_in_vec;
+          bool center = false;
+          int sid_back_shift;
           if (!idle) {
             constexpr int in_x_shift = 2;
             int back_x[4] = {x[0] - in_x_shift, x[1] - in_x_shift, x[2] - in_x_shift, x[3] - in_x_shift};
             int back_dim[4] = {arg.dim[0] - in_x_shift*2, arg.dim[1] - in_x_shift*2, arg.dim[2] - in_x_shift*2, arg.dim[3] - in_x_shift*2};
             if (back_x[0] >= 0 && back_x[0] < back_dim[0] && back_x[1] >= 0 && back_x[1] < back_dim[1] && back_x[2] >= 0
-                && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
+              && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
+              center = true;
               int volume_4d_cb_back = back_dim[0] * back_dim[1] * back_dim[2] * back_dim[3] >> 1;
-              int sid_back_shift = threadIdx.y * volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim);
+              sid_back_shift = threadIdx.y * volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim);
               aux_in_vec = arg.x(sid_back_shift, explicit_parity);
             }
           }
           load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
-          if (!idle){
-            store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid, smem_scale[0]);
+          if (!idle && center){
+            store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back_shift, smem_scale[0]);
           }
           __syncthreads();
-          wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+          // wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+          mma_sync_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
           __syncthreads();
 
         } else if (type_ == 3) {
           Vector aux_in_vec;
+          int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
           if (!idle) {
-            aux_in_vec = arg.x(sid, explicit_parity);
+            aux_in_vec = arg.x(sid_shift, explicit_parity);
           }
           load_matrix_b_vector<N_sm/2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
           if (!idle) {
-            int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
             arg.out(sid_shift, explicit_parity) = aux_in_vec;
           }
         }
@@ -436,12 +444,16 @@ namespace quda {
       }
 
       long long bytes() const {
+        const size_t dim[4] = { arg.dim[0], arg.dim[1], arg.dim[2], arg.dim[3] };
+        const size_t b_m0 =  ((dim[0]-0)*(dim[1]-0)*(dim[2]-0)*(dim[3]-0)/2)*arg.Ls*(24*2+4);
+        const size_t b_m1 =  ((dim[0]-1)*(dim[1]-1)*(dim[2]-1)*(dim[3]-1)/2)*arg.Ls*(24*2+4);
+        const size_t b_m2 =  ((dim[0]-2)*(dim[1]-2)*(dim[2]-2)*(dim[3]-2)/2)*arg.Ls*(24*2+4);
         switch (arg.type) {
-        case 0: return arg.out.Bytes() + arg.in.Bytes() + arg.U.Bytes();
-        case 1: return 3 * arg.out.Bytes() + arg.in.Bytes() + arg.U.Bytes();
-        case 2: return arg.out.Bytes() + arg.in.Bytes() + arg.U.Bytes();
-        case 3:
-        case 4: return 2 * arg.out.Bytes() + arg.in.Bytes() + arg.U.Bytes();
+        case 0: return b_m1 + b_m2 + arg.U.Bytes();
+        case 1: return 2*b_m2 + b_m1 + b_m0 + arg.U.Bytes();
+        case 2: return b_m1 + b_m0 + arg.U.Bytes();
+        case 3: return 2*b_m2 + b_m1 + arg.U.Bytes();
+        case 4: return 2*b_m2;
         default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
         return 0ll;
@@ -454,13 +466,26 @@ namespace quda {
 
       unsigned int shared_bytes_per_block(const TuneParam& param) const {
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
-        if (param.aux.x == 1) { // aux.x == 1 --> reload == true
+        // if (param.aux.x == 1) { // aux.x == 1 --> reload == true
+        if (true) { // aux.x == 1 --> reload == true
+          /**
           if (arg.type == 1) {
             return ((param.block.y * 4) * (param.block.y * 4 + 0) * 2 + (param.block.y * 4) * (param.block.x * 6 + 16))
                 * sizeof(half) + 128;
           } else {
             return ((param.block.y * 4) * (param.block.y * 4 + 0) + (param.block.y * 4) * (param.block.x * 6 + 16))
                 * sizeof(half) + 128;
+          }
+          */
+          if (arg.type == 1) {
+            // return ((param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size) * 2 
+            return ((param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size) * 1 
+                  + (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size))
+                  * sizeof(half) + 128;
+          } else {
+            return ((param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size) 
+                  + (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size))
+                  * sizeof(half) + 128;
           }
         } else {
           int a_size = (param.block.y * 4) * (param.block.y * 4 + 0);
@@ -517,7 +542,7 @@ namespace quda {
 
       virtual unsigned int maxGridSize() const { return 32 * deviceProp.multiProcessorCount; }
       virtual unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
-      unsigned int min_block_size() const { return 8; }
+      unsigned int min_block_size() const { return 32; }
       unsigned int max_block_size() const { return 32; }
       unsigned int step_block_size() const { return 8; }
 
@@ -585,16 +610,17 @@ namespace quda {
 
       template <bool reload, int type> void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
         switch (tp.block.x) {
-          case  8: apply< 8, reload, type>(tp, arg, stream); break;
-          case 16: apply<16, reload, type>(tp, arg, stream); break;
-          case 24: apply<24, reload, type>(tp, arg, stream); break;
+          // case  8: apply< 8, reload, type>(tp, arg, stream); break;
+          // case 16: apply<16, reload, type>(tp, arg, stream); break;
+          // case 24: apply<24, reload, type>(tp, arg, stream); break;
           case 32: apply<32, reload, type>(tp, arg, stream); break;
           default: errorQuda("NOT valid tp.block.x(=%d)\n", tp.block.x);
         }
       }
 
       template <int type> void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
-        if (tp.aux.x == 0) {
+        // if (tp.aux.x == 0) {
+        if (false) { // TODO: for test only
           apply<false, type>(tp, arg, stream); // reload = false
         } else {
           apply<true, type>(tp, arg, stream); // reload = true

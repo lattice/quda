@@ -1208,8 +1208,8 @@ public:
 	      Type() == typeid(DiracImprovedStaggeredPC).name() ||
 	      Type() == typeid(DiracImprovedStaggered).name()) ? true : false;
     }
-    
-    const Dirac* Expose() { return dirac; }
+
+    const Dirac *Expose() const { return dirac; }
 
     //! Shift term added onto operator (M/M^dag M/M M^dag + shift)
     double shift;

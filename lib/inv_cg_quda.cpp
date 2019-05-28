@@ -15,6 +15,7 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
+#include <eigensolve_quda.h>
 
 namespace quda {
 
@@ -23,7 +24,6 @@ namespace quda {
     rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
     rSloppyp(nullptr), xSloppyp(nullptr), init(false)
   {
-
   }
 
   CG::~CG() {
@@ -34,16 +34,22 @@ namespace quda {
       if (pp) delete pp;
       if (yp) delete yp;
       if (App) delete App;
-      if(param.precision != param.precision_sloppy) {
-	if (rSloppyp) delete rSloppyp;
-	if (xSloppyp) delete xSloppyp;
+      if (param.precision != param.precision_sloppy) {
+        if (rSloppyp) delete rSloppyp;
+        if (xSloppyp) delete xSloppyp;
       }
       if (tmpp) delete tmpp;
-      if(!mat.isStaggered()) {
-	if (tmp2p && tmpp != tmp2p) delete tmp2p;
-	if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
+      if (!mat.isStaggered()) {
+        if (tmp2p && tmpp != tmp2p) delete tmp2p;
+        if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
       }
       if (rnewp) delete rnewp;
+      if (deflate_init) {
+        for (auto veci : param.evecs)
+          if (veci) delete veci;
+        delete defl_tmp1[0];
+        delete defl_tmp2[0];
+      }
 
       init = false;
     }
@@ -157,7 +163,6 @@ namespace quda {
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       bp = ColorSpinorField::Create(csParam);
-
       init = true;
     }
 
@@ -197,7 +202,33 @@ namespace quda {
 
   }
 
-  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField* p_init, double r2_old_init) {
+  void CG::constructDeflationSpace()
+  {
+    // Deflation requested + first instance of solver
+    eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
+
+    // Clone from an existing vector
+    ColorSpinorParam csParam(*rp);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    // This is the vector precision used by matResidual
+    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+    param.evecs.resize(param.eig_param.nKr);
+    for (int i = 0; i < param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
+
+    // Construct vectors to hold deflated RHS
+    defl_tmp1.push_back(ColorSpinorField::Create(csParam));
+    defl_tmp2.push_back(ColorSpinorField::Create(csParam));
+
+    param.evals.resize(param.eig_param.nEv);
+    for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
+
+    (*eig_solve)(param.evecs, param.evals);
+
+    deflate_init = true;
+  }
+
+  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
+  {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (checkPrecision(x, b) != param.precision)
@@ -262,6 +293,10 @@ namespace quda {
       init = true;
     }
 
+    // Once the CG operator is called, we are able to construct an appropriate
+    // Krylov space for deflation
+    if (param.deflate && !deflate_init) { constructDeflationSpace(); }
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
@@ -290,16 +325,16 @@ namespace quda {
     const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double deps=sqrt(u);
     constexpr double dfac = 1.1;
-    double d_new =0 ;
-    double d =0 ;
-    double dinit =0;
+    double d_new = 0;
+    double d = 0;
+    double dinit = 0;
     double xNorm = 0;
     double xnorm = 0;
     double pnorm = 0;
     double ppnorm = 0;
     double Anorm = 0;
     double beta = 0.0;
-    
+
     // for alternative reliable updates
     if(alternative_reliable){
       // estimate norm for reliable updates
@@ -310,10 +345,31 @@ namespace quda {
     // compute initial residual
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, y, tmp3);
-      r2 = blas::xmyNorm(b, r);
-      if (b2 == 0) b2 = r2;
-      blas::copy(y, x);
+
+      // DMH start
+      // Just replace any initial guess with a deflated RHS
+      if (param.deflate == true) {
+
+        // Deflate the exact part from the RHS
+        std::vector<ColorSpinorField *> rhs;
+        rhs.push_back(&b);
+        eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+
+        // Compute r_defl  = b - A * x_defl
+        mat(r, *defl_tmp1[0], y, tmp3);
+        r2 = blas::xmyNorm(b, r);
+
+        // Place the initial residiual in r. defl_tmp1 must be added
+        // to the solution at the end.
+        blas::copy(y, *defl_tmp1[0]);
+      } else {
+        // Compute r = b - A * x
+        mat(r, x, y, tmp3);
+        r2 = blas::xmyNorm(b, r);
+        if (b2 == 0) b2 = r2;
+        // y contains the original guess.
+        blas::copy(y, x);
+      }
     } else {
       if (&r != &b) blas::copy(r, b);
       r2 = b2;
@@ -328,9 +384,10 @@ namespace quda {
       p.resize(Np);
       ColorSpinorParam csParam(rSloppy);
       csParam.create = QUDA_COPY_FIELD_CREATE;
-        for (auto &pi : p) pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);      
+      for (auto &pi : p)
+        pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);
     } else {
-        for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
+      for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
     }
 
     double r2_old=0.0;
@@ -339,7 +396,7 @@ namespace quda {
       Complex rp = blas::cDotProduct(rSloppy, *p[0]) / (r2);
       blas::caxpy(-rp, rSloppy, *p[0]);
       beta = r2 / r2_old;
-      blas::xpayz(rSloppy, beta, *p[0], *p[0]); 
+      blas::xpayz(rSloppy, beta, *p[0], *p[0]);
     }
 
     const bool use_heavy_quark_res =
@@ -370,19 +427,20 @@ namespace quda {
     double maxrr = rNorm;
     double delta = param.delta;
 
-
     // this parameter determines how many consective reliable update
     // residual increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
-    const int maxResIncrease = (use_heavy_quark_res ? 0 : param.max_res_increase); //  check if we reached the limit of our tolerance
+    const int maxResIncrease = param.max_res_increase; //  check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
-    // 0 means we have no tolerance
-    // maybe we should expose this as a parameter
-    const int hqmaxresIncrease = maxResIncrease + 1;
+
+    // this means when using heavy quarks we will switch to simple hq restarts as soon as the reliable strategy fails
+    const int hqmaxresIncrease = param.max_hq_res_increase;
+    const int hqmaxresRestartTotal = param.max_hq_res_restart_total; // this limits the number of heavy quark restarts we can do
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
     int hqresIncrease = 0;
+    int hqresRestartTotal = 0;
 
     // set this to true if maxResIncrease has been exceeded but when we use heavy quark residual we still want to continue the CG
     // only used if we use the heavy_quark_res
@@ -436,12 +494,11 @@ namespace quda {
         r2_old = r2;
 
         // alternative reliable updates,
-        if(alternative_reliable){
+        if (alternative_reliable) {
           double3 pAppp = blas::cDotProductNormA(*p[j],Ap);
           pAp = pAppp.x;
           ppnorm = pAppp.z;
-        }
-        else{
+        } else {
           pAp = blas::reDotProduct(*p[j], Ap);
         }
 
@@ -458,19 +515,15 @@ namespace quda {
       int updateX;
       int updateR;
 
-      if(alternative_reliable){
+      if (alternative_reliable) {
         // alternative reliable updates
         updateX = ( (d <= deps*sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac * dinit);
         updateR = 0;
-        // if(updateX)
-          // printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
-        // updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
-      }
-      else{
+      } else {
         if (rNorm > maxrx) maxrx = rNorm;
         if (rNorm > maxrr) maxrr = rNorm;
-        updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-        updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+        updateX = (rNorm < delta * r0Norm && r0Norm <= maxrx) ? 1 : 0;
+        updateR = ((rNorm < delta * maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
       }
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
@@ -556,7 +609,7 @@ namespace quda {
         blas::zero(xSloppy);
 
         // alternative reliable updates
-        if(alternative_reliable){
+        if (alternative_reliable) {
           dinit = uhigh*(sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
           d = d_new;
           xnorm = 0;//sqrt(norm2(x));
@@ -570,17 +623,16 @@ namespace quda {
           maxrx = rNorm;
         }
 
-
         // calculate new reliable HQ resididual
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
 
         // break-out check if we have reached the limit of the precision
-        if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
+        if (sqrt(r2) > r0Norm && updateX and not L2breakdown) { // reuse r0Norm for this
           resIncrease++;
           resIncreaseTotal++;
           warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-          sqrt(r2), r0Norm, resIncreaseTotal);
-          if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+                      sqrt(r2), r0Norm, resIncreaseTotal);
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
             } else {
@@ -591,19 +643,30 @@ namespace quda {
         } else {
           resIncrease = 0;
         }
+
         // if L2 broke down already we turn off reliable updates and restart the CG
         if (use_heavy_quark_res and L2breakdown) {
+          hqresRestartTotal++; // count the number of heavy quark restarts we've done
           delta = 0;
-          warningQuda("CG: Restarting without reliable updates for heavy-quark residual");
+          warningQuda("CG: Restarting without reliable updates for heavy-quark residual (total #inc %i)", hqresRestartTotal);
           heavy_quark_restart = true;
-          if (heavy_quark_res > heavy_quark_res_old) {
-            hqresIncrease++;
-            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
+
+          if (heavy_quark_res > heavy_quark_res_old) { // check if new hq residual is greater than previous
+            hqresIncrease++; // count the number of consecutive increases
+            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
+                        heavy_quark_res, heavy_quark_res_old);
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
               warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
               break;
             }
+          } else {
+            hqresIncrease = 0;
+          }
+
+          if (hqresRestartTotal > hqmaxresRestartTotal) {
+            warningQuda("CG: solver exiting due to too many heavy quark residual restarts");
+            break;
           }
         }
 
@@ -636,7 +699,7 @@ namespace quda {
 
       // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
-        // L2 is concverged or precision maxed out for L2
+        // L2 is converged or precision maxed out for L2
         bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
         // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
         bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
@@ -693,7 +756,6 @@ namespace quda {
 
     return;
   }
-
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
@@ -767,7 +829,7 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   if(!rnewp) {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
   }
 
   ColorSpinorField &r = *rp;
@@ -1160,7 +1222,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if(!rnewp) {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
   }
 
   ColorSpinorField &r = *rp;

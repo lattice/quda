@@ -1,6 +1,13 @@
 #include <pthread.h>
+
+#if QUDA_NVTX_VERSION==3
+#include <nvtx3/nvToolsExt.h>
+#include <nvtx3/nvToolsExtCudaRt.h>
+#else
 #include <nvToolsExt.h>
 #include <nvToolsExtCudaRt.h>
+#endif
+
 #include <mpi_comm_handle.h>
 // Setup event category name
 {{fn name MPI_Init}}
