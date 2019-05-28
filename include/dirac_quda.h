@@ -87,6 +87,7 @@ namespace quda {
   class DiracMdagM;
   class DiracMMdag;
   class DiracMdag;
+  class DiracProjMMdagProj;
   //Forward declaration of multigrid Transfer class
   class Transfer;
 
@@ -98,6 +99,7 @@ namespace quda {
     friend class DiracMdagM;
     friend class DiracMMdag;
     friend class DiracMdag;
+    friend class DiracProjMMdagProj;
 
   protected:
     cudaGaugeField *gauge;
@@ -1123,6 +1125,9 @@ public:
 
     //! Shift term added onto operator (M/M^dag M/M M^dag + shift)
     double shift;
+
+    // Orthonormal set used in the projection of MMdag
+    std::vector<ColorSpinorField*> projSpace;
   };
 
   class DiracM : public DiracMatrix {
@@ -1241,6 +1246,136 @@ public:
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
   };
+
+
+  class DiracProjMMdagProj : public DiracMatrix {
+
+  public:
+    DiracProjMMdagProj(const Dirac &d) : DiracMatrix(d) { }
+    DiracProjMMdagProj(const Dirac *d) : DiracMatrix(d) { }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      // Temporary buffer for the projection process -- TODO: avoid allocation of Pv[0] on each call to operator()
+      std::vector<ColorSpinorField*> Pv;
+      ColorSpinorParam csParamClone(out);
+      csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+      Pv.push_back(ColorSpinorField::Create(csParamClone));
+
+      // Apply projector ( I - QQ^ )
+      *Pv[0] = in;
+      int sizePS = projSpace.size();
+      Complex* resultDotProd = (Complex*) safe_malloc( sizePS * sizeof(Complex) );
+      blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-resultDotProd[i], *projSpace[i], *Pv[0]);
+      }
+
+      // The inner matmul
+      dirac->MMdag(out, *Pv[0]);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(*Pv[0]), out);
+
+      // Apply projector ( I - QQ^ )
+      // Swaping for temporary switch to out
+      ColorSpinorField* tmpPv = Pv[0];
+      Pv[0] = &out;
+      blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-resultDotProd[i], *projSpace[i], out);
+      }
+
+      // Removing temporary buffers
+      host_free(resultDotProd);
+      delete tmpPv;
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    {
+      dirac->tmp1 = &tmp;
+
+      // Temporary buffer for the projection process -- TODO: avoid allocation of Pv[0] on each call to operator()
+      std::vector<ColorSpinorField*> Pv;
+      ColorSpinorParam csParamClone(out);
+      csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+      Pv.push_back(ColorSpinorField::Create(csParamClone));
+
+      // Apply projector ( I - QQ^ )
+      *Pv[0] = in;
+      int sizePS = projSpace.size();
+      Complex* resultDotProd = (Complex*) safe_malloc( sizePS * sizeof(Complex) );
+      blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-resultDotProd[i], *projSpace[i], *Pv[0]);
+      }
+
+      // The inner matmul
+      dirac->MMdag(out, *Pv[0]);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(*Pv[0]), out);
+
+      // Apply projector ( I - QQ^ )
+      // Swaping - tmpPv  for temporary switch to out
+      ColorSpinorField* tmpPv = Pv[0];
+      Pv[0] = &out;
+      blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-resultDotProd[i], *projSpace[i], out);
+      }
+
+      // Removing temporary buffers
+      host_free(resultDotProd);
+      delete tmpPv;
+
+      dirac->tmp1 = NULL;
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+    {
+      dirac->tmp1 = &Tmp1;
+      dirac->tmp2 = &Tmp2;
+
+      // Temporary buffer for the projection process -- TODO: avoid allocation of Pv[0] on each call to operator()
+      std::vector<ColorSpinorField*> Pv;
+      ColorSpinorParam csParamClone(out);
+      csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+      Pv.push_back(ColorSpinorField::Create(csParamClone));
+
+      // Apply projector ( I - QQ^ )
+      *Pv[0] = in;
+      int sizePS = projSpace.size();
+      Complex* resultDotProd = (Complex*) safe_malloc( sizePS * sizeof(Complex) );
+      blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-resultDotProd[i], *projSpace[i], *Pv[0]);
+      }
+
+      // The inner matmul
+      dirac->MMdag(out, *Pv[0]);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(*Pv[0]), out);
+
+      // Apply projector ( I - QQ^ )
+      // Swaping for temporary switch to out
+      ColorSpinorField* tmpPv = Pv[0];
+      Pv[0] = &out;
+      blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-resultDotProd[i], *projSpace[i], out);
+      }
+
+      // Removing temporary buffers
+      host_free(resultDotProd);
+      delete tmpPv;
+
+      dirac->tmp2 = NULL;
+      dirac->tmp1 = NULL;
+    }
+
+    int getStencilSteps() const
+    {
+      return 2*dirac->getStencilSteps(); // 2 for M and M dagger
+    }
+  };
+
 
   class DiracMdag : public DiracMatrix {
 
