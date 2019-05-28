@@ -1,7 +1,7 @@
 
 include_directories(. googletest/include googletest)
 
-  enable_language(Fortran)
+  # enable_language(Fortran)
 
 ## enable tests
 #build a common library for all test utilities

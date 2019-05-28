@@ -315,7 +315,7 @@ set(CMAKE_C_FLAGS_SANITIZE "-Wall -g -fno-inline -DHOST_DEBUG -fsanitize=address
 enable_language(C)
 # do all the build definitions
 #
-enable_language(Fortran)
+
 set(CMAKE_EXE_LINKER_FLAGS_SANITIZE ${CMAKE_EXE_LINKER_FLAGS_SANITIZE} "-fsanitize=address,undefined")
 
 if(QUDA_MPI OR QUDA_QMP)
@@ -331,9 +331,9 @@ if(QUDA_MPI OR QUDA_QMP)
     set(MPI_C_COMPILER $ENV{MPICC})
     set(mpimessage True)
   endif()
-  if((NOT MPI_FORT_COMPILER) AND DEFINED ENV{MPIFORT})
-    message(STATUS "Found environment variable MPIFORT. Using it for MPI detection: $ENV{MPIFORT}")
-    set(MPI_C_COMPILER $ENV{MPICC})
+  if((NOT MPI_Fortran_COMPILER) AND DEFINED ENV{MPIFORT})
+    message(STATUS "Found environment variable MPIFC. Using it for MPI detection: $ENV{MPIFORT}")
+    set(MPI_FORTRAN_COMPILER $ENV{MPIFORT})
     set(mpimessage True)
   endif() 
   if(mpimessage)
