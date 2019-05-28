@@ -157,7 +157,11 @@ endif()
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
-  target_link_libraries(quda INTERFACE ${QIO_LIB} ${LIME_LIB})
+  if(QUDA_DOWNLOAD_USQCD)
+    add_dependencies(quda QIO)
+    add_dependencies(quda_cpp QIO)
+  endif()
+  target_link_libraries(quda INTERFACE ${QUDA_QIO_LDFLAGS} ${QUDA_QIO_LIBS})
 endif()
 
 if(QUDA_QDPJIT)
@@ -165,6 +169,10 @@ if(QUDA_QDPJIT)
 endif()
 
 if(QUDA_QMP)
+  if(QUDA_DOWNLOAD_USQCD)
+    add_dependencies(quda QMP)
+    add_dependencies(quda_cpp QMP)
+  endif()
   target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
 endif()
 
@@ -207,6 +215,14 @@ target_link_libraries(quda PUBLIC ${CUDA_cuda_LIBRARY})
 if (QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
+endif()
+
+configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
+
+if(QUDA_JITIFY)
+  configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
 endif()
 
 # until we define an install step copy the include directory to the build directory
