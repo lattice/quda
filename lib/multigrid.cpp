@@ -450,18 +450,23 @@ namespace quda
         if ( strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
              param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0) ) {
           std::string vec_infile(param.mg_global.vec_infile);
-          vec_infile += "_defl_level_";
+          vec_infile += "_level_";
           vec_infile += std::to_string(param.level+1);
+          vec_infile += "_defl_";
+          vec_infile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_infile, vec_infile.c_str());
         }
 
         if ( strcmp(param_coarse_solver->eig_param.vec_outfile, "") == 0 && // check that output file not already set
              param.mg_global.vec_store == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_outfile, "") != 0) ) {
-          std::string vec_outfile(param.mg_global.vec_outfile);
-          vec_outfile += "_defl_level_";
+          std::string vec_outfile(param.mg_global.vec_infile);
+          vec_outfile += "_level_";
           vec_outfile += std::to_string(param.level+1);
+          vec_outfile += "_defl_";
+          vec_outfile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_outfile, vec_outfile.c_str());
         }
+
       }
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
       param_coarse_solver->global_reduction = true;
@@ -987,6 +992,8 @@ namespace quda
     std::string vec_infile(param.mg_global.vec_infile);
     vec_infile += "_level_";
     vec_infile += std::to_string(param.level);
+    vec_infile += "_nvec_";
+    vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
     eig_solve->loadVectors(B, vec_infile);
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
@@ -1001,6 +1008,8 @@ namespace quda
     std::string vec_outfile(param.mg_global.vec_outfile);
     vec_outfile += "_level_";
     vec_outfile += std::to_string(param.level);
+    vec_outfile += "_nvec_";
+    vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
     eig_solve->saveVectors(B, vec_outfile);
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
