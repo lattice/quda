@@ -25,9 +25,9 @@ namespace quda
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
-  EigenSolver::EigenSolver(QudaEigParam *eig_param, TimeProfile &profile) : eig_param(eig_param), profile(profile)
+  EigenSolver::EigenSolver(QudaEigParam *eig_param, TimeProfile &profile)
+    : eig_param(eig_param), profile(profile), tmp1(nullptr), tmp2(nullptr)
   {
-
     // Timings for components of the eigensolver
     time_ = 0.0;
     time_e = 0.0;   // time in Eigen
@@ -62,14 +62,14 @@ namespace quda
     if (nKr == 0) errorQuda("nKr=0 passed to Eigensolver\n");
     if (nConv == 0) errorQuda("nConv=0 passed to Eigensolver\n");
 
-    residua = new double[nKr];
+    residua = (double*)safe_malloc(nKr * sizeof(double));
     for (int i = 0; i < nKr; i++) { residua[nKr] = 0.0; }
 
     // Quda MultiBLAS freindly array
-    Qmat = new Complex[nEv * nKr];
+    Qmat = (Complex*)safe_malloc(nEv * nKr * sizeof(Complex));
 
     // Part of the spectrum to be computed.
-    spectrum = strdup("SR"); // Initialsed to stop the compiler warning.
+    spectrum = strdup("SR"); // Initialised to stop the compiler warning.
 
     if (eig_param->use_poly_acc) {
       if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
@@ -127,7 +127,6 @@ namespace quda
   // eigensolver.
   EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile)
   {
-
     EigenSolver *eig_solver = nullptr;
 
     switch (eig_param->eig_type) {
@@ -146,17 +145,20 @@ namespace quda
 
   void EigenSolver::matVec(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in)
   {
-    mat(out, in);
-    return;
+    if (!tmp1 || !tmp2) {
+      ColorSpinorParam param(in);
+      if (!tmp1) tmp1 = ColorSpinorField::Create(param);
+      if (!tmp2) tmp2 = ColorSpinorField::Create(param);
+    }
+    mat(out, in, *tmp1, *tmp2);
   }
 
   void EigenSolver::chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in)
   {
-
     // Just do a simple matVec if no poly acc is requested
     if (!eig_param->use_poly_acc) {
       time_ = -clock();
-      mat(out, in);
+      matVec(mat, out, in);
       time_ += clock();
       time_mv += time_;
       return;
@@ -183,7 +185,7 @@ namespace quda
     // out = d2 * in + d1 * out
     // C_1(x) = x
     time_ = -clock();
-    mat(out, in);
+    matVec(mat, out, in);
     time_ += clock();
     time_mv += time_;
 
@@ -219,23 +221,22 @@ namespace quda
 
       // mat*C_{m}(x)
       time_ = -clock();
-      mat(out, *tmp2);
+      matVec(mat, out, *tmp2);
       time_ += clock();
       time_mv += time_;
 
       time_ = -clock();
-      blas::ax(d3, *tmp1);
       Complex d1c(d1, 0.0);
       Complex d2c(d2, 0.0);
-      blas::cxpaypbz(*tmp1, d2c, *tmp2, d1c, out);
-
-      blas::copy(*tmp1, *tmp2);
-      blas::copy(*tmp2, out);
+      Complex d3c(d3, 0.0);
+      blas::caxpbypczw(d3c, *tmp1, d2c, *tmp2, d1c, out, *tmp1);
+      std::swap(tmp1, tmp2);
       time_ += clock();
       time_mb += time_;
 
       sigma_old = sigma;
     }
+    blas::copy(out,*tmp2);
 
     delete tmp1;
     delete tmp2;
@@ -262,7 +263,7 @@ namespace quda
                                           int j)
   {
     time_ = -clock();
-    Complex *s = new Complex[j + 1];
+    Complex *s = (Complex*)safe_malloc((j + 1)*sizeof(Complex));
     Complex sum(0.0, 0.0);
     std::vector<ColorSpinorField *> vecs_ptr;
     for (int i = 0; i < j + 1; i++) { vecs_ptr.push_back(vecs[i]); }
@@ -276,7 +277,7 @@ namespace quda
     }
     blas::caxpy(s, vecs_ptr, rvec);
 
-    delete s;
+    host_free(s);
     time_ += clock();
     time_mb += time_;
     return sum;
@@ -286,7 +287,6 @@ namespace quda
   void EigenSolver::deflate(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
                             std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
   {
-
     // number of evecs
     int n_defl = eig_param->nEv;
 
@@ -301,7 +301,7 @@ namespace quda
     for (int i = 0; i < n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
-    Complex *s = new Complex[n_defl];
+    Complex *s = (Complex*)safe_malloc(n_defl*sizeof(Complex));
     blas::cDotProduct(s, eig_vecs_ptr, vec);
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
@@ -310,17 +310,21 @@ namespace quda
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
     blas::caxpy(s, eig_vecs_ptr, vec_defl);
+    // FIXME - we can optimize the zeroing out with a "multi-caxy"
+    // function that just writes over vec_defl and doesn't sum.  When
+    // we exceed the multi-blas limit this would deompose into caxy
+    // for the kernel call and caxpy for the subsequent ones
+
+    host_free(s);
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
-
     for (int i = 0; i < size; i++) {
-
       // r = A * v_i
       time_ = -clock();
-      mat(*r[0], *evecs[i]);
+      matVec(mat, *r[0], *evecs[i]);
       time_ += clock();
       time_mv += time_;
 
@@ -340,7 +344,6 @@ namespace quda
 
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
   {
-
     // profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     // profile.TPSTART(QUDA_PROFILE_IO);
 
@@ -371,8 +374,9 @@ namespace quda
         }
       }
 
-      read_spinor_field(vec_infile.c_str(), &V[0], eig_vecs[0]->Precision(), eig_vecs[0]->X(), eig_vecs[0]->Ncolor(),
-                        eig_vecs[0]->Nspin(), Nvec, 0, (char **)0);
+      read_spinor_field(vec_infile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(),
+                        tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
+
       host_free(V);
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
         for (int i = 0; i < Nvec; i++) {
@@ -396,7 +400,6 @@ namespace quda
 
   void EigenSolver::saveVectors(const std::vector<ColorSpinorField *> &eig_vecs, std::string vec_outfile)
   {
-
     // profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     // profile.TPSTART(QUDA_PROFILE_IO);
 
@@ -428,8 +431,8 @@ namespace quda
       }
     }
 
-    write_spinor_field(vec_outfile.c_str(), &V[0], eig_vecs[0]->Precision(), eig_vecs[0]->X(), eig_vecs[0]->Ncolor(),
-                       eig_vecs[0]->Nspin(), Nvec, 0, (char **)0);
+    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(),
+                       tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
 
     host_free(V);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
@@ -470,7 +473,12 @@ namespace quda
     return;
   }
 
-  EigenSolver::~EigenSolver() {}
+  EigenSolver::~EigenSolver() {
+    if (tmp1) delete tmp1;
+    if (tmp2) delete tmp2;
+    host_free(residua);
+    host_free(Qmat);
+  }
   //-----------------------------------------------------------------------------
   //-----------------------------------------------------------------------------
 
@@ -479,17 +487,21 @@ namespace quda
     EigenSolver(eig_param, profile),
     mat(mat)
   {
-
     // Tridiagonal/Arrow matrix
-    alpha = new double[nKr];
-    beta = new double[nKr];
+    alpha = (double*)safe_malloc(nKr*sizeof(double));
+    beta = (double*)safe_malloc(nKr*sizeof(double));
     for (int i = 0; i < nKr; i++) {
       alpha[i] = 0.0;
       beta[i] = 0.0;
     }
 
-    // Thick restart specific check
+    // Thick restart specific checks
     if (nKr < nEv + 6) errorQuda("nKr=%d must be greater than nEv+6=%d\n", nKr, nEv + 6);
+
+    if (eig_param->eig_type == QUDA_EIG_LANCZOS
+        && !(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
+      errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
+    }
   }
 
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
@@ -722,8 +734,8 @@ namespace quda
   {
     ritz_mat.clear();
     ritz_mat.shrink_to_fit();
-    delete alpha;
-    delete beta;
+    host_free(alpha);
+    host_free(beta);
   }
 
   // Thick Restart Member functions

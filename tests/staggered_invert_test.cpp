@@ -74,7 +74,7 @@ extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG s
 // Dirac operator type
 extern QudaDslashType dslash_type;
 extern QudaMatPCType matpc_type; // preconditioning type
-QudaSolutionType solution_type; // solution type
+extern QudaSolutionType solution_type; // solution type
 
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator

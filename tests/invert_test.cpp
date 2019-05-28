@@ -56,7 +56,7 @@ extern double tol_hq; // heavy-quark tolerance for inverter
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 extern QudaMatPCType matpc_type; // preconditioning type
 extern QudaSolutionType solution_type; // the solution we desire
-extern QudaSolveType solve_type; // the solve type we want to find the solution
+extern QudaSolveType solve_type;       // the solve type we want to find the solution
 
 extern double clover_coeff;
 extern bool compute_clover;

@@ -416,9 +416,11 @@ endif(QUDA_MAGMA)
 
 # This selects arpack or parpack for Multi GPU
 if(QUDA_ARPACK)
+  enable_language(Fortran)
   add_definitions(-DARPACK_LIB)
   find_package(PkgConfig REQUIRED)
-
+  enable_language(Fortran)
+  
   # We always need the serial library
   pkg_check_modules(ARPACK QUIET arpack)
   if(NOT ARPACK_FOUND OR QUDA_ARPACK_HOME)
@@ -428,8 +430,8 @@ if(QUDA_ARPACK)
   endif()
   include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
   include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
-
-
+  
+  
   # Link the parallel library if required
   if(QUDA_MPI OR QUDA_QMP)
     pkg_check_modules(PARPACK QUIET parpack)
@@ -443,7 +445,6 @@ if(QUDA_ARPACK)
   endif()
   
 endif(QUDA_ARPACK)
-
 
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})

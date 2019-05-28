@@ -233,13 +233,16 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 void setEigParam(QudaEigParam &mg_eig_param, int level)
 {
 
+  mg_eig_param.eig_type = mg_eig_type[level];
+  mg_eig_param.spectrum = mg_eig_spectrum[level];
+  if (mg_eig_type[level] == QUDA_EIG_LANCZOS
+      && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
+  }
+
   mg_eig_param.nEv = nvec[level];
   mg_eig_param.nKr = nvec[level] + nvec[level] / 2;
   mg_eig_param.nConv = nvec[level];
-  mg_eig_param.spectrum = mg_eig_spectrum[level];
-
-  mg_eig_param.eig_type = mg_eig_type[level];
-  mg_eig_param.spectrum = mg_eig_spectrum[level];
 
   mg_eig_param.tol = mg_eig_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
@@ -592,7 +595,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
 int main(int argc, char **argv)
 {
   // We give here the default values to some of the array
-  for(int i=0; i<QUDA_MAX_MG_LEVEL; i++) {
+  solve_type = QUDA_DIRECT_PC_SOLVE;
+  for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SUMMARIZE;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;

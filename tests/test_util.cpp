@@ -1849,7 +1849,8 @@ void usage(char** argv )
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym) \n");
   printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
-  printf("    --solution-type                           # The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))\n");
+  printf("    --solution-type                           # The solution we desire (mat (default), mat-dag-mat, mat-pc, "
+         "mat-pc-dag-mat-pc (default for multi-shift))\n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
   printf("    --reliable-delta <delta>                  # Set reliable update delta factor\n");
@@ -2729,11 +2730,9 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--solution-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    solution_type = get_solution_type(argv[i+1]);
+  if (strcmp(argv[i], "--solution-type") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    solution_type = get_solution_type(argv[i + 1]);
     i++;
     ret = 0;
     goto out;

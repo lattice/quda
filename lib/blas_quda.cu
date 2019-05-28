@@ -525,10 +525,16 @@ namespace quda {
           make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), make_double2(0.0, 0.0), x, y, x, x, y);
     }
 
+    void caxpbypczw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y,
+                    const Complex &c, ColorSpinorField &z, ColorSpinorField &w) {
+      uni_blas<caxpbypczw_, 0, 0, 0, 1>(make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)),
+                                        make_double2(REAL(c), IMAG(c)), x, y, z, w, y);
+    }
+
     void cxpaypbz(ColorSpinorField &x, const Complex &a, ColorSpinorField &y,
 		  const Complex &b, ColorSpinorField &z) {
-      uni_blas<cxpaypbz_, 0, 0, 1>(
-          make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), make_double2(0.0, 0.0), x, y, z, z, y);
+      uni_blas<caxpbypczw_, 0, 0, 0, 1>(make_double2(1.0, 0.0), make_double2(REAL(a), IMAG(a)),
+                                        make_double2(REAL(b), IMAG(b)), x, y, z, z, y);
     }
 
     void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b,

@@ -199,9 +199,6 @@ namespace quda {
     /** This is the next lower level */
     MG *coarse;
 
-    /** This is the next coarser level */
-    MG *fine;
-
     /** The coarse grid solver - this either points at "coarse" or a solver preconditioned by "coarse" */
     Solver *coarse_solver;
 
@@ -216,9 +213,6 @@ namespace quda {
 
     /** Storage for the parameter struct for the coarse solver */
     SolverParam *param_coarse_solver;
-
-    /** The fine-grid representation of the null space vectors */
-    std::vector<ColorSpinorField*> *B;
 
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField*> *B_coarse;
@@ -237,6 +231,9 @@ namespace quda {
 
     /** Coarse temporary vector */
     ColorSpinorField *tmp_coarse;
+
+    /** Coarse temporary vector */
+    ColorSpinorField *tmp2_coarse;
 
     /** The fine operator used for computing inter-grid residuals */
     const Dirac *diracResidual;

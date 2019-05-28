@@ -26,7 +26,8 @@ namespace quda {
   {
   }
 
-  CG::~CG() {
+  CG::~CG()
+  {
     profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
       for (auto pi : p) if (pi) delete pi;
@@ -346,7 +347,6 @@ namespace quda {
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
 
-      // DMH start
       // Just replace any initial guess with a deflated RHS
       if (param.deflate == true) {
 

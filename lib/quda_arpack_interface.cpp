@@ -182,20 +182,18 @@ namespace quda
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
 
     if (arpack_logfile != NULL && (comm_rank() == 0)) {
-
       ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
       int msglvl0 = 9, msglvl3 = 9;
       ARPACK(pmcinitdebug)
-      (&arpack_log_u, // logfil
-       &msglvl3,      // mcaupd
-       &msglvl3,      // mcaup2
-       &msglvl0,      // mcaitr
-       &msglvl3,      // mceigh
-       &msglvl0,      // mcapps
-       &msglvl0,      // mcgets
-       &msglvl3       // mceupd
-      );
-
+        (&arpack_log_u, // logfil
+         &msglvl3,      // mcaupd
+         &msglvl3,      // mcaup2
+         &msglvl0,      // mcaitr
+         &msglvl3,      // mceigh
+         &msglvl0,      // mcapps
+         &msglvl0,      // mcgets
+         &msglvl3       // mceupd
+         );
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("eigenSolver: Log info:\n");
         printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");
@@ -204,20 +202,18 @@ namespace quda
     }
 #else
     if (arpack_logfile != NULL) {
-
       ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
       int msglvl0 = 9, msglvl3 = 9;
       ARPACK(mcinitdebug)
-      (&arpack_log_u, // logfil
-       &msglvl3,      // mcaupd
-       &msglvl3,      // mcaup2
-       &msglvl0,      // mcaitr
-       &msglvl3,      // mceigh
-       &msglvl0,      // mcapps
-       &msglvl0,      // mcgets
-       &msglvl3       // mceupd
-      );
-
+        (&arpack_log_u, // logfil
+         &msglvl3,      // mcaupd
+         &msglvl3,      // mcaup2
+         &msglvl0,      // mcaitr
+         &msglvl3,      // mceigh
+         &msglvl0,      // mcapps
+         &msglvl0,      // mcgets
+         &msglvl3       // mceupd
+         );
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("eigenSolver: Log info:\n");
         printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");
@@ -347,6 +343,7 @@ namespace quda
     } else if (info_ != 0) {
       arpackErrorHelpNEUPD();
       errorQuda("\nError in zneupd info = %d. Exiting.", info_);
+    }
 #endif
 
     // Print additional convergence information.
@@ -365,8 +362,7 @@ namespace quda
       if (arpack_logfile != NULL) { ARPACK(finilog)(&arpack_log_u); }
     }
 #else
-      if (arpack_logfile != NULL) ARPACK(finilog)(&arpack_log_u);
-
+    if (arpack_logfile != NULL) ARPACK(finilog)(&arpack_log_u);
 #endif
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking eigenvalues\n");

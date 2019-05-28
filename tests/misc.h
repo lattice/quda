@@ -35,7 +35,7 @@ extern "C" {
   QudaSolveType get_solve_type(char* s);
   const char* get_solve_str(QudaSolveType);
 
-  QudaSolutionType get_solution_type(char* s);
+  QudaSolutionType get_solution_type(char *s);
 
   QudaSchwarzType get_schwarz_type(char* s);
 

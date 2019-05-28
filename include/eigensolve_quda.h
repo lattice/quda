@@ -52,6 +52,9 @@ protected:
     std::vector<ColorSpinorField *> r;
     std::vector<ColorSpinorField *> d_vecs_tmp;
 
+    ColorSpinorField *tmp1;
+    ColorSpinorField *tmp2;
+
     Complex *Qmat;
 
 public:
