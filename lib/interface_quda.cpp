@@ -2485,6 +2485,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
+      delete eig_solve;
     }
   } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -2493,6 +2494,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
+      delete eig_solve;
     }
   } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -2501,6 +2503,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
+      delete eig_solve;
     }
   } else if (eig_param->use_norm_op && eig_param->use_dagger) {
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -2509,6 +2512,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
+      delete eig_solve;
     }
   } else {
     errorQuda("Invalid use_norm_op and dagger combination");
