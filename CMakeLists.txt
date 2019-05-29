@@ -535,6 +535,8 @@ if(QUDA_ARPACK)
       #include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)    
     endif()
 
+    # ARPACK-NG does not seem to suppport logging - we need to disable it
+    add_definitions(-DARPACK_NG)
   else(QUDA_DOWNLOAD_ARPACK)
   find_package(PkgConfig REQUIRED)
   

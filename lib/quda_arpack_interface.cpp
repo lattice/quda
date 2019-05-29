@@ -33,11 +33,18 @@ namespace quda
                     ColorSpinorParam *cpuParam)
   {
 
+
     // ARPACK logfile name
+    #ifndef ARPACK_NG
     char *arpack_logfile = eig_param->arpack_logfile;
+    #endif
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("**** START ARPACK SOLUTION ****\n");
+      #ifdef ARPACK_NG
+      printfQuda("Arpack logging not supported with arpack-ng\n");
+      #else
       printfQuda("Output directed to %s\n", arpack_logfile);
+      #endif
     }
 
     // Create Eigensolver object for member function use
@@ -176,6 +183,7 @@ namespace quda
     ColorSpinorField *d_v2 = nullptr;
     ColorSpinorField *resid = nullptr;
 
+#ifndef ARPACK_NG
     // ARPACK log routines
     // Code added to print the log of ARPACK
     int arpack_log_u = 9999;
@@ -223,7 +231,7 @@ namespace quda
     }
 
 #endif
-
+#endif
     // Start ARPACK routines
     //---------------------------------------------------------------------------------
 
@@ -356,7 +364,7 @@ namespace quda
         errorQuda("Arnoldi update.\n");
       }
     }
-
+#ifndef ARPACK_NG
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
 
     if (comm_rank() == 0) {
@@ -364,6 +372,7 @@ namespace quda
     }
 #else
     if (arpack_logfile != NULL) ARPACK(finilog)(&arpack_log_u);
+#endif
 #endif
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking eigenvalues\n");
