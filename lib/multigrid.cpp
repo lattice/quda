@@ -115,7 +115,7 @@ namespace quda
   void MG::reset(bool refresh) {
     pushLevel(param.level);
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d\n", transfer ? "Resetting":"Creating", param.level);
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
 
     destroySmoother();
     destroyCoarseSolver();
@@ -151,7 +151,8 @@ namespace quda
         tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
 
         // create coarse temporary vector
-        tmp2_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
+        tmp2_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
+                                               param.mg_global.location[param.level + 1]);
 
         // create coarse residual vector
         r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
@@ -211,13 +212,13 @@ namespace quda
 
       createCoarseSolver();
 
-      if (param.level == param.Nlevel-2 && param.mg_global.deflate_coarsest) {
+      if (param.level == param.Nlevel - 2 && param.mg_global.deflate_coarsest) {
         // if we are deflating the coarsest grid, then run a dummy solve
         // so that the deflation is done during the setup
         spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
         param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
         (*coarse_solver)(*x_coarse, *r_coarse);
-        param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level+1];
+        param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
       }
     }
 
@@ -447,26 +448,25 @@ namespace quda
         param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
         param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
-        if ( strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
-             param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0) ) {
+        if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
+            param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile);
           vec_infile += "_level_";
-          vec_infile += std::to_string(param.level+1);
+          vec_infile += std::to_string(param.level + 1);
           vec_infile += "_defl_";
           vec_infile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_infile, vec_infile.c_str());
         }
 
-        if ( strcmp(param_coarse_solver->eig_param.vec_outfile, "") == 0 && // check that output file not already set
-             param.mg_global.vec_store == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_outfile, "") != 0) ) {
+        if (strcmp(param_coarse_solver->eig_param.vec_outfile, "") == 0 && // check that output file not already set
+            param.mg_global.vec_store == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_outfile, "") != 0)) {
           std::string vec_outfile(param.mg_global.vec_infile);
           vec_outfile += "_level_";
-          vec_outfile += std::to_string(param.level+1);
+          vec_outfile += std::to_string(param.level + 1);
           vec_outfile += "_defl_";
           vec_outfile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_outfile, vec_outfile.c_str());
         }
-
       }
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
       param_coarse_solver->global_reduction = true;
@@ -863,7 +863,7 @@ namespace quda
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     char prefix_bkup[100];  strncpy(prefix_bkup, prefix, 100);  setOutputPrefix(prefix);
 
-    if (param.level < param.Nlevel-1) { // set parity for the solver in the transfer operator
+    if (param.level < param.Nlevel - 1) { // set parity for the solver in the transfer operator
       QudaSiteSubset site_subset
         = param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
       QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
@@ -1108,7 +1108,9 @@ namespace quda
     }
 
     for (int si=0; si<param.mg_global.num_setup_iter[param.level]; si++ ) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level, si+1, param.mg_global.num_setup_iter[param.level]);
+      if (getVerbosity() >= QUDA_VERBOSE)
+        printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
+                   param.mg_global.num_setup_iter[param.level]);
 
       // global orthonormalization of the initial null-space vectors
       if(param.mg_global.pre_orthonormalize) {

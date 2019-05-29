@@ -596,7 +596,7 @@ int main(int argc, char **argv)
 {
   // We give here the default values to some of the array
   solve_type = QUDA_DIRECT_PC_SOLVE;
-  for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) {
+  for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SUMMARIZE;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;

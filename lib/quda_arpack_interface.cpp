@@ -185,15 +185,15 @@ namespace quda
       ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
       int msglvl0 = 9, msglvl3 = 9;
       ARPACK(pmcinitdebug)
-        (&arpack_log_u, // logfil
-         &msglvl3,      // mcaupd
-         &msglvl3,      // mcaup2
-         &msglvl0,      // mcaitr
-         &msglvl3,      // mceigh
-         &msglvl0,      // mcapps
-         &msglvl0,      // mcgets
-         &msglvl3       // mceupd
-         );
+      (&arpack_log_u, // logfil
+       &msglvl3,      // mcaupd
+       &msglvl3,      // mcaup2
+       &msglvl0,      // mcaitr
+       &msglvl3,      // mceigh
+       &msglvl0,      // mcapps
+       &msglvl0,      // mcgets
+       &msglvl3       // mceupd
+      );
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("eigenSolver: Log info:\n");
         printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");
@@ -205,15 +205,15 @@ namespace quda
       ARPACK(initlog)(&arpack_log_u, arpack_logfile, strlen(arpack_logfile));
       int msglvl0 = 9, msglvl3 = 9;
       ARPACK(mcinitdebug)
-        (&arpack_log_u, // logfil
-         &msglvl3,      // mcaupd
-         &msglvl3,      // mcaup2
-         &msglvl0,      // mcaitr
-         &msglvl3,      // mceigh
-         &msglvl0,      // mcapps
-         &msglvl0,      // mcgets
-         &msglvl3       // mceupd
-         );
+      (&arpack_log_u, // logfil
+       &msglvl3,      // mcaupd
+       &msglvl3,      // mcaup2
+       &msglvl0,      // mcaitr
+       &msglvl3,      // mceigh
+       &msglvl0,      // mcapps
+       &msglvl0,      // mcgets
+       &msglvl3       // mceupd
+      );
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("eigenSolver: Log info:\n");
         printfQuda("ARPACK verbosity set to mcaup2=3 mcaupd=3 mceupd=3; \n");

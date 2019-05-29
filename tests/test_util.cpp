@@ -2810,7 +2810,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     nvec[level] = atoi(argv[i+1]);
-    if (nvec[level] < 0 || nvec[level] > 1024){
+    if (nvec[level] < 0 || nvec[level] > 1024) {
       printf("ERROR: invalid number of vectors (%d)\n", nvec[level]);
       usage(argv);
     }
