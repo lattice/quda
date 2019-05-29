@@ -875,17 +875,34 @@ namespace quda
       }
     }
 
+    // Array for multi-BLAS caxpy
+    Complex *ritz_mat_col = (Complex*)safe_malloc((dim-1)*sizeof(Complex));
+    
     for (int i = 0; i < iter_keep; i++) {
       int k = offset + i;
       *r[0] = *kSpace[num_locked];
       blas::ax(ritz_mat[dim * i], *r[0]);
       *kSpace[k] = *r[0];
-      for (int j = 1; j < dim; j++) { blas::axpy(ritz_mat[i * dim + j], *kSpace[num_locked + j], *kSpace[k]); }
-    }
 
+      // Pointers to the relevant vectors
+      std::vector<ColorSpinorField *> vecs_ptr;
+      std::vector<ColorSpinorField *> kSpace_ptr;
+      kSpace_ptr.push_back(kSpace[k]);
+      for (int j = 1; j < dim; j++) {
+	vecs_ptr.push_back(kSpace[num_locked + j]);
+	ritz_mat_col[j-1].real(ritz_mat[i * dim + j]);
+	ritz_mat_col[j-1].imag(0.0);
+      }
+      
+      //Multi-BLAS axpy
+      blas::caxpy(ritz_mat_col, vecs_ptr, kSpace_ptr);
+    }
+    
+    host_free(ritz_mat_col);
+    
     for (int i = 0; i < iter_keep; i++) *kSpace[i + num_locked] = *kSpace[offset + i];
     *kSpace[num_locked + iter_keep] = *kSpace[nKr];
-
+    
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * ritz_mat[dim * (i + 1) - 1];
   }
 
