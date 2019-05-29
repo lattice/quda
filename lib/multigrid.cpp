@@ -90,7 +90,7 @@ namespace quda
         if (param.mg_global.num_setup_iter[param.level] > 0) {
           if (strcmp(param.mg_global.vec_infile, "") != 0) { // only load if infile is defined and not computing
             loadVectors(param.B);
-          } else if (param.mg_global.use_low_modes) {
+          } else if (param.mg_global.use_eig_solver[param.level]) {
             generateEigenVectors(); // Run the eigensolver
           } else {
             generateNullVectors(param.B);
@@ -212,7 +212,7 @@ namespace quda
 
       createCoarseSolver();
 
-      if (param.level == param.Nlevel - 2 && param.mg_global.deflate_coarsest) {
+      if (param.level == param.Nlevel - 2 && param.mg_global.use_eig_solver[param.level + 1]) {
         // if we are deflating the coarsest grid, then run a dummy solve
         // so that the deflation is done during the setup
         spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
@@ -221,7 +221,7 @@ namespace quda
         param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
       }
     }
-
+    
     if (param.level == 0) {
       // now we can run the verification if requested
       if (param.mg_global.run_verify) verify();
@@ -443,11 +443,11 @@ namespace quda
       param_coarse_solver->return_residual = false; // coarse solver does need to return residual vector
 
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
-      if (param.mg_global.deflate_coarsest) {
+      if (param.mg_global.use_eig_solver[param.Nlevel - 1]) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
         param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
         param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-
+	
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
             param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile);

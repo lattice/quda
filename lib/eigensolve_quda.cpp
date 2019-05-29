@@ -768,9 +768,8 @@ namespace quda
 
   void TRLM::reorder(std::vector<ColorSpinorField *> &kSpace)
   {
-
     int i = 0;
-
+    
     if (reverse) {
       while (i < nKr) {
         if ((i == 0) || (alpha[i - 1] >= alpha[i]))
@@ -779,9 +778,7 @@ namespace quda
           double tmp = alpha[i];
           alpha[i] = alpha[i - 1];
           alpha[--i] = tmp;
-          *r[0] = *kSpace[i];
-          *kSpace[i] = *kSpace[i - 1];
-          *kSpace[i - 1] = *r[0];
+          std::swap(kSpace[i], kSpace[i - 1]);
         }
       }
     } else {
@@ -792,9 +789,7 @@ namespace quda
           double tmp = alpha[i];
           alpha[i] = alpha[i - 1];
           alpha[--i] = tmp;
-          *r[0] = *kSpace[i];
-          *kSpace[i] = *kSpace[i - 1];
-          *kSpace[i - 1] = *r[0];
+	  std::swap(kSpace[i], kSpace[i - 1]);
         }
       }
     }

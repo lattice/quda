@@ -112,13 +112,14 @@ extern bool compute_clover;
 extern bool verify_results;
 
 // Eigensolver params for MG
-extern bool use_low_modes;
-extern bool deflate_coarsest;
 extern bool low_mode_check;
 extern bool oblique_proj_check;
 
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
+extern bool mg_eig[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_nEv[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_nKr[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_check_interval[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL];
 extern double mg_eig_tol[QUDA_MAX_MG_LEVEL];
@@ -157,25 +158,22 @@ display_test_info()
 
   printfQuda("Outer solver paramers\n");
   printfQuda(" - pipeline = %d\n", pipeline);
-
-  if (low_mode_check || use_low_modes || deflate_coarsest) {
-    printfQuda("Eigensolver parameters\n");
-    for (int i = 0; i < mg_levels; i++) {
-      if ((i < mg_levels - 1 && (low_mode_check || use_low_modes)) || (i == mg_levels - 1 && deflate_coarsest)) {
-        printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
-        printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
-        printfQuda(" - level %d number of eigenvectors requested %d\n", i + 1, nvec[i]);
-        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, nvec[i]);
-        printfQuda(" - level %d size of Krylov space %d\n", i + 1, nvec[i] + nvec[i] / 2);
-        printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
-        printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1,
-                   mg_eig_use_dagger[i] ? "true" : "false", mg_eig_use_normop[i] ? "true" : "false");
-
-        if (mg_eig_use_poly_acc[i]) {
-          printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
-          printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
-          printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
-        }
+  
+  printfQuda("Eigensolver parameters\n");
+  for (int i = 0; i < mg_levels; i++) {
+    if (i < mg_levels && (low_mode_check || mg_eig[i])) {
+      printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
+      printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
+      printfQuda(" - level %d number of eigenvectors requested nConv%d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
+      printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+      printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
+      printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1,
+		 mg_eig_use_dagger[i] ? "true" : "false", mg_eig_use_normop[i] ? "true" : "false");
+      if (mg_eig_use_poly_acc[i]) {
+	printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
+	printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
+	printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
       }
     }
     printfQuda("\n");
@@ -232,7 +230,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 // Parameters defining the eigensolver
 void setEigParam(QudaEigParam &mg_eig_param, int level)
 {
-
+  
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
   if (mg_eig_type[level] == QUDA_EIG_LANCZOS
@@ -240,8 +238,8 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
     errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
   }
 
-  mg_eig_param.nEv = nvec[level];
-  mg_eig_param.nKr = nvec[level] + nvec[level] / 2;
+  mg_eig_param.nEv = mg_eig_nEv[level];
+  mg_eig_param.nKr = mg_eig_nKr[level];
   mg_eig_param.nConv = nvec[level];
 
   mg_eig_param.tol = mg_eig_tol[level];
@@ -327,6 +325,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
+    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
@@ -478,8 +477,6 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_param.use_low_modes = use_low_modes ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_param.deflate_coarsest = deflate_coarsest ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
@@ -618,6 +615,7 @@ int main(int argc, char **argv)
     nu_post[i] = 2;
 
     // Default eigensolver params
+    mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
     mg_eig_type[i] = QUDA_EIG_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
@@ -629,7 +627,7 @@ int main(int argc, char **argv)
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
     mg_eig_amax[i] = 5.0;
-
+    
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;
     setup_ca_lambda_min[i] = 0.0;
@@ -688,14 +686,19 @@ int main(int argc, char **argv)
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
   for (int i = 0; i < mg_levels; i++) {
-    mg_eig_param[i] = newQudaEigParam();
-    setEigParam(mg_eig_param[i], i);
-    mg_param.eig_param[i] = &mg_eig_param[i];
+    if (mg_eig[i] ) {
+      mg_eig_param[i] = newQudaEigParam();
+      setEigParam(mg_eig_param[i], i);
+      mg_param.eig_param[i] = &mg_eig_param[i];
+    } else {
+      mg_param.eig_param[i] = nullptr;
+    }
   }
+    
   // Set MG
   mg_param.invert_param = &mg_inv_param;
   setMultigridParam(mg_param);
-
+  
   display_test_info();
 
   // *** Everything between here and the call to initQuda() is
