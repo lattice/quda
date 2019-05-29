@@ -16,6 +16,11 @@
 // ARPACK INTERAFCE ROUTINES
 //--------------------------------------------------------------------------
 
+#if (defined(QMP_COMMS) || defined(MPI_COMMS))
+#include <mpi.h>
+#include "mpi_comm_handle.h"
+#endif
+
 namespace quda
 {
 
@@ -23,10 +28,6 @@ namespace quda
 
   void arpackErrorHelpNAUPD();
   void arpackErrorHelpNEUPD();
-
-#if (defined(QMP_COMMS) || defined(MPI_COMMS))
-#include <mpi.h>
-#endif
 
   void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
                     ColorSpinorParam *cpuParam)
