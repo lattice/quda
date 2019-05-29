@@ -616,7 +616,7 @@ extern "C" {
 
     /** Whether to run null vector oblique checks once set up is complete */
     QudaBoolean run_oblique_proj_check;
-    
+
     /** Whether to load the null-space vectors to disk (requires QIO) */
     QudaBoolean vec_load;
 

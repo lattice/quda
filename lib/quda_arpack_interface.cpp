@@ -16,6 +16,11 @@
 // ARPACK INTERAFCE ROUTINES
 //--------------------------------------------------------------------------
 
+#if (defined(QMP_COMMS) || defined(MPI_COMMS))
+#include <mpi.h>
+#include "mpi_comm_handle.h"
+#endif
+
 namespace quda
 {
 
@@ -23,10 +28,6 @@ namespace quda
 
   void arpackErrorHelpNAUPD();
   void arpackErrorHelpNEUPD();
-
-#if (defined(QMP_COMMS) || defined(MPI_COMMS))
-#include <mpi.h>
-#endif
 
   void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
                     ColorSpinorParam *cpuParam)
@@ -50,8 +51,8 @@ namespace quda
     double time_ev = 0.0; // time in computing Eigenvectors
 
     // MPI objects
-    int *fcomm_ = nullptr;
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
+    int *fcomm_ = nullptr;
     MPI_Fint mpi_comm_fort = MPI_Comm_c2f(MPI_COMM_HANDLE);
     fcomm_ = static_cast<int *>(&mpi_comm_fort);
 #endif

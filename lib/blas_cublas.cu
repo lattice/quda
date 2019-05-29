@@ -129,7 +129,7 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE)
 	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
 #endif // CUBLAS_LIB
-      
+
       return flops;
     }
 

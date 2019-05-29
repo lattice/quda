@@ -525,8 +525,9 @@ namespace quda {
           make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), make_double2(0.0, 0.0), x, y, x, x, y);
     }
 
-    void caxpbypczw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y,
-                    const Complex &c, ColorSpinorField &z, ColorSpinorField &w) {
+    void caxpbypczw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, const Complex &c,
+                    ColorSpinorField &z, ColorSpinorField &w)
+    {
       uni_blas<caxpbypczw_, 0, 0, 0, 1>(make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)),
                                         make_double2(REAL(c), IMAG(c)), x, y, z, w, y);
     }

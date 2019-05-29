@@ -380,8 +380,6 @@ namespace quda
 #endif
     // profile.TPSTOP(QUDA_PROFILE_IO);
     // profile.TPSTART(QUDA_PROFILE_COMPUTE);
-
-    return;
   }
 
   void EigenSolver::saveVectors(const std::vector<ColorSpinorField *> &eig_vecs, std::string vec_outfile)
@@ -431,15 +429,11 @@ namespace quda
 #endif
     // profile.TPSTOP(QUDA_PROFILE_IO);
     // profile.TPSTART(QUDA_PROFILE_COMPUTE);
-
-    return;
   }
 
   void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
                                  std::vector<Complex> &evals)
   {
-
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Loading eigenvectors\n");
     loadVectors(kSpace, eig_param->vec_infile);
 
     // Create the device side residual vector by cloning
@@ -456,7 +450,6 @@ namespace quda
     }
 
     delete r[0];
-    return;
   }
 
   EigenSolver::~EigenSolver()
@@ -769,7 +762,7 @@ namespace quda
   void TRLM::reorder(std::vector<ColorSpinorField *> &kSpace)
   {
     int i = 0;
-    
+
     if (reverse) {
       while (i < nKr) {
         if ((i == 0) || (alpha[i - 1] >= alpha[i]))
@@ -789,7 +782,7 @@ namespace quda
           double tmp = alpha[i];
           alpha[i] = alpha[i - 1];
           alpha[--i] = tmp;
-	  std::swap(kSpace[i], kSpace[i - 1]);
+          std::swap(kSpace[i], kSpace[i - 1]);
         }
       }
     }
