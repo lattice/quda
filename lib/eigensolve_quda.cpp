@@ -546,21 +546,25 @@ namespace quda
     double mat_norm = 0.0;
     double epsilon = DBL_EPSILON;
     QudaPrecision prec = kSpace[0]->Precision();
-    if (prec == QUDA_DOUBLE_PRECISION) {
+    switch (prec) {
+    case QUDA_DOUBLE_PRECISION:
       epsilon = DBL_EPSILON;
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in double precision\n");
-    }
-    if (prec == QUDA_SINGLE_PRECISION) {
+      break;
+    case QUDA_SINGLE_PRECISION:
       epsilon = FLT_EPSILON;
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in single precision\n");
-    }
-    if (prec == QUDA_HALF_PRECISION) {
+      break;
+    case QUDA_HALF_PRECISION :
       epsilon = 2e-3;
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in half precision\n");
-    }
-    if (prec == QUDA_QUARTER_PRECISION) {
+      break;
+    case QUDA_QUARTER_PRECISION:
       epsilon = 5e-2;
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision\n");
+      break;
+    default:
+      errorQuda("Invalid precision %d", prec);
     }
 
     // Begin TRLM Eigensolver computation

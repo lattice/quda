@@ -968,7 +968,6 @@ namespace quda
     } else { // do the coarse grid solve
 
       ColorSpinorField *out=nullptr, *in=nullptr;
-      // Deflate EVEN ODD here
       diracSmoother->prepare(in, out, x, b, outer_solution_type);
       if (presmoother) (*presmoother)(*out, *in);
       diracSmoother->reconstruct(x, b, outer_solution_type);
