@@ -243,22 +243,6 @@ namespace quda
   }
 
   // Orthogonalise r against V_[j]
-  Complex EigenSolver::orthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> rvec, int j)
-  {
-    time_ = -clock();
-    Complex s(0.0, 0.0);
-    Complex sum(0.0, 0.0);
-    for (int i = 0; i < j; i++) {
-      s = blas::cDotProduct(*vecs[i], *rvec[0]);
-      sum += s;
-      blas::caxpy(-s, *vecs[i], *rvec[0]);
-    }
-    time_ += clock();
-    time_mb += time_;
-    return sum;
-  }
-
-  // Orthogonalise r against V_[j]
   Complex EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> rvec,
                                           int j)
   {
