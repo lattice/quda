@@ -136,6 +136,10 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating TRLM eigensolver\n");
       eig_solver = new TRLM(eig_param, mat, profile);
       break;
+    case QUDA_EIG_JD:
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating JD eigensolver\n");
+      eig_solver = new JD(eig_param, mat, profile);
+      break;
     default: errorQuda("Invalid eig solver type");
     }
     return eig_solver;
@@ -940,4 +944,80 @@ namespace quda
       evals[2 * i + 1] = sigma_tmp[i];
     }
   }
+
+
+
+  // JD eigensolver class
+  // --------------------------------
+
+  ///*
+  // Thick Restarted Lanczos Method constructor
+  JD::JD(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile) :
+    EigenSolver(eig_param, profile),
+    mat(mat)
+  {
+
+    errorQuda("From the constructor of JD: eigensolver under construction !");
+
+    // Tridiagonal/Arrow matrix
+    //alpha = new double[nKr];
+    //beta = new double[nKr];
+    //for (int i = 0; i < nKr; i++) {
+    //  alpha[i] = 0.0;
+    //  beta[i] = 0.0;
+    //}
+
+    // Thick restart specific checks
+    //if (nKr < nEv + 6) errorQuda("nKr=%d must be greater than nEv+6=%d\n", nKr, nEv + 6);
+
+    //if (eig_param->eig_type == QUDA_EIG_LANCZOS
+    //    && !(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    //  errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
+    //}
+  }
+
+  void JD::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
+  { }
+
+  // Destructor
+  JD::~JD()
+  {
+    //ritz_mat.clear();
+    //ritz_mat.shrink_to_fit();
+    //delete alpha;
+    //delete beta;
+  }
+  //*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 } // namespace quda

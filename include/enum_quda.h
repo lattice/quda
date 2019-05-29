@@ -131,6 +131,7 @@ extern "C" {
   typedef enum QudaEigType_s {
     QUDA_EIG_LANCZOS, // Thick restarted lanczos solver
     QUDA_EIG_ARNOLDI, // Arnoldi solver (not implemented)
+    QUDA_EIG_JD, // JD solver
     QUDA_INVALID_EIG = QUDA_INVALID_ENUM
   } QudaEigType;
 

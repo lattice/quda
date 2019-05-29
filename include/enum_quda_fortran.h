@@ -128,6 +128,7 @@
 #define QudaEigType integer(4)
 #define QUDA_EIG_LANCZOS 0 // Implicitly restarted lanczos solver
 #define QUDA_EIG_ARNOLDI 1 // Arnoldi solver (not yet implemented)
+#define QUDA_EIG_JD 2 // JD solver
 #define QUDA_EIG_INVALID QUDA_INVALID_ENUM
 
 #define QudaEigSpectrumType integer(4)

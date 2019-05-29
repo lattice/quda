@@ -245,4 +245,35 @@ public:
   void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
                     ColorSpinorParam *cpuParam);
 
+
+  /**
+     @brief Jacobi-Davidson Method.
+  */
+  class JD : public EigenSolver
+  {
+
+public:
+    const DiracMatrix &mat;
+    /**
+       @brief Constructor for JD Eigensolver class
+       @param eig_param The eigensolver parameters
+       @param mat The operator to solve
+       @param profile Time Profile
+    */
+    JD(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
+
+    /**
+       @brief Compute eigenpairs
+       @param[in] kSpace the "acceleration" vector space
+       @param[in] evals Computed eigenvalues
+    */
+    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief Destructor for JD Eigensolver class
+    */
+    virtual ~JD();
+
+  };
+
 } // namespace quda

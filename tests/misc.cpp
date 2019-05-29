@@ -1010,6 +1010,8 @@ QudaEigType get_eig_type(char *s)
     ret = QUDA_EIG_LANCZOS;
   } else if (strcmp(s, "arnoldi") == 0) {
     ret = QUDA_EIG_ARNOLDI;
+  } else if (strcmp(s, "JD") == 0) {
+    ret = QUDA_EIG_JD;
   } else {
     fprintf(stderr, "Error: invalid quda eigensolver type\n");
     exit(1);
