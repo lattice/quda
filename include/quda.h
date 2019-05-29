@@ -594,6 +594,9 @@ extern "C" {
     /** Location where the coarse-operator construction will be computedn */
     QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
 
+    /** Whether to use eigenvectors for the nullspace or, if the coarsest instance deflate*/
+    QudaBoolean use_eig_solver[QUDA_MAX_MG_LEVEL];
+
     /** Minimize device memory allocations during the adaptive setup,
         placing temporary fields in mapped memory instad of device
         memory */
@@ -613,12 +616,6 @@ extern "C" {
 
     /** Whether to run null vector oblique checks once set up is complete */
     QudaBoolean run_oblique_proj_check;
-
-    /** Whether to use eigenvectors for the nullspace */
-    QudaBoolean use_low_modes;
-
-    /** Deflate the coarsest grid  */
-    QudaBoolean deflate_coarsest;
 
     /** Whether to load the null-space vectors to disk (requires QIO) */
     QudaBoolean vec_load;

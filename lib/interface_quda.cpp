@@ -2461,9 +2461,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   ColorSpinorParam cudaParam(cpuParam);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ? cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
-                                                       cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-  if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) { cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER; }
+  cudaParam.setPrecision(eig_param->cuda_prec_ritz, eig_param->cuda_prec_ritz, true);
 
   std::vector<Complex> evals(eig_param->nEv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
@@ -2772,8 +2770,8 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   ritzParam.setPrecision(param->cuda_prec_ritz);
 
   if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
-    ritzParam.fieldOrder = (param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ) ?  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-    if(ritzParam.nSpin != 1) ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    ritzParam.setPrecision(param->cuda_prec_ritz, param->cuda_prec_ritz, true); // set native field order
+    if (ritzParam.nSpin != 1) ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
     //select memory location here, by default ritz vectors will be allocated on the device
     //but if not sufficient device memory, then the user may choose mapped type of memory

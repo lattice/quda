@@ -1247,7 +1247,7 @@ public:
 
     /**
        @brief Expands deflation space.
-       @param V container of new eigenvectors
+       @param V Composite field container of new eigenvectors
        @param nev number of vectors to load
      */
     void increment(ColorSpinorField &V, int nev);

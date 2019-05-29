@@ -105,16 +105,6 @@ public:
 
     /**
        @brief Orthogonalise input vector r against
-       vector space v
-       @param[out] Sum of inner products
-       @param[in] v Vector space
-       @param[in] r Vector to be orthogonalised
-       @param[in] j Number of vectors in v to orthogonalise against
-    */
-    Complex orthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
-
-    /**
-       @brief Orthogonalise input vector r against
        vector space v using block-BLAS
        @param[out] Sum of inner products
        @param[in] v Vector space
