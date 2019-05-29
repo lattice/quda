@@ -158,7 +158,7 @@ display_test_info()
 
   printfQuda("Outer solver paramers\n");
   printfQuda(" - pipeline = %d\n", pipeline);
-  
+
   printfQuda("Eigensolver parameters\n");
   for (int i = 0; i < mg_levels; i++) {
     if (i < mg_levels && (low_mode_check || mg_eig[i])) {
@@ -168,12 +168,12 @@ display_test_info()
       printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
       printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
       printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
-      printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1,
-		 mg_eig_use_dagger[i] ? "true" : "false", mg_eig_use_normop[i] ? "true" : "false");
+      printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
+                 mg_eig_use_normop[i] ? "true" : "false");
       if (mg_eig_use_poly_acc[i]) {
-	printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
-	printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
-	printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
+        printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
+        printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
+        printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
       }
     }
     printfQuda("\n");
@@ -230,7 +230,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 // Parameters defining the eigensolver
 void setEigParam(QudaEigParam &mg_eig_param, int level)
 {
-  
+
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
   if (mg_eig_type[level] == QUDA_EIG_LANCZOS
@@ -627,7 +627,7 @@ int main(int argc, char **argv)
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
     mg_eig_amax[i] = 5.0;
-    
+
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;
     setup_ca_lambda_min[i] = 0.0;
@@ -686,7 +686,7 @@ int main(int argc, char **argv)
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
   for (int i = 0; i < mg_levels; i++) {
-    if (mg_eig[i] ) {
+    if (mg_eig[i]) {
       mg_eig_param[i] = newQudaEigParam();
       setEigParam(mg_eig_param[i], i);
       mg_param.eig_param[i] = &mg_eig_param[i];
@@ -694,11 +694,11 @@ int main(int argc, char **argv)
       mg_param.eig_param[i] = nullptr;
     }
   }
-    
+
   // Set MG
   mg_param.invert_param = &mg_inv_param;
   setMultigridParam(mg_param);
-  
+
   display_test_info();
 
   // *** Everything between here and the call to initQuda() is

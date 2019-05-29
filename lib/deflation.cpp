@@ -20,14 +20,18 @@ namespace quda
   static auto pinned_allocator = [] (size_t bytes ) { return static_cast<Complex*>(pool_pinned_malloc(bytes)); };
   static auto pinned_deleter   = [] (Complex *hptr) { pool_pinned_free(hptr); };
 
-  Deflation::Deflation(DeflationParam &param, TimeProfile &profile)
-    : param(param),   profile(profile),
-      r(nullptr), Av(nullptr), r_sloppy(nullptr), Av_sloppy(nullptr)
+  Deflation::Deflation(DeflationParam &param, TimeProfile &profile) :
+    param(param),
+    profile(profile),
+    r(nullptr),
+    Av(nullptr),
+    r_sloppy(nullptr),
+    Av_sloppy(nullptr)
   {
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     printfQuda("Creating deflation space of %d vectors.\n", param.tot_dim);
 
-    if ( param.eig_global.import_vectors ) loadVectors(param.RV);//whether to load eigenvectors
+    if (param.eig_global.import_vectors) loadVectors(param.RV); // whether to load eigenvectors
     // create aux fields
     ColorSpinorParam csParam(param.RV->Component(0));
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -44,7 +48,7 @@ namespace quda
     r  = ColorSpinorField::Create(csParam);
     Av = ColorSpinorField::Create(csParam);
 
-    if (param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ) { //allocate sloppy fields
+    if (param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION) { // allocate sloppy fields
       csParam.setPrecision(param.eig_global.cuda_prec_ritz);//accum fields always full precision
       if (csParam.location==QUDA_CUDA_FIELD_LOCATION) csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
 
@@ -191,7 +195,7 @@ namespace quda
 
     const int first_idx = param.cur_dim;
 
-    if (param.RV->CompositeDim() < (first_idx+nev) || param.tot_dim < (first_idx+nev)) {
+    if (param.RV->CompositeDim() < (first_idx + nev) || param.tot_dim < (first_idx + nev)) {
       warningQuda("\nNot enough space to add %d vectors. Keep deflation space unchanged.\n", nev);
       return;
     }
@@ -259,7 +263,6 @@ namespace quda
     printfQuda("\nNew curr deflation space dim = %d\n", param.cur_dim);
   }
 
-
   void Deflation::reduce(double tol, int max_nev)
   {
     if (param.cur_dim < max_nev) {
@@ -323,7 +326,7 @@ namespace quda
       blas::caxpy(&projm.get()[idx * param.ld], rv, res); // multiblas
       blas::copy(buff->Component(idx), *r);
 
-      if (do_residual_check) {// if tol=0.0 then disable relative residual norm check
+      if (do_residual_check) { // if tol=0.0 then disable relative residual norm check
         *r_sloppy = *r;
         param.matDeflation(*Av_sloppy, *r_sloppy);
         double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
@@ -354,13 +357,13 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_IO);
 
     std::string vec_infile(param.eig_global.vec_infile);
-    std::vector<ColorSpinorField*> &B = RV->Components();
+    std::vector<ColorSpinorField *> &B = RV->Components();
 
     const int Nvec = B.size();
     printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
 
     void **V = new void*[Nvec];
-    for (int i=0; i<Nvec; i++) {
+    for (int i = 0; i < Nvec; i++) {
       V[i] = B[i]->V();
       if (V[i] == NULL) {
 	printfQuda("Could not allocate V[%d]\n", i);

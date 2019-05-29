@@ -1854,13 +1854,15 @@ void usage(char** argv )
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
 
-  // Multigrid 
+  // Multigrid
   printf("    --mg-low-mode-check <true/false>          # Measure how well the null vector subspace overlaps with the "
          "low eigenmode subspace (default false)\n");
   printf("    --mg-oblique-proj-check <true/false>      # Measure how well the null vector subspace adjusts the low "
          "eigenmode subspace (default false)\n");
-  printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n"
-	 "                                                If using the eigensolver of the coarsest level then this dictates the size of the deflation space.\n");
+  printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid "
+         "transfer operator on a given level\n"
+         "                                                If using the eigensolver of the coarsest level then this "
+         "dictates the size of the deflation space.\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre <level 1-20>                  # The number of pre-smoother applications to do at a given multigrid level (default 2)\n");
@@ -1945,29 +1947,36 @@ void usage(char** argv )
          "default false)\n");
   printf("    --eig-load-vec <file>                     # Load eigenvectors to <file> (requires QIO)\n");
   printf("    --eig-save-vec <file>                     # Save eigenvectors to <file> (requires QIO)\n");
-  
+
   // Multigrid Eigensolver
   printf("    --mg-eig <level> <true/false>                     # Use the eigensolver on this level (default false)\n");
-  printf("    --mg-eig-nEv <level> <n>                          # The size of eigenvector search space in the eigensolver\n");
-  printf("    --mg-eig-nKr <level> <n>                          # The size of the Krylov subspace to use in the eigensolver\n");
+  printf("    --mg-eig-nEv <level> <n>                          # The size of eigenvector search space in the "
+         "eigensolver\n");
+  printf("    --mg-eig-nKr <level> <n>                          # The size of the Krylov subspace to use in the "
+         "eigensolver\n");
   printf("    --mg-eig-check-interval <level> <n>               # Perform a convergence check every nth "
          "restart/iteration (only used in Implicit Restart types)\n");
-  printf("    --mg-eig-max-restarts <level> <n>                 # Perform a maximun of n restarts in eigensolver (default 100)\n");
+  printf("    --mg-eig-max-restarts <level> <n>                 # Perform a maximun of n restarts in eigensolver "
+         "(default 100)\n");
   printf("    --mg-eig-use-normop <level> <true/false>          # Solve the MdagM problem instead of M (MMdag if "
          "eig-use-dagger == true) (default false)\n");
   printf("    --mg-eig-use-dagger <level> <true/false>          # Solve the MMdag problem instead of M (MMdag if "
          "eig-use-normop == true) (default false)\n");
-  printf("    --mg-eig-tol <level> <tol>                        # The tolerance to use in the eigensolver (default 1e-6)\n");
+  printf(
+    "    --mg-eig-tol <level> <tol>                        # The tolerance to use in the eigensolver (default 1e-6)\n");
   printf("    --mg-eig-use-poly-acc <level> <true/false>        # Use Chebyshev polynomial acceleration in the "
          "eigensolver (default true)\n");
-  printf("    --mg-eig-poly-deg <level> <n>                     # Set the degree of the Chebyshev polynomial (default 100)\n");
-  printf("    --mg-eig-amin <level> <Float>                     # The minimum in the polynomial acceleration (default 0.1)\n");
-  printf("    --mg-eig-amax <level> <Float>                     # The maximum in the polynomial acceleration (default 4.0)\n");
+  printf("    --mg-eig-poly-deg <level> <n>                     # Set the degree of the Chebyshev polynomial (default "
+         "100)\n");
+  printf("    --mg-eig-amin <level> <Float>                     # The minimum in the polynomial acceleration (default "
+         "0.1)\n");
+  printf("    --mg-eig-amax <level> <Float>                     # The maximum in the polynomial acceleration (default "
+         "4.0)\n");
   printf("    --mg-eig-spectrum <level> <SR/LR/SM/LM/SI/LI>     # The spectrum part to be calulated. S=smallest "
          "L=largest R=real M=modulus I=imaginary (default SR)\n");
   printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (default lanczos)\n");
 
-  // Miscellanea 
+  // Miscellanea
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
   printf("    --heatbath-beta <beta>                    # Beta value used in heatbath test (default 6.2)\n");
@@ -3857,9 +3866,9 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     i++;
-    
+
     mg_eig_nEv[level] = atoi(argv[i + 1]);
-    
+
     i++;
     ret = 0;
     goto out;
@@ -3873,14 +3882,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     i++;
-    
+
     mg_eig_nKr[level] = atoi(argv[i + 1]);
-    
+
     i++;
     ret = 0;
     goto out;
   }
-  
+
   if (strcmp(argv[i], "--mg-eig-check-interval") == 0) {
     if (i + 1 >= argc) { usage(argv); }
     int level = atoi(argv[i + 1]);
@@ -3891,7 +3900,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     mg_eig_check_interval[level] = atoi(argv[i + 1]);
-    
+
     i++;
     ret = 0;
     goto out;
@@ -3946,7 +3955,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       fprintf(stderr, "ERROR: invalid value for mg-eig-use-poly-acc %d (true/false)\n", level);
       exit(1);
     }
-    
+
     i++;
     ret = 0;
     goto out;
@@ -4045,7 +4054,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-  
+
   if (strcmp(argv[i], "--mg-eig-spectrum") == 0) {
     if (i + 1 >= argc) { usage(argv); }
     int level = atoi(argv[i + 1]);

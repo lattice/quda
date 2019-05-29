@@ -630,7 +630,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #else
   P(post_orthonormalize, QUDA_BOOLEAN_INVALID);
 #endif
-  
+
   for (int i=0; i<n_level; i++) {
 #ifdef INIT_PARAM
     P(verbosity[i], QUDA_SILENT);
