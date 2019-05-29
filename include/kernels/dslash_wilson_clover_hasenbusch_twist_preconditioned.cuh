@@ -7,7 +7,7 @@
 namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType reconstruct_, bool dynamic_clover_>
-  struct WilsonCloverHasenbuschTwistArg : WilsonArg<Float,nColor,reconstruct_> {
+  struct WilsonCloverHasenbuschTwistPCArg : WilsonArg<Float,nColor,reconstruct_> {
     using WilsonArg<Float,nColor,reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
     static constexpr bool dynamic_clover = dynamic_clover_;
@@ -19,7 +19,7 @@ namespace quda {
     const C A_inv;
     real b;
 
-    WilsonCloverHasenbuschTwistArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+    WilsonCloverHasenbuschTwistPCArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
 		    const CloverField &A_, double a_, double b_, const ColorSpinorField &x,
 		    int parity, bool dagger, const int *comm_override)
       : WilsonArg<Float,nColor,reconstruct_>(out, in, U, a_, x, parity, dagger, comm_override),
@@ -33,7 +33,7 @@ namespace quda {
      - with xpay:  out(x) = M*in = (1 - a*A(x)^{-1}D) * in(x-mu)
   */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, bool doClovInv, typename Arg>
-  __device__ __host__ inline void wilsonCloverHasenbuschTwist(Arg &arg, int idx, int parity)
+  __device__ __host__ inline void wilsonCloverHasenbuschTwistPC(Arg &arg, int idx, int parity)
   {
 
 	  using namespace linalg; // for Cholesky
@@ -122,7 +122,7 @@ namespace quda {
 
   // CPU kernel for applying the Wilson operator to a vector
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  void wilsonCloverHasenbuschTwistNoClovInvCPU(Arg arg)
+  void wilsonCloverHasenbuschTwistPCNoClovInvCPU(Arg arg)
   {
 
     for (int parity= 0; parity < nParity; parity++) {
@@ -130,7 +130,7 @@ namespace quda {
       parity = nParity == 2 ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-    	  wilsonCloverHasenbuschTwist<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,false>(arg, x_cb, parity);
+    	  wilsonCloverHasenbuschTwistPC<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,false>(arg, x_cb, parity);
       } // 4-d volumeCB
     } // parity
 
@@ -138,7 +138,7 @@ namespace quda {
 
   // GPU Kernel for applying the Wilson operator to a vector
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void wilsonCloverHasenbuschTwistNoClovInvGPU(Arg arg)
+  __global__ void wilsonCloverHasenbuschTwistPCNoClovInvGPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.threads) return;
@@ -147,8 +147,8 @@ namespace quda {
     int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
     switch(parity) {
-    case 0: wilsonCloverHasenbuschTwist<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,false>(arg, x_cb, 0); break;
-    case 1: wilsonCloverHasenbuschTwist<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,false>(arg, x_cb, 1); break;
+    case 0: wilsonCloverHasenbuschTwistPC<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,false>(arg, x_cb, 0); break;
+    case 1: wilsonCloverHasenbuschTwistPC<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,false>(arg, x_cb, 1); break;
     }
 
   }
@@ -156,7 +156,7 @@ namespace quda {
   // CPU kernel for applying the Wilson operator to a vector
    template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay,
    	   KernelType kernel_type, typename Arg>
-   void wilsonCloverHasenbuschTwistClovInvCPU(Arg arg)
+   void wilsonCloverHasenbuschTwistPCClovInvCPU(Arg arg)
    {
 
      for (int parity= 0; parity < nParity; parity++) {
@@ -164,7 +164,7 @@ namespace quda {
        parity = nParity == 2 ? parity : arg.parity;
 
        for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-    	   wilsonCloverHasenbuschTwist<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,true>(arg, x_cb, parity);
+    	   wilsonCloverHasenbuschTwistPC<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,true>(arg, x_cb, parity);
        } // 4-d volumeCB
      } // parity
 
@@ -172,7 +172,7 @@ namespace quda {
 
    // GPU Kernel for applying the Wilson operator to a vector
    template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-   __global__ void wilsonCloverHasenbuschTwistClovInvGPU(Arg arg)
+   __global__ void wilsonCloverHasenbuschTwistPCClovInvGPU(Arg arg)
    {
      int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
      if (x_cb >= arg.threads) return;
@@ -181,8 +181,8 @@ namespace quda {
      int parity = nParity == 2 ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
 
      switch(parity) {
-     case 0: wilsonCloverHasenbuschTwist<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,true>(arg, x_cb, 0); break;
-     case 1: wilsonCloverHasenbuschTwist<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,true>(arg, x_cb, 1); break;
+     case 0: wilsonCloverHasenbuschTwistPC<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,true>(arg, x_cb, 0); break;
+     case 1: wilsonCloverHasenbuschTwistPC<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,true>(arg, x_cb, 1); break;
      }
 
    }

@@ -231,7 +231,7 @@ namespace quda {
         @param[in] comm_override Override for which dimensions are partitioned
         @param[in] profile The TimeProfile used for profiling the dslash
      */
-  void ApplyWilsonCloverHasenbuschTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+  void ApplyWilsonCloverHasenbuschTwistPCClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
 					const CloverField &A, double kappa, double mu, const ColorSpinorField &x, int parity, bool dagger,
 			 const int *comm_override, TimeProfile &profile);
 
@@ -258,7 +258,7 @@ namespace quda {
         @param[in] comm_override Override for which dimensions are partitioned
         @param[in] profile The TimeProfile used for profiling the dslash
      */
-  void ApplyWilsonCloverHasenbuschTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+  void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
 					const CloverField &A, double kappa, double mu, const ColorSpinorField &x, int parity, bool dagger,
 			 const int *comm_override, TimeProfile &profile);
 

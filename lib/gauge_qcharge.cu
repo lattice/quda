@@ -21,10 +21,12 @@ private:
     unsigned int minThreads() const { return arg.threads; }
 
 public:
-    QChargeCompute(Arg &arg, const GaugeField &meta) : arg(arg), meta(meta) {}
+    QChargeCompute(Arg &arg, const GaugeField &meta) : arg(arg), meta(meta) {
 #ifdef JITIFY
     create_jitify_program("kernels/gauge_qcharge.cuh");
 #endif
+    }
+
     virtual ~QChargeCompute() {}
 
     void apply(const cudaStream_t &stream)

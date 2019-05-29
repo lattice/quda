@@ -17,31 +17,31 @@ namespace quda {
      correct templated kernel for the dslash.
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct WilsonCloverHasenbuschTwistClovInvLaunch {
-	  static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistClovInvGPU"; // Kernel name for jit
+  struct WilsonCloverHasenbuschTwistPCClovInvLaunch {
+	  static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistPCClovInvGPU"; // Kernel name for jit
 
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-      static_assert(xpay == true, "wilsonCloverHasenbuschTwistClovInv operator only defined for xpay");
-      dslash.launch(wilsonCloverHasenbuschTwistClovInvGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+      static_assert(xpay == true, "wilsonCloverHasenbuschTwistPCClovInv operator only defined for xpay");
+      dslash.launch(wilsonCloverHasenbuschTwistPCClovInvGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
     }
   };
 
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-    struct WilsonCloverHasenbuschTwistNoClovInvLaunch {
-	  static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistNoClovInvGPU"; // Kernel name for jit
+    struct WilsonCloverHasenbuschTwistPCNoClovInvLaunch {
+	  static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistPCNoClovInvGPU"; // Kernel name for jit
 
       template <typename Dslash>
       inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-        static_assert(xpay == true, "wilsonCloverHasenbuschNoTwistClovInv operator only defined for xpay");
-        dslash.launch(wilsonCloverHasenbuschTwistNoClovInvGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+        static_assert(xpay == true, "wilsonCloverHasenbuschNoTwistPCClovInv operator only defined for xpay");
+        dslash.launch(wilsonCloverHasenbuschTwistPCNoClovInvGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
       }
     };
 
     /* ***************************
   	  * No Clov Inv:  1 - k^2 D - i mu gamma_5 A
   	  * **************************/
-  template <typename Float, int nDim, int nColor, typename Arg> class WilsonCloverHasenbuschTwistNoClovInv : public Dslash<Float> {
+  template <typename Float, int nDim, int nColor, typename Arg> class WilsonCloverHasenbuschTwistPCNoClovInv : public Dslash<Float> {
 
     protected:
       Arg &arg;
@@ -49,17 +49,17 @@ namespace quda {
 
     public:
 
-      WilsonCloverHasenbuschTwistNoClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
+      WilsonCloverHasenbuschTwistPCNoClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
         : Dslash<Float>(arg, out, in,"kernels/dslash_wilson_clover_hasenbusch_twist_preconditioned.cuh"),
 		  arg(arg),
 		  in(in){  }
 
-      virtual ~WilsonCloverHasenbuschTwistNoClovInv() { }
+      virtual ~WilsonCloverHasenbuschTwistPCNoClovInv() { }
 
       void apply(const cudaStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         Dslash<Float>::setParam(arg);
-        if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistNoClovInvLaunch,nDim,nColor,true>(tp, arg, stream);
+        if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistPCNoClovInvLaunch,nDim,nColor,true>(tp, arg, stream);
         else errorQuda("Wilson-clover hasenbusch twist no clover operator only defined for xpay=true");
       }
 
@@ -133,9 +133,9 @@ namespace quda {
       TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
     };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistNoClovInvApply {
+  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
 
-      inline WilsonCloverHasenbuschTwistNoClovInvApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+      inline WilsonCloverHasenbuschTwistPCNoClovInvApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
           double a, double b, const ColorSpinorField &x, int parity, bool dagger,
 		  const int *comm_override, TimeProfile &profile)
       {
@@ -147,10 +147,10 @@ namespace quda {
     constexpr bool dynamic_clover = false;
 #endif
 
-    	     using ArgType = WilsonCloverHasenbuschTwistArg<Float,nColor,recon,dynamic_clover>;
+    	     using ArgType = WilsonCloverHasenbuschTwistPCArg<Float,nColor,recon,dynamic_clover>;
 
     	      ArgType arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
-    	      WilsonCloverHasenbuschTwistNoClovInv<Float,nDim,nColor,ArgType > wilson(arg, out, in);
+    	      WilsonCloverHasenbuschTwistPCNoClovInv<Float,nDim,nColor,ArgType > wilson(arg, out, in);
 
     	      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
     	                                                in.VolumeCB(), in.GhostFaceCB(), profile);
@@ -164,7 +164,7 @@ namespace quda {
   // Apply the Wilson-clover operator
     // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
     // Uses the kappa normalization for the Wilson operator.
-    void ApplyWilsonCloverHasenbuschTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+    void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
   					const CloverField &A, double a, double b, const ColorSpinorField &x, int parity, bool dagger,
   			 const int *comm_override, TimeProfile &profile)
     {
@@ -179,7 +179,7 @@ namespace quda {
       // check all locations match
       checkLocation(out, in, U, A);
 
-      instantiate<WilsonCloverHasenbuschTwistNoClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override, profile);
+      instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override, profile);
   #else
       errorQuda("Clover dslash has not been built");
   #endif
@@ -194,7 +194,7 @@ namespace quda {
      * M = psi_p - k^2 A^{-1} D_p\not{p} - i mu gamma_5 A_{pp} psi_{p}
      * **************************/
     template <typename Float, int nDim, int nColor, typename Arg>
-      class WilsonCloverHasenbuschTwistClovInv : public Dslash<Float> {
+      class WilsonCloverHasenbuschTwistPCClovInv : public Dslash<Float> {
 
       protected:
         Arg &arg;
@@ -202,18 +202,18 @@ namespace quda {
 
       public:
 
-        WilsonCloverHasenbuschTwistClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-          : Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover_hasnbusch_twist_preconditioned.cuh"),
+        WilsonCloverHasenbuschTwistPCClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
+          : Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover_hasenbusch_twist_preconditioned.cuh"),
 			arg(arg),
 			in(in)
         {}
 
-        virtual ~WilsonCloverHasenbuschTwistClovInv() { }
+        virtual ~WilsonCloverHasenbuschTwistPCClovInv() { }
 
         void apply(const cudaStream_t &stream) {
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           Dslash<Float>::setParam(arg);
-          if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistClovInvLaunch,nDim,nColor,true>(tp, arg, stream);
+          if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistPCClovInvLaunch,nDim,nColor,true>(tp, arg, stream);
           else errorQuda("Wilson-clover hasenbusch twist clov inv operator only defined for xpay=true");
         }
 
@@ -291,9 +291,9 @@ namespace quda {
       };
 
 
-    template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistClovInvApply {
+    template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCClovInvApply {
 
-        inline WilsonCloverHasenbuschTwistClovInvApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+        inline WilsonCloverHasenbuschTwistPCClovInvApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
 				double kappa, double mu, const ColorSpinorField &x, int parity, bool dagger,
 				const int *comm_override, TimeProfile &profile)
          {
@@ -304,10 +304,10 @@ namespace quda {
             constexpr bool dynamic_clover = false;
         #endif
 
-            using ArgType = WilsonCloverHasenbuschTwistArg<Float,nColor,recon,dynamic_clover>;
+            using ArgType = WilsonCloverHasenbuschTwistPCArg<Float,nColor,recon,dynamic_clover>;
 
             ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
-            WilsonCloverHasenbuschTwistClovInv<Float,nDim,nColor,ArgType > wilson(arg, out, in);
+            WilsonCloverHasenbuschTwistPCClovInv<Float,nDim,nColor,ArgType > wilson(arg, out, in);
 
             dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
                                                       in.VolumeCB(), in.GhostFaceCB(), profile);
@@ -324,7 +324,7 @@ namespace quda {
     // Apply the Wilson-clover operator
     // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
     // Uses the kappa normalization for the Wilson operator.
-    void ApplyWilsonCloverHasenbuschTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+    void ApplyWilsonCloverHasenbuschTwistPCClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
   					const CloverField &A, double a, double b, const ColorSpinorField &x, int parity, bool dagger,
   			 const int *comm_override, TimeProfile &profile)
     {
@@ -339,7 +339,7 @@ namespace quda {
       // check all locations match
       checkLocation(out, in, U, A);
 
-      instantiate<WilsonCloverHasenbuschTwistClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override, profile);
+      instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override, profile);
   #else
       errorQuda("Clover dslash has not been built");
   #endif

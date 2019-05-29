@@ -482,7 +482,7 @@ namespace quda {
         checkParitySpinor(in, out);
         checkSpinorAlias(in, out);
 
-        ApplyWilsonCloverHasenbuschTwistClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
+        ApplyWilsonCloverHasenbuschTwistPCClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
 
         //    DiracCloverPC.DslashXPay -/+ mu ( i gamma_5 ) A
         flops += (1872ll + 48ll + 504ll)*in.Volume();
@@ -496,7 +496,7 @@ namespace quda {
          checkParitySpinor(in, out);
          checkSpinorAlias(in, out);
 
-         ApplyWilsonCloverHasenbuschTwistNoClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
+         ApplyWilsonCloverHasenbuschTwistPCNoClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
 
          //    DiracCloverPC.DslashXPay -/+ mu ( i gamma_5 )
          flops += (1872ll+48)*in.Volume();

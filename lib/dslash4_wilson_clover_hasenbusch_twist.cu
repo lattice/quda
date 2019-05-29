@@ -7,7 +7,7 @@
 #include <worker.h>
 
 #include <dslash_policy.cuh>
-#include <kernels/dslash_wilson_clover.cuh>
+#include <kernels/dslash_wilson_clover_hasenbusch_twist.cuh>
 
 /**
    This is the Wilson-clover linear operator
@@ -38,7 +38,7 @@ namespace quda {
   public:
 
     WilsonCloverHasenbuschTwist(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-      : Dslash<Float>(arg, out, in,"kernels/dslash_wilson_clover.cuh"),
+      : Dslash<Float>(arg, out, in,"kernels/dslash_wilson_clover_hasenbusch_twist.cuh"),
 		arg(arg),
 		in(in) { }
 
@@ -64,10 +64,10 @@ namespace quda {
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
     	  flops += clover_flops * in.Volume();
-    	  if( arg.twist ) {
+
     		  // -mu * (i gamma_5 A) (A x)
     		  flops += ((clover_flops+48)*in.Volume());
-    	  }
+
 	break;
       }
       return flops;
@@ -103,7 +103,14 @@ namespace quda {
          double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
      {
        constexpr int nDim = 4;
-       using ArgType = WilsonCloverArg<Float,nColor,recon,true>;
+
+#ifdef DYNAMIC_CLOVER
+    constexpr bool dynamic_clover = true;
+#else
+    constexpr bool dynamic_clover = false;
+#endif
+
+       using ArgType = WilsonCloverHasenbuschTwistArg<Float,nColor,recon,dynamic_clover>;
        ArgType arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
        WilsonCloverHasenbuschTwist<Float,nDim,nColor,ArgType > wilson(arg, out, in);
 
