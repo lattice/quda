@@ -164,7 +164,7 @@ display_test_info()
     if (i < mg_levels && (low_mode_check || mg_eig[i])) {
       printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
       printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
-      printfQuda(" - level %d number of eigenvectors requested nConv%d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
       printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
       printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
       printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
@@ -255,6 +255,11 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.poly_deg = mg_eig_poly_deg[level];
   mg_eig_param.a_min = mg_eig_amin[level];
   mg_eig_param.a_max = mg_eig_amax[level];
+
+  // set file i/o parameters
+  // Give empty strings, Multigrid will handle IO.
+  strcpy(mg_eig_param.vec_infile, "");
+  strcpy(mg_eig_param.vec_outfile, "");
 
   strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }

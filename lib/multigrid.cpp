@@ -1392,18 +1392,14 @@ namespace quda
   {
     pushLevel(param.level);
 
-    // Extract eigensolver params from the size of the null space.
-    int nConv = param.B.size();
-    param.mg_global.eig_param[param.level]->nConv = nConv;
-    int nEv = param.B.size() + 10;
-    param.mg_global.eig_param[param.level]->nEv = nEv;
-    // int nKr = nEv + nEv / 2;
-    int nKr = 2 * nEv;
-    param.mg_global.eig_param[param.level]->nKr = nKr;
+    // Extract eigensolver params
+    int nConv = param.mg_global.eig_param[param.level]->nConv;
+    int nEv = param.mg_global.eig_param[param.level]->nEv;
+    int nKr = param.mg_global.eig_param[param.level]->nKr;
 
     // Dummy array to keep the eigensolver happy.
     std::vector<Complex> evals(nEv, 0.0);
-
+    
     std::vector<ColorSpinorField *> B_evecs;
     ColorSpinorParam csParam(*param.B[0]);
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;

@@ -493,9 +493,9 @@ namespace quda
 
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
-
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
+      printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
       loadFromFile(mat, kSpace, evals);
       return;
     }
