@@ -374,7 +374,7 @@ if(QUDA_QMP)
       GIT_TAG qmp2-5-1
       GIT_SHALLOW YES
       PREFIX usqcd
-      CONFIGURE_COMMAND <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR> CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} CFLAGS=-std=c99 CXXFLAGS=-std=c99
+      CONFIGURE_COMMAND <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR> CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} CFLAGS=-std=c99
       BUILD_COMMAND  make
       INSTALL_COMMAND make install
       LOG_INSTALL ON
@@ -425,7 +425,7 @@ if(QUDA_QIO)
       GIT_TAG qio2-5-0
       GIT_SHALLOW YES
       PREFIX usqcd 
-      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} CFLAGS=-std=c99 CXXFLAGS=-std=c99 <SOURCE_DIR>/configure --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} CFLAGS=-std=c99 <SOURCE_DIR>/configure --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
       BUILD_COMMAND  make
       INSTALL_COMMAND make install
       DEPENDS QMP
