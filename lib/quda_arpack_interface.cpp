@@ -51,8 +51,8 @@ namespace quda
     double time_ev = 0.0; // time in computing Eigenvectors
 
     // MPI objects
-    int *fcomm_ = nullptr;
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
+    int *fcomm_ = nullptr;
     MPI_Fint mpi_comm_fort = MPI_Comm_c2f(MPI_COMM_HANDLE);
     fcomm_ = static_cast<int *>(&mpi_comm_fort);
 #endif
