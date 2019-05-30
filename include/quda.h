@@ -628,7 +628,7 @@ extern "C" {
 
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
-    
+
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 

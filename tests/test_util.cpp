@@ -4095,7 +4095,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
 
   if (strcmp(argv[i], "--mg-eig-coarse-guess") == 0) {
     if (i + 1 >= argc) { usage(argv); }
-    
+
     if (strcmp(argv[i + 1], "true") == 0) {
       eig_use_poly_acc = true;
     } else if (strcmp(argv[i + 1], "false") == 0) {
@@ -4104,12 +4104,12 @@ int process_command_line_option(int argc, char** argv, int* idx)
       fprintf(stderr, "ERROR: invalid value for mg-eig-coarse-guess (true/false)\n");
       exit(1);
     }
-    
+
     i++;
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);

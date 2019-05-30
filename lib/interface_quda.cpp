@@ -2455,7 +2455,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   // Create device side ColorSpinorField vector space and to pass to the
   // compute function.
   const int *X = cudaGauge->X();
-  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);  
+  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
 
   // Copy any initial guess in resident in host array
   cpuParam.v = host_evecs;
@@ -2518,28 +2518,28 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   }
 
   // Transfer Eigenpairs back to host if using GPU eigensolver
-  if ( !(eig_param->arpack_check) ) {
+  if (!(eig_param->arpack_check)) {
     // Get number of reals
     int elems = 2 * kSpace[0]->Ncolor() * kSpace[0]->Nspin() * kSpace[0]->Volume();
     if (inv_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
       for (int i = 0; i < eig_param->nConv; i++) {
-	((complex<double> *)host_evals)[i] = evals[i];
-	((complex<double> *)cpuParam.v)[0] = ((complex<double> *)host_evecs)[i*elems];
-	std::vector<ColorSpinorField*> host_vec;
-	host_vec.push_back(ColorSpinorField::Create(cpuParam));
-	blas::copy(*host_vec[0], *kSpace[i]);	
+        ((complex<double> *)host_evals)[i] = evals[i];
+        ((complex<double> *)cpuParam.v)[0] = ((complex<double> *)host_evecs)[i * elems];
+        std::vector<ColorSpinorField *> host_vec;
+        host_vec.push_back(ColorSpinorField::Create(cpuParam));
+        blas::copy(*host_vec[0], *kSpace[i]);
       }
     } else {
       for (int i = 0; i < eig_param->nConv; i++) {
-	((complex<float> *)host_evals)[i] = evals[i];
-	((complex<float> *)cpuParam.v)[0] = ((complex<float> *)host_evecs)[i*elems];
-	std::vector<ColorSpinorField*> host_vec;
-	host_vec.push_back(ColorSpinorField::Create(cpuParam));
-	blas::copy(*host_vec[0], *kSpace[i]);
+        ((complex<float> *)host_evals)[i] = evals[i];
+        ((complex<float> *)cpuParam.v)[0] = ((complex<float> *)host_evecs)[i * elems];
+        std::vector<ColorSpinorField *> host_vec;
+        host_vec.push_back(ColorSpinorField::Create(cpuParam));
+        blas::copy(*host_vec[0], *kSpace[i]);
       }
     }
   }
-  
+
   profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
   delete d;
