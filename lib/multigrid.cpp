@@ -1396,10 +1396,10 @@ namespace quda
     int nKr = param.mg_global.eig_param[param.level]->nKr;
     bool dagger = param.mg_global.eig_param[param.level]->use_dagger;
     bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
-    
+
     // Dummy array to keep the eigensolver happy.
     std::vector<Complex> evals(nEv, 0.0);
-    
+
     std::vector<ColorSpinorField *> B_evecs;
     ColorSpinorParam csParam(*param.B[0]);
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
@@ -1412,7 +1412,7 @@ namespace quda
     // before entering the eigen solver, lets free the B vectors to save some memory
     ColorSpinorParam bParam(*param.B[0]);
     for (int i = 0; i < (int)param.B.size(); i++) delete param.B[i];
-    
+
     EigenSolver *eig_solve;
     if (!normop && !dagger) {
       DiracM *mat = new DiracM(*diracResidual);
@@ -1439,21 +1439,20 @@ namespace quda
       delete eig_solve;
       delete mat;      
     }
-    
-    
+
     // now reallocate the B vectors copy in e-vectors
     for (int i = 0; i < (int)param.B.size(); i++) {
       param.B[i] = ColorSpinorField::Create(bParam);
       *param.B[i] = *B_evecs[i];
     }
-
+    
     // Local clean-up
     for (auto b : B_evecs) { delete b; }
-
+    
     // only save if outfile is defined
     if (strcmp(param.mg_global.vec_outfile, "") != 0) { saveVectors(param.B); }
-
+    
     popLevel(param.level);
   }
-
+  
 } // namespace quda

@@ -16,11 +16,11 @@ namespace quda
     Arg &arg;
     const GaugeField &meta;
 
-  private:
+private:
     bool tuneGridDim() const { return true; }
     unsigned int minThreads() const { return arg.threads; }
 
-  public:
+public:
     QChargeCompute(Arg &arg, const GaugeField &meta) : arg(arg), meta(meta)
     {
 #ifdef JITIFY
@@ -37,9 +37,9 @@ namespace quda
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::qChargeComputeKernel")
-	  .instantiate((int)tp.block.x, Type<Float>(), Type<Arg>())
-	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-	  .launch(arg);
+                         .instantiate((int)tp.block.x, Type<Float>(), Type<Arg>())
+                         .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                         .launch(arg);
 #else
 	LAUNCH_KERNEL(qChargeComputeKernel, tp, stream, arg, Float);
 #endif
@@ -60,7 +60,8 @@ namespace quda
     long long bytes() const { return 2 * arg.threads * ((6 * 18) + Arg::density) * sizeof(Float); }
   }; // QChargeCompute
 
-  template <typename Float, typename Gauge, bool density> void computeQCharge(const Gauge data, const GaugeField &Fmunu, Float *qDensity, Float &qChg)
+  template <typename Float, typename Gauge, bool density>
+  void computeQCharge(const Gauge data, const GaugeField &Fmunu, Float *qDensity, Float &qChg)
   {
     QChargeArg<Float, Gauge, density> arg(data, Fmunu, qDensity);
     QChargeCompute<Float, decltype(arg)> qChargeCompute(arg, Fmunu);
@@ -70,7 +71,7 @@ namespace quda
     qChg = arg.result_h[0];
   }
 
-  template <typename Float, bool density> Float computeQCharge(const GaugeField &Fmunu, Float *qDensity=nullptr)
+  template <typename Float, bool density> Float computeQCharge(const GaugeField &Fmunu, Float *qDensity = nullptr)
   {
     Float qChg = 0.0;
 
@@ -78,13 +79,13 @@ namespace quda
 
     if (Fmunu.Reconstruct() == QUDA_RECONSTRUCT_NO) {
       typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Gauge;
-      computeQCharge<Float,Gauge,density>(Gauge(Fmunu), Fmunu, qDensity, qChg);
+      computeQCharge<Float, Gauge, density>(Gauge(Fmunu), Fmunu, qDensity, qChg);
     } else if (Fmunu.Reconstruct() == QUDA_RECONSTRUCT_12) {
       typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_12>::type Gauge;
-      computeQCharge<Float,Gauge,density>(Gauge(Fmunu), Fmunu, qDensity, qChg);
+      computeQCharge<Float, Gauge, density>(Gauge(Fmunu), Fmunu, qDensity, qChg);
     } else if (Fmunu.Reconstruct() == QUDA_RECONSTRUCT_8) {
       typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_8>::type Gauge;
-      computeQCharge<Float,Gauge,density>(Gauge(Fmunu), Fmunu, qDensity, qChg);
+      computeQCharge<Float, Gauge, density>(Gauge(Fmunu), Fmunu, qDensity, qChg);
     } else {
       errorQuda("Reconstruction type %d of gauge field not supported", Fmunu.Reconstruct());
     }
@@ -100,9 +101,9 @@ namespace quda
     if (!Fmunu.isNative()) errorQuda("Order %d with %d reconstruct not supported", Fmunu.Order(), Fmunu.Reconstruct());
 
     if (Fmunu.Precision() == QUDA_SINGLE_PRECISION) {
-      qChg = computeQCharge<float,false>(Fmunu);
+      qChg = computeQCharge<float, false>(Fmunu);
     } else if (Fmunu.Precision() == QUDA_DOUBLE_PRECISION) {
-      qChg = computeQCharge<double,false>(Fmunu);
+      qChg = computeQCharge<double, false>(Fmunu);
     } else {
       errorQuda("Precision %d not supported", Fmunu.Precision());
     }
@@ -119,9 +120,9 @@ namespace quda
     if (!Fmunu.isNative()) errorQuda("Order %d with %d reconstruct not supported", Fmunu.Order(), Fmunu.Reconstruct());
 
     if (Fmunu.Precision() == QUDA_SINGLE_PRECISION) {
-      qChg = computeQCharge<float,true>(Fmunu, (float*)qDensity);
+      qChg = computeQCharge<float, true>(Fmunu, (float *)qDensity);
     } else if (Fmunu.Precision() == QUDA_DOUBLE_PRECISION) {
-      qChg = computeQCharge<double,true>(Fmunu, (double*)qDensity);
+      qChg = computeQCharge<double, true>(Fmunu, (double *)qDensity);
     } else {
       errorQuda("Precision %d not supported", Fmunu.Precision());
     }
