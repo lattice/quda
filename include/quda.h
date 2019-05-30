@@ -626,7 +626,7 @@ extern "C" {
     /** Whether to store the null-space vectors to disk (requires QIO) */
     QudaBoolean vec_store;
 
-    /** Whether to use and initial guess during coarse gris deflation */
+    /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
     
     /** Filename prefix for where to save the null-space vectors */
