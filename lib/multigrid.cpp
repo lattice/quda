@@ -446,7 +446,10 @@ namespace quda
       if (param.mg_global.use_eig_solver[param.Nlevel - 1]) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
         param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
-
+ 	// Due to coherence between these levels, an initial guess 
+	// is beneficial.
+	param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+	
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
             param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile);

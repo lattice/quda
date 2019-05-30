@@ -436,7 +436,10 @@ namespace quda
   void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
                                  std::vector<Complex> &evals)
   {
-    loadVectors(kSpace, eig_param->vec_infile);
+    // Make an array of size nConv
+    std::vector<ColorSpinorField *> vecs_ptr;
+    for (int i = 0; i < nConv; i++) { vecs_ptr.push_back(kSpace[i]); }
+    loadVectors(vecs_ptr, eig_param->vec_infile);
 
     // Create the device side residual vector by cloning
     // the kSpace passed to the function.
@@ -703,7 +706,10 @@ namespace quda
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
-      saveVectors(kSpace, eig_param->vec_outfile);
+      // Make an array of size nConv
+      std::vector<ColorSpinorField *> vecs_ptr;
+      for (int i = 0; i < nConv; i++) { vecs_ptr.push_back(kSpace[i]); }
+      saveVectors(vecs_ptr, eig_param->vec_outfile);
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
